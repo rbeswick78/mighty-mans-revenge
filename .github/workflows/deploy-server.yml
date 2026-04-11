@@ -1,0 +1,88 @@
+name: Deploy Server to GCE
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'server/**'
+      - 'shared/**'
+
+jobs:
+  deploy-server:
+    name: Build & Deploy Server
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build server
+        run: pnpm --filter @game/server build
+
+      - name: Prepare deployment artifact
+        run: |
+          mkdir -p deploy
+          cp -r server/dist deploy/dist
+          cp server/package.json deploy/package.json
+          cp pnpm-lock.yaml deploy/pnpm-lock.yaml
+          # Copy shared build output for runtime imports
+          mkdir -p deploy/shared
+          cp -r shared/dist deploy/shared/dist
+          cp shared/package.json deploy/shared/package.json
+          # Copy shared maps directory
+          cp -r shared/maps deploy/shared/maps
+
+      - name: Deploy to GCE via SSH
+        env:
+          GCE_SSH_KEY: ${{ secrets.GCE_SSH_KEY }}
+          GCE_SERVER_IP: ${{ secrets.GCE_SERVER_IP }}
+        run: |
+          # Write SSH key
+          mkdir -p ~/.ssh
+          echo "$GCE_SSH_KEY" > ~/.ssh/gce_key
+          chmod 600 ~/.ssh/gce_key
+          ssh-keyscan -H "$GCE_SERVER_IP" >> ~/.ssh/known_hosts 2>/dev/null
+
+          # Rsync build artifacts to server
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/gce_key" \
+            deploy/ \
+            deploy@${GCE_SERVER_IP}:/opt/mighty-mans-revenge/
+
+          # Install production dependencies and restart PM2
+          ssh -i ~/.ssh/gce_key deploy@${GCE_SERVER_IP} << 'ENDSSH'
+            cd /opt/mighty-mans-revenge
+            npm install --production
+            pm2 restart mighty-mans-revenge || pm2 start dist/index.js --name mighty-mans-revenge
+          ENDSSH
+
+      - name: Post-deploy health check
+        env:
+          GCE_SERVER_IP: ${{ secrets.GCE_SERVER_IP }}
+        run: |
+          echo "Waiting for server to start..."
+          sleep 10
+          for i in 1 2 3 4 5; do
+            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://${GCE_SERVER_IP}:3001/health" || true)
+            if [ "$HTTP_STATUS" = "200" ]; then
+              echo "Health check passed!"
+              curl -s "http://${GCE_SERVER_IP}:3001/health" | jq .
+              exit 0
+            fi
+            echo "Attempt $i: got HTTP $HTTP_STATUS, retrying in 5s..."
+            sleep 5
+          done
+          echo "Health check failed after 5 attempts"
+          exit 1
