@@ -1,0 +1,5 @@
+{
+  "name": "@game/e2e",
+  "private": true,
+  "type": "module"
+}
