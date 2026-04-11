@@ -7,6 +7,7 @@ export default defineConfig({
       '@shared': path.resolve(__dirname, '../shared/src'),
     },
   },
+  envDir: '.',
   server: {
     port: 5173,
   },
