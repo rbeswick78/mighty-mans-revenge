@@ -320,8 +320,8 @@ export class MatchmakingManager {
       matchTimer: match.matchTimer,
       countdownTimer: match.countdownTimer,
       players,
-      grenades: [],
-      bulletTrails: [],
+      grenades: match.getActiveGrenades(),
+      bulletTrails: match.getTickBulletTrails(),
       pickups: match.pickupManager.getPickups(),
     };
 

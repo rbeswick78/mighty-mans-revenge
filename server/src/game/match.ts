@@ -16,17 +16,15 @@ import type {
   MatchResult,
   KillFeedEntry,
   PickupState,
+  BulletTrail,
+  GrenadeState,
 } from '@shared/game';
 import { PickupManager } from './pickup-manager.js';
 import { StatsTracker } from './stats-tracker.js';
 import { MapManager } from './map-manager.js';
+import { CombatManager } from './combat-manager.js';
 import { getGameMode } from './modes/index.js';
 import type { GameMode, MatchContext } from './modes/game-mode.js';
-
-/** Minimal interface for the combat system. The real implementation will satisfy this. */
-export interface CombatManager {
-  update(dt: number, players: Map<PlayerId, PlayerState>): void;
-}
 
 export class Match implements MatchContext {
   readonly matchId: string;
@@ -39,9 +37,15 @@ export class Match implements MatchContext {
   readonly mapManager: MapManager;
   private readonly gameMode: GameMode;
   private readonly killFeed: KillFeedEntry[] = [];
-  private combatManager: CombatManager | null = null;
+  readonly combatManager: CombatManager = new CombatManager();
+  /** Recent bullet trails from this tick, cleared after broadcast. */
+  private tickBulletTrails: BulletTrail[] = [];
   /** Most recent input per player, processed each tick. */
   private pendingInputs: Map<PlayerId, PlayerInput> = new Map();
+  /** Fire rate cooldown per player, in seconds. */
+  private fireCooldowns: Map<PlayerId, number> = new Map();
+  /** Tracks throwGrenade rising edge so holding the button only throws once. */
+  private grenadeHeld: Map<PlayerId, boolean> = new Map();
   /** Timestamp when the match became ACTIVE, for duration tracking. */
   get matchStartTime(): number {
     return this._matchStartTimeMs;
@@ -71,11 +75,6 @@ export class Match implements MatchContext {
       this.stats.initPlayer(entry.id);
       this.connectedPlayers.add(entry.id);
     }
-  }
-
-  /** Optionally attach a combat manager. */
-  setCombatManager(combat: CombatManager): void {
-    this.combatManager = combat;
   }
 
   /** Queue a player input to be processed on the next tick. */
@@ -177,6 +176,16 @@ export class Match implements MatchContext {
     return MATCH.TIME_LIMIT;
   }
 
+  /** Bullet trails created in the most recent tick, for broadcasting. */
+  getTickBulletTrails(): BulletTrail[] {
+    return this.tickBulletTrails;
+  }
+
+  /** Active grenades in flight, for broadcasting. */
+  getActiveGrenades(): GrenadeState[] {
+    return this.combatManager.getGrenades();
+  }
+
   /** Collect a pickup for a player, applying its effect. */
   tryCollectPickup(playerId: PlayerId): PickupState | null {
     const player = this.players.get(playerId);
@@ -214,6 +223,17 @@ export class Match implements MatchContext {
       this.matchTimer = 0;
     }
 
+    // Clear last tick's bullet trails — only trails from THIS tick are
+    // broadcast in the next gameState message.
+    this.tickBulletTrails = [];
+
+    // Decrement fire cooldowns
+    for (const [id, cd] of this.fireCooldowns) {
+      const next = cd - dt;
+      if (next <= 0) this.fireCooldowns.delete(id);
+      else this.fireCooldowns.set(id, next);
+    }
+
     // Process movement for each player using their most recent input.
     const grid = this.mapManager.getCollisionGrid();
     for (const [playerId, player] of this.players) {
@@ -221,13 +241,91 @@ export class Match implements MatchContext {
       const input = this.pendingInputs.get(playerId);
       if (!input) continue;
 
+      // Movement
       const result = calculateMovement(input, player.position, player.stamina, dt, grid);
       player.position = result.newPos;
       player.velocity = result.velocity;
       player.stamina = result.newStamina;
       player.isSprinting = input.sprint && player.stamina > 0;
+      player.aimAngle = input.aimAngle;
+
+      // Reload
+      if (input.reload && !player.isReloading && player.ammo < GUN.MAGAZINE_SIZE) {
+        player.isReloading = true;
+        player.reloadTimer = GUN.RELOAD_TIME;
+      }
+
+      // Shoot
+      const onCooldown = (this.fireCooldowns.get(playerId) ?? 0) > 0;
+      if (
+        input.shooting &&
+        !onCooldown &&
+        !player.isReloading &&
+        player.ammo > 0
+      ) {
+        const shot = this.combatManager.processShot(
+          playerId,
+          input.aimAngle,
+          this.players,
+          grid,
+        );
+        this.tickBulletTrails.push(shot.trail);
+        player.ammo -= 1;
+        this.fireCooldowns.set(playerId, GUN.FIRE_RATE);
+        this.stats.recordShot(playerId);
+
+        if (shot.hit && shot.victimId && shot.damage !== undefined) {
+          const victim = this.players.get(shot.victimId);
+          if (victim) {
+            const result = this.combatManager.applyDamage(victim, shot.damage, playerId);
+            this.stats.recordHit(playerId);
+            this.stats.recordDamage(playerId, shot.damage);
+            if (result.killed && result.entry) {
+              this.onKill(playerId, shot.victimId, 'gun');
+            }
+          }
+        }
+      }
+
+      // Throw grenade (rising edge only)
+      const wasHeld = this.grenadeHeld.get(playerId) ?? false;
+      if (input.throwGrenade && !wasHeld && player.grenades > 0) {
+        this.combatManager.spawnGrenade(playerId, player.position, input.aimAngle);
+        player.grenades -= 1;
+        this.stats.recordGrenade(playerId);
+      }
+      this.grenadeHeld.set(playerId, input.throwGrenade);
     }
     this.pendingInputs.clear();
+
+    // Update grenades (movement, fuse, explosions)
+    const { explosions } = this.combatManager.updateGrenades(dt, this.players, grid);
+    for (const explosion of explosions) {
+      for (const dmg of explosion.damages) {
+        this.stats.recordDamage(explosion.grenadeId, dmg.damage);
+        if (dmg.killed) {
+          // Find the grenade's thrower — unknown here, skip kill feed
+          const victim = this.players.get(dmg.playerId);
+          if (victim) {
+            victim.isDead = true;
+            victim.respawnTimer = RESPAWN.DELAY;
+            victim.deaths++;
+          }
+        }
+      }
+    }
+
+    // Reload timers
+    for (const player of this.players.values()) {
+      if (player.isReloading) {
+        player.reloadTimer -= dt;
+        if (player.reloadTimer <= 0) {
+          player.isReloading = false;
+          player.reloadTimer = 0;
+          player.ammo = GUN.MAGAZINE_SIZE;
+        }
+      }
+    }
 
     // Update respawn timers for dead players
     for (const player of this.players.values()) {
@@ -249,9 +347,17 @@ export class Match implements MatchContext {
     // Update pickups
     this.pickupManager.update(dt);
 
-    // Update combat if available
-    if (this.combatManager) {
-      this.combatManager.update(dt, this.players);
+    // Pickup collection
+    for (const player of this.players.values()) {
+      if (player.isDead) continue;
+      const pickup = this.pickupManager.checkCollection(player.position, {
+        width: PLAYER.HITBOX_WIDTH,
+        height: PLAYER.HITBOX_HEIGHT,
+      });
+      if (pickup) {
+        this.pickupManager.applyPickup(pickup, player);
+        this.pickupManager.collectPickup(pickup.id);
+      }
     }
 
     // Game mode tick

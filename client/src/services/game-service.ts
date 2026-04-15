@@ -22,7 +22,8 @@ type GameServiceEvent =
   | 'matchEnd'
   | 'matchmakingStatus'
   | 'rematchStatus'
-  | 'opponentDisconnected';
+  | 'opponentDisconnected'
+  | 'bulletTrail';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type GameServiceCallback = (...args: any[]) => void;
@@ -169,6 +170,10 @@ export class GameService {
 
     this.networkManager.on('opponentDisconnected', (playerId: PlayerId) => {
       this.emit('opponentDisconnected', playerId);
+    });
+
+    this.networkManager.on('bulletTrail', (trail: unknown) => {
+      this.emit('bulletTrail', trail);
     });
   }
 

@@ -28,6 +28,7 @@ type EventName =
   | 'matchmakingStatus'
   | 'rematchStatus'
   | 'opponentDisconnected'
+  | 'bulletTrail'
   | 'error';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -260,6 +261,11 @@ export class NetworkManager {
 
   private handleGameState(msg: ServerGameStateMessage): void {
     if (!this.localPlayerId) return;
+
+    // Emit bullet trails so scenes can render them as effects.
+    for (const trail of msg.bulletTrails) {
+      this.emit('bulletTrail', trail);
+    }
 
     // Derive phase transition events from the game state stream, since the
     // server only broadcasts phase info inline with gameState messages.

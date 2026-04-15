@@ -98,6 +98,10 @@ export class TouchInput {
   }
 
   private onPointerDown(pointer: Phaser.Input.Pointer): void {
+    // Only respond to actual touch events, not mouse clicks. Otherwise
+    // desktop users see phantom joystick circles every time they click.
+    if (!pointer.wasTouch) return;
+
     const halfWidth = this.scene.scale.width / 2;
 
     if (pointer.x < halfWidth && !this.leftJoystick.active) {

@@ -45,6 +45,8 @@ export class GameScene extends Phaser.Scene {
   private onMatchStart: (() => void) | null = null;
   private onMatchEnd: ((result: MatchResult) => void) | null = null;
   private onOpponentDisconnected: ((playerId: PlayerId) => void) | null = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private onBulletTrail: ((trail: any) => void) | null = null;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -276,10 +278,21 @@ export class GameScene extends Phaser.Scene {
       });
     };
 
+    this.onBulletTrail = (trail: { startPos: Vec2; endPos: Vec2 }) => {
+      this.effectsRenderer?.showBulletTrail(
+        trail.startPos.x,
+        trail.startPos.y,
+        trail.endPos.x,
+        trail.endPos.y,
+      );
+      this.effectsRenderer?.showMuzzleFlash(trail.startPos.x, trail.startPos.y, 0);
+    };
+
     this.gameService.on('matchCountdown', this.onMatchCountdown);
     this.gameService.on('matchStart', this.onMatchStart);
     this.gameService.on('matchEnd', this.onMatchEnd);
     this.gameService.on('opponentDisconnected', this.onOpponentDisconnected);
+    this.gameService.on('bulletTrail', this.onBulletTrail);
   }
 
   private cleanupEvents(): void {
@@ -298,6 +311,10 @@ export class GameScene extends Phaser.Scene {
     if (this.onOpponentDisconnected) {
       this.gameService.off('opponentDisconnected', this.onOpponentDisconnected);
       this.onOpponentDisconnected = null;
+    }
+    if (this.onBulletTrail) {
+      this.gameService.off('bulletTrail', this.onBulletTrail);
+      this.onBulletTrail = null;
     }
   }
 

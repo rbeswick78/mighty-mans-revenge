@@ -9,7 +9,6 @@ export class GameLoop {
   private intervalId: ReturnType<typeof setInterval> | null = null;
   private currentTick = 0;
   private expectedTime = 0;
-  private lastTickTime = 0;
   private _isRunning = false;
 
   /** Rolling average of tick processing time in ms. */
@@ -35,7 +34,6 @@ export class GameLoop {
     this._isRunning = true;
     this.currentTick = 0;
     this.expectedTime = performance.now();
-    this.lastTickTime = this.expectedTime;
     this.ticksThisSecond = 0;
     this.secondTimer = 0;
 
@@ -102,7 +100,6 @@ export class GameLoop {
     // so any mismatch would cause constant small corrections (bounce-back).
     // Wall-clock jitter is absorbed by drift compensation above.
     const dt = this.tickIntervalMs / 1000;
-    this.lastTickTime = now;
 
     const tickStart = performance.now();
 
