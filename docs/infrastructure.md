@@ -103,25 +103,55 @@ module.exports = {
 };
 ```
 
-### SSL Setup with Certbot
+### HTTPS via Caddy + sslip.io
+
+The client is served over HTTPS from Firebase, so the game server's signaling endpoint must also be HTTPS (browsers block mixed content). We use [sslip.io](https://sslip.io) — a free wildcard DNS service that resolves `<dash-separated-ip>.sslip.io` to the corresponding IP — paired with [Caddy](https://caddyserver.com), which auto-provisions a Let's Encrypt cert and reverse-proxies to the geckos.io server on localhost.
+
+This avoids needing to buy or configure a real domain for the game server.
 
 ```bash
-# Install Certbot
-sudo apt-get install -y certbot
-
-# Obtain certificate (replace with your domain)
-sudo certbot certonly --standalone -d game.yourdomain.com
-
-# Certificates are stored at:
-#   /etc/letsencrypt/live/game.yourdomain.com/fullchain.pem
-#   /etc/letsencrypt/live/game.yourdomain.com/privkey.pem
-
-# Auto-renewal is configured by Certbot automatically
-# Test renewal:
-sudo certbot renew --dry-run
+# Install Caddy
+sudo apt-get install -y debian-keyring debian-archive-keyring apt-transport-https curl
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | \
+  sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | \
+  sudo tee /etc/apt/sources.list.d/caddy-stable.list
+sudo apt-get update
+sudo apt-get install -y caddy
 ```
 
-Note: Geckos.io handles its own HTTPS signaling server. Pass the cert paths via environment variables or configuration if needed for production HTTPS.
+Write `/etc/caddy/Caddyfile` (replace the hostname with the dashed form of your server's public IP):
+
+```caddyfile
+34-24-140-207.sslip.io {
+    reverse_proxy localhost:3000
+
+    @health path /health
+    reverse_proxy @health localhost:3001
+
+    @admin path /admin /admin/*
+    reverse_proxy @admin localhost:3001
+
+    header {
+        Access-Control-Allow-Origin *
+        Access-Control-Allow-Methods "GET, POST, OPTIONS"
+        Access-Control-Allow-Headers "Content-Type"
+    }
+}
+```
+
+Then reload:
+
+```bash
+sudo systemctl restart caddy
+sudo systemctl enable caddy
+```
+
+Caddy obtains the Let's Encrypt cert on first start and auto-renews it thereafter. Verify with `curl https://<your-dashed-ip>.sslip.io/health`.
+
+**Client configuration:** `client/.env.production` points `VITE_SERVER_URL` at the sslip.io hostname. The geckos.io client library parses the URL and uses port 443 when the protocol is HTTPS.
+
+**Note on WebRTC UDP:** Caddy only proxies the HTTPS signaling handshake. The actual game traffic uses WebRTC data channels on UDP ports (1025–65535), which the client negotiates directly with the geckos.io server via ICE. Those UDP ports must be open in the GCE firewall (see firewall rules above) but are not proxied through Caddy.
 
 ## Deployment Process
 
