@@ -97,7 +97,11 @@ export class GameLoop {
       this.expectedTime = now;
     }
 
-    const dt = (now - this.lastTickTime) / 1000; // delta time in seconds
+    // Use a FIXED dt equal to the tick interval, not wall-clock delta.
+    // The client uses the same fixed dt for prediction and reconciliation,
+    // so any mismatch would cause constant small corrections (bounce-back).
+    // Wall-clock jitter is absorbed by drift compensation above.
+    const dt = this.tickIntervalMs / 1000;
     this.lastTickTime = now;
 
     const tickStart = performance.now();
