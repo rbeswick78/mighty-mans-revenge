@@ -225,28 +225,10 @@ export class MatchmakingManager {
     const match = this.activeMatches.get(matchId);
     if (!match) return;
 
-    const player = match.players.get(playerId);
-    if (!player) return;
-
-    // Apply input to the player's state in the match
-    // The match's player state will be updated by the server physics
-    player.lastProcessedInput = input.sequenceNumber;
-
-    // Store movement intent on player velocity based on input
-    // Actual physics is processed by the match/combat system
-    player.aimAngle = input.aimAngle;
-
-    // Movement is handled by the shared physics in the match tick
-    // For now, we store raw input so the match can process it
-    if (!match.players.has(playerId)) return;
-
-    // Movement input is stored for processing
-    const speed = input.sprint ? 320 : 200; // PLAYER.SPRINT_SPEED : PLAYER.BASE_SPEED
-    player.velocity = {
-      x: input.moveX * speed,
-      y: input.moveY * speed,
-    };
-    player.isSprinting = input.sprint;
+    // The match's updateActive tick will consume this input via shared
+    // physics (calculateMovement), keeping client prediction and server
+    // authority in sync.
+    match.queueInput(playerId, input);
   }
 
   // ──────────────────────────── Private ────────────────────────────

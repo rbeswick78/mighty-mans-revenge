@@ -6,10 +6,12 @@ import {
   PLAYER,
   GUN,
   GRENADE,
+  calculateMovement,
 } from '@shared/game';
 import type {
   PlayerId,
   PlayerState,
+  PlayerInput,
   MapData,
   MatchResult,
   KillFeedEntry,
@@ -38,6 +40,8 @@ export class Match implements MatchContext {
   private readonly gameMode: GameMode;
   private readonly killFeed: KillFeedEntry[] = [];
   private combatManager: CombatManager | null = null;
+  /** Most recent input per player, processed each tick. */
+  private pendingInputs: Map<PlayerId, PlayerInput> = new Map();
   /** Timestamp when the match became ACTIVE, for duration tracking. */
   get matchStartTime(): number {
     return this._matchStartTimeMs;
@@ -72,6 +76,17 @@ export class Match implements MatchContext {
   /** Optionally attach a combat manager. */
   setCombatManager(combat: CombatManager): void {
     this.combatManager = combat;
+  }
+
+  /** Queue a player input to be processed on the next tick. */
+  queueInput(playerId: PlayerId, input: PlayerInput): void {
+    const player = this.players.get(playerId);
+    if (!player) return;
+    // Keep only the latest input per player; it carries the cumulative state
+    // (movement, aim, buttons) so intermediate inputs can be safely dropped.
+    this.pendingInputs.set(playerId, input);
+    player.lastProcessedInput = input.sequenceNumber;
+    player.aimAngle = input.aimAngle;
   }
 
   /** Start the countdown phase. */
@@ -198,6 +213,21 @@ export class Match implements MatchContext {
     if (this.matchTimer < 0) {
       this.matchTimer = 0;
     }
+
+    // Process movement for each player using their most recent input.
+    const grid = this.mapManager.getCollisionGrid();
+    for (const [playerId, player] of this.players) {
+      if (player.isDead) continue;
+      const input = this.pendingInputs.get(playerId);
+      if (!input) continue;
+
+      const result = calculateMovement(input, player.position, player.stamina, dt, grid);
+      player.position = result.newPos;
+      player.velocity = result.velocity;
+      player.stamina = result.newStamina;
+      player.isSprinting = input.sprint && player.stamina > 0;
+    }
+    this.pendingInputs.clear();
 
     // Update respawn timers for dead players
     for (const player of this.players.values()) {

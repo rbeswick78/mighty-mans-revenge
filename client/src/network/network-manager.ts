@@ -5,6 +5,7 @@ import type {
   ServerMessage,
   ServerGameStateMessage,
 } from '@shared/types/network.js';
+import { MatchPhase } from '@shared/types/game.js';
 import { SERVER, PLAYER } from '@shared/config/game.js';
 import { NetworkConnection } from './connection.js';
 import { ClientPrediction } from './prediction.js';
@@ -41,6 +42,8 @@ export class NetworkManager {
   private localPlayerId: PlayerId | null = null;
   private localPlayerState: PlayerState | null = null;
   private collisionGrid: CollisionGrid | null = null;
+  private lastPhase: MatchPhase | null = null;
+  private lastCountdownEmitted = -1;
 
   private listeners = new Map<EventName, EventCallback[]>();
 
@@ -82,6 +85,9 @@ export class NetworkManager {
    * feels zero latency, then sent to the server for authoritative processing.
    */
   sendInput(input: PlayerInput): void {
+    // Always send to the server — prediction is a best-effort overlay.
+    this.connection.send({ type: 'client:input', input });
+
     if (!this.localPlayerState || !this.collisionGrid) return;
 
     // Predict locally using shared physics
@@ -93,9 +99,6 @@ export class NetworkManager {
 
     this.prediction.addPrediction(input, predicted);
     this.localPlayerState = predicted;
-
-    // Send to server
-    this.connection.send({ type: 'client:input', input });
   }
 
   /** Join matchmaking with a nickname. */
@@ -257,6 +260,22 @@ export class NetworkManager {
 
   private handleGameState(msg: ServerGameStateMessage): void {
     if (!this.localPlayerId) return;
+
+    // Derive phase transition events from the game state stream, since the
+    // server only broadcasts phase info inline with gameState messages.
+    if (msg.phase !== this.lastPhase) {
+      if (msg.phase === MatchPhase.ACTIVE) {
+        this.emit('matchStart');
+      }
+      this.lastPhase = msg.phase;
+    }
+    if (msg.phase === MatchPhase.COUNTDOWN) {
+      const countdownInt = Math.ceil(msg.countdownTimer);
+      if (countdownInt !== this.lastCountdownEmitted) {
+        this.lastCountdownEmitted = countdownInt;
+        this.emit('matchCountdown', msg.countdownTimer);
+      }
+    }
 
     const newRemoteIds: PlayerId[] = [];
 

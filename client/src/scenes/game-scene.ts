@@ -58,6 +58,13 @@ export class GameScene extends Phaser.Scene {
     this.mapRenderer = new MapRenderer(this);
     this.mapRenderer.renderMap(wastelandOutpost as MapData);
 
+    // Wire the collision grid into the network manager so client-side
+    // prediction and reconciliation use the same physics as the server.
+    const grid = this.mapRenderer.getCollisionGrid();
+    if (grid) {
+      this.gameService.getNetworkManager().setCollisionGrid(grid);
+    }
+
     // Create subsystems
     this.playerManager = new ClientPlayerManager(this);
     this.effectsRenderer = new EffectsRenderer(this);
@@ -92,8 +99,9 @@ export class GameScene extends Phaser.Scene {
     const networkManager = this.gameService.getNetworkManager();
     const localState = networkManager.getLocalPlayerState();
 
-    // Read input and send to server
-    if (localState && this.matchPhase === MatchPhase.ACTIVE) {
+    // Read input and send to server. Server ignores inputs during countdown
+    // anyway, so it's safe to always send once we have a local player state.
+    if (localState && this.matchPhase !== MatchPhase.ENDED) {
       this.currentTick++;
       const input = this.inputManager.update(localState.position, this.currentTick);
       this.gameService.sendInput(input);
