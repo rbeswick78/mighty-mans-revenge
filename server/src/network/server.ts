@@ -25,8 +25,15 @@ export class GameServer {
   constructor(port?: number) {
     this.port = port ?? parseInt(process.env['PORT'] ?? '3000', 10);
     this.io = geckos({
-      // CORS configuration for dev
       cors: { allowAuthorization: true, origin: '*' },
+      // STUN servers let the WebRTC stack discover the VM's public IP via NAT
+      // traversal and advertise it as an ICE candidate. Without this, the
+      // server only advertises its internal GCE IP (10.x) which clients
+      // on the public internet cannot reach.
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+      ],
     });
   }
 
