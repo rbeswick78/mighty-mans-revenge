@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 
 import type { MapData } from '@shared/types/map.js';
-import type { PlayerId } from '@shared/types/common.js';
+import type { PlayerId, Vec2 } from '@shared/types/common.js';
 import type { MatchResult } from '@shared/types/game.js';
 import { MatchPhase } from '@shared/types/game.js';
 import { PLAYER, SERVER } from '@shared/config/game.js';
@@ -35,6 +35,10 @@ export class GameScene extends Phaser.Scene {
   private inputAccumulatorMs = 0;
   private lastCountdownValue = -1;
   private matchPhase: MatchPhase = MatchPhase.WAITING;
+
+  /** Previous and current predicted positions for render-rate interpolation. */
+  private prevLocalPos: Vec2 | null = null;
+  private currLocalPos: Vec2 | null = null;
 
   // Event handler references for cleanup
   private onMatchCountdown: ((countdown: number) => void) | null = null;
@@ -106,8 +110,7 @@ export class GameScene extends Phaser.Scene {
 
     // Rate-limit input to the server tick rate. Client prediction uses
     // dt = 1/TICK_RATE, so inputs must be emitted at exactly that cadence
-    // or the client will over-predict (at 60fps with 50ms dt, the player
-    // would appear to move 3x too fast before reconciliation snaps back).
+    // or the client will over-predict.
     this.inputAccumulatorMs += delta;
     while (
       this.inputAccumulatorMs >= SERVER.TICK_INTERVAL &&
@@ -116,32 +119,59 @@ export class GameScene extends Phaser.Scene {
     ) {
       this.inputAccumulatorMs -= SERVER.TICK_INTERVAL;
       this.currentTick++;
+
+      // Capture the position as it was going into this tick for render
+      // interpolation. The most recent predicted position after sendInput
+      // becomes the new "current" target.
+      this.prevLocalPos = this.currLocalPos ?? { x: localState.position.x, y: localState.position.y };
+
       const input = this.inputManager.update(localState.position, this.currentTick);
       this.gameService.sendInput(input);
+
+      const updatedState = networkManager.getLocalPlayerState();
+      if (updatedState) {
+        this.currLocalPos = { x: updatedState.position.x, y: updatedState.position.y };
+      }
     }
 
+    // Re-read latest local state after any input ticks that ran this frame.
+    const currentLocalState = networkManager.getLocalPlayerState();
+
     // Update local player rendering
-    if (localState && this.playerManager) {
+    if (currentLocalState && this.playerManager) {
       const playerId = networkManager.getPlayerId();
       if (playerId) {
+        // Interpolate local player position between the previous and
+        // current predicted positions. Alpha = fraction of the way through
+        // the current tick window, so rendering runs at 60fps even though
+        // prediction ticks at 20Hz.
+        let renderPos = currentLocalState.position;
+        if (this.prevLocalPos && this.currLocalPos) {
+          const alpha = Math.min(1, this.inputAccumulatorMs / SERVER.TICK_INTERVAL);
+          renderPos = {
+            x: this.prevLocalPos.x + (this.currLocalPos.x - this.prevLocalPos.x) * alpha,
+            y: this.prevLocalPos.y + (this.currLocalPos.y - this.prevLocalPos.y) * alpha,
+          };
+        }
+
         // Build serialized state array for the player manager
         const allPlayers = [{
-          id: localState.id,
-          position: localState.position,
-          velocity: localState.velocity,
-          aimAngle: localState.aimAngle,
-          health: localState.health,
-          ammo: localState.ammo,
-          grenades: localState.grenades,
-          isReloading: localState.isReloading,
-          isSprinting: localState.isSprinting,
-          stamina: localState.stamina,
-          isDead: localState.isDead,
-          invulnerableTimer: localState.invulnerableTimer,
-          lastProcessedInput: localState.lastProcessedInput,
-          score: localState.score,
-          deaths: localState.deaths,
-          nickname: localState.nickname,
+          id: currentLocalState.id,
+          position: renderPos,
+          velocity: currentLocalState.velocity,
+          aimAngle: currentLocalState.aimAngle,
+          health: currentLocalState.health,
+          ammo: currentLocalState.ammo,
+          grenades: currentLocalState.grenades,
+          isReloading: currentLocalState.isReloading,
+          isSprinting: currentLocalState.isSprinting,
+          stamina: currentLocalState.stamina,
+          isDead: currentLocalState.isDead,
+          invulnerableTimer: currentLocalState.invulnerableTimer,
+          lastProcessedInput: currentLocalState.lastProcessedInput,
+          score: currentLocalState.score,
+          deaths: currentLocalState.deaths,
+          nickname: currentLocalState.nickname,
         }];
 
         // Add interpolated remote players
@@ -170,17 +200,17 @@ export class GameScene extends Phaser.Scene {
         this.playerManager.updatePlayers(allPlayers, playerId);
 
         // Update HUD
-        this.hud.updateHealth(localState.health, PLAYER.MAX_HEALTH);
-        this.hud.updateAmmo(localState.ammo, 30, localState.isReloading);
-        this.hud.updateGrenades(localState.grenades);
-        this.hud.updateStamina(localState.stamina, PLAYER.SPRINT_DURATION);
+        this.hud.updateHealth(currentLocalState.health, PLAYER.MAX_HEALTH);
+        this.hud.updateAmmo(currentLocalState.ammo, 30, currentLocalState.isReloading);
+        this.hud.updateGrenades(currentLocalState.grenades);
+        this.hud.updateStamina(currentLocalState.stamina, PLAYER.SPRINT_DURATION);
 
         // Update scores
         let opponentScore = 0;
         for (const [, interpState] of interpolatedPlayers) {
           opponentScore = Math.max(opponentScore, interpState.score);
         }
-        this.hud.updateScores(localState.score, opponentScore);
+        this.hud.updateScores(currentLocalState.score, opponentScore);
       }
     }
   }
