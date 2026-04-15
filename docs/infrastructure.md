@@ -124,21 +124,17 @@ Write `/etc/caddy/Caddyfile` (replace the hostname with the dashed form of your 
 
 ```caddyfile
 34-24-140-207.sslip.io {
-    reverse_proxy localhost:3000
-
     @health path /health
     reverse_proxy @health localhost:3001
 
     @admin path /admin /admin/*
     reverse_proxy @admin localhost:3001
 
-    header {
-        Access-Control-Allow-Origin *
-        Access-Control-Allow-Methods "GET, POST, OPTIONS"
-        Access-Control-Allow-Headers "Content-Type"
-    }
+    reverse_proxy localhost:3000
 }
 ```
+
+**Important:** Do not add CORS headers in Caddy. The geckos.io server already sends them, and having both produces duplicate `Access-Control-Allow-Origin` headers, which browsers reject as a CORS error.
 
 Then reload:
 
