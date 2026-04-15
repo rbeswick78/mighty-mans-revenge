@@ -4,7 +4,7 @@ import type { MapData } from '@shared/types/map.js';
 import type { PlayerId } from '@shared/types/common.js';
 import type { MatchResult } from '@shared/types/game.js';
 import { MatchPhase } from '@shared/types/game.js';
-import { PLAYER } from '@shared/config/game.js';
+import { PLAYER, SERVER } from '@shared/config/game.js';
 import { MapRenderer } from '../rendering/map-renderer.js';
 import { ClientPlayerManager } from '../rendering/player-manager.js';
 import { EffectsRenderer } from '../rendering/effects-renderer.js';
@@ -32,6 +32,7 @@ export class GameScene extends Phaser.Scene {
   private nickname = '';
   private matchData: MatchData | null = null;
   private currentTick = 0;
+  private inputAccumulatorMs = 0;
   private lastCountdownValue = -1;
   private matchPhase: MatchPhase = MatchPhase.WAITING;
 
@@ -53,6 +54,10 @@ export class GameScene extends Phaser.Scene {
   create(): void {
     this.cameras.main.fadeIn(300, 0, 0, 0);
     this.gameService = GameService.getInstance();
+
+    // Prevent the browser context menu from appearing on right-click so
+    // right-click-to-throw-grenade works without a popup.
+    this.input.mouse?.disableContextMenu();
 
     // Render the map
     this.mapRenderer = new MapRenderer(this);
@@ -93,15 +98,23 @@ export class GameScene extends Phaser.Scene {
     statusText.setData('type', 'status');
   }
 
-  update(_time: number, _delta: number): void {
+  update(_time: number, delta: number): void {
     if (!this.inputManager || !this.hud) return;
 
     const networkManager = this.gameService.getNetworkManager();
     const localState = networkManager.getLocalPlayerState();
 
-    // Read input and send to server. Server ignores inputs during countdown
-    // anyway, so it's safe to always send once we have a local player state.
-    if (localState && this.matchPhase !== MatchPhase.ENDED) {
+    // Rate-limit input to the server tick rate. Client prediction uses
+    // dt = 1/TICK_RATE, so inputs must be emitted at exactly that cadence
+    // or the client will over-predict (at 60fps with 50ms dt, the player
+    // would appear to move 3x too fast before reconciliation snaps back).
+    this.inputAccumulatorMs += delta;
+    while (
+      this.inputAccumulatorMs >= SERVER.TICK_INTERVAL &&
+      localState &&
+      this.matchPhase !== MatchPhase.ENDED
+    ) {
+      this.inputAccumulatorMs -= SERVER.TICK_INTERVAL;
       this.currentTick++;
       const input = this.inputManager.update(localState.position, this.currentTick);
       this.gameService.sendInput(input);
