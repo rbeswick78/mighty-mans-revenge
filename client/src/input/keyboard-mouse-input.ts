@@ -14,6 +14,8 @@ export class KeyboardMouseInput {
     G: Phaser.Input.Keyboard.Key;
   };
   private pointer: Phaser.Input.Pointer;
+  /** Rising-edge flag for right-click grenade throw, cleared on read. */
+  private rightClickPending = false;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -32,11 +34,18 @@ export class KeyboardMouseInput {
       G: scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.G),
     };
 
-    // Use the dedicated mouse pointer, not activePointer. With TouchInput
-    // also registered, activePointer may be pointing at a touch pointer
-    // that never receives mouse button state changes (which is why
-    // right-click in particular wasn't registering).
+    // Use the dedicated mouse pointer, not activePointer.
     this.pointer = scene.input.mousePointer ?? scene.input.activePointer;
+
+    // Listen for right-click events directly on the scene input. Polling
+    // pointer.rightButtonDown() wasn't reliably catching presses between
+    // input ticks — an event-driven flag is more robust.
+    // pointer.button: 0 = left, 1 = middle, 2 = right
+    scene.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      if (pointer.button === 2) {
+        this.rightClickPending = true;
+      }
+    });
   }
 
   getInput(playerWorldPos: Vec2): RawInput {
@@ -65,12 +74,18 @@ export class KeyboardMouseInput {
       worldPoint.x - playerWorldPos.x,
     );
 
+    // Consume the right-click rising-edge flag. Server also does rising
+    // edge detection for grenade, but draining it here avoids sending
+    // throwGrenade=true on multiple consecutive ticks for one click.
+    const rightClickFired = this.rightClickPending;
+    this.rightClickPending = false;
+
     return {
       moveX,
       moveY,
       aimAngle,
       shooting: this.pointer.leftButtonDown(),
-      throwGrenade: this.pointer.rightButtonDown() || this.keys.G.isDown,
+      throwGrenade: rightClickFired || this.keys.G.isDown,
       sprint: this.keys.SHIFT.isDown,
       reload: Phaser.Input.Keyboard.JustDown(this.keys.R),
     };
