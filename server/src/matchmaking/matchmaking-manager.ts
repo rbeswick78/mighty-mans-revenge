@@ -41,6 +41,8 @@ export class MatchmakingManager {
   private readonly postMatchStates: Map<string, PostMatchState> = new Map();
   /** Track nicknames for players (set when they join matchmaking). */
   private readonly playerNicknames: Map<PlayerId, string> = new Map();
+  /** Previous-tick phase per match, for detecting phase transitions. */
+  private readonly previousPhases: Map<string, MatchPhase> = new Map();
 
   constructor(server: GameServer) {
     this.server = server;
@@ -193,7 +195,17 @@ export class MatchmakingManager {
 
     // Update active matches
     for (const [matchId, match] of this.activeMatches) {
+      const prevPhase = this.previousPhases.get(matchId);
       match.update(dt);
+      const newPhase = match.phase;
+
+      // Fire one-time phase-transition messages BEFORE broadcasting the
+      // new state, so the client has the context it needs to interpret
+      // the state that follows in the same frame.
+      if (prevPhase !== MatchPhase.ACTIVE && newPhase === MatchPhase.ACTIVE) {
+        this.sendMatchStart(match);
+      }
+      this.previousPhases.set(matchId, newPhase);
 
       // Broadcast game state to match players
       this.broadcastMatchState(match);
@@ -202,6 +214,21 @@ export class MatchmakingManager {
       if (match.phase === MatchPhase.ENDED) {
         this.onMatchEnded(matchId, match);
       }
+    }
+  }
+
+  /**
+   * Tell both players in a match that it just transitioned to ACTIVE and
+   * how much time remains. Client extrapolates the clock locally from
+   * here; we don't need to re-send it every tick.
+   */
+  private sendMatchStart(match: Match): void {
+    const matchEndsInMs = match.matchTimer * 1000;
+    for (const [playerId] of match.players) {
+      this.server.sendTo(playerId, {
+        type: 'server:matchStart',
+        matchEndsInMs,
+      });
     }
   }
 
@@ -318,7 +345,6 @@ export class MatchmakingManager {
       type: 'server:gameState',
       tick: 0, // Will be set properly when we integrate with game loop tick
       phase: match.phase,
-      matchTimer: match.matchTimer,
       countdownTimer: match.countdownTimer,
       players,
       grenades: match.getActiveGrenades(),
@@ -371,6 +397,7 @@ export class MatchmakingManager {
 
     // Remove from active matches
     this.activeMatches.delete(matchId);
+    this.previousPhases.delete(matchId);
   }
 
   private onRematchTimeout(matchId: string): void {

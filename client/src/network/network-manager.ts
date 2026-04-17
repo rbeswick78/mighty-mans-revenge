@@ -45,7 +45,6 @@ export class NetworkManager {
   private localPlayerId: PlayerId | null = null;
   private localPlayerState: PlayerState | null = null;
   private collisionGrid: CollisionGrid | null = null;
-  private lastPhase: MatchPhase | null = null;
   private lastCountdownEmitted = -1;
 
   /**
@@ -56,8 +55,13 @@ export class NetworkManager {
   private latestGrenades: GrenadeState[] = [];
   private lastGrenadePositions = new Map<string, Vec2>();
 
-  /** Remaining match time in seconds, from the most recent gameState. */
-  private matchTimer = 0;
+  /**
+   * Local-clock timestamp (performance.now() ms) at which the current
+   * match ends. Set once from ServerMatchStartMessage.matchEndsInMs and
+   * extrapolated from there each render frame — no per-tick broadcast
+   * of the clock is needed. Null outside an active match.
+   */
+  private matchEndsAtLocalMs: number | null = null;
 
   private listeners = new Map<EventName, EventCallback[]>();
 
@@ -91,6 +95,7 @@ export class NetworkManager {
     this.connection.disconnect();
     this.localPlayerId = null;
     this.localPlayerState = null;
+    this.matchEndsAtLocalMs = null;
   }
 
   /**
@@ -177,9 +182,16 @@ export class NetworkManager {
     return this.latestGrenades;
   }
 
-  /** Remaining match time in seconds from the most recent gameState. */
+  /**
+   * Remaining match time in seconds, extrapolated from the one-time
+   * ServerMatchStartMessage. Counts down smoothly at render rate between
+   * server ticks and continues ticking through packet loss. Returns 0
+   * when no match is active or the timer has expired.
+   */
   getMatchTimer(): number {
-    return this.matchTimer;
+    if (this.matchEndsAtLocalMs === null) return 0;
+    const remainingMs = this.matchEndsAtLocalMs - performance.now();
+    return Math.max(0, remainingMs / 1000);
   }
 
   /** Get the local player's ID (assigned by server on welcome). */
@@ -239,10 +251,15 @@ export class NetworkManager {
         break;
 
       case 'server:matchStart':
+        // Authoritative source of the match clock. Anchor the countdown
+        // to our local performance.now() so the display stays smooth
+        // regardless of gameState cadence or packet loss.
+        this.matchEndsAtLocalMs = performance.now() + msg.matchEndsInMs;
         this.emit('matchStart');
         break;
 
       case 'server:matchEnd':
+        this.matchEndsAtLocalMs = null;
         this.emit('matchEnd', msg);
         break;
 
@@ -285,8 +302,6 @@ export class NetworkManager {
   private handleGameState(msg: ServerGameStateMessage): void {
     if (!this.localPlayerId) return;
 
-    this.matchTimer = msg.matchTimer;
-
     // Emit bullet trails so scenes can render them as effects.
     for (const trail of msg.bulletTrails) {
       this.emit('bulletTrail', trail);
@@ -309,14 +324,9 @@ export class NetworkManager {
     }
     this.latestGrenades = msg.grenades;
 
-    // Derive phase transition events from the game state stream, since the
-    // server only broadcasts phase info inline with gameState messages.
-    if (msg.phase !== this.lastPhase) {
-      if (msg.phase === MatchPhase.ACTIVE) {
-        this.emit('matchStart');
-      }
-      this.lastPhase = msg.phase;
-    }
+    // matchStart is driven by the explicit ServerMatchStartMessage (which
+    // also carries the match clock), so this block only debounces and
+    // forwards per-second countdown emits for the 3/2/1/FIGHT overlay.
     if (msg.phase === MatchPhase.COUNTDOWN) {
       const countdownInt = Math.ceil(msg.countdownTimer);
       if (countdownInt !== this.lastCountdownEmitted) {

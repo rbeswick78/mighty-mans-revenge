@@ -68,7 +68,11 @@ export interface ServerGameStateMessage {
   type: 'server:gameState';
   tick: Tick;
   phase: MatchPhase;
-  matchTimer: number;
+  /**
+   * Remaining seconds in the countdown phase. Only meaningful when
+   * phase === COUNTDOWN. The match timer is NOT here — it is sent
+   * once via ServerMatchStartMessage and extrapolated client-side.
+   */
   countdownTimer: number;
   players: SerializedPlayerState[];
   grenades: GrenadeState[];
@@ -110,6 +114,15 @@ export interface ServerMatchCountdownMessage {
 
 export interface ServerMatchStartMessage {
   type: 'server:matchStart';
+  /**
+   * Match duration from now, in milliseconds. Sent once when the match
+   * transitions from COUNTDOWN to ACTIVE. The client stores
+   * matchEndsAtLocalMs = performance.now() + matchEndsInMs and
+   * extrapolates the displayed timer at render rate from there — so no
+   * per-tick clock broadcast is needed. Relative time sidesteps any
+   * client/server wall-clock offset.
+   */
+  matchEndsInMs: number;
 }
 
 export interface ServerMatchEndMessage {
