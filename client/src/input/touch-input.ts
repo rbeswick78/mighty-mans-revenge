@@ -41,7 +41,9 @@ export class TouchInput {
     this.leftJoystick = this.createJoystick();
     this.rightJoystick = this.createJoystick();
 
-    // Grenade button (top-right area)
+    // Grenade button (top-right area). Hidden until the user actually
+    // touches the screen — desktop users don't need it and it looks out
+    // of place on a mouse-and-keyboard session.
     const { width } = scene.scale;
     const btnX = width - GRENADE_BUTTON_MARGIN - GRENADE_BUTTON_SIZE;
     const btnY = GRENADE_BUTTON_MARGIN + GRENADE_BUTTON_SIZE;
@@ -50,6 +52,7 @@ export class TouchInput {
     this.grenadeButton.setScrollFactor(0);
     this.grenadeButton.setDepth(3000);
     this.grenadeButton.setInteractive();
+    this.grenadeButton.setVisible(false);
 
     this.grenadeButtonText = scene.add.text(btnX, btnY, 'G', {
       fontFamily: 'Courier, monospace',
@@ -60,6 +63,7 @@ export class TouchInput {
     this.grenadeButtonText.setOrigin(0.5, 0.5);
     this.grenadeButtonText.setScrollFactor(0);
     this.grenadeButtonText.setDepth(3001);
+    this.grenadeButtonText.setVisible(false);
 
     this.grenadeButton.on('pointerdown', () => {
       this.grenadePressed = true;
@@ -72,6 +76,13 @@ export class TouchInput {
     scene.input.on('pointerdown', this.onPointerDown, this);
     scene.input.on('pointermove', this.onPointerMove, this);
     scene.input.on('pointerup', this.onPointerUp, this);
+  }
+
+  /** Reveal touch-only UI once we know the user is on a touch device. */
+  private showTouchUI(): void {
+    if (this.grenadeButton.visible) return;
+    this.grenadeButton.setVisible(true);
+    this.grenadeButtonText.setVisible(true);
   }
 
   private createJoystick(): VirtualJoystick {
@@ -101,6 +112,9 @@ export class TouchInput {
     // Only respond to actual touch events, not mouse clicks. Otherwise
     // desktop users see phantom joystick circles every time they click.
     if (!pointer.wasTouch) return;
+
+    // First confirmed touch — reveal the touch-only UI.
+    this.showTouchUI();
 
     const halfWidth = this.scene.scale.width / 2;
 

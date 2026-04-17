@@ -32,7 +32,11 @@ export class KeyboardMouseInput {
       G: scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.G),
     };
 
-    this.pointer = scene.input.activePointer;
+    // Use the dedicated mouse pointer, not activePointer. With TouchInput
+    // also registered, activePointer may be pointing at a touch pointer
+    // that never receives mouse button state changes (which is why
+    // right-click in particular wasn't registering).
+    this.pointer = scene.input.mousePointer ?? scene.input.activePointer;
   }
 
   getInput(playerWorldPos: Vec2): RawInput {
