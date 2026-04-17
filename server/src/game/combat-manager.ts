@@ -24,6 +24,7 @@ export interface ExplosionResult {
   position: Vec2;
   damages: { playerId: PlayerId; damage: number; killed: boolean }[];
   grenadeId: string;
+  throwerId: PlayerId;
 }
 
 export interface ShotResult {
@@ -316,6 +317,7 @@ export class CombatManager {
         position: { x: grenade.position.x, y: grenade.position.y },
         damages,
         grenadeId: grenade.id,
+        throwerId: grenade.throwerId,
       });
     }
 

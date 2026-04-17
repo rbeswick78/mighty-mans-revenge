@@ -104,7 +104,17 @@ export class GameLoop {
     const tickStart = performance.now();
 
     this.currentTick++;
-    this.callback(dt, this.currentTick);
+    // Isolate tick errors so a single throw doesn't freeze the loop
+    // (which would stop state broadcasts and leave every connected
+    // client frozen). Log with tick number for diagnosis.
+    try {
+      this.callback(dt, this.currentTick);
+    } catch (err) {
+      logger.error(
+        { err, tick: this.currentTick },
+        'Uncaught error in tick callback; continuing loop',
+      );
+    }
 
     const tickEnd = performance.now();
     this._lastTickWallTime = Date.now();

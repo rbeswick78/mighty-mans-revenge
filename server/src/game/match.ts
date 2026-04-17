@@ -302,9 +302,13 @@ export class Match implements MatchContext {
     const { explosions } = this.combatManager.updateGrenades(dt, this.players, grid);
     for (const explosion of explosions) {
       for (const dmg of explosion.damages) {
-        this.stats.recordDamage(explosion.grenadeId, dmg.damage);
-        if (dmg.killed) {
-          // Find the grenade's thrower — unknown here, skip kill feed
+        // Credit damage to the thrower. Self-damage from your own grenade
+        // is real and intentional, but don't award yourself a kill.
+        this.stats.recordDamage(explosion.throwerId, dmg.damage);
+        if (dmg.killed && dmg.playerId !== explosion.throwerId) {
+          this.onKill(explosion.throwerId, dmg.playerId, 'grenade');
+        } else if (dmg.killed) {
+          // Suicide: mark dead without crediting a kill.
           const victim = this.players.get(dmg.playerId);
           if (victim) {
             victim.isDead = true;
