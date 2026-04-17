@@ -56,6 +56,9 @@ export class NetworkManager {
   private latestGrenades: GrenadeState[] = [];
   private lastGrenadePositions = new Map<string, Vec2>();
 
+  /** Remaining match time in seconds, from the most recent gameState. */
+  private matchTimer = 0;
+
   private listeners = new Map<EventName, EventCallback[]>();
 
   constructor(serverUrl?: string) {
@@ -174,6 +177,11 @@ export class NetworkManager {
     return this.latestGrenades;
   }
 
+  /** Remaining match time in seconds from the most recent gameState. */
+  getMatchTimer(): number {
+    return this.matchTimer;
+  }
+
   /** Get the local player's ID (assigned by server on welcome). */
   getPlayerId(): PlayerId | null {
     return this.localPlayerId;
@@ -276,6 +284,8 @@ export class NetworkManager {
 
   private handleGameState(msg: ServerGameStateMessage): void {
     if (!this.localPlayerId) return;
+
+    this.matchTimer = msg.matchTimer;
 
     // Emit bullet trails so scenes can render them as effects.
     for (const trail of msg.bulletTrails) {

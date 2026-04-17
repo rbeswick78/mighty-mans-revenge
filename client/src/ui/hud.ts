@@ -212,8 +212,15 @@ export class HUD {
     this.staminaBarFg.setSize(200 * ratio, 6);
   }
 
-  updateScores(localScore: number, opponentScore: number): void {
-    this.scoreText.setText(`YOU: ${localScore} | ENEMY: ${opponentScore}`);
+  updateScores(
+    localName: string,
+    localScore: number,
+    opponentName: string,
+    opponentScore: number,
+  ): void {
+    this.scoreText.setText(
+      `${localName}: ${localScore} | ${opponentName}: ${opponentScore}`,
+    );
   }
 
   updateTimer(secondsRemaining: number): void {

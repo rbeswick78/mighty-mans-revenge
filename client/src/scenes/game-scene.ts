@@ -85,23 +85,6 @@ export class GameScene extends Phaser.Scene {
 
     // Wire up network events
     this.wireGameServiceEvents();
-
-    // Status text overlay
-    const opponentName = this.matchData?.opponents[0]?.nickname ?? 'opponent';
-    const statusText = this.add.text(
-      this.cameras.main.width / 2,
-      16,
-      `${this.nickname} vs ${opponentName}`,
-      {
-        fontFamily: '"Courier New", Courier, monospace',
-        fontSize: '14px',
-        color: '#00ff66',
-        stroke: '#000000',
-        strokeThickness: 3,
-      },
-    ).setOrigin(0.5, 0).setScrollFactor(0).setDepth(100);
-
-    statusText.setData('type', 'status');
   }
 
   update(_time: number, delta: number): void {
@@ -210,12 +193,23 @@ export class GameScene extends Phaser.Scene {
         this.hud.updateStamina(currentLocalState.stamina, PLAYER.SPRINT_DURATION);
         this.hud.updateDeathState(currentLocalState.isDead, currentLocalState.respawnTimer);
 
-        // Update scores
+        // Update scores — use actual opponent nickname from the most
+        // recent interpolated state; fall back to matchData for the
+        // frame between match start and the first gameState.
         let opponentScore = 0;
+        let opponentName = this.matchData?.opponents[0]?.nickname ?? 'OPPONENT';
         for (const [, interpState] of interpolatedPlayers) {
-          opponentScore = Math.max(opponentScore, interpState.score);
+          if (interpState.score > opponentScore) opponentScore = interpState.score;
+          if (interpState.nickname) opponentName = interpState.nickname;
         }
-        this.hud.updateScores(currentLocalState.score, opponentScore);
+        this.hud.updateScores(
+          currentLocalState.nickname || this.nickname,
+          currentLocalState.score,
+          opponentName,
+          opponentScore,
+        );
+
+        this.hud.updateTimer(networkManager.getMatchTimer());
       }
     }
 
