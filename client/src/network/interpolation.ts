@@ -16,6 +16,7 @@ interface BufferedState {
   isDead: boolean;
   isReloading: boolean;
   stamina: number;
+  respawnTimer: number;
   invulnerableTimer: number;
   score: number;
   deaths: number;
@@ -52,6 +53,7 @@ function toInterpolated(s: BufferedState): InterpolatedState {
     isDead: s.isDead,
     isReloading: s.isReloading,
     stamina: s.stamina,
+    respawnTimer: s.respawnTimer,
     invulnerableTimer: s.invulnerableTimer,
     score: s.score,
     deaths: s.deaths,
@@ -82,6 +84,7 @@ export class EntityInterpolation {
       isDead: state.isDead,
       isReloading: state.isReloading,
       stamina: state.stamina,
+      respawnTimer: state.respawnTimer,
       invulnerableTimer: state.invulnerableTimer,
       score: state.score,
       deaths: state.deaths,
@@ -151,6 +154,7 @@ export class EntityInterpolation {
       isDead: curr.isDead,
       isReloading: curr.isReloading,
       stamina: curr.stamina,
+      respawnTimer: curr.respawnTimer,
       invulnerableTimer: curr.invulnerableTimer,
       score: curr.score,
       deaths: curr.deaths,

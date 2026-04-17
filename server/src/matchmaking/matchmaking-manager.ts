@@ -305,6 +305,7 @@ export class MatchmakingManager {
         isSprinting: player.isSprinting,
         stamina: player.stamina,
         isDead: player.isDead,
+        respawnTimer: player.respawnTimer,
         invulnerableTimer: player.invulnerableTimer,
         lastProcessedInput: player.lastProcessedInput,
         score: player.score,

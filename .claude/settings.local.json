@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:phaser.discourse.group)",
+      "WebFetch(domain:blog.khutchins.com)"
+    ]
+  }
+}

@@ -165,6 +165,7 @@ export class GameScene extends Phaser.Scene {
           isSprinting: currentLocalState.isSprinting,
           stamina: currentLocalState.stamina,
           isDead: currentLocalState.isDead,
+          respawnTimer: currentLocalState.respawnTimer,
           invulnerableTimer: currentLocalState.invulnerableTimer,
           lastProcessedInput: currentLocalState.lastProcessedInput,
           score: currentLocalState.score,
@@ -187,6 +188,7 @@ export class GameScene extends Phaser.Scene {
             isSprinting: interpState.isSprinting,
             stamina: interpState.stamina,
             isDead: interpState.isDead,
+            respawnTimer: interpState.respawnTimer,
             invulnerableTimer: interpState.invulnerableTimer,
             lastProcessedInput: 0,
             score: interpState.score,
@@ -202,6 +204,7 @@ export class GameScene extends Phaser.Scene {
         this.hud.updateAmmo(currentLocalState.ammo, 30, currentLocalState.isReloading);
         this.hud.updateGrenades(currentLocalState.grenades);
         this.hud.updateStamina(currentLocalState.stamina, PLAYER.SPRINT_DURATION);
+        this.hud.updateDeathState(currentLocalState.isDead, currentLocalState.respawnTimer);
 
         // Update scores
         let opponentScore = 0;

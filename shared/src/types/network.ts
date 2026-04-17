@@ -88,6 +88,7 @@ export interface SerializedPlayerState {
   isSprinting: boolean;
   stamina: number;
   isDead: boolean;
+  respawnTimer: number;
   invulnerableTimer: number;
   lastProcessedInput: number;
   score: number;

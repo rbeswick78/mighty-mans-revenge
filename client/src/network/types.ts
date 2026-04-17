@@ -20,6 +20,7 @@ export interface InterpolatedState {
   isDead: boolean;
   isReloading: boolean;
   stamina: number;
+  respawnTimer: number;
   invulnerableTimer: number;
   score: number;
   deaths: number;

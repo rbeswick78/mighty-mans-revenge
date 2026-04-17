@@ -58,6 +58,9 @@ export class HUD {
   // Countdown
   private countdownText: Phaser.GameObjects.Text;
 
+  // Death overlay (shown while the local player is dead)
+  private deathOverlay: Phaser.GameObjects.Text;
+
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
 
@@ -160,6 +163,17 @@ export class HUD {
     this.countdownText.setScrollFactor(0);
     this.countdownText.setDepth(2000);
     this.countdownText.setVisible(false);
+
+    // --- Death overlay: center ---
+    this.deathOverlay = scene.add.text(width / 2, height / 2, '', {
+      ...LARGE_FONT_STYLE,
+      color: '#ff3333',
+      fontSize: '36px',
+    });
+    this.deathOverlay.setOrigin(0.5, 0.5);
+    this.deathOverlay.setScrollFactor(0);
+    this.deathOverlay.setDepth(2000);
+    this.deathOverlay.setVisible(false);
   }
 
   updateHealth(current: number, max: number): void {
@@ -173,6 +187,17 @@ export class HUD {
   updateAmmo(current: number, max: number, isReloading: boolean): void {
     this.ammoText.setText(`${current} / ${max}`);
     this.reloadingText.setVisible(isReloading);
+  }
+
+  /** Show "YOU DIED" with a respawn countdown, or hide it when alive. */
+  updateDeathState(isDead: boolean, respawnSecondsRemaining: number): void {
+    if (!isDead) {
+      this.deathOverlay.setVisible(false);
+      return;
+    }
+    const seconds = Math.max(0, Math.ceil(respawnSecondsRemaining));
+    this.deathOverlay.setText(`YOU DIED\nRESPAWN IN ${seconds}`);
+    this.deathOverlay.setVisible(true);
   }
 
   updateGrenades(count: number): void {
@@ -270,6 +295,7 @@ export class HUD {
     this.scoreText.destroy();
     this.timerText.destroy();
     this.countdownText.destroy();
+    this.deathOverlay.destroy();
     for (const entry of this.killFeedEntries) {
       entry.timer.remove();
       entry.text.destroy();
