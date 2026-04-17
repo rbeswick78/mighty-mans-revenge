@@ -85,12 +85,14 @@ export class KeyboardMouseInput {
     const rightClickFired = this.rightClickPending;
     this.rightClickPending = false;
 
+    const throwGrenade = rightClickFired || this.keys.G.isDown;
+
     return {
       moveX,
       moveY,
       aimAngle,
       shooting: this.pointer.leftButtonDown(),
-      throwGrenade: rightClickFired || this.keys.G.isDown,
+      throwGrenade,
       sprint: this.keys.SHIFT.isDown,
       reload: Phaser.Input.Keyboard.JustDown(this.keys.R),
     };

@@ -23,7 +23,8 @@ type GameServiceEvent =
   | 'matchmakingStatus'
   | 'rematchStatus'
   | 'opponentDisconnected'
-  | 'bulletTrail';
+  | 'bulletTrail'
+  | 'grenadeExploded';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type GameServiceCallback = (...args: any[]) => void;
@@ -174,6 +175,10 @@ export class GameService {
 
     this.networkManager.on('bulletTrail', (trail: unknown) => {
       this.emit('bulletTrail', trail);
+    });
+
+    this.networkManager.on('grenadeExploded', (pos: unknown) => {
+      this.emit('grenadeExploded', pos);
     });
   }
 

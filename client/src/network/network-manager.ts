@@ -1,6 +1,7 @@
-import type { PlayerId } from '@shared/types/common.js';
+import type { PlayerId, Vec2 } from '@shared/types/common.js';
 import type { CollisionGrid } from '@shared/types/map.js';
 import type { PlayerInput, PlayerState } from '@shared/types/player.js';
+import type { GrenadeState } from '@shared/types/projectile.js';
 import type {
   ServerMessage,
   ServerGameStateMessage,
@@ -29,6 +30,7 @@ type EventName =
   | 'rematchStatus'
   | 'opponentDisconnected'
   | 'bulletTrail'
+  | 'grenadeExploded'
   | 'error';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -45,6 +47,14 @@ export class NetworkManager {
   private collisionGrid: CollisionGrid | null = null;
   private lastPhase: MatchPhase | null = null;
   private lastCountdownEmitted = -1;
+
+  /**
+   * Most recent grenades from server gameState. Scene polls this each
+   * frame to render in-flight grenades. We also diff between updates to
+   * emit explosion events when a grenade disappears from the list.
+   */
+  private latestGrenades: GrenadeState[] = [];
+  private lastGrenadePositions = new Map<string, Vec2>();
 
   private listeners = new Map<EventName, EventCallback[]>();
 
@@ -159,6 +169,11 @@ export class NetworkManager {
     return this.remotePlayerIds;
   }
 
+  /** Most recent active grenades from the server, for rendering. */
+  getActiveGrenades(): GrenadeState[] {
+    return this.latestGrenades;
+  }
+
   /** Get the local player's ID (assigned by server on welcome). */
   getPlayerId(): PlayerId | null {
     return this.localPlayerId;
@@ -266,6 +281,23 @@ export class NetworkManager {
     for (const trail of msg.bulletTrails) {
       this.emit('bulletTrail', trail);
     }
+
+    // Grenades: mirror the server list and emit explosion events for any
+    // that disappeared since the last gameState. A grenade vanishing from
+    // the active list means its fuse expired and it detonated; show an
+    // explosion at its last known position.
+    const incomingIds = new Set<string>();
+    for (const g of msg.grenades) {
+      incomingIds.add(g.id);
+      this.lastGrenadePositions.set(g.id, { x: g.position.x, y: g.position.y });
+    }
+    for (const [id, pos] of this.lastGrenadePositions) {
+      if (!incomingIds.has(id)) {
+        this.emit('grenadeExploded', pos);
+        this.lastGrenadePositions.delete(id);
+      }
+    }
+    this.latestGrenades = msg.grenades;
 
     // Derive phase transition events from the game state stream, since the
     // server only broadcasts phase info inline with gameState messages.

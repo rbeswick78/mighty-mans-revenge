@@ -9,6 +9,7 @@ import { MapRenderer } from '../rendering/map-renderer.js';
 import { ClientPlayerManager } from '../rendering/player-manager.js';
 import { EffectsRenderer } from '../rendering/effects-renderer.js';
 import { PickupRenderer } from '../rendering/pickup-renderer.js';
+import { GrenadeRenderer } from '../rendering/grenade-renderer.js';
 import { HUD } from '../ui/hud.js';
 import { InputManager } from '../input/input-manager.js';
 import { GameService, type MatchData } from '../services/game-service.js';
@@ -26,6 +27,7 @@ export class GameScene extends Phaser.Scene {
   private playerManager: ClientPlayerManager | null = null;
   private effectsRenderer: EffectsRenderer | null = null;
   private pickupRenderer: PickupRenderer | null = null;
+  private grenadeRenderer: GrenadeRenderer | null = null;
   private hud: HUD | null = null;
   private inputManager: InputManager | null = null;
   private gameService!: GameService;
@@ -47,6 +49,7 @@ export class GameScene extends Phaser.Scene {
   private onOpponentDisconnected: ((playerId: PlayerId) => void) | null = null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private onBulletTrail: ((trail: any) => void) | null = null;
+  private onGrenadeExploded: ((pos: Vec2) => void) | null = null;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -76,6 +79,7 @@ export class GameScene extends Phaser.Scene {
     this.playerManager = new ClientPlayerManager(this);
     this.effectsRenderer = new EffectsRenderer(this);
     this.pickupRenderer = new PickupRenderer(this);
+    this.grenadeRenderer = new GrenadeRenderer(this);
     this.hud = new HUD(this);
     this.inputManager = new InputManager(this);
 
@@ -214,6 +218,11 @@ export class GameScene extends Phaser.Scene {
         this.hud.updateScores(currentLocalState.score, opponentScore);
       }
     }
+
+    // Render in-flight grenades from the server's authoritative list.
+    if (this.grenadeRenderer) {
+      this.grenadeRenderer.updateGrenades(networkManager.getActiveGrenades());
+    }
   }
 
   shutdown(): void {
@@ -287,11 +296,16 @@ export class GameScene extends Phaser.Scene {
       this.effectsRenderer?.showMuzzleFlash(trail.startPos.x, trail.startPos.y, 0);
     };
 
+    this.onGrenadeExploded = (pos: Vec2) => {
+      this.effectsRenderer?.showExplosion(pos.x, pos.y);
+    };
+
     this.gameService.on('matchCountdown', this.onMatchCountdown);
     this.gameService.on('matchStart', this.onMatchStart);
     this.gameService.on('matchEnd', this.onMatchEnd);
     this.gameService.on('opponentDisconnected', this.onOpponentDisconnected);
     this.gameService.on('bulletTrail', this.onBulletTrail);
+    this.gameService.on('grenadeExploded', this.onGrenadeExploded);
   }
 
   private cleanupEvents(): void {
@@ -315,6 +329,10 @@ export class GameScene extends Phaser.Scene {
       this.gameService.off('bulletTrail', this.onBulletTrail);
       this.onBulletTrail = null;
     }
+    if (this.onGrenadeExploded) {
+      this.gameService.off('grenadeExploded', this.onGrenadeExploded);
+      this.onGrenadeExploded = null;
+    }
   }
 
   private cleanup(): void {
@@ -335,6 +353,10 @@ export class GameScene extends Phaser.Scene {
     if (this.pickupRenderer) {
       this.pickupRenderer.destroy();
       this.pickupRenderer = null;
+    }
+    if (this.grenadeRenderer) {
+      this.grenadeRenderer.destroy();
+      this.grenadeRenderer = null;
     }
     if (this.hud) {
       this.hud.destroy();
