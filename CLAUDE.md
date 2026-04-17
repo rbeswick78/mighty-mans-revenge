@@ -52,6 +52,20 @@ pnpm format                 # Prettier
 pnpm typecheck              # tsc --noEmit across all packages
 ```
 
+## Deployment
+
+**Client (Firebase Hosting):** The Firebase CLI is installed and authenticated on this machine, and `client/.firebaserc` + `client/firebase.json` are configured for the `mighty-mans-revenge` project. Manual deploy is the fastest path:
+
+```bash
+pnpm --filter @game/client build
+cd client && firebase deploy --only hosting
+# Live at https://mighty-mans-revenge.web.app
+```
+
+**Server (GCE VM, us-east1):** Deployed via rsync over SSH to `/opt/mighty-mans-revenge/` and restarted with PM2. Health check at `http://<GCE_SERVER_IP>:3001/health`.
+
+**CI deploy workflows** (`.github/workflows/deploy-client.yml`, `deploy-server.yml`) trigger on pushes to `client/**`/`server/**`/`shared/**` and also support `workflow_dispatch`. They are currently **non-functional** because the required repo secrets are not set: `FIREBASE_TOKEN` (service account JSON for hosting), `GCE_SSH_KEY`, and `GCE_SERVER_IP`. Until those are added via `gh secret set`, deploys must be done manually from a local machine with the CLIs authenticated.
+
 ## Architecture
 
 ### Authoritative Server Model
