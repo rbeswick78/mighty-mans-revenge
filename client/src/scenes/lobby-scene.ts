@@ -37,9 +37,13 @@ export class LobbyScene extends Phaser.Scene {
     this.gameService = GameService.getInstance();
 
     const centerX = this.cameras.main.width / 2;
+    // Original layout was designed for a 540px-tall canvas. Re-center
+    // vertically so the lobby sits in the middle of whatever canvas we
+    // render into (currently 720px).
+    const yOffset = Math.max(0, (this.cameras.main.height - 540) / 2);
 
     // Title
-    this.add.text(centerX, 60, 'MIGHTY MAN\'S\nREVENGE', {
+    this.add.text(centerX, 60 + yOffset, 'MIGHTY MAN\'S\nREVENGE', {
       fontFamily: '"Courier New", Courier, monospace',
       fontSize: '40px',
       color: '#e94560',
@@ -50,14 +54,14 @@ export class LobbyScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     // Subtitle
-    this.add.text(centerX, 140, 'POST-APOCALYPTIC SHOWDOWN', {
+    this.add.text(centerX, 140 + yOffset, 'POST-APOCALYPTIC SHOWDOWN', {
       fontFamily: '"Courier New", Courier, monospace',
       fontSize: '12px',
       color: '#888888',
     }).setOrigin(0.5);
 
     // Nickname label
-    this.add.text(centerX, 200, 'ENTER CALLSIGN:', {
+    this.add.text(centerX, 200 + yOffset, 'ENTER CALLSIGN:', {
       fontFamily: '"Courier New", Courier, monospace',
       fontSize: '14px',
       color: '#aaaaaa',
@@ -66,12 +70,12 @@ export class LobbyScene extends Phaser.Scene {
     // Nickname input background
     const inputBg = this.add.graphics();
     inputBg.fillStyle(0x0f0f1e, 1);
-    inputBg.fillRect(centerX - 120, 218, 240, 32);
+    inputBg.fillRect(centerX - 120, 218 + yOffset, 240, 32);
     inputBg.lineStyle(1, 0xe94560, 0.6);
-    inputBg.strokeRect(centerX - 120, 218, 240, 32);
+    inputBg.strokeRect(centerX - 120, 218 + yOffset, 240, 32);
 
     // Nickname display text
-    this.nicknameText = this.add.text(centerX - 110, 226, this.nickname + '_', {
+    this.nicknameText = this.add.text(centerX - 110, 226 + yOffset, this.nickname + '_', {
       fontFamily: '"Courier New", Courier, monospace',
       fontSize: '16px',
       color: '#00ff66',
@@ -88,35 +92,35 @@ export class LobbyScene extends Phaser.Scene {
     });
 
     // Quick Match button
-    this.quickMatchButton = this.createQuickMatchButton(centerX, 290);
+    this.quickMatchButton = this.createQuickMatchButton(centerX, 290 + yOffset);
 
     // Searching text (hidden initially)
-    this.searchingText = this.add.text(centerX, 360, 'Searching for opponent...', {
+    this.searchingText = this.add.text(centerX, 360 + yOffset, 'Searching for opponent...', {
       fontFamily: '"Courier New", Courier, monospace',
       fontSize: '14px',
       color: '#e94560',
     }).setOrigin(0.5).setVisible(false);
 
     // Search timer text (hidden initially)
-    this.searchTimerText = this.add.text(centerX, 380, '0:00', {
+    this.searchTimerText = this.add.text(centerX, 380 + yOffset, '0:00', {
       fontFamily: '"Courier New", Courier, monospace',
       fontSize: '12px',
       color: '#888888',
     }).setOrigin(0.5).setVisible(false);
 
     // Cancel button (hidden initially)
-    this.cancelButton = this.createCancelButton(centerX, 410);
+    this.cancelButton = this.createCancelButton(centerX, 410 + yOffset);
     this.cancelButton.setVisible(false);
 
     // Player count
-    this.playerCountText = this.add.text(centerX, 500, '0 players online', {
+    this.playerCountText = this.add.text(centerX, 500 + yOffset, '0 players online', {
       fontFamily: '"Courier New", Courier, monospace',
       fontSize: '12px',
       color: '#666666',
     }).setOrigin(0.5);
 
     // Version / footer
-    this.add.text(centerX, 525, 'v0.1.0 // PRE-ALPHA', {
+    this.add.text(centerX, 525 + yOffset, 'v0.1.0 // PRE-ALPHA', {
       fontFamily: '"Courier New", Courier, monospace',
       fontSize: '10px',
       color: '#444444',
@@ -307,9 +311,10 @@ export class LobbyScene extends Phaser.Scene {
     if (this.isSearching) return;
 
     if (this.nickname.length < 2) {
+      const yOffset = Math.max(0, (this.cameras.main.height - 540) / 2);
       const flash = this.add.text(
         this.cameras.main.width / 2,
-        258,
+        258 + yOffset,
         'Callsign must be at least 2 characters',
         {
           fontFamily: '"Courier New", Courier, monospace',

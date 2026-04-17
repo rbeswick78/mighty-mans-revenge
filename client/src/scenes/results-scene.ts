@@ -43,6 +43,10 @@ export class ResultsScene extends Phaser.Scene {
     this.gameService = GameService.getInstance();
 
     const centerX = this.cameras.main.width / 2;
+    // Original layout was designed for a 540px-tall canvas. Re-center so
+    // the results screen sits in the middle of whatever canvas we render
+    // into (currently 720px).
+    const yOffset = Math.max(0, (this.cameras.main.height - 540) / 2);
     const playerId = this.gameService.getPlayerId();
 
     // Determine winner/loser
@@ -63,7 +67,7 @@ export class ResultsScene extends Phaser.Scene {
       titleColor = '#e94560';
     }
 
-    this.add.text(centerX, 40, titleText, {
+    this.add.text(centerX, 40 + yOffset, titleText, {
       fontFamily: '"Courier New", Courier, monospace',
       fontSize: '48px',
       color: titleColor,
@@ -75,19 +79,19 @@ export class ResultsScene extends Phaser.Scene {
     // Divider line
     const divider = this.add.graphics();
     divider.lineStyle(1, 0xe94560, 0.5);
-    divider.lineBetween(centerX - 300, 80, centerX + 300, 80);
+    divider.lineBetween(centerX - 300, 80 + yOffset, centerX + 300, 80 + yOffset);
 
     if (this.result) {
-      this.renderStats(centerX, playerId);
+      this.renderStats(centerX, playerId, yOffset);
     } else {
-      this.add.text(centerX, 200, 'No match data available', {
+      this.add.text(centerX, 200 + yOffset, 'No match data available', {
         ...FONT_MONO,
         color: '#888888',
       }).setOrigin(0.5);
     }
 
     // Rematch status text (hidden initially)
-    this.rematchStatusText = this.add.text(centerX, 430, '', {
+    this.rematchStatusText = this.add.text(centerX, 430 + yOffset, '', {
       ...FONT_MONO,
       fontSize: '13px',
       color: '#ffaa00',
@@ -96,10 +100,10 @@ export class ResultsScene extends Phaser.Scene {
     // Bottom divider
     const bottomDivider = this.add.graphics();
     bottomDivider.lineStyle(1, 0xe94560, 0.3);
-    bottomDivider.lineBetween(centerX - 300, 450, centerX + 300, 450);
+    bottomDivider.lineBetween(centerX - 300, 450 + yOffset, centerX + 300, 450 + yOffset);
 
     // Buttons
-    const buttonY = 470;
+    const buttonY = 470 + yOffset;
 
     // Rematch button
     this.createButton(centerX - 110, buttonY, 'REMATCH', 0xe94560, () => {
@@ -118,7 +122,7 @@ export class ResultsScene extends Phaser.Scene {
     });
 
     // Footer
-    this.add.text(centerX, 525, 'MIGHTY MAN\'S REVENGE // POST-APOCALYPTIC SHOWDOWN', {
+    this.add.text(centerX, 525 + yOffset, 'MIGHTY MAN\'S REVENGE // POST-APOCALYPTIC SHOWDOWN', {
       fontFamily: '"Courier New", Courier, monospace',
       fontSize: '9px',
       color: '#333333',
@@ -132,7 +136,7 @@ export class ResultsScene extends Phaser.Scene {
     this.cleanupEvents();
   }
 
-  private renderStats(centerX: number, localPlayerId: PlayerId | null): void {
+  private renderStats(centerX: number, localPlayerId: PlayerId | null, yOffset: number): void {
     if (!this.result) return;
 
     // Convert playerStats if it's a plain object (from JSON serialization)
@@ -155,7 +159,7 @@ export class ResultsScene extends Phaser.Scene {
     // Column headers
     const col1X = centerX - 140;
     const col2X = centerX + 140;
-    const headerY = 95;
+    const headerY = 95 + yOffset;
 
     const localNick = this.nickname;
     const opponentNick = this.matchData?.opponents[0]?.nickname ?? 'Opponent';
@@ -179,7 +183,7 @@ export class ResultsScene extends Phaser.Scene {
     const stats2 = playerIds[1] ? statsMap.get(playerIds[1]) : null;
 
     const statRows = this.buildStatRows(stats1 ?? null, stats2 ?? null);
-    const startY = 125;
+    const startY = 125 + yOffset;
     const rowHeight = 30;
 
     // Animate stats in sequentially (arcade-style tally)

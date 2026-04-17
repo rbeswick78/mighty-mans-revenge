@@ -3,11 +3,12 @@ import { BootScene } from './scenes/boot-scene.js';
 import { LobbyScene } from './scenes/lobby-scene.js';
 import { GameScene } from './scenes/game-scene.js';
 import { ResultsScene } from './scenes/results-scene.js';
+import { CANVAS_HEIGHT, CANVAS_WIDTH } from './ui/layout.js';
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
-  width: 960,
-  height: 540,
+  width: CANVAS_WIDTH,
+  height: CANVAS_HEIGHT,
   parent: 'game-container',
   pixelArt: true,
   roundPixels: true,

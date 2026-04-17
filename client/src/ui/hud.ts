@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { GUN, GRENADE as GRENADE_CONFIG } from '@shared/config/game.js';
+import { HUD_STRIP_HEIGHT, MAP_HEIGHT_PX, MAP_WIDTH_PX } from './layout.js';
 
 const FONT_STYLE: Phaser.Types.GameObjects.Text.TextStyle = {
   fontFamily: 'Courier, monospace',
@@ -29,50 +30,54 @@ function healthColor(ratio: number): number {
 export class HUD {
   private scene: Phaser.Scene;
 
-  // Health bar (bottom-left)
+  // Strip chrome (dedicated HUD band below the gameboard)
+  private stripBg: Phaser.GameObjects.Rectangle;
+  private stripBorder: Phaser.GameObjects.Rectangle;
+
+  // Left column: player stats
   private healthBarBg: Phaser.GameObjects.Rectangle;
   private healthBarFg: Phaser.GameObjects.Rectangle;
   private healthText: Phaser.GameObjects.Text;
-
-  // Ammo (bottom-left, below health)
-  private ammoText: Phaser.GameObjects.Text;
-  private reloadingText: Phaser.GameObjects.Text;
-
-  // Grenades (bottom-left, below ammo)
-  private grenadeText: Phaser.GameObjects.Text;
-
-  // Stamina bar (below health bar)
   private staminaBarBg: Phaser.GameObjects.Rectangle;
   private staminaBarFg: Phaser.GameObjects.Rectangle;
+  private ammoText: Phaser.GameObjects.Text;
+  private reloadingText: Phaser.GameObjects.Text;
+  private grenadeText: Phaser.GameObjects.Text;
 
-  // Score (top-center)
+  // Middle column: match state
   private scoreText: Phaser.GameObjects.Text;
-
-  // Timer (top-center, below score)
   private timerText: Phaser.GameObjects.Text;
 
-  // Kill feed (top-right)
+  // Right column: kill feed
   private killFeedEntries: KillFeedItem[] = [];
   private killFeedContainer: Phaser.GameObjects.Container;
 
-  // Countdown
+  // Map-centered overlays
   private countdownText: Phaser.GameObjects.Text;
-
-  // Death overlay (shown while the local player is dead)
   private deathOverlay: Phaser.GameObjects.Text;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
 
-    const { width, height } = scene.scale;
+    // Strip occupies the bottom band of the canvas. The gameboard owns
+    // the top MAP_HEIGHT_PX pixels; the strip never overlays map tiles.
+    const stripTop = MAP_HEIGHT_PX;
     const margin = 16;
 
-    // --- Health bar: bottom-left ---
-    // Stack of: health bar, stamina bar, ammo, grenades — 4 rows need to
-    // fit above the bottom edge. Reserve ~90px so the grenade row isn't
-    // clipped off the canvas.
+    // --- Strip background + 1px top border ---
+    this.stripBg = scene.add.rectangle(0, stripTop, MAP_WIDTH_PX, HUD_STRIP_HEIGHT, 0x0a0a1a);
+    this.stripBg.setOrigin(0, 0);
+    this.stripBg.setScrollFactor(0);
+    this.stripBg.setDepth(500);
+
+    this.stripBorder = scene.add.rectangle(0, stripTop, MAP_WIDTH_PX, 1, 0x444444);
+    this.stripBorder.setOrigin(0, 0);
+    this.stripBorder.setScrollFactor(0);
+    this.stripBorder.setDepth(501);
+
+    // --- Left column: health, stamina, ammo, grenades ---
     const hbX = margin;
-    const hbY = height - 90;
+    const hbY = stripTop + 16;
     const hbW = 200;
     const hbH = 20;
 
@@ -96,8 +101,7 @@ export class HUD {
     this.healthText.setScrollFactor(0);
     this.healthText.setDepth(1002);
 
-    // --- Stamina bar: just below health ---
-    const stY = hbY + hbH + 4;
+    const stY = hbY + hbH + 6;
     const stH = 6;
 
     this.staminaBarBg = scene.add.rectangle(hbX, stY, hbW, stH, 0x333333);
@@ -110,8 +114,7 @@ export class HUD {
     this.staminaBarFg.setScrollFactor(0);
     this.staminaBarFg.setDepth(1001);
 
-    // --- Ammo: below stamina ---
-    const ammoY = stY + stH + 8;
+    const ammoY = stY + stH + 10;
     this.ammoText = scene.add.text(hbX, ammoY, `${GUN.MAGAZINE_SIZE} / ${GUN.MAGAZINE_SIZE}`, {
       ...FONT_STYLE,
     });
@@ -126,40 +129,42 @@ export class HUD {
     this.reloadingText.setDepth(1000);
     this.reloadingText.setVisible(false);
 
-    // --- Grenades: below ammo ---
-    const grenadeY = ammoY + 20;
+    const grenadeY = ammoY + 22;
     this.grenadeText = scene.add.text(hbX, grenadeY, `GRN: ${GRENADE_CONFIG.MAX_CARRY}`, {
       ...FONT_STYLE,
     });
     this.grenadeText.setScrollFactor(0);
     this.grenadeText.setDepth(1000);
 
-    // --- Score: top-center ---
-    this.scoreText = scene.add.text(width / 2, margin, 'YOU: 0 | ENEMY: 0', {
+    // --- Middle column: score + timer ---
+    const middleX = MAP_WIDTH_PX / 2;
+    this.scoreText = scene.add.text(middleX, stripTop + 24, 'YOU: 0 | ENEMY: 0', {
       ...FONT_STYLE,
-      fontSize: '16px',
+      fontSize: '18px',
       fontStyle: 'bold',
     });
     this.scoreText.setOrigin(0.5, 0);
     this.scoreText.setScrollFactor(0);
     this.scoreText.setDepth(1000);
 
-    // --- Timer: below score ---
-    this.timerText = scene.add.text(width / 2, margin + 24, '5:00', {
+    this.timerText = scene.add.text(middleX, stripTop + 58, '5:00', {
       ...FONT_STYLE,
-      fontSize: '14px',
+      fontSize: '16px',
     });
     this.timerText.setOrigin(0.5, 0);
     this.timerText.setScrollFactor(0);
     this.timerText.setDepth(1000);
 
-    // --- Kill feed container: top-right ---
-    this.killFeedContainer = scene.add.container(width - margin, margin + 50);
+    // --- Right column: kill feed (right-anchored, stacks downward) ---
+    this.killFeedContainer = scene.add.container(MAP_WIDTH_PX - margin, stripTop + 16);
     this.killFeedContainer.setScrollFactor(0);
     this.killFeedContainer.setDepth(1000);
 
-    // --- Countdown: center ---
-    this.countdownText = scene.add.text(width / 2, height / 2, '', {
+    // --- Map-centered overlays ---
+    const mapCenterX = MAP_WIDTH_PX / 2;
+    const mapCenterY = MAP_HEIGHT_PX / 2;
+
+    this.countdownText = scene.add.text(mapCenterX, mapCenterY, '', {
       ...LARGE_FONT_STYLE,
     });
     this.countdownText.setOrigin(0.5, 0.5);
@@ -167,8 +172,7 @@ export class HUD {
     this.countdownText.setDepth(2000);
     this.countdownText.setVisible(false);
 
-    // --- Death overlay: center ---
-    this.deathOverlay = scene.add.text(width / 2, height / 2, '', {
+    this.deathOverlay = scene.add.text(mapCenterX, mapCenterY, '', {
       ...LARGE_FONT_STYLE,
       color: '#ff3333',
       fontSize: '36px',
@@ -294,6 +298,8 @@ export class HUD {
   }
 
   destroy(): void {
+    this.stripBg.destroy();
+    this.stripBorder.destroy();
     this.healthBarBg.destroy();
     this.healthBarFg.destroy();
     this.healthText.destroy();

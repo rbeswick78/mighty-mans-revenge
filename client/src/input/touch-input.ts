@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import type { RawInput } from './types.js';
+import { MAP_HEIGHT_PX } from '../ui/layout.js';
 
 const JOYSTICK_MAX_RADIUS = 50;
 const DEAD_ZONE_RATIO = 0.15;
@@ -112,6 +113,10 @@ export class TouchInput {
     // Only respond to actual touch events, not mouse clicks. Otherwise
     // desktop users see phantom joystick circles every time they click.
     if (!pointer.wasTouch) return;
+
+    // Ignore touches in the HUD strip so joysticks never spawn below
+    // the gameboard (where they would be obscured by the HUD panel).
+    if (pointer.y >= MAP_HEIGHT_PX) return;
 
     // First confirmed touch — reveal the touch-only UI.
     this.showTouchUI();
