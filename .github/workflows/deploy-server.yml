@@ -6,6 +6,7 @@ on:
     paths:
       - 'server/**'
       - 'shared/**'
+  workflow_dispatch:
 
 jobs:
   deploy-server:
