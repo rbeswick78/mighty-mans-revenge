@@ -217,6 +217,11 @@ export class GameScene extends Phaser.Scene {
     if (this.grenadeRenderer) {
       this.grenadeRenderer.updateGrenades(networkManager.getActiveGrenades());
     }
+
+    // Render pickups (active ones visible, collected ones hidden).
+    if (this.pickupRenderer) {
+      this.pickupRenderer.updatePickups(networkManager.getPickups());
+    }
   }
 
   shutdown(): void {

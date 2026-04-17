@@ -69,7 +69,7 @@ export class PickupRenderer {
 
   private createPickup(state: PickupState): PickupSprite {
     const textureKey =
-      state.type === PickupType.GUN_AMMO ? 'pickup_ammo' : 'pickup_grenade';
+      state.type === PickupType.GUN_AMMO ? 'pickup-ammo' : 'pickup-grenade';
 
     const sprite = this.scene.add.sprite(0, 0, textureKey);
     sprite.setOrigin(0.5, 0.5);

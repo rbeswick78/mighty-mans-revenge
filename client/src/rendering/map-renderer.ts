@@ -8,7 +8,6 @@ export class MapRenderer {
   private scene: Phaser.Scene;
   private container: Phaser.GameObjects.Container | null = null;
   private collisionGrid: CollisionGrid | null = null;
-  private pickupTweens: Phaser.Tweens.Tween[] = [];
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -53,32 +52,9 @@ export class MapRenderer {
       this.container.add(marker);
     }
 
-    // Add pickup location indicators (pulsing dots)
-    for (const pickup of mapData.pickupSpawns) {
-      const x = pickup.x * tileSize + tileSize / 2;
-      const y = pickup.y * tileSize + tileSize / 2;
-
-      const color = pickup.type === 'gun_ammo' ? 0x4488ff : 0xff8800;
-
-      const dot = this.scene.add.graphics();
-      dot.fillStyle(color, 0.6);
-      dot.fillCircle(0, 0, 4);
-      dot.setPosition(x, y);
-      this.container.add(dot);
-
-      // Pulsing animation
-      const tween = this.scene.tweens.add({
-        targets: dot,
-        scaleX: { from: 0.8, to: 1.3 },
-        scaleY: { from: 0.8, to: 1.3 },
-        alpha: { from: 0.8, to: 0.3 },
-        duration: 1000,
-        yoyo: true,
-        repeat: -1,
-        ease: 'Sine.easeInOut',
-      });
-      this.pickupTweens.push(tween);
-    }
+    // Pickup spawn locations are not drawn here — PickupRenderer owns
+    // their visuals based on authoritative server state (visible when
+    // available, invisible while respawning).
 
     // Build collision grid for client-side prediction
     this.collisionGrid = createCollisionGrid(mapData);
@@ -91,11 +67,6 @@ export class MapRenderer {
   }
 
   destroy(): void {
-    for (const tween of this.pickupTweens) {
-      tween.destroy();
-    }
-    this.pickupTweens = [];
-
     if (this.container) {
       this.container.destroy(true);
       this.container = null;

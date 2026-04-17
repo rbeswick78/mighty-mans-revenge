@@ -2,6 +2,7 @@ import type { PlayerId, Vec2 } from '@shared/types/common.js';
 import type { CollisionGrid } from '@shared/types/map.js';
 import type { PlayerInput, PlayerState } from '@shared/types/player.js';
 import type { GrenadeState } from '@shared/types/projectile.js';
+import type { PickupState } from '@shared/types/pickup.js';
 import type {
   ServerMessage,
   ServerGameStateMessage,
@@ -54,6 +55,9 @@ export class NetworkManager {
    */
   private latestGrenades: GrenadeState[] = [];
   private lastGrenadePositions = new Map<string, Vec2>();
+
+  /** Most recent pickups from server gameState. Scene polls for rendering. */
+  private latestPickups: PickupState[] = [];
 
   /**
    * Local-clock timestamp (performance.now() ms) at which the current
@@ -180,6 +184,11 @@ export class NetworkManager {
   /** Most recent active grenades from the server, for rendering. */
   getActiveGrenades(): GrenadeState[] {
     return this.latestGrenades;
+  }
+
+  /** Most recent pickups from the server, for rendering. */
+  getPickups(): PickupState[] {
+    return this.latestPickups;
   }
 
   /**
@@ -323,6 +332,7 @@ export class NetworkManager {
       }
     }
     this.latestGrenades = msg.grenades;
+    this.latestPickups = msg.pickups;
 
     // matchStart is driven by the explicit ServerMatchStartMessage (which
     // also carries the match clock), so this block only debounces and
