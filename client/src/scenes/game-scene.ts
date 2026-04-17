@@ -61,10 +61,6 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.fadeIn(300, 0, 0, 0);
     this.gameService = GameService.getInstance();
 
-    // Prevent the browser context menu from appearing on right-click so
-    // right-click-to-throw-grenade works without a popup.
-    this.input.mouse?.disableContextMenu();
-
     // Render the map
     this.mapRenderer = new MapRenderer(this);
     this.mapRenderer.renderMap(wastelandOutpost as MapData);

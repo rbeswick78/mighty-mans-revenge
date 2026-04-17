@@ -11,6 +11,8 @@ const config: Phaser.Types.Core.GameConfig = {
   parent: 'game-container',
   pixelArt: true,
   roundPixels: true,
+  // Right-click throws grenades, so we never want the browser context menu.
+  disableContextMenu: true,
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,

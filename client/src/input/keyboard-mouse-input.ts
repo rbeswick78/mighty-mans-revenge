@@ -14,6 +14,8 @@ export class KeyboardMouseInput {
     G: Phaser.Input.Keyboard.Key;
   };
   private pointer: Phaser.Input.Pointer;
+  private canvas: HTMLCanvasElement;
+  private onCanvasMouseDown: (e: MouseEvent) => void;
   /** Rising-edge flag for right-click grenade throw, cleared on read. */
   private rightClickPending = false;
 
@@ -37,15 +39,18 @@ export class KeyboardMouseInput {
     // Use the dedicated mouse pointer, not activePointer.
     this.pointer = scene.input.mousePointer ?? scene.input.activePointer;
 
-    // Listen for right-click events directly on the scene input. Polling
-    // pointer.rightButtonDown() wasn't reliably catching presses between
-    // input ticks — an event-driven flag is more robust.
-    // pointer.button: 0 = left, 1 = middle, 2 = right
-    scene.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      if (pointer.button === 2) {
+    // Phaser's event system isn't reliably firing pointerdown for right-click
+    // in this environment (see phaserjs/phaser#6194). The browser always
+    // fires `mousedown` on the canvas with e.button === 2 for right-click,
+    // so we listen there directly. Context menu suppression is handled
+    // globally via the game config (see main.ts).
+    this.canvas = scene.game.canvas;
+    this.onCanvasMouseDown = (e: MouseEvent) => {
+      if (e.button === 2) {
         this.rightClickPending = true;
       }
-    });
+    };
+    this.canvas.addEventListener('mousedown', this.onCanvasMouseDown);
   }
 
   getInput(playerWorldPos: Vec2): RawInput {
@@ -92,6 +97,7 @@ export class KeyboardMouseInput {
   }
 
   destroy(): void {
+    this.canvas.removeEventListener('mousedown', this.onCanvasMouseDown);
     if (this.scene.input.keyboard) {
       this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.W);
       this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.A);
