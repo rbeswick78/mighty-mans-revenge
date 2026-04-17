@@ -15,6 +15,7 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
+  "files": [],
   "references": [
     { "path": "./shared" },
     { "path": "./client" },
