@@ -68,8 +68,11 @@ export class HUD {
     const margin = 16;
 
     // --- Health bar: bottom-left ---
+    // Stack of: health bar, stamina bar, ammo, grenades — 4 rows need to
+    // fit above the bottom edge. Reserve ~90px so the grenade row isn't
+    // clipped off the canvas.
     const hbX = margin;
-    const hbY = height - 60;
+    const hbY = height - 90;
     const hbW = 200;
     const hbH = 20;
 
