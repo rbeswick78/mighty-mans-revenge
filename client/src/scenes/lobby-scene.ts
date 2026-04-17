@@ -6,6 +6,7 @@ const STORAGE_KEY_NICKNAME = 'mmr_nickname';
 
 export class LobbyScene extends Phaser.Scene {
   private nicknameText!: Phaser.GameObjects.Text;
+  private nicknameInput: HTMLInputElement | null = null;
   private searchingText!: Phaser.GameObjects.Text;
   private searchTimerText!: Phaser.GameObjects.Text;
   private cancelButton!: Phaser.GameObjects.Container;
@@ -91,6 +92,13 @@ export class LobbyScene extends Phaser.Scene {
       },
     });
 
+    // Transparent HTML <input> overlaid on the nickname box. Needed so
+    // mobile virtual keyboards appear when the user taps the field —
+    // Phaser-only keyboard listeners don't trigger the soft keyboard.
+    // The Phaser-drawn box/text remain for the retro look; this input
+    // is invisible and just captures text entry + tap focus.
+    this.nicknameInput = this.createNicknameInput(centerX, 234 + yOffset);
+
     // Quick Match button
     this.quickMatchButton = this.createQuickMatchButton(centerX, 290 + yOffset);
 
@@ -126,9 +134,15 @@ export class LobbyScene extends Phaser.Scene {
       color: '#444444',
     }).setOrigin(0.5);
 
-    // Keyboard input for nickname
-    this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
-      this.handleKeyInput(event);
+    // Enter = quick match (works whether the nickname input has focus
+    // or not, since the keydown bubbles up from the input element).
+    this.input.keyboard?.on('keydown-ENTER', () => {
+      if (!this.isSearching) this.onQuickMatch();
+    });
+    // Escape cancels an active search (for desktop; mobile users tap
+    // the CANCEL button).
+    this.input.keyboard?.on('keydown-ESC', () => {
+      if (this.isSearching) this.onCancelSearch();
     });
 
     // Wire up network events
@@ -152,6 +166,8 @@ export class LobbyScene extends Phaser.Scene {
       this.searchTimerEvent.remove();
       this.searchTimerEvent = null;
     }
+    // DOM element is destroyed with the scene; drop the reference.
+    this.nicknameInput = null;
   }
 
   private wireGameServiceEvents(): void {
@@ -267,35 +283,50 @@ export class LobbyScene extends Phaser.Scene {
     return container;
   }
 
-  private handleKeyInput(event: KeyboardEvent): void {
-    if (this.isSearching) {
-      if (event.key === 'Escape') {
-        this.onCancelSearch();
-      }
-      return;
-    }
+  private createNicknameInput(x: number, y: number): HTMLInputElement {
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = this.nickname;
+    input.maxLength = 16;
+    input.setAttribute('autocomplete', 'off');
+    input.setAttribute('autocorrect', 'off');
+    input.setAttribute('autocapitalize', 'off');
+    input.setAttribute('spellcheck', 'false');
+    input.setAttribute('inputmode', 'text');
 
-    if (event.key === 'Backspace') {
-      this.nickname = this.nickname.slice(0, -1);
+    // Match the Phaser-drawn box dimensions, but fully transparent so
+    // the retro pixel text underneath shows through. font-size >= 16px
+    // prevents iOS from auto-zooming on focus.
+    Object.assign(input.style, {
+      width: '240px',
+      height: '32px',
+      padding: '0',
+      margin: '0',
+      border: 'none',
+      outline: 'none',
+      background: 'transparent',
+      color: 'transparent',
+      caretColor: 'transparent',
+      fontSize: '16px',
+      textAlign: 'center',
+    } as Partial<CSSStyleDeclaration>);
+
+    this.add.dom(x, y, input).setOrigin(0.5, 0.5);
+
+    input.addEventListener('input', () => {
+      const sanitized = input.value.replace(/[^a-zA-Z0-9_\-.]/g, '').slice(0, 16);
+      if (sanitized !== input.value) input.value = sanitized;
+      this.nickname = sanitized;
       this.saveNickname();
       this.updateNicknameDisplay();
-      return;
-    }
+    });
 
-    if (event.key === 'Enter') {
-      this.onQuickMatch();
-      return;
-    }
+    // Auto-focus for desktop convenience (no-op for mobile keyboard —
+    // that only appears when the user actually taps, which is fine:
+    // we want users to tap the visible box to open the keyboard).
+    input.focus();
 
-    // Allow alphanumeric and some special chars, max 16 chars
-    if (event.key.length === 1 && this.nickname.length < 16) {
-      const allowed = /^[a-zA-Z0-9_\-.]$/;
-      if (allowed.test(event.key)) {
-        this.nickname += event.key;
-        this.saveNickname();
-        this.updateNicknameDisplay();
-      }
-    }
+    return input;
   }
 
   private updateNicknameDisplay(): void {
@@ -328,6 +359,10 @@ export class LobbyScene extends Phaser.Scene {
 
     this.isSearching = true;
     this.searchStartTime = Date.now();
+
+    // Hide the mobile virtual keyboard once we've committed to a
+    // callsign and started matchmaking.
+    this.nicknameInput?.blur();
 
     // Show searching UI
     this.searchingText.setVisible(true);

@@ -23,6 +23,12 @@ const config: Phaser.Types.Core.GameConfig = {
     // the canvas aspect.
     autoCenter: Phaser.Scale.NO_CENTER,
   },
+  // Enables this.add.dom(...), which lets scenes mount real HTML
+  // elements (e.g. a transparent <input> over the nickname box so
+  // mobile virtual keyboards appear on tap).
+  dom: {
+    createContainer: true,
+  },
   backgroundColor: '#1a1a2e',
   scene: [BootScene, LobbyScene, GameScene, ResultsScene],
 };
