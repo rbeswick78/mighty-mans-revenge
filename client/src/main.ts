@@ -34,4 +34,9 @@ const config: Phaser.Types.Core.GameConfig = {
 };
 
 const game = new Phaser.Game(config);
+
+// Expose the Phaser game on window for Playwright E2E inspection (hooking
+// scene input to verify touch events propagate). Harmless in production.
+(window as unknown as { game: Phaser.Game }).game = game;
+
 export default game;

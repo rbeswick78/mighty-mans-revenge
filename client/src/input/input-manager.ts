@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import type { Vec2 } from '@shared/types/common.js';
 import type { PlayerInput } from '@shared/types/player.js';
+import { isTouchDevice } from './is-touch-device.js';
 import { KeyboardMouseInput } from './keyboard-mouse-input.js';
 import { TouchInput } from './touch-input.js';
 import type { RawInput } from './types.js';
@@ -21,14 +22,7 @@ export class InputManager {
     this.keyboardMouseInput = new KeyboardMouseInput(scene);
     this.touchInput = new TouchInput(scene);
 
-    // Default to keyboard; switch on first touch
-    this.activeMode = 'keyboard';
-
-    scene.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      if (pointer.wasTouch) {
-        this.activeMode = 'touch';
-      }
-    });
+    this.activeMode = isTouchDevice() ? 'touch' : 'keyboard';
 
     if (scene.input.keyboard) {
       scene.input.keyboard.on('keydown', () => {

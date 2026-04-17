@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import type { RawInput } from './types.js';
+import { isTouchDevice } from './is-touch-device.js';
 import { MAP_HEIGHT_PX } from '../ui/layout.js';
 
 const JOYSTICK_MAX_RADIUS = 50;
@@ -31,9 +32,11 @@ export class TouchInput {
   private grenadeButtonText: Phaser.GameObjects.Text;
   private grenadePressed = false;
   private sprintActive = false;
+  private readonly isTouch: boolean;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
+    this.isTouch = isTouchDevice();
 
     // Enable multitouch
     scene.input.addPointer(2);
@@ -52,7 +55,6 @@ export class TouchInput {
     this.grenadeButton = scene.add.circle(btnX, btnY, GRENADE_BUTTON_SIZE, 0xff6600, 0.5);
     this.grenadeButton.setScrollFactor(0);
     this.grenadeButton.setDepth(3000);
-    this.grenadeButton.setInteractive();
     this.grenadeButton.setVisible(false);
 
     this.grenadeButtonText = scene.add.text(btnX, btnY, 'G', {
@@ -84,6 +86,7 @@ export class TouchInput {
     if (this.grenadeButton.visible) return;
     this.grenadeButton.setVisible(true);
     this.grenadeButtonText.setVisible(true);
+    this.grenadeButton.setInteractive();
   }
 
   private createJoystick(): VirtualJoystick {
@@ -110,9 +113,10 @@ export class TouchInput {
   }
 
   private onPointerDown(pointer: Phaser.Input.Pointer): void {
-    // Only respond to actual touch events, not mouse clicks. Otherwise
-    // desktop users see phantom joystick circles every time they click.
-    if (!pointer.wasTouch) return;
+    // Gate on device capability (isTouchDevice()) rather than per-event
+    // pointer.wasTouch — the latter is unreliable on mobile browsers when
+    // a DOM container overlays the canvas.
+    if (!this.isTouch) return;
 
     // Ignore touches in the HUD strip so joysticks never spawn below
     // the gameboard (where they would be obscured by the HUD panel).
