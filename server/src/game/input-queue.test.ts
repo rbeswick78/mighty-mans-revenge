@@ -8,8 +8,11 @@ function makeInput(seq: number, overrides: Partial<PlayerInput> = {}): PlayerInp
     moveX: 0,
     moveY: 0,
     aimAngle: 0,
-    shooting: false,
-    throwGrenade: false,
+    aimingGun: false,
+    firePressed: false,
+    aimingGrenade: false,
+    throwPressed: false,
+    detonatePressed: false,
     sprint: false,
     reload: false,
     tick: 0,
@@ -111,7 +114,8 @@ describe('InputQueue', () => {
       moveX: 1,
       moveY: -1,
       aimAngle: Math.PI / 4,
-      shooting: true,
+      aimingGun: true,
+      firePressed: true,
       sprint: true,
     });
 
@@ -121,7 +125,8 @@ describe('InputQueue', () => {
     expect(drained[0].moveX).toBe(1);
     expect(drained[0].moveY).toBe(-1);
     expect(drained[0].aimAngle).toBe(Math.PI / 4);
-    expect(drained[0].shooting).toBe(true);
+    expect(drained[0].aimingGun).toBe(true);
+    expect(drained[0].firePressed).toBe(true);
     expect(drained[0].sprint).toBe(true);
   });
 });

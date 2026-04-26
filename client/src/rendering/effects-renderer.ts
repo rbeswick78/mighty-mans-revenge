@@ -1,10 +1,60 @@
 import Phaser from 'phaser';
+import type { Vec2 } from '@shared/types/common.js';
+
+const AIM_LINE_COLOR = 0xffffff;
+const AIM_LINE_ALPHA = 0.6;
 
 export class EffectsRenderer {
   private scene: Phaser.Scene;
+  /** Persistent aim graphic; recreated each frame while aiming, cleared otherwise. */
+  private aimGraphic: Phaser.GameObjects.Graphics | null = null;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
+  }
+
+  /** Draw a single straight white line from origin to end (bullet aim). */
+  showBulletAim(originX: number, originY: number, endX: number, endY: number): void {
+    const g = this.ensureAimGraphic();
+    g.clear();
+    g.lineStyle(1, AIM_LINE_COLOR, AIM_LINE_ALPHA);
+    g.beginPath();
+    g.moveTo(originX, originY);
+    g.lineTo(endX, endY);
+    g.strokePath();
+  }
+
+  /** Draw a white polyline along the predicted grenade trajectory. */
+  showGrenadeAim(points: Vec2[]): void {
+    if (points.length < 2) {
+      this.clearAim();
+      return;
+    }
+    const g = this.ensureAimGraphic();
+    g.clear();
+    g.lineStyle(1, AIM_LINE_COLOR, AIM_LINE_ALPHA);
+    g.beginPath();
+    g.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) {
+      g.lineTo(points[i].x, points[i].y);
+    }
+    g.strokePath();
+  }
+
+  /** Hide the aim line. */
+  clearAim(): void {
+    if (this.aimGraphic) {
+      this.aimGraphic.clear();
+    }
+  }
+
+  private ensureAimGraphic(): Phaser.GameObjects.Graphics {
+    if (!this.aimGraphic) {
+      this.aimGraphic = this.scene.add.graphics();
+      // Render below players (depth 10) so the line doesn't obscure them.
+      this.aimGraphic.setDepth(5);
+    }
+    return this.aimGraphic;
   }
 
   showBulletTrail(startX: number, startY: number, endX: number, endY: number): void {
@@ -171,6 +221,9 @@ export class EffectsRenderer {
   }
 
   destroy(): void {
-    // Effects are self-cleaning; nothing to track persistently
+    if (this.aimGraphic) {
+      this.aimGraphic.destroy();
+      this.aimGraphic = null;
+    }
   }
 }

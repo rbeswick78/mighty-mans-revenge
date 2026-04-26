@@ -18,6 +18,8 @@ import {
   vecAdd,
   vecScale,
   raycastAgainstGrid,
+  rayIntersectsAABB,
+  stepGrenade,
 } from '@shared/game';
 
 export interface ExplosionResult {
@@ -38,53 +40,6 @@ let nextGrenadeId = 0;
 
 function generateGrenadeId(): string {
   return `grenade_${Date.now()}_${nextGrenadeId++}`;
-}
-
-/**
- * Ray vs AABB intersection test.
- * Returns the distance along the ray to the intersection point, or null if no hit.
- * Position is the center of the AABB.
- */
-function rayIntersectsAABB(
-  rayOriginX: number,
-  rayOriginY: number,
-  rayDirX: number,
-  rayDirY: number,
-  centerX: number,
-  centerY: number,
-  halfWidth: number,
-  halfHeight: number,
-): number | null {
-  const minX = centerX - halfWidth;
-  const maxX = centerX + halfWidth;
-  const minY = centerY - halfHeight;
-  const maxY = centerY + halfHeight;
-
-  let tmin = -Infinity;
-  let tmax = Infinity;
-
-  if (rayDirX !== 0) {
-    const t1 = (minX - rayOriginX) / rayDirX;
-    const t2 = (maxX - rayOriginX) / rayDirX;
-    tmin = Math.max(tmin, Math.min(t1, t2));
-    tmax = Math.min(tmax, Math.max(t1, t2));
-  } else {
-    if (rayOriginX < minX || rayOriginX > maxX) return null;
-  }
-
-  if (rayDirY !== 0) {
-    const t1 = (minY - rayOriginY) / rayDirY;
-    const t2 = (maxY - rayOriginY) / rayDirY;
-    tmin = Math.max(tmin, Math.min(t1, t2));
-    tmax = Math.min(tmax, Math.max(t1, t2));
-  } else {
-    if (rayOriginY < minY || rayOriginY > maxY) return null;
-  }
-
-  if (tmax < 0 || tmin > tmax) return null;
-
-  // Return the nearest positive intersection
-  return tmin >= 0 ? tmin : tmax >= 0 ? tmax : null;
 }
 
 /**
@@ -111,6 +66,11 @@ export class CombatManager {
 
   getGrenades(): GrenadeState[] {
     return this.grenades;
+  }
+
+  /** Find this player's in-flight grenade, if any. */
+  getActiveGrenadeFor(playerId: PlayerId): GrenadeState | undefined {
+    return this.grenades.find((g) => g.throwerId === playerId);
   }
 
   processShot(
@@ -213,11 +173,29 @@ export class CombatManager {
       id: generateGrenadeId(),
       position: { x: position.x, y: position.y },
       velocity,
-      fuseTimer: GRENADE.FUSE_TIME,
+      safetyFuseTimer: GRENADE.SAFETY_FUSE,
       throwerId,
     };
     this.grenades.push(grenade);
     return grenade;
+  }
+
+  /**
+   * Manually detonate a single grenade (typically from a player's second
+   * right-click). Removes it from the active list and applies damage to
+   * everyone in the blast radius with line of sight. Returns null if the
+   * grenade was already gone.
+   */
+  detonateGrenade(
+    grenadeId: string,
+    players: Map<PlayerId, PlayerState>,
+    grid: CollisionGrid,
+  ): ExplosionResult | null {
+    const idx = this.grenades.findIndex((g) => g.id === grenadeId);
+    if (idx === -1) return null;
+    const grenade = this.grenades[idx];
+    this.grenades.splice(idx, 1);
+    return this.applyExplosion(grenade, players, grid);
   }
 
   updateGrenades(
@@ -228,59 +206,16 @@ export class CombatManager {
     const explosions: ExplosionResult[] = [];
 
     for (const grenade of this.grenades) {
-      // Move grenade
-      const newX = grenade.position.x + grenade.velocity.x * dt;
-      const newY = grenade.position.y + grenade.velocity.y * dt;
-
-      // Check wall collisions for bouncing
-      const tileX = Math.floor(newX / grid.tileSize);
-      const tileY = Math.floor(newY / grid.tileSize);
-      const oldTileX = Math.floor(grenade.position.x / grid.tileSize);
-      const oldTileY = Math.floor(grenade.position.y / grid.tileSize);
-
-      let hitWallX = false;
-      let hitWallY = false;
-
-      // Check X movement
-      if (tileX !== oldTileX) {
-        const checkX = tileX < 0 || tileX >= grid.width || tileY < 0 || tileY >= grid.height
-          ? true
-          : grid.solid[Math.floor(grenade.position.y / grid.tileSize)]?.[tileX] ?? true;
-        if (checkX) hitWallX = true;
-      }
-
-      // Check Y movement
-      if (tileY !== oldTileY) {
-        const checkY = tileX < 0 || tileX >= grid.width || tileY < 0 || tileY >= grid.height
-          ? true
-          : grid.solid[tileY]?.[Math.floor(grenade.position.x / grid.tileSize)] ?? true;
-        if (checkY) hitWallY = true;
-      }
-
-      if (hitWallX) {
-        grenade.velocity.x = -grenade.velocity.x;
-        // Don't update X position
-      } else {
-        grenade.position.x = newX;
-      }
-
-      if (hitWallY) {
-        grenade.velocity.y = -grenade.velocity.y;
-        // Don't update Y position
-      } else {
-        grenade.position.y = newY;
-      }
-
-      // Decrement fuse
-      grenade.fuseTimer -= dt;
+      stepGrenade(grenade, dt, grid);
+      grenade.safetyFuseTimer -= dt;
     }
 
-    // Process explosions for grenades whose fuse has expired
+    // Process explosions for grenades whose safety fuse has expired
     const exploded: GrenadeState[] = [];
     const remaining: GrenadeState[] = [];
 
     for (const grenade of this.grenades) {
-      if (grenade.fuseTimer <= 0) {
+      if (grenade.safetyFuseTimer <= 0) {
         exploded.push(grenade);
       } else {
         remaining.push(grenade);
@@ -290,35 +225,7 @@ export class CombatManager {
     this.grenades = remaining;
 
     for (const grenade of exploded) {
-      const damages: ExplosionResult['damages'] = [];
-
-      for (const [playerId, playerState] of players) {
-        if (playerState.isDead) continue;
-
-        if (!isInBlastRadius(grenade.position, playerState.position)) continue;
-
-        // Check line of sight — walls block explosion damage
-        if (!hasLineOfSight(grenade.position, playerState.position, grid)) continue;
-
-        const dist = vecDistance(grenade.position, playerState.position);
-        const damage = calculateGrenadeDamage(dist);
-
-        if (damage > 0) {
-          const result = this.applyDamage(playerState, damage, grenade.throwerId);
-          damages.push({
-            playerId,
-            damage,
-            killed: result.killed,
-          });
-        }
-      }
-
-      explosions.push({
-        position: { x: grenade.position.x, y: grenade.position.y },
-        damages,
-        grenadeId: grenade.id,
-        throwerId: grenade.throwerId,
-      });
+      explosions.push(this.applyExplosion(grenade, players, grid));
     }
 
     return { explosions };
@@ -347,5 +254,39 @@ export class CombatManager {
     }
 
     return { killed: false };
+  }
+
+  /** Internal: apply explosion damage to all players in range with LOS. */
+  private applyExplosion(
+    grenade: GrenadeState,
+    players: Map<PlayerId, PlayerState>,
+    grid: CollisionGrid,
+  ): ExplosionResult {
+    const damages: ExplosionResult['damages'] = [];
+
+    for (const [playerId, playerState] of players) {
+      if (playerState.isDead) continue;
+      if (!isInBlastRadius(grenade.position, playerState.position)) continue;
+      if (!hasLineOfSight(grenade.position, playerState.position, grid)) continue;
+
+      const dist = vecDistance(grenade.position, playerState.position);
+      const damage = calculateGrenadeDamage(dist);
+
+      if (damage > 0) {
+        const result = this.applyDamage(playerState, damage, grenade.throwerId);
+        damages.push({
+          playerId,
+          damage,
+          killed: result.killed,
+        });
+      }
+    }
+
+    return {
+      position: { x: grenade.position.x, y: grenade.position.y },
+      damages,
+      grenadeId: grenade.id,
+      throwerId: grenade.throwerId,
+    };
   }
 }

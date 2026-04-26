@@ -3,7 +3,6 @@ import { PlayerManager } from './player-manager.js';
 import {
   PLAYER,
   GUN,
-  GRENADE,
   RESPAWN,
 } from '@shared/game';
 import type { CollisionGrid, PlayerInput } from '@shared/game';
@@ -36,8 +35,11 @@ function makeInput(seq: number, overrides: Partial<PlayerInput> = {}): PlayerInp
     moveX: 0,
     moveY: 0,
     aimAngle: 0,
-    shooting: false,
-    throwGrenade: false,
+    aimingGun: false,
+    firePressed: false,
+    aimingGrenade: false,
+    throwPressed: false,
+    detonatePressed: false,
     sprint: false,
     reload: false,
     tick: 0,
@@ -65,7 +67,6 @@ describe('PlayerManager', () => {
       expect(player.nickname).toBe('Alice');
       expect(player.health).toBe(PLAYER.MAX_HEALTH);
       expect(player.ammo).toBe(GUN.MAGAZINE_SIZE);
-      expect(player.grenades).toBe(GRENADE.MAX_CARRY);
       expect(player.isDead).toBe(false);
       expect(player.score).toBe(0);
       expect(player.deaths).toBe(0);
@@ -276,7 +277,6 @@ describe('PlayerManager', () => {
       expect(player.isDead).toBe(false);
       expect(player.health).toBe(PLAYER.MAX_HEALTH);
       expect(player.ammo).toBe(GUN.MAGAZINE_SIZE);
-      expect(player.grenades).toBe(GRENADE.MAX_CARRY);
       expect(player.invulnerableTimer).toBe(RESPAWN.INVULNERABILITY_DURATION);
     });
 

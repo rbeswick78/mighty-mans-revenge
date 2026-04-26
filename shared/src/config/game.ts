@@ -13,7 +13,10 @@ export const GUN = Object.freeze({
   DAMAGE_MAX: 25,
   FALLOFF_RANGE_MIN: 64,
   FALLOFF_RANGE_MAX: 400,
-  FIRE_RATE: 0.15,
+  /** Number of rounds in a single burst fired on left-click release. */
+  BURST_SIZE: 3,
+  /** Seconds between each round in a burst. */
+  BURST_INTERVAL: 0.15,
   MAGAZINE_SIZE: 30,
   RELOAD_TIME: 2.0,
 });
@@ -21,14 +24,23 @@ export const GUN = Object.freeze({
 export const GRENADE = Object.freeze({
   DAMAGE: 80,
   BLAST_RADIUS: 96,
-  FUSE_TIME: 2.5,
-  MAX_CARRY: 3,
+  /**
+   * Fallback fuse — grenades wait for a manual right-click detonation,
+   * but auto-explode after this many seconds if the player forgets or dies.
+   */
+  SAFETY_FUSE: 5.0,
   THROW_SPEED: 300,
+});
+
+export const TRAJECTORY = Object.freeze({
+  /** How far ahead (seconds) the grenade aim preview simulates. */
+  PREVIEW_SECONDS: 1.5,
+  /** Sub-step used when simulating the preview path. */
+  PREVIEW_STEP_DT: 1 / 60,
 });
 
 export const PICKUP = Object.freeze({
   GUN_AMMO_AMOUNT: 15,
-  GRENADE_AMOUNT: 1,
   RESPAWN_TIME: 15,
 });
 

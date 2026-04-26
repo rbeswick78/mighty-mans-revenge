@@ -1,7 +1,25 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Match } from './match.js';
-import { MatchPhase, MATCH, RESPAWN, PLAYER, GUN, GRENADE } from '@shared/game';
-import type { MapData } from '@shared/game';
+import { MatchPhase, MATCH, RESPAWN, PLAYER, GUN } from '@shared/game';
+import type { MapData, PlayerInput } from '@shared/game';
+
+function makeInput(seq: number, overrides: Partial<PlayerInput> = {}): PlayerInput {
+  return {
+    sequenceNumber: seq,
+    moveX: 0,
+    moveY: 0,
+    aimAngle: 0,
+    aimingGun: false,
+    firePressed: false,
+    aimingGrenade: false,
+    throwPressed: false,
+    detonatePressed: false,
+    sprint: false,
+    reload: false,
+    tick: seq,
+    ...overrides,
+  };
+}
 
 function makeMapData(): MapData {
   return {
@@ -141,7 +159,6 @@ describe('Match', () => {
       expect(victim.invulnerableTimer).toBeGreaterThan(0);
       expect(victim.invulnerableTimer).toBeLessThanOrEqual(RESPAWN.INVULNERABILITY_DURATION);
       expect(victim.ammo).toBe(GUN.MAGAZINE_SIZE);
-      expect(victim.grenades).toBe(GRENADE.MAX_CARRY);
     });
   });
 
@@ -203,7 +220,6 @@ describe('Match', () => {
       const player = match.players.get('player-0')!;
       expect(player.health).toBe(PLAYER.MAX_HEALTH);
       expect(player.ammo).toBe(GUN.MAGAZINE_SIZE);
-      expect(player.grenades).toBe(GRENADE.MAX_CARRY);
       expect(player.isDead).toBe(false);
       expect(player.score).toBe(0);
     });
@@ -211,6 +227,168 @@ describe('Match', () => {
     it('should support N players', () => {
       const bigMatch = createMatch(5);
       expect(bigMatch.players.size).toBe(5);
+    });
+  });
+
+  describe('burst firing', () => {
+    function startActiveMatch(): Match {
+      const m = createMatch();
+      m.startCountdown();
+      m.update(MATCH.COUNTDOWN_DURATION + 0.05);
+      return m;
+    }
+
+    it('fires the first round on firePressed and queues the rest', () => {
+      const m = startActiveMatch();
+      const player = m.players.get('player-0')!;
+      const startAmmo = player.ammo;
+
+      m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+      m.update(0.05);
+
+      // First shot already fired.
+      expect(player.ammo).toBe(startAmmo - 1);
+      expect(m.getTickBulletTrails().length).toBe(1);
+    });
+
+    it('fires exactly 3 shots over the burst interval, even if aim changes', () => {
+      const m = startActiveMatch();
+      const player = m.players.get('player-0')!;
+      const startAmmo = player.ammo;
+
+      m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+      m.update(0.05);
+
+      // After tick 1: 1 shot fired.
+      expect(startAmmo - player.ammo).toBe(1);
+
+      // The player rotates to the side, but the burst is locked at 0 and
+      // continues independently.
+      m.queueInput('player-0', makeInput(2, { aimAngle: Math.PI / 2 }));
+      // Advance ~150ms — should fire shot 2.
+      m.update(0.15);
+      expect(startAmmo - player.ammo).toBe(2);
+
+      m.queueInput('player-0', makeInput(3, { aimAngle: Math.PI }));
+      m.update(0.15);
+      expect(startAmmo - player.ammo).toBe(3);
+
+      // No more shots after the burst is exhausted.
+      m.update(0.5);
+      expect(startAmmo - player.ammo).toBe(3);
+    });
+
+    it('cancels the burst when the player dies mid-burst', () => {
+      const m = startActiveMatch();
+      const player = m.players.get('player-0')!;
+      const startAmmo = player.ammo;
+
+      m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+      m.update(0.05);
+      expect(startAmmo - player.ammo).toBe(1);
+
+      // Kill the shooter.
+      m.onKill('player-1', 'player-0', 'gun');
+
+      // Advance enough to fire the rest of the burst.
+      m.update(0.5);
+      // No more shots fired.
+      expect(startAmmo - player.ammo).toBe(1);
+    });
+
+    it('with only 2 rounds in the mag, fires 2 and starts an auto-reload', () => {
+      const m = startActiveMatch();
+      const player = m.players.get('player-0')!;
+      player.ammo = 2;
+
+      m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+      m.update(0.05);
+      expect(player.ammo).toBe(1);
+
+      // Tick to fire shot 2 (~150ms).
+      m.update(0.15);
+      expect(player.ammo).toBe(0);
+
+      // Tick to attempt shot 3 — out of ammo, should start a reload.
+      m.update(0.15);
+      expect(player.ammo).toBe(0);
+      expect(player.isReloading).toBe(true);
+    });
+  });
+
+  describe('manual grenade detonation', () => {
+    function startActiveMatch(): Match {
+      const m = createMatch();
+      m.startCountdown();
+      m.update(MATCH.COUNTDOWN_DURATION + 0.05);
+      return m;
+    }
+
+    it('throw on throwPressed spawns a grenade', () => {
+      const m = startActiveMatch();
+      expect(m.getActiveGrenades().length).toBe(0);
+
+      m.queueInput('player-0', makeInput(1, { throwPressed: true, aimAngle: 0 }));
+      m.update(0.05);
+
+      expect(m.getActiveGrenades().length).toBe(1);
+      expect(m.getActiveGrenades()[0].throwerId).toBe('player-0');
+    });
+
+    it('refuses to throw a second grenade while one is in flight', () => {
+      const m = startActiveMatch();
+
+      m.queueInput('player-0', makeInput(1, { throwPressed: true, aimAngle: 0 }));
+      m.update(0.05);
+      expect(m.getActiveGrenades().length).toBe(1);
+
+      m.queueInput('player-0', makeInput(2, { throwPressed: true, aimAngle: 0 }));
+      m.update(0.05);
+      expect(m.getActiveGrenades().length).toBe(1);
+    });
+
+    it('detonatePressed explodes the player\'s grenade and removes it', () => {
+      const m = startActiveMatch();
+
+      m.queueInput('player-0', makeInput(1, { throwPressed: true, aimAngle: 0 }));
+      m.update(0.05);
+      expect(m.getActiveGrenades().length).toBe(1);
+
+      m.queueInput('player-0', makeInput(2, { detonatePressed: true }));
+      m.update(0.05);
+      expect(m.getActiveGrenades().length).toBe(0);
+    });
+
+    it('safety fuse auto-detonates if no detonate input arrives', () => {
+      const m = startActiveMatch();
+
+      m.queueInput('player-0', makeInput(1, { throwPressed: true, aimAngle: 0 }));
+      m.update(0.05);
+      expect(m.getActiveGrenades().length).toBe(1);
+
+      // Advance well past the safety fuse (5s).
+      for (let i = 0; i < 120; i++) {
+        m.update(0.05);
+      }
+      expect(m.getActiveGrenades().length).toBe(0);
+    });
+
+    it('keeps the grenade alive after the thrower dies — safety fuse still ticks', () => {
+      const m = startActiveMatch();
+      m.queueInput('player-0', makeInput(1, { throwPressed: true, aimAngle: 0 }));
+      m.update(0.05);
+      expect(m.getActiveGrenades().length).toBe(1);
+
+      m.onKill('player-1', 'player-0', 'gun');
+
+      // Grenade not removed by death; only by safety fuse / detonate.
+      expect(m.getActiveGrenades().length).toBe(1);
+
+      // Advance past safety fuse.
+      for (let i = 0; i < 120; i++) {
+        m.update(0.05);
+      }
+      expect(m.getActiveGrenades().length).toBe(0);
     });
   });
 });

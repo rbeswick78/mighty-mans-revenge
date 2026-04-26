@@ -18,7 +18,6 @@ function createPlayer(overrides: Partial<PlayerState> & { id: PlayerId }): Playe
     health: PLAYER.MAX_HEALTH,
     maxHealth: PLAYER.MAX_HEALTH,
     ammo: GUN.MAGAZINE_SIZE,
-    grenades: GRENADE.MAX_CARRY,
     isReloading: false,
     reloadTimer: 0,
     isSprinting: false,
@@ -211,11 +210,11 @@ describe('CombatManager', () => {
   });
 
   describe('grenade system', () => {
-    it('spawns a grenade with correct velocity and fuse timer', () => {
+    it('spawns a grenade with correct velocity and safety fuse', () => {
       const grenade = combat.spawnGrenade('player1', { x: 100, y: 100 }, 0);
 
       expect(grenade.throwerId).toBe('player1');
-      expect(grenade.fuseTimer).toBe(GRENADE.FUSE_TIME);
+      expect(grenade.safetyFuseTimer).toBe(GRENADE.SAFETY_FUSE);
       expect(grenade.velocity.x).toBeCloseTo(GRENADE.THROW_SPEED);
       expect(grenade.velocity.y).toBeCloseTo(0);
       expect(grenade.position).toEqual({ x: 100, y: 100 });
@@ -242,7 +241,7 @@ describe('CombatManager', () => {
       const players = new Map<PlayerId, PlayerState>([['victim', victim]]);
 
       // Set fuse to nearly expired
-      grenades[0].fuseTimer = 0.01;
+      grenades[0].safetyFuseTimer = 0.01;
 
       const result = combat.updateGrenades(0.02, players, grid);
 
@@ -269,7 +268,7 @@ describe('CombatManager', () => {
       const players = new Map<PlayerId, PlayerState>([['victim', victim]]);
 
       // Set fuse to about to expire
-      grenades[0].fuseTimer = 0.01;
+      grenades[0].safetyFuseTimer = 0.01;
 
       const result = combat.updateGrenades(0.02, players, grid);
 
@@ -283,7 +282,7 @@ describe('CombatManager', () => {
       combat.spawnGrenade('attacker', { x: 200, y: 200 }, 0);
       const grenades = combat.getGrenades();
       grenades[0].velocity = { x: 0, y: 0 };
-      grenades[0].fuseTimer = 0.01;
+      grenades[0].safetyFuseTimer = 0.01;
 
       const victim = createPlayer({ id: 'victim', position: { x: 210, y: 200 }, isDead: true });
       const players = new Map<PlayerId, PlayerState>([['victim', victim]]);
@@ -292,6 +291,37 @@ describe('CombatManager', () => {
 
       expect(result.explosions.length).toBe(1);
       expect(result.explosions[0].damages.length).toBe(0);
+    });
+
+    it('returns the active grenade for a thrower', () => {
+      expect(combat.getActiveGrenadeFor('p1')).toBeUndefined();
+      const g = combat.spawnGrenade('p1', { x: 100, y: 100 }, 0);
+      expect(combat.getActiveGrenadeFor('p1')?.id).toBe(g.id);
+      expect(combat.getActiveGrenadeFor('p2')).toBeUndefined();
+    });
+
+    it('detonateGrenade explodes the named grenade and removes it', () => {
+      const grid = createOpenGrid();
+      const g = combat.spawnGrenade('attacker', { x: 200, y: 200 }, 0);
+      const grenades = combat.getGrenades();
+      grenades[0].velocity = { x: 0, y: 0 };
+
+      const victim = createPlayer({ id: 'victim', position: { x: 210, y: 200 } });
+      const players = new Map<PlayerId, PlayerState>([['victim', victim]]);
+
+      const explosion = combat.detonateGrenade(g.id, players, grid);
+
+      expect(explosion).not.toBeNull();
+      expect(explosion!.damages.length).toBe(1);
+      expect(explosion!.damages[0].playerId).toBe('victim');
+      expect(combat.getActiveGrenadeFor('attacker')).toBeUndefined();
+      expect(combat.getGrenades().length).toBe(0);
+    });
+
+    it('detonateGrenade returns null for an unknown id', () => {
+      const grid = createOpenGrid();
+      const result = combat.detonateGrenade('nonexistent', new Map(), grid);
+      expect(result).toBeNull();
     });
 
     it('bounces off walls', () => {

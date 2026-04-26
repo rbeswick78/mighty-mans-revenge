@@ -6,7 +6,6 @@ import {
   MapData,
   PICKUP,
   GUN,
-  GRENADE,
 } from '@shared/game';
 
 const MAX_AMMO = GUN.MAGAZINE_SIZE * 2;
@@ -21,11 +20,16 @@ export class PickupManager {
     this.nextId = 0;
 
     for (const spawn of mapData.pickupSpawns) {
+      // Grenades have no carry count anymore, so grenade pickups are no-ops
+      // and we skip spawning them. Maps may still declare them; the schema
+      // is preserved for backwards compatibility.
+      if (spawn.type !== 'gun_ammo') continue;
+
       const id = `pickup-${this.nextId++}`;
       const tileSize = mapData.tileSize;
       const pickup: PickupState = {
         id,
-        type: spawn.type === 'gun_ammo' ? PickupType.GUN_AMMO : PickupType.GRENADE,
+        type: PickupType.GUN_AMMO,
         position: {
           x: spawn.x * tileSize + tileSize / 2,
           y: spawn.y * tileSize + tileSize / 2,
@@ -89,14 +93,9 @@ export class PickupManager {
         player.ammo = Math.min(player.ammo + PICKUP.GUN_AMMO_AMOUNT, MAX_AMMO);
         return true;
       }
-      case PickupType.GRENADE: {
-        if (player.grenades >= GRENADE.MAX_CARRY) return false;
-        player.grenades = Math.min(
-          player.grenades + PICKUP.GRENADE_AMOUNT,
-          GRENADE.MAX_CARRY,
-        );
-        return true;
-      }
+      case PickupType.GRENADE:
+        // Grenades have no carry count — pickup is a no-op.
+        return false;
       default:
         return false;
     }

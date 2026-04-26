@@ -5,7 +5,6 @@ import {
   RESPAWN,
   PLAYER,
   GUN,
-  GRENADE,
   calculateMovement,
 } from '@shared/game';
 import type {
@@ -26,6 +25,14 @@ import { CombatManager } from './combat-manager.js';
 import { getGameMode } from './modes/index.js';
 import type { GameMode, MatchContext } from './modes/game-mode.js';
 
+interface PendingBurst {
+  shotsRemaining: number;
+  /** Seconds until the next shot in the burst fires. */
+  nextShotIn: number;
+  /** Aim angle locked when the player released LMB. */
+  lockedAngle: number;
+}
+
 export class Match implements MatchContext {
   readonly matchId: string;
   phase: MatchPhase = MatchPhase.WAITING;
@@ -42,10 +49,8 @@ export class Match implements MatchContext {
   private tickBulletTrails: BulletTrail[] = [];
   /** Most recent input per player, processed each tick. */
   private pendingInputs: Map<PlayerId, PlayerInput> = new Map();
-  /** Fire rate cooldown per player, in seconds. */
-  private fireCooldowns: Map<PlayerId, number> = new Map();
-  /** Tracks throwGrenade rising edge so holding the button only throws once. */
-  private grenadeHeld: Map<PlayerId, boolean> = new Map();
+  /** Active 3-shot bursts in flight, keyed by player. */
+  private pendingBursts: Map<PlayerId, PendingBurst> = new Map();
   /** Timestamp when the match became ACTIVE, for duration tracking. */
   get matchStartTime(): number {
     return this._matchStartTimeMs;
@@ -81,8 +86,21 @@ export class Match implements MatchContext {
   queueInput(playerId: PlayerId, input: PlayerInput): void {
     const player = this.players.get(playerId);
     if (!player) return;
-    // Keep only the latest input per player; it carries the cumulative state
-    // (movement, aim, buttons) so intermediate inputs can be safely dropped.
+
+    // Most fields (movement, aim, sprint) are level signals — overwriting is
+    // safe. The release/press edge fields are one-shot signals; if multiple
+    // inputs arrive within a single tick window, OR them onto the latest so
+    // we don't drop a click.
+    const existing = this.pendingInputs.get(playerId);
+    if (existing) {
+      input = {
+        ...input,
+        firePressed: input.firePressed || existing.firePressed,
+        throwPressed: input.throwPressed || existing.throwPressed,
+        detonatePressed: input.detonatePressed || existing.detonatePressed,
+      };
+    }
+
     this.pendingInputs.set(playerId, input);
     player.lastProcessedInput = input.sequenceNumber;
     player.aimAngle = input.aimAngle;
@@ -122,6 +140,9 @@ export class Match implements MatchContext {
       victim.respawnTimer = RESPAWN.DELAY;
       victim.deaths++;
     }
+
+    // Cancel any in-flight burst for the killed player.
+    this.pendingBursts.delete(victimId);
 
     this.killFeed.push({
       killerId,
@@ -227,15 +248,9 @@ export class Match implements MatchContext {
     // broadcast in the next gameState message.
     this.tickBulletTrails = [];
 
-    // Decrement fire cooldowns
-    for (const [id, cd] of this.fireCooldowns) {
-      const next = cd - dt;
-      if (next <= 0) this.fireCooldowns.delete(id);
-      else this.fireCooldowns.set(id, next);
-    }
-
-    // Process movement for each player using their most recent input.
     const grid = this.mapManager.getCollisionGrid();
+
+    // Process movement and player-driven actions for each player.
     for (const [playerId, player] of this.players) {
       if (player.isDead) continue;
       const input = this.pendingInputs.get(playerId);
@@ -255,68 +270,55 @@ export class Match implements MatchContext {
         player.reloadTimer = GUN.RELOAD_TIME;
       }
 
-      // Shoot
-      const onCooldown = (this.fireCooldowns.get(playerId) ?? 0) > 0;
+      // Start a burst on the LMB-release edge. Refuse if the player is
+      // already mid-burst, reloading, or out of ammo.
+      const alreadyBursting = this.pendingBursts.has(playerId);
       if (
-        input.shooting &&
-        !onCooldown &&
+        input.firePressed &&
+        !alreadyBursting &&
         !player.isReloading &&
         player.ammo > 0
       ) {
-        const shot = this.combatManager.processShot(
-          playerId,
-          input.aimAngle,
-          this.players,
-          grid,
-        );
-        this.tickBulletTrails.push(shot.trail);
-        player.ammo -= 1;
-        this.fireCooldowns.set(playerId, GUN.FIRE_RATE);
-        this.stats.recordShot(playerId);
-
-        if (shot.hit && shot.victimId && shot.damage !== undefined) {
-          const victim = this.players.get(shot.victimId);
-          if (victim) {
-            const result = this.combatManager.applyDamage(victim, shot.damage, playerId);
-            this.stats.recordHit(playerId);
-            this.stats.recordDamage(playerId, shot.damage);
-            if (result.killed && result.entry) {
-              this.onKill(playerId, shot.victimId, 'gun');
-            }
-          }
+        this.fireOneShot(playerId, input.aimAngle, grid);
+        // Queue the remaining shots if the burst has more than one round.
+        if (GUN.BURST_SIZE > 1) {
+          this.pendingBursts.set(playerId, {
+            shotsRemaining: GUN.BURST_SIZE - 1,
+            nextShotIn: GUN.BURST_INTERVAL,
+            lockedAngle: input.aimAngle,
+          });
         }
       }
 
-      // Throw grenade (rising edge only)
-      const wasHeld = this.grenadeHeld.get(playerId) ?? false;
-      if (input.throwGrenade && !wasHeld && player.grenades > 0) {
+      // Throw grenade (release edge), only if no live grenade for this player.
+      if (
+        input.throwPressed &&
+        !this.combatManager.getActiveGrenadeFor(playerId)
+      ) {
         this.combatManager.spawnGrenade(playerId, player.position, input.aimAngle);
-        player.grenades -= 1;
         this.stats.recordGrenade(playerId);
       }
-      this.grenadeHeld.set(playerId, input.throwGrenade);
+
+      // Manual detonation (press edge), only if a live grenade exists.
+      if (input.detonatePressed) {
+        const active = this.combatManager.getActiveGrenadeFor(playerId);
+        if (active) {
+          const explosion = this.combatManager.detonateGrenade(active.id, this.players, grid);
+          if (explosion) {
+            this.recordExplosion(explosion);
+          }
+        }
+      }
     }
     this.pendingInputs.clear();
 
-    // Update grenades (movement, fuse, explosions)
+    // Advance any pending bursts.
+    this.advanceBursts(dt, grid);
+
+    // Update grenades (movement + safety fuse + explosions)
     const { explosions } = this.combatManager.updateGrenades(dt, this.players, grid);
     for (const explosion of explosions) {
-      for (const dmg of explosion.damages) {
-        // Credit damage to the thrower. Self-damage from your own grenade
-        // is real and intentional, but don't award yourself a kill.
-        this.stats.recordDamage(explosion.throwerId, dmg.damage);
-        if (dmg.killed && dmg.playerId !== explosion.throwerId) {
-          this.onKill(explosion.throwerId, dmg.playerId, 'grenade');
-        } else if (dmg.killed) {
-          // Suicide: mark dead without crediting a kill.
-          const victim = this.players.get(dmg.playerId);
-          if (victim) {
-            victim.isDead = true;
-            victim.respawnTimer = RESPAWN.DELAY;
-            victim.deaths++;
-          }
-        }
-      }
+      this.recordExplosion(explosion);
     }
 
     // Reload timers
@@ -371,6 +373,94 @@ export class Match implements MatchContext {
     this.checkMatchEnd();
   }
 
+  /**
+   * Advance burst timers and fire any rounds whose interval has elapsed.
+   * Cancels a burst if the player runs out of ammo (and starts a reload) or
+   * dies mid-burst.
+   */
+  private advanceBursts(dt: number, grid: ReturnType<MapManager['getCollisionGrid']>): void {
+    for (const [playerId, burst] of this.pendingBursts) {
+      const player = this.players.get(playerId);
+      if (!player || player.isDead) {
+        this.pendingBursts.delete(playerId);
+        continue;
+      }
+
+      burst.nextShotIn -= dt;
+      // Fire all shots whose timer has elapsed (handles slow ticks gracefully).
+      while (burst.nextShotIn <= 0 && burst.shotsRemaining > 0) {
+        if (player.ammo <= 0) {
+          // Out of ammo mid-burst: drop remaining shots and start a reload.
+          if (!player.isReloading) {
+            player.isReloading = true;
+            player.reloadTimer = GUN.RELOAD_TIME;
+          }
+          burst.shotsRemaining = 0;
+          break;
+        }
+
+        this.fireOneShot(playerId, burst.lockedAngle, grid);
+        burst.shotsRemaining -= 1;
+        burst.nextShotIn += GUN.BURST_INTERVAL;
+      }
+
+      if (burst.shotsRemaining <= 0) {
+        this.pendingBursts.delete(playerId);
+      }
+    }
+  }
+
+  /**
+   * Fire one round at the given angle from the player's current position.
+   * Records the shot, decrements ammo, and applies damage.
+   */
+  private fireOneShot(
+    playerId: PlayerId,
+    aimAngle: number,
+    grid: ReturnType<MapManager['getCollisionGrid']>,
+  ): void {
+    const player = this.players.get(playerId);
+    if (!player) return;
+
+    const shot = this.combatManager.processShot(playerId, aimAngle, this.players, grid);
+    this.tickBulletTrails.push(shot.trail);
+    player.ammo = Math.max(0, player.ammo - 1);
+    this.stats.recordShot(playerId);
+
+    if (shot.hit && shot.victimId && shot.damage !== undefined) {
+      const victim = this.players.get(shot.victimId);
+      if (victim) {
+        const result = this.combatManager.applyDamage(victim, shot.damage, playerId);
+        this.stats.recordHit(playerId);
+        this.stats.recordDamage(playerId, shot.damage);
+        if (result.killed && result.entry) {
+          this.onKill(playerId, shot.victimId, 'gun');
+        }
+      }
+    }
+  }
+
+  /** Apply stats and kill credit for an explosion that just happened. */
+  private recordExplosion(explosion: { throwerId: PlayerId; damages: { playerId: PlayerId; damage: number; killed: boolean }[] }): void {
+    for (const dmg of explosion.damages) {
+      // Credit damage to the thrower. Self-damage from your own grenade
+      // is real and intentional, but don't award yourself a kill.
+      this.stats.recordDamage(explosion.throwerId, dmg.damage);
+      if (dmg.killed && dmg.playerId !== explosion.throwerId) {
+        this.onKill(explosion.throwerId, dmg.playerId, 'grenade');
+      } else if (dmg.killed) {
+        // Suicide: mark dead without crediting a kill.
+        const victim = this.players.get(dmg.playerId);
+        if (victim) {
+          victim.isDead = true;
+          victim.respawnTimer = RESPAWN.DELAY;
+          victim.deaths++;
+          this.pendingBursts.delete(dmg.playerId);
+        }
+      }
+    }
+  }
+
   private respawnPlayer(player: PlayerState): void {
     // Find a spawn point far from where the player died
     const spawnPos = this.mapManager.getSpawnPointAwayFrom(player.position);
@@ -381,7 +471,6 @@ export class Match implements MatchContext {
     player.respawnTimer = 0;
     player.invulnerableTimer = RESPAWN.INVULNERABILITY_DURATION;
     player.ammo = GUN.MAGAZINE_SIZE;
-    player.grenades = GRENADE.MAX_CARRY;
     player.isReloading = false;
     player.reloadTimer = 0;
     player.stamina = PLAYER.SPRINT_DURATION;
@@ -397,7 +486,6 @@ export class Match implements MatchContext {
       health: PLAYER.MAX_HEALTH,
       maxHealth: PLAYER.MAX_HEALTH,
       ammo: GUN.MAGAZINE_SIZE,
-      grenades: GRENADE.MAX_CARRY,
       isReloading: false,
       reloadTimer: 0,
       isSprinting: false,

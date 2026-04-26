@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GUN, GRENADE as GRENADE_CONFIG } from '@shared/config/game.js';
+import { GUN } from '@shared/config/game.js';
 import { HUD_STRIP_HEIGHT, MAP_HEIGHT_PX, MAP_WIDTH_PX } from './layout.js';
 
 const FONT_STYLE: Phaser.Types.GameObjects.Text.TextStyle = {
@@ -130,7 +130,7 @@ export class HUD {
     this.reloadingText.setVisible(false);
 
     const grenadeY = ammoY + 22;
-    this.grenadeText = scene.add.text(hbX, grenadeY, `GRN: ${GRENADE_CONFIG.MAX_CARRY}`, {
+    this.grenadeText = scene.add.text(hbX, grenadeY, 'GRN: ready', {
       ...FONT_STYLE,
     });
     this.grenadeText.setScrollFactor(0);
@@ -207,8 +207,18 @@ export class HUD {
     this.deathOverlay.setVisible(true);
   }
 
-  updateGrenades(count: number): void {
-    this.grenadeText.setText(`GRN: ${count}`);
+  /**
+   * Show "GRN: ready" when no grenade is in flight (right-click will throw),
+   * and "GRN: LIVE" when one is out (right-click will detonate).
+   */
+  updateGrenadeStatus(hasActiveGrenade: boolean): void {
+    if (hasActiveGrenade) {
+      this.grenadeText.setText('GRN: LIVE');
+      this.grenadeText.setColor('#ff5544');
+    } else {
+      this.grenadeText.setText('GRN: ready');
+      this.grenadeText.setColor('#ffffff');
+    }
   }
 
   updateStamina(current: number, max: number): void {

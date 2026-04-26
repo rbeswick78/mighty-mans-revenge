@@ -13,6 +13,11 @@ const THUMB_RADIUS = 24;
 const GRENADE_BUTTON_SIZE = 40;
 const GRENADE_BUTTON_MARGIN = 16;
 
+const GRENADE_AIM_COLOR = 0xff6600;
+const GRENADE_DETONATE_COLOR = 0xff2222;
+const GRENADE_AIM_ALPHA = 0.5;
+const GRENADE_DETONATE_ALPHA = 0.85;
+
 interface VirtualJoystick {
   active: boolean;
   pointerId: number;
@@ -22,6 +27,10 @@ interface VirtualJoystick {
   currentY: number;
   baseCircle: Phaser.GameObjects.Arc;
   thumbCircle: Phaser.GameObjects.Arc;
+  /** Last aim angle while the joystick was pulled out of the dead zone. */
+  lastAimAngle: number;
+  /** Whether the joystick was outside the dead zone in the previous sample. */
+  wasOutOfDeadZone: boolean;
 }
 
 export class TouchInput {
@@ -30,7 +39,15 @@ export class TouchInput {
   private rightJoystick: VirtualJoystick;
   private grenadeButton: Phaser.GameObjects.Arc;
   private grenadeButtonText: Phaser.GameObjects.Text;
-  private grenadePressed = false;
+  private grenadeButtonDown = false;
+  /** Set on the frame the grenade button is pressed; cleared on read. */
+  private grenadeButtonPressedFlag = false;
+  /** Set on the frame the grenade button is released; cleared on read. */
+  private grenadeButtonReleasedFlag = false;
+  /** True if a live grenade existed at the moment the button was pressed. */
+  private grenadeButtonPressedWhileLive = false;
+  /** Set on the frame the right joystick is released or dropped into deadzone. */
+  private rightStickReleasedFlag = false;
   private sprintActive = false;
   private readonly isTouch: boolean;
 
@@ -38,21 +55,16 @@ export class TouchInput {
     this.scene = scene;
     this.isTouch = isTouchDevice();
 
-    // Enable multitouch
     scene.input.addPointer(2);
 
-    // Create joystick graphics (hidden until touched)
     this.leftJoystick = this.createJoystick();
     this.rightJoystick = this.createJoystick();
 
-    // Grenade button (top-right area). Hidden until the user actually
-    // touches the screen — desktop users don't need it and it looks out
-    // of place on a mouse-and-keyboard session.
     const { width } = scene.scale;
     const btnX = width - GRENADE_BUTTON_MARGIN - GRENADE_BUTTON_SIZE;
     const btnY = GRENADE_BUTTON_MARGIN + GRENADE_BUTTON_SIZE;
 
-    this.grenadeButton = scene.add.circle(btnX, btnY, GRENADE_BUTTON_SIZE, 0xff6600, 0.5);
+    this.grenadeButton = scene.add.circle(btnX, btnY, GRENADE_BUTTON_SIZE, GRENADE_AIM_COLOR, GRENADE_AIM_ALPHA);
     this.grenadeButton.setScrollFactor(0);
     this.grenadeButton.setDepth(3000);
     this.grenadeButton.setVisible(false);
@@ -69,19 +81,25 @@ export class TouchInput {
     this.grenadeButtonText.setVisible(false);
 
     this.grenadeButton.on('pointerdown', () => {
-      this.grenadePressed = true;
+      if (!this.grenadeButtonDown) this.grenadeButtonPressedFlag = true;
+      this.grenadeButtonDown = true;
     });
     this.grenadeButton.on('pointerup', () => {
-      this.grenadePressed = false;
+      if (this.grenadeButtonDown) this.grenadeButtonReleasedFlag = true;
+      this.grenadeButtonDown = false;
+    });
+    this.grenadeButton.on('pointerout', () => {
+      // If the touch slides off the button, treat it as a release so we don't
+      // get stuck in aim mode.
+      if (this.grenadeButtonDown) this.grenadeButtonReleasedFlag = true;
+      this.grenadeButtonDown = false;
     });
 
-    // Touch event handlers
     scene.input.on('pointerdown', this.onPointerDown, this);
     scene.input.on('pointermove', this.onPointerMove, this);
     scene.input.on('pointerup', this.onPointerUp, this);
   }
 
-  /** Reveal touch-only UI once we know the user is on a touch device. */
   private showTouchUI(): void {
     if (this.grenadeButton.visible) return;
     this.grenadeButton.setVisible(true);
@@ -109,20 +127,15 @@ export class TouchInput {
       currentY: 0,
       baseCircle: base,
       thumbCircle: thumb,
+      lastAimAngle: 0,
+      wasOutOfDeadZone: false,
     };
   }
 
   private onPointerDown(pointer: Phaser.Input.Pointer): void {
-    // Gate on device capability (isTouchDevice()) rather than per-event
-    // pointer.wasTouch — the latter is unreliable on mobile browsers when
-    // a DOM container overlays the canvas.
     if (!this.isTouch) return;
-
-    // Ignore touches in the HUD strip so joysticks never spawn below
-    // the gameboard (where they would be obscured by the HUD panel).
     if (pointer.y >= MAP_HEIGHT_PX) return;
 
-    // First confirmed touch — reveal the touch-only UI.
     this.showTouchUI();
 
     const halfWidth = this.scene.scale.width / 2;
@@ -141,6 +154,7 @@ export class TouchInput {
     joystick.originY = pointer.y;
     joystick.currentX = pointer.x;
     joystick.currentY = pointer.y;
+    joystick.wasOutOfDeadZone = false;
 
     joystick.baseCircle.setPosition(pointer.x, pointer.y);
     joystick.thumbCircle.setPosition(pointer.x, pointer.y);
@@ -175,13 +189,8 @@ export class TouchInput {
     joystick.currentY = joystick.originY + clampedY;
     joystick.thumbCircle.setPosition(joystick.currentX, joystick.currentY);
 
-    // Sprint detection: full extension on left joystick
     if (joystick === this.leftJoystick) {
-      if (dist >= JOYSTICK_MAX_RADIUS * 0.95) {
-        this.sprintActive = true;
-      } else {
-        this.sprintActive = false;
-      }
+      this.sprintActive = dist >= JOYSTICK_MAX_RADIUS * 0.95;
     }
   }
 
@@ -191,6 +200,10 @@ export class TouchInput {
       this.sprintActive = false;
     }
     if (this.rightJoystick.active && this.rightJoystick.pointerId === pointer.id) {
+      // Releasing the stick fires the burst (if it was outside the dead zone).
+      if (this.rightJoystick.wasOutOfDeadZone) {
+        this.rightStickReleasedFlag = true;
+      }
       this.deactivateJoystick(this.rightJoystick);
     }
   }
@@ -198,6 +211,7 @@ export class TouchInput {
   private deactivateJoystick(joystick: VirtualJoystick): void {
     joystick.active = false;
     joystick.pointerId = -1;
+    joystick.wasOutOfDeadZone = false;
     joystick.baseCircle.setVisible(false);
     joystick.thumbCircle.setVisible(false);
   }
@@ -211,7 +225,6 @@ export class TouchInput {
 
     if (dist < DEAD_ZONE) return { x: 0, y: 0 };
 
-    // Normalize and scale (remove dead zone from range)
     const effectiveDist = (dist - DEAD_ZONE) / (JOYSTICK_MAX_RADIUS - DEAD_ZONE);
     const clampedDist = Math.min(1, effectiveDist);
     const angle = Math.atan2(dy, dx);
@@ -222,27 +235,72 @@ export class TouchInput {
     };
   }
 
-  getInput(): RawInput {
+  /** Re-color the grenade button based on detonate vs aim mode. */
+  private syncGrenadeButtonAppearance(hasActiveGrenade: boolean): void {
+    if (hasActiveGrenade) {
+      this.grenadeButton.setFillStyle(GRENADE_DETONATE_COLOR, GRENADE_DETONATE_ALPHA);
+      this.grenadeButtonText.setText('!');
+    } else {
+      this.grenadeButton.setFillStyle(GRENADE_AIM_COLOR, GRENADE_AIM_ALPHA);
+      this.grenadeButtonText.setText('G');
+    }
+  }
+
+  getInput(hasActiveGrenade: boolean): RawInput {
+    this.syncGrenadeButtonAppearance(hasActiveGrenade);
+
     const moveVec = this.getJoystickVector(this.leftJoystick);
     const aimVec = this.getJoystickVector(this.rightJoystick);
 
-    // Aim angle from right joystick direction
-    let aimAngle = 0;
-    if (aimVec.x !== 0 || aimVec.y !== 0) {
-      aimAngle = Math.atan2(aimVec.y, aimVec.x);
+    // Track right-stick aim. While it's outside the dead zone, capture the
+    // angle (so the burst fires in that direction on release).
+    const rightOutOfDeadZone = aimVec.x !== 0 || aimVec.y !== 0;
+    if (rightOutOfDeadZone) {
+      this.rightJoystick.lastAimAngle = Math.atan2(aimVec.y, aimVec.x);
+      this.rightJoystick.wasOutOfDeadZone = true;
+    } else if (this.rightJoystick.wasOutOfDeadZone && this.rightJoystick.active) {
+      // The thumb returned inside the dead zone without lifting — treat that
+      // as a release so the burst still fires.
+      this.rightStickReleasedFlag = true;
+      this.rightJoystick.wasOutOfDeadZone = false;
     }
 
-    // Auto-fire when right joystick is active and outside dead zone
-    const shooting = this.rightJoystick.active && (aimVec.x !== 0 || aimVec.y !== 0);
+    // Drain edge flags.
+    const stickReleased = this.rightStickReleasedFlag;
+    this.rightStickReleasedFlag = false;
+    const grenadePressed = this.grenadeButtonPressedFlag;
+    this.grenadeButtonPressedFlag = false;
+    const grenadeReleased = this.grenadeButtonReleasedFlag;
+    this.grenadeButtonReleasedFlag = false;
+
+    // On press, remember whether a grenade was already live. The release is
+    // only a "throw" if the press started in aim mode.
+    if (grenadePressed) {
+      this.grenadeButtonPressedWhileLive = hasActiveGrenade;
+    }
+
+    const aimingGun = this.rightJoystick.active && rightOutOfDeadZone;
+    const firePressed = stickReleased;
+    const aimAngle = this.rightJoystick.lastAimAngle;
+
+    const aimingGrenade = this.grenadeButtonDown && !hasActiveGrenade;
+    // Throw fires on release only if the press started before any grenade
+    // existed (otherwise the press was a detonate, and release does nothing).
+    const throwPressed = grenadeReleased && !this.grenadeButtonPressedWhileLive;
+    // Detonate fires on press only if a grenade was already live.
+    const detonatePressed = grenadePressed && hasActiveGrenade;
 
     return {
       moveX: moveVec.x,
       moveY: moveVec.y,
       aimAngle,
-      shooting,
-      throwGrenade: this.grenadePressed,
+      aimingGun,
+      firePressed,
+      aimingGrenade,
+      throwPressed,
+      detonatePressed,
       sprint: this.sprintActive,
-      reload: false, // Auto-reload on mobile; no explicit button
+      reload: false, // Auto-reload on mobile; no explicit button.
     };
   }
 

@@ -397,7 +397,6 @@ export class NetworkManager {
       // Always trust server for these values
       health: serverState.health,
       ammo: serverState.ammo,
-      grenades: serverState.grenades,
       isReloading: serverState.isReloading,
       isDead: serverState.isDead,
       respawnTimer: serverState.respawnTimer,
@@ -419,7 +418,6 @@ export class NetworkManager {
       health: s.health,
       maxHealth: PLAYER.MAX_HEALTH,
       ammo: s.ammo,
-      grenades: s.grenades,
       isReloading: s.isReloading,
       reloadTimer: 0,
       isSprinting: s.isSprinting,
@@ -432,6 +430,11 @@ export class NetworkManager {
       deaths: s.deaths,
       nickname: s.nickname,
     };
+  }
+
+  /** True if this player has a grenade currently in flight. */
+  hasActiveGrenadeFor(playerId: PlayerId): boolean {
+    return this.latestGrenades.some((g) => g.throwerId === playerId);
   }
 
   private emit(event: EventName, ...args: unknown[]): void {

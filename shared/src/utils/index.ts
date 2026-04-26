@@ -4,3 +4,6 @@ export * from './physics.js';
 export * from './damage.js';
 export * from './map-validator.js';
 export * from './map-loader.js';
+export * from './ray-aabb.js';
+export * from './grenade-physics.js';
+export * from './trajectory-prediction.js';

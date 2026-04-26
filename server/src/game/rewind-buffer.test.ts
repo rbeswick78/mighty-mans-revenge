@@ -5,7 +5,6 @@ import {
   type PlayerId,
   PLAYER,
   GUN,
-  GRENADE,
   SERVER,
 } from '@shared/game';
 
@@ -17,7 +16,6 @@ function createPlayer(overrides: Partial<PlayerState> & { id: PlayerId }): Playe
     health: PLAYER.MAX_HEALTH,
     maxHealth: PLAYER.MAX_HEALTH,
     ammo: GUN.MAGAZINE_SIZE,
-    grenades: GRENADE.MAX_CARRY,
     isReloading: false,
     reloadTimer: 0,
     isSprinting: false,

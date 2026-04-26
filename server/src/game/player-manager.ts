@@ -1,7 +1,6 @@
 import {
   PLAYER,
   GUN,
-  GRENADE,
   RESPAWN,
   calculateMovement,
 } from '@shared/game';
@@ -31,7 +30,6 @@ export class PlayerManager {
       health: PLAYER.MAX_HEALTH,
       maxHealth: PLAYER.MAX_HEALTH,
       ammo: GUN.MAGAZINE_SIZE,
-      grenades: GRENADE.MAX_CARRY,
       isReloading: false,
       reloadTimer: 0,
       isSprinting: false,
@@ -153,7 +151,6 @@ export class PlayerManager {
     player.velocity = { x: 0, y: 0 };
     player.health = PLAYER.MAX_HEALTH;
     player.ammo = GUN.MAGAZINE_SIZE;
-    player.grenades = GRENADE.MAX_CARRY;
     player.isReloading = false;
     player.reloadTimer = 0;
     player.isDead = false;

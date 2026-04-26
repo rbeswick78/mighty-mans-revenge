@@ -5,6 +5,11 @@ import type { PlayerId, Vec2 } from '@shared/types/common.js';
 import type { MatchResult } from '@shared/types/game.js';
 import { MatchPhase } from '@shared/types/game.js';
 import { PLAYER, SERVER } from '@shared/config/game.js';
+import {
+  predictBulletRay,
+  predictGrenadePath,
+} from '@shared/utils/trajectory-prediction.js';
+import type { PlayerState } from '@shared/types/player.js';
 import { MapRenderer } from '../rendering/map-renderer.js';
 import { ClientPlayerManager } from '../rendering/player-manager.js';
 import { EffectsRenderer } from '../rendering/effects-renderer.js';
@@ -13,6 +18,7 @@ import { GrenadeRenderer } from '../rendering/grenade-renderer.js';
 import { HUD } from '../ui/hud.js';
 import { InputManager } from '../input/input-manager.js';
 import { GameService, type MatchData } from '../services/game-service.js';
+import type { NetworkManager } from '../network/network-manager.js';
 
 // Vite handles JSON imports
 import wastelandOutpost from '../../../shared/maps/wasteland-outpost.json';
@@ -110,7 +116,15 @@ export class GameScene extends Phaser.Scene {
       // becomes the new "current" target.
       this.prevLocalPos = this.currLocalPos ?? { x: localState.position.x, y: localState.position.y };
 
-      const input = this.inputManager.update(localState.position, this.currentTick);
+      const playerId = networkManager.getPlayerId();
+      const hasActiveGrenade = playerId
+        ? networkManager.hasActiveGrenadeFor(playerId)
+        : false;
+      const input = this.inputManager.update(
+        localState.position,
+        this.currentTick,
+        hasActiveGrenade,
+      );
       this.gameService.sendInput(input);
 
       const updatedState = networkManager.getLocalPlayerState();
@@ -147,7 +161,6 @@ export class GameScene extends Phaser.Scene {
           aimAngle: currentLocalState.aimAngle,
           health: currentLocalState.health,
           ammo: currentLocalState.ammo,
-          grenades: currentLocalState.grenades,
           isReloading: currentLocalState.isReloading,
           isSprinting: currentLocalState.isSprinting,
           stamina: currentLocalState.stamina,
@@ -170,7 +183,6 @@ export class GameScene extends Phaser.Scene {
             aimAngle: interpState.aimAngle,
             health: interpState.health,
             ammo: interpState.ammo,
-            grenades: interpState.grenades,
             isReloading: interpState.isReloading,
             isSprinting: interpState.isSprinting,
             stamina: interpState.stamina,
@@ -189,7 +201,7 @@ export class GameScene extends Phaser.Scene {
         // Update HUD
         this.hud.updateHealth(currentLocalState.health, PLAYER.MAX_HEALTH);
         this.hud.updateAmmo(currentLocalState.ammo, 30, currentLocalState.isReloading);
-        this.hud.updateGrenades(currentLocalState.grenades);
+        this.hud.updateGrenadeStatus(networkManager.hasActiveGrenadeFor(playerId));
         this.hud.updateStamina(currentLocalState.stamina, PLAYER.SPRINT_DURATION);
         this.hud.updateDeathState(currentLocalState.isDead, currentLocalState.respawnTimer);
 
@@ -222,6 +234,82 @@ export class GameScene extends Phaser.Scene {
     if (this.pickupRenderer) {
       this.pickupRenderer.updatePickups(networkManager.getPickups());
     }
+
+    // Aim line preview (white) — re-drawn each render frame so it tracks the
+    // mouse smoothly, not just on server-tick boundaries.
+    this.updateAimLine(currentLocalState);
+  }
+
+  private updateAimLine(localState: ReturnType<NetworkManager['getLocalPlayerState']>): void {
+    if (!this.effectsRenderer || !this.inputManager || !localState || localState.isDead) {
+      this.effectsRenderer?.clearAim();
+      return;
+    }
+
+    const raw = this.inputManager.getLastRawInput();
+    if (!raw) {
+      this.effectsRenderer.clearAim();
+      return;
+    }
+
+    const grid = this.mapRenderer?.getCollisionGrid();
+    if (!grid) {
+      this.effectsRenderer.clearAim();
+      return;
+    }
+
+    const networkManager = this.gameService.getNetworkManager();
+
+    if (raw.aimingGun) {
+      // Build the players map (local + remotes) for ray hit-testing. Use
+      // current/interpolated positions so the preview matches what the
+      // server will see at firing time.
+      const players = this.collectPlayersForAim(localState, networkManager);
+      const aim = predictBulletRay(localState.id, localState.position, raw.aimAngle, players, grid);
+      this.effectsRenderer.showBulletAim(
+        localState.position.x,
+        localState.position.y,
+        aim.endPos.x,
+        aim.endPos.y,
+      );
+    } else if (raw.aimingGrenade) {
+      const path = predictGrenadePath(localState.position, raw.aimAngle, grid);
+      this.effectsRenderer.showGrenadeAim(path);
+    } else {
+      this.effectsRenderer.clearAim();
+    }
+  }
+
+  private collectPlayersForAim(
+    localState: PlayerState,
+    networkManager: NetworkManager,
+  ): Map<string, PlayerState> {
+    const players = new Map<string, PlayerState>();
+    players.set(localState.id, localState);
+    for (const [remoteId, interp] of networkManager.getInterpolatedPlayers()) {
+      // Build a minimal PlayerState from the interpolated snapshot.
+      players.set(remoteId, {
+        id: remoteId,
+        position: interp.position,
+        velocity: interp.velocity,
+        aimAngle: interp.aimAngle,
+        health: interp.health,
+        maxHealth: PLAYER.MAX_HEALTH,
+        ammo: interp.ammo,
+        isReloading: interp.isReloading,
+        reloadTimer: 0,
+        isSprinting: interp.isSprinting,
+        stamina: interp.stamina,
+        isDead: interp.isDead,
+        respawnTimer: interp.respawnTimer,
+        invulnerableTimer: interp.invulnerableTimer,
+        lastProcessedInput: 0,
+        score: interp.score,
+        deaths: interp.deaths,
+        nickname: interp.nickname,
+      });
+    }
+    return players;
   }
 
   shutdown(): void {

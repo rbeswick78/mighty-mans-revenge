@@ -11,7 +11,6 @@ interface BufferedState {
   aimAngle: number;
   health: number;
   ammo: number;
-  grenades: number;
   isSprinting: boolean;
   isDead: boolean;
   isReloading: boolean;
@@ -48,7 +47,6 @@ function toInterpolated(s: BufferedState): InterpolatedState {
     aimAngle: s.aimAngle,
     health: s.health,
     ammo: s.ammo,
-    grenades: s.grenades,
     isSprinting: s.isSprinting,
     isDead: s.isDead,
     isReloading: s.isReloading,
@@ -79,7 +77,6 @@ export class EntityInterpolation {
       aimAngle: state.aimAngle,
       health: state.health,
       ammo: state.ammo,
-      grenades: state.grenades,
       isSprinting: state.isSprinting,
       isDead: state.isDead,
       isReloading: state.isReloading,
@@ -149,7 +146,6 @@ export class EntityInterpolation {
       aimAngle: lerpAngle(prev.aimAngle, curr.aimAngle, t),
       health: curr.health, // discrete -- don't interpolate
       ammo: curr.ammo,
-      grenades: curr.grenades,
       isSprinting: curr.isSprinting,
       isDead: curr.isDead,
       isReloading: curr.isReloading,

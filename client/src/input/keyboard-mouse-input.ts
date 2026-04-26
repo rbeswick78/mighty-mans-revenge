@@ -2,6 +2,11 @@ import Phaser from 'phaser';
 import type { Vec2 } from '@shared/types/common.js';
 import type { RawInput } from './types.js';
 
+/**
+ * Mouse buttons we care about. We listen on the canvas directly because
+ * Phaser's pointer events for non-left buttons aren't reliable in this
+ * environment (see phaserjs/phaser#6194).
+ */
 export class KeyboardMouseInput {
   private scene: Phaser.Scene;
   private keys: {
@@ -11,13 +16,20 @@ export class KeyboardMouseInput {
     D: Phaser.Input.Keyboard.Key;
     SHIFT: Phaser.Input.Keyboard.Key;
     R: Phaser.Input.Keyboard.Key;
-    G: Phaser.Input.Keyboard.Key;
   };
   private pointer: Phaser.Input.Pointer;
   private canvas: HTMLCanvasElement;
   private onCanvasMouseDown: (e: MouseEvent) => void;
-  /** Rising-edge flag for right-click grenade throw, cleared on read. */
-  private rightClickPending = false;
+  private onCanvasMouseUp: (e: MouseEvent) => void;
+  private onWindowBlur: () => void;
+
+  private lmbDown = false;
+  private rmbDown = false;
+  /** Set on the frame the corresponding button is released; cleared on read. */
+  private lmbReleasedFlag = false;
+  private rmbReleasedFlag = false;
+  /** Set on the frame the corresponding button is pressed; cleared on read. */
+  private rmbPressedFlag = false;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -33,27 +45,50 @@ export class KeyboardMouseInput {
       D: scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D),
       SHIFT: scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT),
       R: scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R),
-      G: scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.G),
     };
 
-    // Use the dedicated mouse pointer, not activePointer.
     this.pointer = scene.input.mousePointer ?? scene.input.activePointer;
 
-    // Phaser's event system isn't reliably firing pointerdown for right-click
-    // in this environment (see phaserjs/phaser#6194). The browser always
-    // fires `mousedown` on the canvas with e.button === 2 for right-click,
-    // so we listen there directly. Context menu suppression is handled
-    // globally via the game config (see main.ts).
     this.canvas = scene.game.canvas;
+
     this.onCanvasMouseDown = (e: MouseEvent) => {
-      if (e.button === 2) {
-        this.rightClickPending = true;
+      if (e.button === 0) {
+        this.lmbDown = true;
+      } else if (e.button === 2) {
+        if (!this.rmbDown) this.rmbPressedFlag = true;
+        this.rmbDown = true;
       }
     };
+    this.onCanvasMouseUp = (e: MouseEvent) => {
+      if (e.button === 0) {
+        if (this.lmbDown) this.lmbReleasedFlag = true;
+        this.lmbDown = false;
+      } else if (e.button === 2) {
+        if (this.rmbDown) this.rmbReleasedFlag = true;
+        this.rmbDown = false;
+      }
+    };
+    // If the window loses focus mid-click, mouseup may never reach the canvas.
+    // Treat blur as a release of any held buttons so we don't get stuck aiming.
+    this.onWindowBlur = () => {
+      if (this.lmbDown) {
+        this.lmbReleasedFlag = true;
+        this.lmbDown = false;
+      }
+      if (this.rmbDown) {
+        this.rmbReleasedFlag = true;
+        this.rmbDown = false;
+      }
+    };
+
     this.canvas.addEventListener('mousedown', this.onCanvasMouseDown);
+    // mouseup must be on window (or document) so a release outside the canvas
+    // still gets reported.
+    window.addEventListener('mouseup', this.onCanvasMouseUp);
+    window.addEventListener('blur', this.onWindowBlur);
   }
 
-  getInput(playerWorldPos: Vec2): RawInput {
+  getInput(playerWorldPos: Vec2, hasActiveGrenade: boolean): RawInput {
     let moveX = 0;
     let moveY = 0;
 
@@ -62,14 +97,13 @@ export class KeyboardMouseInput {
     if (this.keys.W.isDown) moveY -= 1;
     if (this.keys.S.isDown) moveY += 1;
 
-    // Normalize diagonal movement
     if (moveX !== 0 && moveY !== 0) {
       const len = Math.sqrt(moveX * moveX + moveY * moveY);
       moveX /= len;
       moveY /= len;
     }
 
-    // Calculate aim angle from player world position to mouse world position
+    // Aim angle from player → mouse cursor in world space.
     const worldPoint = this.scene.cameras.main.getWorldPoint(
       this.pointer.x,
       this.pointer.y,
@@ -79,20 +113,34 @@ export class KeyboardMouseInput {
       worldPoint.x - playerWorldPos.x,
     );
 
-    // Consume the right-click rising-edge flag. Server also does rising
-    // edge detection for grenade, but draining it here avoids sending
-    // throwGrenade=true on multiple consecutive ticks for one click.
-    const rightClickFired = this.rightClickPending;
-    this.rightClickPending = false;
+    // Drain the edge flags. Reading them once-per-tick guarantees a single
+    // edge event reaches the server even if multiple clicks happen between
+    // input samples.
+    const lmbReleased = this.lmbReleasedFlag;
+    this.lmbReleasedFlag = false;
+    const rmbReleased = this.rmbReleasedFlag;
+    this.rmbReleasedFlag = false;
+    const rmbPressed = this.rmbPressedFlag;
+    this.rmbPressedFlag = false;
 
-    const throwGrenade = rightClickFired || this.keys.G.isDown;
+    const aimingGun = this.lmbDown;
+    const firePressed = lmbReleased;
+
+    // RMB has two roles depending on whether a grenade is currently in flight
+    // for this player: aim/throw a new one, or detonate the live one.
+    const aimingGrenade = this.rmbDown && !hasActiveGrenade;
+    const throwPressed = rmbReleased && !hasActiveGrenade;
+    const detonatePressed = rmbPressed && hasActiveGrenade;
 
     return {
       moveX,
       moveY,
       aimAngle,
-      shooting: this.pointer.leftButtonDown(),
-      throwGrenade,
+      aimingGun,
+      firePressed,
+      aimingGrenade,
+      throwPressed,
+      detonatePressed,
       sprint: this.keys.SHIFT.isDown,
       reload: Phaser.Input.Keyboard.JustDown(this.keys.R),
     };
@@ -100,6 +148,8 @@ export class KeyboardMouseInput {
 
   destroy(): void {
     this.canvas.removeEventListener('mousedown', this.onCanvasMouseDown);
+    window.removeEventListener('mouseup', this.onCanvasMouseUp);
+    window.removeEventListener('blur', this.onWindowBlur);
     if (this.scene.input.keyboard) {
       this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.W);
       this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.A);
@@ -107,7 +157,6 @@ export class KeyboardMouseInput {
       this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.D);
       this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
       this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.R);
-      this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.G);
     }
   }
 }

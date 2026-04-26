@@ -17,6 +17,7 @@ export class InputManager {
   private sequenceNumber = 0;
   private inputBuffer: PlayerInput[] = [];
   private lastAcknowledged = -1;
+  private lastRawInput: RawInput | null = null;
 
   constructor(scene: Phaser.Scene) {
     this.keyboardMouseInput = new KeyboardMouseInput(scene);
@@ -31,15 +32,20 @@ export class InputManager {
     }
   }
 
-  update(playerWorldPos: Vec2, currentTick: number): PlayerInput {
+  /**
+   * Sample input for one server tick. `hasActiveGrenade` controls whether
+   * RMB / the grenade button is in throw-aim mode or detonate mode.
+   */
+  update(playerWorldPos: Vec2, currentTick: number, hasActiveGrenade: boolean): PlayerInput {
     let raw: RawInput;
 
     if (this.activeMode === 'touch') {
-      raw = this.touchInput.getInput();
+      raw = this.touchInput.getInput(hasActiveGrenade);
     } else {
-      raw = this.keyboardMouseInput.getInput(playerWorldPos);
+      raw = this.keyboardMouseInput.getInput(playerWorldPos, hasActiveGrenade);
     }
 
+    this.lastRawInput = raw;
     this.sequenceNumber++;
 
     const input: PlayerInput = {
@@ -47,8 +53,11 @@ export class InputManager {
       moveX: raw.moveX,
       moveY: raw.moveY,
       aimAngle: raw.aimAngle,
-      shooting: raw.shooting,
-      throwGrenade: raw.throwGrenade,
+      aimingGun: raw.aimingGun,
+      firePressed: raw.firePressed,
+      aimingGrenade: raw.aimingGrenade,
+      throwPressed: raw.throwPressed,
+      detonatePressed: raw.detonatePressed,
       sprint: raw.sprint,
       reload: raw.reload,
       tick: currentTick,
@@ -56,12 +65,19 @@ export class InputManager {
 
     this.inputBuffer.push(input);
 
-    // Keep buffer bounded
     if (this.inputBuffer.length > INPUT_BUFFER_SIZE) {
       this.inputBuffer.splice(0, this.inputBuffer.length - INPUT_BUFFER_SIZE);
     }
 
     return input;
+  }
+
+  /**
+   * Most recent raw input snapshot — used by the scene to drive the aim
+   * line each render frame (in between server-tick samples).
+   */
+  getLastRawInput(): RawInput | null {
+    return this.lastRawInput;
   }
 
   getUnacknowledgedInputs(lastAck: number): PlayerInput[] {
@@ -70,14 +86,12 @@ export class InputManager {
 
   acknowledgeInput(sequenceNumber: number): void {
     this.lastAcknowledged = sequenceNumber;
-    // Remove all inputs up to and including the acknowledged one
     const idx = this.inputBuffer.findIndex(
       (input) => input.sequenceNumber > sequenceNumber,
     );
     if (idx > 0) {
       this.inputBuffer.splice(0, idx);
     } else if (idx === -1 && this.inputBuffer.length > 0) {
-      // All inputs acknowledged
       this.inputBuffer = [];
     }
   }
