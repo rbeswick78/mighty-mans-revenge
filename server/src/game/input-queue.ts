@@ -14,10 +14,16 @@ export class InputQueue {
     return true;
   }
 
-  /** Return all queued inputs and clear the queue. */
-  drain(): PlayerInput[] {
-    const inputs = this.queue;
-    this.queue = [];
+  /** Return queued inputs in order and clear them from the queue. */
+  drain(maxCount?: number): PlayerInput[] {
+    if (maxCount === undefined || maxCount >= this.queue.length) {
+      const inputs = this.queue;
+      this.queue = [];
+      return inputs;
+    }
+
+    const inputs = this.queue.slice(0, maxCount);
+    this.queue = this.queue.slice(maxCount);
     return inputs;
   }
 

@@ -1,6 +1,7 @@
 import type { Vec2 } from '@shared/types/common.js';
 import type { CollisionGrid } from '@shared/types/map.js';
 import type { SerializedPlayerState } from '@shared/types/network.js';
+import type { PlayerState } from '@shared/types/player.js';
 import { calculateMovement } from '@shared/utils/physics.js';
 import { SERVER } from '@shared/config/game.js';
 import type { PredictionEntry } from './types.js';
@@ -91,6 +92,80 @@ export class ServerReconciliation {
         y: predicted.position.y + dy * CORRECTION_LERP,
       },
       velocity: vel,
+      stamina,
+      shouldSnap: false,
+    };
+  }
+
+  /**
+   * Smooth toward the latest authoritative state when the server has already
+   * acknowledged every local prediction. This avoids an instant visual jump
+   * when the remaining difference is small or medium-sized.
+   */
+  reconcileAuthoritative(
+    serverState: SerializedPlayerState,
+    currentState: PlayerState,
+  ): ReconciliationResult {
+    const serverPosition = {
+      x: serverState.position.x,
+      y: serverState.position.y,
+    };
+    const serverVelocity = {
+      x: serverState.velocity.x,
+      y: serverState.velocity.y,
+    };
+
+    if (serverState.isDead !== currentState.isDead) {
+      return {
+        position: serverPosition,
+        velocity: serverVelocity,
+        stamina: serverState.stamina,
+        shouldSnap: true,
+      };
+    }
+
+    return this.correctPosition(
+      currentState.position,
+      serverPosition,
+      serverVelocity,
+      serverState.stamina,
+    );
+  }
+
+  private correctPosition(
+    currentPosition: Vec2,
+    targetPosition: Vec2,
+    velocity: Vec2,
+    stamina: number,
+  ): ReconciliationResult {
+    const dx = targetPosition.x - currentPosition.x;
+    const dy = targetPosition.y - currentPosition.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    if (dist > SNAP_THRESHOLD) {
+      return {
+        position: targetPosition,
+        velocity,
+        stamina,
+        shouldSnap: true,
+      };
+    }
+
+    if (dist < SMOOTH_THRESHOLD) {
+      return {
+        position: { x: currentPosition.x, y: currentPosition.y },
+        velocity,
+        stamina,
+        shouldSnap: false,
+      };
+    }
+
+    return {
+      position: {
+        x: currentPosition.x + dx * CORRECTION_LERP,
+        y: currentPosition.y + dy * CORRECTION_LERP,
+      },
+      velocity,
       stamina,
       shouldSnap: false,
     };

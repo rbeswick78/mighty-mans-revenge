@@ -5,7 +5,7 @@ import type {
   ServerMatchFoundMessage,
   ServerMatchmakingStatusMessage,
 } from '@shared/types/network.js';
-import { NetworkManager } from '../network/network-manager.js';
+import { NetworkManager, type LocalCorrection } from '../network/network-manager.js';
 
 export interface MatchData {
   matchId: string;
@@ -24,7 +24,8 @@ type GameServiceEvent =
   | 'rematchStatus'
   | 'opponentDisconnected'
   | 'bulletTrail'
-  | 'grenadeExploded';
+  | 'grenadeExploded'
+  | 'localCorrection';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type GameServiceCallback = (...args: any[]) => void;
@@ -179,6 +180,10 @@ export class GameService {
 
     this.networkManager.on('grenadeExploded', (pos: unknown) => {
       this.emit('grenadeExploded', pos);
+    });
+
+    this.networkManager.on('localCorrection', (correction: LocalCorrection) => {
+      this.emit('localCorrection', correction);
     });
   }
 

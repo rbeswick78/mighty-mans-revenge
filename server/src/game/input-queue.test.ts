@@ -40,6 +40,23 @@ describe('InputQueue', () => {
     expect(inputs[2].sequenceNumber).toBe(2);
   });
 
+  it('can drain a capped number of inputs and retain the rest', () => {
+    queue.push(makeInput(0));
+    queue.push(makeInput(1));
+    queue.push(makeInput(2));
+
+    const firstBatch = queue.drain(2);
+    expect(firstBatch).toHaveLength(2);
+    expect(firstBatch[0].sequenceNumber).toBe(0);
+    expect(firstBatch[1].sequenceNumber).toBe(1);
+    expect(queue.length).toBe(1);
+
+    const secondBatch = queue.drain();
+    expect(secondBatch).toHaveLength(1);
+    expect(secondBatch[0].sequenceNumber).toBe(2);
+    expect(queue.length).toBe(0);
+  });
+
   it('rejects duplicate sequence numbers', () => {
     expect(queue.push(makeInput(1))).toBe(true);
     expect(queue.push(makeInput(1))).toBe(false);

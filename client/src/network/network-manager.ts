@@ -32,10 +32,18 @@ type EventName =
   | 'opponentDisconnected'
   | 'bulletTrail'
   | 'grenadeExploded'
+  | 'localCorrection'
   | 'error';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type EventCallback = (...args: any[]) => void;
+
+export interface LocalCorrection {
+  previousPosition: Vec2;
+  correctedPosition: Vec2;
+  delta: Vec2;
+  shouldSnap: boolean;
+}
 
 export class NetworkManager {
   private connection: NetworkConnection;
@@ -376,8 +384,13 @@ export class NetworkManager {
     const predictions = this.prediction.getHistory();
 
     if (predictions.length === 0) {
-      // No unacknowledged inputs — just accept server state
-      this.localPlayerState = this.serverStateToPlayerState(serverState);
+      // No unacknowledged inputs remain. Smooth any residual difference
+      // instead of visibly jumping to the authoritative state.
+      const result = this.reconciliation.reconcileAuthoritative(
+        serverState,
+        this.localPlayerState,
+      );
+      this.applyReconciledLocalState(serverState, result);
       return;
     }
 
@@ -386,6 +399,20 @@ export class NetworkManager {
       predictions,
       this.collisionGrid,
     );
+
+    this.applyReconciledLocalState(serverState, result);
+  }
+
+  private applyReconciledLocalState(
+    serverState: ServerGameStateMessage['players'][number],
+    result: ReturnType<ServerReconciliation['reconcile']>,
+  ): void {
+    if (!this.localPlayerState) return;
+
+    const previousPosition = {
+      x: this.localPlayerState.position.x,
+      y: this.localPlayerState.position.y,
+    };
 
     // Apply reconciled position to local state, keep server-authoritative
     // values for health, ammo, etc.
@@ -405,6 +432,20 @@ export class NetworkManager {
       deaths: serverState.deaths,
       nickname: serverState.nickname,
     };
+
+    const dx = result.position.x - previousPosition.x;
+    const dy = result.position.y - previousPosition.y;
+    if (dx !== 0 || dy !== 0) {
+      this.emit('localCorrection', {
+        previousPosition,
+        correctedPosition: {
+          x: result.position.x,
+          y: result.position.y,
+        },
+        delta: { x: dx, y: dy },
+        shouldSnap: result.shouldSnap,
+      } satisfies LocalCorrection);
+    }
   }
 
   private serverStateToPlayerState(

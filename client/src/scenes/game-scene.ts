@@ -18,10 +18,13 @@ import { GrenadeRenderer } from '../rendering/grenade-renderer.js';
 import { HUD } from '../ui/hud.js';
 import { InputManager } from '../input/input-manager.js';
 import { GameService, type MatchData } from '../services/game-service.js';
-import type { NetworkManager } from '../network/network-manager.js';
+import type { LocalCorrection, NetworkManager } from '../network/network-manager.js';
 
 // Vite handles JSON imports
 import wastelandOutpost from '../../../shared/maps/wasteland-outpost.json';
+
+const LOCAL_CORRECTION_SMOOTH_MS = 120;
+const LOCAL_CORRECTION_EPSILON = 0.01;
 
 interface GameSceneData {
   nickname?: string;
@@ -47,6 +50,10 @@ export class GameScene extends Phaser.Scene {
   /** Previous and current predicted positions for render-rate interpolation. */
   private prevLocalPos: Vec2 | null = null;
   private currLocalPos: Vec2 | null = null;
+  private localCorrectionOffset: Vec2 = { x: 0, y: 0 };
+  private localCorrectionOffsetStart: Vec2 = { x: 0, y: 0 };
+  private localCorrectionElapsedMs = 0;
+  private lastRenderedLocalPos: Vec2 | null = null;
 
   // Event handler references for cleanup
   private onMatchCountdown: ((countdown: number) => void) | null = null;
@@ -56,6 +63,7 @@ export class GameScene extends Phaser.Scene {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private onBulletTrail: ((trail: any) => void) | null = null;
   private onGrenadeExploded: ((pos: Vec2) => void) | null = null;
+  private onLocalCorrection: ((correction: LocalCorrection) => void) | null = null;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -97,19 +105,26 @@ export class GameScene extends Phaser.Scene {
     if (!this.inputManager || !this.hud) return;
 
     const networkManager = this.gameService.getNetworkManager();
-    const localState = networkManager.getLocalPlayerState();
+    let localState = networkManager.getLocalPlayerState();
 
     // Rate-limit input to the server tick rate. Client prediction uses
     // dt = 1/TICK_RATE, so inputs must be emitted at exactly that cadence
     // or the client will over-predict.
-    this.inputAccumulatorMs += delta;
+    if (this.matchPhase === MatchPhase.ACTIVE) {
+      this.inputAccumulatorMs += delta;
+    } else {
+      this.inputAccumulatorMs = 0;
+    }
     while (
       this.inputAccumulatorMs >= SERVER.TICK_INTERVAL &&
       localState &&
-      this.matchPhase !== MatchPhase.ENDED
+      this.matchPhase === MatchPhase.ACTIVE
     ) {
       this.inputAccumulatorMs -= SERVER.TICK_INTERVAL;
       this.currentTick++;
+
+      localState = networkManager.getLocalPlayerState();
+      if (!localState) break;
 
       // Capture the position as it was going into this tick for render
       // interpolation. The most recent predicted position after sendInput
@@ -135,6 +150,7 @@ export class GameScene extends Phaser.Scene {
 
     // Re-read latest local state after any input ticks that ran this frame.
     const currentLocalState = networkManager.getLocalPlayerState();
+    this.decayLocalCorrectionOffset(delta);
 
     // Update local player rendering
     if (currentLocalState && this.playerManager) {
@@ -152,6 +168,11 @@ export class GameScene extends Phaser.Scene {
             y: this.prevLocalPos.y + (this.currLocalPos.y - this.prevLocalPos.y) * alpha,
           };
         }
+        renderPos = {
+          x: renderPos.x + this.localCorrectionOffset.x,
+          y: renderPos.y + this.localCorrectionOffset.y,
+        };
+        this.lastRenderedLocalPos = { x: renderPos.x, y: renderPos.y };
 
         // Build serialized state array for the player manager
         const allPlayers = [{
@@ -387,12 +408,43 @@ export class GameScene extends Phaser.Scene {
       this.effectsRenderer?.showExplosion(pos.x, pos.y);
     };
 
+    this.onLocalCorrection = (correction: LocalCorrection) => {
+      this.prevLocalPos = {
+        x: correction.correctedPosition.x,
+        y: correction.correctedPosition.y,
+      };
+      this.currLocalPos = {
+        x: correction.correctedPosition.x,
+        y: correction.correctedPosition.y,
+      };
+
+      if (correction.shouldSnap) {
+        this.localCorrectionOffset = { x: 0, y: 0 };
+        this.localCorrectionOffsetStart = { x: 0, y: 0 };
+        this.localCorrectionElapsedMs = 0;
+        this.lastRenderedLocalPos = {
+          x: correction.correctedPosition.x,
+          y: correction.correctedPosition.y,
+        };
+        return;
+      }
+
+      const visualStart = this.lastRenderedLocalPos ?? correction.previousPosition;
+      this.localCorrectionOffset = {
+        x: visualStart.x - correction.correctedPosition.x,
+        y: visualStart.y - correction.correctedPosition.y,
+      };
+      this.localCorrectionOffsetStart = { ...this.localCorrectionOffset };
+      this.localCorrectionElapsedMs = 0;
+    };
+
     this.gameService.on('matchCountdown', this.onMatchCountdown);
     this.gameService.on('matchStart', this.onMatchStart);
     this.gameService.on('matchEnd', this.onMatchEnd);
     this.gameService.on('opponentDisconnected', this.onOpponentDisconnected);
     this.gameService.on('bulletTrail', this.onBulletTrail);
     this.gameService.on('grenadeExploded', this.onGrenadeExploded);
+    this.gameService.on('localCorrection', this.onLocalCorrection);
   }
 
   private cleanupEvents(): void {
@@ -420,6 +472,34 @@ export class GameScene extends Phaser.Scene {
       this.gameService.off('grenadeExploded', this.onGrenadeExploded);
       this.onGrenadeExploded = null;
     }
+    if (this.onLocalCorrection) {
+      this.gameService.off('localCorrection', this.onLocalCorrection);
+      this.onLocalCorrection = null;
+    }
+  }
+
+  private decayLocalCorrectionOffset(deltaMs: number): void {
+    const distanceSq =
+      this.localCorrectionOffset.x * this.localCorrectionOffset.x +
+      this.localCorrectionOffset.y * this.localCorrectionOffset.y;
+
+    if (distanceSq < LOCAL_CORRECTION_EPSILON * LOCAL_CORRECTION_EPSILON) {
+      this.localCorrectionOffset = { x: 0, y: 0 };
+      this.localCorrectionOffsetStart = { x: 0, y: 0 };
+      this.localCorrectionElapsedMs = 0;
+      return;
+    }
+
+    this.localCorrectionElapsedMs = Math.min(
+      LOCAL_CORRECTION_SMOOTH_MS,
+      this.localCorrectionElapsedMs + deltaMs,
+    );
+    const t = this.localCorrectionElapsedMs / LOCAL_CORRECTION_SMOOTH_MS;
+    const keep = (1 - t) * (1 - t);
+    this.localCorrectionOffset = {
+      x: this.localCorrectionOffsetStart.x * keep,
+      y: this.localCorrectionOffsetStart.y * keep,
+    };
   }
 
   private cleanup(): void {

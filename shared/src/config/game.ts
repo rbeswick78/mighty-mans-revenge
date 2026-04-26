@@ -58,6 +58,12 @@ export const MATCH = Object.freeze({
 export const SERVER = Object.freeze({
   TICK_RATE: 20,
   TICK_INTERVAL: 50,
+  /**
+   * Upper bound on how many queued inputs a player can catch up with in one
+   * server tick. Normal play is 1; short client/frame/network bursts may be
+   * 2-3. Keeping a cap protects the tick budget without forcing bad acks.
+   */
+  MAX_INPUTS_PER_PLAYER_PER_TICK: 5,
   REWIND_BUFFER_SECONDS: 1,
   MAX_PLAYERS: 10,
 });

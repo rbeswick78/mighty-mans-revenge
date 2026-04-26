@@ -5,6 +5,7 @@ import {
   RESPAWN,
   PLAYER,
   GUN,
+  SERVER,
   calculateMovement,
 } from '@shared/game';
 import type {
@@ -24,6 +25,7 @@ import { MapManager } from './map-manager.js';
 import { CombatManager } from './combat-manager.js';
 import { getGameMode } from './modes/index.js';
 import type { GameMode, MatchContext } from './modes/game-mode.js';
+import { InputQueue } from './input-queue.js';
 
 interface PendingBurst {
   shotsRemaining: number;
@@ -47,8 +49,8 @@ export class Match implements MatchContext {
   readonly combatManager: CombatManager = new CombatManager();
   /** Recent bullet trails from this tick, cleared after broadcast. */
   private tickBulletTrails: BulletTrail[] = [];
-  /** Most recent input per player, processed each tick. */
-  private pendingInputs: Map<PlayerId, PlayerInput> = new Map();
+  /** Ordered input queue per player. Inputs are acked only after consumption. */
+  private inputQueues: Map<PlayerId, InputQueue> = new Map();
   /** Active 3-shot bursts in flight, keyed by player. */
   private pendingBursts: Map<PlayerId, PendingBurst> = new Map();
   /** Timestamp when the match became ACTIVE, for duration tracking. */
@@ -77,6 +79,7 @@ export class Match implements MatchContext {
       const spawnPos = this.mapManager.getRandomSpawnPoint();
       const player = this.createPlayerState(entry.id, entry.nickname, spawnPos);
       this.players.set(entry.id, player);
+      this.inputQueues.set(entry.id, new InputQueue());
       this.stats.initPlayer(entry.id);
       this.connectedPlayers.add(entry.id);
     }
@@ -86,24 +89,19 @@ export class Match implements MatchContext {
   queueInput(playerId: PlayerId, input: PlayerInput): void {
     const player = this.players.get(playerId);
     if (!player) return;
+    if (input.sequenceNumber <= player.lastProcessedInput) return;
 
-    // Most fields (movement, aim, sprint) are level signals — overwriting is
-    // safe. The release/press edge fields are one-shot signals; if multiple
-    // inputs arrive within a single tick window, OR them onto the latest so
-    // we don't drop a click.
-    const existing = this.pendingInputs.get(playerId);
-    if (existing) {
-      input = {
-        ...input,
-        firePressed: input.firePressed || existing.firePressed,
-        throwPressed: input.throwPressed || existing.throwPressed,
-        detonatePressed: input.detonatePressed || existing.detonatePressed,
-      };
+    if (this.phase !== MatchPhase.ACTIVE) {
+      player.lastProcessedInput = input.sequenceNumber;
+      player.aimAngle = input.aimAngle;
+      return;
     }
 
-    this.pendingInputs.set(playerId, input);
-    player.lastProcessedInput = input.sequenceNumber;
-    player.aimAngle = input.aimAngle;
+    // Sequence validation lives in the queue; acks advance only during update.
+    const queue = this.inputQueues.get(playerId);
+    if (!queue) return;
+
+    queue.push(input);
   }
 
   /** Start the countdown phase. */
@@ -252,65 +250,82 @@ export class Match implements MatchContext {
 
     // Process movement and player-driven actions for each player.
     for (const [playerId, player] of this.players) {
-      if (player.isDead) continue;
-      const input = this.pendingInputs.get(playerId);
-      if (!input) continue;
+      const queue = this.inputQueues.get(playerId);
+      if (!queue) continue;
 
-      // Movement
-      const result = calculateMovement(input, player.position, player.stamina, dt, grid);
-      player.position = result.newPos;
-      player.velocity = result.velocity;
-      player.stamina = result.newStamina;
-      player.isSprinting = input.sprint && player.stamina > 0;
-      player.aimAngle = input.aimAngle;
-
-      // Reload
-      if (input.reload && !player.isReloading && player.ammo < GUN.MAGAZINE_SIZE) {
-        player.isReloading = true;
-        player.reloadTimer = GUN.RELOAD_TIME;
-      }
-
-      // Start a burst on the LMB-release edge. Refuse if the player is
-      // already mid-burst, reloading, or out of ammo.
-      const alreadyBursting = this.pendingBursts.has(playerId);
-      if (
-        input.firePressed &&
-        !alreadyBursting &&
-        !player.isReloading &&
-        player.ammo > 0
-      ) {
-        this.fireOneShot(playerId, input.aimAngle, grid);
-        // Queue the remaining shots if the burst has more than one round.
-        if (GUN.BURST_SIZE > 1) {
-          this.pendingBursts.set(playerId, {
-            shotsRemaining: GUN.BURST_SIZE - 1,
-            nextShotIn: GUN.BURST_INTERVAL,
-            lockedAngle: input.aimAngle,
-          });
+      if (player.isDead) {
+        const ignoredInputs = queue.drain();
+        const lastIgnored = ignoredInputs[ignoredInputs.length - 1];
+        if (lastIgnored) {
+          player.lastProcessedInput = lastIgnored.sequenceNumber;
+          player.aimAngle = lastIgnored.aimAngle;
         }
+        continue;
       }
 
-      // Throw grenade (release edge), only if no live grenade for this player.
-      if (
-        input.throwPressed &&
-        !this.combatManager.getActiveGrenadeFor(playerId)
-      ) {
-        this.combatManager.spawnGrenade(playerId, player.position, input.aimAngle);
-        this.stats.recordGrenade(playerId);
-      }
+      const inputs = queue.drain(SERVER.MAX_INPUTS_PER_PLAYER_PER_TICK);
+      if (inputs.length === 0) continue;
 
-      // Manual detonation (press edge), only if a live grenade exists.
-      if (input.detonatePressed) {
-        const active = this.combatManager.getActiveGrenadeFor(playerId);
-        if (active) {
-          const explosion = this.combatManager.detonateGrenade(active.id, this.players, grid);
-          if (explosion) {
-            this.recordExplosion(explosion);
+      for (const input of inputs) {
+        // Movement. Each client input represents one fixed simulation tick,
+        // so replay queued inputs one at a time with the server tick dt.
+        const result = calculateMovement(input, player.position, player.stamina, dt, grid);
+        player.position = result.newPos;
+        player.velocity = result.velocity;
+        player.stamina = result.newStamina;
+        player.isSprinting =
+          input.sprint && (input.moveX !== 0 || input.moveY !== 0) && player.stamina > 0;
+        player.aimAngle = input.aimAngle;
+
+        // Reload
+        if (input.reload && !player.isReloading && player.ammo < GUN.MAGAZINE_SIZE) {
+          player.isReloading = true;
+          player.reloadTimer = GUN.RELOAD_TIME;
+        }
+
+        // Start a burst on the LMB-release edge. Refuse if the player is
+        // already mid-burst, reloading, or out of ammo.
+        const alreadyBursting = this.pendingBursts.has(playerId);
+        if (
+          input.firePressed &&
+          !alreadyBursting &&
+          !player.isReloading &&
+          player.ammo > 0
+        ) {
+          this.fireOneShot(playerId, input.aimAngle, grid);
+          // Queue the remaining shots if the burst has more than one round.
+          if (GUN.BURST_SIZE > 1) {
+            this.pendingBursts.set(playerId, {
+              shotsRemaining: GUN.BURST_SIZE - 1,
+              nextShotIn: GUN.BURST_INTERVAL,
+              lockedAngle: input.aimAngle,
+            });
           }
         }
+
+        // Throw grenade (release edge), only if no live grenade for this player.
+        if (
+          input.throwPressed &&
+          !this.combatManager.getActiveGrenadeFor(playerId)
+        ) {
+          this.combatManager.spawnGrenade(playerId, player.position, input.aimAngle);
+          this.stats.recordGrenade(playerId);
+        }
+
+        // Manual detonation (press edge), only if a live grenade exists.
+        if (input.detonatePressed) {
+          const active = this.combatManager.getActiveGrenadeFor(playerId);
+          if (active) {
+            const explosion = this.combatManager.detonateGrenade(active.id, this.players, grid);
+            if (explosion) {
+              this.recordExplosion(explosion);
+            }
+          }
+        }
+
+        player.lastProcessedInput = input.sequenceNumber;
       }
     }
-    this.pendingInputs.clear();
 
     // Advance any pending bursts.
     this.advanceBursts(dt, grid);

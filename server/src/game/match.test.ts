@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Match } from './match.js';
-import { MatchPhase, MATCH, RESPAWN, PLAYER, GUN } from '@shared/game';
+import { MatchPhase, MATCH, RESPAWN, PLAYER, GUN, SERVER } from '@shared/game';
 import type { MapData, PlayerInput } from '@shared/game';
 
 function makeInput(seq: number, overrides: Partial<PlayerInput> = {}): PlayerInput {
@@ -227,6 +227,79 @@ describe('Match', () => {
     it('should support N players', () => {
       const bigMatch = createMatch(5);
       expect(bigMatch.players.size).toBe(5);
+    });
+  });
+
+  describe('movement input queue', () => {
+    function startActiveMatch(): Match {
+      const m = createMatch();
+      m.startCountdown();
+      m.update(MATCH.COUNTDOWN_DURATION + 0.05);
+      return m;
+    }
+
+    it('does not acknowledge input before it is simulated', () => {
+      const m = startActiveMatch();
+      const player = m.players.get('player-0')!;
+
+      m.queueInput('player-0', makeInput(1, { moveX: 1 }));
+
+      expect(player.lastProcessedInput).toBe(0);
+
+      m.update(0.05);
+
+      expect(player.lastProcessedInput).toBe(1);
+    });
+
+    it('acknowledges but ignores movement before the match is active', () => {
+      const m = createMatch();
+      m.startCountdown();
+      const player = m.players.get('player-0')!;
+      const startX = player.position.x;
+
+      m.queueInput('player-0', makeInput(1, { moveX: 1 }));
+
+      expect(player.lastProcessedInput).toBe(1);
+
+      m.update(MATCH.COUNTDOWN_DURATION + 0.05);
+      m.update(1 / SERVER.TICK_RATE);
+
+      expect(player.position.x).toBeCloseTo(startX, 5);
+      expect(player.lastProcessedInput).toBe(1);
+    });
+
+    it('replays multiple queued movement inputs with fixed tick dt', () => {
+      const m = startActiveMatch();
+      const player = m.players.get('player-0')!;
+      const startX = player.position.x;
+
+      m.queueInput('player-0', makeInput(1, { moveX: 1 }));
+      m.queueInput('player-0', makeInput(2, { moveX: 1 }));
+
+      m.update(1 / SERVER.TICK_RATE);
+
+      expect(player.position.x).toBeCloseTo(
+        startX + PLAYER.BASE_SPEED * (1 / SERVER.TICK_RATE) * 2,
+        5,
+      );
+      expect(player.lastProcessedInput).toBe(2);
+    });
+
+    it('caps catch-up inputs without acknowledging unprocessed inputs', () => {
+      const m = startActiveMatch();
+      const player = m.players.get('player-0')!;
+
+      for (let seq = 1; seq <= SERVER.MAX_INPUTS_PER_PLAYER_PER_TICK + 2; seq++) {
+        m.queueInput('player-0', makeInput(seq, { moveX: 1 }));
+      }
+
+      m.update(1 / SERVER.TICK_RATE);
+
+      expect(player.lastProcessedInput).toBe(SERVER.MAX_INPUTS_PER_PLAYER_PER_TICK);
+
+      m.update(1 / SERVER.TICK_RATE);
+
+      expect(player.lastProcessedInput).toBe(SERVER.MAX_INPUTS_PER_PLAYER_PER_TICK + 2);
     });
   });
 
