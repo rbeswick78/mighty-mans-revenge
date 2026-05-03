@@ -36,8 +36,16 @@ interface BufferedState {
 
 interface EntityBuffer {
   states: BufferedState[];
-  /** Highest serverTick we've already accepted; used to drop late/stale arrivals. */
+  /**
+   * Highest serverTick we've already accepted. Only used as an out-of-order
+   * filter when the server actually sends a monotonically increasing tick
+   * number. If every gameState carries the same tick (e.g., legacy server
+   * stamping `tick: 0`), we silently disable this filter so updates aren't
+   * dropped.
+   */
   highestTick: number;
+  /** True until we've seen two distinct tick values; gates the dedup filter. */
+  tickDedupActive: boolean;
 }
 
 function lerp(a: number, b: number, t: number): number {
@@ -87,13 +95,20 @@ export class EntityInterpolation {
   ): void {
     let buffer = this.buffers.get(playerId);
     if (!buffer) {
-      buffer = { states: [], highestTick: -1 };
+      buffer = { states: [], highestTick: -1, tickDedupActive: false };
       this.buffers.set(playerId, buffer);
     }
 
-    // Reject duplicates and out-of-order arrivals. Without this, a stale
-    // packet arriving after a fresher one would jerk the entity backwards.
-    if (serverTick <= buffer.highestTick) return;
+    // Reject out-of-order arrivals when the server actually sends incrementing
+    // tick numbers. If the server stamps a constant value (e.g. 0) we'd
+    // otherwise drop every update after the first — disable the filter until
+    // we observe two distinct ticks.
+    if (buffer.tickDedupActive) {
+      if (serverTick <= buffer.highestTick) return;
+    } else if (buffer.highestTick !== -1 && serverTick !== buffer.highestTick) {
+      buffer.tickDedupActive = true;
+      if (serverTick <= buffer.highestTick) return;
+    }
     buffer.highestTick = serverTick;
 
     const buffered: BufferedState = {

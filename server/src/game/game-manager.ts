@@ -18,8 +18,8 @@ export class GameManager {
     this.server = server;
     this.matchmaking = new MatchmakingManager(server);
 
-    this.gameLoop = new GameLoop((dt, _tick) => {
-      this.tick(dt);
+    this.gameLoop = new GameLoop((dt, tick) => {
+      this.tick(dt, tick);
     }, SERVER.TICK_RATE);
 
     this.wireEvents();
@@ -92,7 +92,7 @@ export class GameManager {
     }
   }
 
-  private tick(dt: number): void {
-    this.matchmaking.tick(dt);
+  private tick(dt: number, tick: number): void {
+    this.matchmaking.tick(dt, tick);
   }
 }

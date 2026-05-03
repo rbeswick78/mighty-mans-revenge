@@ -189,7 +189,7 @@ export class MatchmakingManager {
   }
 
   /** Called each server tick. */
-  tick(dt: number): void {
+  tick(dt: number, serverTick: number): void {
     // Try to create matches from queued players
     this.tryCreateMatch();
 
@@ -208,7 +208,7 @@ export class MatchmakingManager {
       this.previousPhases.set(matchId, newPhase);
 
       // Broadcast game state to match players
-      this.broadcastMatchState(match);
+      this.broadcastMatchState(match, serverTick);
 
       // Check if match ended
       if (match.phase === MatchPhase.ENDED) {
@@ -316,7 +316,7 @@ export class MatchmakingManager {
     match.startCountdown();
   }
 
-  private broadcastMatchState(match: Match): void {
+  private broadcastMatchState(match: Match, serverTick: number): void {
     const players: SerializedPlayerState[] = [];
 
     for (const [, player] of match.players) {
@@ -343,7 +343,7 @@ export class MatchmakingManager {
 
     const stateMessage: ServerGameStateMessage = {
       type: 'server:gameState',
-      tick: 0, // Will be set properly when we integrate with game loop tick
+      tick: serverTick,
       phase: match.phase,
       countdownTimer: match.countdownTimer,
       players,
