@@ -54,6 +54,17 @@ import wastelandOutpost from '../../../shared/maps/wasteland-outpost.json';
 const LOCAL_CORRECTION_SMOOTH_MS = 120;
 const LOCAL_CORRECTION_EPSILON = 0.01;
 
+/**
+ * Hard cap on how many catch-up ticks can run in a single Phaser frame.
+ * If `delta` ever balloons (tab hidden, GC pause, RAF throttling, OS sleep),
+ * we discard the surplus instead of replaying it. Replaying causes runaway
+ * prediction (visible as the local player rocketing across the map) and
+ * floods the server's input queue, where the per-tick drain limit then
+ * stretches a multi-second backlog out — the client sees rubber-banding
+ * for every gameState until the queue clears.
+ */
+const MAX_CATCHUP_TICKS = 3;
+
 interface GameSceneData {
   nickname?: string;
   matchData?: MatchData;
@@ -202,6 +213,14 @@ export class GameScene extends Phaser.Scene {
     // or the client will over-predict.
     if (this.matchPhase === MatchPhase.ACTIVE) {
       this.inputAccumulatorMs += delta;
+      // Cap the accumulator before draining. After a tab-hide / freeze the
+      // first frame's delta can be seconds long; without a cap we'd run
+      // dozens of ticks synchronously, fast-forwarding prediction and
+      // spamming the server with stale inputs.
+      const maxAccumulator = SERVER.TICK_INTERVAL * MAX_CATCHUP_TICKS;
+      if (this.inputAccumulatorMs > maxAccumulator) {
+        this.inputAccumulatorMs = maxAccumulator;
+      }
     } else {
       this.inputAccumulatorMs = 0;
     }

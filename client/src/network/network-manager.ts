@@ -160,10 +160,15 @@ export class NetworkManager {
 
   /**
    * Get interpolated states for all remote players.
-   * Render time is one tick behind real-time by design.
+   *
+   * We render 2 server ticks behind real time (not 1) so typical UDP jitter
+   * — packets arriving 20-30ms late or early — lands inside the buffered
+   * window instead of forcing the interpolator to snap or freeze. With one
+   * tick of slack the entity visibly hops between snapshot positions; two
+   * ticks absorbs jitter and a single dropped packet without artifacts.
    */
   getInterpolatedPlayers(): Map<PlayerId, InterpolatedState> {
-    const renderTime = performance.now() - SERVER.TICK_INTERVAL;
+    const renderTime = performance.now() - SERVER.TICK_INTERVAL * 2;
     const result = new Map<PlayerId, InterpolatedState>();
 
     for (const playerId of this.remotePlayerIds) {
@@ -176,12 +181,9 @@ export class NetworkManager {
     return result;
   }
 
-  /**
-   * Get an interpolated state for a specific remote player.
-   * Render time is one tick behind real-time by design.
-   */
+  /** Get an interpolated state for a specific remote player. */
   getInterpolatedPlayer(playerId: PlayerId): InterpolatedState | null {
-    const renderTime = performance.now() - SERVER.TICK_INTERVAL;
+    const renderTime = performance.now() - SERVER.TICK_INTERVAL * 2;
     return this.interpolation.getInterpolatedState(playerId, renderTime);
   }
 

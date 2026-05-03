@@ -5,6 +5,14 @@ import type { InterpolatedState } from './types.js';
 /** Stop extrapolating if we haven't received an update in this many ms. */
 const MAX_EXTRAPOLATION_MS = 200;
 
+/**
+ * Maximum number of authoritative snapshots we retain per remote entity.
+ * With 20 ticks/sec server rate and a 100ms render delay, two states are
+ * the absolute minimum to interpolate; we keep a few extra to absorb
+ * jitter and out-of-order arrivals.
+ */
+const MAX_BUFFER_SIZE = 12;
+
 interface BufferedState {
   position: Vec2;
   velocity: Vec2;
@@ -21,12 +29,15 @@ interface BufferedState {
   score: number;
   deaths: number;
   nickname: string;
-  timestamp: number; // local receive time in ms
+  /** Local receive time in ms (performance.now()). */
+  timestamp: number;
   serverTick: number;
 }
 
 interface EntityBuffer {
-  states: [BufferedState] | [BufferedState, BufferedState];
+  states: BufferedState[];
+  /** Highest serverTick we've already accepted; used to drop late/stale arrivals. */
+  highestTick: number;
 }
 
 function lerp(a: number, b: number, t: number): number {
@@ -66,13 +77,25 @@ export class EntityInterpolation {
 
   /**
    * Push a new authoritative state for a remote entity.
-   * Keeps only the two most recent states for interpolation.
+   * Drops out-of-order arrivals (UDP can reorder packets), keeps a small
+   * sliding window of recent states for the interpolator to pick from.
    */
   pushState(
     playerId: PlayerId,
     state: SerializedPlayerState,
     serverTick: number,
   ): void {
+    let buffer = this.buffers.get(playerId);
+    if (!buffer) {
+      buffer = { states: [], highestTick: -1 };
+      this.buffers.set(playerId, buffer);
+    }
+
+    // Reject duplicates and out-of-order arrivals. Without this, a stale
+    // packet arriving after a fresher one would jerk the entity backwards.
+    if (serverTick <= buffer.highestTick) return;
+    buffer.highestTick = serverTick;
+
     const buffered: BufferedState = {
       position: { x: state.position.x, y: state.position.y },
       velocity: { x: state.velocity.x, y: state.velocity.y },
@@ -93,73 +116,85 @@ export class EntityInterpolation {
       serverTick,
     };
 
-    const existing = this.buffers.get(playerId);
-    if (!existing) {
-      this.buffers.set(playerId, { states: [buffered] });
-    } else {
-      // Keep the most recent as "previous", new one as "current"
-      const prev = existing.states.length === 2
-        ? existing.states[1]
-        : existing.states[0];
-      existing.states = [prev, buffered];
+    buffer.states.push(buffered);
+    if (buffer.states.length > MAX_BUFFER_SIZE) {
+      buffer.states.shift();
     }
   }
 
   /**
    * Get the interpolated state for a remote entity at the given render time.
    *
-   * Entity interpolation intentionally renders other players ONE TICK BEHIND
-   * real-time. The caller provides `renderTime` which should be
-   * `performance.now() - tickIntervalMs` to achieve this buffering.
+   * Picks the two buffered states whose receive timestamps bracket
+   * `renderTime` and lerps between them. The caller renders ~2 ticks
+   * behind real-time so typical UDP jitter (±20-30ms) lands inside the
+   * buffered window instead of forcing a snap.
    */
   getInterpolatedState(
     playerId: PlayerId,
     renderTime: number,
   ): InterpolatedState | null {
     const buffer = this.buffers.get(playerId);
-    if (!buffer) return null;
+    if (!buffer || buffer.states.length === 0) return null;
 
-    const { states } = buffer;
+    const states = buffer.states;
+    const newest = states[states.length - 1];
 
+    // Single state — nothing to interpolate against.
     if (states.length === 1) {
-      return toInterpolated(states[0]);
+      return toInterpolated(newest);
     }
 
-    const [prev, curr] = states;
-
-    // If no update for too long, freeze at last known position
-    if (renderTime - curr.timestamp > MAX_EXTRAPOLATION_MS) {
-      return toInterpolated(curr);
+    // Render time newer than newest sample. Briefly hold at last known
+    // state; if we go too long without an update, freeze hard.
+    if (renderTime >= newest.timestamp) {
+      if (renderTime - newest.timestamp > MAX_EXTRAPOLATION_MS) {
+        return toInterpolated(newest);
+      }
+      return toInterpolated(newest);
     }
 
-    // Compute interpolation factor between previous and current
-    const duration = curr.timestamp - prev.timestamp;
-    if (duration <= 0) {
-      return toInterpolated(curr);
+    // Render time older than oldest sample (we're still filling the buffer).
+    const oldest = states[0];
+    if (renderTime <= oldest.timestamp) {
+      return toInterpolated(oldest);
     }
 
-    const t = Math.max(0, Math.min(1, (renderTime - prev.timestamp) / duration));
+    // Find the pair of consecutive states bracketing renderTime.
+    for (let i = 0; i < states.length - 1; i++) {
+      const prev = states[i];
+      const curr = states[i + 1];
+      if (renderTime >= prev.timestamp && renderTime <= curr.timestamp) {
+        const duration = curr.timestamp - prev.timestamp;
+        if (duration <= 0) {
+          return toInterpolated(curr);
+        }
+        const t = (renderTime - prev.timestamp) / duration;
+        return {
+          position: {
+            x: lerp(prev.position.x, curr.position.x, t),
+            y: lerp(prev.position.y, curr.position.y, t),
+          },
+          velocity: { x: curr.velocity.x, y: curr.velocity.y },
+          aimAngle: lerpAngle(prev.aimAngle, curr.aimAngle, t),
+          health: curr.health, // discrete -- don't interpolate
+          ammo: curr.ammo,
+          grenades: curr.grenades,
+          isSprinting: curr.isSprinting,
+          isDead: curr.isDead,
+          isReloading: curr.isReloading,
+          stamina: curr.stamina,
+          respawnTimer: curr.respawnTimer,
+          invulnerableTimer: curr.invulnerableTimer,
+          score: curr.score,
+          deaths: curr.deaths,
+          nickname: curr.nickname,
+        };
+      }
+    }
 
-    return {
-      position: {
-        x: lerp(prev.position.x, curr.position.x, t),
-        y: lerp(prev.position.y, curr.position.y, t),
-      },
-      velocity: { x: curr.velocity.x, y: curr.velocity.y },
-      aimAngle: lerpAngle(prev.aimAngle, curr.aimAngle, t),
-      health: curr.health, // discrete -- don't interpolate
-      ammo: curr.ammo,
-      grenades: curr.grenades,
-      isSprinting: curr.isSprinting,
-      isDead: curr.isDead,
-      isReloading: curr.isReloading,
-      stamina: curr.stamina,
-      respawnTimer: curr.respawnTimer,
-      invulnerableTimer: curr.invulnerableTimer,
-      score: curr.score,
-      deaths: curr.deaths,
-      nickname: curr.nickname,
-    };
+    // Fallback (shouldn't reach here given the bracketing checks above).
+    return toInterpolated(newest);
   }
 
   /** Remove a disconnected entity from the buffer. */
