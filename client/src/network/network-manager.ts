@@ -161,14 +161,17 @@ export class NetworkManager {
   /**
    * Get interpolated states for all remote players.
    *
-   * We render 2 server ticks behind real time (not 1) so typical UDP jitter
-   * — packets arriving 20-30ms late or early — lands inside the buffered
-   * window instead of forcing the interpolator to snap or freeze. With one
-   * tick of slack the entity visibly hops between snapshot positions; two
-   * ticks absorbs jitter and a single dropped packet without artifacts.
+   * Rendered ONE server tick behind real time. The server-side hit detection
+   * (match.ts → combatManager.processShot) uses current authoritative
+   * positions with no lag-compensation rewind, so the render delay here
+   * effectively becomes a hit-registration error budget. Going past one
+   * tick (~50ms) widens the gap between where the client sees an opponent
+   * and where the server places them, and shots stop landing on moving
+   * targets. If LagCompensator gets wired up later we can safely raise
+   * this back to 2 ticks for better jitter tolerance.
    */
   getInterpolatedPlayers(): Map<PlayerId, InterpolatedState> {
-    const renderTime = performance.now() - SERVER.TICK_INTERVAL * 2;
+    const renderTime = performance.now() - SERVER.TICK_INTERVAL;
     const result = new Map<PlayerId, InterpolatedState>();
 
     for (const playerId of this.remotePlayerIds) {
@@ -183,7 +186,7 @@ export class NetworkManager {
 
   /** Get an interpolated state for a specific remote player. */
   getInterpolatedPlayer(playerId: PlayerId): InterpolatedState | null {
-    const renderTime = performance.now() - SERVER.TICK_INTERVAL * 2;
+    const renderTime = performance.now() - SERVER.TICK_INTERVAL;
     return this.interpolation.getInterpolatedState(playerId, renderTime);
   }
 
