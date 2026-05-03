@@ -4,7 +4,9 @@ import type { MapData } from '@shared/types/map.js';
 import type { PlayerId, Vec2 } from '@shared/types/common.js';
 import type { MatchResult } from '@shared/types/game.js';
 import { MatchPhase } from '@shared/types/game.js';
+import type { BulletTrail } from '@shared/types/projectile.js';
 import { PLAYER, SERVER } from '@shared/config/game.js';
+import { Wasteland, cssHex } from '@shared/config/palette.js';
 import {
   predictBulletRay,
   predictGrenadePath,
@@ -15,9 +17,35 @@ import { ClientPlayerManager } from '../rendering/player-manager.js';
 import { EffectsRenderer } from '../rendering/effects-renderer.js';
 import { PickupRenderer } from '../rendering/pickup-renderer.js';
 import { GrenadeRenderer } from '../rendering/grenade-renderer.js';
+import { LightingRenderer } from '../rendering/lighting-renderer.js';
+import { KillJuice } from '../rendering/kill-juice.js';
+import { ImpactFx } from '../rendering/impact-fx.js';
+import { ExplosionFx } from '../rendering/explosion-fx.js';
+import { SmokeFx } from '../rendering/smoke-fx.js';
+import { DecalRenderer } from '../rendering/decal-renderer.js';
+import { CameraKick } from '../rendering/camera-kick.js';
+import { ZoomPulse } from '../rendering/zoom-pulse.js';
+import { CameraRoll, ROLL_DAMAGE_THRESHOLD } from '../rendering/camera-roll.js';
+import {
+  CHROMATIC_DECAY_MS,
+  CHROMATIC_INITIAL_PIXELS,
+  CrtPipeline,
+} from '../rendering/post-fx/crt-pipeline.js';
+import { ShockwaveController } from '../rendering/post-fx/shockwave-controller.js';
+import {
+  BLOOM_BLUR_STRENGTH,
+  BLOOM_COLOR,
+  BLOOM_OFFSET_X,
+  BLOOM_OFFSET_Y,
+  BLOOM_STEPS,
+  BLOOM_STRENGTH,
+} from '../rendering/post-fx/bloom-config.js';
+import { Crosshair } from '../rendering/crosshair.js';
 import { HUD } from '../ui/hud.js';
 import { InputManager } from '../input/input-manager.js';
+import { isTouchDevice } from '../input/is-touch-device.js';
 import { GameService, type MatchData } from '../services/game-service.js';
+import { AudioManager } from '../audio/audio-manager.js';
 import type { LocalCorrection, NetworkManager } from '../network/network-manager.js';
 
 // Vite handles JSON imports
@@ -37,7 +65,24 @@ export class GameScene extends Phaser.Scene {
   private effectsRenderer: EffectsRenderer | null = null;
   private pickupRenderer: PickupRenderer | null = null;
   private grenadeRenderer: GrenadeRenderer | null = null;
+  private lightingRenderer: LightingRenderer | null = null;
+  private killJuice: KillJuice | null = null;
+  private impactFx: ImpactFx | null = null;
+  private explosionFx: ExplosionFx | null = null;
+  private smokeFx: SmokeFx | null = null;
+  private decalRenderer: DecalRenderer | null = null;
+  private cameraKick: CameraKick | null = null;
+  private zoomPulse: ZoomPulse | null = null;
+  private cameraRoll: CameraRoll | null = null;
+  /** Tracks last-seen isDead per player so we can detect the false→true edge. */
+  private prevDeadStates: Map<string, boolean> = new Map();
+  /** Chromatic-aberration offset in pixels; decays toward 0, kicks back up on local damage. */
+  private aberrationPixels = 0;
+  private prevLocalHealth: number | null = null;
+  private crtPipeline: CrtPipeline | null = null;
+  private shockwaveController: ShockwaveController | null = null;
   private hud: HUD | null = null;
+  private crosshair: Crosshair | null = null;
   private inputManager: InputManager | null = null;
   private gameService!: GameService;
   private nickname = '';
@@ -60,8 +105,7 @@ export class GameScene extends Phaser.Scene {
   private onMatchStart: (() => void) | null = null;
   private onMatchEnd: ((result: MatchResult) => void) | null = null;
   private onOpponentDisconnected: ((playerId: PlayerId) => void) | null = null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private onBulletTrail: ((trail: any) => void) | null = null;
+  private onBulletTrail: ((trail: BulletTrail) => void) | null = null;
   private onGrenadeExploded: ((pos: Vec2) => void) | null = null;
   private onLocalCorrection: ((correction: LocalCorrection) => void) | null = null;
 
@@ -76,7 +120,17 @@ export class GameScene extends Phaser.Scene {
 
   create(): void {
     this.cameras.main.fadeIn(300, 0, 0, 0);
+    this.installCrtPipeline();
+    this.installBloomFX();
     this.gameService = GameService.getInstance();
+
+    // Lobby music plays into the lobby; the countdown phase is silent and
+    // the gameplay track starts on match start (see onMatchStart below).
+    const audio = AudioManager.getInstance();
+    if (audio) {
+      audio.setScene(this);
+      audio.stopMusic();
+    }
 
     // Render the map
     this.mapRenderer = new MapRenderer(this);
@@ -89,12 +143,37 @@ export class GameScene extends Phaser.Scene {
       this.gameService.getNetworkManager().setCollisionGrid(grid);
     }
 
+    // Decal RT must be created right after the map and before any player
+    // containers — display-list insertion order is what stacks decals
+    // above tiles and below players. See `DecalRenderer` class doc. The
+    // grid is also used to bake a wall mask so decals are clipped to
+    // wall pixels (no spillage onto floor at tile edges).
+    this.decalRenderer = new DecalRenderer(this, grid);
+    // Scorch is now a hard tile-frame swap on the map sprites themselves
+    // (see MapRenderer.scorchArea), so no separate RT renderer here. The
+    // ScorchRenderer module file is still in the repo for easy revert if
+    // the hard-swap look turns out wrong.
+
     // Create subsystems
     this.playerManager = new ClientPlayerManager(this);
     this.effectsRenderer = new EffectsRenderer(this);
     this.pickupRenderer = new PickupRenderer(this);
     this.grenadeRenderer = new GrenadeRenderer(this);
+    this.lightingRenderer = new LightingRenderer(this);
+    this.killJuice = new KillJuice(this);
+    this.impactFx = new ImpactFx(this);
+    this.explosionFx = new ExplosionFx(this);
+    this.smokeFx = new SmokeFx(this);
+    this.shockwaveController = new ShockwaveController();
+    this.cameraKick = new CameraKick();
+    this.zoomPulse = new ZoomPulse();
+    this.cameraRoll = new CameraRoll();
     this.hud = new HUD(this);
+    // Bullseye replaces the OS cursor on desktop only — touch input
+    // doesn't have a hover position to track.
+    if (!isTouchDevice()) {
+      this.crosshair = new Crosshair(this);
+    }
     this.inputManager = new InputManager(this);
 
     // Wire up network events
@@ -103,6 +182,14 @@ export class GameScene extends Phaser.Scene {
 
   update(_time: number, delta: number): void {
     if (!this.inputManager || !this.hud) return;
+
+    // Decay chromatic aberration toward 0 every frame; it's pushed to the
+    // pipeline at the end of update() so a same-frame hit registers
+    // immediately.
+    if (this.aberrationPixels > 0) {
+      const decayPerMs = CHROMATIC_INITIAL_PIXELS / CHROMATIC_DECAY_MS;
+      this.aberrationPixels = Math.max(0, this.aberrationPixels - delta * decayPerMs);
+    }
 
     const networkManager = this.gameService.getNetworkManager();
     let localState = networkManager.getLocalPlayerState();
@@ -182,6 +269,7 @@ export class GameScene extends Phaser.Scene {
           aimAngle: currentLocalState.aimAngle,
           health: currentLocalState.health,
           ammo: currentLocalState.ammo,
+          grenades: currentLocalState.grenades,
           isReloading: currentLocalState.isReloading,
           isSprinting: currentLocalState.isSprinting,
           stamina: currentLocalState.stamina,
@@ -204,6 +292,7 @@ export class GameScene extends Phaser.Scene {
             aimAngle: interpState.aimAngle,
             health: interpState.health,
             ammo: interpState.ammo,
+            grenades: interpState.grenades,
             isReloading: interpState.isReloading,
             isSprinting: interpState.isSprinting,
             stamina: interpState.stamina,
@@ -217,12 +306,46 @@ export class GameScene extends Phaser.Scene {
           });
         }
 
+        // Detect local-player damage (health decreased since last frame)
+        // and kick chromatic aberration to peak. Respawns (0 → MAX) are
+        // increases so they don't trigger here. Heavy hits also roll the
+        // camera; chip damage skips the roll and gets only the aberration.
+        if (
+          this.prevLocalHealth !== null &&
+          currentLocalState.health < this.prevLocalHealth
+        ) {
+          this.aberrationPixels = CHROMATIC_INITIAL_PIXELS;
+          const damage = this.prevLocalHealth - currentLocalState.health;
+          if (damage >= ROLL_DAMAGE_THRESHOLD) {
+            this.cameraRoll?.trigger();
+          }
+        }
+        this.prevLocalHealth = currentLocalState.health;
+
+        // Detect any player flipping false→true on isDead and fire kill
+        // juice. Update tracker and prune disconnected players.
+        const seenIds = new Set<string>();
+        for (const p of allPlayers) {
+          seenIds.add(p.id);
+          const prev = this.prevDeadStates.get(p.id);
+          if (prev === false && p.isDead) {
+            this.killJuice?.trigger();
+          }
+          this.prevDeadStates.set(p.id, p.isDead);
+        }
+        for (const id of this.prevDeadStates.keys()) {
+          if (!seenIds.has(id)) this.prevDeadStates.delete(id);
+        }
+
         this.playerManager.updatePlayers(allPlayers, playerId);
 
         // Update HUD
         this.hud.updateHealth(currentLocalState.health, PLAYER.MAX_HEALTH);
         this.hud.updateAmmo(currentLocalState.ammo, 30, currentLocalState.isReloading);
-        this.hud.updateGrenadeStatus(networkManager.hasActiveGrenadeFor(playerId));
+        this.hud.updateGrenadeStatus(
+          networkManager.hasActiveGrenadeFor(playerId),
+          currentLocalState.grenades,
+        );
         this.hud.updateStamina(currentLocalState.stamina, PLAYER.SPRINT_DURATION);
         this.hud.updateDeathState(currentLocalState.isDead, currentLocalState.respawnTimer);
 
@@ -252,13 +375,35 @@ export class GameScene extends Phaser.Scene {
     }
 
     // Render pickups (active ones visible, collected ones hidden).
+    const pickups = networkManager.getPickups();
     if (this.pickupRenderer) {
-      this.pickupRenderer.updatePickups(networkManager.getPickups());
+      this.pickupRenderer.updatePickups(pickups);
     }
 
     // Aim line preview (white) — re-drawn each render frame so it tracks the
     // mouse smoothly, not just on server-tick boundaries.
     this.updateAimLine(currentLocalState);
+
+    if (this.lightingRenderer) {
+      const activePickupPositions: Vec2[] = [];
+      for (const p of pickups) {
+        if (p.isActive) {
+          activePickupPositions.push({ x: p.position.x, y: p.position.y });
+        }
+      }
+      this.lightingRenderer.update(activePickupPositions, delta);
+    }
+
+    this.impactFx?.update(delta);
+    this.explosionFx?.update(delta);
+    this.smokeFx?.update(delta);
+
+    this.crtPipeline?.setChromaticPixels(this.aberrationPixels);
+    this.shockwaveController?.update(delta, this.crtPipeline);
+    this.cameraKick?.update(delta, this.cameras.main);
+    this.zoomPulse?.update(delta, this.cameras.main);
+    this.cameraRoll?.update(delta, this.cameras.main);
+    this.crosshair?.update();
   }
 
   private updateAimLine(localState: ReturnType<NetworkManager['getLocalPlayerState']>): void {
@@ -319,6 +464,7 @@ export class GameScene extends Phaser.Scene {
         ammo: interp.ammo,
         isReloading: interp.isReloading,
         reloadTimer: 0,
+        grenades: interp.grenades,
         isSprinting: interp.isSprinting,
         stamina: interp.stamina,
         isDead: interp.isDead,
@@ -337,6 +483,35 @@ export class GameScene extends Phaser.Scene {
     this.cleanup();
   }
 
+  private installCrtPipeline(): void {
+    // Phaser's PostFXPipeline subclasses can't be registered via the GameConfig
+    // 'pipeline' field — its typing expects ordinary pipelines. Register here
+    // (idempotent — Phaser overwrites by name) before attaching it to the
+    // main camera.
+    const renderer = this.game.renderer;
+    if (!(renderer instanceof Phaser.Renderer.WebGL.WebGLRenderer)) return;
+    renderer.pipelines.addPostPipeline('CrtPipeline', CrtPipeline);
+    this.cameras.main.setPostPipeline(CrtPipeline);
+    // Cache the live instance so we can push chromatic-aberration strength
+    // each frame without re-resolving by class.
+    const pipeline = this.cameras.main.getPostPipeline(CrtPipeline);
+    this.crtPipeline = pipeline instanceof CrtPipeline ? pipeline : null;
+  }
+
+  private installBloomFX(): void {
+    // Camera postFX runs before postPipeline, so bloom feeds into the CRT
+    // shader: bright pixels glow first, then vignette+scanlines compose on
+    // top.
+    this.cameras.main.postFX.addBloom(
+      BLOOM_COLOR,
+      BLOOM_OFFSET_X,
+      BLOOM_OFFSET_Y,
+      BLOOM_BLUR_STRENGTH,
+      BLOOM_STRENGTH,
+      BLOOM_STEPS,
+    );
+  }
+
   private wireGameServiceEvents(): void {
     this.onMatchCountdown = (countdown: number) => {
       const value = Math.ceil(countdown);
@@ -352,6 +527,8 @@ export class GameScene extends Phaser.Scene {
       if (this.hud) {
         this.hud.showCountdown(0); // Shows "FIGHT!"
       }
+      // Match length is tuned to this track (MATCH.TIME_LIMIT).
+      AudioManager.getInstance()?.playMusic('music-gameplay');
     };
 
     this.onMatchEnd = (result: MatchResult) => {
@@ -378,7 +555,7 @@ export class GameScene extends Phaser.Scene {
         {
           fontFamily: '"Courier New", Courier, monospace',
           fontSize: '24px',
-          color: '#ff4444',
+          color: cssHex(Wasteland.TEXT_DISCONNECT),
           stroke: '#000000',
           strokeThickness: 4,
         },
@@ -394,18 +571,59 @@ export class GameScene extends Phaser.Scene {
       });
     };
 
-    this.onBulletTrail = (trail: { startPos: Vec2; endPos: Vec2 }) => {
+    this.onBulletTrail = (trail: BulletTrail) => {
       this.effectsRenderer?.showBulletTrail(
         trail.startPos.x,
         trail.startPos.y,
         trail.endPos.x,
         trail.endPos.y,
       );
-      this.effectsRenderer?.showMuzzleFlash(trail.startPos.x, trail.startPos.y, 0);
+
+      const bulletAngle = Math.atan2(
+        trail.endPos.y - trail.startPos.y,
+        trail.endPos.x - trail.startPos.x,
+      );
+
+      this.effectsRenderer?.showMuzzleFlash(trail.startPos.x, trail.startPos.y, bulletAngle);
+      this.lightingRenderer?.addMuzzleFlash(trail.startPos.x, trail.startPos.y);
+
+      // Trigger the shooter's gun shoot animation (only player-kind
+      // renderers have one; remote players are zombies and silently
+      // no-op inside playShootAnimation).
+      this.playerManager?.getRenderer(trail.shooterId)?.playShootAnimation();
+
+      const grid = this.mapRenderer?.getCollisionGrid() ?? null;
+      this.impactFx?.spawnBulletImpact(
+        trail.endPos.x,
+        trail.endPos.y,
+        bulletAngle,
+        grid,
+      );
+      this.decalRenderer?.addBulletHoleIfWall(
+        trail.endPos.x,
+        trail.endPos.y,
+        bulletAngle,
+        grid,
+      );
+
+      // Recoil kick — only the local player's shot moves the local camera.
+      // Watching a remote player fire must not jitter your view.
+      if (trail.shooterId === this.gameService.getNetworkManager().getPlayerId()) {
+        this.cameraKick?.trigger(bulletAngle + Math.PI);
+      }
     };
 
     this.onGrenadeExploded = (pos: Vec2) => {
       this.effectsRenderer?.showExplosion(pos.x, pos.y);
+      this.lightingRenderer?.addExplosionFlash(pos.x, pos.y);
+      this.explosionFx?.spawnExplosion(pos.x, pos.y);
+      this.smokeFx?.spawnExplosionSmoke(pos.x, pos.y);
+      // Scorch: swap the single floor tile containing the explosion
+      // midpoint to the lighter-spot frame. Pixel-art coherent, snaps
+      // to the grid.
+      this.mapRenderer?.scorchTileAt(pos.x, pos.y);
+      this.shockwaveController?.trigger(pos.x, pos.y);
+      this.zoomPulse?.trigger();
     };
 
     this.onLocalCorrection = (correction: LocalCorrection) => {
@@ -505,6 +723,12 @@ export class GameScene extends Phaser.Scene {
   private cleanup(): void {
     this.cleanupEvents();
 
+    this.cameras.main.resetPostPipeline();
+    this.cameras.main.postFX.clear();
+    this.crtPipeline = null;
+    this.aberrationPixels = 0;
+    this.prevLocalHealth = null;
+
     if (this.mapRenderer) {
       this.mapRenderer.destroy();
       this.mapRenderer = null;
@@ -525,9 +749,51 @@ export class GameScene extends Phaser.Scene {
       this.grenadeRenderer.destroy();
       this.grenadeRenderer = null;
     }
+    if (this.lightingRenderer) {
+      this.lightingRenderer.destroy();
+      this.lightingRenderer = null;
+    }
+    if (this.killJuice) {
+      this.killJuice.destroy();
+      this.killJuice = null;
+    }
+    if (this.impactFx) {
+      this.impactFx.destroy();
+      this.impactFx = null;
+    }
+    if (this.explosionFx) {
+      this.explosionFx.destroy();
+      this.explosionFx = null;
+    }
+    if (this.smokeFx) {
+      this.smokeFx.destroy();
+      this.smokeFx = null;
+    }
+    this.shockwaveController = null;
+    if (this.cameraKick) {
+      this.cameraKick.reset(this.cameras.main);
+      this.cameraKick = null;
+    }
+    if (this.zoomPulse) {
+      this.zoomPulse.reset(this.cameras.main);
+      this.zoomPulse = null;
+    }
+    if (this.cameraRoll) {
+      this.cameraRoll.reset(this.cameras.main);
+      this.cameraRoll = null;
+    }
+    if (this.decalRenderer) {
+      this.decalRenderer.destroy();
+      this.decalRenderer = null;
+    }
+    this.prevDeadStates.clear();
     if (this.hud) {
       this.hud.destroy();
       this.hud = null;
+    }
+    if (this.crosshair) {
+      this.crosshair.destroy();
+      this.crosshair = null;
     }
     if (this.inputManager) {
       this.inputManager.destroy();

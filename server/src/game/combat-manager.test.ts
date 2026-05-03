@@ -20,6 +20,7 @@ function createPlayer(overrides: Partial<PlayerState> & { id: PlayerId }): Playe
     ammo: GUN.MAGAZINE_SIZE,
     isReloading: false,
     reloadTimer: 0,
+    grenades: GRENADE.STARTING_COUNT,
     isSprinting: false,
     stamina: PLAYER.SPRINT_DURATION,
     isDead: false,

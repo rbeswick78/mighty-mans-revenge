@@ -10,6 +10,8 @@ export interface PlayerState {
   ammo: number;
   isReloading: boolean;
   reloadTimer: number;
+  /** Number of grenades the player can still throw. */
+  grenades: number;
   isSprinting: boolean;
   stamina: number;
   isDead: boolean;

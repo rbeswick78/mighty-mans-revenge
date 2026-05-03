@@ -424,6 +424,7 @@ export class NetworkManager {
       // Always trust server for these values
       health: serverState.health,
       ammo: serverState.ammo,
+      grenades: serverState.grenades,
       isReloading: serverState.isReloading,
       isDead: serverState.isDead,
       respawnTimer: serverState.respawnTimer,
@@ -461,6 +462,7 @@ export class NetworkManager {
       ammo: s.ammo,
       isReloading: s.isReloading,
       reloadTimer: 0,
+      grenades: s.grenades,
       isSprinting: s.isSprinting,
       stamina: s.stamina,
       isDead: s.isDead,

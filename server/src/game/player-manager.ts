@@ -1,6 +1,7 @@
 import {
   PLAYER,
   GUN,
+  GRENADE,
   RESPAWN,
   calculateMovement,
 } from '@shared/game';
@@ -32,6 +33,7 @@ export class PlayerManager {
       ammo: GUN.MAGAZINE_SIZE,
       isReloading: false,
       reloadTimer: 0,
+      grenades: GRENADE.STARTING_COUNT,
       isSprinting: false,
       stamina: PLAYER.SPRINT_DURATION,
       isDead: false,
@@ -153,6 +155,7 @@ export class PlayerManager {
     player.ammo = GUN.MAGAZINE_SIZE;
     player.isReloading = false;
     player.reloadTimer = 0;
+    player.grenades = GRENADE.STARTING_COUNT;
     player.isDead = false;
     player.respawnTimer = 0;
     player.invulnerableTimer = RESPAWN.INVULNERABILITY_DURATION;

@@ -1,8 +1,34 @@
 import Phaser from 'phaser';
 import type { ServerMatchmakingStatusMessage } from '@shared/types/network.js';
+import { Wasteland, cssHex } from '@shared/config/palette.js';
+import { AudioManager } from '../audio/audio-manager.js';
 import { GameService, type MatchData } from '../services/game-service.js';
 
 const STORAGE_KEY_NICKNAME = 'mmr_nickname';
+
+// --- Wasteland palette mapping for lobby chrome (TUNABLE) ---
+// Keep all color decisions for this scene at the top so a future palette
+// pass can re-tune the lobby in one place. Numeric values feed graphics
+// fillStyle / lineStyle; cssHex() wraps them for Phaser.Text styles.
+const TITLE_COLOR = Wasteland.LOADING_BAR_FILL;       // hot orange — same accent as boot
+const TITLE_STROKE = Wasteland.CANVAS_BG;             // near-black plum
+const SUBTITLE_COLOR = Wasteland.COVER_FILL;          // weathered tan
+const LABEL_COLOR = Wasteland.COVER_FILL;             // weathered tan
+const NICKNAME_COLOR = Wasteland.HEALTH_GOOD;         // dusty mint terminal-green
+const INPUT_BG = Wasteland.HUD_STRIP_BG;              // near-black plum
+const INPUT_BORDER = Wasteland.LOADING_BAR_FILL;      // hot orange
+const PRIMARY_BTN_COLOR = Wasteland.LOADING_BAR_FILL; // hot orange (CTA)
+const SECONDARY_BTN_COLOR = Wasteland.WALL_FILL;      // crumbling concrete
+const BTN_LABEL_COLOR = Wasteland.TEXT_PRIMARY;       // bone-white
+const SEARCHING_COLOR = Wasteland.LOADING_BAR_FILL;   // hot orange (active state)
+const SEARCH_TIMER_COLOR = Wasteland.COVER_FILL;
+const PLAYER_COUNT_COLOR = Wasteland.WALL_FILL;       // dim
+const FOOTER_COLOR = Wasteland.WALL_LINE;             // very dim ash-shadow
+const ERROR_COLOR = Wasteland.HIT_FLASH;              // dried blood
+const HOVER_LIGHTEN = 20;                             // Phaser Color.lighten() amount
+
+const lighten = (hex: number, amount: number): number =>
+  Phaser.Display.Color.ValueToColor(hex).lighten(amount).color;
 
 export class LobbyScene extends Phaser.Scene {
   private nicknameText!: Phaser.GameObjects.Text;
@@ -37,6 +63,12 @@ export class LobbyScene extends Phaser.Scene {
 
     this.gameService = GameService.getInstance();
 
+    const audio = AudioManager.getInstance();
+    if (audio) {
+      audio.setScene(this);
+      audio.playMusic('music-lobby');
+    }
+
     const centerX = this.cameras.main.width / 2;
     // Original layout was designed for a 540px-tall canvas. Re-center
     // vertically so the lobby sits in the middle of whatever canvas we
@@ -47,10 +79,10 @@ export class LobbyScene extends Phaser.Scene {
     this.add.text(centerX, 60 + yOffset, 'MIGHTY MAN\'S\nREVENGE', {
       fontFamily: '"Courier New", Courier, monospace',
       fontSize: '40px',
-      color: '#e94560',
+      color: cssHex(TITLE_COLOR),
       align: 'center',
       lineSpacing: 8,
-      stroke: '#1a1a2e',
+      stroke: cssHex(TITLE_STROKE),
       strokeThickness: 4,
     }).setOrigin(0.5);
 
@@ -58,28 +90,28 @@ export class LobbyScene extends Phaser.Scene {
     this.add.text(centerX, 140 + yOffset, 'POST-APOCALYPTIC SHOWDOWN', {
       fontFamily: '"Courier New", Courier, monospace',
       fontSize: '12px',
-      color: '#888888',
+      color: cssHex(SUBTITLE_COLOR),
     }).setOrigin(0.5);
 
     // Nickname label
     this.add.text(centerX, 200 + yOffset, 'ENTER CALLSIGN:', {
       fontFamily: '"Courier New", Courier, monospace',
       fontSize: '14px',
-      color: '#aaaaaa',
+      color: cssHex(LABEL_COLOR),
     }).setOrigin(0.5);
 
     // Nickname input background
     const inputBg = this.add.graphics();
-    inputBg.fillStyle(0x0f0f1e, 1);
+    inputBg.fillStyle(INPUT_BG, 1);
     inputBg.fillRect(centerX - 120, 218 + yOffset, 240, 32);
-    inputBg.lineStyle(1, 0xe94560, 0.6);
+    inputBg.lineStyle(1, INPUT_BORDER, 0.6);
     inputBg.strokeRect(centerX - 120, 218 + yOffset, 240, 32);
 
     // Nickname display text
     this.nicknameText = this.add.text(centerX - 110, 226 + yOffset, this.nickname + '_', {
       fontFamily: '"Courier New", Courier, monospace',
       fontSize: '16px',
-      color: '#00ff66',
+      color: cssHex(NICKNAME_COLOR),
     });
 
     // Blinking cursor
@@ -106,14 +138,14 @@ export class LobbyScene extends Phaser.Scene {
     this.searchingText = this.add.text(centerX, 360 + yOffset, 'Searching for opponent...', {
       fontFamily: '"Courier New", Courier, monospace',
       fontSize: '14px',
-      color: '#e94560',
+      color: cssHex(SEARCHING_COLOR),
     }).setOrigin(0.5).setVisible(false);
 
     // Search timer text (hidden initially)
     this.searchTimerText = this.add.text(centerX, 380 + yOffset, '0:00', {
       fontFamily: '"Courier New", Courier, monospace',
       fontSize: '12px',
-      color: '#888888',
+      color: cssHex(SEARCH_TIMER_COLOR),
     }).setOrigin(0.5).setVisible(false);
 
     // Cancel button (hidden initially)
@@ -124,14 +156,14 @@ export class LobbyScene extends Phaser.Scene {
     this.playerCountText = this.add.text(centerX, 500 + yOffset, '0 players online', {
       fontFamily: '"Courier New", Courier, monospace',
       fontSize: '12px',
-      color: '#666666',
+      color: cssHex(PLAYER_COUNT_COLOR),
     }).setOrigin(0.5);
 
     // Version / footer
     this.add.text(centerX, 525 + yOffset, 'v0.1.0 // PRE-ALPHA', {
       fontFamily: '"Courier New", Courier, monospace',
       fontSize: '10px',
-      color: '#444444',
+      color: cssHex(FOOTER_COLOR),
     }).setOrigin(0.5);
 
     // Enter = quick match (works whether the nickname input has focus
@@ -216,14 +248,17 @@ export class LobbyScene extends Phaser.Scene {
   }
 
   private createQuickMatchButton(centerX: number, buttonY: number): Phaser.GameObjects.Container {
+    const baseColor = PRIMARY_BTN_COLOR;
+    const hoverColor = lighten(baseColor, HOVER_LIGHTEN);
+
     const buttonBg = this.add.graphics();
-    buttonBg.fillStyle(0xe94560, 1);
+    buttonBg.fillStyle(baseColor, 1);
     buttonBg.fillRoundedRect(-100, 0, 200, 40, 4);
 
     const text = this.add.text(0, 20, 'QUICK MATCH', {
       fontFamily: '"Courier New", Courier, monospace',
       fontSize: '18px',
-      color: '#ffffff',
+      color: cssHex(BTN_LABEL_COLOR),
     }).setOrigin(0.5);
 
     const zone = this.add.zone(0, 20, 200, 40)
@@ -231,13 +266,13 @@ export class LobbyScene extends Phaser.Scene {
 
     zone.on('pointerover', () => {
       buttonBg.clear();
-      buttonBg.fillStyle(0xff5a7a, 1);
+      buttonBg.fillStyle(hoverColor, 1);
       buttonBg.fillRoundedRect(-100, 0, 200, 40, 4);
     });
 
     zone.on('pointerout', () => {
       buttonBg.clear();
-      buttonBg.fillStyle(0xe94560, 1);
+      buttonBg.fillStyle(baseColor, 1);
       buttonBg.fillRoundedRect(-100, 0, 200, 40, 4);
     });
 
@@ -250,14 +285,17 @@ export class LobbyScene extends Phaser.Scene {
   }
 
   private createCancelButton(centerX: number, buttonY: number): Phaser.GameObjects.Container {
+    const baseColor = SECONDARY_BTN_COLOR;
+    const hoverColor = lighten(baseColor, HOVER_LIGHTEN);
+
     const buttonBg = this.add.graphics();
-    buttonBg.fillStyle(0x444466, 1);
+    buttonBg.fillStyle(baseColor, 1);
     buttonBg.fillRoundedRect(-60, 0, 120, 30, 4);
 
     const text = this.add.text(0, 15, 'CANCEL', {
       fontFamily: '"Courier New", Courier, monospace',
       fontSize: '13px',
-      color: '#ffffff',
+      color: cssHex(BTN_LABEL_COLOR),
     }).setOrigin(0.5);
 
     const zone = this.add.zone(0, 15, 120, 30)
@@ -265,13 +303,13 @@ export class LobbyScene extends Phaser.Scene {
 
     zone.on('pointerover', () => {
       buttonBg.clear();
-      buttonBg.fillStyle(0x555577, 1);
+      buttonBg.fillStyle(hoverColor, 1);
       buttonBg.fillRoundedRect(-60, 0, 120, 30, 4);
     });
 
     zone.on('pointerout', () => {
       buttonBg.clear();
-      buttonBg.fillStyle(0x444466, 1);
+      buttonBg.fillStyle(baseColor, 1);
       buttonBg.fillRoundedRect(-60, 0, 120, 30, 4);
     });
 
@@ -350,7 +388,7 @@ export class LobbyScene extends Phaser.Scene {
         {
           fontFamily: '"Courier New", Courier, monospace',
           fontSize: '11px',
-          color: '#ff4444',
+          color: cssHex(ERROR_COLOR),
         },
       ).setOrigin(0.5);
       this.time.delayedCall(2000, () => flash.destroy());

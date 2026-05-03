@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import type { RawInput } from './types.js';
 import { isTouchDevice } from './is-touch-device.js';
+import { Wasteland, cssHex } from '@shared/config/palette.js';
 import { MAP_HEIGHT_PX } from '../ui/layout.js';
 
 const JOYSTICK_MAX_RADIUS = 50;
@@ -13,8 +14,8 @@ const THUMB_RADIUS = 24;
 const GRENADE_BUTTON_SIZE = 40;
 const GRENADE_BUTTON_MARGIN = 16;
 
-const GRENADE_AIM_COLOR = 0xff6600;
-const GRENADE_DETONATE_COLOR = 0xff2222;
+const GRENADE_AIM_COLOR = Wasteland.GRENADE_AIM;
+const GRENADE_DETONATE_COLOR = Wasteland.GRENADE_DETONATE;
 const GRENADE_AIM_ALPHA = 0.5;
 const GRENADE_DETONATE_ALPHA = 0.85;
 
@@ -72,7 +73,7 @@ export class TouchInput {
     this.grenadeButtonText = scene.add.text(btnX, btnY, 'G', {
       fontFamily: 'Courier, monospace',
       fontSize: '18px',
-      color: '#ffffff',
+      color: cssHex(Wasteland.TEXT_PRIMARY),
       fontStyle: 'bold',
     });
     this.grenadeButtonText.setOrigin(0.5, 0.5);
@@ -108,12 +109,12 @@ export class TouchInput {
   }
 
   private createJoystick(): VirtualJoystick {
-    const base = this.scene.add.circle(0, 0, BASE_RADIUS, 0xffffff, BASE_ALPHA);
+    const base = this.scene.add.circle(0, 0, BASE_RADIUS, Wasteland.JOYSTICK, BASE_ALPHA);
     base.setScrollFactor(0);
     base.setDepth(3000);
     base.setVisible(false);
 
-    const thumb = this.scene.add.circle(0, 0, THUMB_RADIUS, 0xffffff, THUMB_ALPHA);
+    const thumb = this.scene.add.circle(0, 0, THUMB_RADIUS, Wasteland.JOYSTICK, THUMB_ALPHA);
     thumb.setScrollFactor(0);
     thumb.setDepth(3001);
     thumb.setVisible(false);

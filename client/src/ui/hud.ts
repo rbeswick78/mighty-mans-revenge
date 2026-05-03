@@ -1,17 +1,18 @@
 import Phaser from 'phaser';
 import { GUN } from '@shared/config/game.js';
+import { Wasteland, cssHex, healthColor } from '@shared/config/palette.js';
 import { HUD_STRIP_HEIGHT, MAP_HEIGHT_PX, MAP_WIDTH_PX } from './layout.js';
 
 const FONT_STYLE: Phaser.Types.GameObjects.Text.TextStyle = {
   fontFamily: 'Courier, monospace',
   fontSize: '14px',
-  color: '#ffffff',
+  color: cssHex(Wasteland.TEXT_PRIMARY),
 };
 
 const LARGE_FONT_STYLE: Phaser.Types.GameObjects.Text.TextStyle = {
   fontFamily: 'Courier, monospace',
   fontSize: '48px',
-  color: '#ffffff',
+  color: cssHex(Wasteland.TEXT_PRIMARY),
   fontStyle: 'bold',
   align: 'center',
 };
@@ -19,12 +20,6 @@ const LARGE_FONT_STYLE: Phaser.Types.GameObjects.Text.TextStyle = {
 interface KillFeedItem {
   text: Phaser.GameObjects.Text;
   timer: Phaser.Time.TimerEvent;
-}
-
-function healthColor(ratio: number): number {
-  if (ratio > 0.6) return 0x00ff00;
-  if (ratio > 0.3) return 0xffff00;
-  return 0xff0000;
 }
 
 export class HUD {
@@ -65,12 +60,12 @@ export class HUD {
     const margin = 16;
 
     // --- Strip background + 1px top border ---
-    this.stripBg = scene.add.rectangle(0, stripTop, MAP_WIDTH_PX, HUD_STRIP_HEIGHT, 0x0a0a1a);
+    this.stripBg = scene.add.rectangle(0, stripTop, MAP_WIDTH_PX, HUD_STRIP_HEIGHT, Wasteland.HUD_STRIP_BG);
     this.stripBg.setOrigin(0, 0);
     this.stripBg.setScrollFactor(0);
     this.stripBg.setDepth(500);
 
-    this.stripBorder = scene.add.rectangle(0, stripTop, MAP_WIDTH_PX, 1, 0x444444);
+    this.stripBorder = scene.add.rectangle(0, stripTop, MAP_WIDTH_PX, 1, Wasteland.HUD_STRIP_BORDER);
     this.stripBorder.setOrigin(0, 0);
     this.stripBorder.setScrollFactor(0);
     this.stripBorder.setDepth(501);
@@ -81,12 +76,12 @@ export class HUD {
     const hbW = 200;
     const hbH = 20;
 
-    this.healthBarBg = scene.add.rectangle(hbX, hbY, hbW, hbH, 0x333333);
+    this.healthBarBg = scene.add.rectangle(hbX, hbY, hbW, hbH, Wasteland.HEALTH_BAR_BG);
     this.healthBarBg.setOrigin(0, 0);
     this.healthBarBg.setScrollFactor(0);
     this.healthBarBg.setDepth(1000);
 
-    this.healthBarFg = scene.add.rectangle(hbX, hbY, hbW, hbH, 0x00ff00);
+    this.healthBarFg = scene.add.rectangle(hbX, hbY, hbW, hbH, Wasteland.HEALTH_GOOD);
     this.healthBarFg.setOrigin(0, 0);
     this.healthBarFg.setScrollFactor(0);
     this.healthBarFg.setDepth(1001);
@@ -104,12 +99,12 @@ export class HUD {
     const stY = hbY + hbH + 6;
     const stH = 6;
 
-    this.staminaBarBg = scene.add.rectangle(hbX, stY, hbW, stH, 0x333333);
+    this.staminaBarBg = scene.add.rectangle(hbX, stY, hbW, stH, Wasteland.STAMINA_BAR_BG);
     this.staminaBarBg.setOrigin(0, 0);
     this.staminaBarBg.setScrollFactor(0);
     this.staminaBarBg.setDepth(1000);
 
-    this.staminaBarFg = scene.add.rectangle(hbX, stY, hbW, stH, 0x3399ff);
+    this.staminaBarFg = scene.add.rectangle(hbX, stY, hbW, stH, Wasteland.STAMINA_FILL);
     this.staminaBarFg.setOrigin(0, 0);
     this.staminaBarFg.setScrollFactor(0);
     this.staminaBarFg.setDepth(1001);
@@ -123,7 +118,7 @@ export class HUD {
 
     this.reloadingText = scene.add.text(hbX + 80, ammoY, 'RELOADING', {
       ...FONT_STYLE,
-      color: '#ffaa00',
+      color: cssHex(Wasteland.TEXT_RELOAD_WARNING),
     });
     this.reloadingText.setScrollFactor(0);
     this.reloadingText.setDepth(1000);
@@ -174,7 +169,7 @@ export class HUD {
 
     this.deathOverlay = scene.add.text(mapCenterX, mapCenterY, '', {
       ...LARGE_FONT_STYLE,
-      color: '#ff3333',
+      color: cssHex(Wasteland.TEXT_DEATH),
       fontSize: '36px',
     });
     this.deathOverlay.setOrigin(0.5, 0.5);
@@ -208,16 +203,16 @@ export class HUD {
   }
 
   /**
-   * Show "GRN: ready" when no grenade is in flight (right-click will throw),
-   * and "GRN: LIVE" when one is out (right-click will detonate).
+   * Show "GRN: LIVE" while a grenade is in flight (right-click will detonate),
+   * otherwise show the player's remaining carry count (right-click will throw).
    */
-  updateGrenadeStatus(hasActiveGrenade: boolean): void {
+  updateGrenadeStatus(hasActiveGrenade: boolean, count: number): void {
     if (hasActiveGrenade) {
       this.grenadeText.setText('GRN: LIVE');
-      this.grenadeText.setColor('#ff5544');
+      this.grenadeText.setColor(cssHex(Wasteland.TEXT_GRENADE_LIVE));
     } else {
-      this.grenadeText.setText('GRN: ready');
-      this.grenadeText.setColor('#ffffff');
+      this.grenadeText.setText(`GRN: ${count}`);
+      this.grenadeText.setColor(cssHex(Wasteland.TEXT_GRENADE_READY));
     }
   }
 

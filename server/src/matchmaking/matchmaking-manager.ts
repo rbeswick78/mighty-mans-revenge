@@ -327,6 +327,7 @@ export class MatchmakingManager {
         aimAngle: player.aimAngle,
         health: player.health,
         ammo: player.ammo,
+        grenades: player.grenades,
         isReloading: player.isReloading,
         isSprinting: player.isSprinting,
         stamina: player.stamina,

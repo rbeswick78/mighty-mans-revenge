@@ -30,6 +30,11 @@ export const GRENADE = Object.freeze({
    */
   SAFETY_FUSE: 5.0,
   THROW_SPEED: 300,
+  /** Grenades a player spawns with and the cap on grenade pickups. */
+  STARTING_COUNT: 3,
+  MAX_COUNT: 3,
+  /** Grenades granted per pickup. */
+  PICKUP_AMOUNT: 1,
 });
 
 export const TRAJECTORY = Object.freeze({
@@ -51,7 +56,12 @@ export const RESPAWN = Object.freeze({
 
 export const MATCH = Object.freeze({
   KILL_TARGET: 10,
-  TIME_LIMIT: 300,
+  /**
+   * Match length in seconds — tuned to the gameplay music track length
+   * (game-play.mp3, 2:53). If the track is replaced, retime this so the
+   * round and the song end together.
+   */
+  TIME_LIMIT: 173,
   COUNTDOWN_DURATION: 3,
 });
 

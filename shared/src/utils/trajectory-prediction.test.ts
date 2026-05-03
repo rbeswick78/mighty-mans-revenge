@@ -32,6 +32,7 @@ function makePlayer(overrides: Partial<PlayerState> = {}): PlayerState {
     ammo: 30,
     isReloading: false,
     reloadTimer: 0,
+    grenades: 3,
     isSprinting: false,
     stamina: 3,
     isDead: false,

@@ -41,3 +41,9 @@ pnpm-debug.log*
 # Firebase
 .firebase/
 firebase-debug.log
+
+# Third-party asset source archives — license forbids redistribution.
+# Only the curated subset we actually use is checked in under
+# client/public/assets/.
+/*.zip
+/.asset-inspect/

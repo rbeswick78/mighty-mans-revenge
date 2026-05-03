@@ -17,6 +17,7 @@ function makePlayer(id: PlayerId, score = 0, deaths = 0): PlayerState {
     ammo: 30,
     isReloading: false,
     reloadTimer: 0,
+    grenades: 3,
     isSprinting: false,
     stamina: 3,
     isDead: false,

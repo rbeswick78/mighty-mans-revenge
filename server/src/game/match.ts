@@ -5,6 +5,7 @@ import {
   RESPAWN,
   PLAYER,
   GUN,
+  GRENADE,
   SERVER,
   calculateMovement,
 } from '@shared/game';
@@ -303,12 +304,15 @@ export class Match implements MatchContext {
           }
         }
 
-        // Throw grenade (release edge), only if no live grenade for this player.
+        // Throw grenade (release edge), only if no live grenade for this
+        // player and they have at least one grenade in their pouch.
         if (
           input.throwPressed &&
+          player.grenades > 0 &&
           !this.combatManager.getActiveGrenadeFor(playerId)
         ) {
           this.combatManager.spawnGrenade(playerId, player.position, input.aimAngle);
+          player.grenades -= 1;
           this.stats.recordGrenade(playerId);
         }
 
@@ -489,6 +493,7 @@ export class Match implements MatchContext {
     player.isReloading = false;
     player.reloadTimer = 0;
     player.stamina = PLAYER.SPRINT_DURATION;
+    player.grenades = GRENADE.STARTING_COUNT;
   }
 
   private createPlayerState(id: PlayerId, nickname: string, position: { x: number; y: number }): PlayerState {
@@ -503,6 +508,7 @@ export class Match implements MatchContext {
       ammo: GUN.MAGAZINE_SIZE,
       isReloading: false,
       reloadTimer: 0,
+      grenades: GRENADE.STARTING_COUNT,
       isSprinting: false,
       stamina: PLAYER.SPRINT_DURATION,
       isDead: false,

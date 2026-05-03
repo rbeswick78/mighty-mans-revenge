@@ -1,8 +1,24 @@
 import Phaser from 'phaser';
 import type { Vec2 } from '@shared/types/common.js';
+import { Wasteland, cssHex } from '@shared/config/palette.js';
+import { bucketAimAngle } from './sprite-direction.js';
 
-const AIM_LINE_COLOR = 0xffffff;
 const AIM_LINE_ALPHA = 0.6;
+const AIM_LINE_THICKNESS = 2;
+/** Match PlayerRenderer's SPRITE_SCALE so the muzzle flash size lines up with the gun. */
+const MUZZLE_FLASH_SCALE = 3;
+
+/** Bullet head sprite scale (matches PlayerRenderer's SPRITE_SCALE for visual coherence). */
+const BULLET_SCALE = 3;
+/** Constant travel time per shot — fast enough that the hit-flash on the
+ *  target lands close enough to bullet-arrival to read as coincident.
+ *  Bumping past ~250 ms starts to feel like backwards causality. */
+const BULLET_TRAVEL_MS = 200;
+/** Comet-tail particle config. */
+const BULLET_TAIL_LIFESPAN_MS = 140;
+const BULLET_TAIL_FREQUENCY_MS = 8;
+const BULLET_TAIL_ALPHA_START = 0.7;
+const BULLET_TAIL_SCALE_START = 0.7;
 
 export class EffectsRenderer {
   private scene: Phaser.Scene;
@@ -13,18 +29,18 @@ export class EffectsRenderer {
     this.scene = scene;
   }
 
-  /** Draw a single straight white line from origin to end (bullet aim). */
+  /** Draw a single straight line from origin to end (bullet aim). */
   showBulletAim(originX: number, originY: number, endX: number, endY: number): void {
     const g = this.ensureAimGraphic();
     g.clear();
-    g.lineStyle(1, AIM_LINE_COLOR, AIM_LINE_ALPHA);
+    g.lineStyle(AIM_LINE_THICKNESS, Wasteland.AIM_LINE, AIM_LINE_ALPHA);
     g.beginPath();
     g.moveTo(originX, originY);
     g.lineTo(endX, endY);
     g.strokePath();
   }
 
-  /** Draw a white polyline along the predicted grenade trajectory. */
+  /** Draw a polyline along the predicted grenade trajectory. */
   showGrenadeAim(points: Vec2[]): void {
     if (points.length < 2) {
       this.clearAim();
@@ -32,7 +48,7 @@ export class EffectsRenderer {
     }
     const g = this.ensureAimGraphic();
     g.clear();
-    g.lineStyle(1, AIM_LINE_COLOR, AIM_LINE_ALPHA);
+    g.lineStyle(AIM_LINE_THICKNESS, Wasteland.AIM_LINE, AIM_LINE_ALPHA);
     g.beginPath();
     g.moveTo(points[0].x, points[0].y);
     for (let i = 1; i < points.length; i++) {
@@ -58,39 +74,65 @@ export class EffectsRenderer {
   }
 
   showBulletTrail(startX: number, startY: number, endX: number, endY: number): void {
-    const line = this.scene.add.line(0, 0, startX, startY, endX, endY, 0xffff00, 0.8);
-    line.setOrigin(0, 0);
-    line.setLineWidth(1);
+    const angle = Math.atan2(endY - startY, endX - startX);
+
+    // Bullet head — tiny 2×1 sprite, rotated to direction of travel.
+    const bullet = this.scene.add.image(startX, startY, 'bullet');
+    bullet.setOrigin(0.5, 0.5);
+    bullet.setScale(BULLET_SCALE);
+    bullet.setRotation(angle);
+
+    // Comet tail — particle emitter follows the bullet, spawning fading
+    // dots at its current position each frame. Reads as a trailing streak
+    // behind the projectile (no static line — the path is drawn as the
+    // bullet moves through it).
+    let tail: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
+    if (this.scene.textures.exists('particle')) {
+      tail = this.scene.add.particles(0, 0, 'particle', {
+        follow: bullet,
+        speed: 0,
+        lifespan: BULLET_TAIL_LIFESPAN_MS,
+        frequency: BULLET_TAIL_FREQUENCY_MS,
+        scale: { start: BULLET_TAIL_SCALE_START, end: 0 },
+        alpha: { start: BULLET_TAIL_ALPHA_START, end: 0 },
+        tint: Wasteland.BULLET_TRAIL,
+      });
+    }
 
     this.scene.tweens.add({
-      targets: line,
-      alpha: 0,
-      duration: 100,
+      targets: bullet,
+      x: endX,
+      y: endY,
+      duration: BULLET_TRAVEL_MS,
+      ease: 'Linear',
       onComplete: () => {
-        line.destroy();
+        bullet.destroy();
+        if (tail) {
+          tail.stop();
+          // Let the last spawned particles finish their fade, then clean up.
+          this.scene.time.delayedCall(BULLET_TAIL_LIFESPAN_MS, () => {
+            tail?.destroy();
+          });
+        }
       },
     });
   }
 
-  showMuzzleFlash(x: number, y: number, _angle: number): void {
-    const flash = this.scene.add.circle(x, y, 6, 0xffffaa, 1);
-    flash.setAlpha(1);
-
-    this.scene.tweens.add({
-      targets: flash,
-      alpha: 0,
-      scaleX: 1.5,
-      scaleY: 1.5,
-      duration: 80,
-      onComplete: () => {
-        flash.destroy();
-      },
+  showMuzzleFlash(x: number, y: number, angle: number): void {
+    const direction = bucketAimAngle(angle);
+    const key = `fire_${direction}`;
+    const flash = this.scene.add.sprite(x, y, key, 0);
+    flash.setOrigin(0.5, 0.5);
+    flash.setScale(MUZZLE_FLASH_SCALE);
+    flash.play(key);
+    flash.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
+      flash.destroy();
     });
   }
 
   showExplosion(x: number, y: number): void {
-    // Expanding circle
-    const circle = this.scene.add.circle(x, y, 8, 0xff6600, 0.8);
+    // Expanding ring
+    const circle = this.scene.add.circle(x, y, 8, Wasteland.EXPLOSION_RING, 0.8);
     this.scene.tweens.add({
       targets: circle,
       scaleX: 8,
@@ -104,7 +146,7 @@ export class EffectsRenderer {
     });
 
     // Inner bright flash
-    const flash = this.scene.add.circle(x, y, 4, 0xffffcc, 1);
+    const flash = this.scene.add.circle(x, y, 4, Wasteland.EXPLOSION_FLASH, 1);
     this.scene.tweens.add({
       targets: flash,
       scaleX: 4,
@@ -116,29 +158,15 @@ export class EffectsRenderer {
       },
     });
 
-    // Particle burst
-    if (this.scene.textures.exists('particle')) {
-      const emitter = this.scene.add.particles(x, y, 'particle', {
-        speed: { min: 50, max: 200 },
-        scale: { start: 1, end: 0 },
-        lifespan: 400,
-        alpha: { start: 1, end: 0 },
-        tint: [0xff6600, 0xff3300, 0xffcc00],
-        quantity: 12,
-        emitting: false,
-      });
-      emitter.explode(12);
-      this.scene.time.delayedCall(500, () => {
-        emitter.destroy();
-      });
-    }
+    // Debris particles are owned by ExplosionFx (pooled). Wire from
+    // game-scene alongside this call.
 
     // Screen shake
     this.scene.cameras.main.shake(200, 0.01);
   }
 
   showHitEffect(x: number, y: number): void {
-    const flash = this.scene.add.circle(x, y, 5, 0xff0000, 0.9);
+    const flash = this.scene.add.circle(x, y, 5, Wasteland.HIT_FLASH, 0.9);
     this.scene.tweens.add({
       targets: flash,
       alpha: 0,
@@ -157,7 +185,7 @@ export class EffectsRenderer {
         scale: { start: 0.5, end: 0 },
         lifespan: 200,
         alpha: { start: 0.8, end: 0 },
-        tint: 0xff0000,
+        tint: Wasteland.HIT_PARTICLE,
         quantity: 5,
         emitting: false,
       });
@@ -172,7 +200,7 @@ export class EffectsRenderer {
     const text = this.scene.add.text(x, y, `-${damage}`, {
       fontFamily: 'Courier, monospace',
       fontSize: '14px',
-      color: '#ff4444',
+      color: cssHex(Wasteland.TEXT_DAMAGE),
       fontStyle: 'bold',
     });
     text.setOrigin(0.5, 0.5);
@@ -190,7 +218,7 @@ export class EffectsRenderer {
   }
 
   showPickupEffect(x: number, y: number): void {
-    const flash = this.scene.add.circle(x, y, 8, 0x00ffff, 0.8);
+    const flash = this.scene.add.circle(x, y, 8, Wasteland.PICKUP_FLASH, 0.8);
     this.scene.tweens.add({
       targets: flash,
       scaleX: 3,
@@ -209,7 +237,7 @@ export class EffectsRenderer {
         scale: { start: 0.8, end: 0 },
         lifespan: 400,
         alpha: { start: 1, end: 0 },
-        tint: [0x00ffff, 0xffffff],
+        tint: [Wasteland.PICKUP_SPARKLE_A, Wasteland.PICKUP_SPARKLE_B],
         quantity: 8,
         emitting: false,
       });

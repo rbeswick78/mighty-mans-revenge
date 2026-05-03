@@ -30,6 +30,8 @@ export class KeyboardMouseInput {
   private rmbReleasedFlag = false;
   /** Set on the frame the corresponding button is pressed; cleared on read. */
   private rmbPressedFlag = false;
+  /** True if a live grenade existed at the moment RMB was pressed. */
+  private rmbPressedWhileLive = false;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -123,13 +125,21 @@ export class KeyboardMouseInput {
     const rmbPressed = this.rmbPressedFlag;
     this.rmbPressedFlag = false;
 
+    // On press, lock in whether a grenade was already live. The release is
+    // only a "throw" if the press started in aim mode — otherwise the press
+    // was a detonate and the matching release would otherwise immediately
+    // re-throw because hasActiveGrenade flipped back to false.
+    if (rmbPressed) {
+      this.rmbPressedWhileLive = hasActiveGrenade;
+    }
+
     const aimingGun = this.lmbDown;
     const firePressed = lmbReleased;
 
     // RMB has two roles depending on whether a grenade is currently in flight
     // for this player: aim/throw a new one, or detonate the live one.
     const aimingGrenade = this.rmbDown && !hasActiveGrenade;
-    const throwPressed = rmbReleased && !hasActiveGrenade;
+    const throwPressed = rmbReleased && !this.rmbPressedWhileLive;
     const detonatePressed = rmbPressed && hasActiveGrenade;
 
     return {

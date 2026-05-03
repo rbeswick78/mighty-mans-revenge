@@ -87,6 +87,7 @@ export interface SerializedPlayerState {
   aimAngle: number;
   health: number;
   ammo: number;
+  grenades: number;
   isReloading: boolean;
   isSprinting: boolean;
   stamina: number;

@@ -2,6 +2,8 @@ import Phaser from 'phaser';
 import type { PickupState } from '@shared/types/pickup.js';
 import { PickupType } from '@shared/types/pickup.js';
 
+const PICKUP_SCALE = 3;
+
 interface PickupSprite {
   container: Phaser.GameObjects.Container;
   sprite: Phaser.GameObjects.Sprite;
@@ -69,10 +71,11 @@ export class PickupRenderer {
 
   private createPickup(state: PickupState): PickupSprite {
     const textureKey =
-      state.type === PickupType.GUN_AMMO ? 'pickup-ammo' : 'pickup-grenade';
+      state.type === PickupType.GUN_AMMO ? 'pickup_ammo' : 'pickup_grenade';
 
     const sprite = this.scene.add.sprite(0, 0, textureKey);
     sprite.setOrigin(0.5, 0.5);
+    sprite.setScale(PICKUP_SCALE);
 
     const container = this.scene.add.container(state.position.x, state.position.y, [
       sprite,

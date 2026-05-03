@@ -2,6 +2,8 @@ import Phaser from 'phaser';
 import type { PlayerId } from '@shared/types/common.js';
 import type { PlayerStats } from '@shared/types/player.js';
 import type { MatchResult } from '@shared/types/game.js';
+import { Wasteland, cssHex } from '@shared/config/palette.js';
+import { AudioManager } from '../audio/audio-manager.js';
 import { GameService, type MatchData } from '../services/game-service.js';
 
 interface ResultsSceneData {
@@ -10,10 +12,29 @@ interface ResultsSceneData {
   matchData?: MatchData;
 }
 
+// --- Wasteland palette mapping for results chrome (TUNABLE) ---
+const VICTORY_COLOR = Wasteland.HEALTH_GOOD;          // dusty mint
+const DEFEAT_COLOR = Wasteland.HIT_FLASH;             // dried blood
+const DRAW_COLOR = Wasteland.HEALTH_WARNING;          // amber warning
+const TITLE_STROKE = Wasteland.CANVAS_BG;             // near-black plum
+const DIVIDER_COLOR = Wasteland.LOADING_BAR_FILL;     // hot orange accent
+const LABEL_COLOR = Wasteland.COVER_FILL;             // weathered tan
+const VALUE_COLOR = Wasteland.TEXT_PRIMARY;           // bone-white
+const LOCAL_NICK_COLOR = Wasteland.HEALTH_GOOD;       // mint (you)
+const OPPONENT_NICK_COLOR = Wasteland.HIT_FLASH;      // blood (them)
+const REMATCH_BTN_COLOR = Wasteland.LOADING_BAR_FILL; // hot orange (CTA)
+const LOBBY_BTN_COLOR = Wasteland.WALL_FILL;          // crumbling concrete
+const BTN_LABEL_COLOR = Wasteland.TEXT_PRIMARY;       // bone-white
+const REMATCH_STATUS_COLOR = Wasteland.HEALTH_WARNING;
+const OPPONENT_LEFT_COLOR = Wasteland.HIT_FLASH;
+const FOOTER_COLOR = Wasteland.WALL_LINE;             // very dim ash-shadow
+const NO_DATA_COLOR = Wasteland.COVER_FILL;
+const HOVER_LIGHTEN = 20;
+
 const FONT_MONO: Phaser.Types.GameObjects.Text.TextStyle = {
   fontFamily: '"Courier New", Courier, monospace',
   fontSize: '14px',
-  color: '#ffffff',
+  color: cssHex(VALUE_COLOR),
 };
 
 export class ResultsScene extends Phaser.Scene {
@@ -53,32 +74,41 @@ export class ResultsScene extends Phaser.Scene {
     const isWinner = this.result?.winnerId === playerId;
     const isDraw = this.result?.winnerId === null;
 
+    // Win/lose music keyed off result. Draws fall through to the lose
+    // track — there's no dedicated "draw" track, and silence on the
+    // results screen feels broken.
+    const audio = AudioManager.getInstance();
+    if (audio) {
+      audio.setScene(this);
+      audio.playMusic(isWinner ? 'music-win' : 'music-lose');
+    }
+
     // Title - Winner/Loser announcement
     let titleText: string;
-    let titleColor: string;
+    let titleColor: number;
     if (isDraw) {
       titleText = 'DRAW';
-      titleColor = '#ffaa00';
+      titleColor = DRAW_COLOR;
     } else if (isWinner) {
       titleText = 'VICTORY';
-      titleColor = '#00ff66';
+      titleColor = VICTORY_COLOR;
     } else {
       titleText = 'DEFEAT';
-      titleColor = '#e94560';
+      titleColor = DEFEAT_COLOR;
     }
 
     this.add.text(centerX, 40 + yOffset, titleText, {
       fontFamily: '"Courier New", Courier, monospace',
       fontSize: '48px',
-      color: titleColor,
-      stroke: '#1a1a2e',
+      color: cssHex(titleColor),
+      stroke: cssHex(TITLE_STROKE),
       strokeThickness: 6,
       fontStyle: 'bold',
     }).setOrigin(0.5);
 
     // Divider line
     const divider = this.add.graphics();
-    divider.lineStyle(1, 0xe94560, 0.5);
+    divider.lineStyle(1, DIVIDER_COLOR, 0.5);
     divider.lineBetween(centerX - 300, 80 + yOffset, centerX + 300, 80 + yOffset);
 
     if (this.result) {
@@ -86,7 +116,7 @@ export class ResultsScene extends Phaser.Scene {
     } else {
       this.add.text(centerX, 200 + yOffset, 'No match data available', {
         ...FONT_MONO,
-        color: '#888888',
+        color: cssHex(NO_DATA_COLOR),
       }).setOrigin(0.5);
     }
 
@@ -94,25 +124,25 @@ export class ResultsScene extends Phaser.Scene {
     this.rematchStatusText = this.add.text(centerX, 430 + yOffset, '', {
       ...FONT_MONO,
       fontSize: '13px',
-      color: '#ffaa00',
+      color: cssHex(REMATCH_STATUS_COLOR),
     }).setOrigin(0.5).setVisible(false);
 
     // Bottom divider
     const bottomDivider = this.add.graphics();
-    bottomDivider.lineStyle(1, 0xe94560, 0.3);
+    bottomDivider.lineStyle(1, DIVIDER_COLOR, 0.3);
     bottomDivider.lineBetween(centerX - 300, 450 + yOffset, centerX + 300, 450 + yOffset);
 
     // Buttons
     const buttonY = 470 + yOffset;
 
     // Rematch button
-    this.createButton(centerX - 110, buttonY, 'REMATCH', 0xe94560, () => {
+    this.createButton(centerX - 110, buttonY, 'REMATCH', REMATCH_BTN_COLOR, () => {
       this.gameService.requestRematch();
       this.rematchStatusText?.setText('Waiting for opponent...').setVisible(true);
     });
 
     // Back to Lobby button
-    this.createButton(centerX + 110, buttonY, 'BACK TO LOBBY', 0x444466, () => {
+    this.createButton(centerX + 110, buttonY, 'BACK TO LOBBY', LOBBY_BTN_COLOR, () => {
       this.gameService.returnToLobby();
       this.cameras.main.fadeOut(300, 0, 0, 0);
       this.cameras.main.once('camerafadeoutcomplete', () => {
@@ -125,7 +155,7 @@ export class ResultsScene extends Phaser.Scene {
     this.add.text(centerX, 525 + yOffset, 'MIGHTY MAN\'S REVENGE // POST-APOCALYPTIC SHOWDOWN', {
       fontFamily: '"Courier New", Courier, monospace',
       fontSize: '9px',
-      color: '#333333',
+      color: cssHex(FOOTER_COLOR),
     }).setOrigin(0.5);
 
     // Wire up events
@@ -167,14 +197,14 @@ export class ResultsScene extends Phaser.Scene {
     this.add.text(col1X, headerY, localNick.toUpperCase(), {
       ...FONT_MONO,
       fontSize: '16px',
-      color: '#00ff66',
+      color: cssHex(LOCAL_NICK_COLOR),
       fontStyle: 'bold',
     }).setOrigin(0.5);
 
     this.add.text(col2X, headerY, opponentNick.toUpperCase(), {
       ...FONT_MONO,
       fontSize: '16px',
-      color: '#e94560',
+      color: cssHex(OPPONENT_NICK_COLOR),
       fontStyle: 'bold',
     }).setOrigin(0.5);
 
@@ -195,21 +225,21 @@ export class ResultsScene extends Phaser.Scene {
       const label = this.add.text(centerX, y, row.label, {
         ...FONT_MONO,
         fontSize: '12px',
-        color: '#888888',
+        color: cssHex(LABEL_COLOR),
       }).setOrigin(0.5).setAlpha(0);
 
       // Left value
       const leftVal = this.add.text(col1X, y, row.left, {
         ...FONT_MONO,
         fontSize: '14px',
-        color: '#ffffff',
+        color: cssHex(VALUE_COLOR),
       }).setOrigin(0.5).setAlpha(0);
 
       // Right value
       const rightVal = this.add.text(col2X, y, row.right, {
         ...FONT_MONO,
         fontSize: '14px',
-        color: '#ffffff',
+        color: cssHex(VALUE_COLOR),
       }).setOrigin(0.5).setAlpha(0);
 
       // Tween in
@@ -285,7 +315,7 @@ export class ResultsScene extends Phaser.Scene {
     this.onOpponentDisconnected = (_playerId: PlayerId) => {
       if (this.rematchStatusText) {
         this.rematchStatusText.setText('Opponent has left.').setVisible(true);
-        this.rematchStatusText.setColor('#ff4444');
+        this.rematchStatusText.setColor(cssHex(OPPONENT_LEFT_COLOR));
       }
     };
 
@@ -326,13 +356,13 @@ export class ResultsScene extends Phaser.Scene {
     const text = this.add.text(x, y + height / 2, label, {
       fontFamily: '"Courier New", Courier, monospace',
       fontSize: '13px',
-      color: '#ffffff',
+      color: cssHex(BTN_LABEL_COLOR),
     }).setOrigin(0.5);
 
     const zone = this.add.zone(x, y + height / 2, width, height)
       .setInteractive({ useHandCursor: true });
 
-    const hoverColor = Phaser.Display.Color.ValueToColor(color).lighten(20).color;
+    const hoverColor = Phaser.Display.Color.ValueToColor(color).lighten(HOVER_LIGHTEN).color;
 
     zone.on('pointerover', () => {
       bg.clear();

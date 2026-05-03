@@ -15,6 +15,7 @@ export interface InterpolatedState {
   aimAngle: number;
   health: number;
   ammo: number;
+  grenades: number;
   isSprinting: boolean;
   isDead: boolean;
   isReloading: boolean;

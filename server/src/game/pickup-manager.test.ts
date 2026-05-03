@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { PickupManager } from './pickup-manager.js';
-import { PickupType, PICKUP, GUN } from '@shared/game';
+import { PickupType, PICKUP, GUN, GRENADE } from '@shared/game';
 import type { MapData, PlayerState, Vec2 } from '@shared/game';
 
 function makeMapData(
@@ -29,6 +29,7 @@ function makePlayer(overrides: Partial<PlayerState> = {}): PlayerState {
     ammo: 10,
     isReloading: false,
     reloadTimer: 0,
+    grenades: 3,
     isSprinting: false,
     stamina: 3,
     isDead: false,
@@ -49,7 +50,7 @@ describe('PickupManager', () => {
   });
 
   describe('initFromMap', () => {
-    it('should create gun_ammo pickups from map data and skip grenade pickups', () => {
+    it('should create both gun_ammo and grenade pickups from map data', () => {
       const mapData = makeMapData([
         { x: 2, y: 3, type: 'gun_ammo' },
         { x: 5, y: 5, type: 'grenade' },
@@ -57,12 +58,19 @@ describe('PickupManager', () => {
       manager.initFromMap(mapData);
 
       const pickups = manager.getPickups();
-      // grenade pickup is skipped — no carry count to refill.
-      expect(pickups).toHaveLength(1);
-      expect(pickups[0].type).toBe(PickupType.GUN_AMMO);
-      expect(pickups[0].isActive).toBe(true);
+      expect(pickups).toHaveLength(2);
+
+      const ammo = pickups.find((p) => p.type === PickupType.GUN_AMMO);
+      expect(ammo).toBeDefined();
+      expect(ammo!.isActive).toBe(true);
       // Tile center: 2 * 48 + 24 = 120, 3 * 48 + 24 = 168
-      expect(pickups[0].position).toEqual({ x: 120, y: 168 });
+      expect(ammo!.position).toEqual({ x: 120, y: 168 });
+
+      const grenade = pickups.find((p) => p.type === PickupType.GRENADE);
+      expect(grenade).toBeDefined();
+      expect(grenade!.isActive).toBe(true);
+      // Tile center: 5 * 48 + 24 = 264, 5 * 48 + 24 = 264
+      expect(grenade!.position).toEqual({ x: 264, y: 264 });
     });
   });
 
@@ -188,8 +196,37 @@ describe('PickupManager', () => {
       expect(player.ammo).toBe(maxAmmo);
     });
 
-    it('GRENADE pickup is a no-op now that grenades have no carry count', () => {
-      const player = makePlayer();
+    it('should add a grenade for GRENADE pickup', () => {
+      const player = makePlayer({ grenades: 1 });
+      const pickup = {
+        id: 'p1',
+        type: PickupType.GRENADE,
+        position: { x: 0, y: 0 },
+        isActive: true,
+        respawnTimer: 0,
+      };
+
+      const result = manager.applyPickup(pickup, player);
+      expect(result).toBe(true);
+      expect(player.grenades).toBe(1 + GRENADE.PICKUP_AMOUNT);
+    });
+
+    it('should cap grenades at GRENADE.MAX_COUNT', () => {
+      const player = makePlayer({ grenades: GRENADE.MAX_COUNT - 1 });
+      const pickup = {
+        id: 'p1',
+        type: PickupType.GRENADE,
+        position: { x: 0, y: 0 },
+        isActive: true,
+        respawnTimer: 0,
+      };
+
+      manager.applyPickup(pickup, player);
+      expect(player.grenades).toBe(GRENADE.MAX_COUNT);
+    });
+
+    it('should not apply GRENADE pickup when at max', () => {
+      const player = makePlayer({ grenades: GRENADE.MAX_COUNT });
       const pickup = {
         id: 'p1',
         type: PickupType.GRENADE,
@@ -200,6 +237,7 @@ describe('PickupManager', () => {
 
       const result = manager.applyPickup(pickup, player);
       expect(result).toBe(false);
+      expect(player.grenades).toBe(GRENADE.MAX_COUNT);
     });
   });
 });
