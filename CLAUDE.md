@@ -62,9 +62,26 @@ cd client && firebase deploy --only hosting
 # Live at https://mighty-mans-revenge.web.app
 ```
 
-**Server (GCE VM, us-east1):** Deployed via rsync over SSH to `/opt/mighty-mans-revenge/` and restarted with PM2. Health check at `http://<GCE_SERVER_IP>:3001/health`.
+**Server (GCE VM, us-east1):** Instance `mighty-mans-server` in zone `us-east1-b` (external IP `34.24.140.207`). The full repo is checked out at `/opt/mighty-mans-revenge/` owned by user `rybes`, and the server runs under that user's PM2 (process name `mighty-mans-revenge`). There is no systemd unit, no cron auto-restart, and no rsync — deploys are git-pull on the VM. SSH is via `gcloud compute ssh` as the `deploy` user, which has passwordless `sudo -u rybes`.
 
-**CI deploy workflows** (`.github/workflows/deploy-client.yml`, `deploy-server.yml`) trigger on pushes to `client/**`/`server/**`/`shared/**` and also support `workflow_dispatch`. They are currently **non-functional** because the required repo secrets are not set: `FIREBASE_TOKEN` (service account JSON for hosting), `GCE_SSH_KEY`, and `GCE_SERVER_IP`. Until those are added via `gh secret set`, deploys must be done manually from a local machine with the CLIs authenticated.
+Prerequisite: the commit you want live must already be on `origin/main` (the VM does `git pull --ff-only` from there).
+
+```bash
+gcloud compute ssh deploy@mighty-mans-server --zone=us-east1-b --command="\
+  sudo -u rybes bash -c 'set -e; \
+    cd /opt/mighty-mans-revenge && \
+    git pull --ff-only && \
+    pnpm install --frozen-lockfile && \
+    pnpm --filter @game/server build && \
+    pm2 restart mighty-mans-revenge'"
+
+# Health check (tickRate, connections, activeMatches in JSON):
+curl http://34.24.140.207:3001/health
+```
+
+**Note on the rsync workflow:** `.github/workflows/deploy-server.yml` rsyncs a `deploy/` artifact to `/opt/mighty-mans-revenge/` as user `deploy@`. That layout doesn't match what's actually on the VM (`server/dist/`, not `dist/`) and the live process is owned by `rybes`, not `deploy`. Don't try to make the rsync flow work — use the git-pull flow above. The CI workflow is non-functional anyway because `GCE_SSH_KEY` and `GCE_SERVER_IP` secrets aren't set.
+
+**CI deploy workflows** (`.github/workflows/deploy-client.yml`, `deploy-server.yml`) trigger on pushes to `client/**`/`server/**`/`shared/**` and also support `workflow_dispatch`. Both are currently **non-functional** because the required repo secrets are not set: `FIREBASE_TOKEN` (service account JSON for hosting), `GCE_SSH_KEY`, and `GCE_SERVER_IP`. Deploys must be done manually using the commands above.
 
 ## Architecture
 
