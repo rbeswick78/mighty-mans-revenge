@@ -356,6 +356,25 @@ export class MatchmakingManager {
     for (const [playerId] of match.players) {
       this.server.sendTo(playerId, stateMessage);
     }
+
+    // Broadcast each kill recorded this tick. The client uses these for
+    // kill-feed entries and per-side kill/death SFX.
+    for (const entry of match.getTickKillFeedEntries()) {
+      for (const [playerId] of match.players) {
+        this.server.sendTo(playerId, { type: 'server:playerKilled', entry });
+      }
+    }
+
+    // Broadcast each pickup collected this tick (for the pickup SFX).
+    for (const collection of match.getTickPickupCollections()) {
+      for (const [playerId] of match.players) {
+        this.server.sendTo(playerId, {
+          type: 'server:pickupCollected',
+          pickupId: collection.pickupId,
+          playerId: collection.playerId,
+        });
+      }
+    }
   }
 
   private onMatchEnded(matchId: string, match: Match): void {

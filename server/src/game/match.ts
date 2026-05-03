@@ -50,6 +50,10 @@ export class Match implements MatchContext {
   readonly combatManager: CombatManager = new CombatManager();
   /** Recent bullet trails from this tick, cleared after broadcast. */
   private tickBulletTrails: BulletTrail[] = [];
+  /** Kills recorded this tick, cleared after broadcast. */
+  private tickKillFeedEntries: KillFeedEntry[] = [];
+  /** Pickups collected this tick, cleared after broadcast. */
+  private tickPickupCollections: Array<{ pickupId: string; playerId: PlayerId }> = [];
   /** Ordered input queue per player. Inputs are acked only after consumption. */
   private inputQueues: Map<PlayerId, InputQueue> = new Map();
   /** Active 3-shot bursts in flight, keyed by player. */
@@ -143,12 +147,14 @@ export class Match implements MatchContext {
     // Cancel any in-flight burst for the killed player.
     this.pendingBursts.delete(victimId);
 
-    this.killFeed.push({
+    const entry: KillFeedEntry = {
       killerId,
       victimId,
       weapon,
       timestamp: Date.now(),
-    });
+    };
+    this.killFeed.push(entry);
+    this.tickKillFeedEntries.push(entry);
   }
 
   /** Record that a player has disconnected. */
@@ -201,6 +207,16 @@ export class Match implements MatchContext {
     return this.tickBulletTrails;
   }
 
+  /** Kill-feed entries recorded during the most recent tick, for broadcasting. */
+  getTickKillFeedEntries(): KillFeedEntry[] {
+    return this.tickKillFeedEntries;
+  }
+
+  /** Pickup collections recorded during the most recent tick, for broadcasting. */
+  getTickPickupCollections(): Array<{ pickupId: string; playerId: PlayerId }> {
+    return this.tickPickupCollections;
+  }
+
   /** Active grenades in flight, for broadcasting. */
   getActiveGrenades(): GrenadeState[] {
     return this.combatManager.getGrenades();
@@ -246,6 +262,8 @@ export class Match implements MatchContext {
     // Clear last tick's bullet trails — only trails from THIS tick are
     // broadcast in the next gameState message.
     this.tickBulletTrails = [];
+    this.tickKillFeedEntries = [];
+    this.tickPickupCollections = [];
 
     const grid = this.mapManager.getCollisionGrid();
 
@@ -382,6 +400,7 @@ export class Match implements MatchContext {
       if (pickup) {
         this.pickupManager.applyPickup(pickup, player);
         this.pickupManager.collectPickup(pickup.id);
+        this.tickPickupCollections.push({ pickupId: pickup.id, playerId: player.id });
       }
     }
 
@@ -468,13 +487,24 @@ export class Match implements MatchContext {
       if (dmg.killed && dmg.playerId !== explosion.throwerId) {
         this.onKill(explosion.throwerId, dmg.playerId, 'grenade');
       } else if (dmg.killed) {
-        // Suicide: mark dead without crediting a kill.
-        const victim = this.players.get(dmg.playerId);
-        if (victim) {
-          victim.isDead = true;
-          victim.respawnTimer = RESPAWN.DELAY;
-          victim.deaths++;
-          this.pendingBursts.delete(dmg.playerId);
+        // Suicide via own grenade. In a duel, credit the kill to the only
+        // other connected player so their score still ticks. In FFA with
+        // multiple opponents we can't safely pick one, so the death just
+        // costs the suicide victim and no kill is awarded.
+        const opponents: PlayerId[] = [];
+        for (const id of this.connectedPlayers) {
+          if (id !== dmg.playerId) opponents.push(id);
+        }
+        if (opponents.length === 1) {
+          this.onKill(opponents[0], dmg.playerId, 'grenade');
+        } else {
+          const victim = this.players.get(dmg.playerId);
+          if (victim) {
+            victim.isDead = true;
+            victim.respawnTimer = RESPAWN.DELAY;
+            victim.deaths++;
+            this.pendingBursts.delete(dmg.playerId);
+          }
         }
       }
     }

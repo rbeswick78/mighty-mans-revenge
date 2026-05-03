@@ -31,6 +31,7 @@ type EventName =
   | 'rematchStatus'
   | 'opponentDisconnected'
   | 'bulletTrail'
+  | 'grenadeThrown'
   | 'grenadeExploded'
   | 'localCorrection'
   | 'error';
@@ -327,10 +328,14 @@ export class NetworkManager {
     // Grenades: mirror the server list and emit explosion events for any
     // that disappeared since the last gameState. A grenade vanishing from
     // the active list means its fuse expired and it detonated; show an
-    // explosion at its last known position.
+    // explosion at its last known position. New IDs (not seen last frame)
+    // emit a 'grenadeThrown' event so scenes can play the throw SFX.
     const incomingIds = new Set<string>();
     for (const g of msg.grenades) {
       incomingIds.add(g.id);
+      if (!this.lastGrenadePositions.has(g.id)) {
+        this.emit('grenadeThrown', { x: g.position.x, y: g.position.y });
+      }
       this.lastGrenadePositions.set(g.id, { x: g.position.x, y: g.position.y });
     }
     for (const [id, pos] of this.lastGrenadePositions) {

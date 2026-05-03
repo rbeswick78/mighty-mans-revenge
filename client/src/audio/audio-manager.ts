@@ -67,6 +67,8 @@ const SOUND_MAP = {
   victoryFanfare: { key: 'sfx-victory', volume: 0.7, category: 'sfx' },
   defeatSound: { key: 'sfx-defeat', volume: 0.6, category: 'sfx' },
   reload: { key: 'sfx-reload', volume: 0.5, category: 'sfx' },
+  kill: { key: 'sfx-kill', volume: 0.7, category: 'sfx' },
+  death: { key: 'sfx-death', volume: 0.7, category: 'sfx' },
 } as const satisfies Record<string, SoundConfig>;
 
 /** Valid sound names derived from the sound map. */

@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 
 import type { MapData } from '@shared/types/map.js';
 import type { PlayerId, Vec2 } from '@shared/types/common.js';
-import type { MatchResult } from '@shared/types/game.js';
+import type { MatchResult, KillFeedEntry } from '@shared/types/game.js';
 import { MatchPhase } from '@shared/types/game.js';
 import type { BulletTrail } from '@shared/types/projectile.js';
 import { PLAYER, SERVER } from '@shared/config/game.js';
@@ -106,6 +106,9 @@ export class GameScene extends Phaser.Scene {
   private onMatchEnd: ((result: MatchResult) => void) | null = null;
   private onOpponentDisconnected: ((playerId: PlayerId) => void) | null = null;
   private onBulletTrail: ((trail: BulletTrail) => void) | null = null;
+  private onPlayerKilled: ((entry: KillFeedEntry) => void) | null = null;
+  private onPickupCollected: ((pickupId: string, playerId: PlayerId) => void) | null = null;
+  private onGrenadeThrown: ((pos: Vec2) => void) | null = null;
   private onGrenadeExploded: ((pos: Vec2) => void) | null = null;
   private onLocalCorrection: ((correction: LocalCorrection) => void) | null = null;
 
@@ -587,6 +590,24 @@ export class GameScene extends Phaser.Scene {
       this.effectsRenderer?.showMuzzleFlash(trail.startPos.x, trail.startPos.y, bulletAngle);
       this.lightingRenderer?.addMuzzleFlash(trail.startPos.x, trail.startPos.y);
 
+      // Three trails per burst (server-authoritative, GUN.BURST_INTERVAL apart),
+      // so this naturally produces three shots spaced to match the bullets.
+      const audio = AudioManager.getInstance();
+      if (audio) {
+        const localState = this.gameService.getNetworkManager().getLocalPlayerState();
+        if (localState) {
+          audio.playAtPosition(
+            'gunshot',
+            trail.startPos.x,
+            trail.startPos.y,
+            localState.position.x,
+            localState.position.y,
+          );
+        } else {
+          audio.play('gunshot');
+        }
+      }
+
       // Trigger the shooter's gun shoot animation (only player-kind
       // renderers have one; remote players are zombies and silently
       // no-op inside playShootAnimation).
@@ -613,11 +634,78 @@ export class GameScene extends Phaser.Scene {
       }
     };
 
+    this.onPlayerKilled = (entry: KillFeedEntry) => {
+      // Killer hears the kill sound; victim hears the death sound. Suicide
+      // (killer === victim, e.g. own grenade) plays only the death sound.
+      const localId = this.gameService.getNetworkManager().getPlayerId();
+      if (!localId) return;
+      const audio = AudioManager.getInstance();
+      if (!audio) return;
+      if (entry.killerId === localId && entry.killerId !== entry.victimId) {
+        audio.play('kill');
+      }
+      if (entry.victimId === localId) {
+        audio.play('death');
+      }
+    };
+
+    this.onPickupCollected = (_pickupId: string, collectorId: PlayerId) => {
+      const audio = AudioManager.getInstance();
+      if (!audio) return;
+      const networkManager = this.gameService.getNetworkManager();
+      const localId = networkManager.getPlayerId();
+      const localState = networkManager.getLocalPlayerState();
+
+      // Position the sound at the collecting player. For the local player
+      // that's our predicted state; for a remote it's their interpolated
+      // position. Fall back to a non-positional play if we can't resolve.
+      let collectorPos: Vec2 | null = null;
+      if (collectorId === localId) {
+        collectorPos = localState ? localState.position : null;
+      } else {
+        const remote = networkManager.getInterpolatedPlayers().get(collectorId);
+        collectorPos = remote ? remote.position : null;
+      }
+
+      if (collectorPos && localState) {
+        audio.playAtPosition(
+          'pickupCollect',
+          collectorPos.x,
+          collectorPos.y,
+          localState.position.x,
+          localState.position.y,
+        );
+      } else {
+        audio.play('pickupCollect');
+      }
+    };
+
+    this.onGrenadeThrown = (pos: Vec2) => {
+      const audio = AudioManager.getInstance();
+      if (!audio) return;
+      const localState = this.gameService.getNetworkManager().getLocalPlayerState();
+      if (localState) {
+        audio.playAtPosition('grenadeThrow', pos.x, pos.y, localState.position.x, localState.position.y);
+      } else {
+        audio.play('grenadeThrow');
+      }
+    };
+
     this.onGrenadeExploded = (pos: Vec2) => {
       this.effectsRenderer?.showExplosion(pos.x, pos.y);
       this.lightingRenderer?.addExplosionFlash(pos.x, pos.y);
       this.explosionFx?.spawnExplosion(pos.x, pos.y);
       this.smokeFx?.spawnExplosionSmoke(pos.x, pos.y);
+
+      const audio = AudioManager.getInstance();
+      if (audio) {
+        const localState = this.gameService.getNetworkManager().getLocalPlayerState();
+        if (localState) {
+          audio.playAtPosition('explosion', pos.x, pos.y, localState.position.x, localState.position.y);
+        } else {
+          audio.play('explosion');
+        }
+      }
       // Scorch: swap the single floor tile containing the explosion
       // midpoint to the lighter-spot frame. Pixel-art coherent, snaps
       // to the grid.
@@ -661,6 +749,9 @@ export class GameScene extends Phaser.Scene {
     this.gameService.on('matchEnd', this.onMatchEnd);
     this.gameService.on('opponentDisconnected', this.onOpponentDisconnected);
     this.gameService.on('bulletTrail', this.onBulletTrail);
+    this.gameService.on('playerKilled', this.onPlayerKilled);
+    this.gameService.on('pickupCollected', this.onPickupCollected);
+    this.gameService.on('grenadeThrown', this.onGrenadeThrown);
     this.gameService.on('grenadeExploded', this.onGrenadeExploded);
     this.gameService.on('localCorrection', this.onLocalCorrection);
   }
@@ -685,6 +776,18 @@ export class GameScene extends Phaser.Scene {
     if (this.onBulletTrail) {
       this.gameService.off('bulletTrail', this.onBulletTrail);
       this.onBulletTrail = null;
+    }
+    if (this.onPlayerKilled) {
+      this.gameService.off('playerKilled', this.onPlayerKilled);
+      this.onPlayerKilled = null;
+    }
+    if (this.onPickupCollected) {
+      this.gameService.off('pickupCollected', this.onPickupCollected);
+      this.onPickupCollected = null;
+    }
+    if (this.onGrenadeThrown) {
+      this.gameService.off('grenadeThrown', this.onGrenadeThrown);
+      this.onGrenadeThrown = null;
     }
     if (this.onGrenadeExploded) {
       this.gameService.off('grenadeExploded', this.onGrenadeExploded);

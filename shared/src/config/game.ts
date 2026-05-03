@@ -22,8 +22,14 @@ export const GUN = Object.freeze({
 });
 
 export const GRENADE = Object.freeze({
-  DAMAGE: 80,
+  DAMAGE: 100,
   BLAST_RADIUS: 96,
+  /**
+   * Damage at the edge of the blast radius, as a fraction of full DAMAGE.
+   * Linear falloff between 1.0 at the center and this value at the edge;
+   * anything outside the blast radius takes 0 damage.
+   */
+  MIN_DAMAGE_FACTOR: 0.5,
   /**
    * Fallback fuse — grenades wait for a manual right-click detonation,
    * but auto-explode after this many seconds if the player forgets or dies.

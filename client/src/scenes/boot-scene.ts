@@ -224,6 +224,16 @@ export class BootScene extends Phaser.Scene {
     this.load.audio('music-gameplay', '/assets/audio/game-play.mp3');
     this.load.audio('music-win', '/assets/audio/post-game-win.mp3');
     this.load.audio('music-lose', '/assets/audio/post-game-lose.mp3');
+
+    // SFX. Key matches the entry in AudioManager's SOUND_MAP — bullet
+    // trails fire at the burst interval, so playing this on each trail
+    // naturally gives three shots per burst at 150 ms spacing.
+    this.load.audio('sfx-gunshot', '/assets/audio/gun-shot.wav');
+    this.load.audio('sfx-explosion', '/assets/audio/grenade-explosion.wav');
+    this.load.audio('sfx-grenade-throw', '/assets/audio/grenade-throw.wav');
+    this.load.audio('sfx-kill', '/assets/audio/kill.wav');
+    this.load.audio('sfx-death', '/assets/audio/death.wav');
+    this.load.audio('sfx-pickup', '/assets/audio/pickup.wav');
   }
 
   private loadCharacterSheet(

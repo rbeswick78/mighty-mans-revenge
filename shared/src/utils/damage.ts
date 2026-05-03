@@ -24,14 +24,16 @@ export function calculateDamage(distance: number): number {
 
 /**
  * Calculate grenade damage based on distance from explosion center.
- * Full damage at center, linear falloff to 0 at BLAST_RADIUS.
+ * Full damage at the center, linear falloff to MIN_DAMAGE_FACTOR * DAMAGE at
+ * BLAST_RADIUS, and 0 strictly outside the blast radius (a step at the edge).
  */
 export function calculateGrenadeDamage(distance: number): number {
-  if (distance >= GRENADE.BLAST_RADIUS) {
+  if (distance > GRENADE.BLAST_RADIUS) {
     return 0;
   }
   const t = clamp(distance / GRENADE.BLAST_RADIUS, 0, 1);
-  return GRENADE.DAMAGE * (1 - t);
+  const factor = 1 - (1 - GRENADE.MIN_DAMAGE_FACTOR) * t;
+  return GRENADE.DAMAGE * factor;
 }
 
 /**

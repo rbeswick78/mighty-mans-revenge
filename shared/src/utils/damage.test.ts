@@ -46,23 +46,27 @@ describe('calculateGrenadeDamage', () => {
     expect(calculateGrenadeDamage(0)).toBeCloseTo(GRENADE.DAMAGE, 5);
   });
 
-  it('returns zero damage at blast radius', () => {
-    expect(calculateGrenadeDamage(GRENADE.BLAST_RADIUS)).toBeCloseTo(0, 5);
+  it('returns MIN_DAMAGE_FACTOR damage at blast radius', () => {
+    expect(calculateGrenadeDamage(GRENADE.BLAST_RADIUS)).toBeCloseTo(
+      GRENADE.DAMAGE * GRENADE.MIN_DAMAGE_FACTOR,
+      5,
+    );
   });
 
   it('returns zero damage beyond blast radius', () => {
     expect(calculateGrenadeDamage(GRENADE.BLAST_RADIUS + 50)).toBeCloseTo(0, 5);
   });
 
-  it('returns half damage at half blast radius', () => {
+  it('returns the midpoint of full and edge damage at half blast radius', () => {
     const halfRadius = GRENADE.BLAST_RADIUS / 2;
-    expect(calculateGrenadeDamage(halfRadius)).toBeCloseTo(GRENADE.DAMAGE / 2, 5);
+    const expected = GRENADE.DAMAGE * (1 + GRENADE.MIN_DAMAGE_FACTOR) / 2;
+    expect(calculateGrenadeDamage(halfRadius)).toBeCloseTo(expected, 5);
   });
 
   it('linearly falls off with distance', () => {
     const quarter = GRENADE.BLAST_RADIUS / 4;
-    const expectedDamage = GRENADE.DAMAGE * 0.75;
-    expect(calculateGrenadeDamage(quarter)).toBeCloseTo(expectedDamage, 5);
+    const expected = GRENADE.DAMAGE * (1 - 0.25 * (1 - GRENADE.MIN_DAMAGE_FACTOR));
+    expect(calculateGrenadeDamage(quarter)).toBeCloseTo(expected, 5);
   });
 });
 

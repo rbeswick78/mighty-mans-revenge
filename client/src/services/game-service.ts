@@ -4,6 +4,7 @@ import type { MatchResult } from '@shared/types/game.js';
 import type {
   ServerMatchFoundMessage,
   ServerMatchmakingStatusMessage,
+  ServerPlayerKilledMessage,
 } from '@shared/types/network.js';
 import { NetworkManager, type LocalCorrection } from '../network/network-manager.js';
 
@@ -23,7 +24,10 @@ type GameServiceEvent =
   | 'matchmakingStatus'
   | 'rematchStatus'
   | 'opponentDisconnected'
+  | 'playerKilled'
+  | 'pickupCollected'
   | 'bulletTrail'
+  | 'grenadeThrown'
   | 'grenadeExploded'
   | 'localCorrection';
 
@@ -174,8 +178,20 @@ export class GameService {
       this.emit('opponentDisconnected', playerId);
     });
 
+    this.networkManager.on('playerKilled', (msg: ServerPlayerKilledMessage) => {
+      this.emit('playerKilled', msg.entry);
+    });
+
+    this.networkManager.on('pickupCollected', (pickupId: string, pid: PlayerId) => {
+      this.emit('pickupCollected', pickupId, pid);
+    });
+
     this.networkManager.on('bulletTrail', (trail: unknown) => {
       this.emit('bulletTrail', trail);
+    });
+
+    this.networkManager.on('grenadeThrown', (pos: unknown) => {
+      this.emit('grenadeThrown', pos);
     });
 
     this.networkManager.on('grenadeExploded', (pos: unknown) => {
