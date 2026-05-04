@@ -144,6 +144,15 @@ export class Match implements MatchContext {
       victim.deaths++;
     }
 
+    // Reward the killer with 50% of their max health (no overheal). Skip
+    // suicide — getting credit for your own death shouldn't refill you.
+    if (killerId !== victimId) {
+      const killer = this.players.get(killerId);
+      if (killer && !killer.isDead) {
+        killer.health = Math.min(killer.maxHealth, killer.health + killer.maxHealth * 0.5);
+      }
+    }
+
     // Cancel any in-flight burst for the killed player.
     this.pendingBursts.delete(victimId);
 

@@ -19,6 +19,7 @@ import { PickupRenderer } from '../rendering/pickup-renderer.js';
 import { GrenadeRenderer } from '../rendering/grenade-renderer.js';
 import { LightingRenderer } from '../rendering/lighting-renderer.js';
 import { KillJuice } from '../rendering/kill-juice.js';
+import { HealFlash } from '../rendering/heal-flash.js';
 import { ImpactFx } from '../rendering/impact-fx.js';
 import { ExplosionFx } from '../rendering/explosion-fx.js';
 import { SmokeFx } from '../rendering/smoke-fx.js';
@@ -78,6 +79,7 @@ export class GameScene extends Phaser.Scene {
   private grenadeRenderer: GrenadeRenderer | null = null;
   private lightingRenderer: LightingRenderer | null = null;
   private killJuice: KillJuice | null = null;
+  private healFlash: HealFlash | null = null;
   private impactFx: ImpactFx | null = null;
   private explosionFx: ExplosionFx | null = null;
   private smokeFx: SmokeFx | null = null;
@@ -175,6 +177,7 @@ export class GameScene extends Phaser.Scene {
     this.grenadeRenderer = new GrenadeRenderer(this);
     this.lightingRenderer = new LightingRenderer(this);
     this.killJuice = new KillJuice(this);
+    this.healFlash = new HealFlash(this);
     this.impactFx = new ImpactFx(this);
     this.explosionFx = new ExplosionFx(this);
     this.smokeFx = new SmokeFx(this);
@@ -675,6 +678,7 @@ export class GameScene extends Phaser.Scene {
       if (!audio) return;
       if (entry.killerId === localId && entry.killerId !== entry.victimId) {
         audio.play('kill');
+        this.healFlash?.trigger();
       }
       if (entry.victimId === localId) {
         audio.play('death');
@@ -892,6 +896,7 @@ export class GameScene extends Phaser.Scene {
       this.killJuice.destroy();
       this.killJuice = null;
     }
+    this.healFlash = null;
     if (this.impactFx) {
       this.impactFx.destroy();
       this.impactFx = null;
