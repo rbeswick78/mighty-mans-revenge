@@ -251,6 +251,18 @@ export class GameScene extends Phaser.Scene {
       );
       this.gameService.sendInput(input);
 
+      // Dry-fire feedback: a small camera shake + click when the player
+      // releases the fire/throw button while their corresponding ammo pool
+      // is empty. throwPressed is already gated to the throw-aim phase (not
+      // detonate), so this only fires when the player intended to throw.
+      if (
+        (input.firePressed && localState.ammo === 0) ||
+        (input.throwPressed && localState.grenades === 0)
+      ) {
+        this.cameras.main.shake(120, 0.004);
+        AudioManager.getInstance()?.play('outOfAmmo');
+      }
+
       const updatedState = networkManager.getLocalPlayerState();
       if (updatedState) {
         this.currLocalPos = { x: updatedState.position.x, y: updatedState.position.y };
@@ -459,10 +471,11 @@ export class GameScene extends Phaser.Scene {
         localState.position.y,
         aim.endPos.x,
         aim.endPos.y,
+        localState.ammo === 0,
       );
     } else if (raw.aimingGrenade) {
       const path = predictGrenadePath(localState.position, raw.aimAngle, grid);
-      this.effectsRenderer.showGrenadeAim(path);
+      this.effectsRenderer.showGrenadeAim(path, localState.grenades === 0);
     } else {
       this.effectsRenderer.clearAim();
     }

@@ -272,6 +272,7 @@
 - Explosion effect: expanding circle with pixel particles, screen shake
 - Damage numbers or hit flash on player when hit
 - All effects use retro pixel art style with limited palette
+- Aim preview lines (bullet ray, grenade arc) turn red when the matching ammo pool is empty; releasing the fire/throw button while empty triggers a small camera shake and an out-of-ammo click
 
 ### 4.5 — Implement HUD (Heads-Up Display) (M, P0)
 **As a** player, **I want** to see my health, ammo, score, and match timer at a glance, **so that** I can make tactical decisions.

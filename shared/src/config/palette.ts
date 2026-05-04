@@ -54,6 +54,7 @@ export const Wasteland = Object.freeze({
   GRENADE_TINT: 0x374e4a,       // dark oxidized steel
   BULLET_TRAIL: 0xfbff86,       // bleached cream tracer
   AIM_LINE: 0xc7dcd0,           // soft bone-white guide
+  AIM_LINE_EMPTY: 0xea4f36,     // hot red — drawn instead of AIM_LINE when out of ammo/grenades
   CROSSHAIR: 0xea4f36,          // hot red bullseye reticle
   GRENADE_AIM: 0xfb6b1d,        // hot orange preview
   GRENADE_DETONATE: 0xea4f36,   // hotter red about-to-blow

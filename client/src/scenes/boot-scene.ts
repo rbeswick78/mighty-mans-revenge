@@ -234,6 +234,7 @@ export class BootScene extends Phaser.Scene {
     this.load.audio('sfx-kill', '/assets/audio/kill.wav');
     this.load.audio('sfx-death', '/assets/audio/death.wav');
     this.load.audio('sfx-pickup', '/assets/audio/pickup.wav');
+    this.load.audio('sfx-out-of-ammo', '/assets/audio/out-of-ammo.wav');
   }
 
   private loadCharacterSheet(

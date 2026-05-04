@@ -30,10 +30,17 @@ export class EffectsRenderer {
   }
 
   /** Draw a single straight line from origin to end (bullet aim). */
-  showBulletAim(originX: number, originY: number, endX: number, endY: number): void {
+  showBulletAim(
+    originX: number,
+    originY: number,
+    endX: number,
+    endY: number,
+    outOfAmmo = false,
+  ): void {
     const g = this.ensureAimGraphic();
     g.clear();
-    g.lineStyle(AIM_LINE_THICKNESS, Wasteland.AIM_LINE, AIM_LINE_ALPHA);
+    const color = outOfAmmo ? Wasteland.AIM_LINE_EMPTY : Wasteland.AIM_LINE;
+    g.lineStyle(AIM_LINE_THICKNESS, color, AIM_LINE_ALPHA);
     g.beginPath();
     g.moveTo(originX, originY);
     g.lineTo(endX, endY);
@@ -41,14 +48,15 @@ export class EffectsRenderer {
   }
 
   /** Draw a polyline along the predicted grenade trajectory. */
-  showGrenadeAim(points: Vec2[]): void {
+  showGrenadeAim(points: Vec2[], outOfAmmo = false): void {
     if (points.length < 2) {
       this.clearAim();
       return;
     }
     const g = this.ensureAimGraphic();
     g.clear();
-    g.lineStyle(AIM_LINE_THICKNESS, Wasteland.AIM_LINE, AIM_LINE_ALPHA);
+    const color = outOfAmmo ? Wasteland.AIM_LINE_EMPTY : Wasteland.AIM_LINE;
+    g.lineStyle(AIM_LINE_THICKNESS, color, AIM_LINE_ALPHA);
     g.beginPath();
     g.moveTo(points[0].x, points[0].y);
     for (let i = 1; i < points.length; i++) {

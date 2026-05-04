@@ -69,6 +69,7 @@ const SOUND_MAP = {
   reload: { key: 'sfx-reload', volume: 0.5, category: 'sfx' },
   kill: { key: 'sfx-kill', volume: 0.7, category: 'sfx' },
   death: { key: 'sfx-death', volume: 0.7, category: 'sfx' },
+  outOfAmmo: { key: 'sfx-out-of-ammo', volume: 0.7, category: 'sfx' },
 } as const satisfies Record<string, SoundConfig>;
 
 /** Valid sound names derived from the sound map. */
