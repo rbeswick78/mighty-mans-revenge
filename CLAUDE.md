@@ -146,10 +146,9 @@ Tile-based maps stored as JSON in `/shared/maps/`. Tile types: `floor`, `wall`, 
 
 ## Git Conventions
 
-- **Branches:** `feature/<epic>-<short-description>`, `fix/<description>`, `chore/<description>`
+- **Workflow:** Solo hobby project — commit and push directly to `main`. No feature branches, no PRs. Don't propose a PR-based alternative.
 - **Commits:** Conventional Commits format — `feat:`, `fix:`, `test:`, `chore:`, `docs:`, `refactor:`
   - Scope is optional but encouraged: `feat(server): add lag compensation rewind buffer`
-- **PRs:** Target `main`. CI must pass. Keep PRs focused on a single story/task.
 
 ## Testing Guidelines
 
