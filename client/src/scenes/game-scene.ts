@@ -594,15 +594,14 @@ export class GameScene extends Phaser.Scene {
     this.onMatchEnd = (result: MatchResult) => {
       this.matchPhase = MatchPhase.ENDED;
       this.hud?.setActiveEventLabel(null);
-      this.time.delayedCall(1500, () => {
-        this.cameras.main.fadeOut(300, 0, 0, 0);
-        this.cameras.main.once('camerafadeoutcomplete', () => {
-          this.cleanup();
-          this.scene.start('ResultsScene', {
-            result,
-            nickname: this.nickname,
-            matchData: this.matchData,
-          });
+      AudioManager.getInstance()?.stopMusic(300);
+      this.cameras.main.fadeOut(300, 0, 0, 0);
+      this.cameras.main.once('camerafadeoutcomplete', () => {
+        this.cleanup();
+        this.scene.start('ResultsScene', {
+          result,
+          nickname: this.nickname,
+          matchData: this.matchData,
         });
       });
     };
