@@ -7,7 +7,9 @@ import {
   GUN,
   GRENADE,
   SERVER,
+  EVENT,
   calculateMovement,
+  eventToMovementModifiers,
 } from '@shared/game';
 import type {
   PlayerId,
@@ -19,6 +21,7 @@ import type {
   PickupState,
   BulletTrail,
   GrenadeState,
+  FinalMinuteEvent,
 } from '@shared/game';
 import { PickupManager } from './pickup-manager.js';
 import { StatsTracker } from './stats-tracker.js';
@@ -65,13 +68,26 @@ export class Match implements MatchContext {
   private _matchStartTimeMs = 0;
   private connectedPlayers: Set<PlayerId> = new Set();
 
+  /** Final-minute event state. */
+  private _activeEvent: FinalMinuteEvent | null = null;
+  private _warningSent = false;
+  private _eventStarted = false;
+  /** One-shot warning to broadcast this tick (consumed by matchmaking-manager). */
+  private _eventWarningThisTick: { event: FinalMinuteEvent; activatesInMs: number } | null = null;
+  /** One-shot start to broadcast this tick (consumed by matchmaking-manager). */
+  private _eventStartThisTick: FinalMinuteEvent | null = null;
+  /** Injected RNG for event selection — defaults to Math.random, override in tests. */
+  private readonly rng: () => number;
+
   constructor(
     matchId: string,
     mapData: MapData,
     playerEntries: Array<{ id: PlayerId; nickname: string }>,
     gameModeType: GameModeType = GameModeType.DEATHMATCH,
+    rng: () => number = Math.random,
   ) {
     this.matchId = matchId;
+    this.rng = rng;
     this.stats = new StatsTracker();
     this.pickupManager = new PickupManager();
     this.mapManager = new MapManager();
@@ -231,6 +247,31 @@ export class Match implements MatchContext {
     return this.combatManager.getGrenades();
   }
 
+  /** The final-minute event that is currently active, or null. */
+  get activeEvent(): FinalMinuteEvent | null {
+    return this._eventStarted ? this._activeEvent : null;
+  }
+
+  /**
+   * Consume the eventWarning generated this tick (if any) for broadcasting.
+   * Returns null on subsequent calls in the same tick.
+   */
+  consumeTickEventWarning(): { event: FinalMinuteEvent; activatesInMs: number } | null {
+    const w = this._eventWarningThisTick;
+    this._eventWarningThisTick = null;
+    return w;
+  }
+
+  /**
+   * Consume the eventStart generated this tick (if any) for broadcasting.
+   * Returns null on subsequent calls in the same tick.
+   */
+  consumeTickEventStart(): FinalMinuteEvent | null {
+    const e = this._eventStartThisTick;
+    this._eventStartThisTick = null;
+    return e;
+  }
+
   /** Collect a pickup for a player, applying its effect. */
   tryCollectPickup(playerId: PlayerId): PickupState | null {
     const player = this.players.get(playerId);
@@ -274,6 +315,8 @@ export class Match implements MatchContext {
     this.tickKillFeedEntries = [];
     this.tickPickupCollections = [];
 
+    this.maybeTriggerFinalMinuteEvent();
+
     const grid = this.mapManager.getCollisionGrid();
 
     // Process movement and player-driven actions for each player.
@@ -294,10 +337,21 @@ export class Match implements MatchContext {
       const inputs = queue.drain(SERVER.MAX_INPUTS_PER_PLAYER_PER_TICK);
       if (inputs.length === 0) continue;
 
+      const movementModifiers = eventToMovementModifiers(this.activeEvent);
+      const grenadesOnly = this.activeEvent === 'grenades_only';
+      const infiniteAmmo = this.activeEvent === 'infinite_ammo';
+
       for (const input of inputs) {
         // Movement. Each client input represents one fixed simulation tick,
         // so replay queued inputs one at a time with the server tick dt.
-        const result = calculateMovement(input, player.position, player.stamina, dt, grid);
+        const result = calculateMovement(
+          input,
+          player.position,
+          player.stamina,
+          dt,
+          grid,
+          movementModifiers,
+        );
         player.position = result.newPos;
         player.velocity = result.velocity;
         player.stamina = result.newStamina;
@@ -305,16 +359,23 @@ export class Match implements MatchContext {
           input.sprint && (input.moveX !== 0 || input.moveY !== 0) && player.stamina > 0;
         player.aimAngle = input.aimAngle;
 
-        // Reload
-        if (input.reload && !player.isReloading && player.ammo < GUN.MAGAZINE_SIZE) {
+        // Reload — gated off during infinite_ammo (mag is always full).
+        if (
+          !infiniteAmmo &&
+          input.reload &&
+          !player.isReloading &&
+          player.ammo < GUN.MAGAZINE_SIZE
+        ) {
           player.isReloading = true;
           player.reloadTimer = GUN.RELOAD_TIME;
         }
 
         // Start a burst on the LMB-release edge. Refuse if the player is
-        // already mid-burst, reloading, or out of ammo.
+        // already mid-burst, reloading, or out of ammo. During grenades_only
+        // the gun is disabled entirely.
         const alreadyBursting = this.pendingBursts.has(playerId);
         if (
+          !grenadesOnly &&
           input.firePressed &&
           !alreadyBursting &&
           !player.isReloading &&
@@ -367,14 +428,38 @@ export class Match implements MatchContext {
       this.recordExplosion(explosion);
     }
 
-    // Reload timers
+    // Reload timers — short-circuited under infinite_ammo so the mag is
+    // never empty and reloads can never start.
+    const infiniteAmmoActive = this.activeEvent === 'infinite_ammo';
     for (const player of this.players.values()) {
+      if (infiniteAmmoActive) {
+        player.isReloading = false;
+        player.reloadTimer = 0;
+        player.ammo = GUN.MAGAZINE_SIZE;
+        continue;
+      }
       if (player.isReloading) {
         player.reloadTimer -= dt;
         if (player.reloadTimer <= 0) {
           player.isReloading = false;
           player.reloadTimer = 0;
           player.ammo = GUN.MAGAZINE_SIZE;
+        }
+      }
+    }
+
+    // Grenade auto-refill during grenades_only (single-slot regen timer).
+    if (this.activeEvent === 'grenades_only') {
+      for (const player of this.players.values()) {
+        if (player.isDead) continue;
+        if (player.grenades >= GRENADE.MAX_COUNT) {
+          player.grenadeRegenSeconds = 0;
+          continue;
+        }
+        player.grenadeRegenSeconds += dt;
+        if (player.grenadeRegenSeconds >= EVENT.GRENADES_ONLY_REFILL_SECONDS) {
+          player.grenades = Math.min(GRENADE.MAX_COUNT, player.grenades + 1);
+          player.grenadeRegenSeconds = 0;
         }
       }
     }
@@ -433,10 +518,11 @@ export class Match implements MatchContext {
         continue;
       }
 
+      const infiniteAmmo = this.activeEvent === 'infinite_ammo';
       burst.nextShotIn -= dt;
       // Fire all shots whose timer has elapsed (handles slow ticks gracefully).
       while (burst.nextShotIn <= 0 && burst.shotsRemaining > 0) {
-        if (player.ammo <= 0) {
+        if (!infiniteAmmo && player.ammo <= 0) {
           // Out of ammo mid-burst: drop remaining shots and start a reload.
           if (!player.isReloading) {
             player.isReloading = true;
@@ -471,7 +557,9 @@ export class Match implements MatchContext {
 
     const shot = this.combatManager.processShot(playerId, aimAngle, this.players, grid);
     this.tickBulletTrails.push(shot.trail);
-    player.ammo = Math.max(0, player.ammo - 1);
+    if (this.activeEvent !== 'infinite_ammo') {
+      player.ammo = Math.max(0, player.ammo - 1);
+    }
     this.stats.recordShot(playerId);
 
     if (shot.hit && shot.victimId && shot.damage !== undefined) {
@@ -524,7 +612,10 @@ export class Match implements MatchContext {
     const spawnPos = this.mapManager.getSpawnPointAwayFrom(player.position);
     player.position = { ...spawnPos };
     player.velocity = { x: 0, y: 0 };
-    player.health = PLAYER.MAX_HEALTH;
+    // Honor any current cap (e.g. low_health drops maxHealth to 1) instead of
+    // resetting to the default — otherwise the event would only bite on first
+    // hit after respawn.
+    player.health = player.maxHealth;
     player.isDead = false;
     player.respawnTimer = 0;
     player.invulnerableTimer = RESPAWN.INVULNERABILITY_DURATION;
@@ -532,7 +623,10 @@ export class Match implements MatchContext {
     player.isReloading = false;
     player.reloadTimer = 0;
     player.stamina = PLAYER.SPRINT_DURATION;
-    player.grenades = GRENADE.STARTING_COUNT;
+    // During grenades_only, top up to MAX so respawning isn't a death sentence.
+    player.grenades =
+      this.activeEvent === 'grenades_only' ? GRENADE.MAX_COUNT : GRENADE.STARTING_COUNT;
+    player.grenadeRegenSeconds = 0;
   }
 
   private createPlayerState(id: PlayerId, nickname: string, position: { x: number; y: number }): PlayerState {
@@ -548,6 +642,7 @@ export class Match implements MatchContext {
       isReloading: false,
       reloadTimer: 0,
       grenades: GRENADE.STARTING_COUNT,
+      grenadeRegenSeconds: 0,
       isSprinting: false,
       stamina: PLAYER.SPRINT_DURATION,
       isDead: false,
@@ -557,5 +652,85 @@ export class Match implements MatchContext {
       score: 0,
       deaths: 0,
     };
+  }
+
+  /**
+   * Check whether the match timer has crossed the warning or activation
+   * thresholds and emit the corresponding one-shot events. Idempotent within
+   * a match — picks one event uniformly at random and uses the same one for
+   * warning and start.
+   */
+  private maybeTriggerFinalMinuteEvent(): void {
+    if (
+      !this._warningSent &&
+      this.matchTimer <= EVENT.WARNING_AT_REMAINING &&
+      this.matchTimer > 0
+    ) {
+      this._activeEvent = this.pickRandomEvent();
+      this._warningSent = true;
+      this._eventWarningThisTick = {
+        event: this._activeEvent,
+        activatesInMs: Math.max(
+          0,
+          (this.matchTimer - EVENT.ACTIVATION_AT_REMAINING) * 1000,
+        ),
+      };
+    }
+
+    if (!this._eventStarted && this.matchTimer <= EVENT.ACTIVATION_AT_REMAINING) {
+      // Defensive: if matchTimer crossed both thresholds in a single tick the
+      // warning still goes out first this tick, paired with the same event.
+      if (!this._activeEvent) {
+        this._activeEvent = this.pickRandomEvent();
+        this._warningSent = true;
+        this._eventWarningThisTick = {
+          event: this._activeEvent,
+          activatesInMs: 0,
+        };
+      }
+      this._eventStarted = true;
+      this._eventStartThisTick = this._activeEvent;
+      this.applyEventOnTrigger(this._activeEvent);
+    }
+  }
+
+  private pickRandomEvent(): FinalMinuteEvent {
+    const forced = process.env.FORCE_EVENT;
+    if (forced && (EVENT.POOL as readonly string[]).includes(forced)) {
+      return forced as FinalMinuteEvent;
+    }
+    const idx = Math.floor(this.rng() * EVENT.POOL.length);
+    return EVENT.POOL[Math.min(idx, EVENT.POOL.length - 1)];
+  }
+
+  private applyEventOnTrigger(event: FinalMinuteEvent): void {
+    switch (event) {
+      case 'super_speed':
+        // Per-tick modifier applied via calculateMovement; nothing to mutate.
+        return;
+      case 'grenades_only':
+        for (const player of this.players.values()) {
+          player.grenades = GRENADE.MAX_COUNT;
+          player.grenadeRegenSeconds = 0;
+        }
+        // Cancel in-flight bursts; the gun is gated off from this tick on.
+        this.pendingBursts.clear();
+        return;
+      case 'infinite_ammo':
+        for (const player of this.players.values()) {
+          player.ammo = GUN.MAGAZINE_SIZE;
+          player.isReloading = false;
+          player.reloadTimer = 0;
+        }
+        return;
+      case 'low_health':
+        for (const player of this.players.values()) {
+          player.maxHealth = EVENT.LOW_HEALTH_HP;
+          if (!player.isDead) {
+            player.health = Math.min(player.health, EVENT.LOW_HEALTH_HP);
+          }
+        }
+        return;
+    }
   }
 }

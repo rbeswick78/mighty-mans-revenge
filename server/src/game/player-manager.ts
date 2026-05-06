@@ -34,6 +34,7 @@ export class PlayerManager {
       isReloading: false,
       reloadTimer: 0,
       grenades: GRENADE.STARTING_COUNT,
+      grenadeRegenSeconds: 0,
       isSprinting: false,
       stamina: PLAYER.SPRINT_DURATION,
       isDead: false,
@@ -151,11 +152,12 @@ export class PlayerManager {
     const spawnPos = this.getNextSpawnPoint();
     player.position = { x: spawnPos.x, y: spawnPos.y };
     player.velocity = { x: 0, y: 0 };
-    player.health = PLAYER.MAX_HEALTH;
+    player.health = player.maxHealth;
     player.ammo = GUN.MAGAZINE_SIZE;
     player.isReloading = false;
     player.reloadTimer = 0;
     player.grenades = GRENADE.STARTING_COUNT;
+    player.grenadeRegenSeconds = 0;
     player.isDead = false;
     player.respawnTimer = 0;
     player.invulnerableTimer = RESPAWN.INVULNERABILITY_DURATION;

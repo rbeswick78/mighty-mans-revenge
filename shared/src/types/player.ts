@@ -12,6 +12,11 @@ export interface PlayerState {
   reloadTimer: number;
   /** Number of grenades the player can still throw. */
   grenades: number;
+  /**
+   * Accumulating regen timer for the grenades_only event. Only ticks when
+   * grenades_only is active and player.grenades < GRENADE.MAX_COUNT.
+   */
+  grenadeRegenSeconds: number;
   isSprinting: boolean;
   stamina: number;
   isDead: boolean;

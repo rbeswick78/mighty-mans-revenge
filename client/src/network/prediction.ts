@@ -1,6 +1,6 @@
 import type { PlayerInput, PlayerState } from '@shared/types/player.js';
 import type { CollisionGrid } from '@shared/types/map.js';
-import { calculateMovement } from '@shared/utils/physics.js';
+import { calculateMovement, type MovementModifiers } from '@shared/utils/physics.js';
 import { SERVER } from '@shared/config/game.js';
 import type { PredictionEntry } from './types.js';
 
@@ -15,6 +15,7 @@ export class ClientPrediction {
     input: PlayerInput,
     currentState: PlayerState,
     grid: CollisionGrid,
+    modifiers?: MovementModifiers,
   ): PlayerState {
     const dt = 1 / SERVER.TICK_RATE;
 
@@ -24,6 +25,7 @@ export class ClientPrediction {
       currentState.stamina,
       dt,
       grid,
+      modifiers,
     );
 
     const predicted: PlayerState = {

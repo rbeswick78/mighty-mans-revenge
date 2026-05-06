@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Match } from './match.js';
-import { MatchPhase, MATCH, RESPAWN, PLAYER, GUN, SERVER } from '@shared/game';
-import type { MapData, PlayerInput } from '@shared/game';
+import { MatchPhase, MATCH, RESPAWN, PLAYER, GUN, SERVER, EVENT, GRENADE } from '@shared/game';
+import type { MapData, PlayerInput, FinalMinuteEvent } from '@shared/game';
 
 function makeInput(seq: number, overrides: Partial<PlayerInput> = {}): PlayerInput {
   return {
@@ -462,6 +462,128 @@ describe('Match', () => {
         m.update(0.05);
       }
       expect(m.getActiveGrenades().length).toBe(0);
+    });
+  });
+
+  describe('final-minute event', () => {
+    /**
+     * Build a match with a deterministic RNG so the picker always lands on
+     * the chosen event. The picker indexes into EVENT.POOL, so the rng
+     * value is the index normalized to [0, 1).
+     */
+    function createMatchWithEvent(event: FinalMinuteEvent): Match {
+      const idx = (EVENT.POOL as readonly FinalMinuteEvent[]).indexOf(event);
+      if (idx === -1) throw new Error(`unknown event: ${event}`);
+      // Math.floor(rng() * POOL.length) === idx → rng = idx/POOL.length + tiny epsilon.
+      const rng = () => idx / EVENT.POOL.length + 0.0001;
+      return new Match(
+        'match-1',
+        makeMapData(),
+        Array.from({ length: 2 }, (_, i) => ({
+          id: `player-${i}`,
+          nickname: `Player ${i}`,
+        })),
+        undefined,
+        rng,
+      );
+    }
+
+    function startActiveMatchAt(remaining: number, event: FinalMinuteEvent): Match {
+      const m = createMatchWithEvent(event);
+      m.startCountdown();
+      m.update(MATCH.COUNTDOWN_DURATION + 0.05);
+      // Fast-forward by mutating matchTimer directly, then run a single
+      // update tick — that's the boundary the production code checks.
+      (m as unknown as { matchTimer: number }).matchTimer = remaining;
+      return m;
+    }
+
+    it('broadcasts an eventWarning the tick the timer crosses the warning threshold', () => {
+      const m = startActiveMatchAt(EVENT.WARNING_AT_REMAINING + 0.01, 'super_speed');
+
+      // First tick: should NOT have crossed yet (0.05s before cross).
+      // Actually 65.01 - 0.05 = 64.96 which IS <= 65 — so the crossing fires.
+      m.update(0.05);
+      const warning = m.consumeTickEventWarning();
+      expect(warning).not.toBeNull();
+      expect(warning!.event).toBe('super_speed');
+      expect(warning!.activatesInMs).toBeGreaterThan(0);
+      // Activation is still pending — activeEvent should still be null.
+      expect(m.activeEvent).toBeNull();
+
+      // Subsequent tick: warning is single-shot.
+      m.update(0.05);
+      expect(m.consumeTickEventWarning()).toBeNull();
+    });
+
+    it('broadcasts an eventStart the tick the timer crosses the activation threshold', () => {
+      const m = startActiveMatchAt(EVENT.ACTIVATION_AT_REMAINING + 0.01, 'grenades_only');
+      m.update(0.05);
+
+      const started = m.consumeTickEventStart();
+      expect(started).toBe('grenades_only');
+      expect(m.activeEvent).toBe('grenades_only');
+    });
+
+    it('grenades_only refills grenades to MAX on activation and gates gun fire', () => {
+      const m = startActiveMatchAt(EVENT.ACTIVATION_AT_REMAINING + 0.01, 'grenades_only');
+      const player = m.players.get('player-0')!;
+      player.grenades = 0;
+      const startingAmmo = player.ammo;
+
+      m.update(0.05); // activation tick
+
+      expect(player.grenades).toBe(GRENADE.MAX_COUNT);
+
+      // Pressing fire after activation: gun is gated off, ammo unchanged.
+      m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+      m.update(0.05);
+      expect(player.ammo).toBe(startingAmmo);
+    });
+
+    it('infinite_ammo keeps the magazine full when firing', () => {
+      const m = startActiveMatchAt(EVENT.ACTIVATION_AT_REMAINING + 0.01, 'infinite_ammo');
+      const player = m.players.get('player-0')!;
+      m.update(0.05); // activation tick
+
+      expect(player.ammo).toBe(GUN.MAGAZINE_SIZE);
+
+      // Fire a burst: magazine should not deplete.
+      m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+      // Run several ticks so the burst fires fully (BURST_INTERVAL spaced).
+      for (let i = 0; i < 10; i++) {
+        m.update(0.05);
+      }
+      expect(player.ammo).toBe(GUN.MAGAZINE_SIZE);
+      expect(player.isReloading).toBe(false);
+    });
+
+    it('low_health snaps maxHealth and current HP to 1 on activation', () => {
+      const m = startActiveMatchAt(EVENT.ACTIVATION_AT_REMAINING + 0.01, 'low_health');
+      const p0 = m.players.get('player-0')!;
+      const p1 = m.players.get('player-1')!;
+      p0.health = 100;
+      p1.health = 50;
+
+      m.update(0.05); // activation tick
+
+      expect(p0.maxHealth).toBe(EVENT.LOW_HEALTH_HP);
+      expect(p1.maxHealth).toBe(EVENT.LOW_HEALTH_HP);
+      expect(p0.health).toBe(EVENT.LOW_HEALTH_HP);
+      expect(p1.health).toBe(EVENT.LOW_HEALTH_HP);
+    });
+
+    it('super_speed has no on-trigger state mutation but is reported on the snapshot', () => {
+      const m = startActiveMatchAt(EVENT.ACTIVATION_AT_REMAINING + 0.01, 'super_speed');
+      const p0 = m.players.get('player-0')!;
+      const startingHealth = p0.health;
+      const startingMag = p0.ammo;
+
+      m.update(0.05);
+
+      expect(p0.health).toBe(startingHealth);
+      expect(p0.ammo).toBe(startingMag);
+      expect(m.activeEvent).toBe('super_speed');
     });
   });
 });

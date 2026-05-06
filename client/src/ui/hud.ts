@@ -50,6 +50,10 @@ export class HUD {
   // Map-centered overlays
   private countdownText: Phaser.GameObjects.Text;
   private deathOverlay: Phaser.GameObjects.Text;
+  private eventBannerText: Phaser.GameObjects.Text;
+
+  // Persistent active-event label, shown next to the timer.
+  private activeEventLabel: Phaser.GameObjects.Text;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -150,6 +154,19 @@ export class HUD {
     this.timerText.setScrollFactor(0);
     this.timerText.setDepth(1000);
 
+    // Persistent active-event label, sits right under the timer. Hidden
+    // until an event activates; never moves, just toggles text + visibility.
+    this.activeEventLabel = scene.add.text(middleX, stripTop + 80, '', {
+      ...FONT_STYLE,
+      fontSize: '14px',
+      fontStyle: 'bold',
+      color: cssHex(Wasteland.TEXT_RELOAD_WARNING),
+    });
+    this.activeEventLabel.setOrigin(0.5, 0);
+    this.activeEventLabel.setScrollFactor(0);
+    this.activeEventLabel.setDepth(1000);
+    this.activeEventLabel.setVisible(false);
+
     // --- Right column: kill feed (right-anchored, stacks downward) ---
     this.killFeedContainer = scene.add.container(MAP_WIDTH_PX - margin, stripTop + 16);
     this.killFeedContainer.setScrollFactor(0);
@@ -176,6 +193,17 @@ export class HUD {
     this.deathOverlay.setScrollFactor(0);
     this.deathOverlay.setDepth(2000);
     this.deathOverlay.setVisible(false);
+
+    // Final-minute event banner — same scale-fade pattern as the countdown,
+    // sits offset above center so it doesn't fight the YOU-DIED overlay.
+    this.eventBannerText = scene.add.text(mapCenterX, mapCenterY - 80, '', {
+      ...LARGE_FONT_STYLE,
+      fontSize: '40px',
+    });
+    this.eventBannerText.setOrigin(0.5, 0.5);
+    this.eventBannerText.setScrollFactor(0);
+    this.eventBannerText.setDepth(2000);
+    this.eventBannerText.setVisible(false);
   }
 
   updateHealth(current: number, max: number): void {
@@ -302,6 +330,50 @@ export class HUD {
     });
   }
 
+  /**
+   * Show a centered, dramatic banner for a final-minute event. Two-line
+   * supported: line1 is the lead, line2 is the event name. Color is
+   * optional — defaults to TEXT_PRIMARY. Same scale-fade animation as the
+   * countdown so it reads as part of the same UX language.
+   */
+  showEventBanner(line1: string, line2?: string, tintColor?: number): void {
+    const text = line2 ? `${line1}\n${line2}` : line1;
+    this.eventBannerText.setText(text);
+    if (tintColor !== undefined) {
+      this.eventBannerText.setColor(cssHex(tintColor));
+    } else {
+      this.eventBannerText.setColor(cssHex(Wasteland.TEXT_PRIMARY));
+    }
+    this.eventBannerText.setVisible(true);
+    this.eventBannerText.setScale(1.6);
+    this.eventBannerText.setAlpha(1);
+
+    this.scene.tweens.add({
+      targets: this.eventBannerText,
+      scaleX: 1,
+      scaleY: 1,
+      alpha: 0,
+      duration: 1800,
+      ease: 'Quad.easeIn',
+      onComplete: () => {
+        this.eventBannerText.setVisible(false);
+      },
+    });
+  }
+
+  /**
+   * Show / hide the persistent label that names the active final-minute
+   * event next to the match timer. Pass null to hide.
+   */
+  setActiveEventLabel(text: string | null): void {
+    if (text === null) {
+      this.activeEventLabel.setVisible(false);
+      return;
+    }
+    this.activeEventLabel.setText(text);
+    this.activeEventLabel.setVisible(true);
+  }
+
   destroy(): void {
     this.stripBg.destroy();
     this.stripBorder.destroy();
@@ -317,6 +389,8 @@ export class HUD {
     this.timerText.destroy();
     this.countdownText.destroy();
     this.deathOverlay.destroy();
+    this.eventBannerText.destroy();
+    this.activeEventLabel.destroy();
     for (const entry of this.killFeedEntries) {
       entry.timer.remove();
       entry.text.destroy();

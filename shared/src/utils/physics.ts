@@ -11,20 +11,38 @@ export interface MovementResult {
   velocity: Vec2;
 }
 
+export interface MovementModifiers {
+  /** Multiplier applied to the chosen speed (default 1). */
+  speedMultiplier?: number;
+  /** When false, sprint never engages (player runs at modified BASE_SPEED). Default true. */
+  sprintEnabled?: boolean;
+  /** When true, stamina is held constant (no drain, no recharge). Default false. */
+  staminaFrozen?: boolean;
+}
+
 export function calculateMovement(
   input: PlayerInput,
   currentPos: Vec2,
   stamina: number,
   dt: number,
   grid: CollisionGrid,
+  modifiers?: MovementModifiers,
 ): MovementResult {
+  const speedMultiplier = modifiers?.speedMultiplier ?? 1;
+  const sprintEnabled = modifiers?.sprintEnabled ?? true;
+  const staminaFrozen = modifiers?.staminaFrozen ?? false;
+
   // Determine speed and update stamina
   let newStamina = stamina;
-  const wantsSprint = input.sprint && (input.moveX !== 0 || input.moveY !== 0);
+  const wantsSprint =
+    sprintEnabled && input.sprint && (input.moveX !== 0 || input.moveY !== 0);
   const canSprint = wantsSprint && newStamina > 0;
-  const speed = canSprint ? PLAYER.SPRINT_SPEED : PLAYER.BASE_SPEED;
+  const baseSpeed = canSprint ? PLAYER.SPRINT_SPEED : PLAYER.BASE_SPEED;
+  const speed = baseSpeed * speedMultiplier;
 
-  if (canSprint) {
+  if (staminaFrozen) {
+    // Hold stamina at its current value for the duration of the modifier.
+  } else if (canSprint) {
     newStamina = Math.max(0, newStamina - dt);
   } else {
     newStamina = Math.min(

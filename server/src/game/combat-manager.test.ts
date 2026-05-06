@@ -21,6 +21,7 @@ function createPlayer(overrides: Partial<PlayerState> & { id: PlayerId }): Playe
     isReloading: false,
     reloadTimer: 0,
     grenades: GRENADE.STARTING_COUNT,
+    grenadeRegenSeconds: 0,
     isSprinting: false,
     stamina: PLAYER.SPRINT_DURATION,
     isDead: false,

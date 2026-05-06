@@ -20,6 +20,10 @@ import { GrenadeRenderer } from '../rendering/grenade-renderer.js';
 import { LightingRenderer } from '../rendering/lighting-renderer.js';
 import { KillJuice } from '../rendering/kill-juice.js';
 import { HealFlash } from '../rendering/heal-flash.js';
+import { EventFlash } from '../rendering/event-flash.js';
+import { eventDisplayName } from '@shared/utils/event-modifiers.js';
+import type { FinalMinuteEvent } from '@shared/types/network.js';
+import type { EventStartPayload, EventWarningPayload } from '../services/game-service.js';
 import { ImpactFx } from '../rendering/impact-fx.js';
 import { ExplosionFx } from '../rendering/explosion-fx.js';
 import { SmokeFx } from '../rendering/smoke-fx.js';
@@ -80,6 +84,7 @@ export class GameScene extends Phaser.Scene {
   private lightingRenderer: LightingRenderer | null = null;
   private killJuice: KillJuice | null = null;
   private healFlash: HealFlash | null = null;
+  private eventFlash: EventFlash | null = null;
   private impactFx: ImpactFx | null = null;
   private explosionFx: ExplosionFx | null = null;
   private smokeFx: SmokeFx | null = null;
@@ -124,6 +129,10 @@ export class GameScene extends Phaser.Scene {
   private onGrenadeThrown: ((pos: Vec2) => void) | null = null;
   private onGrenadeExploded: ((pos: Vec2) => void) | null = null;
   private onLocalCorrection: ((correction: LocalCorrection) => void) | null = null;
+  private onEventWarning: ((payload: EventWarningPayload) => void) | null = null;
+  private onEventStart: ((payload: EventStartPayload) => void) | null = null;
+  /** Cached so we can detect changes (incl. mid-match-join) and resync the label. */
+  private lastSyncedActiveEvent: FinalMinuteEvent | null = null;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -178,6 +187,7 @@ export class GameScene extends Phaser.Scene {
     this.lightingRenderer = new LightingRenderer(this);
     this.killJuice = new KillJuice(this);
     this.healFlash = new HealFlash(this);
+    this.eventFlash = new EventFlash(this);
     this.impactFx = new ImpactFx(this);
     this.explosionFx = new ExplosionFx(this);
     this.smokeFx = new SmokeFx(this);
@@ -305,6 +315,7 @@ export class GameScene extends Phaser.Scene {
           velocity: currentLocalState.velocity,
           aimAngle: currentLocalState.aimAngle,
           health: currentLocalState.health,
+          maxHealth: currentLocalState.maxHealth,
           ammo: currentLocalState.ammo,
           grenades: currentLocalState.grenades,
           isReloading: currentLocalState.isReloading,
@@ -328,6 +339,7 @@ export class GameScene extends Phaser.Scene {
             velocity: interpState.velocity,
             aimAngle: interpState.aimAngle,
             health: interpState.health,
+            maxHealth: interpState.maxHealth,
             ammo: interpState.ammo,
             grenades: interpState.grenades,
             isReloading: interpState.isReloading,
@@ -403,6 +415,15 @@ export class GameScene extends Phaser.Scene {
         );
 
         this.hud.updateTimer(networkManager.getMatchTimer());
+
+        // Sync the persistent active-event label. The eventStart handler
+        // also sets this, but mid-match joiners only learn the active event
+        // through snapshots, so polling here covers that case too.
+        const activeEvent = networkManager.getActiveEvent();
+        if (activeEvent !== this.lastSyncedActiveEvent) {
+          this.lastSyncedActiveEvent = activeEvent;
+          this.hud.setActiveEventLabel(activeEvent ? eventDisplayName(activeEvent) : null);
+        }
       }
     }
 
@@ -498,11 +519,12 @@ export class GameScene extends Phaser.Scene {
         velocity: interp.velocity,
         aimAngle: interp.aimAngle,
         health: interp.health,
-        maxHealth: PLAYER.MAX_HEALTH,
+        maxHealth: interp.maxHealth,
         ammo: interp.ammo,
         isReloading: interp.isReloading,
         reloadTimer: 0,
         grenades: interp.grenades,
+        grenadeRegenSeconds: 0,
         isSprinting: interp.isSprinting,
         stamina: interp.stamina,
         isDead: interp.isDead,
@@ -571,6 +593,7 @@ export class GameScene extends Phaser.Scene {
 
     this.onMatchEnd = (result: MatchResult) => {
       this.matchPhase = MatchPhase.ENDED;
+      this.hud?.setActiveEventLabel(null);
       this.time.delayedCall(1500, () => {
         this.cameras.main.fadeOut(300, 0, 0, 0);
         this.cameras.main.once('camerafadeoutcomplete', () => {
@@ -780,6 +803,30 @@ export class GameScene extends Phaser.Scene {
       this.localCorrectionElapsedMs = 0;
     };
 
+    // Per-event tint, kept in lock-step with EventFlash so the banner color
+    // matches the screen flash. Picked for high contrast against the
+    // wasteland palette.
+    const EVENT_BANNER_COLORS: Record<FinalMinuteEvent, number> = {
+      super_speed: 0xfff200,
+      grenades_only: 0xff8a00,
+      infinite_ammo: 0x39c5ff,
+      low_health: 0xff2e3a,
+    };
+
+    this.onEventWarning = (payload: EventWarningPayload) => {
+      const name = eventDisplayName(payload.event);
+      this.hud?.showEventBanner('FINAL MINUTE INCOMING', name, EVENT_BANNER_COLORS[payload.event]);
+      AudioManager.getInstance()?.play('matchStartHorn');
+    };
+
+    this.onEventStart = (payload: EventStartPayload) => {
+      const name = eventDisplayName(payload.event);
+      this.hud?.showEventBanner(`${name}!`, undefined, EVENT_BANNER_COLORS[payload.event]);
+      this.hud?.setActiveEventLabel(name);
+      this.eventFlash?.trigger(payload.event);
+      AudioManager.getInstance()?.play('matchStartHorn');
+    };
+
     this.gameService.on('matchCountdown', this.onMatchCountdown);
     this.gameService.on('matchStart', this.onMatchStart);
     this.gameService.on('matchEnd', this.onMatchEnd);
@@ -790,6 +837,8 @@ export class GameScene extends Phaser.Scene {
     this.gameService.on('grenadeThrown', this.onGrenadeThrown);
     this.gameService.on('grenadeExploded', this.onGrenadeExploded);
     this.gameService.on('localCorrection', this.onLocalCorrection);
+    this.gameService.on('eventWarning', this.onEventWarning);
+    this.gameService.on('eventStart', this.onEventStart);
   }
 
   private cleanupEvents(): void {
@@ -832,6 +881,14 @@ export class GameScene extends Phaser.Scene {
     if (this.onLocalCorrection) {
       this.gameService.off('localCorrection', this.onLocalCorrection);
       this.onLocalCorrection = null;
+    }
+    if (this.onEventWarning) {
+      this.gameService.off('eventWarning', this.onEventWarning);
+      this.onEventWarning = null;
+    }
+    if (this.onEventStart) {
+      this.gameService.off('eventStart', this.onEventStart);
+      this.onEventStart = null;
     }
   }
 
@@ -897,6 +954,8 @@ export class GameScene extends Phaser.Scene {
       this.killJuice = null;
     }
     this.healFlash = null;
+    this.eventFlash = null;
+    this.lastSyncedActiveEvent = null;
     if (this.impactFx) {
       this.impactFx.destroy();
       this.impactFx = null;

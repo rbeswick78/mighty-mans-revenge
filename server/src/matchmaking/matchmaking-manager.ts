@@ -326,6 +326,7 @@ export class MatchmakingManager {
         velocity: player.velocity,
         aimAngle: player.aimAngle,
         health: player.health,
+        maxHealth: player.maxHealth,
         ammo: player.ammo,
         grenades: player.grenades,
         isReloading: player.isReloading,
@@ -350,6 +351,7 @@ export class MatchmakingManager {
       grenades: match.getActiveGrenades(),
       bulletTrails: match.getTickBulletTrails(),
       pickups: match.pickupManager.getPickups(),
+      activeEvent: match.activeEvent,
     };
 
     // Send only to players in this match
@@ -372,6 +374,32 @@ export class MatchmakingManager {
           type: 'server:pickupCollected',
           pickupId: collection.pickupId,
           playerId: collection.playerId,
+        });
+      }
+    }
+
+    // Broadcast a one-shot event warning (5s before activation) if generated
+    // this tick. Drives the HUD pre-event banner + horn.
+    const warning = match.consumeTickEventWarning();
+    if (warning) {
+      for (const [playerId] of match.players) {
+        this.server.sendTo(playerId, {
+          type: 'server:eventWarning',
+          event: warning.event,
+          activatesInMs: warning.activatesInMs,
+        });
+      }
+    }
+
+    // Broadcast a one-shot event start at activation. Drives the HUD reveal
+    // banner + flash + horn; client modifier kicks in immediately so
+    // prediction matches authority.
+    const started = match.consumeTickEventStart();
+    if (started) {
+      for (const [playerId] of match.players) {
+        this.server.sendTo(playerId, {
+          type: 'server:eventStart',
+          event: started,
         });
       }
     }

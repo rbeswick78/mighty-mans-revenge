@@ -140,11 +140,9 @@ describe('GameLoop', () => {
   });
 
   it('tracks processing time', () => {
-    let callCount = 0;
     const callback: TickCallback = () => {
-      callCount++;
-      // Simulate work by advancing performance.now() via a small busy loop
-      // With fake timers, performance.now() is mocked, so we just verify the property exists
+      // No-op; with fake timers performance.now() is mocked, so we just
+      // verify the processing-time properties are populated.
     };
     const loop = new GameLoop(callback, 20);
 

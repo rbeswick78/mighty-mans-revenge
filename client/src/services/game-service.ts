@@ -5,8 +5,18 @@ import type {
   ServerMatchFoundMessage,
   ServerMatchmakingStatusMessage,
   ServerPlayerKilledMessage,
+  FinalMinuteEvent,
 } from '@shared/types/network.js';
 import { NetworkManager, type LocalCorrection } from '../network/network-manager.js';
+
+export interface EventWarningPayload {
+  event: FinalMinuteEvent;
+  activatesInMs: number;
+}
+
+export interface EventStartPayload {
+  event: FinalMinuteEvent;
+}
 
 export interface MatchData {
   matchId: string;
@@ -29,7 +39,9 @@ type GameServiceEvent =
   | 'bulletTrail'
   | 'grenadeThrown'
   | 'grenadeExploded'
-  | 'localCorrection';
+  | 'localCorrection'
+  | 'eventWarning'
+  | 'eventStart';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type GameServiceCallback = (...args: any[]) => void;
@@ -200,6 +212,14 @@ export class GameService {
 
     this.networkManager.on('localCorrection', (correction: LocalCorrection) => {
       this.emit('localCorrection', correction);
+    });
+
+    this.networkManager.on('eventWarning', (payload: EventWarningPayload) => {
+      this.emit('eventWarning', payload);
+    });
+
+    this.networkManager.on('eventStart', (payload: EventStartPayload) => {
+      this.emit('eventStart', payload);
     });
   }
 

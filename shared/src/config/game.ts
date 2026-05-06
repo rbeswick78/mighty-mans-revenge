@@ -71,6 +71,23 @@ export const MATCH = Object.freeze({
   COUNTDOWN_DURATION: 3,
 });
 
+export const EVENT = Object.freeze({
+  /**
+   * Final-minute events: when the match timer crosses these thresholds (in
+   * seconds remaining), the server fires a warning, then activates a
+   * randomly chosen modifier that runs until match end.
+   */
+  WARNING_AT_REMAINING: 65,
+  ACTIVATION_AT_REMAINING: 60,
+  POOL: ['super_speed', 'grenades_only', 'infinite_ammo', 'low_health'] as const,
+  /** BASE_SPEED multiplier during super_speed. */
+  SUPER_SPEED_MULTIPLIER: 1.6,
+  /** Seconds to refill one grenade during grenades_only. */
+  GRENADES_ONLY_REFILL_SECONDS: 3.0,
+  /** Max-HP cap during low_health (clamps current HP and respawn HP). */
+  LOW_HEALTH_HP: 1,
+});
+
 export const SERVER = Object.freeze({
   TICK_RATE: 20,
   TICK_INTERVAL: 50,

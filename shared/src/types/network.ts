@@ -4,6 +4,17 @@ import { GrenadeState, BulletTrail } from './projectile.js';
 import { PickupState } from './pickup.js';
 import { MatchPhase, KillFeedEntry, MatchResult } from './game.js';
 
+/**
+ * Final-minute events: a single one is picked at random ~5s before
+ * activation, broadcast on warning, then on activation it runs until
+ * the match ends.
+ */
+export type FinalMinuteEvent =
+  | 'super_speed'
+  | 'grenades_only'
+  | 'infinite_ammo'
+  | 'low_health';
+
 // === Client -> Server Messages ===
 
 export type ClientMessage =
@@ -56,6 +67,8 @@ export type ServerMessage =
   | ServerMatchmakingStatusMessage
   | ServerRematchStatusMessage
   | ServerOpponentDisconnectedMessage
+  | ServerEventWarningMessage
+  | ServerEventStartMessage
   | ServerPongMessage
   | ServerErrorMessage;
 
@@ -78,6 +91,12 @@ export interface ServerGameStateMessage {
   grenades: GrenadeState[];
   bulletTrails: BulletTrail[];
   pickups: PickupState[];
+  /**
+   * The active final-minute event, or null if no event has activated yet.
+   * Sent every snapshot so reconnecting / late-joining clients pick up the
+   * modifier without an extra round-trip.
+   */
+  activeEvent: FinalMinuteEvent | null;
 }
 
 export interface SerializedPlayerState {
@@ -86,6 +105,12 @@ export interface SerializedPlayerState {
   velocity: Vec2;
   aimAngle: number;
   health: number;
+  /**
+   * Per-player max HP. Normally PLAYER.MAX_HEALTH, but the low_health
+   * final-minute event drops it to 1, and the client needs to know so the
+   * health bar shows current/max correctly.
+   */
+  maxHealth: number;
   ammo: number;
   grenades: number;
   isReloading: boolean;
@@ -162,6 +187,18 @@ export interface ServerRematchStatusMessage {
 export interface ServerOpponentDisconnectedMessage {
   type: 'server:opponentDisconnected';
   playerId: PlayerId;
+}
+
+export interface ServerEventWarningMessage {
+  type: 'server:eventWarning';
+  event: FinalMinuteEvent;
+  /** Ms from now until the event activates. */
+  activatesInMs: number;
+}
+
+export interface ServerEventStartMessage {
+  type: 'server:eventStart';
+  event: FinalMinuteEvent;
 }
 
 export interface ServerPongMessage {

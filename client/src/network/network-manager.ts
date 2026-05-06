@@ -6,9 +6,11 @@ import type { PickupState } from '@shared/types/pickup.js';
 import type {
   ServerMessage,
   ServerGameStateMessage,
+  FinalMinuteEvent,
 } from '@shared/types/network.js';
 import { MatchPhase } from '@shared/types/game.js';
-import { SERVER, PLAYER } from '@shared/config/game.js';
+import { SERVER } from '@shared/config/game.js';
+import { eventToMovementModifiers } from '@shared/utils/event-modifiers.js';
 import { NetworkConnection } from './connection.js';
 import { ClientPrediction } from './prediction.js';
 import { ServerReconciliation } from './reconciliation.js';
@@ -34,6 +36,8 @@ type EventName =
   | 'grenadeThrown'
   | 'grenadeExploded'
   | 'localCorrection'
+  | 'eventWarning'
+  | 'eventStart'
   | 'error';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -76,6 +80,14 @@ export class NetworkManager {
    */
   private matchEndsAtLocalMs: number | null = null;
 
+  /**
+   * The active final-minute event, or null. Driven authoritatively from
+   * ServerGameStateMessage.activeEvent (every snapshot) and bumped early
+   * by ServerEventStartMessage so the modifier engages on the same frame
+   * the banner shows.
+   */
+  private _activeEvent: FinalMinuteEvent | null = null;
+
   private listeners = new Map<EventName, EventCallback[]>();
 
   constructor(serverUrl?: string) {
@@ -109,6 +121,12 @@ export class NetworkManager {
     this.localPlayerId = null;
     this.localPlayerState = null;
     this.matchEndsAtLocalMs = null;
+    this._activeEvent = null;
+  }
+
+  /** The currently active final-minute event, or null if none. */
+  getActiveEvent(): FinalMinuteEvent | null {
+    return this._activeEvent;
   }
 
   /**
@@ -122,11 +140,14 @@ export class NetworkManager {
 
     if (!this.localPlayerState || !this.collisionGrid) return;
 
-    // Predict locally using shared physics
+    // Predict locally using shared physics, applying the active event's
+    // movement modifier so prediction matches server authority during e.g.
+    // super_speed.
     const predicted = this.prediction.predictInput(
       input,
       this.localPlayerState,
       this.collisionGrid,
+      eventToMovementModifiers(this._activeEvent),
     );
 
     this.prediction.addPrediction(input, predicted);
@@ -283,7 +304,17 @@ export class NetworkManager {
 
       case 'server:matchEnd':
         this.matchEndsAtLocalMs = null;
+        this._activeEvent = null;
         this.emit('matchEnd', msg);
+        break;
+
+      case 'server:eventWarning':
+        this.emit('eventWarning', { event: msg.event, activatesInMs: msg.activatesInMs });
+        break;
+
+      case 'server:eventStart':
+        this._activeEvent = msg.event;
+        this.emit('eventStart', { event: msg.event });
         break;
 
       case 'server:playerKilled':
@@ -351,6 +382,9 @@ export class NetworkManager {
     }
     this.latestGrenades = msg.grenades;
     this.latestPickups = msg.pickups;
+    // Server is authoritative for the active event. Mirror every snapshot
+    // so reconnects pick up the modifier without an extra round-trip.
+    this._activeEvent = msg.activeEvent;
 
     // matchStart is driven by the explicit ServerMatchStartMessage (which
     // also carries the match clock), so this block only debounces and
@@ -408,6 +442,7 @@ export class NetworkManager {
       serverState,
       predictions,
       this.collisionGrid,
+      eventToMovementModifiers(this._activeEvent),
     );
 
     this.applyReconciledLocalState(serverState, result);
@@ -433,6 +468,7 @@ export class NetworkManager {
       stamina: result.stamina,
       // Always trust server for these values
       health: serverState.health,
+      maxHealth: serverState.maxHealth,
       ammo: serverState.ammo,
       grenades: serverState.grenades,
       isReloading: serverState.isReloading,
@@ -468,11 +504,12 @@ export class NetworkManager {
       velocity: { x: s.velocity.x, y: s.velocity.y },
       aimAngle: s.aimAngle,
       health: s.health,
-      maxHealth: PLAYER.MAX_HEALTH,
+      maxHealth: s.maxHealth,
       ammo: s.ammo,
       isReloading: s.isReloading,
       reloadTimer: 0,
       grenades: s.grenades,
+      grenadeRegenSeconds: 0,
       isSprinting: s.isSprinting,
       stamina: s.stamina,
       isDead: s.isDead,

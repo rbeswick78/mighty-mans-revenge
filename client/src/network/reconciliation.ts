@@ -2,7 +2,7 @@ import type { Vec2 } from '@shared/types/common.js';
 import type { CollisionGrid } from '@shared/types/map.js';
 import type { SerializedPlayerState } from '@shared/types/network.js';
 import type { PlayerState } from '@shared/types/player.js';
-import { calculateMovement } from '@shared/utils/physics.js';
+import { calculateMovement, type MovementModifiers } from '@shared/utils/physics.js';
 import { SERVER } from '@shared/config/game.js';
 import type { PredictionEntry } from './types.js';
 
@@ -36,6 +36,7 @@ export class ServerReconciliation {
     serverState: SerializedPlayerState,
     predictions: PredictionEntry[],
     grid: CollisionGrid,
+    modifiers?: MovementModifiers,
   ): ReconciliationResult {
     const dt = 1 / SERVER.TICK_RATE;
 
@@ -51,7 +52,7 @@ export class ServerReconciliation {
 
     // Replay unacknowledged inputs on top of server state
     for (const entry of unacked) {
-      const result = calculateMovement(entry.input, pos, stamina, dt, grid);
+      const result = calculateMovement(entry.input, pos, stamina, dt, grid, modifiers);
       pos = result.newPos;
       vel = result.velocity;
       stamina = result.newStamina;

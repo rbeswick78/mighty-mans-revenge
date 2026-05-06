@@ -14,6 +14,7 @@ export interface InterpolatedState {
   velocity: Vec2;
   aimAngle: number;
   health: number;
+  maxHealth: number;
   ammo: number;
   grenades: number;
   isSprinting: boolean;
