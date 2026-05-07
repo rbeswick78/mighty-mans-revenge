@@ -402,6 +402,13 @@ export class LobbyScene extends Phaser.Scene {
     // callsign and started matchmaking.
     this.nicknameInput?.blur();
 
+    // Request fullscreen on this user gesture (browsers reject the call
+    // outside one). Best-effort — iframes, restrictive policies, and most
+    // iPhone Safari versions report fullscreenEnabled=false and we skip.
+    if (document.fullscreenEnabled && !this.scale.isFullscreen) {
+      this.scale.startFullscreen();
+    }
+
     // Show searching UI
     this.searchingText.setVisible(true);
     this.searchTimerText.setVisible(true);
