@@ -109,6 +109,17 @@ export class GameScene extends Phaser.Scene {
   private inputAccumulatorMs = 0;
   private lastCountdownValue = -1;
   private matchPhase: MatchPhase = MatchPhase.WAITING;
+  /**
+   * The fade-out + scene transition is started by whichever of these fires first:
+   * the local match clock reaching 0:00, or the server:matchEnd arriving (kill
+   * target / disconnect / etc.). The other side fills in once it shows up. The
+   * actual ResultsScene start is gated on having both the result and the fade
+   * complete, so timer-driven match-ends don't sit on a frozen 0:00 waiting on
+   * server round-trip + fade.
+   */
+  private endTransitionStarted = false;
+  private fadeComplete = false;
+  private pendingResult: MatchResult | null = null;
 
   /** Previous and current predicted positions for render-rate interpolation. */
   private prevLocalPos: Vec2 | null = null;
@@ -141,6 +152,9 @@ export class GameScene extends Phaser.Scene {
   init(data: GameSceneData): void {
     this.nickname = data.nickname ?? 'Unknown';
     this.matchData = data.matchData ?? null;
+    this.endTransitionStarted = false;
+    this.fadeComplete = false;
+    this.pendingResult = null;
   }
 
   create(): void {
@@ -414,7 +428,19 @@ export class GameScene extends Phaser.Scene {
           opponentScore,
         );
 
-        this.hud.updateTimer(networkManager.getMatchTimer());
+        const remainingSeconds = networkManager.getMatchTimer();
+        this.hud.updateTimer(remainingSeconds);
+
+        // Start the end-of-match fade the moment the local clock hits 0,
+        // rather than waiting for server:matchEnd to round-trip back. Saves
+        // ~50–150ms of "stuck on 0:00" before the screen reacts.
+        if (
+          this.matchPhase === MatchPhase.ACTIVE &&
+          !this.endTransitionStarted &&
+          remainingSeconds <= 0
+        ) {
+          this.beginEndTransition();
+        }
 
         // Sync the persistent active-event label. The eventStart handler
         // also sets this, but mid-match joiners only learn the active event
@@ -592,18 +618,9 @@ export class GameScene extends Phaser.Scene {
     };
 
     this.onMatchEnd = (result: MatchResult) => {
-      this.matchPhase = MatchPhase.ENDED;
-      this.hud?.setActiveEventLabel(null);
-      AudioManager.getInstance()?.stopMusic(300);
-      this.cameras.main.fadeOut(300, 0, 0, 0);
-      this.cameras.main.once('camerafadeoutcomplete', () => {
-        this.cleanup();
-        this.scene.start('ResultsScene', {
-          result,
-          nickname: this.nickname,
-          matchData: this.matchData,
-        });
-      });
+      this.pendingResult = result;
+      this.beginEndTransition();
+      this.tryStartResultsScene();
     };
 
     this.onOpponentDisconnected = (_playerId: PlayerId) => {
@@ -838,6 +855,38 @@ export class GameScene extends Phaser.Scene {
     this.gameService.on('localCorrection', this.onLocalCorrection);
     this.gameService.on('eventWarning', this.onEventWarning);
     this.gameService.on('eventStart', this.onEventStart);
+  }
+
+  /**
+   * Kick off the end-of-match fade-out (camera + music) exactly once. Called
+   * by the local 0:00 detector OR by the server:matchEnd handler — whichever
+   * fires first. The actual ResultsScene transition is deferred to
+   * tryStartResultsScene so we don't start it before we have the result.
+   */
+  private beginEndTransition(): void {
+    if (this.endTransitionStarted) return;
+    this.endTransitionStarted = true;
+    this.matchPhase = MatchPhase.ENDED;
+    this.hud?.setActiveEventLabel(null);
+    AudioManager.getInstance()?.stopMusic(300);
+    this.cameras.main.fadeOut(300, 0, 0, 0);
+    this.cameras.main.once('camerafadeoutcomplete', () => {
+      this.fadeComplete = true;
+      this.tryStartResultsScene();
+    });
+  }
+
+  /** Start ResultsScene once both the fade has finished and the result has arrived. */
+  private tryStartResultsScene(): void {
+    if (!this.fadeComplete || !this.pendingResult) return;
+    const result = this.pendingResult;
+    this.pendingResult = null;
+    this.cleanup();
+    this.scene.start('ResultsScene', {
+      result,
+      nickname: this.nickname,
+      matchData: this.matchData,
+    });
   }
 
   private cleanupEvents(): void {
