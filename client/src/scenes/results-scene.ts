@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import type { PlayerId } from '@shared/types/common.js';
 import type { PlayerStats } from '@shared/types/player.js';
 import type { MatchResult } from '@shared/types/game.js';
+import type { ServerMatchmakingStatusMessage } from '@shared/types/network.js';
 import { Wasteland, cssHex } from '@shared/config/palette.js';
 import { AudioManager } from '../audio/audio-manager.js';
 import { GameService, type MatchData } from '../services/game-service.js';
@@ -48,6 +49,7 @@ export class ResultsScene extends Phaser.Scene {
   private onRematchStatus: ((opponentWantsRematch: boolean) => void) | null = null;
   private onMatchFound: ((matchData: MatchData) => void) | null = null;
   private onOpponentDisconnected: ((playerId: PlayerId) => void) | null = null;
+  private onMatchmakingStatus: ((msg: ServerMatchmakingStatusMessage) => void) | null = null;
 
   constructor() {
     super({ key: 'ResultsScene' });
@@ -319,9 +321,23 @@ export class ResultsScene extends Phaser.Scene {
       }
     };
 
+    // The post-match window has a server-side TTL: if both players sit on
+    // this screen too long without committing, the server tears the state
+    // down and broadcasts matchmakingStatus 'cancelled'. Reflect that here
+    // so a stranded player isn't left staring at "Waiting for opponent..."
+    // forever — they need to know REMATCH won't fire and to head back to
+    // the lobby instead.
+    this.onMatchmakingStatus = (msg: ServerMatchmakingStatusMessage) => {
+      if (msg.status === 'cancelled' && this.rematchStatusText) {
+        this.rematchStatusText.setText('Rematch expired — return to lobby.').setVisible(true);
+        this.rematchStatusText.setColor(cssHex(OPPONENT_LEFT_COLOR));
+      }
+    };
+
     this.gameService.on('rematchStatus', this.onRematchStatus);
     this.gameService.on('matchFound', this.onMatchFound);
     this.gameService.on('opponentDisconnected', this.onOpponentDisconnected);
+    this.gameService.on('matchmakingStatus', this.onMatchmakingStatus);
   }
 
   private cleanupEvents(): void {
@@ -336,6 +352,10 @@ export class ResultsScene extends Phaser.Scene {
     if (this.onOpponentDisconnected) {
       this.gameService.off('opponentDisconnected', this.onOpponentDisconnected);
       this.onOpponentDisconnected = null;
+    }
+    if (this.onMatchmakingStatus) {
+      this.gameService.off('matchmakingStatus', this.onMatchmakingStatus);
+      this.onMatchmakingStatus = null;
     }
   }
 

@@ -15,7 +15,16 @@ import { GameServer } from '../network/server.js';
 import { MatchmakingQueue } from './matchmaking-queue.js';
 import { logger } from '../utils/logger.js';
 
-const REMATCH_TIMEOUT_MS = 30_000;
+/**
+ * How long the post-match state is kept alive while waiting for both players
+ * to click rematch (or one to bail to lobby). Reset every time *either*
+ * player presses REMATCH so the opponent always has the full window to
+ * respond after they see "Opponent wants a rematch!" — without that reset,
+ * the timer runs from match end, the stats screen + read time eats most of
+ * it, and the second player's click silently no-ops because the state was
+ * already torn down. See handleRematchRequest.
+ */
+const REMATCH_TIMEOUT_MS = 60_000;
 
 interface PostMatchState {
   matchId: string;
@@ -147,6 +156,14 @@ export class MatchmakingManager {
     if (!postMatch) return;
 
     postMatch.rematchRequests.add(playerId);
+
+    // Reset the post-match expiry: the opponent now has the full window to
+    // click after they see this player's rematch prompt, instead of racing
+    // a timer that started at match end.
+    clearTimeout(postMatch.timeoutHandle);
+    postMatch.timeoutHandle = setTimeout(() => {
+      this.onRematchTimeout(matchId);
+    }, REMATCH_TIMEOUT_MS);
 
     // Notify other players that this player wants a rematch
     for (const pid of postMatch.playerIds) {
