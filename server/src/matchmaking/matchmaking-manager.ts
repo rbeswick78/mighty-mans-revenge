@@ -1,11 +1,12 @@
 import {
   MatchPhase,
   GameModeType,
+  getMap,
+  DEFAULT_MAP_NAME,
 } from '@shared/game';
 import type {
   PlayerId,
   MatchResult,
-  MapData,
   ServerGameStateMessage,
   SerializedPlayerState,
 } from '@shared/game';
@@ -13,13 +14,6 @@ import { Match } from '../game/match.js';
 import { GameServer } from '../network/server.js';
 import { MatchmakingQueue } from './matchmaking-queue.js';
 import { logger } from '../utils/logger.js';
-
-// Vite/tsc can resolve JSON via resolveJsonModule, but for Node ESM we use
-// a createRequire workaround or inline the import assertion.  Since the server
-// tsconfig targets NodeNext, use import with assertion.
-import { createRequire } from 'node:module';
-const require = createRequire(import.meta.url);
-const wastelandOutpost: MapData = require('../../../shared/maps/wasteland-outpost.json') as MapData;
 
 const REMATCH_TIMEOUT_MS = 30_000;
 
@@ -43,10 +37,21 @@ export class MatchmakingManager {
   private readonly playerNicknames: Map<PlayerId, string> = new Map();
   /** Previous-tick phase per match, for detecting phase transitions. */
   private readonly previousPhases: Map<string, MatchPhase> = new Map();
+  /**
+   * Resolver for per-player RTT in milliseconds, supplied by GameManager.
+   * Each new Match installs this so its lag-compensated shot path can
+   * rewind to the shooter's render time. Defaults to 0 (no compensation)
+   * when GameManager hasn't been given one — keeps tests trivial.
+   */
+  private readonly getPlayerRTT: (playerId: PlayerId) => number;
 
-  constructor(server: GameServer) {
+  constructor(
+    server: GameServer,
+    getPlayerRTT: (playerId: PlayerId) => number = () => 0,
+  ) {
     this.server = server;
     this.queue = new MatchmakingQueue();
+    this.getPlayerRTT = getPlayerRTT;
   }
 
   handleJoinMatchmaking(playerId: PlayerId, nickname: string): void {
@@ -266,7 +271,8 @@ export class MatchmakingManager {
 
     const { player1, player2 } = pair;
     const matchId = crypto.randomUUID();
-    const mapData = wastelandOutpost;
+    const mapName = DEFAULT_MAP_NAME;
+    const mapData = getMap(mapName);
 
     const playerEntries = [
       { id: player1.playerId, nickname: player1.nickname },
@@ -274,6 +280,7 @@ export class MatchmakingManager {
     ];
 
     const match = new Match(matchId, mapData, playerEntries, GameModeType.DEATHMATCH);
+    match.setRttResolver(this.getPlayerRTT);
     this.activeMatches.set(matchId, match);
     this.playerMatchMap.set(player1.playerId, matchId);
     this.playerMatchMap.set(player2.playerId, matchId);
@@ -470,7 +477,8 @@ export class MatchmakingManager {
     clearTimeout(postMatch.timeoutHandle);
 
     const matchId = crypto.randomUUID();
-    const mapData = wastelandOutpost;
+    const mapName = DEFAULT_MAP_NAME;
+    const mapData = getMap(mapName);
 
     const playerEntries = postMatch.playerIds.map((pid) => ({
       id: pid,
@@ -478,6 +486,7 @@ export class MatchmakingManager {
     }));
 
     const match = new Match(matchId, mapData, playerEntries, GameModeType.DEATHMATCH);
+    match.setRttResolver(this.getPlayerRTT);
     this.activeMatches.set(matchId, match);
 
     // Update player-match mapping

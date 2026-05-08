@@ -52,9 +52,7 @@ import { isTouchDevice } from '../input/is-touch-device.js';
 import { GameService, type MatchData } from '../services/game-service.js';
 import { AudioManager } from '../audio/audio-manager.js';
 import type { LocalCorrection, NetworkManager } from '../network/network-manager.js';
-
-// Vite handles JSON imports
-import wastelandOutpost from '../../../shared/maps/wasteland-outpost.json';
+import { getMap, DEFAULT_MAP_NAME } from '@shared/maps/registry.js';
 
 const LOCAL_CORRECTION_SMOOTH_MS = 120;
 const LOCAL_CORRECTION_EPSILON = 0.01;
@@ -171,9 +169,13 @@ export class GameScene extends Phaser.Scene {
       audio.stopMusic();
     }
 
-    // Render the map
+    // Render the map. Server picks the map at match-creation and tells the
+    // client via matchFound.mapName; we look it up in the shared registry.
+    // Falls back to the default map if matchData is missing (e.g., reloaded
+    // mid-match before the matchFound event re-fires).
     this.mapRenderer = new MapRenderer(this);
-    this.mapRenderer.renderMap(wastelandOutpost as MapData);
+    const mapData: MapData = getMap(this.matchData?.mapName ?? DEFAULT_MAP_NAME);
+    this.mapRenderer.renderMap(mapData);
 
     // Wire the collision grid into the network manager so client-side
     // prediction and reconciliation use the same physics as the server.
