@@ -66,7 +66,7 @@ export class MatchmakingManager {
       status: 'queued',
       queuePosition: this.queue.getQueueLength(),
       playersOnline: this.getOnlinePlayerCount(),
-    });
+    }, { reliable: true });
 
     // Try to match immediately
     this.tryCreateMatch();
@@ -80,7 +80,7 @@ export class MatchmakingManager {
         type: 'server:matchmakingStatus',
         status: 'cancelled',
         playersOnline: this.getOnlinePlayerCount(),
-      });
+      }, { reliable: true });
     }
   }
 
@@ -102,7 +102,7 @@ export class MatchmakingManager {
             this.server.sendTo(pid, {
               type: 'server:opponentDisconnected',
               playerId,
-            });
+            }, { reliable: true });
           }
         }
       }
@@ -118,7 +118,7 @@ export class MatchmakingManager {
             this.server.sendTo(pid, {
               type: 'server:opponentDisconnected',
               playerId,
-            });
+            }, { reliable: true });
           }
         }
         clearTimeout(state.timeoutHandle);
@@ -149,7 +149,7 @@ export class MatchmakingManager {
         this.server.sendTo(pid, {
           type: 'server:rematchStatus',
           opponentWantsRematch: true,
-        });
+        }, { reliable: true });
       }
     }
 
@@ -174,7 +174,7 @@ export class MatchmakingManager {
           this.server.sendTo(pid, {
             type: 'server:opponentDisconnected',
             playerId,
-          });
+          }, { reliable: true });
           // Return them to lobby too
           this.playerMatchMap.delete(pid);
         }
@@ -228,7 +228,7 @@ export class MatchmakingManager {
       this.server.sendTo(playerId, {
         type: 'server:matchStart',
         matchEndsInMs,
-      });
+      }, { reliable: true });
     }
   }
 
@@ -294,14 +294,14 @@ export class MatchmakingManager {
       matchId,
       opponents: [{ id: player2.playerId, nickname: player2.nickname }],
       mapName: mapData.name,
-    });
+    }, { reliable: true });
 
     this.server.sendTo(player2.playerId, {
       type: 'server:matchFound',
       matchId,
       opponents: [{ id: player1.playerId, nickname: player1.nickname }],
       mapName: mapData.name,
-    });
+    }, { reliable: true });
 
     // Send matchmaking status update
     for (const entry of playerEntries) {
@@ -309,7 +309,7 @@ export class MatchmakingManager {
         type: 'server:matchmakingStatus',
         status: 'matched',
         playersOnline: this.getOnlinePlayerCount(),
-      });
+      }, { reliable: true });
     }
 
     // Start countdown
@@ -387,7 +387,7 @@ export class MatchmakingManager {
           type: 'server:eventWarning',
           event: warning.event,
           activatesInMs: warning.activatesInMs,
-        });
+        }, { reliable: true });
       }
     }
 
@@ -400,7 +400,7 @@ export class MatchmakingManager {
         this.server.sendTo(playerId, {
           type: 'server:eventStart',
           event: started,
-        });
+        }, { reliable: true });
       }
     }
   }
@@ -420,7 +420,7 @@ export class MatchmakingManager {
       this.server.sendTo(playerId, {
         type: 'server:matchEnd',
         result: serializableResult as unknown as MatchResult,
-      });
+      }, { reliable: true });
     }
 
     logger.info(
@@ -460,7 +460,7 @@ export class MatchmakingManager {
         type: 'server:matchmakingStatus',
         status: 'cancelled',
         playersOnline: this.getOnlinePlayerCount(),
-      });
+      }, { reliable: true });
     }
 
     this.postMatchStates.delete(matchId);
@@ -506,7 +506,7 @@ export class MatchmakingManager {
         matchId,
         opponents,
         mapName: mapData.name,
-      });
+      }, { reliable: true });
     }
 
     match.startCountdown();

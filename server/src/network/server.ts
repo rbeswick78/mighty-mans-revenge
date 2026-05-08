@@ -61,8 +61,10 @@ export class GameServer {
         'Player connected',
       );
 
-      // Send welcome message with assigned player ID
-      this.sendTo(playerId, { type: 'server:welcome', playerId });
+      // Send welcome message with assigned player ID. Reliable: this is the
+      // one-shot that gives the client its assigned playerId; if it's
+      // dropped, every later message is misrouted on the client side.
+      this.sendTo(playerId, { type: 'server:welcome', playerId }, { reliable: true });
 
       // Notify connect handler
       this.connectHandler?.(playerId);
@@ -117,14 +119,26 @@ export class GameServer {
     this.io.emit('message', payload);
   }
 
-  /** Send a message to a specific player. */
-  sendTo(playerId: PlayerId, message: ServerMessage): void {
+  /**
+   * Send a message to a specific player.
+   *
+   * Set `reliable: true` for one-shot lifecycle messages where a drop would
+   * leave the client stuck (matchFound, matchStart, matchEnd, rematchStatus,
+   * matchmakingStatus, opponentDisconnected, eventWarning, eventStart,
+   * welcome, error). Per-tick gameState and other low-stakes broadcasts
+   * should stay unreliable so we don't retransmit stale data.
+   */
+  sendTo(playerId: PlayerId, message: ServerMessage, opts?: { reliable?: boolean }): void {
     const channel = this.channels.get(playerId);
     if (!channel) {
       logger.debug({ playerId }, 'Cannot send to unknown player');
       return;
     }
-    channel.emit('message', JSON.stringify(message));
+    if (opts?.reliable) {
+      channel.emit('message', JSON.stringify(message), { reliable: true });
+    } else {
+      channel.emit('message', JSON.stringify(message));
+    }
   }
 
   /** Register a handler for incoming client messages. */
