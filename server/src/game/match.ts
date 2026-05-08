@@ -537,9 +537,11 @@ export class Match implements MatchContext {
         height: PLAYER.HITBOX_HEIGHT,
       });
       if (pickup) {
-        this.pickupManager.applyPickup(pickup, player);
-        this.pickupManager.collectPickup(pickup.id);
-        this.tickPickupCollections.push({ pickupId: pickup.id, playerId: player.id });
+        const applied = this.pickupManager.applyPickup(pickup, player);
+        if (applied) {
+          this.pickupManager.collectPickup(pickup.id);
+          this.tickPickupCollections.push({ pickupId: pickup.id, playerId: player.id });
+        }
       }
     }
 

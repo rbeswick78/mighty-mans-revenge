@@ -465,6 +465,67 @@ describe('Match', () => {
     });
   });
 
+  describe('pickup collection at max inventory', () => {
+    function makeGrenadePickupMap(): MapData {
+      return {
+        name: 'test-map-grenade-pickup',
+        width: 10,
+        height: 10,
+        tileSize: 48,
+        tiles: Array.from({ length: 10 }, () => Array.from({ length: 10 }, () => 0)),
+        spawnPoints: [
+          { x: 1, y: 1 },
+          { x: 8, y: 8 },
+        ],
+        pickupSpawns: [{ x: 1, y: 1, type: 'grenade' as const }],
+      };
+    }
+
+    // Map tile (1,1) → world (1*48 + 24, 1*48 + 24) = (72, 72).
+    const PICKUP_WORLD_POS = { x: 72, y: 72 } as const;
+
+    function startActiveMatchWithGrenadePickup(): Match {
+      const m = new Match('match-pickup', makeGrenadePickupMap(), [
+        { id: 'player-0', nickname: 'P0' },
+        { id: 'player-1', nickname: 'P1' },
+      ]);
+      m.startCountdown();
+      m.update(MATCH.COUNTDOWN_DURATION + 0.05);
+      // Spawns are randomly shuffled — pin player-0 onto the pickup tile so
+      // collision is deterministic.
+      m.players.get('player-0')!.position = { ...PICKUP_WORLD_POS };
+      return m;
+    }
+
+    it('does not consume a grenade pickup when the player is at max grenades', () => {
+      const m = startActiveMatchWithGrenadePickup();
+      const player = m.players.get('player-0')!;
+      player.grenades = GRENADE.MAX_COUNT;
+
+      m.update(0.05);
+
+      // Inventory unchanged — and the pickup is still on the board, ready to be
+      // grabbed once the player throws a grenade.
+      expect(player.grenades).toBe(GRENADE.MAX_COUNT);
+      const pickups = m.pickupManager.getPickups();
+      expect(pickups).toHaveLength(1);
+      expect(pickups[0].isActive).toBe(true);
+      expect(m.getTickPickupCollections()).toHaveLength(0);
+    });
+
+    it('consumes the grenade pickup when the player has room', () => {
+      const m = startActiveMatchWithGrenadePickup();
+      const player = m.players.get('player-0')!;
+      player.grenades = GRENADE.MAX_COUNT - 1;
+
+      m.update(0.05);
+
+      expect(player.grenades).toBe(GRENADE.MAX_COUNT);
+      expect(m.pickupManager.getPickups()[0].isActive).toBe(false);
+      expect(m.getTickPickupCollections()).toHaveLength(1);
+    });
+  });
+
   describe('final-minute event', () => {
     /**
      * Build a match with a deterministic RNG so the picker always lands on
