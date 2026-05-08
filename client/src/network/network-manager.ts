@@ -182,14 +182,12 @@ export class NetworkManager {
   /**
    * Get interpolated states for all remote players.
    *
-   * Rendered ONE server tick behind real time. The server-side hit detection
-   * (match.ts → combatManager.processShot) uses current authoritative
-   * positions with no lag-compensation rewind, so the render delay here
-   * effectively becomes a hit-registration error budget. Going past one
-   * tick (~50ms) widens the gap between where the client sees an opponent
-   * and where the server places them, and shots stop landing on moving
-   * targets. If LagCompensator gets wired up later we can safely raise
-   * this back to 2 ticks for better jitter tolerance.
+   * Rendered ONE server tick behind real time. With server-side rewind on
+   * (match.ts → lagCompensator.processShootWithRewind), the server already
+   * accounts for half-RTT when validating hits, so the render delay here
+   * is mostly a jitter buffer. Two ticks would tolerate more loss but
+   * widens the gap the rewind has to cover; keep at one tick until
+   * playtesting says otherwise.
    */
   getInterpolatedPlayers(): Map<PlayerId, InterpolatedState> {
     const renderTime = performance.now() - SERVER.TICK_INTERVAL;

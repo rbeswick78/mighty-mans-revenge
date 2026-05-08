@@ -586,4 +586,53 @@ describe('Match', () => {
       expect(m.activeEvent).toBe('super_speed');
     });
   });
+
+  describe('lag compensation wiring', () => {
+    function startActive(): Match {
+      const m = createMatch();
+      m.startCountdown();
+      m.update(MATCH.COUNTDOWN_DURATION + 0.05);
+      // Place opponents at known positions in line of sight.
+      const p0 = m.players.get('player-0')!;
+      const p1 = m.players.get('player-1')!;
+      p0.position = { x: 100, y: 100 };
+      p1.position = { x: 300, y: 100 };
+      return m;
+    }
+
+    it('asks the RTT resolver for the shooter on each fired shot', () => {
+      const m = startActive();
+      const seen: string[] = [];
+      m.setRttResolver((pid) => {
+        seen.push(pid);
+        return 0;
+      });
+
+      // One press, one burst — three shots at GUN.BURST_INTERVAL apart.
+      m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+      m.update(SERVER.TICK_INTERVAL / 1000);
+      // Drain the rest of the burst.
+      for (let i = 0; i < GUN.BURST_SIZE; i++) {
+        m.update(GUN.BURST_INTERVAL + 0.01);
+      }
+
+      expect(seen.length).toBeGreaterThanOrEqual(GUN.BURST_SIZE);
+      for (const id of seen) {
+        expect(id).toBe('player-0');
+      }
+    });
+
+    it('with default zero-RTT resolver, shots still hit a stationary opponent (no regression)', () => {
+      const m = startActive();
+      // No setRttResolver call → default returns 0 → lag-comp collapses
+      // to current positions.
+      const p1 = m.players.get('player-1')!;
+      const startingHp = p1.health;
+
+      m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+      m.update(SERVER.TICK_INTERVAL / 1000);
+
+      expect(p1.health).toBeLessThan(startingHp);
+    });
+  });
 });

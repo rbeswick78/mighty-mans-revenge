@@ -14,15 +14,30 @@ export class GameManager {
   private readonly gameLoop: GameLoop;
   private readonly server: GameServer;
   private readonly matchmaking: MatchmakingManager;
+  /**
+   * Most recent measured round-trip time per connected player, in ms,
+   * derived from the client:ping/server:pong cycle. Used by lag
+   * compensation to rewind opponent positions to the shooter's render
+   * time. Defaults to 0 for players who haven't yet sent a ping.
+   */
+  private readonly playerRTTs: Map<PlayerId, number> = new Map();
+
   constructor(server: GameServer) {
     this.server = server;
-    this.matchmaking = new MatchmakingManager(server);
+    this.matchmaking = new MatchmakingManager(server, (pid) =>
+      this.playerRTTs.get(pid) ?? 0,
+    );
 
     this.gameLoop = new GameLoop((dt, tick) => {
       this.tick(dt, tick);
     }, SERVER.TICK_RATE);
 
     this.wireEvents();
+  }
+
+  /** Most recent RTT for a player in ms, or 0 if no ping has landed yet. */
+  getPlayerRTT(playerId: PlayerId): number {
+    return this.playerRTTs.get(playerId) ?? 0;
   }
 
   /** Expose the game loop for health check / admin status. */
@@ -52,6 +67,7 @@ export class GameManager {
     });
 
     this.server.onDisconnect((playerId: PlayerId) => {
+      this.playerRTTs.delete(playerId);
       this.matchmaking.handlePlayerDisconnect(playerId);
     });
 
@@ -82,13 +98,20 @@ export class GameManager {
         this.matchmaking.handleReturnToLobby(playerId);
         break;
 
-      case 'client:ping':
+      case 'client:ping': {
+        // Cache server-side RTT estimate so lag compensation can rewind
+        // opponent positions to this player's render time on shoot. The
+        // pong handler on the client does its own clock-anchored RTT for
+        // display; this is the server's parallel measurement.
+        const rtt = Math.max(0, Date.now() - message.clientTime);
+        this.playerRTTs.set(playerId, rtt);
         this.server.sendTo(playerId, {
           type: 'server:pong',
           clientTime: message.clientTime,
           serverTime: Date.now(),
         });
         break;
+      }
     }
   }
 

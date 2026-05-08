@@ -27,6 +27,7 @@ import { PickupManager } from './pickup-manager.js';
 import { StatsTracker } from './stats-tracker.js';
 import { MapManager } from './map-manager.js';
 import { CombatManager } from './combat-manager.js';
+import { LagCompensator } from './lag-compensator.js';
 import { getGameMode } from './modes/index.js';
 import type { GameMode, MatchContext } from './modes/game-mode.js';
 import { InputQueue } from './input-queue.js';
@@ -51,6 +52,28 @@ export class Match implements MatchContext {
   private readonly gameMode: GameMode;
   private readonly killFeed: KillFeedEntry[] = [];
   readonly combatManager: CombatManager = new CombatManager();
+  /**
+   * Server-side rewind path for "favor the shooter" hit detection. Owns a
+   * RewindBuffer of recent player states and routes processShot through it
+   * using the shooter's measured RTT. Wraps combatManager — see
+   * lag-compensator.ts.
+   */
+  private readonly lagCompensator: LagCompensator = new LagCompensator(
+    this.combatManager,
+  );
+  /**
+   * Monotonic counter passed to the rewind buffer as its tick key. Distinct
+   * from server tick — internal so tests don't need to thread an external
+   * counter.
+   */
+  private rewindTickCounter = 0;
+  /**
+   * Resolver for the shooter's most recent measured RTT (ms). Installed by
+   * MatchmakingManager from GameManager's per-player ping cache. Defaults
+   * to 0 so unit tests get pass-through behavior identical to the
+   * pre-lag-comp path.
+   */
+  private rttForShooter: (playerId: PlayerId) => number = () => 0;
   /** Recent bullet trails from this tick, cleared after broadcast. */
   private tickBulletTrails: BulletTrail[] = [];
   /** Kills recorded this tick, cleared after broadcast. */
@@ -104,6 +127,15 @@ export class Match implements MatchContext {
       this.stats.initPlayer(entry.id);
       this.connectedPlayers.add(entry.id);
     });
+  }
+
+  /**
+   * Install the resolver used to fetch each shooter's RTT (ms) for the
+   * lag-compensation rewind. Called once by MatchmakingManager when the
+   * match is created.
+   */
+  setRttResolver(fn: (playerId: PlayerId) => number): void {
+    this.rttForShooter = fn;
   }
 
   /** Queue a player input to be processed on the next tick. */
@@ -314,6 +346,19 @@ export class Match implements MatchContext {
     this.tickBulletTrails = [];
     this.tickKillFeedEntries = [];
     this.tickPickupCollections = [];
+
+    // Snapshot positions BEFORE this tick's inputs move anyone. A shot
+    // that arrives this tick will rewind opponents to the snapshot taken
+    // at (now - rtt/2), which lines up with what the shooter saw on
+    // their screen when they pulled the trigger. The buffer self-clamps
+    // when empty (first tick of the match), so this is safe even before
+    // any state is stored.
+    this.rewindTickCounter += 1;
+    this.lagCompensator.saveCurrentState(
+      this.rewindTickCounter,
+      Date.now(),
+      this.players,
+    );
 
     this.maybeTriggerFinalMinuteEvent();
 
@@ -555,7 +600,19 @@ export class Match implements MatchContext {
     const player = this.players.get(playerId);
     if (!player) return;
 
-    const shot = this.combatManager.processShot(playerId, aimAngle, this.players, grid);
+    // Route every shot — including subsequent burst rounds — through lag
+    // compensation. The shooter's position stays current (they see
+    // themselves in real time); opponents get rewound to render time. RTT
+    // of 0 collapses to a normal processShot, so unit tests with no RTT
+    // resolver behave identically to the pre-lag-comp path.
+    const rtt = this.rttForShooter(playerId);
+    const shot = this.lagCompensator.processShootWithRewind(
+      playerId,
+      aimAngle,
+      this.players,
+      grid,
+      rtt,
+    );
     this.tickBulletTrails.push(shot.trail);
     if (this.activeEvent !== 'infinite_ammo') {
       player.ammo = Math.max(0, player.ammo - 1);
