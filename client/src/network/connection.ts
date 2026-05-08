@@ -100,6 +100,16 @@ export class NetworkConnection {
       if (typeof data !== 'string') return;
       try {
         const message = JSON.parse(data) as ServerMessage;
+        // TEMP: rematch-debug — log the lifecycle messages we suspect of
+        // getting dropped between WebRTC and the scene listeners. Remove
+        // once the rematch-stuck bug is diagnosed.
+        if (
+          message.type === 'server:matchFound' ||
+          message.type === 'server:rematchStatus' ||
+          message.type === 'server:matchmakingStatus'
+        ) {
+          console.log('[net] received', message.type, message);
+        }
         for (const cb of this.messageCallbacks) {
           cb(message);
         }

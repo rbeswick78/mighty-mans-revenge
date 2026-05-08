@@ -303,12 +303,14 @@ export class ResultsScene extends Phaser.Scene {
 
   private wireGameServiceEvents(): void {
     this.onRematchStatus = (opponentWantsRematch: boolean) => {
+      console.log('[results] rematchStatus', opponentWantsRematch);
       if (opponentWantsRematch && this.rematchStatusText) {
         this.rematchStatusText.setText('Opponent wants a rematch!').setVisible(true);
       }
     };
 
     this.onMatchFound = (matchData: MatchData) => {
+      console.log('[results] matchFound', matchData);
       // Rematch accepted — transition to game scene. Guard against the
       // fade-complete event not firing (observed on backgrounded tabs and
       // some mobile browsers): if the camera event doesn't land within the

@@ -553,6 +553,10 @@ export class MatchmakingManager {
         .filter((e) => e.id !== entry.id)
         .map((e) => ({ id: e.id, nickname: e.nickname }));
 
+      logger.info(
+        { playerId: entry.id, matchId },
+        'Sending rematch matchFound',
+      );
       this.server.sendTo(entry.id, {
         type: 'server:matchFound',
         matchId,

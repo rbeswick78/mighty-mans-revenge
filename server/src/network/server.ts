@@ -131,7 +131,10 @@ export class GameServer {
   sendTo(playerId: PlayerId, message: ServerMessage, opts?: { reliable?: boolean }): void {
     const channel = this.channels.get(playerId);
     if (!channel) {
-      logger.debug({ playerId }, 'Cannot send to unknown player');
+      logger.warn(
+        { playerId, type: message.type },
+        'Cannot send to unknown player',
+      );
       return;
     }
     if (opts?.reliable) {
