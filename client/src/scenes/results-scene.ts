@@ -309,15 +309,24 @@ export class ResultsScene extends Phaser.Scene {
     };
 
     this.onMatchFound = (matchData: MatchData) => {
-      // Rematch accepted — transition to game scene
-      this.cameras.main.fadeOut(300, 0, 0, 0);
-      this.cameras.main.once('camerafadeoutcomplete', () => {
+      // Rematch accepted — transition to game scene. Guard against the
+      // fade-complete event not firing (observed on backgrounded tabs and
+      // some mobile browsers): if the camera event doesn't land within the
+      // fade window, fall back to a timer so the player isn't stranded on
+      // "Waiting for opponent..." while the new match runs without them.
+      let transitioned = false;
+      const goToGame = () => {
+        if (transitioned) return;
+        transitioned = true;
         this.cleanupEvents();
         this.scene.start('GameScene', {
           nickname: this.nickname,
           matchData,
         });
-      });
+      };
+      this.cameras.main.fadeOut(300, 0, 0, 0);
+      this.cameras.main.once('camerafadeoutcomplete', goToGame);
+      this.time.delayedCall(500, goToGame);
     };
 
     this.onOpponentDisconnected = (_playerId: PlayerId) => {
