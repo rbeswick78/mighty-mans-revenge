@@ -44,6 +44,7 @@ export class ResultsScene extends Phaser.Scene {
   private nickname = '';
   private matchData: MatchData | null = null;
   private rematchStatusText: Phaser.GameObjects.Text | null = null;
+  private rematchUnavailable = false;
 
   // Event handler references for cleanup
   private onRematchStatus: ((opponentWantsRematch: boolean) => void) | null = null;
@@ -59,6 +60,7 @@ export class ResultsScene extends Phaser.Scene {
     this.result = data.result ?? null;
     this.nickname = data.nickname ?? 'Player';
     this.matchData = data.matchData ?? null;
+    this.rematchUnavailable = false;
   }
 
   create(): void {
@@ -139,6 +141,10 @@ export class ResultsScene extends Phaser.Scene {
 
     // Rematch button
     this.createButton(centerX - 110, buttonY, 'REMATCH', REMATCH_BTN_COLOR, () => {
+      if (this.rematchUnavailable) {
+        this.showRematchUnavailable();
+        return;
+      }
       this.gameService.requestRematch();
       this.rematchStatusText?.setText('Waiting for opponent...').setVisible(true);
     });
@@ -315,6 +321,7 @@ export class ResultsScene extends Phaser.Scene {
     };
 
     this.onOpponentDisconnected = (_playerId: PlayerId) => {
+      this.rematchUnavailable = true;
       if (this.rematchStatusText) {
         this.rematchStatusText.setText('Opponent has left.').setVisible(true);
         this.rematchStatusText.setColor(cssHex(OPPONENT_LEFT_COLOR));
@@ -329,8 +336,8 @@ export class ResultsScene extends Phaser.Scene {
     // the lobby instead.
     this.onMatchmakingStatus = (msg: ServerMatchmakingStatusMessage) => {
       if (msg.status === 'cancelled' && this.rematchStatusText) {
-        this.rematchStatusText.setText('Rematch expired — return to lobby.').setVisible(true);
-        this.rematchStatusText.setColor(cssHex(OPPONENT_LEFT_COLOR));
+        this.rematchUnavailable = true;
+        this.showRematchUnavailable();
       }
     };
 
@@ -357,6 +364,12 @@ export class ResultsScene extends Phaser.Scene {
       this.gameService.off('matchmakingStatus', this.onMatchmakingStatus);
       this.onMatchmakingStatus = null;
     }
+  }
+
+  private showRematchUnavailable(): void {
+    if (!this.rematchStatusText) return;
+    this.rematchStatusText.setText('Rematch unavailable - return to lobby.').setVisible(true);
+    this.rematchStatusText.setColor(cssHex(OPPONENT_LEFT_COLOR));
   }
 
   private createButton(

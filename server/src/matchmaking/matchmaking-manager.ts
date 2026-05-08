@@ -150,12 +150,30 @@ export class MatchmakingManager {
 
   handleRematchRequest(playerId: PlayerId): void {
     const matchId = this.playerMatchMap.get(playerId);
-    if (!matchId) return;
+    if (!matchId) {
+      logger.warn({ playerId }, 'Ignoring rematch request from player with no match');
+      this.sendRematchUnavailable(playerId);
+      return;
+    }
 
     const postMatch = this.postMatchStates.get(matchId);
-    if (!postMatch) return;
+    if (!postMatch) {
+      logger.warn({ playerId, matchId }, 'Ignoring rematch request outside post-match state');
+      this.sendRematchUnavailable(playerId);
+      return;
+    }
 
     postMatch.rematchRequests.add(playerId);
+
+    logger.info(
+      {
+        playerId,
+        matchId,
+        requested: postMatch.rematchRequests.size,
+        required: postMatch.playerIds.length,
+      },
+      'Rematch requested',
+    );
 
     // Reset the post-match expiry: the opponent now has the full window to
     // click after they see this player's rematch prompt, instead of racing
@@ -488,6 +506,14 @@ export class MatchmakingManager {
     }
 
     this.postMatchStates.delete(matchId);
+  }
+
+  private sendRematchUnavailable(playerId: PlayerId): void {
+    this.server.sendTo(playerId, {
+      type: 'server:matchmakingStatus',
+      status: 'cancelled',
+      playersOnline: this.getOnlinePlayerCount(),
+    }, { reliable: true });
   }
 
   private startRematch(postMatch: PostMatchState): void {

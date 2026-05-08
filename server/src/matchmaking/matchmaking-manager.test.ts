@@ -101,4 +101,28 @@ describe('MatchmakingManager rematch flow', () => {
       vi.useRealTimers();
     }
   });
+
+  it('responds when a rematch request arrives after the post-match window expired', () => {
+    vi.useFakeTimers();
+    try {
+      startMatchAndForceEnd('A', 'B');
+      sent.length = 0;
+
+      vi.advanceTimersByTime(60_001);
+      sent.length = 0;
+
+      mgr.handleRematchRequest('A');
+
+      expect(sent).toContainEqual(expect.objectContaining({
+        playerId: 'A',
+        message: expect.objectContaining({
+          type: 'server:matchmakingStatus',
+          status: 'cancelled',
+        }),
+        reliable: true,
+      }));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
