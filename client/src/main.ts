@@ -24,6 +24,10 @@ const config: Phaser.Types.Core.GameConfig = {
     // the canvas right/down when the viewport aspect doesn't match
     // the canvas aspect.
     autoCenter: Phaser.Scale.NO_CENTER,
+    // Reuse the flex parent as the fullscreen target. Without this,
+    // Phaser wraps the canvas in a fresh div on fullscreen entry,
+    // which has no centering CSS and pins the canvas to the top-left.
+    fullscreenTarget: 'game-container',
   },
   // Enables this.add.dom(...), which lets scenes mount real HTML
   // elements (e.g. a transparent <input> over the nickname box so
