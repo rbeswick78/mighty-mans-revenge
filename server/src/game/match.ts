@@ -96,14 +96,14 @@ export class Match implements MatchContext {
     this.mapManager.loadMap(mapData);
     this.pickupManager.initFromMap(mapData);
 
-    for (const entry of playerEntries) {
-      const spawnPos = this.mapManager.getRandomSpawnPoint();
-      const player = this.createPlayerState(entry.id, entry.nickname, spawnPos);
+    const spawns = this.mapManager.pickInitialSpawns(playerEntries.length, this.rng);
+    playerEntries.forEach((entry, i) => {
+      const player = this.createPlayerState(entry.id, entry.nickname, spawns[i]);
       this.players.set(entry.id, player);
       this.inputQueues.set(entry.id, new InputQueue());
       this.stats.initPlayer(entry.id);
       this.connectedPlayers.add(entry.id);
-    }
+    });
   }
 
   /** Queue a player input to be processed on the next tick. */
