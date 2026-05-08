@@ -204,14 +204,26 @@ export class LobbyScene extends Phaser.Scene {
 
   private wireGameServiceEvents(): void {
     this.onMatchFound = (matchData: MatchData) => {
+      // Tear down listeners and pin the transition guard before kicking
+      // off the fade. If we leave the listener attached and the next
+      // matchFound (e.g. from a rematch) fires while the camera/scene
+      // are mid-shutdown, the stale handler throws on this.cameras.main
+      // and brings down the GameService dispatch chain — silently
+      // stranding the live scene's listener.
       this.isSearching = false;
-      this.cameras.main.fadeOut(300, 0, 0, 0);
-      this.cameras.main.once('camerafadeoutcomplete', () => {
+      let transitioned = false;
+      const goToGame = () => {
+        if (transitioned) return;
+        transitioned = true;
+        this.cleanupEvents();
         this.scene.start('GameScene', {
           nickname: this.nickname,
           matchData,
         });
-      });
+      };
+      this.cameras.main.fadeOut(300, 0, 0, 0);
+      this.cameras.main.once('camerafadeoutcomplete', goToGame);
+      this.time.delayedCall(500, goToGame);
     };
 
     this.onMatchmakingStatus = (msg: ServerMatchmakingStatusMessage) => {

@@ -529,7 +529,15 @@ export class NetworkManager {
     const list = this.listeners.get(event);
     if (!list) return;
     for (const cb of list) {
-      cb(...args);
+      try {
+        cb(...args);
+      } catch (err) {
+        // Isolate per-listener exceptions so a single throwing handler
+        // doesn't strand later listeners. See the rematch hang where a
+        // stale scene listener threw and silently dropped subsequent
+        // listeners' chance to run.
+        console.error('[NetworkManager] listener for', event, 'threw', err);
+      }
     }
   }
 }

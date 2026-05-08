@@ -98,23 +98,25 @@ export class NetworkConnection {
 
     this.channel.on('message', (data) => {
       if (typeof data !== 'string') return;
+      let message: ServerMessage;
       try {
-        const message = JSON.parse(data) as ServerMessage;
-        // TEMP: rematch-debug — log the lifecycle messages we suspect of
-        // getting dropped between WebRTC and the scene listeners. Remove
-        // once the rematch-stuck bug is diagnosed.
-        if (
-          message.type === 'server:matchFound' ||
-          message.type === 'server:rematchStatus' ||
-          message.type === 'server:matchmakingStatus'
-        ) {
-          console.log('[net] received', message.type, message);
-        }
-        for (const cb of this.messageCallbacks) {
+        message = JSON.parse(data) as ServerMessage;
+      } catch (err) {
+        console.warn('[NetworkConnection] Failed to parse server message', err);
+        return;
+      }
+      for (const cb of this.messageCallbacks) {
+        try {
           cb(message);
+        } catch (err) {
+          // Don't let one throwing handler abort the rest of the dispatch:
+          // we used to wrap parse + iteration in a single try/catch, which
+          // meant a thrown listener swallowed downstream events under a
+          // bogus "Failed to parse" log. See the rematch hang where a
+          // stale LobbyScene.onMatchFound on a shut-down scene threw on
+          // cameras.main, dropping ResultsScene's listener silently.
+          console.error('[NetworkConnection] message handler threw', err);
         }
-      } catch {
-        console.warn('[NetworkConnection] Failed to parse server message');
       }
     });
   }

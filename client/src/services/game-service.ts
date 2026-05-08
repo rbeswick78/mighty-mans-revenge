@@ -227,7 +227,13 @@ export class GameService {
     const list = this.listeners.get(event);
     if (!list) return;
     for (const cb of list) {
-      cb(...args);
+      try {
+        cb(...args);
+      } catch (err) {
+        // Isolate per-listener exceptions — a stale scene's handler
+        // throwing must not stop the live scene's handler from running.
+        console.error('[GameService] listener for', event, 'threw', err);
+      }
     }
   }
 }
