@@ -611,7 +611,7 @@ export class GameScene extends Phaser.Scene {
       if (this.hud) {
         this.hud.showCountdown(0); // Shows "FIGHT!"
       }
-      // Match length is tuned to this track (MATCH.TIME_LIMIT === 169s).
+      // Match length is tuned to this track (MATCH.TIME_LIMIT === 173s).
       // loop=false because the track ends exactly when the match ends —
       // looping would replay the intro for whatever fraction of a tick
       // the audio engine takes to honor stopMusic.

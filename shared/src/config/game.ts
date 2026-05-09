@@ -64,11 +64,11 @@ export const MATCH = Object.freeze({
   KILL_TARGET: 10,
   /**
    * Match length in seconds. Tuned to the gameplay music track
-   * (game-play.mp3, exactly 169s) so the track plays through once and
+   * (game-play.mp3, ~173.5s) so the track plays through once and
    * ends at the same moment the timer hits 0:00 — no loop, no trailing
    * silence. If the music asset changes length, change this too.
    */
-  TIME_LIMIT: 169,
+  TIME_LIMIT: 173,
   COUNTDOWN_DURATION: 3,
 });
 
