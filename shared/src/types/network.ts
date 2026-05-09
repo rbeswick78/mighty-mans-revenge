@@ -83,10 +83,17 @@ export interface ServerGameStateMessage {
   phase: MatchPhase;
   /**
    * Remaining seconds in the countdown phase. Only meaningful when
-   * phase === COUNTDOWN. The match timer is NOT here — it is sent
-   * once via ServerMatchStartMessage and extrapolated client-side.
+   * phase === COUNTDOWN.
    */
   countdownTimer: number;
+  /**
+   * Authoritative remaining match seconds. Only meaningful when
+   * phase === ACTIVE. The client re-anchors its local clock from this
+   * every snapshot so any drift between the initial matchStart anchor
+   * and the server's tick-driven matchTimer self-corrects within one
+   * tick.
+   */
+  matchTimer: number;
   players: SerializedPlayerState[];
   grenades: GrenadeState[];
   bulletTrails: BulletTrail[];

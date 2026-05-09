@@ -190,8 +190,12 @@ export class AudioManager {
     });
   }
 
-  /** Play background music. Stops any currently playing music first. */
-  playMusic(key: string, fadeIn = 0): void {
+  /**
+   * Play background music. Stops any currently playing music first.
+   * Pass `loop: false` for tracks that are tuned to play through exactly
+   * once (e.g. gameplay music whose length matches MATCH.TIME_LIMIT).
+   */
+  playMusic(key: string, fadeIn = 0, loop = true): void {
     // Tear down anything still in flight from a prior call. cancelFade runs the
     // pending stop-and-destroy synchronously, so we can't end up with two
     // tracks layered on top of each other if playMusic arrives mid fade-out.
@@ -210,7 +214,7 @@ export class AudioManager {
 
     const music = this.game.sound.add(key, {
       volume: startVolume,
-      loop: true,
+      loop,
     });
     this.currentMusic = music;
     music.play();

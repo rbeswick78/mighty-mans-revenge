@@ -74,9 +74,12 @@ export class NetworkManager {
 
   /**
    * Local-clock timestamp (performance.now() ms) at which the current
-   * match ends. Set once from ServerMatchStartMessage.matchEndsInMs and
-   * extrapolated from there each render frame — no per-tick broadcast
-   * of the clock is needed. Null outside an active match.
+   * match ends. Initially set from ServerMatchStartMessage.matchEndsInMs,
+   * then re-anchored every gameState while phase===ACTIVE from the
+   * authoritative matchTimer. Re-anchoring keeps the displayed clock
+   * drift-free even if the initial anchor was perturbed by message
+   * delivery latency, paint stalls, or audio-context warm-up.
+   * Null outside an active match.
    */
   private matchEndsAtLocalMs: number | null = null;
 
@@ -384,9 +387,20 @@ export class NetworkManager {
     // so reconnects pick up the modifier without an extra round-trip.
     this._activeEvent = msg.activeEvent;
 
+    // Re-anchor the match clock from every active-phase snapshot. The
+    // initial anchor came from ServerMatchStartMessage; this corrects
+    // any drift between local extrapolation and the server's authoritative
+    // tick-driven matchTimer. The eventStart message is sent in the same
+    // tick as the gameState that crosses the threshold, so by the time
+    // the client renders the event, the timer display already reflects
+    // server-truth.
+    if (msg.phase === MatchPhase.ACTIVE) {
+      this.matchEndsAtLocalMs = performance.now() + msg.matchTimer * 1000;
+    }
+
     // matchStart is driven by the explicit ServerMatchStartMessage (which
-    // also carries the match clock), so this block only debounces and
-    // forwards per-second countdown emits for the 3/2/1/FIGHT overlay.
+    // also carries the music-start trigger), so this block only debounces
+    // and forwards per-second countdown emits for the 3/2/1/FIGHT overlay.
     if (msg.phase === MatchPhase.COUNTDOWN) {
       const countdownInt = Math.ceil(msg.countdownTimer);
       if (countdownInt !== this.lastCountdownEmitted) {

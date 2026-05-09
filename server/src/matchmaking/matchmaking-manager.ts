@@ -389,6 +389,7 @@ export class MatchmakingManager {
       tick: serverTick,
       phase: match.phase,
       countdownTimer: match.countdownTimer,
+      matchTimer: match.matchTimer,
       players,
       grenades: match.getActiveGrenades(),
       bulletTrails: match.getTickBulletTrails(),

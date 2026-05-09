@@ -63,11 +63,12 @@ export const RESPAWN = Object.freeze({
 export const MATCH = Object.freeze({
   KILL_TARGET: 10,
   /**
-   * Match length in seconds. Slightly longer than the gameplay music track
-   * (game-play.mp3, ~169s, looped) so the track loops once near the end of
-   * the round rather than ending in silence before the timer hits 0.
+   * Match length in seconds. Tuned to the gameplay music track
+   * (game-play.mp3, exactly 169s) so the track plays through once and
+   * ends at the same moment the timer hits 0:00 — no loop, no trailing
+   * silence. If the music asset changes length, change this too.
    */
-  TIME_LIMIT: 173,
+  TIME_LIMIT: 169,
   COUNTDOWN_DURATION: 3,
 });
 

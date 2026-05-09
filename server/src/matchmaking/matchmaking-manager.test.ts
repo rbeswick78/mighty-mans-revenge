@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { MatchPhase } from '@shared/game';
+import { MatchPhase, MATCH, EVENT } from '@shared/game';
 import type { PlayerId, ServerMessage } from '@shared/game';
 import { MatchmakingManager } from './matchmaking-manager.js';
 import type { GameServer } from '../network/server.js';
@@ -123,6 +123,92 @@ describe('MatchmakingManager rematch flow', () => {
       }));
     } finally {
       vi.useRealTimers();
+    }
+  });
+});
+
+describe('match clock alignment (regression: 3-second event/timer offset)', () => {
+  it('matchEndsInMs equals the wall-clock time between matchStart broadcast and eventStart broadcast', () => {
+    process.env.FORCE_EVENT = 'infinite_ammo';
+    try {
+      const { fake, sent } = makeFakeServer();
+      const mgr = new MatchmakingManager(fake);
+      const dt = 0.05;
+
+      mgr.handleJoinMatchmaking('A', 'A');
+      mgr.handleJoinMatchmaking('B', 'B');
+      expect(mgr.getActiveMatches()).toHaveLength(1);
+
+      let matchStartTick = -1;
+      let matchEndsInMsValue = 0;
+      let eventStartTick = -1;
+      const totalTicks = Math.ceil(
+        (MATCH.COUNTDOWN_DURATION + MATCH.TIME_LIMIT - EVENT.ACTIVATION_AT_REMAINING + 1) / dt,
+      );
+
+      for (let i = 1; i <= totalTicks; i++) {
+        mgr.tick(dt, i);
+        for (const s of sent) {
+          if (s.message.type === 'server:matchStart' && matchStartTick === -1) {
+            matchStartTick = i;
+            matchEndsInMsValue = s.message.matchEndsInMs;
+          }
+          if (s.message.type === 'server:eventStart' && eventStartTick === -1) {
+            eventStartTick = i;
+          }
+        }
+        sent.length = 0;
+      }
+
+      expect(matchStartTick).toBeGreaterThan(0);
+      expect(eventStartTick).toBeGreaterThan(0);
+
+      // Wall-clock ms between matchStart and eventStart on the server.
+      const elapsedMs = (eventStartTick - matchStartTick) * dt * 1000;
+
+      // The client computes display = matchEndsInMs - elapsedMs. For the
+      // displayed timer to read ~ACTIVATION_AT_REMAINING when eventStart
+      // fires, matchEndsInMs - elapsedMs must equal ACTIVATION_AT_REMAINING * 1000.
+      const displayAtEventMs = matchEndsInMsValue - elapsedMs;
+      const displayAtEvent = displayAtEventMs / 1000;
+
+      // Allow a 1-tick (50ms) tolerance for tick discretization.
+      expect(displayAtEvent).toBeGreaterThan(EVENT.ACTIVATION_AT_REMAINING - 0.06);
+      expect(displayAtEvent).toBeLessThan(EVENT.ACTIVATION_AT_REMAINING + 0.06);
+    } finally {
+      delete process.env.FORCE_EVENT;
+    }
+  });
+
+  it('every active-phase gameState carries the authoritative matchTimer for client re-anchoring', () => {
+    const { fake, sent } = makeFakeServer();
+    const mgr = new MatchmakingManager(fake);
+    const dt = 0.05;
+
+    mgr.handleJoinMatchmaking('A', 'A');
+    mgr.handleJoinMatchmaking('B', 'B');
+
+    // Run through the countdown plus a handful of active ticks.
+    const totalTicks = Math.ceil(MATCH.COUNTDOWN_DURATION / dt) + 20;
+    for (let i = 1; i <= totalTicks; i++) {
+      mgr.tick(dt, i);
+    }
+
+    const activeStateMessages = sent.filter(
+      (s) => s.message.type === 'server:gameState' && s.message.phase === MatchPhase.ACTIVE,
+    );
+    expect(activeStateMessages.length).toBeGreaterThan(0);
+
+    // Each active snapshot must carry a sane matchTimer (descending toward 0,
+    // never larger than TIME_LIMIT). The first one should be very close to
+    // TIME_LIMIT; the last one should be smaller; all should be <= TIME_LIMIT.
+    let prev = Number.POSITIVE_INFINITY;
+    for (const m of activeStateMessages) {
+      if (m.message.type !== 'server:gameState') throw new Error('unreachable');
+      expect(m.message.matchTimer).toBeLessThanOrEqual(MATCH.TIME_LIMIT);
+      expect(m.message.matchTimer).toBeLessThanOrEqual(prev + 1e-6);
+      expect(m.message.matchTimer).toBeGreaterThanOrEqual(0);
+      prev = m.message.matchTimer;
     }
   });
 });
