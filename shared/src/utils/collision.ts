@@ -85,10 +85,20 @@ export function raycastAgainstGrid(
   startY: number,
   angle: number,
   maxDistance: number,
+  ignoreSolids: boolean = false,
 ): RaycastResult {
   const dirX = Math.cos(angle);
   const dirY = Math.sin(angle);
   const ts = grid.tileSize;
+
+  if (ignoreSolids) {
+    return {
+      hitX: startX + dirX * maxDistance,
+      hitY: startY + dirY * maxDistance,
+      distance: maxDistance,
+      hitTile: false,
+    };
+  }
 
   // Current tile position
   let tileX = Math.floor(startX / ts);

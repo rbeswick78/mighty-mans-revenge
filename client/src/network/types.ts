@@ -35,4 +35,6 @@ export interface InterpolatedState {
   score: number;
   deaths: number;
   nickname: string;
+  abilityActiveSeconds: number;
+  abilityCooldownSeconds: number;
 }

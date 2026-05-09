@@ -115,6 +115,39 @@ export const MAP = Object.freeze({
 });
 
 /**
+ * Per-character active abilities, triggered by the spacebar / on-screen
+ * ability button. See server/src/game/match.ts for the state machine and
+ * client/src/scenes/game-scene.ts for VFX wiring.
+ *
+ * Cooldown semantics:
+ *   - Bruce: cooldown begins at activation. Total cycle = COOLDOWN seconds.
+ *     The 1.2s breath plays out within that window.
+ *   - Mighty Man: cooldown begins when the active window ends. Total cycle =
+ *     DURATION + COOLDOWN. Death cancels the active window early; cooldown
+ *     starts at the death moment in that case.
+ */
+export const ABILITY = Object.freeze({
+  BRUCE_FIRE_BREATH: {
+    DURATION: 1.2,
+    COOLDOWN: 45,
+    /** Reach in tiles. 4 * TILE_SIZE = 192px. */
+    RANGE_TILES: 4,
+    /** Inside this band the breath does CLOSE_DAMAGE; beyond it FAR_DAMAGE. */
+    CLOSE_RANGE_TILES: 2,
+    /** One-shot from full HP at 100/100. */
+    CLOSE_DAMAGE: 100,
+    /** Heavy chip outside the close band; not lethal alone from full HP. */
+    FAR_DAMAGE: 70,
+    /** Segment thickness in pixels — gives the breath some hit forgiveness. */
+    WIDTH: 14,
+  },
+  MIGHTY_MAN_XRAY: {
+    DURATION: 7,
+    COOLDOWN: 30,
+  },
+});
+
+/**
  * Character roster. Frame dimensions are sourced from the actual sprite
  * sheets shipped under `client/public/assets/{assetFolder}/`. Each sheet
  * is 6 frames laid horizontally (sheet width = w * 6).

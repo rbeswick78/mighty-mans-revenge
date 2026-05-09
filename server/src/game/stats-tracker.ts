@@ -30,7 +30,7 @@ export class StatsTracker {
     s.shotsHit++;
   }
 
-  recordKill(killerId: PlayerId, _victimId: PlayerId, weapon: 'gun' | 'grenade'): void {
+  recordKill(killerId: PlayerId, _victimId: PlayerId, weapon: 'gun' | 'grenade' | 'fire'): void {
     const s = this.getStatsOrThrow(killerId);
     s.kills++;
 

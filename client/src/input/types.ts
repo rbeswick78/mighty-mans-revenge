@@ -14,4 +14,6 @@ export interface RawInput {
   detonatePressed: boolean;
   sprint: boolean;
   reload: boolean;
+  /** Spacebar / on-screen ability button — pressed-edge for this tick. */
+  abilityPressed: boolean;
 }

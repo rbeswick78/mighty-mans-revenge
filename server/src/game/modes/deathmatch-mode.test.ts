@@ -28,6 +28,9 @@ function makePlayer(id: PlayerId, score = 0, deaths = 0): PlayerState {
     lastProcessedInput: 0,
     score,
     deaths,
+    abilityActiveSeconds: 0,
+    abilityCooldownSeconds: 0,
+    abilityLockedAim: 0,
   };
 }
 

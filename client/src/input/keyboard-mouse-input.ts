@@ -16,6 +16,7 @@ export class KeyboardMouseInput {
     D: Phaser.Input.Keyboard.Key;
     SHIFT: Phaser.Input.Keyboard.Key;
     R: Phaser.Input.Keyboard.Key;
+    SPACE: Phaser.Input.Keyboard.Key;
   };
   private pointer: Phaser.Input.Pointer;
   private canvas: HTMLCanvasElement;
@@ -47,7 +48,10 @@ export class KeyboardMouseInput {
       D: scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D),
       SHIFT: scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT),
       R: scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R),
+      SPACE: scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE),
     };
+    // Don't let the spacebar scroll the page when the canvas has focus.
+    scene.input.keyboard.addCapture(Phaser.Input.Keyboard.KeyCodes.SPACE);
 
     this.pointer = scene.input.mousePointer ?? scene.input.activePointer;
 
@@ -153,6 +157,7 @@ export class KeyboardMouseInput {
       detonatePressed,
       sprint: this.keys.SHIFT.isDown,
       reload: Phaser.Input.Keyboard.JustDown(this.keys.R),
+      abilityPressed: Phaser.Input.Keyboard.JustDown(this.keys.SPACE),
     };
   }
 
@@ -167,6 +172,8 @@ export class KeyboardMouseInput {
       this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.D);
       this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
       this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.R);
+      this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+      this.scene.input.keyboard.removeCapture(Phaser.Input.Keyboard.KeyCodes.SPACE);
     }
   }
 }

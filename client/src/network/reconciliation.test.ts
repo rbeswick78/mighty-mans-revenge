@@ -27,6 +27,9 @@ function makePlayerState(overrides: Partial<PlayerState> = {}): PlayerState {
     score: 0,
     deaths: 0,
     nickname: 'Player',
+    abilityActiveSeconds: 0,
+    abilityCooldownSeconds: 0,
+    abilityLockedAim: 0,
     ...overrides,
   };
 }
@@ -54,6 +57,8 @@ function makeServerState(
     score: 0,
     deaths: 0,
     nickname: 'Player',
+    abilityActiveSeconds: 0,
+    abilityCooldownSeconds: 0,
     ...overrides,
   };
 }

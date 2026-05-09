@@ -150,6 +150,13 @@ export interface SerializedPlayerState {
   score: number;
   deaths: number;
   nickname: string;
+  /**
+   * Active ability state, broadcast so the client can render the HUD
+   * cooldown indicator and ability VFX (Bruce's fire cone, Mighty Man's
+   * x-ray tint and silhouettes). See ABILITY in shared/config/game.ts.
+   */
+  abilityActiveSeconds: number;
+  abilityCooldownSeconds: number;
 }
 
 export interface ServerMatchFoundMessage {

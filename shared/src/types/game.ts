@@ -37,7 +37,7 @@ export interface GameState {
 export interface KillFeedEntry {
   killerId: PlayerId;
   victimId: PlayerId;
-  weapon: 'gun' | 'grenade';
+  weapon: 'gun' | 'grenade' | 'fire';
   timestamp: number;
 }
 

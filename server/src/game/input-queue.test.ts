@@ -15,6 +15,7 @@ function makeInput(seq: number, overrides: Partial<PlayerInput> = {}): PlayerInp
     detonatePressed: false,
     sprint: false,
     reload: false,
+    abilityPressed: false,
     tick: 0,
     ...overrides,
   };

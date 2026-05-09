@@ -79,6 +79,7 @@ export class CombatManager {
     players: Map<PlayerId, PlayerState>,
     grid: CollisionGrid,
     rewindStates?: Map<PlayerId, PlayerState>,
+    piercing: boolean = false,
   ): ShotResult {
     const shooter = (rewindStates ?? players).get(shooterId) ?? players.get(shooterId);
     if (!shooter) {
@@ -97,9 +98,18 @@ export class CombatManager {
     const startPos = { x: shooter.position.x, y: shooter.position.y };
     const dir = vecFromAngle(aimAngle);
 
-    // Raycast against grid to find max distance (wall hit)
+    // Raycast against grid to find max distance (wall hit). When piercing
+    // is true (shot fired during Mighty Man's x-ray), walls are ignored so
+    // the bullet can hit a target through tiles.
     const maxRayDistance = GUN.FALLOFF_RANGE_MAX * 2; // extend past falloff for actual hits
-    const wallHit = raycastAgainstGrid(grid, startPos.x, startPos.y, aimAngle, maxRayDistance);
+    const wallHit = raycastAgainstGrid(
+      grid,
+      startPos.x,
+      startPos.y,
+      aimAngle,
+      maxRayDistance,
+      piercing,
+    );
     const wallDistance = wallHit.hitTile ? wallHit.distance : maxRayDistance;
 
     // Check all living, non-invulnerable, non-shooter players
@@ -167,7 +177,12 @@ export class CombatManager {
     };
   }
 
-  spawnGrenade(throwerId: PlayerId, position: Vec2, aimAngle: number): GrenadeState {
+  spawnGrenade(
+    throwerId: PlayerId,
+    position: Vec2,
+    aimAngle: number,
+    piercing: boolean = false,
+  ): GrenadeState {
     const velocity = vecScale(vecFromAngle(aimAngle), GRENADE.THROW_SPEED);
     const grenade: GrenadeState = {
       id: generateGrenadeId(),
@@ -175,6 +190,7 @@ export class CombatManager {
       velocity,
       safetyFuseTimer: GRENADE.SAFETY_FUSE,
       throwerId,
+      piercing,
     };
     this.grenades.push(grenade);
     return grenade;
@@ -267,7 +283,9 @@ export class CombatManager {
     for (const [playerId, playerState] of players) {
       if (playerState.isDead) continue;
       if (!isInBlastRadius(grenade.position, playerState.position)) continue;
-      if (!hasLineOfSight(grenade.position, playerState.position, grid)) continue;
+      // Piercing grenades (thrown during Mighty Man's x-ray) damage through
+      // walls — skip the LOS check.
+      if (!grenade.piercing && !hasLineOfSight(grenade.position, playerState.position, grid)) continue;
 
       const dist = vecDistance(grenade.position, playerState.position);
       const damage = calculateGrenadeDamage(dist);

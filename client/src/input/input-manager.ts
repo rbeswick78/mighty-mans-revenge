@@ -60,6 +60,7 @@ export class InputManager {
       detonatePressed: raw.detonatePressed,
       sprint: raw.sprint,
       reload: raw.reload,
+      abilityPressed: raw.abilityPressed,
       tick: currentTick,
     };
 

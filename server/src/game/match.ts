@@ -8,9 +8,12 @@ import {
   GRENADE,
   SERVER,
   EVENT,
+  ABILITY,
   CHARACTER_IDS,
+  MAP,
   calculateMovement,
   eventToMovementModifiers,
+  rayIntersectsAABB,
 } from '@shared/game';
 import type {
   PlayerId,
@@ -96,6 +99,14 @@ export class Match implements MatchContext {
   private inputQueues: Map<PlayerId, InputQueue> = new Map();
   /** Active 3-shot bursts in flight, keyed by player. */
   private pendingBursts: Map<PlayerId, PendingBurst> = new Map();
+  /**
+   * Per-cast set of victims a Bruce has already hit during the current
+   * fire-breath. Prevents double-tapping the same target across the
+   * sustained 1.2s window (close-band would otherwise re-kill at every
+   * tick and far-band would over-stack damage). Cleared when the active
+   * window ends (natural expiry, death, or new cast).
+   */
+  private abilityHitTargetsByPlayer: Map<PlayerId, Set<PlayerId>> = new Map();
   /** Timestamp when the match became ACTIVE, for duration tracking. */
   get matchStartTime(): number {
     return this._matchStartTimeMs;
@@ -339,7 +350,7 @@ export class Match implements MatchContext {
   }
 
   /** Record a kill event. */
-  onKill(killerId: PlayerId, victimId: PlayerId, weapon: 'gun' | 'grenade'): void {
+  onKill(killerId: PlayerId, victimId: PlayerId, weapon: 'gun' | 'grenade' | 'fire'): void {
     this.stats.recordKill(killerId, victimId, weapon);
     this.stats.recordDeath(victimId);
 
@@ -350,6 +361,7 @@ export class Match implements MatchContext {
       victim.isDead = true;
       victim.respawnTimer = RESPAWN.DELAY;
       victim.deaths++;
+      this.cancelActiveAbility(victim);
     }
 
     // Reward the killer with 50% of their max health (no overheal). Skip
@@ -547,6 +559,22 @@ export class Match implements MatchContext {
       const infiniteAmmo = this.activeEvent === 'infinite_ammo';
 
       for (const input of inputs) {
+        // Spacebar / ability button: try to activate before everything else
+        // so the Bruce-locked check below picks up the just-activated state.
+        if (input.abilityPressed) {
+          this.tryActivateAbility(player, input.aimAngle);
+        }
+
+        // While Bruce is breathing fire he is committed: aim, position, and
+        // all combat actions are pinned. Just consume the input and move on
+        // so the client's sequence ack still advances.
+        const isBruceLocked =
+          player.characterId === 'bruce' && player.abilityActiveSeconds > 0;
+        if (isBruceLocked) {
+          player.lastProcessedInput = input.sequenceNumber;
+          continue;
+        }
+
         // Movement. Each client input represents one fixed simulation tick,
         // so replay queued inputs one at a time with the server tick dt.
         const result = calculateMovement(
@@ -604,7 +632,17 @@ export class Match implements MatchContext {
           player.grenades > 0 &&
           !this.combatManager.getActiveGrenadeFor(playerId)
         ) {
-          this.combatManager.spawnGrenade(playerId, player.position, input.aimAngle);
+          // Piercing stamps at throw-time and persists for the grenade's
+          // lifetime — physics skip wall-bounce and the explosion damages
+          // through walls.
+          const grenadePiercing =
+            player.characterId === 'mighty_man' && player.abilityActiveSeconds > 0;
+          this.combatManager.spawnGrenade(
+            playerId,
+            player.position,
+            input.aimAngle,
+            grenadePiercing,
+          );
           player.grenades -= 1;
           this.stats.recordGrenade(playerId);
         }
@@ -626,6 +664,14 @@ export class Match implements MatchContext {
 
     // Advance any pending bursts.
     this.advanceBursts(dt, grid);
+
+    // Bruce's fire-breath: per-tick segment hit check while abilityActiveSeconds
+    // > 0. Runs BEFORE tickAbilities so the activation tick fires once before
+    // the first decrement.
+    this.tickFireBreath();
+
+    // Decrement ability active/cooldown timers for all players.
+    this.tickAbilities(dt);
 
     // Update grenades (movement + safety fuse + explosions)
     const { explosions } = this.combatManager.updateGrenades(dt, this.players, grid);
@@ -768,12 +814,17 @@ export class Match implements MatchContext {
     // of 0 collapses to a normal processShot, so unit tests with no RTT
     // resolver behave identically to the pre-lag-comp path.
     const rtt = this.rttForShooter(playerId);
+    // Piercing is evaluated at fire-time per shot. Stickiness for in-flight
+    // bullets is automatic — each shot's outcome is computed when fired.
+    const piercing =
+      player.characterId === 'mighty_man' && player.abilityActiveSeconds > 0;
     const shot = this.lagCompensator.processShootWithRewind(
       playerId,
       aimAngle,
       this.players,
       grid,
       rtt,
+      piercing,
     );
     this.tickBulletTrails.push(shot.trail);
     if (this.activeEvent !== 'infinite_ammo') {
@@ -820,6 +871,7 @@ export class Match implements MatchContext {
             victim.respawnTimer = RESPAWN.DELAY;
             victim.deaths++;
             this.pendingBursts.delete(dmg.playerId);
+            this.cancelActiveAbility(victim);
           }
         }
       }
@@ -879,6 +931,9 @@ export class Match implements MatchContext {
       lastProcessedInput: 0,
       score: 0,
       deaths: 0,
+      abilityActiveSeconds: 0,
+      abilityCooldownSeconds: 0,
+      abilityLockedAim: 0,
     };
   }
 
@@ -959,6 +1014,143 @@ export class Match implements MatchContext {
           }
         }
         return;
+    }
+  }
+
+  // ──────────────────────────── Abilities ────────────────────────────
+
+  /**
+   * Try to activate the player's character-specific ability. No-op if the
+   * player is dead, has no character locked yet, is already mid-cast, or is
+   * still cooling down. Both characters store the activation aim angle so
+   * Bruce's locked breath direction is stable and Mighty Man's HUD has a
+   * known reference for VFX placement.
+   *
+   * Cooldown anchors:
+   *   Bruce — 45s cycle from activation. Set cooldown = COOLDOWN; both
+   *     timers tick simultaneously, the 1.2s active overlaps the first
+   *     1.2s of the cooldown.
+   *   Mighty Man — 30s cooldown begins AFTER the 7s active window. Set
+   *     cooldown = DURATION + COOLDOWN so it expires at the right moment.
+   */
+  private tryActivateAbility(player: PlayerState, aimAngle: number): void {
+    if (player.isDead) return;
+    if (!player.characterId) return;
+    if (player.abilityActiveSeconds > 0) return;
+    if (player.abilityCooldownSeconds > 0) return;
+
+    player.abilityLockedAim = aimAngle;
+
+    if (player.characterId === 'bruce') {
+      player.abilityActiveSeconds = ABILITY.BRUCE_FIRE_BREATH.DURATION;
+      player.abilityCooldownSeconds = ABILITY.BRUCE_FIRE_BREATH.COOLDOWN;
+      // Pin aim so the breath cone fires along the activation direction.
+      player.aimAngle = aimAngle;
+      // Fresh per-cast hit-set so a previous cast's hits don't leak in.
+      this.abilityHitTargetsByPlayer.set(player.id, new Set());
+    } else if (player.characterId === 'mighty_man') {
+      player.abilityActiveSeconds = ABILITY.MIGHTY_MAN_XRAY.DURATION;
+      player.abilityCooldownSeconds =
+        ABILITY.MIGHTY_MAN_XRAY.DURATION + ABILITY.MIGHTY_MAN_XRAY.COOLDOWN;
+    }
+  }
+
+  /**
+   * Cancel an active ability — used on death. The active window ends
+   * immediately. For Mighty Man, the 30s cooldown is reset to start from
+   * "now" (death moment) per the design Q&A; for Bruce, the cooldown was
+   * set at activation and is already running, so we leave it untouched
+   * (continues through respawn).
+   */
+  private cancelActiveAbility(player: PlayerState): void {
+    if (player.abilityActiveSeconds <= 0) return;
+    player.abilityActiveSeconds = 0;
+    if (player.characterId === 'mighty_man') {
+      player.abilityCooldownSeconds = ABILITY.MIGHTY_MAN_XRAY.COOLDOWN;
+    }
+    this.abilityHitTargetsByPlayer.delete(player.id);
+  }
+
+  /** Decrement active and cooldown timers for every player. */
+  private tickAbilities(dt: number): void {
+    for (const player of this.players.values()) {
+      if (player.abilityActiveSeconds > 0) {
+        player.abilityActiveSeconds = Math.max(0, player.abilityActiveSeconds - dt);
+        if (player.abilityActiveSeconds <= 0) {
+          // Natural expiry — clear the per-cast hit-set so the next cast
+          // starts fresh.
+          this.abilityHitTargetsByPlayer.delete(player.id);
+        }
+      }
+      if (player.abilityCooldownSeconds > 0) {
+        player.abilityCooldownSeconds = Math.max(0, player.abilityCooldownSeconds - dt);
+      }
+    }
+  }
+
+  /**
+   * Per-tick fire-breath hit check for every Bruce currently breathing.
+   * Sweeps a fat ray (the player hitbox is inflated by half the breath
+   * width) from Bruce's locked position along his locked aim, capped at
+   * RANGE_TILES. Damage tier is decided by the distance to the victim's
+   * center: <= CLOSE_RANGE_TILES does CLOSE_DAMAGE (one-shot from full HP),
+   * beyond that does FAR_DAMAGE (heavy chip). Each victim can only be hit
+   * once per cast — the per-player hit-set guards against per-tick
+   * re-application across the sustained 1.2s window.
+   */
+  private tickFireBreath(): void {
+    const range = ABILITY.BRUCE_FIRE_BREATH.RANGE_TILES * MAP.TILE_SIZE;
+    const closeRange = ABILITY.BRUCE_FIRE_BREATH.CLOSE_RANGE_TILES * MAP.TILE_SIZE;
+    const halfW = PLAYER.HITBOX_WIDTH / 2 + ABILITY.BRUCE_FIRE_BREATH.WIDTH / 2;
+    const halfH = PLAYER.HITBOX_HEIGHT / 2 + ABILITY.BRUCE_FIRE_BREATH.WIDTH / 2;
+
+    for (const [playerId, player] of this.players) {
+      if (player.characterId !== 'bruce') continue;
+      if (player.abilityActiveSeconds <= 0) continue;
+      if (player.isDead) continue;
+
+      let hitSet = this.abilityHitTargetsByPlayer.get(playerId);
+      if (!hitSet) {
+        hitSet = new Set();
+        this.abilityHitTargetsByPlayer.set(playerId, hitSet);
+      }
+
+      const dirX = Math.cos(player.abilityLockedAim);
+      const dirY = Math.sin(player.abilityLockedAim);
+
+      for (const [otherId, other] of this.players) {
+        if (otherId === playerId) continue;
+        if (other.isDead) continue;
+        if (other.invulnerableTimer > 0) continue;
+        if (hitSet.has(otherId)) continue;
+
+        const hitDist = rayIntersectsAABB(
+          player.position.x,
+          player.position.y,
+          dirX,
+          dirY,
+          other.position.x,
+          other.position.y,
+          halfW,
+          halfH,
+        );
+        if (hitDist === null || hitDist <= 0 || hitDist > range) continue;
+
+        const dx = other.position.x - player.position.x;
+        const dy = other.position.y - player.position.y;
+        const centerDist = Math.sqrt(dx * dx + dy * dy);
+        const damage =
+          centerDist <= closeRange
+            ? ABILITY.BRUCE_FIRE_BREATH.CLOSE_DAMAGE
+            : ABILITY.BRUCE_FIRE_BREATH.FAR_DAMAGE;
+
+        const result = this.combatManager.applyDamage(other, damage, playerId);
+        hitSet.add(otherId);
+        this.stats.recordDamage(playerId, damage);
+        if (result.killed) {
+          this.onKill(playerId, otherId, 'fire');
+        }
+      }
     }
   }
 }

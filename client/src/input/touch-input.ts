@@ -13,11 +13,18 @@ const BASE_RADIUS = 50;
 const THUMB_RADIUS = 24;
 const GRENADE_BUTTON_SIZE = 40;
 const GRENADE_BUTTON_MARGIN = 16;
+const ABILITY_BUTTON_SIZE = 40;
+/** Vertical gap between the grenade button (above) and the ability button. */
+const ABILITY_BUTTON_GAP = 12;
 
 const GRENADE_AIM_COLOR = Wasteland.GRENADE_AIM;
 const GRENADE_DETONATE_COLOR = Wasteland.GRENADE_DETONATE;
 const GRENADE_AIM_ALPHA = 0.5;
 const GRENADE_DETONATE_ALPHA = 0.85;
+/** Cyan-ish ready color for the ability button (matches the x-ray VFX hue). */
+const ABILITY_READY_COLOR = 0x4ad8e8;
+const ABILITY_DIM_COLOR = 0x55667a;
+const ABILITY_BUTTON_ALPHA = 0.55;
 
 interface VirtualJoystick {
   active: boolean;
@@ -47,6 +54,11 @@ export class TouchInput {
   private grenadeButtonReleasedFlag = false;
   /** True if a live grenade existed at the moment the button was pressed. */
   private grenadeButtonPressedWhileLive = false;
+  /** Character ability button (spacebar equivalent) — sits below the grenade button. */
+  private abilityButton: Phaser.GameObjects.Arc;
+  private abilityButtonText: Phaser.GameObjects.Text;
+  /** Set on the frame the ability button is pressed; cleared on read. */
+  private abilityButtonPressedFlag = false;
   /** Set on the frame the right joystick is released or dropped into deadzone. */
   private rightStickReleasedFlag = false;
   private sprintActive = false;
@@ -96,6 +108,30 @@ export class TouchInput {
       this.grenadeButtonDown = false;
     });
 
+    // Ability button — sits directly below the grenade button.
+    const abilityX = btnX;
+    const abilityY = btnY + GRENADE_BUTTON_SIZE + ABILITY_BUTTON_GAP + ABILITY_BUTTON_SIZE;
+
+    this.abilityButton = scene.add.circle(abilityX, abilityY, ABILITY_BUTTON_SIZE, ABILITY_READY_COLOR, ABILITY_BUTTON_ALPHA);
+    this.abilityButton.setScrollFactor(0);
+    this.abilityButton.setDepth(3000);
+    this.abilityButton.setVisible(false);
+
+    this.abilityButtonText = scene.add.text(abilityX, abilityY, 'A', {
+      fontFamily: 'Courier, monospace',
+      fontSize: '18px',
+      color: cssHex(Wasteland.TEXT_PRIMARY),
+      fontStyle: 'bold',
+    });
+    this.abilityButtonText.setOrigin(0.5, 0.5);
+    this.abilityButtonText.setScrollFactor(0);
+    this.abilityButtonText.setDepth(3001);
+    this.abilityButtonText.setVisible(false);
+
+    this.abilityButton.on('pointerdown', () => {
+      this.abilityButtonPressedFlag = true;
+    });
+
     scene.input.on('pointerdown', this.onPointerDown, this);
     scene.input.on('pointermove', this.onPointerMove, this);
     scene.input.on('pointerup', this.onPointerUp, this);
@@ -106,6 +142,9 @@ export class TouchInput {
     this.grenadeButton.setVisible(true);
     this.grenadeButtonText.setVisible(true);
     this.grenadeButton.setInteractive();
+    this.abilityButton.setVisible(true);
+    this.abilityButtonText.setVisible(true);
+    this.abilityButton.setInteractive();
   }
 
   private createJoystick(): VirtualJoystick {
@@ -291,6 +330,9 @@ export class TouchInput {
     // Detonate fires on press only if a grenade was already live.
     const detonatePressed = grenadePressed && hasActiveGrenade;
 
+    const abilityPressed = this.abilityButtonPressedFlag;
+    this.abilityButtonPressedFlag = false;
+
     return {
       moveX: moveVec.x,
       moveY: moveVec.y,
@@ -302,7 +344,24 @@ export class TouchInput {
       detonatePressed,
       sprint: this.sprintActive,
       reload: false, // Auto-reload on mobile; no explicit button.
+      abilityPressed,
     };
+  }
+
+  /**
+   * Tint the ability button based on cooldown / active state. Called by the
+   * scene each frame from the local player's snapshot. Visible-state only —
+   * input still goes through regardless of color so the server has final say.
+   */
+  setAbilityButtonState(state: 'ready' | 'active' | 'cooldown'): void {
+    if (!this.abilityButton.visible) return;
+    if (state === 'ready') {
+      this.abilityButton.setFillStyle(ABILITY_READY_COLOR, ABILITY_BUTTON_ALPHA);
+    } else if (state === 'active') {
+      this.abilityButton.setFillStyle(ABILITY_READY_COLOR, 0.85);
+    } else {
+      this.abilityButton.setFillStyle(ABILITY_DIM_COLOR, ABILITY_BUTTON_ALPHA);
+    }
   }
 
   destroy(): void {
@@ -316,5 +375,7 @@ export class TouchInput {
     this.rightJoystick.thumbCircle.destroy();
     this.grenadeButton.destroy();
     this.grenadeButtonText.destroy();
+    this.abilityButton.destroy();
+    this.abilityButtonText.destroy();
   }
 }

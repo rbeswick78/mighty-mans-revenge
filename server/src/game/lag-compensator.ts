@@ -31,6 +31,7 @@ export class LagCompensator {
     currentPlayers: Map<PlayerId, PlayerState>,
     grid: CollisionGrid,
     rtt: number,
+    piercing: boolean = false,
   ): ShotResult {
     const currentTime = Date.now();
     const renderTime = currentTime - rtt / 2;
@@ -44,6 +45,8 @@ export class LagCompensator {
         aimAngle,
         currentPlayers,
         grid,
+        undefined,
+        piercing,
       );
     }
 
@@ -76,6 +79,7 @@ export class LagCompensator {
       currentPlayers,
       grid,
       hybridPlayers,
+      piercing,
     );
   }
 

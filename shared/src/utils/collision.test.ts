@@ -288,6 +288,23 @@ describe('raycastAgainstGrid', () => {
     expect(result.hitTile).toBe(true);
     expect(result.hitY).toBeCloseTo(48, 0);
   });
+
+  describe('ignoreSolids (Mighty Man x-ray piercing)', () => {
+    it('walks past a wall when ignoreSolids is true', () => {
+      // Same wall as the rightward test, but with ignoreSolids — the ray
+      // should report no tile hit and return at max distance.
+      const result = raycastAgainstGrid(grid, 120, 120, 0, 500, true);
+      expect(result.hitTile).toBe(false);
+      expect(result.distance).toBeCloseTo(500, 5);
+      expect(result.hitX).toBeCloseTo(120 + 500, 5);
+    });
+
+    it('default (ignoreSolids omitted) preserves the wall-blocked behavior', () => {
+      const result = raycastAgainstGrid(grid, 120, 120, 0, 500);
+      expect(result.hitTile).toBe(true);
+      expect(result.distance).toBeLessThan(500);
+    });
+  });
 });
 
 describe('getCollidingTiles', () => {

@@ -4,6 +4,12 @@ import { Vec2 } from '../types/common.js';
 export interface GrenadeKinematics {
   position: Vec2;
   velocity: Vec2;
+  /**
+   * When true, wall-bounce is disabled — the grenade flies in a straight
+   * line through tiles. Set on grenades thrown during Mighty Man's x-ray
+   * vision; left undefined / false everywhere else.
+   */
+  piercing?: boolean;
 }
 
 /**
@@ -19,6 +25,12 @@ export function stepGrenade<T extends GrenadeKinematics>(
   dt: number,
   grid: CollisionGrid,
 ): T {
+  if (grenade.piercing) {
+    grenade.position.x = grenade.position.x + grenade.velocity.x * dt;
+    grenade.position.y = grenade.position.y + grenade.velocity.y * dt;
+    return grenade;
+  }
+
   const newX = grenade.position.x + grenade.velocity.x * dt;
   const newY = grenade.position.y + grenade.velocity.y * dt;
 

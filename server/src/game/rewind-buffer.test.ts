@@ -30,6 +30,9 @@ function createPlayer(overrides: Partial<PlayerState> & { id: PlayerId }): Playe
     score: 0,
     deaths: 0,
     nickname: 'test',
+    abilityActiveSeconds: 0,
+    abilityCooldownSeconds: 0,
+    abilityLockedAim: 0,
     ...overrides,
   };
 }

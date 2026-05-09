@@ -33,6 +33,24 @@ export interface PlayerState {
   score: number;
   deaths: number;
   nickname: string;
+  /**
+   * Per-character active ability state. See ABILITY in shared/config/game.ts
+   * for tunables and server/src/game/match.ts for the state machine.
+   *
+   *   abilityActiveSeconds > 0: ability is firing right now (Bruce breathing,
+   *     Mighty Man's x-ray window). Counts down each tick.
+   *   abilityCooldownSeconds > 0: ability is on cooldown. Counts down each
+   *     tick; only ticks while abilityActiveSeconds <= 0.
+   *
+   * For Bruce: aim and movement are pinned during the active window —
+   * abilityLockedAim captures the aim angle at activation and the server
+   * ignores subsequent aim/move input updates. The per-cast hit set
+   * (preventing double-tap on a single victim during one breath) is held
+   * server-side on Match, not on this shared PlayerState.
+   */
+  abilityActiveSeconds: number;
+  abilityCooldownSeconds: number;
+  abilityLockedAim: number;
 }
 
 export interface PlayerInput {
@@ -61,6 +79,11 @@ export interface PlayerInput {
   detonatePressed: boolean;
   sprint: boolean;
   reload: boolean;
+  /**
+   * Spacebar / ability-button pressed-edge this tick. Activates the player's
+   * character-specific ability if it's off cooldown and not currently active.
+   */
+  abilityPressed: boolean;
   tick: Tick;
 }
 

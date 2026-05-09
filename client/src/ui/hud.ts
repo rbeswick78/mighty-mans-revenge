@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import { GUN } from '@shared/config/game.js';
+import { GUN, ABILITY } from '@shared/config/game.js';
+import type { CharacterId } from '@shared/config/game.js';
 import { Wasteland, cssHex, healthColor } from '@shared/config/palette.js';
 import { HUD_STRIP_HEIGHT, MAP_HEIGHT_PX, MAP_WIDTH_PX } from './layout.js';
 
@@ -54,6 +55,16 @@ export class HUD {
 
   // Persistent active-event label, shown next to the timer.
   private activeEventLabel: Phaser.GameObjects.Text;
+
+  // Ability indicator (left column, near the grenade row): icon + radial
+  // sweep cooldown overlay + numeric countdown.
+  private abilityBg: Phaser.GameObjects.Arc;
+  private abilityIconText: Phaser.GameObjects.Text;
+  private abilityCountdownText: Phaser.GameObjects.Text;
+  private abilitySweep: Phaser.GameObjects.Graphics;
+  private abilityCenterX: number = 0;
+  private abilityCenterY: number = 0;
+  private abilityRadius: number = 0;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -134,6 +145,57 @@ export class HUD {
     });
     this.grenadeText.setScrollFactor(0);
     this.grenadeText.setDepth(1000);
+
+    // --- Ability indicator: themed icon + radial sweep cooldown ---
+    this.abilityRadius = 18;
+    this.abilityCenterX = hbX + hbW + 36;
+    this.abilityCenterY = hbY + this.abilityRadius;
+
+    this.abilityBg = scene.add.circle(
+      this.abilityCenterX,
+      this.abilityCenterY,
+      this.abilityRadius,
+      Wasteland.HUD_STRIP_BG,
+      0.85,
+    );
+    this.abilityBg.setStrokeStyle(2, 0x55667a, 1);
+    this.abilityBg.setScrollFactor(0);
+    this.abilityBg.setDepth(1000);
+    this.abilityBg.setVisible(false);
+
+    this.abilityIconText = scene.add.text(
+      this.abilityCenterX,
+      this.abilityCenterY,
+      '',
+      {
+        fontFamily: 'Courier, monospace',
+        fontSize: '16px',
+        fontStyle: 'bold',
+        color: cssHex(Wasteland.TEXT_PRIMARY),
+      },
+    );
+    this.abilityIconText.setOrigin(0.5, 0.5);
+    this.abilityIconText.setScrollFactor(0);
+    this.abilityIconText.setDepth(1002);
+    this.abilityIconText.setVisible(false);
+
+    this.abilitySweep = scene.add.graphics();
+    this.abilitySweep.setScrollFactor(0);
+    this.abilitySweep.setDepth(1001);
+
+    this.abilityCountdownText = scene.add.text(
+      this.abilityCenterX,
+      this.abilityCenterY + this.abilityRadius + 6,
+      '',
+      {
+        ...FONT_STYLE,
+        fontSize: '11px',
+      },
+    );
+    this.abilityCountdownText.setOrigin(0.5, 0);
+    this.abilityCountdownText.setScrollFactor(0);
+    this.abilityCountdownText.setDepth(1002);
+    this.abilityCountdownText.setVisible(false);
 
     // --- Middle column: score + timer ---
     const middleX = MAP_WIDTH_PX / 2;
@@ -369,6 +431,96 @@ export class HUD {
   }
 
   /**
+   * Update the per-character ability indicator. Pass null/undefined character
+   * before COUNTDOWN to hide it.
+   *
+   *   ready    — icon glows, no sweep, blank countdown
+   *   active   — icon pulses, sweep shows shrinking active fraction (cyan),
+   *              countdown shows ceil(active seconds)
+   *   cooldown — icon dimmed, sweep shows shrinking cooldown fraction (red),
+   *              countdown shows ceil(cooldown seconds)
+   */
+  updateAbility(
+    characterId: CharacterId | null,
+    activeSeconds: number,
+    cooldownSeconds: number,
+  ): void {
+    if (!characterId) {
+      this.abilityBg.setVisible(false);
+      this.abilityIconText.setVisible(false);
+      this.abilityCountdownText.setVisible(false);
+      this.abilitySweep.clear();
+      return;
+    }
+
+    const isBruce = characterId === 'bruce';
+    const icon = isBruce ? '\u{1F525}' : 'X'; // flame glyph or X for x-ray
+    const totalCycle = isBruce
+      ? ABILITY.BRUCE_FIRE_BREATH.COOLDOWN
+      : ABILITY.MIGHTY_MAN_XRAY.DURATION + ABILITY.MIGHTY_MAN_XRAY.COOLDOWN;
+    const activeDuration = isBruce
+      ? ABILITY.BRUCE_FIRE_BREATH.DURATION
+      : ABILITY.MIGHTY_MAN_XRAY.DURATION;
+
+    this.abilityBg.setVisible(true);
+    this.abilityIconText.setVisible(true);
+    this.abilityIconText.setText(icon);
+
+    // Pick state.
+    const isActive = activeSeconds > 0;
+    const isCoolingDown = !isActive && cooldownSeconds > 0;
+
+    let strokeColor: number;
+    let bgAlpha: number;
+    let sweepColor: number;
+    let sweepFraction: number; // 0–1, the slice we draw
+    let countdownText: string;
+
+    if (isActive) {
+      strokeColor = 0x4ad8e8;
+      bgAlpha = 0.95;
+      sweepColor = 0x4ad8e8;
+      sweepFraction = activeSeconds / activeDuration;
+      countdownText = `${Math.ceil(activeSeconds)}`;
+    } else if (isCoolingDown) {
+      strokeColor = 0x55667a;
+      bgAlpha = 0.6;
+      sweepColor = 0xc24545;
+      sweepFraction = cooldownSeconds / totalCycle;
+      countdownText = `${Math.ceil(cooldownSeconds)}`;
+    } else {
+      strokeColor = 0xfca72a;
+      bgAlpha = 0.95;
+      sweepColor = 0;
+      sweepFraction = 0;
+      countdownText = 'READY';
+    }
+
+    this.abilityBg.setStrokeStyle(2, strokeColor, 1);
+    this.abilityBg.setFillStyle(Wasteland.HUD_STRIP_BG, bgAlpha);
+    this.abilityIconText.setAlpha(isCoolingDown ? 0.5 : 1);
+    this.abilityCountdownText.setText(countdownText);
+    this.abilityCountdownText.setVisible(true);
+
+    this.abilitySweep.clear();
+    if (sweepFraction > 0) {
+      const start = -Math.PI / 2;
+      const end = start + sweepFraction * Math.PI * 2;
+      this.abilitySweep.lineStyle(3, sweepColor, 0.9);
+      this.abilitySweep.beginPath();
+      this.abilitySweep.arc(
+        this.abilityCenterX,
+        this.abilityCenterY,
+        this.abilityRadius + 3,
+        start,
+        end,
+        false,
+      );
+      this.abilitySweep.strokePath();
+    }
+  }
+
+  /**
    * Show / hide the persistent label that names the active final-minute
    * event next to the match timer. Pass null to hide.
    */
@@ -398,6 +550,10 @@ export class HUD {
     this.deathOverlay.destroy();
     this.eventBannerText.destroy();
     this.activeEventLabel.destroy();
+    this.abilityBg.destroy();
+    this.abilityIconText.destroy();
+    this.abilityCountdownText.destroy();
+    this.abilitySweep.destroy();
     for (const entry of this.killFeedEntries) {
       entry.timer.remove();
       entry.text.destroy();

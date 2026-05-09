@@ -43,6 +43,9 @@ function makePlayer(overrides: Partial<PlayerState> = {}): PlayerState {
     lastProcessedInput: 0,
     score: 0,
     deaths: 0,
+    abilityActiveSeconds: 0,
+    abilityCooldownSeconds: 0,
+    abilityLockedAim: 0,
     ...overrides,
   };
 }

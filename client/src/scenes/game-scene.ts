@@ -27,6 +27,8 @@ import type { EventStartPayload, EventWarningPayload } from '../services/game-se
 import { ImpactFx } from '../rendering/impact-fx.js';
 import { ExplosionFx } from '../rendering/explosion-fx.js';
 import { SmokeFx } from '../rendering/smoke-fx.js';
+import { FireBreathFx } from '../rendering/fire-breath-fx.js';
+import { XrayFx } from '../rendering/xray-fx.js';
 import { DecalRenderer } from '../rendering/decal-renderer.js';
 import { CameraKick } from '../rendering/camera-kick.js';
 import { ZoomPulse } from '../rendering/zoom-pulse.js';
@@ -86,6 +88,8 @@ export class GameScene extends Phaser.Scene {
   private impactFx: ImpactFx | null = null;
   private explosionFx: ExplosionFx | null = null;
   private smokeFx: SmokeFx | null = null;
+  private fireBreathFx: FireBreathFx | null = null;
+  private xrayFx: XrayFx | null = null;
   private decalRenderer: DecalRenderer | null = null;
   private cameraKick: CameraKick | null = null;
   private zoomPulse: ZoomPulse | null = null;
@@ -203,6 +207,8 @@ export class GameScene extends Phaser.Scene {
     this.impactFx = new ImpactFx(this);
     this.explosionFx = new ExplosionFx(this);
     this.smokeFx = new SmokeFx(this);
+    this.fireBreathFx = new FireBreathFx(this);
+    this.xrayFx = new XrayFx(this);
     this.shockwaveController = new ShockwaveController();
     this.cameraKick = new CameraKick();
     this.zoomPulse = new ZoomPulse();
@@ -349,6 +355,8 @@ export class GameScene extends Phaser.Scene {
           score: currentLocalState.score,
           deaths: currentLocalState.deaths,
           nickname: currentLocalState.nickname,
+          abilityActiveSeconds: currentLocalState.abilityActiveSeconds,
+          abilityCooldownSeconds: currentLocalState.abilityCooldownSeconds,
         }];
 
         // Add interpolated remote players
@@ -374,6 +382,8 @@ export class GameScene extends Phaser.Scene {
             score: interpState.score,
             deaths: interpState.deaths,
             nickname: interpState.nickname,
+            abilityActiveSeconds: interpState.abilityActiveSeconds,
+            abilityCooldownSeconds: interpState.abilityCooldownSeconds,
           });
         }
 
@@ -410,6 +420,14 @@ export class GameScene extends Phaser.Scene {
 
         this.playerManager.updatePlayers(allPlayers, playerId);
 
+        // Ability VFX. Fire-cone for any active Bruce; x-ray tint + opponent
+        // silhouettes for the local Mighty Man only.
+        const localSerialized =
+          allPlayers.find((p) => p.id === playerId) ?? null;
+        const collisionGrid = this.mapRenderer?.getCollisionGrid() ?? null;
+        this.fireBreathFx?.update(allPlayers, delta);
+        this.xrayFx?.update(localSerialized, allPlayers, collisionGrid);
+
         // Update HUD
         this.hud.updateHealth(currentLocalState.health, PLAYER.MAX_HEALTH);
         this.hud.updateAmmo(currentLocalState.ammo, 30, currentLocalState.isReloading);
@@ -419,6 +437,11 @@ export class GameScene extends Phaser.Scene {
         );
         this.hud.updateStamina(currentLocalState.stamina, PLAYER.SPRINT_DURATION);
         this.hud.updateDeathState(currentLocalState.isDead, currentLocalState.respawnTimer);
+        this.hud.updateAbility(
+          currentLocalState.characterId,
+          currentLocalState.abilityActiveSeconds,
+          currentLocalState.abilityCooldownSeconds,
+        );
 
         // Update scores — use actual opponent nickname from the most
         // recent interpolated state; fall back to matchData for the
@@ -518,12 +541,25 @@ export class GameScene extends Phaser.Scene {
 
     const networkManager = this.gameService.getNetworkManager();
 
+    // X-ray vision pierces walls for shots and grenades thrown right now.
+    // Stickiness for already-fired projectiles is server-authoritative; we
+    // only use this for live aim-line/aim-arc previews.
+    const piercing =
+      localState.characterId === 'mighty_man' && localState.abilityActiveSeconds > 0;
+
     if (raw.aimingGun) {
       // Build the players map (local + remotes) for ray hit-testing. Use
       // current/interpolated positions so the preview matches what the
       // server will see at firing time.
       const players = this.collectPlayersForAim(localState, networkManager);
-      const aim = predictBulletRay(localState.id, localState.position, raw.aimAngle, players, grid);
+      const aim = predictBulletRay(
+        localState.id,
+        localState.position,
+        raw.aimAngle,
+        players,
+        grid,
+        piercing,
+      );
       this.effectsRenderer.showBulletAim(
         localState.position.x,
         localState.position.y,
@@ -532,7 +568,14 @@ export class GameScene extends Phaser.Scene {
         localState.ammo === 0,
       );
     } else if (raw.aimingGrenade) {
-      const path = predictGrenadePath(localState.position, raw.aimAngle, grid);
+      const path = predictGrenadePath(
+        localState.position,
+        raw.aimAngle,
+        grid,
+        undefined,
+        undefined,
+        piercing,
+      );
       this.effectsRenderer.showGrenadeAim(path, localState.grenades === 0);
     } else {
       this.effectsRenderer.clearAim();
@@ -575,6 +618,9 @@ export class GameScene extends Phaser.Scene {
         score: interp.score,
         deaths: interp.deaths,
         nickname: interp.nickname,
+        abilityActiveSeconds: 0,
+        abilityCooldownSeconds: 0,
+        abilityLockedAim: 0,
       });
     }
     return players;
@@ -1040,6 +1086,14 @@ export class GameScene extends Phaser.Scene {
     if (this.smokeFx) {
       this.smokeFx.destroy();
       this.smokeFx = null;
+    }
+    if (this.fireBreathFx) {
+      this.fireBreathFx.destroy();
+      this.fireBreathFx = null;
+    }
+    if (this.xrayFx) {
+      this.xrayFx.destroy();
+      this.xrayFx = null;
     }
     this.shockwaveController = null;
     if (this.cameraKick) {

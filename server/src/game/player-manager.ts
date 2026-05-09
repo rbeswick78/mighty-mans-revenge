@@ -47,6 +47,9 @@ export class PlayerManager {
       score: 0,
       deaths: 0,
       nickname,
+      abilityActiveSeconds: 0,
+      abilityCooldownSeconds: 0,
+      abilityLockedAim: 0,
     };
 
     this.players.set(id, player);

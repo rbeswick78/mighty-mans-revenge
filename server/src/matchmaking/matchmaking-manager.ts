@@ -426,6 +426,8 @@ export class MatchmakingManager {
         score: player.score,
         deaths: player.deaths,
         nickname: player.nickname,
+        abilityActiveSeconds: player.abilityActiveSeconds,
+        abilityCooldownSeconds: player.abilityCooldownSeconds,
       });
     }
 

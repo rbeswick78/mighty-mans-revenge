@@ -62,6 +62,12 @@ interface CardWidgets {
 const lighten = (hex: number, amount: number): number =>
   Phaser.Display.Color.ValueToColor(hex).lighten(amount).color;
 
+function abilityBlurb(id: CharacterId): string {
+  if (id === 'bruce') return 'FIRE BREATH\nthrough walls (45s)';
+  if (id === 'mighty_man') return 'X-RAY VISION\nshoot through walls (30s)';
+  return '';
+}
+
 export class CharacterSelectScene extends Phaser.Scene {
   private gameService!: GameService;
   private nickname = '';
@@ -187,11 +193,19 @@ export class CharacterSelectScene extends Phaser.Scene {
     sprite.setScale(SPRITE_SCALE);
     sprite.play(`${def.spritePrefix}_down_idle`);
 
-    const nameText = this.add.text(0, CARD_HEIGHT / 2 - 38, def.displayName.toUpperCase(), {
+    const nameText = this.add.text(0, CARD_HEIGHT / 2 - 56, def.displayName.toUpperCase(), {
       fontFamily: '"Courier New", Courier, monospace',
       fontSize: '16px',
       color: cssHex(VALUE_COLOR),
       fontStyle: 'bold',
+    }).setOrigin(0.5);
+
+    const abilityText = this.add.text(0, CARD_HEIGHT / 2 - 32, abilityBlurb(id), {
+      fontFamily: '"Courier New", Courier, monospace',
+      fontSize: '10px',
+      color: cssHex(LABEL_COLOR),
+      align: 'center',
+      lineSpacing: 2,
     }).setOrigin(0.5);
 
     const lockedBadge = this.add.text(0, CARD_HEIGHT / 2 - 18, '', {
@@ -210,6 +224,7 @@ export class CharacterSelectScene extends Phaser.Scene {
       border,
       sprite,
       nameText,
+      abilityText,
       lockedBadge,
       hitZone,
     ]);

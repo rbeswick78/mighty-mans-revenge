@@ -26,6 +26,7 @@ function makeInput(seq: number, overrides: Partial<PlayerInput> = {}): PlayerInp
     detonatePressed: false,
     sprint: false,
     reload: false,
+    abilityPressed: false,
     tick: seq,
     ...overrides,
   };
@@ -863,6 +864,283 @@ describe('Match', () => {
       m.update(SERVER.TICK_INTERVAL / 1000);
 
       expect(p1.health).toBeLessThan(startingHp);
+    });
+  });
+
+  describe('character abilities (spacebar)', () => {
+    function startActiveWithCharacters(p0Char: 'mighty_man' | 'bruce', p1Char: 'mighty_man' | 'bruce'): Match {
+      const m = createMatch();
+      m.setLock('player-0', p0Char);
+      m.setLock('player-1', p1Char);
+      m.update(0.05); // commits the locks → COUNTDOWN
+      m.update(MATCH.COUNTDOWN_DURATION + 0.05); // → ACTIVE
+      return m;
+    }
+
+    describe('Bruce fire-breath', () => {
+      it('activates on abilityPressed and starts the active window + cooldown', () => {
+        const m = startActiveWithCharacters('bruce', 'mighty_man');
+        const bruce = m.players.get('player-0')!;
+        expect(bruce.abilityActiveSeconds).toBe(0);
+        expect(bruce.abilityCooldownSeconds).toBe(0);
+
+        m.queueInput('player-0', makeInput(1, { abilityPressed: true, aimAngle: 0 }));
+        m.update(0.001); // tiny dt so the timers don't visibly decay
+
+        expect(bruce.abilityActiveSeconds).toBeGreaterThan(0);
+        expect(bruce.abilityCooldownSeconds).toBeGreaterThan(0);
+      });
+
+      it('one-shots an opponent within close range (<= 2 tiles)', () => {
+        const m = startActiveWithCharacters('bruce', 'mighty_man');
+        const bruce = m.players.get('player-0')!;
+        const victim = m.players.get('player-1')!;
+        // 1.5 tiles to the right at full HP.
+        bruce.position = { x: 100, y: 100 };
+        victim.position = { x: 100 + 1.5 * 48, y: 100 };
+        victim.health = PLAYER.MAX_HEALTH;
+
+        m.queueInput('player-0', makeInput(1, { abilityPressed: true, aimAngle: 0 }));
+        m.update(0.05);
+
+        expect(victim.isDead).toBe(true);
+      });
+
+      it('chips for 70 (not lethal from full HP) when opponent is in the far band', () => {
+        const m = startActiveWithCharacters('bruce', 'mighty_man');
+        const bruce = m.players.get('player-0')!;
+        const victim = m.players.get('player-1')!;
+        // 3 tiles to the right (> 2, < 4).
+        bruce.position = { x: 100, y: 100 };
+        victim.position = { x: 100 + 3 * 48, y: 100 };
+        victim.health = PLAYER.MAX_HEALTH;
+
+        m.queueInput('player-0', makeInput(1, { abilityPressed: true, aimAngle: 0 }));
+        m.update(0.05);
+
+        expect(victim.isDead).toBe(false);
+        expect(victim.health).toBe(PLAYER.MAX_HEALTH - 70);
+      });
+
+      it('does nothing to opponents beyond the 4-tile range', () => {
+        const m = startActiveWithCharacters('bruce', 'mighty_man');
+        const bruce = m.players.get('player-0')!;
+        const victim = m.players.get('player-1')!;
+        // 5 tiles away — outside the breath cone.
+        bruce.position = { x: 100, y: 100 };
+        victim.position = { x: 100 + 5 * 48, y: 100 };
+        victim.health = PLAYER.MAX_HEALTH;
+
+        m.queueInput('player-0', makeInput(1, { abilityPressed: true, aimAngle: 0 }));
+        m.update(0.05);
+
+        expect(victim.health).toBe(PLAYER.MAX_HEALTH);
+      });
+
+      it('hits each victim once per cast even though the breath sustains for 1.2s', () => {
+        // Far-band sustained victim: if per-tick damage stacked, 70 × ~24 ticks
+        // would kill them many times over. The hit-set must guard against that.
+        const m = startActiveWithCharacters('bruce', 'mighty_man');
+        const bruce = m.players.get('player-0')!;
+        const victim = m.players.get('player-1')!;
+        bruce.position = { x: 100, y: 100 };
+        victim.position = { x: 100 + 3 * 48, y: 100 };
+        victim.health = PLAYER.MAX_HEALTH;
+
+        m.queueInput('player-0', makeInput(1, { abilityPressed: true, aimAngle: 0 }));
+        // Sustain for the full 1.2s active window.
+        for (let i = 0; i < 30; i++) m.update(0.05);
+
+        expect(victim.isDead).toBe(false);
+        expect(victim.health).toBe(PLAYER.MAX_HEALTH - 70);
+      });
+
+      it('locks aim and movement while breathing', () => {
+        const m = startActiveWithCharacters('bruce', 'mighty_man');
+        const bruce = m.players.get('player-0')!;
+        bruce.position = { x: 200, y: 200 };
+        const startPos = { ...bruce.position };
+
+        m.queueInput('player-0', makeInput(1, { abilityPressed: true, aimAngle: 0 }));
+        // Subsequent inputs try to move + aim elsewhere.
+        m.queueInput('player-0', makeInput(2, { moveX: 1, aimAngle: Math.PI / 2 }));
+        m.queueInput('player-0', makeInput(3, { moveX: 1, aimAngle: Math.PI / 2 }));
+        m.update(0.05);
+
+        expect(bruce.position).toEqual(startPos);
+        expect(bruce.aimAngle).toBe(0);
+      });
+
+      it('cooldown blocks re-activation while it is still running', () => {
+        const m = startActiveWithCharacters('bruce', 'mighty_man');
+        const bruce = m.players.get('player-0')!;
+
+        m.queueInput('player-0', makeInput(1, { abilityPressed: true }));
+        m.update(0.05);
+        const firstCooldown = bruce.abilityCooldownSeconds;
+        expect(firstCooldown).toBeGreaterThan(40); // ~45 minus tiny tick
+
+        // Wait out the active window (1.2s) but stay deep in cooldown.
+        for (let i = 0; i < 30; i++) m.update(0.05);
+        expect(bruce.abilityActiveSeconds).toBe(0);
+        expect(bruce.abilityCooldownSeconds).toBeGreaterThan(40);
+
+        // Press again — should be a no-op.
+        m.queueInput('player-0', makeInput(100, { abilityPressed: true }));
+        m.update(0.05);
+        expect(bruce.abilityActiveSeconds).toBe(0);
+      });
+
+      it('death mid-cast cancels the active window; cooldown keeps ticking', () => {
+        const m = startActiveWithCharacters('bruce', 'mighty_man');
+        const bruce = m.players.get('player-0')!;
+
+        m.queueInput('player-0', makeInput(1, { abilityPressed: true }));
+        m.update(0.05);
+        expect(bruce.abilityActiveSeconds).toBeGreaterThan(0);
+        const cooldownBeforeDeath = bruce.abilityCooldownSeconds;
+
+        // Kill Bruce.
+        m.onKill('player-1', 'player-0', 'gun');
+        expect(bruce.abilityActiveSeconds).toBe(0);
+        // Bruce's cooldown started at activation and continues running — not
+        // reset on death.
+        expect(bruce.abilityCooldownSeconds).toBeCloseTo(cooldownBeforeDeath, 5);
+      });
+    });
+
+    describe('Mighty Man x-ray', () => {
+      it('activates with active=DURATION and cooldown=DURATION+COOLDOWN', () => {
+        const m = startActiveWithCharacters('mighty_man', 'bruce');
+        const mm = m.players.get('player-0')!;
+
+        m.queueInput('player-0', makeInput(1, { abilityPressed: true }));
+        m.update(0.001);
+
+        // 7s active and 37s total cycle.
+        expect(mm.abilityActiveSeconds).toBeGreaterThan(6.9);
+        expect(mm.abilityCooldownSeconds).toBeGreaterThan(36.9);
+      });
+
+      it('does NOT lock movement or aim — x-ray is mechanics-only', () => {
+        const m = startActiveWithCharacters('mighty_man', 'bruce');
+        const mm = m.players.get('player-0')!;
+        const startX = mm.position.x;
+
+        m.queueInput('player-0', makeInput(1, { abilityPressed: true, aimAngle: 0 }));
+        m.queueInput('player-0', makeInput(2, { moveX: 1, aimAngle: 1.0 }));
+        m.update(0.05);
+
+        expect(mm.position.x).toBeGreaterThan(startX);
+        expect(mm.aimAngle).toBeCloseTo(1.0, 5);
+      });
+
+      it('death mid-active cancels the active window and resets cooldown to 30s', () => {
+        const m = startActiveWithCharacters('mighty_man', 'bruce');
+        const mm = m.players.get('player-0')!;
+
+        m.queueInput('player-0', makeInput(1, { abilityPressed: true }));
+        m.update(0.05);
+        expect(mm.abilityActiveSeconds).toBeGreaterThan(0);
+
+        m.onKill('player-1', 'player-0', 'gun');
+        expect(mm.abilityActiveSeconds).toBe(0);
+        // Reset to ABILITY.MIGHTY_MAN_XRAY.COOLDOWN (30s).
+        expect(mm.abilityCooldownSeconds).toBeCloseTo(30, 5);
+      });
+    });
+
+    describe('Mighty Man piercing projectiles', () => {
+      function makeMapWithVerticalWall(): MapData {
+        // 12-wide, 6-tall map. Column 5 is solid. Players on either side
+        // can't see each other but a piercing shot or grenade can.
+        const tiles = Array.from({ length: 6 }, (_, r) =>
+          Array.from({ length: 12 }, (_, c) => {
+            if (r === 0 || r === 5 || c === 0 || c === 11) return 1; // walls
+            if (c === 5) return 1; // vertical wall
+            return 0;
+          }),
+        );
+        return {
+          name: 'wall-test',
+          width: 12,
+          height: 6,
+          tileSize: 48,
+          tiles,
+          spawnPoints: [
+            { x: 2, y: 2 },
+            { x: 8, y: 2 },
+          ],
+          pickupSpawns: [],
+        };
+      }
+
+      function startActiveWithWall(p0Char: 'mighty_man', p1Char: 'bruce'): Match {
+        const m = new Match('match-wall', makeMapWithVerticalWall(), [
+          { id: 'player-0', nickname: 'P0' },
+          { id: 'player-1', nickname: 'P1' },
+        ]);
+        m.setLock('player-0', p0Char);
+        m.setLock('player-1', p1Char);
+        m.update(0.05);
+        m.update(MATCH.COUNTDOWN_DURATION + 0.05);
+        return m;
+      }
+
+      it('a normal bullet is blocked by the wall', () => {
+        const m = startActiveWithWall('mighty_man', 'bruce');
+        const mm = m.players.get('player-0')!;
+        const target = m.players.get('player-1')!;
+        // Place both on row 2, column 2 vs 8 — wall is at column 5.
+        mm.position = { x: 2.5 * 48, y: 2.5 * 48 };
+        target.position = { x: 8.5 * 48, y: 2.5 * 48 };
+        const startHp = target.health;
+
+        m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+        m.update(0.05);
+        expect(target.health).toBe(startHp);
+      });
+
+      it('bullets fired during x-ray pass through walls', () => {
+        const m = startActiveWithWall('mighty_man', 'bruce');
+        const mm = m.players.get('player-0')!;
+        const target = m.players.get('player-1')!;
+        mm.position = { x: 2.5 * 48, y: 2.5 * 48 };
+        target.position = { x: 8.5 * 48, y: 2.5 * 48 };
+        const startHp = target.health;
+
+        // Activate x-ray, then fire on the next input.
+        m.queueInput('player-0', makeInput(1, { abilityPressed: true, aimAngle: 0 }));
+        m.queueInput('player-0', makeInput(2, { firePressed: true, aimAngle: 0 }));
+        m.update(0.05);
+        expect(target.health).toBeLessThan(startHp);
+      });
+
+      it('grenades thrown during x-ray pierce walls and damage through them', () => {
+        const m = startActiveWithWall('mighty_man', 'bruce');
+        const mm = m.players.get('player-0')!;
+        const target = m.players.get('player-1')!;
+        mm.position = { x: 2.5 * 48, y: 2.5 * 48 };
+        target.position = { x: 8.5 * 48, y: 2.5 * 48 };
+        const startHp = target.health;
+
+        // Activate, then throw aimed at the target through the wall.
+        m.queueInput('player-0', makeInput(1, { abilityPressed: true, aimAngle: 0 }));
+        m.queueInput('player-0', makeInput(2, { throwPressed: true, aimAngle: 0 }));
+        m.update(0.05);
+
+        // Distance ~288px at THROW_SPEED 300 → ~0.96s of flight to reach the
+        // target. Step the simulation until the grenade is alongside, then
+        // manually detonate. (Piercing disables wall-bounce; with a 5s safety
+        // fuse the grenade would otherwise fly straight off the map without
+        // detonating anywhere near the target.)
+        for (let i = 0; i < 19; i++) m.update(0.05);
+
+        m.queueInput('player-0', makeInput(3, { detonatePressed: true }));
+        m.update(0.05);
+
+        expect(target.health).toBeLessThan(startHp);
+      });
     });
   });
 });

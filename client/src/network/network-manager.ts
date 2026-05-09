@@ -550,6 +550,9 @@ export class NetworkManager {
       score: s.score,
       deaths: s.deaths,
       nickname: s.nickname,
+      abilityActiveSeconds: s.abilityActiveSeconds,
+      abilityCooldownSeconds: s.abilityCooldownSeconds,
+      abilityLockedAim: 0,
     };
   }
 

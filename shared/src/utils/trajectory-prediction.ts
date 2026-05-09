@@ -23,11 +23,19 @@ export function predictBulletRay(
   aimAngle: number,
   players: Map<PlayerId, PlayerState> | Iterable<PlayerState>,
   grid: CollisionGrid,
+  piercing: boolean = false,
 ): BulletAim {
   const dir = vecFromAngle(aimAngle);
   const maxRayDistance = GUN.FALLOFF_RANGE_MAX * 2;
 
-  const wallHit = raycastAgainstGrid(grid, origin.x, origin.y, aimAngle, maxRayDistance);
+  const wallHit = raycastAgainstGrid(
+    grid,
+    origin.x,
+    origin.y,
+    aimAngle,
+    maxRayDistance,
+    piercing,
+  );
   const wallDistance = wallHit.hitTile ? wallHit.distance : maxRayDistance;
 
   let closestHit: { playerId: PlayerId; distance: number } | null = null;
@@ -87,11 +95,13 @@ export function predictGrenadePath(
   grid: CollisionGrid,
   durationSeconds: number = TRAJECTORY.PREVIEW_SECONDS,
   stepDt: number = TRAJECTORY.PREVIEW_STEP_DT,
+  piercing: boolean = false,
 ): Vec2[] {
   const velocity = vecScale(vecFromAngle(aimAngle), GRENADE.THROW_SPEED);
-  const sim = {
+  const sim: { position: Vec2; velocity: Vec2; piercing?: boolean } = {
     position: { x: origin.x, y: origin.y },
     velocity: { x: velocity.x, y: velocity.y },
+    piercing,
   };
 
   const points: Vec2[] = [{ x: sim.position.x, y: sim.position.y }];
