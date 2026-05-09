@@ -420,13 +420,14 @@ export class GameScene extends Phaser.Scene {
 
         this.playerManager.updatePlayers(allPlayers, playerId);
 
-        // Ability VFX. Fire-cone for any active Bruce; x-ray tint + opponent
-        // silhouettes for the local Mighty Man only.
+        // Ability VFX. Fire cone for any active Bruce; screen-edge border +
+        // tint for the local player while their ability is active; x-ray
+        // silhouettes only for the local Mighty Man.
         const localSerialized =
           allPlayers.find((p) => p.id === playerId) ?? null;
         const collisionGrid = this.mapRenderer?.getCollisionGrid() ?? null;
         this.fireBreathFx?.update(allPlayers, delta);
-        this.xrayFx?.update(localSerialized, allPlayers, collisionGrid);
+        this.xrayFx?.update(localSerialized, allPlayers, collisionGrid, delta);
 
         // Update HUD
         this.hud.updateHealth(currentLocalState.health, PLAYER.MAX_HEALTH);

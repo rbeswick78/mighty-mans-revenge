@@ -454,7 +454,12 @@ export class HUD {
     }
 
     const isBruce = characterId === 'bruce';
-    const icon = isBruce ? '\u{1F525}' : 'X'; // flame glyph or X for x-ray
+    // Per-character "ready" color — the icon background is filled with this
+    // when the ability is up, and a flat dark-grey when on cooldown so the
+    // status reads at a glance.
+    const readyColor = isBruce ? 0xff7b2a : 0x4ad8e8;
+    const cooldownColor = 0x3a4252;
+    const icon = isBruce ? 'F' : 'X';
     const totalCycle = isBruce
       ? ABILITY.BRUCE_FIRE_BREATH.COOLDOWN
       : ABILITY.MIGHTY_MAN_XRAY.DURATION + ABILITY.MIGHTY_MAN_XRAY.COOLDOWN;
@@ -466,39 +471,50 @@ export class HUD {
     this.abilityIconText.setVisible(true);
     this.abilityIconText.setText(icon);
 
-    // Pick state.
     const isActive = activeSeconds > 0;
     const isCoolingDown = !isActive && cooldownSeconds > 0;
 
+    let fillColor: number;
     let strokeColor: number;
-    let bgAlpha: number;
+    let iconAlpha: number;
+    let iconColor: string;
     let sweepColor: number;
-    let sweepFraction: number; // 0–1, the slice we draw
+    let sweepFraction: number;
     let countdownText: string;
 
     if (isActive) {
-      strokeColor = 0x4ad8e8;
-      bgAlpha = 0.95;
-      sweepColor = 0x4ad8e8;
+      // Pulsing ready-color fill so the player feels the active window.
+      fillColor = readyColor;
+      strokeColor = 0xffffff;
+      iconAlpha = 1;
+      iconColor = '#000000';
+      sweepColor = 0xffffff;
       sweepFraction = activeSeconds / activeDuration;
       countdownText = `${Math.ceil(activeSeconds)}`;
     } else if (isCoolingDown) {
+      // Flat dark grey — the unmistakable "not ready" state.
+      fillColor = cooldownColor;
       strokeColor = 0x55667a;
-      bgAlpha = 0.6;
-      sweepColor = 0xc24545;
+      iconAlpha = 0.45;
+      iconColor = '#9aa3b0';
+      sweepColor = readyColor;
       sweepFraction = cooldownSeconds / totalCycle;
       countdownText = `${Math.ceil(cooldownSeconds)}`;
     } else {
-      strokeColor = 0xfca72a;
-      bgAlpha = 0.95;
+      // Ready: solid character color. Reads clearly even peripheral.
+      fillColor = readyColor;
+      strokeColor = 0xffffff;
+      iconAlpha = 1;
+      iconColor = '#000000';
       sweepColor = 0;
       sweepFraction = 0;
       countdownText = 'READY';
     }
 
+    this.abilityBg.setFillStyle(fillColor, 1);
     this.abilityBg.setStrokeStyle(2, strokeColor, 1);
-    this.abilityBg.setFillStyle(Wasteland.HUD_STRIP_BG, bgAlpha);
-    this.abilityIconText.setAlpha(isCoolingDown ? 0.5 : 1);
+    this.abilityIconText.setAlpha(iconAlpha);
+    this.abilityIconText.setColor(iconColor);
     this.abilityCountdownText.setText(countdownText);
     this.abilityCountdownText.setVisible(true);
 
@@ -506,7 +522,7 @@ export class HUD {
     if (sweepFraction > 0) {
       const start = -Math.PI / 2;
       const end = start + sweepFraction * Math.PI * 2;
-      this.abilitySweep.lineStyle(3, sweepColor, 0.9);
+      this.abilitySweep.lineStyle(3, sweepColor, 0.95);
       this.abilitySweep.beginPath();
       this.abilitySweep.arc(
         this.abilityCenterX,

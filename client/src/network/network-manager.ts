@@ -505,6 +505,11 @@ export class NetworkManager {
       score: serverState.score,
       deaths: serverState.deaths,
       nickname: serverState.nickname,
+      // Ability state is server-authoritative — without forwarding here, the
+      // local snapshot stays at 0/0 forever, which kills HUD feedback, the
+      // fire-cone VFX, x-ray tint, and aim-line piercing for the local player.
+      abilityActiveSeconds: serverState.abilityActiveSeconds,
+      abilityCooldownSeconds: serverState.abilityCooldownSeconds,
     };
 
     const dx = result.position.x - previousPosition.x;

@@ -19,6 +19,21 @@ export class ClientPrediction {
   ): PlayerState {
     const dt = 1 / SERVER.TICK_RATE;
 
+    // Mirror the server's Bruce-locked branch: while Bruce is breathing fire
+    // his movement and aim are pinned. Predicting movement here would drift
+    // the local sprite forward, then reconcile would snap it back the moment
+    // the server's authoritative position arrives — visible rubber-banding.
+    const isBruceLocked =
+      currentState.characterId === 'bruce' && currentState.abilityActiveSeconds > 0;
+    if (isBruceLocked) {
+      return {
+        ...currentState,
+        velocity: { x: 0, y: 0 },
+        isSprinting: false,
+        lastProcessedInput: input.sequenceNumber,
+      };
+    }
+
     const { newPos, newStamina, velocity } = calculateMovement(
       input,
       currentState.position,
