@@ -261,8 +261,15 @@ export class HUD {
   }
 
   updateTimer(secondsRemaining: number): void {
-    const mins = Math.floor(secondsRemaining / 60);
-    const secs = Math.floor(secondsRemaining % 60);
+    // Round UP so the displayed clock represents "at most this much time
+    // left." Matches countdown convention everywhere else in the app —
+    // "1:00" means up to 60s remaining, "0:00" means the timer has hit
+    // zero. Floor would flip "1:00" → "0:59" the instant the event-trigger
+    // threshold (60s remaining) was crossed and would show "0:00" for the
+    // entire final second, making the music appear to outlast the clock.
+    const totalSeconds = Math.ceil(secondsRemaining);
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
     this.timerText.setText(`${mins}:${secs.toString().padStart(2, '0')}`);
   }
 
