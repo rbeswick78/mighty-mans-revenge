@@ -22,7 +22,7 @@ import { KillJuice } from '../rendering/kill-juice.js';
 import { HealFlash } from '../rendering/heal-flash.js';
 import { EventFlash } from '../rendering/event-flash.js';
 import { eventDisplayName } from '@shared/utils/event-modifiers.js';
-import type { FinalMinuteEvent } from '@shared/types/network.js';
+import type { FinalMinuteEvent, SerializedPlayerState } from '@shared/types/network.js';
 import type { EventStartPayload, EventWarningPayload } from '../services/game-service.js';
 import { ImpactFx } from '../rendering/impact-fx.js';
 import { ExplosionFx } from '../rendering/explosion-fx.js';
@@ -320,9 +320,18 @@ export class GameScene extends Phaser.Scene {
         };
         this.lastRenderedLocalPos = { x: renderPos.x, y: renderPos.y };
 
-        // Build serialized state array for the player manager
-        const allPlayers = [{
+        // Build serialized state array for the player manager.
+        // Inside an active match the local state always has a non-null
+        // characterId (server selects/auto-locks before COUNTDOWN), but
+        // PlayerState models it as nullable. Fall back to 'mighty_man'
+        // for the rare frame the renderer might briefly construct on a
+        // stale snapshot — this only matters for the very first render
+        // before reconciliation, where the visible difference is one
+        // tick of a placeholder sprite.
+        const localCharacterId = currentLocalState.characterId ?? 'mighty_man';
+        const allPlayers: SerializedPlayerState[] = [{
           id: currentLocalState.id,
+          characterId: localCharacterId,
           position: renderPos,
           velocity: currentLocalState.velocity,
           aimAngle: currentLocalState.aimAngle,
@@ -347,6 +356,7 @@ export class GameScene extends Phaser.Scene {
         for (const [remoteId, interpState] of interpolatedPlayers) {
           allPlayers.push({
             id: remoteId,
+            characterId: interpState.characterId,
             position: interpState.position,
             velocity: interpState.velocity,
             aimAngle: interpState.aimAngle,
@@ -539,6 +549,13 @@ export class GameScene extends Phaser.Scene {
       // Build a minimal PlayerState from the interpolated snapshot.
       players.set(remoteId, {
         id: remoteId,
+        // characterId is unused by aim ray-casting (it only consults
+        // position/hitbox), but PlayerState requires the field. The
+        // interpolation buffer doesn't carry characterId — and doesn't
+        // need to, since the renderer holds onto it from construction
+        // time. Pass null so the type lines up; this map is consumed
+        // only by predictBulletRay and never sent to a renderer.
+        characterId: null,
         position: interp.position,
         velocity: interp.velocity,
         aimAngle: interp.aimAngle,

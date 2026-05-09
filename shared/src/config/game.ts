@@ -1,3 +1,5 @@
+import type { CharacterDef } from '../types/character.js';
+
 export const PLAYER = Object.freeze({
   BASE_SPEED: 200,
   SPRINT_SPEED: 320,
@@ -70,6 +72,12 @@ export const MATCH = Object.freeze({
    */
   TIME_LIMIT: 173,
   COUNTDOWN_DURATION: 3,
+  /**
+   * Max seconds players have on the character-select screen before any
+   * unlocked player is auto-locked onto their current hover and the
+   * countdown begins.
+   */
+  CHARACTER_SELECT_TIMEOUT_SEC: 30,
 });
 
 export const EVENT = Object.freeze({
@@ -105,6 +113,61 @@ export const SERVER = Object.freeze({
 export const MAP = Object.freeze({
   TILE_SIZE: 48,
 });
+
+/**
+ * Character roster. Frame dimensions are sourced from the actual sprite
+ * sheets shipped under `client/public/assets/{assetFolder}/`. Each sheet
+ * is 6 frames laid horizontally (sheet width = w * 6).
+ *
+ * Adding a new character: add an entry here, drop the assets into
+ * `client/public/assets/<folder>/`, and the BootScene loader picks it up
+ * automatically. No further code changes needed for the sprite pipeline.
+ *
+ * Special abilities are not modeled yet — they will be added in a follow-up.
+ */
+export const CHARACTERS = Object.freeze({
+  mighty_man: {
+    id: 'mighty_man',
+    displayName: 'Mighty Man',
+    spritePrefix: 'mighty_man',
+    assetFolder: 'player',
+    assetBaseName: 'character',
+    idleFrames: {
+      down: { w: 11, h: 16 },
+      up: { w: 11, h: 16 },
+      side: { w: 10, h: 16 },
+      'side-left': { w: 10, h: 16 },
+    },
+    runFrames: {
+      down: { w: 11, h: 17 },
+      up: { w: 11, h: 17 },
+      side: { w: 10, h: 17 },
+      'side-left': { w: 10, h: 17 },
+    },
+  },
+  bruce: {
+    id: 'bruce',
+    displayName: 'Bruce',
+    spritePrefix: 'bruce',
+    assetFolder: 'enemies',
+    assetBaseName: 'zombie',
+    idleFrames: {
+      down: { w: 13, h: 16 },
+      up: { w: 13, h: 15 },
+      side: { w: 11, h: 15 },
+      'side-left': { w: 11, h: 15 },
+    },
+    runFrames: {
+      down: { w: 12, h: 16 },
+      up: { w: 13, h: 16 },
+      side: { w: 13, h: 15 },
+      'side-left': { w: 13, h: 15 },
+    },
+  },
+}) satisfies Readonly<Record<string, CharacterDef>>;
+
+export type CharacterId = keyof typeof CHARACTERS;
+export const CHARACTER_IDS = Object.keys(CHARACTERS) as CharacterId[];
 
 /** Convenience alias for SERVER.TICK_RATE */
 export const TICK_RATE = SERVER.TICK_RATE;

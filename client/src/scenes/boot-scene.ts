@@ -1,58 +1,20 @@
 import Phaser from 'phaser';
 import { Wasteland, cssHex } from '@shared/config/palette.js';
+import { CHARACTERS } from '@shared/config/game.js';
+import { DIRECTIONS, type Direction4, type FrameDim } from '@shared/types/character.js';
 import { AudioManager } from '../audio/audio-manager.js';
-import type { Direction4 } from '../rendering/sprite-direction.js';
-
-interface FrameDim {
-  w: number;
-  h: number;
-}
 
 /**
- * Frame dimensions for each character sprite sheet. Each sheet has 6 frames
- * laid out horizontally; sheet width varies per direction so frame width
- * does too. Heights also vary slightly between idle vs run for the same
- * direction (the asset pack isn't strictly uniform).
+ * Per-direction frame dimensions for the gun overlay (the "Gun" weapon —
+ * pack ships Pistol/Gun/Shotgun/Bat; this is the medium gun that matches
+ * our 3-round-burst feel). 6-frame hold animation plays continuously while
+ * held; 3-frame shoot animation plays once per shot. Sheets are smaller
+ * than the character — the artist drew the gun centered relative to the
+ * character such that overlaying both at the same origin places the gun
+ * in the held hand.
  *
- * Player uses the `_no-hands` variants of the asset pack — the gun overlay
- * (registered separately below) supplies the held weapon. No-hands sprites
- * are 1–4 px narrower than the with-hands originals.
- */
-const PLAYER_IDLE_FRAMES: Record<Direction4, FrameDim> = {
-  down: { w: 11, h: 16 },        // 66 × 16
-  up: { w: 11, h: 16 },          // 66 × 16
-  side: { w: 10, h: 16 },        // 60 × 16
-  'side-left': { w: 10, h: 16 }, // 60 × 16
-};
-
-const PLAYER_RUN_FRAMES: Record<Direction4, FrameDim> = {
-  down: { w: 11, h: 17 },        // 66 × 17
-  up: { w: 11, h: 17 },          // 66 × 17
-  side: { w: 10, h: 17 },        // 60 × 17
-  'side-left': { w: 10, h: 17 }, // 60 × 17
-};
-
-const ENEMY_IDLE_FRAMES: Record<Direction4, FrameDim> = {
-  down: { w: 13, h: 16 },        // 78 × 16
-  up: { w: 13, h: 15 },          // 78 × 15
-  side: { w: 11, h: 15 },        // 66 × 15
-  'side-left': { w: 11, h: 15 }, // 66 × 15
-};
-
-const ENEMY_RUN_FRAMES: Record<Direction4, FrameDim> = {
-  down: { w: 12, h: 16 },        // 72 × 16 (zombie walk)
-  up: { w: 13, h: 16 },          // 78 × 16
-  side: { w: 13, h: 15 },        // 78 × 15
-  'side-left': { w: 13, h: 15 }, // 78 × 15
-};
-
-/**
- * Gun overlay (the "Gun" weapon — pack ships Pistol/Gun/Shotgun/Bat; this
- * is the medium gun that matches our 3-round-burst feel). 6-frame hold
- * animation plays continuously while held; 3-frame shoot animation plays
- * once per shot. Sheets are smaller than the character — the artist drew
- * the gun centered relative to the character such that overlaying both at
- * the same origin places the gun in the held hand.
+ * Character sprite frame dimensions live on the CHARACTERS registry in
+ * /shared and are loaded automatically by the loop in `loadRealAssets`.
  */
 const GUN_HOLD_FRAMES: Record<Direction4, FrameDim> = {
   down: { w: 5, h: 16 },          // 30 × 16
@@ -80,7 +42,6 @@ const FIRE_FRAMES: Record<Direction4, FrameDim> = {
   'side-left': { w: 10, h: 7 },   // 30 × 7
 };
 
-const DIRECTIONS: readonly Direction4[] = ['down', 'up', 'side', 'side-left'];
 const IDLE_FPS = 6;
 const RUN_FPS = 12;
 const GUN_HOLD_FPS = 9;     // between idle and run — visually close enough either way
@@ -154,15 +115,33 @@ export class BootScene extends Phaser.Scene {
   }
 
   private loadRealAssets(): void {
-    // Player + enemy sprite sheets — 4 directions × 2 states (idle, run).
-    for (const dir of DIRECTIONS) {
-      this.loadCharacterSheet('player', dir, 'idle', PLAYER_IDLE_FRAMES[dir]);
-      this.loadCharacterSheet('player', dir, 'run', PLAYER_RUN_FRAMES[dir]);
-      this.loadCharacterSheet('enemy', dir, 'idle', ENEMY_IDLE_FRAMES[dir]);
-      this.loadCharacterSheet('enemy', dir, 'run', ENEMY_RUN_FRAMES[dir]);
+    // Character sprite sheets — each character × 4 directions × 2 states.
+    // Driven by the CHARACTERS registry in /shared so adding a new
+    // character only requires registering it there + dropping assets in
+    // the right folder.
+    for (const char of Object.values(CHARACTERS)) {
+      for (const dir of DIRECTIONS) {
+        this.loadCharacterSheet(
+          char.spritePrefix,
+          dir,
+          'idle',
+          char.idleFrames[dir],
+          char.assetFolder,
+          char.assetBaseName,
+        );
+        this.loadCharacterSheet(
+          char.spritePrefix,
+          dir,
+          'run',
+          char.runFrames[dir],
+          char.assetFolder,
+          char.assetBaseName,
+        );
+      }
     }
 
-    // Gun overlay + muzzle flash — 4 directions each.
+    // Gun overlay + muzzle flash — 4 directions each. Shared across all
+    // characters (not character-specific assets).
     for (const dir of DIRECTIONS) {
       this.load.spritesheet(
         `gun_${dir}_hold`,
@@ -239,28 +218,28 @@ export class BootScene extends Phaser.Scene {
   }
 
   private loadCharacterSheet(
-    kind: 'player' | 'enemy',
+    spritePrefix: string,
     direction: Direction4,
     state: 'idle' | 'run',
     dim: FrameDim,
+    assetFolder: string,
+    assetBaseName: string,
   ): void {
-    const folder = kind === 'player' ? 'player' : 'enemies';
-    const filePrefix = kind === 'player' ? 'character' : 'zombie';
-    const key = `${kind}_${direction}_${state}`;
-    const path = `/assets/${folder}/${filePrefix}_${direction}_${state}.png`;
+    const key = `${spritePrefix}_${direction}_${state}`;
+    const path = `/assets/${assetFolder}/${assetBaseName}_${direction}_${state}.png`;
     this.load.spritesheet(key, path, { frameWidth: dim.w, frameHeight: dim.h });
   }
 
   /**
-   * Define looping idle and run animations for player and enemy. Each anim
-   * key matches its texture key (Phaser keeps anims and textures in
-   * separate registries so this isn't ambiguous).
+   * Define looping idle and run animations for every registered character.
+   * Each anim key matches its texture key (Phaser keeps anims and textures
+   * in separate registries so this isn't ambiguous).
    */
   private createCharacterAnimations(): void {
-    for (const kind of ['player', 'enemy'] as const) {
+    for (const char of Object.values(CHARACTERS)) {
       for (const dir of DIRECTIONS) {
         for (const state of ['idle', 'run'] as const) {
-          const key = `${kind}_${dir}_${state}`;
+          const key = `${char.spritePrefix}_${dir}_${state}`;
           this.anims.create({
             key,
             frames: this.anims.generateFrameNumbers(key, {}),

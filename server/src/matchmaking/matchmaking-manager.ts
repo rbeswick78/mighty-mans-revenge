@@ -9,6 +9,7 @@ import type {
   MatchResult,
   ServerGameStateMessage,
   SerializedPlayerState,
+  CharacterId,
 } from '@shared/game';
 import { Match } from '../game/match.js';
 import { GameServer } from '../network/server.js';
@@ -247,8 +248,15 @@ export class MatchmakingManager {
       }
       this.previousPhases.set(matchId, newPhase);
 
-      // Broadcast game state to match players
-      this.broadcastMatchState(match, serverTick);
+      // Phase-aware broadcast: while the match is in CHARACTER_SELECT we
+      // ship the lightweight selection snapshot only — clients have no
+      // need for positions, grenades, or pickups during select. From
+      // COUNTDOWN onward we run the regular gameState pipeline.
+      if (match.phase === MatchPhase.CHARACTER_SELECT) {
+        this.broadcastCharacterSelectState(match);
+      } else {
+        this.broadcastMatchState(match, serverTick);
+      }
 
       // Check if match ended
       if (match.phase === MatchPhase.ENDED) {
@@ -354,8 +362,39 @@ export class MatchmakingManager {
       }, { reliable: true });
     }
 
-    // Start countdown
-    match.startCountdown();
+    // The match starts itself in CHARACTER_SELECT (set by Match's
+    // constructor); per-tick update() drives the transition into
+    // COUNTDOWN once both players lock in or the select timer expires.
+  }
+
+  /**
+   * Send the per-tick character-select snapshot to every player in the
+   * match. Replaces the regular gameState broadcast while the match is
+   * in CHARACTER_SELECT.
+   */
+  private broadcastCharacterSelectState(match: Match): void {
+    const message = match.getSelectStateMessage();
+    for (const [playerId] of match.players) {
+      this.server.sendTo(playerId, message);
+    }
+  }
+
+  /** Forward a character hover from a client into the player's match. */
+  handleCharacterHover(playerId: PlayerId, characterId: CharacterId): void {
+    const matchId = this.playerMatchMap.get(playerId);
+    if (!matchId) return;
+    const match = this.activeMatches.get(matchId);
+    if (!match) return;
+    match.setHover(playerId, characterId);
+  }
+
+  /** Forward a character lock from a client into the player's match. */
+  handleCharacterLock(playerId: PlayerId, characterId: CharacterId): void {
+    const matchId = this.playerMatchMap.get(playerId);
+    if (!matchId) return;
+    const match = this.activeMatches.get(matchId);
+    if (!match) return;
+    match.setLock(playerId, characterId);
   }
 
   private broadcastMatchState(match: Match, serverTick: number): void {
@@ -364,6 +403,12 @@ export class MatchmakingManager {
     for (const [, player] of match.players) {
       players.push({
         id: player.id,
+        // SerializedPlayerState requires characterId non-null. By the time we
+        // reach this branch the match has transitioned out of
+        // CHARACTER_SELECT, so updateCharacterSelect has committed every
+        // player's locked selection onto playerState.characterId. Defensive
+        // fallback to CHARACTER_IDS[0] is just to satisfy the type system.
+        characterId: (player.characterId ?? 'mighty_man') as CharacterId,
         position: player.position,
         velocity: player.velocity,
         aimAngle: player.aimAngle,
@@ -566,6 +611,8 @@ export class MatchmakingManager {
       }, { reliable: true });
     }
 
-    match.startCountdown();
+    // Like fresh matches, the rematch starts in CHARACTER_SELECT — no
+    // direct startCountdown call here. Players re-pick characters each
+    // rematch.
   }
 }

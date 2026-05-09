@@ -23,8 +23,10 @@ export class ClientPlayerManager {
 
       let renderer = this.renderers.get(playerState.id);
       if (!renderer) {
-        const isLocal = playerState.id === localPlayerId;
-        renderer = new PlayerRenderer(this.scene, isLocal);
+        // SerializedPlayerState.characterId is non-null inside an active
+        // match (server only ships gameState messages from COUNTDOWN
+        // onward, by which point both players are locked).
+        renderer = new PlayerRenderer(this.scene, playerState.characterId);
         this.renderers.set(playerState.id, renderer);
       }
 

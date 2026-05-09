@@ -3,6 +3,7 @@ import { PlayerInput } from './player.js';
 import { GrenadeState, BulletTrail } from './projectile.js';
 import { PickupState } from './pickup.js';
 import { MatchPhase, KillFeedEntry, MatchResult } from './game.js';
+import type { CharacterId } from '../config/game.js';
 
 /**
  * Final-minute events: a single one is picked at random ~5s before
@@ -23,6 +24,8 @@ export type ClientMessage =
   | ClientCancelMatchmakingMessage
   | ClientRematchRequestMessage
   | ClientReturnToLobbyMessage
+  | ClientCharacterHoverMessage
+  | ClientCharacterLockMessage
   | ClientPingMessage;
 
 export interface ClientInputMessage {
@@ -47,6 +50,16 @@ export interface ClientReturnToLobbyMessage {
   type: 'client:returnToLobby';
 }
 
+export interface ClientCharacterHoverMessage {
+  type: 'client:characterHover';
+  characterId: CharacterId;
+}
+
+export interface ClientCharacterLockMessage {
+  type: 'client:characterLock';
+  characterId: CharacterId;
+}
+
 export interface ClientPingMessage {
   type: 'client:ping';
   clientTime: number;
@@ -58,6 +71,7 @@ export type ServerMessage =
   | ServerWelcomeMessage
   | ServerGameStateMessage
   | ServerMatchFoundMessage
+  | ServerCharacterSelectStateMessage
   | ServerMatchCountdownMessage
   | ServerMatchStartMessage
   | ServerMatchEndMessage
@@ -108,6 +122,12 @@ export interface ServerGameStateMessage {
 
 export interface SerializedPlayerState {
   id: PlayerId;
+  /**
+   * The character this player has chosen. Always non-null in
+   * `server:gameState` messages (those only ship from COUNTDOWN onward,
+   * by which point both players are locked).
+   */
+  characterId: CharacterId;
   position: Vec2;
   velocity: Vec2;
   aimAngle: number;
@@ -137,6 +157,34 @@ export interface ServerMatchFoundMessage {
   matchId: MatchId;
   opponents: { id: PlayerId; nickname: string }[];
   mapName: string;
+}
+
+/**
+ * Per-player state during the CHARACTER_SELECT phase. Sent every server
+ * tick (or on change) until both players are locked. The presence of a
+ * non-null `lockedCharacterId` for a player means that player has
+ * committed; once both players have committed, the next message stream
+ * the client receives is `server:matchCountdown` followed by
+ * `server:gameState`.
+ *
+ * Lock-to-one rule (v1): no two players can have the same
+ * `lockedCharacterId`. The server snaps the second player's hover off
+ * a taken character automatically.
+ */
+export interface ServerCharacterSelectStateMessage {
+  type: 'server:characterSelectState';
+  selections: Array<{
+    playerId: PlayerId;
+    nickname: string;
+    hoveredCharacterId: CharacterId | null;
+    lockedCharacterId: CharacterId | null;
+  }>;
+  /**
+   * Milliseconds remaining on the auto-lock timer. Counts down from
+   * MATCH.CHARACTER_SELECT_TIMEOUT_SEC * 1000. Anyone unlocked at zero
+   * is auto-locked onto their current hover and the match begins.
+   */
+  timeRemainingMs: number;
 }
 
 export interface ServerMatchCountdownMessage {

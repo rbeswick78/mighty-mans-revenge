@@ -11,7 +11,8 @@
  *     -π/2  → -y (up)           → 'up'
  */
 
-export type Direction4 = 'up' | 'down' | 'side' | 'side-left';
+export type { Direction4 } from '@shared/types/character.js';
+import type { Direction4 } from '@shared/types/character.js';
 
 const QUARTER_PI = Math.PI / 4;
 const THREE_QUARTER_PI = 3 * Math.PI / 4;

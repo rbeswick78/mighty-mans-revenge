@@ -8,6 +8,7 @@ import {
   GRENADE,
   SERVER,
   EVENT,
+  CHARACTER_IDS,
   calculateMovement,
   eventToMovementModifiers,
 } from '@shared/game';
@@ -22,7 +23,10 @@ import type {
   BulletTrail,
   GrenadeState,
   FinalMinuteEvent,
+  CharacterId,
+  ServerCharacterSelectStateMessage,
 } from '@shared/game';
+import { logger } from '../utils/logger.js';
 import { PickupManager } from './pickup-manager.js';
 import { StatsTracker } from './stats-tracker.js';
 import { MapManager } from './map-manager.js';
@@ -42,10 +46,18 @@ interface PendingBurst {
 
 export class Match implements MatchContext {
   readonly matchId: string;
-  phase: MatchPhase = MatchPhase.WAITING;
+  phase: MatchPhase = MatchPhase.CHARACTER_SELECT;
   countdownTimer = 0;
   matchTimer = 0;
   players: Map<PlayerId, PlayerState> = new Map();
+  /**
+   * Per-player character-select state. Populated for every player in the
+   * constructor; mutated by setHover / setLock and consumed by
+   * updateCharacterSelect when select completes.
+   */
+  selectionState: Map<PlayerId, { hovered: CharacterId | null; locked: CharacterId | null }> = new Map();
+  /** Seconds remaining on the character-select auto-lock timer. */
+  private selectTimer: number = MATCH.CHARACTER_SELECT_TIMEOUT_SEC;
   readonly stats: StatsTracker;
   readonly pickupManager: PickupManager;
   readonly mapManager: MapManager;
@@ -120,12 +132,22 @@ export class Match implements MatchContext {
     this.pickupManager.initFromMap(mapData);
 
     const spawns = this.mapManager.pickInitialSpawns(playerEntries.length, this.rng);
+    // Default-hover assignment: as we iterate over players in insertion order,
+    // give each player the first CHARACTER_ID not already taken as a default
+    // hover. With only 2 characters and 2 players today this means P1 gets
+    // CHARACTER_IDS[0] and P2 gets CHARACTER_IDS[1] — but it generalizes
+    // cleanly to any roster size.
+    const takenDefaults = new Set<CharacterId>();
     playerEntries.forEach((entry, i) => {
       const player = this.createPlayerState(entry.id, entry.nickname, spawns[i]);
       this.players.set(entry.id, player);
       this.inputQueues.set(entry.id, new InputQueue());
       this.stats.initPlayer(entry.id);
       this.connectedPlayers.add(entry.id);
+
+      const defaultHover = CHARACTER_IDS.find((c) => !takenDefaults.has(c)) ?? CHARACTER_IDS[0];
+      takenDefaults.add(defaultHover);
+      this.selectionState.set(entry.id, { hovered: defaultHover, locked: null });
     });
   }
 
@@ -157,9 +179,24 @@ export class Match implements MatchContext {
     queue.push(input);
   }
 
-  /** Start the countdown phase. */
+  /**
+   * Start the countdown phase. Called by updateCharacterSelect once both
+   * players have locked (or the select timer has expired and any
+   * unlocked players have been auto-locked). Every player must have a
+   * non-null `characterId` by the time we get here — assert it loudly so
+   * a logic bug in select-completion doesn't silently produce a match
+   * with unset characters.
+   */
   startCountdown(): void {
-    if (this.phase !== MatchPhase.WAITING) return;
+    if (this.phase !== MatchPhase.CHARACTER_SELECT && this.phase !== MatchPhase.WAITING) return;
+    for (const [id, player] of this.players) {
+      if (player.characterId === null) {
+        logger.error(
+          { matchId: this.matchId, playerId: id },
+          'startCountdown called with player.characterId still null',
+        );
+      }
+    }
     this.phase = MatchPhase.COUNTDOWN;
     this.countdownTimer = MATCH.COUNTDOWN_DURATION;
   }
@@ -167,6 +204,9 @@ export class Match implements MatchContext {
   /** Main per-tick update. dt is in seconds. */
   update(dt: number): void {
     switch (this.phase) {
+      case MatchPhase.CHARACTER_SELECT:
+        this.updateCharacterSelect(dt);
+        break;
       case MatchPhase.COUNTDOWN:
         this.updateCountdown(dt);
         break;
@@ -176,6 +216,126 @@ export class Match implements MatchContext {
       default:
         break;
     }
+  }
+
+  /**
+   * Tick the character-select phase. Transitions to COUNTDOWN once every
+   * player has locked, OR once the select timer hits zero (unlocked
+   * players are auto-locked onto their current hover, falling back to
+   * CHARACTER_IDS[0] if somehow nothing is hovered). On transition,
+   * commits the locked character onto each player's persistent
+   * playerState.characterId.
+   */
+  updateCharacterSelect(dt: number): void {
+    this.selectTimer -= dt;
+
+    let allLocked = true;
+    for (const sel of this.selectionState.values()) {
+      if (sel.locked === null) {
+        allLocked = false;
+        break;
+      }
+    }
+
+    const timedOut = this.selectTimer <= 0;
+    if (!allLocked && !timedOut) return;
+
+    if (timedOut) {
+      this.selectTimer = 0;
+      for (const sel of this.selectionState.values()) {
+        if (sel.locked === null) {
+          sel.locked = sel.hovered ?? CHARACTER_IDS[0];
+        }
+      }
+    }
+
+    // Commit locks onto persistent player state.
+    for (const [playerId, sel] of this.selectionState) {
+      const player = this.players.get(playerId);
+      if (!player) continue;
+      // sel.locked is non-null here: either the all-locked branch made it so,
+      // or the timeout branch just auto-locked any stragglers.
+      player.characterId = sel.locked;
+    }
+
+    this.startCountdown();
+  }
+
+  /**
+   * Update a player's hovered character during CHARACTER_SELECT. Silently
+   * ignored if the match isn't in select, the player isn't in this match,
+   * or the requested character is already locked by someone else (the
+   * server's broadcast will reflect the actual state).
+   */
+  setHover(playerId: PlayerId, characterId: CharacterId): void {
+    if (this.phase !== MatchPhase.CHARACTER_SELECT) return;
+    const sel = this.selectionState.get(playerId);
+    if (!sel) return;
+    // Reject hovers onto a character another player has already locked.
+    for (const [otherId, otherSel] of this.selectionState) {
+      if (otherId === playerId) continue;
+      if (otherSel.locked === characterId) return;
+    }
+    sel.hovered = characterId;
+  }
+
+  /**
+   * Lock a player onto a character during CHARACTER_SELECT. Silently
+   * ignored if the match isn't in select, the player isn't in this match,
+   * the player has already locked, or the character is already locked by
+   * another player. Auto-snaps any other player whose hover matches the
+   * just-locked character to a different available character so the UI
+   * never shows two players hovering the same locked option.
+   */
+  setLock(playerId: PlayerId, characterId: CharacterId): void {
+    if (this.phase !== MatchPhase.CHARACTER_SELECT) return;
+    const sel = this.selectionState.get(playerId);
+    if (!sel) return;
+    if (sel.locked !== null) return;
+    for (const [otherId, otherSel] of this.selectionState) {
+      if (otherId === playerId) continue;
+      if (otherSel.locked === characterId) return;
+    }
+
+    sel.locked = characterId;
+    sel.hovered = characterId;
+
+    // Auto-snap any other player whose hover collides with the new lock.
+    for (const [otherId, otherSel] of this.selectionState) {
+      if (otherId === playerId) continue;
+      if (otherSel.locked !== null) continue;
+      if (otherSel.hovered !== characterId) continue;
+      // Find the first character not currently locked by anyone.
+      const taken = new Set<CharacterId>();
+      for (const s of this.selectionState.values()) {
+        if (s.locked !== null) taken.add(s.locked);
+      }
+      const fallback = CHARACTER_IDS.find((c) => !taken.has(c)) ?? CHARACTER_IDS[0];
+      otherSel.hovered = fallback;
+    }
+  }
+
+  /**
+   * Build the per-tick character-select state message from the selection
+   * map. The matchmaking manager broadcasts this in place of gameState
+   * while the match is in CHARACTER_SELECT.
+   */
+  getSelectStateMessage(): ServerCharacterSelectStateMessage {
+    const selections: ServerCharacterSelectStateMessage['selections'] = [];
+    for (const [playerId, sel] of this.selectionState) {
+      const player = this.players.get(playerId);
+      selections.push({
+        playerId,
+        nickname: player?.nickname ?? '',
+        hoveredCharacterId: sel.hovered,
+        lockedCharacterId: sel.locked,
+      });
+    }
+    return {
+      type: 'server:characterSelectState',
+      selections,
+      timeRemainingMs: Math.max(0, this.selectTimer * 1000),
+    };
   }
 
   /** Record a kill event. */
@@ -698,6 +858,9 @@ export class Match implements MatchContext {
     return {
       id,
       nickname,
+      // Set during the CHARACTER_SELECT → COUNTDOWN transition by
+      // updateCharacterSelect, from each player's locked selection.
+      characterId: null,
       position: { x: position.x, y: position.y },
       velocity: { x: 0, y: 0 },
       aimAngle: 0,

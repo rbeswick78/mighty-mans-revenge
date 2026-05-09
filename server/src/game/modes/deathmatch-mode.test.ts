@@ -9,6 +9,7 @@ function makePlayer(id: PlayerId, score = 0, deaths = 0): PlayerState {
   return {
     id,
     nickname: `Player ${id}`,
+    characterId: 'mighty_man',
     position: { x: 0, y: 0 },
     velocity: { x: 0, y: 0 },
     aimAngle: 0,

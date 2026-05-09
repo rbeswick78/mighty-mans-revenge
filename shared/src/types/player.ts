@@ -1,7 +1,14 @@
 import { PlayerId, Vec2, Tick } from './common.js';
+import type { CharacterId } from '../config/game.js';
 
 export interface PlayerState {
   id: PlayerId;
+  /**
+   * The character this player has chosen on the select screen. Null until
+   * the player locks in (or is auto-locked at timeout). Once a match
+   * transitions to COUNTDOWN this is guaranteed non-null on every player.
+   */
+  characterId: CharacterId | null;
   position: Vec2;
   velocity: Vec2;
   aimAngle: number;

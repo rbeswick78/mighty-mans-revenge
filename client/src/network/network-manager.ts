@@ -9,7 +9,7 @@ import type {
   FinalMinuteEvent,
 } from '@shared/types/network.js';
 import { MatchPhase } from '@shared/types/game.js';
-import { SERVER } from '@shared/config/game.js';
+import { SERVER, type CharacterId } from '@shared/config/game.js';
 import { eventToMovementModifiers } from '@shared/utils/event-modifiers.js';
 import { NetworkConnection } from './connection.js';
 import { ClientPrediction } from './prediction.js';
@@ -32,6 +32,7 @@ type EventName =
   | 'matchmakingStatus'
   | 'rematchStatus'
   | 'opponentDisconnected'
+  | 'characterSelectState'
   | 'bulletTrail'
   | 'grenadeThrown'
   | 'grenadeExploded'
@@ -167,6 +168,16 @@ export class NetworkManager {
     this.connection.send({ type: 'client:cancelMatchmaking' });
   }
 
+  /** Send a hover update during the character-select phase. */
+  sendCharacterHover(characterId: CharacterId): void {
+    this.connection.send({ type: 'client:characterHover', characterId });
+  }
+
+  /** Lock in the chosen character for the character-select phase. */
+  sendCharacterLock(characterId: CharacterId): void {
+    this.connection.send({ type: 'client:characterLock', characterId });
+  }
+
   /** Request a rematch. */
   requestRematch(): void {
     this.connection.send({ type: 'client:rematchRequest' });
@@ -289,6 +300,10 @@ export class NetworkManager {
 
       case 'server:matchFound':
         this.emit('matchFound', msg);
+        break;
+
+      case 'server:characterSelectState':
+        this.emit('characterSelectState', msg);
         break;
 
       case 'server:matchCountdown':
@@ -512,6 +527,10 @@ export class NetworkManager {
   ): PlayerState {
     return {
       id: s.id,
+      // Mirror server: SerializedPlayerState.characterId is non-null in
+      // gameState messages (those only ship from COUNTDOWN onward), so we
+      // can carry it straight through to PlayerState.
+      characterId: s.characterId,
       position: { x: s.position.x, y: s.position.y },
       velocity: { x: s.velocity.x, y: s.velocity.y },
       aimAngle: s.aimAngle,

@@ -24,6 +24,7 @@ function makePlayer(overrides: Partial<PlayerState> = {}): PlayerState {
   return {
     id: 'p1',
     nickname: 'p1',
+    characterId: 'mighty_man',
     position: { x: 0, y: 0 },
     velocity: { x: 0, y: 0 },
     aimAngle: 0,

@@ -12,6 +12,7 @@ import {
 
 function createPlayer(overrides: Partial<PlayerState> & { id: PlayerId }): PlayerState {
   return {
+    characterId: 'mighty_man',
     position: { x: 100, y: 100 },
     velocity: { x: 0, y: 0 },
     aimAngle: 0,

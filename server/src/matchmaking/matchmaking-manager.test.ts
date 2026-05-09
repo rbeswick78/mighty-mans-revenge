@@ -139,6 +139,11 @@ describe('match clock alignment (regression: 3-second event/timer offset)', () =
       mgr.handleJoinMatchmaking('B', 'B');
       expect(mgr.getActiveMatches()).toHaveLength(1);
 
+      // Skip CHARACTER_SELECT — both players lock immediately so the
+      // match transitions to COUNTDOWN on the next tick.
+      mgr.handleCharacterLock('A', 'mighty_man');
+      mgr.handleCharacterLock('B', 'bruce');
+
       let matchStartTick = -1;
       let matchEndsInMsValue = 0;
       let eventStartTick = -1;
@@ -187,6 +192,10 @@ describe('match clock alignment (regression: 3-second event/timer offset)', () =
 
     mgr.handleJoinMatchmaking('A', 'A');
     mgr.handleJoinMatchmaking('B', 'B');
+
+    // Skip CHARACTER_SELECT — both players lock immediately.
+    mgr.handleCharacterLock('A', 'mighty_man');
+    mgr.handleCharacterLock('B', 'bruce');
 
     // Run through the countdown plus a handful of active ticks.
     const totalTicks = Math.ceil(MATCH.COUNTDOWN_DURATION / dt) + 20;

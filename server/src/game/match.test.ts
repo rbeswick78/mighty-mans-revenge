@@ -1,6 +1,16 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Match } from './match.js';
-import { MatchPhase, MATCH, RESPAWN, PLAYER, GUN, SERVER, EVENT, GRENADE } from '@shared/game';
+import {
+  MatchPhase,
+  MATCH,
+  RESPAWN,
+  PLAYER,
+  GUN,
+  SERVER,
+  EVENT,
+  GRENADE,
+  CHARACTER_IDS,
+} from '@shared/game';
 import type { MapData, PlayerInput, FinalMinuteEvent } from '@shared/game';
 
 function makeInput(seq: number, overrides: Partial<PlayerInput> = {}): PlayerInput {
@@ -56,17 +66,17 @@ describe('Match', () => {
   });
 
   describe('state transitions', () => {
-    it('should start in WAITING phase', () => {
-      expect(match.phase).toBe(MatchPhase.WAITING);
+    it('should start in CHARACTER_SELECT phase', () => {
+      expect(match.phase).toBe(MatchPhase.CHARACTER_SELECT);
     });
 
-    it('should transition from WAITING to COUNTDOWN', () => {
+    it('should transition from CHARACTER_SELECT to COUNTDOWN', () => {
       match.startCountdown();
       expect(match.phase).toBe(MatchPhase.COUNTDOWN);
       expect(match.countdownTimer).toBe(MATCH.COUNTDOWN_DURATION);
     });
 
-    it('should not start countdown if not in WAITING', () => {
+    it('should not start countdown if not in CHARACTER_SELECT', () => {
       match.startCountdown();
       match.startCountdown(); // second call should be ignored
       expect(match.phase).toBe(MatchPhase.COUNTDOWN);
@@ -83,6 +93,138 @@ describe('Match', () => {
       match.startCountdown();
       match.update(1);
       expect(match.countdownTimer).toBeCloseTo(MATCH.COUNTDOWN_DURATION - 1, 5);
+    });
+  });
+
+  describe('character select', () => {
+    it('getSelectStateMessage seeds one entry per player with deterministic default hovers', () => {
+      const m = createMatch();
+      const msg = m.getSelectStateMessage();
+
+      expect(msg.type).toBe('server:characterSelectState');
+      expect(msg.selections).toHaveLength(2);
+
+      const p0 = msg.selections.find((s) => s.playerId === 'player-0')!;
+      const p1 = msg.selections.find((s) => s.playerId === 'player-1')!;
+
+      expect(p0).toBeDefined();
+      expect(p1).toBeDefined();
+
+      // First player gets CHARACTER_IDS[0] (mighty_man), second gets [1] (bruce).
+      expect(p0.hoveredCharacterId).toBe(CHARACTER_IDS[0]);
+      expect(p1.hoveredCharacterId).toBe(CHARACTER_IDS[1]);
+      expect(p0.lockedCharacterId).toBeNull();
+      expect(p1.lockedCharacterId).toBeNull();
+      expect(msg.timeRemainingMs).toBeGreaterThan(0);
+    });
+
+    it('setHover updates the hover and is reflected in the next broadcast', () => {
+      const m = createMatch();
+      m.setHover('player-0', 'bruce');
+
+      const msg = m.getSelectStateMessage();
+      const p0 = msg.selections.find((s) => s.playerId === 'player-0')!;
+      expect(p0.hoveredCharacterId).toBe('bruce');
+    });
+
+    it('setHover is a no-op when the requested character is locked by another player', () => {
+      const m = createMatch();
+      m.setLock('player-0', 'mighty_man');
+
+      // P2 default hover is bruce; trying to hover mighty_man (P1's lock)
+      // should be silently rejected, leaving the hover unchanged.
+      const before = m.getSelectStateMessage().selections.find(
+        (s) => s.playerId === 'player-1',
+      )!;
+      m.setHover('player-1', 'mighty_man');
+      const after = m.getSelectStateMessage().selections.find(
+        (s) => s.playerId === 'player-1',
+      )!;
+
+      expect(after.hoveredCharacterId).toBe(before.hoveredCharacterId);
+      expect(after.hoveredCharacterId).not.toBe('mighty_man');
+    });
+
+    it('setLock is a no-op when the character is already locked by another player', () => {
+      const m = createMatch();
+      m.setLock('player-0', 'mighty_man');
+      m.setLock('player-1', 'mighty_man');
+
+      const p1 = m.getSelectStateMessage().selections.find(
+        (s) => s.playerId === 'player-1',
+      )!;
+      expect(p1.lockedCharacterId).toBeNull();
+    });
+
+    it('auto-snaps a colliding hover when the other player locks that character', () => {
+      const m = createMatch();
+      // Force both players onto mighty_man.
+      m.setHover('player-0', 'mighty_man');
+      m.setHover('player-1', 'mighty_man');
+
+      m.setLock('player-0', 'mighty_man');
+
+      const msg = m.getSelectStateMessage();
+      const p1 = msg.selections.find((s) => s.playerId === 'player-1')!;
+      expect(p1.hoveredCharacterId).not.toBe('mighty_man');
+      // With a 2-character roster, the only available fallback is bruce.
+      expect(p1.hoveredCharacterId).toBe('bruce');
+    });
+
+    it('transitions to COUNTDOWN once both players are locked, committing characterId on each player', () => {
+      const m = createMatch();
+      m.setLock('player-0', 'mighty_man');
+      m.setLock('player-1', 'bruce');
+
+      // Pre-tick: phase is still CHARACTER_SELECT. The transition happens
+      // inside update() (updateCharacterSelect drains the locks).
+      expect(m.phase).toBe(MatchPhase.CHARACTER_SELECT);
+
+      m.update(0.1);
+
+      expect(m.phase).toBe(MatchPhase.COUNTDOWN);
+      expect(m.players.get('player-0')!.characterId).toBe('mighty_man');
+      expect(m.players.get('player-1')!.characterId).toBe('bruce');
+    });
+
+    it('on timeout, auto-locks every unlocked player onto their current hover and starts countdown', () => {
+      const m = createMatch();
+      // Don't lock anything. P0's default hover is mighty_man, P1's is bruce.
+
+      // One big tick well past the timeout. updateCharacterSelect doesn't
+      // clamp dt internally — it just decrements selectTimer and checks if
+      // it's hit zero.
+      m.update(MATCH.CHARACTER_SELECT_TIMEOUT_SEC + 1);
+
+      expect(m.phase).toBe(MatchPhase.COUNTDOWN);
+      expect(m.players.get('player-0')!.characterId).not.toBeNull();
+      expect(m.players.get('player-1')!.characterId).not.toBeNull();
+      // Default hovers were preserved as the auto-lock targets.
+      expect(m.players.get('player-0')!.characterId).toBe('mighty_man');
+      expect(m.players.get('player-1')!.characterId).toBe('bruce');
+    });
+
+    it('after both players lock, no two players hold the same locked character', () => {
+      // With auto-snap on lock, even colliding hovers must resolve to a
+      // distinct lock per player.
+      const m = createMatch();
+      m.setHover('player-0', 'mighty_man');
+      m.setHover('player-1', 'mighty_man');
+
+      m.setLock('player-0', 'mighty_man');
+      // P1's hover was auto-snapped to bruce; lock that.
+      const p1Selection = m.getSelectStateMessage().selections.find(
+        (s) => s.playerId === 'player-1',
+      )!;
+      m.setLock('player-1', p1Selection.hoveredCharacterId!);
+
+      m.update(0.1);
+
+      const p0Char = m.players.get('player-0')!.characterId;
+      const p1Char = m.players.get('player-1')!.characterId;
+      expect(p0Char).not.toBeNull();
+      expect(p1Char).not.toBeNull();
+      expect(p0Char).not.toBe(p1Char);
     });
   });
 

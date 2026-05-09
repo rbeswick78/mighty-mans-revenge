@@ -5,6 +5,13 @@ import { PickupState } from './pickup.js';
 
 export enum MatchPhase {
   WAITING = 'waiting',
+  /**
+   * Both players are connected and on the character-select screen. The
+   * server broadcasts `server:characterSelectState` (not `server:gameState`)
+   * during this phase. Transitions to COUNTDOWN once both players are
+   * locked in or the select timer expires.
+   */
+  CHARACTER_SELECT = 'character_select',
   COUNTDOWN = 'countdown',
   ACTIVE = 'active',
   ENDED = 'ended',

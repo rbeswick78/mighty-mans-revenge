@@ -317,7 +317,7 @@ export class ResultsScene extends Phaser.Scene {
         if (transitioned) return;
         transitioned = true;
         this.cleanupEvents();
-        this.scene.start('GameScene', {
+        this.scene.start('CharacterSelectScene', {
           nickname: this.nickname,
           matchData,
         });

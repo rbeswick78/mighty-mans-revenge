@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { Wasteland, cssHex } from '@shared/config/palette.js';
 import { BootScene } from './scenes/boot-scene.js';
 import { LobbyScene } from './scenes/lobby-scene.js';
+import { CharacterSelectScene } from './scenes/character-select-scene.js';
 import { GameScene } from './scenes/game-scene.js';
 import { ResultsScene } from './scenes/results-scene.js';
 import { TilePickerScene } from './scenes/tile-picker-scene.js';
@@ -36,7 +37,7 @@ const config: Phaser.Types.Core.GameConfig = {
     createContainer: true,
   },
   backgroundColor: cssHex(Wasteland.CANVAS_BG),
-  scene: [BootScene, LobbyScene, GameScene, ResultsScene, TilePickerScene],
+  scene: [BootScene, LobbyScene, CharacterSelectScene, GameScene, ResultsScene, TilePickerScene],
 };
 
 const game = new Phaser.Game(config);

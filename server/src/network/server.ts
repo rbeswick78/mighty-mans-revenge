@@ -11,6 +11,8 @@ const VALID_CLIENT_MESSAGE_TYPES = new Set([
   'client:cancelMatchmaking',
   'client:rematchRequest',
   'client:returnToLobby',
+  'client:characterHover',
+  'client:characterLock',
   'client:ping',
 ]);
 

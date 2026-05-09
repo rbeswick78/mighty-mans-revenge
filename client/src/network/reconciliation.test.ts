@@ -7,6 +7,7 @@ import { ServerReconciliation } from './reconciliation.js';
 function makePlayerState(overrides: Partial<PlayerState> = {}): PlayerState {
   return {
     id: 'player-1',
+    characterId: null,
     position: { x: 100, y: 100 },
     velocity: { x: 0, y: 0 },
     aimAngle: 0,
@@ -35,6 +36,7 @@ function makeServerState(
 ): SerializedPlayerState {
   return {
     id: 'player-1',
+    characterId: 'mighty_man',
     position: { x: 100, y: 100 },
     velocity: { x: 0, y: 0 },
     aimAngle: 0,

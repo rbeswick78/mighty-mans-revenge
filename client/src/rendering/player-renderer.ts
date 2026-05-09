@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import type { PlayerState } from '@shared/types/player.js';
+import { CHARACTERS, type CharacterId } from '@shared/config/game.js';
 import { Wasteland, cssHex, healthColor } from '@shared/config/palette.js';
 import { bucketAimAngle, type Direction4 } from './sprite-direction.js';
 
@@ -30,8 +31,8 @@ type GunState = 'hold' | 'shoot';
 export class PlayerRenderer {
   private container: Phaser.GameObjects.Container;
   private sprite: Phaser.GameObjects.Sprite;
-  /** Held weapon overlay; only present for player-kind renderers (zombies have no gun). */
-  private gunSprite: Phaser.GameObjects.Sprite | null = null;
+  /** Held weapon overlay layered on top of the no-hands character sprite. */
+  private gunSprite: Phaser.GameObjects.Sprite;
   private healthBarBg: Phaser.GameObjects.Rectangle;
   private healthBarFg: Phaser.GameObjects.Rectangle;
   private nicknameText: Phaser.GameObjects.Text;
@@ -39,7 +40,12 @@ export class PlayerRenderer {
   private invulnerableTween: Phaser.Tweens.Tween | null = null;
   private sprintParticles: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
 
-  private readonly texturePrefix: 'player' | 'enemy';
+  /**
+   * Sprite-sheet/animation key prefix for this character. Sourced from
+   * `CHARACTERS[characterId].spritePrefix` in /shared so the character
+   * registry stays the single source of truth.
+   */
+  private readonly texturePrefix: string;
   private currentDirection: Direction4 = 'down';
   private currentAnimState: AnimState = 'idle';
   private currentGunState: GunState = 'hold';
@@ -48,24 +54,22 @@ export class PlayerRenderer {
   private lastX = 0;
   private lastY = 0;
 
-  constructor(scene: Phaser.Scene, isLocalPlayer: boolean) {
+  constructor(scene: Phaser.Scene, characterId: CharacterId) {
     this.scene = scene;
-    this.texturePrefix = isLocalPlayer ? 'player' : 'enemy';
+    this.texturePrefix = CHARACTERS[characterId].spritePrefix;
 
     this.sprite = scene.add.sprite(0, 0, this.animKey('down', 'idle'), 0);
     this.sprite.setOrigin(0.5, 0.5);
     this.sprite.setScale(SPRITE_SCALE);
     this.sprite.play(this.animKey('down', 'idle'));
 
-    // Gun overlay: only the player kind. Layered on top of the no-hands
-    // character sprite so the asset-pack's centered weapon falls into the
-    // held-hand position. Zombies don't get one — they wield nothing.
-    if (this.texturePrefix === 'player') {
-      this.gunSprite = scene.add.sprite(0, 0, this.gunKey('down', 'hold'), 0);
-      this.gunSprite.setOrigin(0.5, 0.5);
-      this.gunSprite.setScale(SPRITE_SCALE);
-      this.gunSprite.play(this.gunKey('down', 'hold'));
-    }
+    // Gun overlay: shared across characters (not character-specific art).
+    // Layered on top of the no-hands character sprite so the asset-pack's
+    // centered weapon falls into the held-hand position.
+    this.gunSprite = scene.add.sprite(0, 0, this.gunKey('down', 'hold'), 0);
+    this.gunSprite.setOrigin(0.5, 0.5);
+    this.gunSprite.setScale(SPRITE_SCALE);
+    this.gunSprite.play(this.gunKey('down', 'hold'));
 
     this.healthBarBg = scene.add.rectangle(
       0,
@@ -93,9 +97,13 @@ export class PlayerRenderer {
     });
     this.nicknameText.setOrigin(0.5, 0.5);
 
-    const children: Phaser.GameObjects.GameObject[] = [this.sprite];
-    if (this.gunSprite) children.push(this.gunSprite);
-    children.push(this.healthBarBg, this.healthBarFg, this.nicknameText);
+    const children: Phaser.GameObjects.GameObject[] = [
+      this.sprite,
+      this.gunSprite,
+      this.healthBarBg,
+      this.healthBarFg,
+      this.nicknameText,
+    ];
     this.container = scene.add.container(0, 0, children);
   }
 
@@ -154,7 +162,6 @@ export class PlayerRenderer {
    * the looping hold anim.
    */
   playShootAnimation(): void {
-    if (!this.gunSprite) return;
     this.currentGunState = 'shoot';
     this.playCurrentGunAnim();
     this.gunShootTimer?.remove(false);
@@ -254,7 +261,6 @@ export class PlayerRenderer {
     }
     this.gunShootTimer?.remove(false);
     this.gunShootTimer = null;
-    this.gunSprite = null;
     this.container.destroy();
   }
 
@@ -265,7 +271,6 @@ export class PlayerRenderer {
   }
 
   private playCurrentGunAnim(): void {
-    if (!this.gunSprite) return;
     const key = this.gunKey(this.currentDirection, this.currentGunState);
     // ignoreIfPlaying = false: shooting again restarts the shoot anim.
     this.gunSprite.play(key, this.currentGunState === 'hold');

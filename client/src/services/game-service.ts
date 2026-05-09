@@ -5,8 +5,10 @@ import type {
   ServerMatchFoundMessage,
   ServerMatchmakingStatusMessage,
   ServerPlayerKilledMessage,
+  ServerCharacterSelectStateMessage,
   FinalMinuteEvent,
 } from '@shared/types/network.js';
+import type { CharacterId } from '@shared/config/game.js';
 import { NetworkManager, type LocalCorrection } from '../network/network-manager.js';
 
 export interface EventWarningPayload {
@@ -34,6 +36,7 @@ type GameServiceEvent =
   | 'matchmakingStatus'
   | 'rematchStatus'
   | 'opponentDisconnected'
+  | 'characterSelectState'
   | 'playerKilled'
   | 'pickupCollected'
   | 'bulletTrail'
@@ -116,6 +119,14 @@ export class GameService {
     this.networkManager.cancelMatchmaking();
   }
 
+  sendCharacterHover(characterId: CharacterId): void {
+    this.networkManager.sendCharacterHover(characterId);
+  }
+
+  sendCharacterLock(characterId: CharacterId): void {
+    this.networkManager.sendCharacterLock(characterId);
+  }
+
   sendInput(input: PlayerInput): void {
     this.networkManager.sendInput(input);
   }
@@ -188,6 +199,10 @@ export class GameService {
 
     this.networkManager.on('opponentDisconnected', (playerId: PlayerId) => {
       this.emit('opponentDisconnected', playerId);
+    });
+
+    this.networkManager.on('characterSelectState', (msg: ServerCharacterSelectStateMessage) => {
+      this.emit('characterSelectState', msg);
     });
 
     this.networkManager.on('playerKilled', (msg: ServerPlayerKilledMessage) => {

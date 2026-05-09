@@ -98,6 +98,14 @@ export class GameManager {
         this.matchmaking.handleReturnToLobby(playerId);
         break;
 
+      case 'client:characterHover':
+        this.matchmaking.handleCharacterHover(playerId, message.characterId);
+        break;
+
+      case 'client:characterLock':
+        this.matchmaking.handleCharacterLock(playerId, message.characterId);
+        break;
+
       case 'client:ping': {
         // Cache server-side RTT estimate so lag compensation can rewind
         // opponent positions to this player's render time on shoot. The

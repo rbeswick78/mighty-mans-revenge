@@ -1,5 +1,6 @@
 import type { PlayerId, Vec2 } from '@shared/types/common.js';
 import type { SerializedPlayerState } from '@shared/types/network.js';
+import type { CharacterId } from '@shared/config/game.js';
 import type { InterpolatedState } from './types.js';
 
 /** Stop extrapolating if we haven't received an update in this many ms. */
@@ -14,6 +15,7 @@ const MAX_EXTRAPOLATION_MS = 200;
 const MAX_BUFFER_SIZE = 12;
 
 interface BufferedState {
+  characterId: CharacterId;
   position: Vec2;
   velocity: Vec2;
   aimAngle: number;
@@ -63,6 +65,7 @@ function lerpAngle(a: number, b: number, t: number): number {
 
 function toInterpolated(s: BufferedState): InterpolatedState {
   return {
+    characterId: s.characterId,
     position: { x: s.position.x, y: s.position.y },
     velocity: { x: s.velocity.x, y: s.velocity.y },
     aimAngle: s.aimAngle,
@@ -114,6 +117,7 @@ export class EntityInterpolation {
     buffer.highestTick = serverTick;
 
     const buffered: BufferedState = {
+      characterId: state.characterId,
       position: { x: state.position.x, y: state.position.y },
       velocity: { x: state.velocity.x, y: state.velocity.y },
       aimAngle: state.aimAngle,
@@ -189,6 +193,7 @@ export class EntityInterpolation {
         }
         const t = (renderTime - prev.timestamp) / duration;
         return {
+          characterId: curr.characterId,
           position: {
             x: lerp(prev.position.x, curr.position.x, t),
             y: lerp(prev.position.y, curr.position.y, t),

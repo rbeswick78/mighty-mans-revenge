@@ -25,6 +25,9 @@ export class PlayerManager {
 
     const player: PlayerState = {
       id,
+      // Populated by Match.updateCharacterSelect once the player locks
+      // their selection (or is auto-locked at timeout).
+      characterId: null,
       position: { x: spawnPos.x, y: spawnPos.y },
       velocity: { x: 0, y: 0 },
       aimAngle: 0,
