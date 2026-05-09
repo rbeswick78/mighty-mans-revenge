@@ -29,6 +29,7 @@ import { ExplosionFx } from '../rendering/explosion-fx.js';
 import { SmokeFx } from '../rendering/smoke-fx.js';
 import { FireBreathFx } from '../rendering/fire-breath-fx.js';
 import { XrayFx } from '../rendering/xray-fx.js';
+import { AbilityAura } from '../rendering/ability-aura.js';
 import { DecalRenderer } from '../rendering/decal-renderer.js';
 import { CameraKick } from '../rendering/camera-kick.js';
 import { ZoomPulse } from '../rendering/zoom-pulse.js';
@@ -90,6 +91,13 @@ export class GameScene extends Phaser.Scene {
   private smokeFx: SmokeFx | null = null;
   private fireBreathFx: FireBreathFx | null = null;
   private xrayFx: XrayFx | null = null;
+  private abilityAura: AbilityAura | null = null;
+  /**
+   * Last-seen `abilityActiveSeconds > 0` for the local player. Used to
+   * detect the false→true edge so the activation banner fires exactly
+   * once per cast — not every frame the ability is active.
+   */
+  private prevAbilityActive = false;
   private decalRenderer: DecalRenderer | null = null;
   private cameraKick: CameraKick | null = null;
   private zoomPulse: ZoomPulse | null = null;
@@ -209,6 +217,7 @@ export class GameScene extends Phaser.Scene {
     this.smokeFx = new SmokeFx(this);
     this.fireBreathFx = new FireBreathFx(this);
     this.xrayFx = new XrayFx(this);
+    this.abilityAura = new AbilityAura(this);
     this.shockwaveController = new ShockwaveController();
     this.cameraKick = new CameraKick();
     this.zoomPulse = new ZoomPulse();
@@ -422,12 +431,28 @@ export class GameScene extends Phaser.Scene {
 
         // Ability VFX. Fire cone for any active Bruce; screen-edge border +
         // tint for the local player while their ability is active; x-ray
-        // silhouettes only for the local Mighty Man.
+        // silhouettes only for the local Mighty Man; floor aura for any
+        // active player so opponents also visibly telegraph their cast.
         const localSerialized =
           allPlayers.find((p) => p.id === playerId) ?? null;
         const collisionGrid = this.mapRenderer?.getCollisionGrid() ?? null;
+        this.abilityAura?.update(allPlayers, delta);
         this.fireBreathFx?.update(allPlayers, delta);
         this.xrayFx?.update(localSerialized, allPlayers, collisionGrid, delta);
+
+        // Detect the local-player ability activation edge (false→true) and
+        // flash a centered banner. Single-shot per cast — only fires the
+        // first frame abilityActiveSeconds crosses 0.
+        const localAbilityActive = currentLocalState.abilityActiveSeconds > 0;
+        if (localAbilityActive && !this.prevAbilityActive) {
+          if (currentLocalState.characterId === 'bruce') {
+            this.hud.showAbilityActivation('FIRE BREATH!', 0xff7b2a);
+          } else if (currentLocalState.characterId === 'mighty_man') {
+            this.hud.showAbilityActivation('X-RAY VISION!', 0x4ad8e8);
+          }
+          this.zoomPulse?.trigger();
+        }
+        this.prevAbilityActive = localAbilityActive;
 
         // Update HUD
         this.hud.updateHealth(currentLocalState.health, PLAYER.MAX_HEALTH);
@@ -1096,6 +1121,11 @@ export class GameScene extends Phaser.Scene {
       this.xrayFx.destroy();
       this.xrayFx = null;
     }
+    if (this.abilityAura) {
+      this.abilityAura.destroy();
+      this.abilityAura = null;
+    }
+    this.prevAbilityActive = false;
     this.shockwaveController = null;
     if (this.cameraKick) {
       this.cameraKick.reset(this.cameras.main);

@@ -56,13 +56,18 @@ export class FireBreathFx {
     const perpX = -dirY;
     const perpY = dirX;
 
+    // Four stacked layers: hot white core → orange → red → outer dark-red
+    // halo. Higher alphas than v1 so the cone reads even under bloom + CRT
+    // post-FX. Tip widths grow per layer so the outer halo bleeds beyond
+    // the hot core, which is what sells the "flame fanning out" silhouette.
     const layers = [
-      { color: 0xfff4d6, alpha: 0.9, scale: 0.55, tipW: 14 },
-      { color: 0xfca72a, alpha: 0.7, scale: 0.78, tipW: 22 },
-      { color: 0xb43a3a, alpha: 0.45, scale: 1.0, tipW: 30 },
+      { color: 0xffffff, alpha: 1.0, scale: 0.45, tipW: 12 },
+      { color: 0xfff4d6, alpha: 0.95, scale: 0.65, tipW: 20 },
+      { color: 0xfca72a, alpha: 0.85, scale: 0.85, tipW: 28 },
+      { color: 0xff3a1e, alpha: 0.65, scale: 1.05, tipW: 36 },
     ];
 
-    const baseHalfWidth = 5;
+    const baseHalfWidth = 7;
 
     for (const layer of layers) {
       const flicker = 0.88 + 0.12 * Math.sin(phase * 24 + layer.scale * 7);

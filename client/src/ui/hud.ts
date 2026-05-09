@@ -537,6 +537,33 @@ export class HUD {
   }
 
   /**
+   * Big centered banner that fires once when the local player triggers an
+   * ability. Same scale-fade language as the countdown, tinted by the
+   * character's ability color. Loud and unmistakable — the player knows
+   * the ability went off even if they can't see the world-space VFX.
+   */
+  showAbilityActivation(label: string, tintColor: number): void {
+    this.eventBannerText.setText(label);
+    this.eventBannerText.setColor(cssHex(tintColor));
+    this.eventBannerText.setVisible(true);
+    this.eventBannerText.setScale(1.8);
+    this.eventBannerText.setAlpha(1);
+
+    this.scene.tweens.killTweensOf(this.eventBannerText);
+    this.scene.tweens.add({
+      targets: this.eventBannerText,
+      scaleX: 1,
+      scaleY: 1,
+      alpha: 0,
+      duration: 1200,
+      ease: 'Quad.easeIn',
+      onComplete: () => {
+        this.eventBannerText.setVisible(false);
+      },
+    });
+  }
+
+  /**
    * Show / hide the persistent label that names the active final-minute
    * event next to the match timer. Pass null to hide.
    */

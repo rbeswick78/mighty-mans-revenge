@@ -9,12 +9,15 @@ const TINT_DEPTH = 1500;
 const BORDER_DEPTH = 1600;
 const SILHOUETTE_DEPTH = 35;
 const XRAY_COLOR = 0x4ad8e8;
-const XRAY_TINT_ALPHA = 0.10;
+const XRAY_TINT_ALPHA = 0.18;
 const FIRE_COLOR = 0xff7b2a;
-const FIRE_TINT_ALPHA = 0.14;
-const SILHOUETTE_ALPHA = 0.55;
-/** Border strip thickness in pixels — bright frame around the gameboard. */
-const BORDER_THICKNESS = 6;
+const FIRE_TINT_ALPHA = 0.22;
+const SILHOUETTE_ALPHA = 0.7;
+/**
+ * Border strip thickness in pixels — bright frame around the gameboard.
+ * Thick enough that the CRT vignette + bloom can't visually erase it.
+ */
+const BORDER_THICKNESS = 10;
 
 /**
  * Local-player ability VFX: screen-edge border, full-screen tint, and (for
@@ -97,10 +100,12 @@ export class XrayFx {
 
     if (active) {
       this.pulseMs += deltaMs;
-      const pulse = 0.7 + 0.3 * Math.abs(Math.sin(this.pulseMs / 220));
+      // Pulse stays high-amplitude (0.85→1.0) so the border never fades
+      // into the background — it reads as "ABILITY ON" at all times.
+      const pulse = 0.85 + 0.15 * Math.abs(Math.sin(this.pulseMs / 180));
       const color = isBruce ? FIRE_COLOR : XRAY_COLOR;
       const tintAlpha = isBruce ? FIRE_TINT_ALPHA : XRAY_TINT_ALPHA;
-      this.tintRect.setFillStyle(color, tintAlpha);
+      this.tintRect.setFillStyle(color, tintAlpha * (0.8 + 0.2 * pulse));
       this.tintRect.setVisible(true);
       for (const rect of this.borderRects) {
         rect.setFillStyle(color, pulse);
