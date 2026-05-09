@@ -41,6 +41,15 @@ export class Crosshair {
     this.canvasLeaveHandler = () => this.sprite.setVisible(false);
     canvas.addEventListener('mouseenter', this.canvasEnterHandler);
     canvas.addEventListener('mouseleave', this.canvasLeaveHandler);
+
+    // If the pointer is already over the canvas when the match starts (the
+    // common case — the player just clicked a lobby button), no mouseenter
+    // will fire, so seed visibility from the current hover state.
+    if (canvas.matches(':hover')) {
+      const pointer = scene.input.activePointer;
+      this.sprite.setPosition(pointer.x, pointer.y);
+      this.sprite.setVisible(true);
+    }
   }
 
   update(): void {
