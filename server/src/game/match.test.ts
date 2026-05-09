@@ -160,6 +160,33 @@ describe('Match', () => {
       expect(victim.invulnerableTimer).toBeLessThanOrEqual(RESPAWN.INVULNERABILITY_DURATION);
       expect(victim.ammo).toBe(GUN.MAGAZINE_SIZE);
     });
+
+    it('should send co-dying players to different spawn points', () => {
+      // Regression: a shared-grenade death used to send both players to the
+      // same "farthest from death" spawn because the respawn picker had no
+      // awareness of other respawning players.
+      match.startCountdown();
+      match.update(MATCH.COUNTDOWN_DURATION + 0.1);
+
+      const p0 = match.players.get('player-0')!;
+      const p1 = match.players.get('player-1')!;
+      // Stand them on the same tile so their death positions match.
+      p0.position = { x: 200, y: 200 };
+      p1.position = { x: 200, y: 200 };
+
+      // Mutual death this tick (mimics a grenade that catches both players).
+      match.onKill('player-1', 'player-0', 'grenade');
+      match.onKill('player-0', 'player-1', 'grenade');
+      expect(p0.isDead).toBe(true);
+      expect(p1.isDead).toBe(true);
+
+      // Tick past the respawn delay; both should respawn this update.
+      match.update(RESPAWN.DELAY + 0.1);
+
+      expect(p0.isDead).toBe(false);
+      expect(p1.isDead).toBe(false);
+      expect(p0.position).not.toEqual(p1.position);
+    });
   });
 
   describe('scoring', () => {

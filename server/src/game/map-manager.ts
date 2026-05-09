@@ -67,22 +67,40 @@ export class MapManager {
   }
 
   /**
-   * Returns the spawn point farthest from the given position (in pixel coordinates).
+   * Pick a respawn point uniformly at random from spawn points not currently
+   * occupied. A spawn is "occupied" if any position in `otherPositions` is
+   * within one tile of it — keeps simultaneous respawns from colliding and
+   * avoids spawning on top of a corpse or a live opponent who happens to be
+   * standing on a spawn tile. Falls back to the spawn farthest from the
+   * nearest occupier if every spawn is blocked.
    */
-  getSpawnPointAwayFrom(pos: Vec2): Vec2 {
+  pickRespawnPoint(otherPositions: Vec2[], rng: () => number = Math.random): Vec2 {
     const mapData = this.getMapData();
-    let bestDist = -1;
-    let bestSpawn: Vec2 = this.spawnToPixel(mapData.spawnPoints[0]);
+    const allSpawns = mapData.spawnPoints.map((sp) => this.spawnToPixel(sp));
+    const minSeparation = mapData.tileSize;
 
-    for (const sp of mapData.spawnPoints) {
-      const pixelPos = this.spawnToPixel(sp);
-      const dist = vecDistance(pixelPos, pos);
-      if (dist > bestDist) {
-        bestDist = dist;
-        bestSpawn = pixelPos;
-      }
+    const available = allSpawns.filter((sp) =>
+      otherPositions.every((op) => vecDistance(sp, op) >= minSeparation),
+    );
+
+    if (available.length > 0) {
+      return available[Math.floor(rng() * available.length)];
     }
 
+    // Degenerate fallback: pick the spawn whose nearest occupier is farthest.
+    let bestSpawn = allSpawns[0];
+    let bestNearest = -1;
+    for (const sp of allSpawns) {
+      let nearest = Infinity;
+      for (const op of otherPositions) {
+        const d = vecDistance(sp, op);
+        if (d < nearest) nearest = d;
+      }
+      if (nearest > bestNearest) {
+        bestNearest = nearest;
+        bestSpawn = sp;
+      }
+    }
     return bestSpawn;
   }
 

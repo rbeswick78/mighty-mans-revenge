@@ -68,3 +68,41 @@ describe('MapManager.pickInitialSpawns', () => {
     }
   });
 });
+
+describe('MapManager.pickRespawnPoint', () => {
+  it('never returns a spawn within one tile of an occupier', () => {
+    const mm = new MapManager();
+    mm.loadMap(makeMap(4));
+    // makeMap(4) has spawns at tiles (0..3, 0..3) → pixel (24,24), (72,72), (120,120), (168,168).
+    const blocked = { x: 24, y: 24 };
+    for (let i = 0; i < 50; i++) {
+      const sp = mm.pickRespawnPoint([blocked], mulberry32(i + 1));
+      expect(sp).not.toEqual(blocked);
+    }
+  });
+
+  it('eventually picks every unoccupied spawn (uniform-ish over many seeds)', () => {
+    const mm = new MapManager();
+    mm.loadMap(makeMap(4));
+    const seen = new Set<string>();
+    for (let i = 0; i < 200; i++) {
+      const sp = mm.pickRespawnPoint([], mulberry32(i + 1));
+      seen.add(`${sp.x},${sp.y}`);
+    }
+    expect(seen.size).toBe(4);
+  });
+
+  it('falls back to the spawn farthest from its nearest occupier when all are blocked', () => {
+    const mm = new MapManager();
+    mm.loadMap(makeMap(2));
+    // Spawns at pixel (24,24) and (72,72). Block both:
+    //   - occupier exactly on spawn 0 → spawn 0 nearest = 0
+    //   - occupier at (60,60) → ~17px from spawn 1 (still inside the 48px bubble → blocked, but farther than 0)
+    const occupiers = [
+      { x: 24, y: 24 },
+      { x: 60, y: 60 },
+    ];
+    const sp = mm.pickRespawnPoint(occupiers, mulberry32(1));
+    expect(sp).toEqual({ x: 72, y: 72 });
+  });
+});

@@ -667,8 +667,14 @@ export class Match implements MatchContext {
   }
 
   private respawnPlayer(player: PlayerState): void {
-    // Find a spawn point far from where the player died
-    const spawnPos = this.mapManager.getSpawnPointAwayFrom(player.position);
+    // Random spawn that isn't already occupied by another player. Reading
+    // positions fresh each call means a co-respawning player processed earlier
+    // in this same tick is already at their new spawn and will be avoided.
+    const otherPositions: { x: number; y: number }[] = [];
+    for (const other of this.players.values()) {
+      if (other.id !== player.id) otherPositions.push(other.position);
+    }
+    const spawnPos = this.mapManager.pickRespawnPoint(otherPositions, this.rng);
     player.position = { ...spawnPos };
     player.velocity = { x: 0, y: 0 };
     // Honor any current cap (e.g. low_health drops maxHealth to 1) instead of
