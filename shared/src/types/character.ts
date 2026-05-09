@@ -35,4 +35,12 @@ export interface CharacterDef {
   readonly assetBaseName: string;
   readonly idleFrames: FramesByDirection;
   readonly runFrames: FramesByDirection;
+  /**
+   * Whether to render the held-gun overlay and matching muzzle flash for
+   * this character. Gameplay (bullets, damage) is identical regardless —
+   * this is purely visual. Mighty Man uses `_no-hands` sprites that need
+   * the overlay to fill in the weapon; Bruce's zombie sprite already shows
+   * his hands, so an extra gun would look glued-on.
+   */
+  readonly hasGun: boolean;
 }

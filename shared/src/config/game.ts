@@ -132,6 +132,7 @@ export const CHARACTERS = Object.freeze({
     spritePrefix: 'mighty_man',
     assetFolder: 'player',
     assetBaseName: 'character',
+    hasGun: true,
     idleFrames: {
       down: { w: 11, h: 16 },
       up: { w: 11, h: 16 },
@@ -151,6 +152,7 @@ export const CHARACTERS = Object.freeze({
     spritePrefix: 'bruce',
     assetFolder: 'enemies',
     assetBaseName: 'zombie',
+    hasGun: false,
     idleFrames: {
       down: { w: 13, h: 16 },
       up: { w: 13, h: 15 },

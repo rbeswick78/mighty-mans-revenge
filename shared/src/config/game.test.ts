@@ -54,6 +54,12 @@ describe('CHARACTERS registry', () => {
     expect(CHARACTER_IDS.length).toBe(keys.length);
   });
 
+  it('every entry declares a hasGun boolean', () => {
+    for (const def of Object.values(CHARACTERS)) {
+      expect(typeof def.hasGun).toBe('boolean');
+    }
+  });
+
   it('CHARACTERS is frozen', () => {
     expect(Object.isFrozen(CHARACTERS)).toBe(true);
   });

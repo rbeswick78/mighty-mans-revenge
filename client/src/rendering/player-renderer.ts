@@ -31,8 +31,14 @@ type GunState = 'hold' | 'shoot';
 export class PlayerRenderer {
   private container: Phaser.GameObjects.Container;
   private sprite: Phaser.GameObjects.Sprite;
-  /** Held weapon overlay layered on top of the no-hands character sprite. */
-  private gunSprite: Phaser.GameObjects.Sprite;
+  /**
+   * Held weapon overlay. Null for characters whose CharacterDef.hasGun is
+   * false (e.g. Bruce, whose zombie sprite already shows his hands and
+   * doesn't need a gun layered on top). Bullet trails still fire — only
+   * the on-character gun visual is suppressed.
+   */
+  private gunSprite: Phaser.GameObjects.Sprite | null;
+  private readonly hasGun: boolean;
   private healthBarBg: Phaser.GameObjects.Rectangle;
   private healthBarFg: Phaser.GameObjects.Rectangle;
   private nicknameText: Phaser.GameObjects.Text;
@@ -56,7 +62,9 @@ export class PlayerRenderer {
 
   constructor(scene: Phaser.Scene, characterId: CharacterId) {
     this.scene = scene;
-    this.texturePrefix = CHARACTERS[characterId].spritePrefix;
+    const def = CHARACTERS[characterId];
+    this.texturePrefix = def.spritePrefix;
+    this.hasGun = def.hasGun;
 
     this.sprite = scene.add.sprite(0, 0, this.animKey('down', 'idle'), 0);
     this.sprite.setOrigin(0.5, 0.5);
@@ -65,11 +73,17 @@ export class PlayerRenderer {
 
     // Gun overlay: shared across characters (not character-specific art).
     // Layered on top of the no-hands character sprite so the asset-pack's
-    // centered weapon falls into the held-hand position.
-    this.gunSprite = scene.add.sprite(0, 0, this.gunKey('down', 'hold'), 0);
-    this.gunSprite.setOrigin(0.5, 0.5);
-    this.gunSprite.setScale(SPRITE_SCALE);
-    this.gunSprite.play(this.gunKey('down', 'hold'));
+    // centered weapon falls into the held-hand position. Skipped entirely
+    // for hands-on-sprite characters like Bruce.
+    if (this.hasGun) {
+      const gun = scene.add.sprite(0, 0, this.gunKey('down', 'hold'), 0);
+      gun.setOrigin(0.5, 0.5);
+      gun.setScale(SPRITE_SCALE);
+      gun.play(this.gunKey('down', 'hold'));
+      this.gunSprite = gun;
+    } else {
+      this.gunSprite = null;
+    }
 
     this.healthBarBg = scene.add.rectangle(
       0,
@@ -97,13 +111,9 @@ export class PlayerRenderer {
     });
     this.nicknameText.setOrigin(0.5, 0.5);
 
-    const children: Phaser.GameObjects.GameObject[] = [
-      this.sprite,
-      this.gunSprite,
-      this.healthBarBg,
-      this.healthBarFg,
-      this.nicknameText,
-    ];
+    const children: Phaser.GameObjects.GameObject[] = [this.sprite];
+    if (this.gunSprite) children.push(this.gunSprite);
+    children.push(this.healthBarBg, this.healthBarFg, this.nicknameText);
     this.container = scene.add.container(0, 0, children);
   }
 
@@ -151,7 +161,7 @@ export class PlayerRenderer {
     if (direction !== this.currentDirection) {
       this.currentDirection = direction;
       this.playCurrentAnim();
-      this.playCurrentGunAnim();
+      if (this.gunSprite) this.playCurrentGunAnim();
     }
   }
 
@@ -159,9 +169,10 @@ export class PlayerRenderer {
    * Trigger the gun's 3-frame shoot animation. Routed from
    * GameScene.onBulletTrail by shooterId. Each new shot restarts the
    * shoot anim (no stacking); after GUN_SHOOT_DURATION_MS we revert to
-   * the looping hold anim.
+   * the looping hold anim. No-op for characters without a rendered gun.
    */
   playShootAnimation(): void {
+    if (!this.gunSprite) return;
     this.currentGunState = 'shoot';
     this.playCurrentGunAnim();
     this.gunShootTimer?.remove(false);
@@ -170,6 +181,11 @@ export class PlayerRenderer {
       this.playCurrentGunAnim();
       this.gunShootTimer = null;
     });
+  }
+
+  /** Whether this character renders a held gun (and matching muzzle flash). */
+  rendersGun(): boolean {
+    return this.gunSprite !== null;
   }
 
   updateHealthBar(health: number, maxHealth: number): void {
@@ -271,6 +287,7 @@ export class PlayerRenderer {
   }
 
   private playCurrentGunAnim(): void {
+    if (!this.gunSprite) return;
     const key = this.gunKey(this.currentDirection, this.currentGunState);
     // ignoreIfPlaying = false: shooting again restarts the shoot anim.
     this.gunSprite.play(key, this.currentGunState === 'hold');

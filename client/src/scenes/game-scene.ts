@@ -679,8 +679,15 @@ export class GameScene extends Phaser.Scene {
         trail.endPos.x - trail.startPos.x,
       );
 
-      this.effectsRenderer?.showMuzzleFlash(trail.startPos.x, trail.startPos.y, bulletAngle);
-      this.lightingRenderer?.addMuzzleFlash(trail.startPos.x, trail.startPos.y);
+      // Muzzle flash + lighting flash are gun-specific visuals. Skip for
+      // characters that don't render a held gun (e.g. Bruce) — fire
+      // emerging from a fist would read as a bug. The bullet trail itself
+      // still plays so the shot is legible.
+      const shooter = this.playerManager?.getRenderer(trail.shooterId);
+      if (shooter?.rendersGun() ?? true) {
+        this.effectsRenderer?.showMuzzleFlash(trail.startPos.x, trail.startPos.y, bulletAngle);
+        this.lightingRenderer?.addMuzzleFlash(trail.startPos.x, trail.startPos.y);
+      }
 
       // Three trails per burst (server-authoritative, GUN.BURST_INTERVAL apart),
       // so this naturally produces three shots spaced to match the bullets.
@@ -700,10 +707,10 @@ export class GameScene extends Phaser.Scene {
         }
       }
 
-      // Trigger the shooter's gun shoot animation (only player-kind
-      // renderers have one; remote players are zombies and silently
-      // no-op inside playShootAnimation).
-      this.playerManager?.getRenderer(trail.shooterId)?.playShootAnimation();
+      // Trigger the shooter's gun shoot animation. Characters without a
+      // rendered gun (CharacterDef.hasGun=false) silently no-op inside
+      // playShootAnimation.
+      shooter?.playShootAnimation();
 
       const grid = this.mapRenderer?.getCollisionGrid() ?? null;
       this.impactFx?.spawnBulletImpact(
