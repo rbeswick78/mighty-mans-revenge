@@ -163,11 +163,7 @@ export class GameScene extends Phaser.Scene {
 
     // Lobby music plays into the lobby; the countdown phase is silent and
     // the gameplay track starts on match start (see onMatchStart below).
-    const audio = AudioManager.getInstance();
-    if (audio) {
-      audio.setScene(this);
-      audio.stopMusic();
-    }
+    AudioManager.getInstance()?.stopMusic();
 
     // Render the map. Server picks the map at match-creation and tells the
     // client via matchFound.mapName; we look it up in the shared registry.

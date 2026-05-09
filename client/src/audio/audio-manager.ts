@@ -1,5 +1,10 @@
 /**
- * AudioManager — Singleton managing all game audio through Phaser's sound system.
+ * AudioManager — Singleton managing all game audio at the game level.
+ *
+ * Intentionally bound to Phaser.Game (process lifetime), NOT Phaser.Scene.
+ * Sounds and fades survive scene transitions because both the SoundManager
+ * (game.sound) and our fade driver (requestAnimationFrame) live above the
+ * scene graph. Scenes do not need to "register" with this manager.
  *
  * ===== INTEGRATION POINTS =====
  *
@@ -81,6 +86,12 @@ interface PlayOptions {
   loop?: boolean;
 }
 
+/** Cancellable handle for an in-flight volume fade. */
+interface FadeHandle {
+  /** Stop the rAF chain and run the completion callback synchronously. */
+  cancel: () => void;
+}
+
 /** localStorage keys for persisted volume settings. */
 const STORAGE_KEY_MASTER_VOLUME = 'mmr_audio_master';
 const STORAGE_KEY_SFX_VOLUME = 'mmr_audio_sfx';
@@ -93,16 +104,18 @@ const MAX_AUDIO_DISTANCE = 800;
 export class AudioManager {
   private static instance: AudioManager | null = null;
 
-  private scene: Phaser.Scene;
+  private game: Phaser.Game;
   private masterVolume: number;
   private sfxVolume: number;
   private musicVolume: number;
   private isMuted: boolean;
   private currentMusic: Phaser.Sound.BaseSound | null = null;
   private audioUnlocked = false;
+  /** Active volume-fade handle, if any. Cancelling runs the completion callback. */
+  private activeFade: FadeHandle | null = null;
 
-  constructor(scene: Phaser.Scene) {
-    this.scene = scene;
+  constructor(game: Phaser.Game) {
+    this.game = game;
 
     // Restore persisted volume settings, defaulting to full volume
     this.masterVolume = this.loadNumber(STORAGE_KEY_MASTER_VOLUME, 1);
@@ -111,11 +124,11 @@ export class AudioManager {
     this.isMuted = localStorage.getItem(STORAGE_KEY_MUTED) === 'true';
 
     // Check if audio context is already running (user may have interacted before init)
-    this.audioUnlocked = !this.scene.sound.locked;
+    this.audioUnlocked = !this.game.sound.locked;
 
     // Listen for Phaser's unlock event (fires after first user interaction)
-    if (this.scene.sound.locked) {
-      this.scene.sound.once('unlocked', () => {
+    if (this.game.sound.locked) {
+      this.game.sound.once('unlocked', () => {
         this.audioUnlocked = true;
       });
     }
@@ -126,14 +139,6 @@ export class AudioManager {
   /** Get the singleton instance. Returns null if not yet created. */
   static getInstance(): AudioManager | null {
     return AudioManager.instance;
-  }
-
-  /**
-   * Update the scene reference. Call this when transitioning scenes so the
-   * AudioManager can use the new scene's sound manager.
-   */
-  setScene(scene: Phaser.Scene): void {
-    this.scene = scene;
   }
 
   // ───────────────────── Playback ─────────────────────
@@ -152,7 +157,7 @@ export class AudioManager {
 
     const effectiveVolume = this.computeVolume(config.volume, config.category, options?.volume);
 
-    this.scene.sound.play(config.key, {
+    this.game.sound.play(config.key, {
       volume: effectiveVolume,
       loop: options?.loop ?? false,
     });
@@ -187,11 +192,11 @@ export class AudioManager {
 
   /** Play background music. Stops any currently playing music first. */
   playMusic(key: string, fadeIn = 0): void {
-    // Stop existing music
-    if (this.currentMusic) {
-      this.currentMusic.destroy();
-      this.currentMusic = null;
-    }
+    // Tear down anything still in flight from a prior call. cancelFade runs the
+    // pending stop-and-destroy synchronously, so we can't end up with two
+    // tracks layered on top of each other if playMusic arrives mid fade-out.
+    this.cancelFade();
+    this.destroyCurrentMusic();
 
     if (!this.isSoundLoaded(key)) {
       if (import.meta.env.DEV) {
@@ -200,21 +205,18 @@ export class AudioManager {
       return;
     }
 
-    const effectiveVolume = this.isMuted ? 0 : this.masterVolume * this.musicVolume;
+    const targetVolume = this.computeMusicVolume();
+    const startVolume = fadeIn > 0 ? 0 : targetVolume;
 
-    this.currentMusic = this.scene.sound.add(key, {
-      volume: fadeIn > 0 ? 0 : effectiveVolume,
+    const music = this.game.sound.add(key, {
+      volume: startVolume,
       loop: true,
     });
+    this.currentMusic = music;
+    music.play();
 
-    this.currentMusic.play();
-
-    if (fadeIn > 0 && this.currentMusic instanceof Phaser.Sound.WebAudioSound) {
-      this.scene.tweens.add({
-        targets: this.currentMusic,
-        volume: effectiveVolume,
-        duration: fadeIn,
-      });
+    if (fadeIn > 0 && music instanceof Phaser.Sound.WebAudioSound) {
+      this.startFade(music, targetVolume, fadeIn, () => {});
     }
   }
 
@@ -222,22 +224,20 @@ export class AudioManager {
   stopMusic(fadeOut = 0): void {
     if (!this.currentMusic) return;
 
-    if (fadeOut > 0 && this.currentMusic instanceof Phaser.Sound.WebAudioSound) {
-      const music = this.currentMusic;
-      this.scene.tweens.add({
-        targets: music,
-        volume: 0,
-        duration: fadeOut,
-        onComplete: () => {
-          music.stop();
-          music.destroy();
-        },
+    // Detach from currentMusic FIRST so subsequent playMusic/stopMusic calls
+    // route to the new state without racing this destroy.
+    const music = this.currentMusic;
+    this.currentMusic = null;
+    this.cancelFade();
+
+    if (fadeOut > 0 && music instanceof Phaser.Sound.WebAudioSound) {
+      this.startFade(music, 0, fadeOut, () => {
+        music.stop();
+        music.destroy();
       });
-      this.currentMusic = null;
     } else {
-      this.currentMusic.stop();
-      this.currentMusic.destroy();
-      this.currentMusic = null;
+      music.stop();
+      music.destroy();
     }
   }
 
@@ -277,13 +277,13 @@ export class AudioManager {
   mute(): void {
     this.isMuted = true;
     localStorage.setItem(STORAGE_KEY_MUTED, 'true');
-    this.scene.sound.mute = true;
+    this.game.sound.mute = true;
   }
 
   unmute(): void {
     this.isMuted = false;
     localStorage.setItem(STORAGE_KEY_MUTED, 'false');
-    this.scene.sound.mute = false;
+    this.game.sound.mute = false;
   }
 
   toggleMute(): void {
@@ -310,7 +310,7 @@ export class AudioManager {
 
     // Phaser's WebAudioSoundManager will resume the AudioContext when it
     // detects user interaction. We can force it by accessing the context.
-    const soundManager = this.scene.sound;
+    const soundManager = this.game.sound;
     if ('context' in soundManager) {
       const ctx = (soundManager as Phaser.Sound.WebAudioSoundManager).context;
       if (ctx.state === 'suspended') {
@@ -340,8 +340,65 @@ export class AudioManager {
 
   // ───────────────────── Private Helpers ─────────────────────
 
+  /**
+   * rAF-driven volume ramp. Runs above the scene graph, so a scene shutdown
+   * mid-fade can't strand the sound. Cancelling runs onComplete synchronously,
+   * so callers can rely on cleanup happening exactly once.
+   */
+  private startFade(
+    sound: Phaser.Sound.WebAudioSound,
+    toVolume: number,
+    durationMs: number,
+    onComplete: () => void,
+  ): void {
+    this.cancelFade();
+
+    const fromVolume = sound.volume;
+    const startTime = performance.now();
+    let rafId = 0;
+    let done = false;
+
+    const finish = () => {
+      if (done) return;
+      done = true;
+      cancelAnimationFrame(rafId);
+      if (this.activeFade?.cancel === finish) {
+        this.activeFade = null;
+      }
+      onComplete();
+    };
+
+    const step = () => {
+      if (done) return;
+      const elapsed = performance.now() - startTime;
+      const t = Math.min(1, elapsed / durationMs);
+      sound.setVolume(fromVolume + (toVolume - fromVolume) * t);
+      if (t >= 1) {
+        finish();
+      } else {
+        rafId = requestAnimationFrame(step);
+      }
+    };
+
+    this.activeFade = { cancel: finish };
+    rafId = requestAnimationFrame(step);
+  }
+
+  private cancelFade(): void {
+    const handle = this.activeFade;
+    this.activeFade = null;
+    handle?.cancel();
+  }
+
+  private destroyCurrentMusic(): void {
+    if (!this.currentMusic) return;
+    this.currentMusic.stop();
+    this.currentMusic.destroy();
+    this.currentMusic = null;
+  }
+
   private isSoundLoaded(key: string): boolean {
-    return this.scene.cache.audio.exists(key);
+    return this.game.cache.audio.exists(key);
   }
 
   private computeVolume(
@@ -354,6 +411,10 @@ export class AudioManager {
     return this.clampVolume(base * categoryVol * this.masterVolume);
   }
 
+  private computeMusicVolume(): number {
+    return this.isMuted ? 0 : this.clampVolume(this.masterVolume * this.musicVolume);
+  }
+
   private clampVolume(v: number): number {
     return Math.max(0, Math.min(1, v));
   }
@@ -363,9 +424,7 @@ export class AudioManager {
       this.currentMusic &&
       this.currentMusic instanceof Phaser.Sound.WebAudioSound
     ) {
-      this.currentMusic.setVolume(
-        this.isMuted ? 0 : this.masterVolume * this.musicVolume,
-      );
+      this.currentMusic.setVolume(this.computeMusicVolume());
     }
   }
 

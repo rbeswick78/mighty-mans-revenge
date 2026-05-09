@@ -81,11 +81,7 @@ export class ResultsScene extends Phaser.Scene {
     // Win/lose music keyed off result. Draws fall through to the lose
     // track — there's no dedicated "draw" track, and silence on the
     // results screen feels broken.
-    const audio = AudioManager.getInstance();
-    if (audio) {
-      audio.setScene(this);
-      audio.playMusic(isWinner ? 'music-win' : 'music-lose');
-    }
+    AudioManager.getInstance()?.playMusic(isWinner ? 'music-win' : 'music-lose');
 
     // Title - Winner/Loser announcement
     let titleText: string;

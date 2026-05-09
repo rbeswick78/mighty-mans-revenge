@@ -63,11 +63,7 @@ export class LobbyScene extends Phaser.Scene {
 
     this.gameService = GameService.getInstance();
 
-    const audio = AudioManager.getInstance();
-    if (audio) {
-      audio.setScene(this);
-      audio.playMusic('music-lobby');
-    }
+    AudioManager.getInstance()?.playMusic('music-lobby');
 
     const centerX = this.cameras.main.width / 2;
     // Original layout was designed for a 540px-tall canvas. Re-center

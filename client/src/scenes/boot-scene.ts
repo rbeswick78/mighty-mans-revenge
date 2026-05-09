@@ -100,9 +100,10 @@ export class BootScene extends Phaser.Scene {
 
   create(): void {
     this.createCharacterAnimations();
-    // Singleton; subsequent scenes call setScene() to retarget it.
+    // Singleton bound to Phaser.Game (process lifetime). Scenes don't
+    // retarget it — sounds and fades live above the scene graph.
     if (!AudioManager.getInstance()) {
-      new AudioManager(this);
+      new AudioManager(this.game);
     }
     // `?tilepicker` URL param routes straight into the debug tile-frame
     // visualizer instead of the lobby — used to identify exact frame
