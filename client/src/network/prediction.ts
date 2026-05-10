@@ -20,9 +20,10 @@ export class ClientPrediction {
     const dt = 1 / SERVER.TICK_RATE;
 
     // Mirror the server's Bruce-locked branch: while Bruce is breathing fire
-    // his movement and aim are pinned. Predicting movement here would drift
-    // the local sprite forward, then reconcile would snap it back the moment
-    // the server's authoritative position arrives — visible rubber-banding.
+    // his movement is pinned (predicting it would drift the sprite forward,
+    // then reconcile would snap it back when the server's authoritative
+    // position arrives — visible rubber-banding). Aim still updates so the
+    // breath cone can sweep with the cursor mid-cast.
     const isBruceLocked =
       currentState.characterId === 'bruce' && currentState.abilityActiveSeconds > 0;
     if (isBruceLocked) {
@@ -30,6 +31,7 @@ export class ClientPrediction {
         ...currentState,
         velocity: { x: 0, y: 0 },
         isSprinting: false,
+        aimAngle: input.aimAngle,
         lastProcessedInput: input.sequenceNumber,
       };
     }

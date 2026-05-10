@@ -574,12 +574,13 @@ export class Match implements MatchContext {
           this.tryActivateAbility(player, input.aimAngle);
         }
 
-        // While Bruce is breathing fire he is committed: aim, position, and
-        // all combat actions are pinned. Just consume the input and move on
-        // so the client's sequence ack still advances.
+        // While Bruce is breathing fire his position and combat actions are
+        // pinned, but he can still re-aim mid-cast so the cone sweeps with
+        // the cursor. Update aim only and skip the rest of the input.
         const isBruceLocked =
           player.characterId === 'bruce' && player.abilityActiveSeconds > 0;
         if (isBruceLocked) {
+          player.aimAngle = input.aimAngle;
           player.lastProcessedInput = input.sequenceNumber;
           continue;
         }
@@ -1128,8 +1129,8 @@ export class Match implements MatchContext {
         this.abilityHitTargetsByPlayer.set(playerId, hitSet);
       }
 
-      const dirX = Math.cos(player.abilityLockedAim);
-      const dirY = Math.sin(player.abilityLockedAim);
+      const dirX = Math.cos(player.aimAngle);
+      const dirY = Math.sin(player.aimAngle);
 
       // Burn down interior wall tiles inside the cone. Outer-perimeter
       // walls are spared so the playfield stays bounded. Cover (low) is

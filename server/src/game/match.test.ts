@@ -955,20 +955,22 @@ describe('Match', () => {
         expect(victim.health).toBe(PLAYER.MAX_HEALTH - 70);
       });
 
-      it('locks aim and movement while breathing', () => {
+      it('locks movement while breathing but lets aim sweep with input', () => {
         const m = startActiveWithCharacters('bruce', 'mighty_man');
         const bruce = m.players.get('player-0')!;
         bruce.position = { x: 200, y: 200 };
         const startPos = { ...bruce.position };
 
         m.queueInput('player-0', makeInput(1, { abilityPressed: true, aimAngle: 0 }));
-        // Subsequent inputs try to move + aim elsewhere.
+        // Subsequent inputs try to move + aim elsewhere. Movement should
+        // stay pinned; aim should follow the latest input so the cone can
+        // sweep with the cursor mid-cast.
         m.queueInput('player-0', makeInput(2, { moveX: 1, aimAngle: Math.PI / 2 }));
         m.queueInput('player-0', makeInput(3, { moveX: 1, aimAngle: Math.PI / 2 }));
         m.update(0.05);
 
         expect(bruce.position).toEqual(startPos);
-        expect(bruce.aimAngle).toBe(0);
+        expect(bruce.aimAngle).toBe(Math.PI / 2);
       });
 
       it('cooldown blocks re-activation while it is still running', () => {

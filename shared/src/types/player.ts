@@ -42,11 +42,13 @@ export interface PlayerState {
    *   abilityCooldownSeconds > 0: ability is on cooldown. Counts down each
    *     tick; only ticks while abilityActiveSeconds <= 0.
    *
-   * For Bruce: aim and movement are pinned during the active window —
-   * abilityLockedAim captures the aim angle at activation and the server
-   * ignores subsequent aim/move input updates. The per-cast hit set
-   * (preventing double-tap on a single victim during one breath) is held
-   * server-side on Match, not on this shared PlayerState.
+   * For Bruce: movement is pinned during the active window, but aim is
+   * still live so the breath cone can sweep with the cursor. The server
+   * uses player.aimAngle (continuously updated from input) as the cone
+   * direction; abilityLockedAim retains the activation-time angle for
+   * diagnostics. The per-cast hit set (preventing double-tap on a single
+   * victim during one breath) is held server-side on Match, not on this
+   * shared PlayerState.
    */
   abilityActiveSeconds: number;
   abilityCooldownSeconds: number;
