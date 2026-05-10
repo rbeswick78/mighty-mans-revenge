@@ -5,11 +5,31 @@ export interface GrenadeKinematics {
   position: Vec2;
   velocity: Vec2;
   /**
-   * When true, wall-bounce is disabled — the grenade flies in a straight
-   * line through tiles. Set on grenades thrown during Mighty Man's x-ray
+   * When true, the grenade ignores interior walls and cover but is still
+   * contained by the map's outer perimeter so it eventually detonates inside
+   * the playable area. Set on grenades thrown during Mighty Man's x-ray
    * vision; left undefined / false everywhere else.
    */
   piercing?: boolean;
+}
+
+/**
+ * True when a tile should bounce a grenade. Out-of-bounds always bounces.
+ * For non-piercing grenades, every solid tile bounces. For piercing
+ * grenades, only perimeter tiles bounce — interior walls and cover are
+ * passed through.
+ */
+function blocksGrenade(
+  grid: CollisionGrid,
+  tx: number,
+  ty: number,
+  piercing: boolean,
+): boolean {
+  if (tx < 0 || tx >= grid.width || ty < 0 || ty >= grid.height) return true;
+  const solid = grid.solid[ty]?.[tx] ?? true;
+  if (!solid) return false;
+  if (!piercing) return true;
+  return tx === 0 || tx === grid.width - 1 || ty === 0 || ty === grid.height - 1;
 }
 
 /**
@@ -25,12 +45,7 @@ export function stepGrenade<T extends GrenadeKinematics>(
   dt: number,
   grid: CollisionGrid,
 ): T {
-  if (grenade.piercing) {
-    grenade.position.x = grenade.position.x + grenade.velocity.x * dt;
-    grenade.position.y = grenade.position.y + grenade.velocity.y * dt;
-    return grenade;
-  }
-
+  const piercing = !!grenade.piercing;
   const newX = grenade.position.x + grenade.velocity.x * dt;
   const newY = grenade.position.y + grenade.velocity.y * dt;
 
@@ -39,24 +54,8 @@ export function stepGrenade<T extends GrenadeKinematics>(
   const oldTileX = Math.floor(grenade.position.x / grid.tileSize);
   const oldTileY = Math.floor(grenade.position.y / grid.tileSize);
 
-  let hitWallX = false;
-  let hitWallY = false;
-
-  if (tileX !== oldTileX) {
-    const checkX =
-      tileX < 0 || tileX >= grid.width || tileY < 0 || tileY >= grid.height
-        ? true
-        : (grid.solid[Math.floor(grenade.position.y / grid.tileSize)]?.[tileX] ?? true);
-    if (checkX) hitWallX = true;
-  }
-
-  if (tileY !== oldTileY) {
-    const checkY =
-      tileX < 0 || tileX >= grid.width || tileY < 0 || tileY >= grid.height
-        ? true
-        : (grid.solid[tileY]?.[Math.floor(grenade.position.x / grid.tileSize)] ?? true);
-    if (checkY) hitWallY = true;
-  }
+  const hitWallX = tileX !== oldTileX && blocksGrenade(grid, tileX, oldTileY, piercing);
+  const hitWallY = tileY !== oldTileY && blocksGrenade(grid, oldTileX, tileY, piercing);
 
   if (hitWallX) {
     grenade.velocity.x = -grenade.velocity.x;
