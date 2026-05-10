@@ -59,7 +59,7 @@ export class HUD {
   // Ability indicator (left column, near the grenade row): icon + radial
   // sweep cooldown overlay + numeric countdown.
   private abilityBg: Phaser.GameObjects.Arc;
-  private abilityIconText: Phaser.GameObjects.Text;
+  private abilityIconGfx: Phaser.GameObjects.Graphics;
   private abilityCountdownText: Phaser.GameObjects.Text;
   private abilitySweep: Phaser.GameObjects.Graphics;
   private abilityCenterX: number = 0;
@@ -163,21 +163,11 @@ export class HUD {
     this.abilityBg.setDepth(1000);
     this.abilityBg.setVisible(false);
 
-    this.abilityIconText = scene.add.text(
-      this.abilityCenterX,
-      this.abilityCenterY,
-      '',
-      {
-        fontFamily: 'Courier, monospace',
-        fontSize: '16px',
-        fontStyle: 'bold',
-        color: cssHex(Wasteland.TEXT_PRIMARY),
-      },
-    );
-    this.abilityIconText.setOrigin(0.5, 0.5);
-    this.abilityIconText.setScrollFactor(0);
-    this.abilityIconText.setDepth(1002);
-    this.abilityIconText.setVisible(false);
+    this.abilityIconGfx = scene.add.graphics();
+    this.abilityIconGfx.setPosition(this.abilityCenterX, this.abilityCenterY);
+    this.abilityIconGfx.setScrollFactor(0);
+    this.abilityIconGfx.setDepth(1002);
+    this.abilityIconGfx.setVisible(false);
 
     this.abilitySweep = scene.add.graphics();
     this.abilitySweep.setScrollFactor(0);
@@ -447,9 +437,10 @@ export class HUD {
   ): void {
     if (!characterId) {
       this.abilityBg.setVisible(false);
-      this.abilityIconText.setVisible(false);
+      this.abilityIconGfx.setVisible(false);
       this.abilityCountdownText.setVisible(false);
       this.abilitySweep.clear();
+      this.abilityIconGfx.clear();
       return;
     }
 
@@ -459,7 +450,6 @@ export class HUD {
     // status reads at a glance.
     const readyColor = isBruce ? 0xff7b2a : 0x4ad8e8;
     const cooldownColor = 0x3a4252;
-    const icon = isBruce ? 'F' : 'X';
     const totalCycle = isBruce
       ? ABILITY.BRUCE_FIRE_BREATH.COOLDOWN
       : ABILITY.MIGHTY_MAN_XRAY.DURATION + ABILITY.MIGHTY_MAN_XRAY.COOLDOWN;
@@ -468,8 +458,7 @@ export class HUD {
       : ABILITY.MIGHTY_MAN_XRAY.DURATION;
 
     this.abilityBg.setVisible(true);
-    this.abilityIconText.setVisible(true);
-    this.abilityIconText.setText(icon);
+    this.abilityIconGfx.setVisible(true);
 
     const isActive = activeSeconds > 0;
     const isCoolingDown = !isActive && cooldownSeconds > 0;
@@ -477,7 +466,7 @@ export class HUD {
     let fillColor: number;
     let strokeColor: number;
     let iconAlpha: number;
-    let iconColor: string;
+    let iconColorNum: number;
     let sweepColor: number;
     let sweepFraction: number;
     let countdownText: string;
@@ -487,7 +476,7 @@ export class HUD {
       fillColor = readyColor;
       strokeColor = 0xffffff;
       iconAlpha = 1;
-      iconColor = '#000000';
+      iconColorNum = 0x000000;
       sweepColor = 0xffffff;
       sweepFraction = activeSeconds / activeDuration;
       countdownText = `${Math.ceil(activeSeconds)}`;
@@ -496,7 +485,7 @@ export class HUD {
       fillColor = cooldownColor;
       strokeColor = 0x55667a;
       iconAlpha = 0.45;
-      iconColor = '#9aa3b0';
+      iconColorNum = 0x9aa3b0;
       sweepColor = readyColor;
       sweepFraction = cooldownSeconds / totalCycle;
       countdownText = `${Math.ceil(cooldownSeconds)}`;
@@ -505,7 +494,7 @@ export class HUD {
       fillColor = readyColor;
       strokeColor = 0xffffff;
       iconAlpha = 1;
-      iconColor = '#000000';
+      iconColorNum = 0x000000;
       sweepColor = 0;
       sweepFraction = 0;
       countdownText = 'READY';
@@ -513,8 +502,11 @@ export class HUD {
 
     this.abilityBg.setFillStyle(fillColor, 1);
     this.abilityBg.setStrokeStyle(2, strokeColor, 1);
-    this.abilityIconText.setAlpha(iconAlpha);
-    this.abilityIconText.setColor(iconColor);
+    if (isBruce) {
+      this.drawFireIcon(iconColorNum, iconAlpha);
+    } else {
+      this.drawGlassesIcon(iconColorNum, iconAlpha);
+    }
     this.abilityCountdownText.setText(countdownText);
     this.abilityCountdownText.setVisible(true);
 
@@ -534,6 +526,54 @@ export class HUD {
       );
       this.abilitySweep.strokePath();
     }
+  }
+
+  /**
+   * Pixel-art flame silhouette for Bruce's fire-breath ability indicator.
+   * Drawn into abilityIconGfx; coordinates are relative to the icon center.
+   */
+  private drawFireIcon(color: number, alpha: number): void {
+    const g = this.abilityIconGfx;
+    g.clear();
+    g.fillStyle(color, alpha);
+    // Outer flame silhouette: tall asymmetric teardrop with a notch on the
+    // upper-left to suggest a flickering tongue.
+    g.beginPath();
+    g.moveTo(0, -12);
+    g.lineTo(3, -7);
+    g.lineTo(2, -3);
+    g.lineTo(5, -5);
+    g.lineTo(7, 0);
+    g.lineTo(7, 5);
+    g.lineTo(4, 10);
+    g.lineTo(0, 11);
+    g.lineTo(-4, 10);
+    g.lineTo(-7, 5);
+    g.lineTo(-7, 0);
+    g.lineTo(-5, -4);
+    g.lineTo(-2, -2);
+    g.lineTo(-3, -7);
+    g.closePath();
+    g.fillPath();
+  }
+
+  /**
+   * Pixel-art glasses silhouette for Mighty Man's x-ray ability indicator.
+   * Two round lenses joined by a bridge, with short temple stubs.
+   * Drawn into abilityIconGfx; coordinates are relative to the icon center.
+   */
+  private drawGlassesIcon(color: number, alpha: number): void {
+    const g = this.abilityIconGfx;
+    g.clear();
+    g.lineStyle(2, color, alpha);
+    // Lenses
+    g.strokeCircle(-7, 1, 5);
+    g.strokeCircle(7, 1, 5);
+    // Bridge
+    g.lineBetween(-2, 1, 2, 1);
+    // Temple stubs
+    g.lineBetween(-12, -1, -14, -3);
+    g.lineBetween(12, -1, 14, -3);
   }
 
   /**
@@ -594,7 +634,7 @@ export class HUD {
     this.eventBannerText.destroy();
     this.activeEventLabel.destroy();
     this.abilityBg.destroy();
-    this.abilityIconText.destroy();
+    this.abilityIconGfx.destroy();
     this.abilityCountdownText.destroy();
     this.abilitySweep.destroy();
     for (const entry of this.killFeedEntries) {
