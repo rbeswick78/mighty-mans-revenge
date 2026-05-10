@@ -6,6 +6,14 @@ import type { ServerMatchmakingStatusMessage } from '@shared/types/network.js';
 import { Wasteland, cssHex } from '@shared/config/palette.js';
 import { AudioManager } from '../audio/audio-manager.js';
 import { GameService, type MatchData } from '../services/game-service.js';
+import {
+  WastelandStreet,
+  type Outcome,
+} from '../ui/menu/wasteland-street.js';
+import { MenuPanel } from '../ui/menu/menu-panel.js';
+import { PixelButton } from '../ui/menu/pixel-button.js';
+import { TitleLogo } from '../ui/menu/title-logo.js';
+import { MENU_FONTS } from '../ui/menu/fonts.js';
 
 interface ResultsSceneData {
   result?: MatchResult;
@@ -13,30 +21,20 @@ interface ResultsSceneData {
   matchData?: MatchData;
 }
 
-// --- Wasteland palette mapping for results chrome (TUNABLE) ---
+// Outcome → primary banner color (matches WastelandStreet's wash family).
 const VICTORY_COLOR = Wasteland.HEALTH_GOOD;          // dusty mint
 const DEFEAT_COLOR = Wasteland.HIT_FLASH;             // dried blood
 const DRAW_COLOR = Wasteland.HEALTH_WARNING;          // amber warning
-const TITLE_STROKE = Wasteland.CANVAS_BG;             // near-black plum
 const DIVIDER_COLOR = Wasteland.LOADING_BAR_FILL;     // hot orange accent
 const LABEL_COLOR = Wasteland.COVER_FILL;             // weathered tan
 const VALUE_COLOR = Wasteland.TEXT_PRIMARY;           // bone-white
-const LOCAL_NICK_COLOR = Wasteland.HEALTH_GOOD;       // mint (you)
-const OPPONENT_NICK_COLOR = Wasteland.HIT_FLASH;      // blood (them)
-const REMATCH_BTN_COLOR = Wasteland.LOADING_BAR_FILL; // hot orange (CTA)
-const LOBBY_BTN_COLOR = Wasteland.WALL_FILL;          // crumbling concrete
-const BTN_LABEL_COLOR = Wasteland.TEXT_PRIMARY;       // bone-white
+const WINNER_NICK_COLOR = Wasteland.HEALTH_GOOD;      // mint
+const LOSER_NICK_COLOR = Wasteland.HIT_FLASH;         // blood
 const REMATCH_STATUS_COLOR = Wasteland.HEALTH_WARNING;
 const OPPONENT_LEFT_COLOR = Wasteland.HIT_FLASH;
-const FOOTER_COLOR = Wasteland.WALL_LINE;             // very dim ash-shadow
+const FOOTER_COLOR = Wasteland.WALL_LINE;
 const NO_DATA_COLOR = Wasteland.COVER_FILL;
-const HOVER_LIGHTEN = 20;
-
-const FONT_MONO: Phaser.Types.GameObjects.Text.TextStyle = {
-  fontFamily: '"Courier New", Courier, monospace',
-  fontSize: '14px',
-  color: cssHex(VALUE_COLOR),
-};
+const LOSER_TINT = 0x55454f;
 
 export class ResultsScene extends Phaser.Scene {
   private gameService!: GameService;
@@ -44,6 +42,7 @@ export class ResultsScene extends Phaser.Scene {
   private nickname = '';
   private matchData: MatchData | null = null;
   private rematchStatusText: Phaser.GameObjects.Text | null = null;
+  private rematchButton: PixelButton | null = null;
   private rematchUnavailable = false;
 
   // Event handler references for cleanup
@@ -68,101 +67,152 @@ export class ResultsScene extends Phaser.Scene {
     this.gameService = GameService.getInstance();
 
     const centerX = this.cameras.main.width / 2;
-    // Original layout was designed for a 540px-tall canvas. Re-center so
-    // the results screen sits in the middle of whatever canvas we render
-    // into (currently 720px).
-    const yOffset = Math.max(0, (this.cameras.main.height - 540) / 2);
-    const playerId = this.gameService.getPlayerId();
+    const camHeight = this.cameras.main.height;
+    const localPlayerId = this.gameService.getPlayerId();
 
-    // Determine winner/loser
-    const isWinner = this.result?.winnerId === playerId;
-    const isDraw = this.result?.winnerId === null;
+    const isWinner = this.result?.winnerId === localPlayerId;
+    const isDraw = this.result?.winnerId === null || this.result?.winnerId === undefined;
+    const outcome: Outcome = isDraw ? 'draw' : isWinner ? 'victory' : 'defeat';
+
+    // ────────────────────────────────────────────────────────────────────
+    // Backdrop — same wasteland street as the lobby, tinted by outcome.
+    // Embers retune to the outcome mood (orange for victory, slow ash for
+    // defeat, dust for draw).
+    // ────────────────────────────────────────────────────────────────────
+    const street = new WastelandStreet(this, { lowDetail: this.isLikelyMobile() });
+    street.setOutcomeWash(outcome);
 
     // Win/lose music keyed off result. Draws fall through to the lose
     // track — there's no dedicated "draw" track, and silence on the
     // results screen feels broken.
     AudioManager.getInstance()?.playMusic(isWinner ? 'music-win' : 'music-lose');
+    // One-shot stinger (silently skipped if asset unloaded).
+    if (isWinner) AudioManager.getInstance()?.play('victoryFanfare');
+    else if (!isDraw) AudioManager.getInstance()?.play('defeatSound');
 
-    // Title - Winner/Loser announcement
-    let titleText: string;
-    let titleColor: number;
-    if (isDraw) {
-      titleText = 'DRAW';
-      titleColor = DRAW_COLOR;
-    } else if (isWinner) {
-      titleText = 'VICTORY';
-      titleColor = VICTORY_COLOR;
-    } else {
-      titleText = 'DEFEAT';
-      titleColor = DEFEAT_COLOR;
-    }
+    // ────────────────────────────────────────────────────────────────────
+    // Outcome banner (Press Start 2P, big)
+    // ────────────────────────────────────────────────────────────────────
+    const titleText = isDraw ? 'DRAW' : isWinner ? 'VICTORY' : 'DEFEAT';
+    const titleColor = isDraw ? DRAW_COLOR : isWinner ? VICTORY_COLOR : DEFEAT_COLOR;
+    new TitleLogo(this, centerX, 70, [titleText], {
+      fontSize: 44,
+      fillColor: titleColor,
+      strokeThickness: 4,
+    }).setDepth(WastelandStreet.DEPTH.UI);
 
-    this.add.text(centerX, 40 + yOffset, titleText, {
-      fontFamily: '"Courier New", Courier, monospace',
-      fontSize: '48px',
-      color: cssHex(titleColor),
-      stroke: cssHex(TITLE_STROKE),
-      strokeThickness: 6,
-      fontStyle: 'bold',
-    }).setOrigin(0.5);
+    // ────────────────────────────────────────────────────────────────────
+    // Winner / loser sprite tableau. Winner stands tall on the left,
+    // loser is tinted darker and rotated forward on the right. For draws,
+    // both stand upright at full color.
+    // (We default to mighty_man for the local player and bruce for the
+    // opponent. Roster expansion can later pass character IDs through
+    // ResultsSceneData.)
+    // ────────────────────────────────────────────────────────────────────
+    this.renderTableau(isWinner, isDraw, camHeight);
 
-    // Divider line
-    const divider = this.add.graphics();
-    divider.lineStyle(1, DIVIDER_COLOR, 0.5);
-    divider.lineBetween(centerX - 300, 80 + yOffset, centerX + 300, 80 + yOffset);
+    // ────────────────────────────────────────────────────────────────────
+    // Stats panel (center)
+    // ────────────────────────────────────────────────────────────────────
+    const panelW = 380;
+    const panelH = 330;
+    const panelX = centerX - panelW / 2;
+    const panelY = 130;
+    const panel = new MenuPanel(this, panelX, panelY, panelW, panelH, {
+      fillAlpha: 0.92,
+    });
+    panel.setDepth(WastelandStreet.DEPTH.UI);
 
     if (this.result) {
-      this.renderStats(centerX, playerId, yOffset);
+      this.renderStats(panel, localPlayerId, isWinner, isDraw);
     } else {
-      this.add.text(centerX, 200 + yOffset, 'No match data available', {
-        ...FONT_MONO,
-        color: cssHex(NO_DATA_COLOR),
-      }).setOrigin(0.5);
+      const noData = this.add
+        .text(panel.centerX, panel.centerY, 'No match data available', {
+          fontFamily: MENU_FONTS.BODY,
+          fontSize: '16px',
+          color: cssHex(NO_DATA_COLOR),
+        })
+        .setOrigin(0.5);
+      panel.add(noData);
     }
 
-    // Rematch status text (hidden initially)
-    this.rematchStatusText = this.add.text(centerX, 430 + yOffset, '', {
-      ...FONT_MONO,
-      fontSize: '13px',
-      color: cssHex(REMATCH_STATUS_COLOR),
-    }).setOrigin(0.5).setVisible(false);
+    // ────────────────────────────────────────────────────────────────────
+    // Rematch status text + action buttons
+    // ────────────────────────────────────────────────────────────────────
+    this.rematchStatusText = this.add
+      .text(centerX, camHeight - 130, '', {
+        fontFamily: MENU_FONTS.HEADER,
+        fontSize: '11px',
+        color: cssHex(REMATCH_STATUS_COLOR),
+      })
+      .setOrigin(0.5)
+      .setVisible(false)
+      .setDepth(WastelandStreet.DEPTH.UI);
 
-    // Bottom divider
-    const bottomDivider = this.add.graphics();
-    bottomDivider.lineStyle(1, DIVIDER_COLOR, 0.3);
-    bottomDivider.lineBetween(centerX - 300, 450 + yOffset, centerX + 300, 450 + yOffset);
+    const btnY = camHeight - 90;
+    const btnW = 200;
+    const btnH = 46;
 
-    // Buttons
-    const buttonY = 470 + yOffset;
+    this.rematchButton = new PixelButton(
+      this,
+      centerX - btnW - 14,
+      btnY,
+      btnW,
+      btnH,
+      'REMATCH',
+      {
+        variant: 'primary',
+        fontSize: 13,
+        onClick: () => {
+          if (this.rematchUnavailable) {
+            this.showRematchUnavailable();
+            return;
+          }
+          this.gameService.requestRematch();
+          this.rematchStatusText
+            ?.setText('Waiting for opponent...')
+            .setVisible(true);
+        },
+      },
+    );
+    this.rematchButton.setDepth(WastelandStreet.DEPTH.UI);
 
-    // Rematch button
-    this.createButton(centerX - 110, buttonY, 'REMATCH', REMATCH_BTN_COLOR, () => {
-      if (this.rematchUnavailable) {
-        this.showRematchUnavailable();
-        return;
-      }
-      this.gameService.requestRematch();
-      this.rematchStatusText?.setText('Waiting for opponent...').setVisible(true);
-    });
-
-    // Back to Lobby button
-    this.createButton(centerX + 110, buttonY, 'BACK TO LOBBY', LOBBY_BTN_COLOR, () => {
-      this.gameService.returnToLobby();
-      this.cameras.main.fadeOut(300, 0, 0, 0);
-      this.cameras.main.once('camerafadeoutcomplete', () => {
-        this.cleanupEvents();
-        this.scene.start('LobbyScene');
-      });
-    });
+    new PixelButton(
+      this,
+      centerX + 14,
+      btnY,
+      btnW,
+      btnH,
+      'BACK TO LOBBY',
+      {
+        variant: 'secondary',
+        fontSize: 13,
+        onClick: () => {
+          this.gameService.returnToLobby();
+          this.cameras.main.fadeOut(300, 0, 0, 0);
+          this.cameras.main.once('camerafadeoutcomplete', () => {
+            this.cleanupEvents();
+            this.scene.start('LobbyScene');
+          });
+        },
+      },
+    ).setDepth(WastelandStreet.DEPTH.UI);
 
     // Footer
-    this.add.text(centerX, 525 + yOffset, 'MIGHTY MAN\'S REVENGE // POST-APOCALYPTIC SHOWDOWN', {
-      fontFamily: '"Courier New", Courier, monospace',
-      fontSize: '9px',
-      color: cssHex(FOOTER_COLOR),
-    }).setOrigin(0.5);
+    this.add
+      .text(
+        centerX,
+        camHeight - 24,
+        "MIGHTY MAN'S REVENGE  //  POST-APOCALYPTIC SHOWDOWN",
+        {
+          fontFamily: MENU_FONTS.BODY,
+          fontSize: '12px',
+          color: cssHex(FOOTER_COLOR),
+        },
+      )
+      .setOrigin(0.5)
+      .setDepth(WastelandStreet.DEPTH.UI);
 
-    // Wire up events
     this.wireGameServiceEvents();
   }
 
@@ -170,87 +220,195 @@ export class ResultsScene extends Phaser.Scene {
     this.cleanupEvents();
   }
 
-  private renderStats(centerX: number, localPlayerId: PlayerId | null, yOffset: number): void {
+  private renderTableau(
+    isWinner: boolean,
+    isDraw: boolean,
+    camHeight: number,
+  ): void {
+    // Local player is assumed to be mighty_man; opponent is assumed to be
+    // bruce. (CharacterId isn't currently threaded through MatchData.)
+    const groundY = camHeight - 130;
+    const tableauY = groundY - 14;
+
+    const localCharKey = 'mighty_man_side_idle';
+    const opponentCharKey = 'bruce_side_idle';
+    const leftX = 130;
+    const rightX = this.cameras.main.width - 130;
+
+    if (isDraw) {
+      // Both stand, both face center
+      this.spawnIdleSprite(leftX, tableauY, localCharKey, false, false);
+      this.spawnIdleSprite(rightX, tableauY, opponentCharKey, true, false);
+      return;
+    }
+
+    if (isWinner) {
+      // Local on left as winner, opponent on right as loser
+      this.spawnIdleSprite(leftX, tableauY, localCharKey, false, false);
+      this.spawnIdleSprite(rightX, tableauY, opponentCharKey, true, true);
+    } else {
+      // Opponent on left as winner, local on right as loser
+      this.spawnIdleSprite(leftX, tableauY, opponentCharKey, false, false);
+      this.spawnIdleSprite(rightX, tableauY, localCharKey, true, true);
+    }
+  }
+
+  // Single sprite helper. `flipX` mirrors the side-idle anim to face
+  // toward center. `slumped` applies a forward tilt + dark tint + smaller
+  // scale to read as a defeated/fallen pose without bespoke art.
+  private spawnIdleSprite(
+    x: number,
+    y: number,
+    animKey: string,
+    flipX: boolean,
+    slumped: boolean,
+  ): Phaser.GameObjects.Sprite {
+    const scale = slumped ? 5 : 6;
+    const sprite = this.add
+      .sprite(x, y, animKey)
+      .setOrigin(0.5, 1)
+      .setScale(scale)
+      .setDepth(WastelandStreet.DEPTH.CHARACTERS)
+      .setFlipX(flipX);
+    sprite.play(animKey);
+    if (slumped) {
+      sprite.setTint(LOSER_TINT);
+      sprite.setRotation(flipX ? -0.35 : 0.35);
+      // Drop the sprite so it reads as collapsed in the dirt.
+      sprite.setY(y + 14);
+    }
+    return sprite;
+  }
+
+  private renderStats(
+    panel: MenuPanel,
+    localPlayerId: PlayerId | null,
+    isWinner: boolean,
+    isDraw: boolean,
+  ): void {
     if (!this.result) return;
 
-    // Convert playerStats if it's a plain object (from JSON serialization)
+    // Normalize map (server payload may serialize to plain object)
     let statsMap: Map<PlayerId, PlayerStats>;
     if (this.result.playerStats instanceof Map) {
       statsMap = this.result.playerStats;
     } else {
-      // Handle deserialized plain object
-      statsMap = new Map(Object.entries(this.result.playerStats as unknown as Record<string, PlayerStats>));
+      statsMap = new Map(
+        Object.entries(
+          this.result.playerStats as unknown as Record<string, PlayerStats>,
+        ),
+      );
     }
 
-    // Collect player IDs — local first
+    // Order columns: winner first (left), loser second (right). For draws,
+    // local player goes on the left.
+    let leftId: PlayerId | null = null;
+    let rightId: PlayerId | null = null;
     const playerIds = [...statsMap.keys()];
-    const localIdx = playerIds.findIndex((id) => id === localPlayerId);
-    if (localIdx > 0) {
-      const [local] = playerIds.splice(localIdx, 1);
-      playerIds.unshift(local);
+    if (isDraw) {
+      leftId = localPlayerId ?? playerIds[0] ?? null;
+      rightId = playerIds.find((id) => id !== leftId) ?? null;
+    } else {
+      leftId = this.result.winnerId;
+      rightId = playerIds.find((id) => id !== leftId) ?? null;
     }
 
-    // Column headers
-    const col1X = centerX - 140;
-    const col2X = centerX + 140;
-    const headerY = 95 + yOffset;
+    const localNick = this.nickname.toUpperCase();
+    const opponentNick = (
+      this.matchData?.opponents[0]?.nickname ?? 'OPPONENT'
+    ).toUpperCase();
+    const leftNick = leftId === localPlayerId ? localNick : opponentNick;
+    const rightNick = rightId === localPlayerId ? localNick : opponentNick;
 
-    const localNick = this.nickname;
-    const opponentNick = this.matchData?.opponents[0]?.nickname ?? 'Opponent';
+    const col1X = panel.contentWidth * 0.32;
+    const col2X = panel.contentWidth * 0.68;
+    const labelX = panel.centerX;
 
-    this.add.text(col1X, headerY, localNick.toUpperCase(), {
-      ...FONT_MONO,
-      fontSize: '16px',
-      color: cssHex(LOCAL_NICK_COLOR),
-      fontStyle: 'bold',
-    }).setOrigin(0.5);
+    // Player nickname headers
+    const leftNickColor = isDraw
+      ? VALUE_COLOR
+      : isWinner && leftId === localPlayerId
+        ? WINNER_NICK_COLOR
+        : !isWinner && leftId !== localPlayerId
+          ? WINNER_NICK_COLOR
+          : LOSER_NICK_COLOR;
+    const rightNickColor = isDraw
+      ? VALUE_COLOR
+      : leftNickColor === WINNER_NICK_COLOR
+        ? LOSER_NICK_COLOR
+        : WINNER_NICK_COLOR;
 
-    this.add.text(col2X, headerY, opponentNick.toUpperCase(), {
-      ...FONT_MONO,
-      fontSize: '16px',
-      color: cssHex(OPPONENT_NICK_COLOR),
-      fontStyle: 'bold',
-    }).setOrigin(0.5);
+    panel.add(
+      this.add
+        .text(col1X, 26, leftNick, {
+          fontFamily: MENU_FONTS.HEADER,
+          fontSize: '12px',
+          color: cssHex(leftNickColor),
+        })
+        .setOrigin(0.5),
+    );
+    panel.add(
+      this.add
+        .text(col2X, 26, rightNick, {
+          fontFamily: MENU_FONTS.HEADER,
+          fontSize: '12px',
+          color: cssHex(rightNickColor),
+        })
+        .setOrigin(0.5),
+    );
+
+    // Header divider
+    const headerDivider = this.add.graphics();
+    headerDivider.fillStyle(DIVIDER_COLOR, 0.55);
+    headerDivider.fillRect(20, 50, panel.contentWidth - 40, 1);
+    panel.add(headerDivider);
 
     // Stat rows
-    const stats1 = playerIds[0] ? statsMap.get(playerIds[0]) : null;
-    const stats2 = playerIds[1] ? statsMap.get(playerIds[1]) : null;
+    const leftStats = leftId ? statsMap.get(leftId) : null;
+    const rightStats = rightId ? statsMap.get(rightId) : null;
+    const rows = this.buildStatRows(leftStats ?? null, rightStats ?? null);
+    const startY = 70;
+    const rowH = 27;
 
-    const statRows = this.buildStatRows(stats1 ?? null, stats2 ?? null);
-    const startY = 125 + yOffset;
-    const rowHeight = 30;
+    rows.forEach((row, i) => {
+      const localY = startY + i * rowH;
+      const delay = i * 220;
 
-    // Animate stats in sequentially (arcade-style tally)
-    statRows.forEach((row, i) => {
-      const y = startY + i * rowHeight;
-      const delay = i * 300;
+      const label = this.add
+        .text(labelX, localY, row.label, {
+          fontFamily: MENU_FONTS.BODY,
+          fontSize: '13px',
+          color: cssHex(LABEL_COLOR),
+        })
+        .setOrigin(0.5)
+        .setAlpha(0);
 
-      // Label in center
-      const label = this.add.text(centerX, y, row.label, {
-        ...FONT_MONO,
-        fontSize: '12px',
-        color: cssHex(LABEL_COLOR),
-      }).setOrigin(0.5).setAlpha(0);
+      const leftVal = this.add
+        .text(col1X, localY, row.left, {
+          fontFamily: MENU_FONTS.BODY,
+          fontSize: '16px',
+          color: cssHex(VALUE_COLOR),
+        })
+        .setOrigin(0.5)
+        .setAlpha(0);
 
-      // Left value
-      const leftVal = this.add.text(col1X, y, row.left, {
-        ...FONT_MONO,
-        fontSize: '14px',
-        color: cssHex(VALUE_COLOR),
-      }).setOrigin(0.5).setAlpha(0);
+      const rightVal = this.add
+        .text(col2X, localY, row.right, {
+          fontFamily: MENU_FONTS.BODY,
+          fontSize: '16px',
+          color: cssHex(VALUE_COLOR),
+        })
+        .setOrigin(0.5)
+        .setAlpha(0);
 
-      // Right value
-      const rightVal = this.add.text(col2X, y, row.right, {
-        ...FONT_MONO,
-        fontSize: '14px',
-        color: cssHex(VALUE_COLOR),
-      }).setOrigin(0.5).setAlpha(0);
+      panel.add(label);
+      panel.add(leftVal);
+      panel.add(rightVal);
 
-      // Tween in
       this.tweens.add({
         targets: [label, leftVal, rightVal],
         alpha: 1,
-        y: { from: y + 10, to: y },
+        y: { from: localY + 10, to: localY },
         duration: 400,
         delay,
         ease: 'Back.easeOut',
@@ -273,12 +431,12 @@ export class ResultsScene extends Phaser.Scene {
     return [
       { label: 'KILLS', left: `${s1.kills}`, right: `${s2.kills}` },
       { label: 'DEATHS', left: `${s1.deaths}`, right: `${s2.deaths}` },
-      { label: 'K/D RATIO', left: kd1, right: kd2 },
+      { label: 'K/D', left: kd1, right: kd2 },
       { label: 'ACCURACY', left: `${accuracy1}%`, right: `${accuracy2}%` },
-      { label: 'DAMAGE DEALT', left: `${Math.round(s1.damageDealt)}`, right: `${Math.round(s2.damageDealt)}` },
-      { label: 'DAMAGE TAKEN', left: `${Math.round(s1.damageTaken)}`, right: `${Math.round(s2.damageTaken)}` },
-      { label: 'GRENADES THROWN', left: `${s1.grenadesThrown}`, right: `${s2.grenadesThrown}` },
-      { label: 'GRENADE KILLS', left: `${s1.grenadeKills}`, right: `${s2.grenadeKills}` },
+      { label: 'DMG DEALT', left: `${Math.round(s1.damageDealt)}`, right: `${Math.round(s2.damageDealt)}` },
+      { label: 'DMG TAKEN', left: `${Math.round(s1.damageTaken)}`, right: `${Math.round(s2.damageTaken)}` },
+      { label: 'GRENADES', left: `${s1.grenadesThrown}`, right: `${s2.grenadesThrown}` },
+      { label: 'GREN KILLS', left: `${s1.grenadeKills}`, right: `${s2.grenadeKills}` },
       { label: 'BEST STREAK', left: `${s1.longestKillStreak}`, right: `${s2.longestKillStreak}` },
     ];
   }
@@ -299,21 +457,19 @@ export class ResultsScene extends Phaser.Scene {
 
   private wireGameServiceEvents(): void {
     this.onRematchStatus = (opponentWantsRematch: boolean) => {
-      console.log('[results] rematchStatus', opponentWantsRematch);
       if (opponentWantsRematch && this.rematchStatusText) {
-        this.rematchStatusText.setText('Opponent wants a rematch!').setVisible(true);
+        this.rematchStatusText
+          .setText('Opponent wants a rematch!')
+          .setVisible(true);
       }
     };
 
     this.onMatchFound = (matchData: MatchData) => {
-      console.log('[results] matchFound', matchData);
-      // Rematch accepted — transition to game scene. Guard against the
-      // fade-complete event not firing (observed on backgrounded tabs and
-      // some mobile browsers): if the camera event doesn't land within the
-      // fade window, fall back to a timer so the player isn't stranded on
-      // "Waiting for opponent..." while the new match runs without them.
+      // Rematch accepted — transition to character-select. Guard against
+      // fade-complete not firing (observed on backgrounded tabs and some
+      // mobile browsers): fall back to a timer.
       let transitioned = false;
-      const goToGame = () => {
+      const goToGame = (): void => {
         if (transitioned) return;
         transitioned = true;
         this.cleanupEvents();
@@ -329,18 +485,17 @@ export class ResultsScene extends Phaser.Scene {
 
     this.onOpponentDisconnected = (_playerId: PlayerId) => {
       this.rematchUnavailable = true;
+      this.rematchButton?.setDisabled(true);
       if (this.rematchStatusText) {
-        this.rematchStatusText.setText('Opponent has left.').setVisible(true);
+        this.rematchStatusText
+          .setText('Opponent has left.')
+          .setVisible(true);
         this.rematchStatusText.setColor(cssHex(OPPONENT_LEFT_COLOR));
       }
     };
 
-    // The post-match window has a server-side TTL: if both players sit on
-    // this screen too long without committing, the server tears the state
-    // down and broadcasts matchmakingStatus 'cancelled'. Reflect that here
-    // so a stranded player isn't left staring at "Waiting for opponent..."
-    // forever — they need to know REMATCH won't fire and to head back to
-    // the lobby instead.
+    // Server tears down the post-match window after a TTL — surface the
+    // cancellation so a stranded player knows REMATCH won't fire.
     this.onMatchmakingStatus = (msg: ServerMatchmakingStatusMessage) => {
       if (msg.status === 'cancelled' && this.rematchStatusText) {
         this.rematchUnavailable = true;
@@ -375,50 +530,17 @@ export class ResultsScene extends Phaser.Scene {
 
   private showRematchUnavailable(): void {
     if (!this.rematchStatusText) return;
-    this.rematchStatusText.setText('Rematch unavailable - return to lobby.').setVisible(true);
+    this.rematchButton?.setDisabled(true);
+    this.rematchStatusText
+      .setText('Rematch unavailable - return to lobby.')
+      .setVisible(true);
     this.rematchStatusText.setColor(cssHex(OPPONENT_LEFT_COLOR));
   }
 
-  private createButton(
-    x: number,
-    y: number,
-    label: string,
-    color: number,
-    onClick: () => void,
-  ): void {
-    const width = 160;
-    const height = 36;
-
-    const bg = this.add.graphics();
-    bg.fillStyle(color, 1);
-    bg.fillRoundedRect(x - width / 2, y, width, height, 4);
-
-    const text = this.add.text(x, y + height / 2, label, {
-      fontFamily: '"Courier New", Courier, monospace',
-      fontSize: '13px',
-      color: cssHex(BTN_LABEL_COLOR),
-    }).setOrigin(0.5);
-
-    const zone = this.add.zone(x, y + height / 2, width, height)
-      .setInteractive({ useHandCursor: true });
-
-    const hoverColor = Phaser.Display.Color.ValueToColor(color).lighten(HOVER_LIGHTEN).color;
-
-    zone.on('pointerover', () => {
-      bg.clear();
-      bg.fillStyle(hoverColor, 1);
-      bg.fillRoundedRect(x - width / 2, y, width, height, 4);
-    });
-
-    zone.on('pointerout', () => {
-      bg.clear();
-      bg.fillStyle(color, 1);
-      bg.fillRoundedRect(x - width / 2, y, width, height, 4);
-    });
-
-    zone.on('pointerdown', onClick);
-
-    // Keep references alive
-    text.setData('zone', zone);
+  private isLikelyMobile(): boolean {
+    return (
+      'ontouchstart' in window &&
+      Math.min(window.innerWidth, window.innerHeight) < 600
+    );
   }
 }

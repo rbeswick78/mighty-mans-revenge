@@ -3,41 +3,36 @@ import type { ServerMatchmakingStatusMessage } from '@shared/types/network.js';
 import { Wasteland, cssHex } from '@shared/config/palette.js';
 import { AudioManager } from '../audio/audio-manager.js';
 import { GameService, type MatchData } from '../services/game-service.js';
+import { WastelandStreet } from '../ui/menu/wasteland-street.js';
+import { MenuPanel } from '../ui/menu/menu-panel.js';
+import { PixelButton } from '../ui/menu/pixel-button.js';
+import { TitleLogo } from '../ui/menu/title-logo.js';
+import { MENU_FONTS } from '../ui/menu/fonts.js';
 
 const STORAGE_KEY_NICKNAME = 'mmr_nickname';
 
-// --- Wasteland palette mapping for lobby chrome (TUNABLE) ---
-// Keep all color decisions for this scene at the top so a future palette
-// pass can re-tune the lobby in one place. Numeric values feed graphics
-// fillStyle / lineStyle; cssHex() wraps them for Phaser.Text styles.
-const TITLE_COLOR = Wasteland.LOADING_BAR_FILL;       // hot orange — same accent as boot
-const TITLE_STROKE = Wasteland.CANVAS_BG;             // near-black plum
+// Scene-local color decisions. Everything beyond the parallax backdrop is
+// pinned here so a future palette pass can re-tune the lobby in one place.
 const SUBTITLE_COLOR = Wasteland.COVER_FILL;          // weathered tan
 const LABEL_COLOR = Wasteland.COVER_FILL;             // weathered tan
 const NICKNAME_COLOR = Wasteland.HEALTH_GOOD;         // dusty mint terminal-green
 const INPUT_BG = Wasteland.HUD_STRIP_BG;              // near-black plum
 const INPUT_BORDER = Wasteland.LOADING_BAR_FILL;      // hot orange
-const PRIMARY_BTN_COLOR = Wasteland.LOADING_BAR_FILL; // hot orange (CTA)
-const SECONDARY_BTN_COLOR = Wasteland.WALL_FILL;      // crumbling concrete
-const BTN_LABEL_COLOR = Wasteland.TEXT_PRIMARY;       // bone-white
 const SEARCHING_COLOR = Wasteland.LOADING_BAR_FILL;   // hot orange (active state)
 const SEARCH_TIMER_COLOR = Wasteland.COVER_FILL;
 const PLAYER_COUNT_COLOR = Wasteland.WALL_FILL;       // dim
 const FOOTER_COLOR = Wasteland.WALL_LINE;             // very dim ash-shadow
 const ERROR_COLOR = Wasteland.HIT_FLASH;              // dried blood
-const HOVER_LIGHTEN = 20;                             // Phaser Color.lighten() amount
-
-const lighten = (hex: number, amount: number): number =>
-  Phaser.Display.Color.ValueToColor(hex).lighten(amount).color;
 
 export class LobbyScene extends Phaser.Scene {
   private nicknameText!: Phaser.GameObjects.Text;
   private nicknameInput: HTMLInputElement | null = null;
   private searchingText!: Phaser.GameObjects.Text;
   private searchTimerText!: Phaser.GameObjects.Text;
-  private cancelButton!: Phaser.GameObjects.Container;
+  private cancelButton!: PixelButton;
   private playerCountText!: Phaser.GameObjects.Text;
-  private quickMatchButton!: Phaser.GameObjects.Container;
+  private quickMatchButton!: PixelButton;
+  private mightyManSprite!: Phaser.GameObjects.Sprite;
   private nickname: string;
   private isSearching = false;
   private searchStartTime = 0;
@@ -66,51 +61,88 @@ export class LobbyScene extends Phaser.Scene {
     AudioManager.getInstance()?.playMusic('music-lobby');
 
     const centerX = this.cameras.main.width / 2;
-    // Original layout was designed for a 540px-tall canvas. Re-center
-    // vertically so the lobby sits in the middle of whatever canvas we
-    // render into (currently 720px).
-    const yOffset = Math.max(0, (this.cameras.main.height - 540) / 2);
+    const camHeight = this.cameras.main.height;
 
-    // Title
-    this.add.text(centerX, 60 + yOffset, 'MIGHTY MAN\'S\nREVENGE', {
-      fontFamily: '"Courier New", Courier, monospace',
-      fontSize: '40px',
-      color: cssHex(TITLE_COLOR),
-      align: 'center',
-      lineSpacing: 8,
-      stroke: cssHex(TITLE_STROKE),
-      strokeThickness: 4,
-    }).setOrigin(0.5);
+    // ────────────────────────────────────────────────────────────────────
+    // Backdrop: parallax wasteland street at dusk + Mighty Man at center.
+    // The WastelandStreet draws sky, city silhouette, distant ruins, mid
+    // wall, near ground, fence, and ember/smoke particles. Auto-cleans
+    // on scene SHUTDOWN.
+    // ────────────────────────────────────────────────────────────────────
+    new WastelandStreet(this, { lowDetail: this.isLikelyMobile() });
 
-    // Subtitle
-    this.add.text(centerX, 140 + yOffset, 'POST-APOCALYPTIC SHOWDOWN', {
-      fontFamily: '"Courier New", Courier, monospace',
-      fontSize: '12px',
-      color: cssHex(SUBTITLE_COLOR),
-    }).setOrigin(0.5);
+    // Mighty Man stands in front of the mid-wall band. Existing idle anim
+    // (created in BootScene) is reused — re-anchored, never re-authored.
+    this.mightyManSprite = this.add
+      .sprite(centerX, 430, 'mighty_man_side_idle')
+      .setOrigin(0.5, 1)
+      .setScale(6)
+      .setDepth(WastelandStreet.DEPTH.CHARACTERS);
+    this.mightyManSprite.play('mighty_man_side_idle');
 
-    // Nickname label
-    this.add.text(centerX, 200 + yOffset, 'ENTER CALLSIGN:', {
-      fontFamily: '"Courier New", Courier, monospace',
-      fontSize: '14px',
-      color: cssHex(LABEL_COLOR),
-    }).setOrigin(0.5);
+    // ────────────────────────────────────────────────────────────────────
+    // Logo + tagline (top of canvas, in the sky band)
+    // ────────────────────────────────────────────────────────────────────
+    new TitleLogo(this, centerX, 95, ["MIGHTY MAN'S", 'REVENGE'], {
+      fontSize: 32,
+      lineSpacing: 12,
+    }).setDepth(WastelandStreet.DEPTH.UI);
 
-    // Nickname input background
-    const inputBg = this.add.graphics();
-    inputBg.fillStyle(INPUT_BG, 1);
-    inputBg.fillRect(centerX - 120, 218 + yOffset, 240, 32);
-    inputBg.lineStyle(1, INPUT_BORDER, 0.6);
-    inputBg.strokeRect(centerX - 120, 218 + yOffset, 240, 32);
+    this.add
+      .text(centerX, 170, 'POST-APOCALYPTIC SHOWDOWN', {
+        fontFamily: MENU_FONTS.BODY,
+        fontSize: '16px',
+        color: cssHex(SUBTITLE_COLOR),
+      })
+      .setOrigin(0.5)
+      .setDepth(WastelandStreet.DEPTH.UI);
 
-    // Nickname display text
-    this.nicknameText = this.add.text(centerX - 110, 226 + yOffset, this.nickname + '_', {
-      fontFamily: '"Courier New", Courier, monospace',
-      fontSize: '16px',
-      color: cssHex(NICKNAME_COLOR),
-    });
+    // ────────────────────────────────────────────────────────────────────
+    // Main UI panel — holds the callsign + Quick Match button. The
+    // searching-state UI shares this panel, swapping visibility.
+    // ────────────────────────────────────────────────────────────────────
+    const panelW = 380;
+    const panelH = 180;
+    const panelX = centerX - panelW / 2;
+    const panelY = camHeight - 270;
+    const panel = new MenuPanel(this, panelX, panelY, panelW, panelH);
+    panel.setDepth(WastelandStreet.DEPTH.UI);
 
-    // Blinking cursor
+    // Callsign label
+    const callsignLabel = this.add
+      .text(panel.centerX, 24, 'ENTER CALLSIGN', {
+        fontFamily: MENU_FONTS.HEADER,
+        fontSize: '11px',
+        color: cssHex(LABEL_COLOR),
+      })
+      .setOrigin(0.5);
+    panel.add(callsignLabel);
+
+    // Callsign input field — Phaser-drawn box + HTML <input> overlay.
+    const inputW = 300;
+    const inputH = 36;
+    const inputLocalX = (panelW - inputW) / 2;
+    const inputLocalY = 46;
+    const inputBgGfx = this.add.graphics();
+    inputBgGfx.fillStyle(INPUT_BG, 0.9);
+    inputBgGfx.fillRect(inputLocalX, inputLocalY, inputW, inputH);
+    inputBgGfx.lineStyle(1, INPUT_BORDER, 0.7);
+    inputBgGfx.strokeRect(inputLocalX, inputLocalY, inputW, inputH);
+    panel.add(inputBgGfx);
+
+    this.nicknameText = this.add.text(
+      panel.centerX,
+      inputLocalY + inputH / 2,
+      this.nickname + '_',
+      {
+        fontFamily: MENU_FONTS.BODY,
+        fontSize: '20px',
+        color: cssHex(NICKNAME_COLOR),
+      },
+    );
+    this.nicknameText.setOrigin(0.5);
+    panel.add(this.nicknameText);
+
     this.time.addEvent({
       delay: 500,
       loop: true,
@@ -120,55 +152,110 @@ export class LobbyScene extends Phaser.Scene {
       },
     });
 
-    // Transparent HTML <input> overlaid on the nickname box. Needed so
-    // mobile virtual keyboards appear when the user taps the field —
-    // Phaser-only keyboard listeners don't trigger the soft keyboard.
-    // The Phaser-drawn box/text remain for the retro look; this input
-    // is invisible and just captures text entry + tap focus.
-    this.nicknameInput = this.createNicknameInput(centerX, 234 + yOffset);
+    // Transparent HTML <input> overlaid on the input box. Needed for
+    // mobile virtual keyboards — Phaser-only listeners don't trigger
+    // soft keyboards.
+    const inputCenterAbsX = panelX + panel.centerX;
+    const inputCenterAbsY = panelY + inputLocalY + inputH / 2;
+    this.nicknameInput = this.createNicknameInput(
+      inputCenterAbsX,
+      inputCenterAbsY,
+    );
 
-    // Quick Match button
-    this.quickMatchButton = this.createQuickMatchButton(centerX, 290 + yOffset);
+    // Quick Match button (primary CTA, centered in lower half of panel)
+    const qmW = 260;
+    const qmH = 48;
+    this.quickMatchButton = new PixelButton(
+      this,
+      panel.centerX - qmW / 2,
+      panelH - qmH - 16,
+      qmW,
+      qmH,
+      'QUICK MATCH',
+      {
+        variant: 'primary',
+        fontSize: 14,
+        onClick: () => this.onQuickMatch(),
+      },
+    );
+    panel.add(this.quickMatchButton);
 
-    // Searching text (hidden initially)
-    this.searchingText = this.add.text(centerX, 360 + yOffset, 'Searching for opponent...', {
-      fontFamily: '"Courier New", Courier, monospace',
-      fontSize: '14px',
-      color: cssHex(SEARCHING_COLOR),
-    }).setOrigin(0.5).setVisible(false);
+    // ────────────────────────────────────────────────────────────────────
+    // Searching state — sits in the same panel real estate, hidden by
+    // default. Searching text replaces the button area; cancel button
+    // replaces the quick-match button position.
+    // ────────────────────────────────────────────────────────────────────
+    this.searchingText = this.add
+      .text(panel.centerX, 70, 'SEARCHING FOR OPPONENT', {
+        fontFamily: MENU_FONTS.HEADER,
+        fontSize: '12px',
+        color: cssHex(SEARCHING_COLOR),
+      })
+      .setOrigin(0.5)
+      .setVisible(false);
+    panel.add(this.searchingText);
 
-    // Search timer text (hidden initially)
-    this.searchTimerText = this.add.text(centerX, 380 + yOffset, '0:00', {
-      fontFamily: '"Courier New", Courier, monospace',
-      fontSize: '12px',
-      color: cssHex(SEARCH_TIMER_COLOR),
-    }).setOrigin(0.5).setVisible(false);
+    this.searchTimerText = this.add
+      .text(panel.centerX, 100, '0:00', {
+        fontFamily: MENU_FONTS.BODY,
+        fontSize: '20px',
+        color: cssHex(SEARCH_TIMER_COLOR),
+      })
+      .setOrigin(0.5)
+      .setVisible(false);
+    panel.add(this.searchTimerText);
 
-    // Cancel button (hidden initially)
-    this.cancelButton = this.createCancelButton(centerX, 410 + yOffset);
+    const cancelW = 180;
+    const cancelH = 38;
+    this.cancelButton = new PixelButton(
+      this,
+      panel.centerX - cancelW / 2,
+      panelH - cancelH - 22,
+      cancelW,
+      cancelH,
+      'CANCEL',
+      {
+        variant: 'secondary',
+        fontSize: 12,
+        onClick: () => this.onCancelSearch(),
+      },
+    );
     this.cancelButton.setVisible(false);
+    panel.add(this.cancelButton);
 
-    // Player count
-    this.playerCountText = this.add.text(centerX, 500 + yOffset, '0 players online', {
-      fontFamily: '"Courier New", Courier, monospace',
-      fontSize: '12px',
-      color: cssHex(PLAYER_COUNT_COLOR),
-    }).setOrigin(0.5);
+    // ────────────────────────────────────────────────────────────────────
+    // Footer row — player count left, version right, both dim against
+    // the near-ground band so they don't compete with the panel/logo.
+    // ────────────────────────────────────────────────────────────────────
+    this.playerCountText = this.add
+      .text(36, camHeight - 24, '0 PLAYERS ONLINE', {
+        fontFamily: MENU_FONTS.BODY,
+        fontSize: '14px',
+        color: cssHex(PLAYER_COUNT_COLOR),
+      })
+      .setOrigin(0, 0.5)
+      .setDepth(WastelandStreet.DEPTH.UI);
 
-    // Version / footer
-    this.add.text(centerX, 525 + yOffset, 'v0.1.0 // PRE-ALPHA', {
-      fontFamily: '"Courier New", Courier, monospace',
-      fontSize: '10px',
-      color: cssHex(FOOTER_COLOR),
-    }).setOrigin(0.5);
+    this.add
+      .text(
+        this.cameras.main.width - 36,
+        camHeight - 24,
+        'v0.1.0 // PRE-ALPHA',
+        {
+          fontFamily: MENU_FONTS.BODY,
+          fontSize: '14px',
+          color: cssHex(FOOTER_COLOR),
+        },
+      )
+      .setOrigin(1, 0.5)
+      .setDepth(WastelandStreet.DEPTH.UI);
 
     // Enter = quick match (works whether the nickname input has focus
     // or not, since the keydown bubbles up from the input element).
     this.input.keyboard?.on('keydown-ENTER', () => {
       if (!this.isSearching) this.onQuickMatch();
     });
-    // Escape cancels an active search (for desktop; mobile users tap
-    // the CANCEL button).
+    // Escape cancels an active search.
     this.input.keyboard?.on('keydown-ESC', () => {
       if (this.isSearching) this.onCancelSearch();
     });
@@ -177,7 +264,9 @@ export class LobbyScene extends Phaser.Scene {
     this.wireGameServiceEvents();
 
     // Connect to server if not already connected
-    if (this.gameService.getNetworkManager().getConnectionState() !== 'connected') {
+    if (
+      this.gameService.getNetworkManager().getConnectionState() !== 'connected'
+    ) {
       this.gameService.connect().catch((err) => {
         console.error('[LobbyScene] Failed to connect:', err);
       });
@@ -208,7 +297,7 @@ export class LobbyScene extends Phaser.Scene {
       // stranding the live scene's listener.
       this.isSearching = false;
       let transitioned = false;
-      const goToGame = () => {
+      const goToGame = (): void => {
         if (transitioned) return;
         transitioned = true;
         this.cleanupEvents();
@@ -255,80 +344,6 @@ export class LobbyScene extends Phaser.Scene {
     }
   }
 
-  private createQuickMatchButton(centerX: number, buttonY: number): Phaser.GameObjects.Container {
-    const baseColor = PRIMARY_BTN_COLOR;
-    const hoverColor = lighten(baseColor, HOVER_LIGHTEN);
-
-    const buttonBg = this.add.graphics();
-    buttonBg.fillStyle(baseColor, 1);
-    buttonBg.fillRoundedRect(-100, 0, 200, 40, 4);
-
-    const text = this.add.text(0, 20, 'QUICK MATCH', {
-      fontFamily: '"Courier New", Courier, monospace',
-      fontSize: '18px',
-      color: cssHex(BTN_LABEL_COLOR),
-    }).setOrigin(0.5);
-
-    const zone = this.add.zone(0, 20, 200, 40)
-      .setInteractive({ useHandCursor: true });
-
-    zone.on('pointerover', () => {
-      buttonBg.clear();
-      buttonBg.fillStyle(hoverColor, 1);
-      buttonBg.fillRoundedRect(-100, 0, 200, 40, 4);
-    });
-
-    zone.on('pointerout', () => {
-      buttonBg.clear();
-      buttonBg.fillStyle(baseColor, 1);
-      buttonBg.fillRoundedRect(-100, 0, 200, 40, 4);
-    });
-
-    zone.on('pointerdown', () => {
-      this.onQuickMatch();
-    });
-
-    const container = this.add.container(centerX, buttonY, [buttonBg, text, zone]);
-    return container;
-  }
-
-  private createCancelButton(centerX: number, buttonY: number): Phaser.GameObjects.Container {
-    const baseColor = SECONDARY_BTN_COLOR;
-    const hoverColor = lighten(baseColor, HOVER_LIGHTEN);
-
-    const buttonBg = this.add.graphics();
-    buttonBg.fillStyle(baseColor, 1);
-    buttonBg.fillRoundedRect(-60, 0, 120, 30, 4);
-
-    const text = this.add.text(0, 15, 'CANCEL', {
-      fontFamily: '"Courier New", Courier, monospace',
-      fontSize: '13px',
-      color: cssHex(BTN_LABEL_COLOR),
-    }).setOrigin(0.5);
-
-    const zone = this.add.zone(0, 15, 120, 30)
-      .setInteractive({ useHandCursor: true });
-
-    zone.on('pointerover', () => {
-      buttonBg.clear();
-      buttonBg.fillStyle(hoverColor, 1);
-      buttonBg.fillRoundedRect(-60, 0, 120, 30, 4);
-    });
-
-    zone.on('pointerout', () => {
-      buttonBg.clear();
-      buttonBg.fillStyle(baseColor, 1);
-      buttonBg.fillRoundedRect(-60, 0, 120, 30, 4);
-    });
-
-    zone.on('pointerdown', () => {
-      this.onCancelSearch();
-    });
-
-    const container = this.add.container(centerX, buttonY, [buttonBg, text, zone]);
-    return container;
-  }
-
   private createNicknameInput(x: number, y: number): HTMLInputElement {
     const input = document.createElement('input');
     input.type = 'text';
@@ -344,8 +359,8 @@ export class LobbyScene extends Phaser.Scene {
     // the retro pixel text underneath shows through. font-size >= 16px
     // prevents iOS from auto-zooming on focus.
     Object.assign(input.style, {
-      width: '240px',
-      height: '32px',
+      width: '300px',
+      height: '36px',
       padding: '0',
       margin: '0',
       border: 'none',
@@ -357,10 +372,12 @@ export class LobbyScene extends Phaser.Scene {
       textAlign: 'center',
     } as Partial<CSSStyleDeclaration>);
 
-    this.add.dom(x, y, input).setOrigin(0.5, 0.5);
+    this.add.dom(x, y, input).setOrigin(0.5, 0.5).setDepth(WastelandStreet.DEPTH.UI + 1);
 
     input.addEventListener('input', () => {
-      const sanitized = input.value.replace(/[^a-zA-Z0-9_\-.]/g, '').slice(0, 16);
+      const sanitized = input.value
+        .replace(/[^a-zA-Z0-9_\-.]/g, '')
+        .slice(0, 16);
       if (sanitized !== input.value) input.value = sanitized;
       this.nickname = sanitized;
       this.saveNickname();
@@ -368,15 +385,18 @@ export class LobbyScene extends Phaser.Scene {
     });
 
     // Auto-focus for desktop convenience (no-op for mobile keyboard —
-    // that only appears when the user actually taps, which is fine:
-    // we want users to tap the visible box to open the keyboard).
+    // that only appears when the user actually taps).
     input.focus();
 
     return input;
   }
 
   private updateNicknameDisplay(): void {
-    const cursor = this.cursorVisible ? '_' : '';
+    // Use a non-breaking space when the cursor is "off" so the text width
+    // stays constant — centered text would otherwise shift horizontally on
+    // every blink. Both '_' and ' ' render the same width in the
+    // Silkscreen monospace pixel font.
+    const cursor = this.cursorVisible ? '_' : ' ';
     this.nicknameText.setText(this.nickname + cursor);
   }
 
@@ -388,17 +408,20 @@ export class LobbyScene extends Phaser.Scene {
     if (this.isSearching) return;
 
     if (this.nickname.length < 2) {
-      const yOffset = Math.max(0, (this.cameras.main.height - 540) / 2);
-      const flash = this.add.text(
-        this.cameras.main.width / 2,
-        258 + yOffset,
-        'Callsign must be at least 2 characters',
-        {
-          fontFamily: '"Courier New", Courier, monospace',
-          fontSize: '11px',
-          color: cssHex(ERROR_COLOR),
-        },
-      ).setOrigin(0.5);
+      const centerX = this.cameras.main.width / 2;
+      const flash = this.add
+        .text(
+          centerX,
+          this.cameras.main.height - 70,
+          'CALLSIGN MUST BE AT LEAST 2 CHARACTERS',
+          {
+            fontFamily: MENU_FONTS.BODY,
+            fontSize: '14px',
+            color: cssHex(ERROR_COLOR),
+          },
+        )
+        .setOrigin(0.5)
+        .setDepth(WastelandStreet.DEPTH.UI + 2);
       this.time.delayedCall(2000, () => flash.destroy());
       return;
     }
@@ -406,24 +429,21 @@ export class LobbyScene extends Phaser.Scene {
     this.isSearching = true;
     this.searchStartTime = Date.now();
 
-    // Hide the mobile virtual keyboard once we've committed to a
-    // callsign and started matchmaking.
+    // Hide mobile virtual keyboard once matchmaking commits.
     this.nicknameInput?.blur();
 
-    // Request fullscreen on this user gesture (browsers reject the call
-    // outside one). Best-effort — iframes, restrictive policies, and most
-    // iPhone Safari versions report fullscreenEnabled=false and we skip.
+    // Request fullscreen on this user gesture. Best-effort — many iOS
+    // Safari versions report fullscreenEnabled=false and we skip.
     if (document.fullscreenEnabled && !this.scale.isFullscreen) {
       this.scale.startFullscreen();
     }
 
-    // Show searching UI
+    // Swap panel content into searching state
     this.searchingText.setVisible(true);
     this.searchTimerText.setVisible(true);
     this.cancelButton.setVisible(true);
     this.quickMatchButton.setVisible(false);
 
-    // Pulsing animation on searching text
     this.searchingTween = this.tweens.add({
       targets: this.searchingText,
       alpha: { from: 1, to: 0.3 },
@@ -432,20 +452,22 @@ export class LobbyScene extends Phaser.Scene {
       repeat: -1,
     });
 
-    // Update search timer every second
     this.searchTimerEvent = this.time.addEvent({
       delay: 1000,
       loop: true,
       callback: () => {
         if (!this.isSearching) return;
-        const elapsed = Math.floor((Date.now() - this.searchStartTime) / 1000);
+        const elapsed = Math.floor(
+          (Date.now() - this.searchStartTime) / 1000,
+        );
         const mins = Math.floor(elapsed / 60);
         const secs = elapsed % 60;
-        this.searchTimerText.setText(`${mins}:${secs.toString().padStart(2, '0')}`);
+        this.searchTimerText.setText(
+          `${mins}:${secs.toString().padStart(2, '0')}`,
+        );
       },
     });
 
-    // Send matchmaking request
     this.gameService.joinMatchmaking(this.nickname);
   }
 
@@ -457,7 +479,6 @@ export class LobbyScene extends Phaser.Scene {
   private stopSearching(): void {
     this.isSearching = false;
 
-    // Hide searching UI
     this.searchingText.setVisible(false);
     this.searchTimerText.setVisible(false);
     this.cancelButton.setVisible(false);
@@ -475,6 +496,17 @@ export class LobbyScene extends Phaser.Scene {
   }
 
   setPlayerCount(count: number): void {
-    this.playerCountText.setText(`${count} player${count !== 1 ? 's' : ''} online`);
+    const label =
+      count === 1 ? '1 PLAYER ONLINE' : `${count} PLAYERS ONLINE`;
+    this.playerCountText.setText(label);
+  }
+
+  private isLikelyMobile(): boolean {
+    // Match the convention used elsewhere in client (is-touch-device.ts):
+    // touch capability + small viewport. Used to decide on reduced
+    // particle counts in the parallax backdrop.
+    return (
+      'ontouchstart' in window && Math.min(window.innerWidth, window.innerHeight) < 600
+    );
   }
 }

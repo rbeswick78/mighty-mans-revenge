@@ -3,6 +3,8 @@ import { Wasteland, cssHex } from '@shared/config/palette.js';
 import { CHARACTERS } from '@shared/config/game.js';
 import { DIRECTIONS, type Direction4, type FrameDim } from '@shared/types/character.js';
 import { AudioManager } from '../audio/audio-manager.js';
+import { generateMenuTextures } from '../ui/menu/wasteland-street.js';
+import { MENU_FONT_CHECK_LIST } from '../ui/menu/fonts.js';
 
 /**
  * Per-direction frame dimensions for the gun overlay (the "Gun" weapon —
@@ -57,6 +59,10 @@ export class BootScene extends Phaser.Scene {
     this.setupLoadingBar();
     this.loadRealAssets();
     this.generateProceduralAssets();
+    // Menu-scene procedural textures (sky gradient, city silhouette, brick
+    // wall band, near-ground debris, wire fence, ember particle). Cached on
+    // the texture manager for the lifetime of the game.
+    generateMenuTextures(this);
   }
 
   create(): void {
@@ -71,10 +77,27 @@ export class BootScene extends Phaser.Scene {
     // indices for map-renderer.ts variant pools.
     const wantTilePicker = new URLSearchParams(window.location.search).has('tilepicker');
     const nextScene = wantTilePicker ? 'TilePickerScene' : 'LobbyScene';
-    this.cameras.main.fadeOut(300, 0, 0, 0);
-    this.cameras.main.once('camerafadeoutcomplete', () => {
-      this.scene.start(nextScene);
+    // Wait for menu web fonts before revealing LobbyScene. Painting first
+    // with the Courier fallback (different character widths) and then
+    // restamping in Press Start 2P produces a visible flicker.
+    void this.awaitMenuFonts().then(() => {
+      this.cameras.main.fadeOut(300, 0, 0, 0);
+      this.cameras.main.once('camerafadeoutcomplete', () => {
+        this.scene.start(nextScene);
+      });
     });
+  }
+
+  private async awaitMenuFonts(): Promise<void> {
+    if (!('fonts' in document)) return;
+    try {
+      await Promise.all(
+        MENU_FONT_CHECK_LIST.map((spec) => document.fonts.load(spec)),
+      );
+      await document.fonts.ready;
+    } catch {
+      // Fall through to Courier fallback — never block startup on font load.
+    }
   }
 
   private setupLoadingBar(): void {
