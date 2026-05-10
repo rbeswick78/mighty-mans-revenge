@@ -103,13 +103,13 @@ export class Match implements MatchContext {
   /** Active 3-shot bursts in flight, keyed by player. */
   private pendingBursts: Map<PlayerId, PendingBurst> = new Map();
   /**
-   * Per-cast set of victims a Bruce has already hit during the current
-   * fire-breath. Prevents double-tapping the same target across the
-   * sustained 1.2s window (close-band would otherwise re-kill at every
-   * tick and far-band would over-stack damage). Cleared when the active
-   * window ends (natural expiry, death, or new cast).
+   * Per-cast count of fire-breath damage ticks that have already fired
+   * for each Bruce. The cast schedules DAMAGE_TICK_COUNT evenly-spaced
+   * ticks across the active window; victims currently inside the cone on
+   * each tick take a flat DAMAGE_PER_TICK. Cleared when the active window
+   * ends (natural expiry, death, or new cast).
    */
-  private abilityHitTargetsByPlayer: Map<PlayerId, Set<PlayerId>> = new Map();
+  private fireBreathTicksByPlayer: Map<PlayerId, number> = new Map();
   /** Timestamp when the match became ACTIVE, for duration tracking. */
   get matchStartTime(): number {
     return this._matchStartTimeMs;
@@ -1056,8 +1056,8 @@ export class Match implements MatchContext {
       player.abilityCooldownSeconds = ABILITY.BRUCE_FIRE_BREATH.COOLDOWN;
       // Pin aim so the breath cone fires along the activation direction.
       player.aimAngle = aimAngle;
-      // Fresh per-cast hit-set so a previous cast's hits don't leak in.
-      this.abilityHitTargetsByPlayer.set(player.id, new Set());
+      // Fresh per-cast damage-tick counter so a previous cast doesn't leak in.
+      this.fireBreathTicksByPlayer.set(player.id, 0);
     } else if (player.characterId === 'mighty_man') {
       player.abilityActiveSeconds = ABILITY.MIGHTY_MAN_XRAY.DURATION;
       player.abilityCooldownSeconds =
@@ -1078,7 +1078,7 @@ export class Match implements MatchContext {
     if (player.characterId === 'mighty_man') {
       player.abilityCooldownSeconds = ABILITY.MIGHTY_MAN_XRAY.COOLDOWN;
     }
-    this.abilityHitTargetsByPlayer.delete(player.id);
+    this.fireBreathTicksByPlayer.delete(player.id);
   }
 
   /** Decrement active and cooldown timers for every player. */
@@ -1087,9 +1087,9 @@ export class Match implements MatchContext {
       if (player.abilityActiveSeconds > 0) {
         player.abilityActiveSeconds = Math.max(0, player.abilityActiveSeconds - dt);
         if (player.abilityActiveSeconds <= 0) {
-          // Natural expiry — clear the per-cast hit-set so the next cast
+          // Natural expiry — clear the per-cast counter so the next cast
           // starts fresh.
-          this.abilityHitTargetsByPlayer.delete(player.id);
+          this.fireBreathTicksByPlayer.delete(player.id);
         }
       }
       if (player.abilityCooldownSeconds > 0) {
@@ -1099,43 +1099,39 @@ export class Match implements MatchContext {
   }
 
   /**
-   * Per-tick fire-breath hit check for every Bruce currently breathing.
-   * Sweeps a fat ray (the player hitbox is inflated by half the breath
-   * width) from Bruce's locked position along his locked aim, capped at
-   * RANGE_TILES. Damage tier is decided by the distance to the victim's
-   * center: <= CLOSE_RANGE_TILES does CLOSE_DAMAGE (one-shot from full HP),
-   * beyond that does FAR_DAMAGE (heavy chip). Each victim can only be hit
-   * once per cast — the per-player hit-set guards against per-tick
-   * re-application across the sustained 1.2s window.
+   * Per-tick fire-breath logic for every Bruce currently breathing.
+   *
+   * Wall destruction runs every server tick so the cone visibly burns
+   * through interior walls as it sweeps. Damage, by contrast, is
+   * scheduled: each cast fires DAMAGE_TICK_COUNT evenly-spaced damage
+   * ticks across the active window. On each scheduled damage tick, every
+   * victim currently inside the cone takes a flat DAMAGE_PER_TICK — the
+   * longer they stay in the breath, the more ticks they eat.
    */
   private tickFireBreath(): void {
     const range = ABILITY.BRUCE_FIRE_BREATH.RANGE_TILES * MAP.TILE_SIZE;
-    const closeRange = ABILITY.BRUCE_FIRE_BREATH.CLOSE_RANGE_TILES * MAP.TILE_SIZE;
     const halfW = PLAYER.HITBOX_WIDTH / 2 + ABILITY.BRUCE_FIRE_BREATH.WIDTH / 2;
     const halfH = PLAYER.HITBOX_HEIGHT / 2 + ABILITY.BRUCE_FIRE_BREATH.WIDTH / 2;
     const breathHalfWidth = ABILITY.BRUCE_FIRE_BREATH.WIDTH / 2;
     const tileSize = MAP.TILE_SIZE;
     const halfTileDiag = (tileSize * Math.SQRT2) / 2;
     const mapData = this.mapManager.getMapData();
+    const duration = ABILITY.BRUCE_FIRE_BREATH.DURATION;
+    const tickCount = ABILITY.BRUCE_FIRE_BREATH.DAMAGE_TICK_COUNT;
+    const tickInterval = duration / tickCount;
+    const damagePerTick = ABILITY.BRUCE_FIRE_BREATH.DAMAGE_PER_TICK;
 
     for (const [playerId, player] of this.players) {
       if (player.characterId !== 'bruce') continue;
       if (player.abilityActiveSeconds <= 0) continue;
       if (player.isDead) continue;
 
-      let hitSet = this.abilityHitTargetsByPlayer.get(playerId);
-      if (!hitSet) {
-        hitSet = new Set();
-        this.abilityHitTargetsByPlayer.set(playerId, hitSet);
-      }
-
       const dirX = Math.cos(player.aimAngle);
       const dirY = Math.sin(player.aimAngle);
 
-      // Burn down interior wall tiles inside the cone. Outer-perimeter
-      // walls are spared so the playfield stays bounded. Cover (low) is
-      // also spared — fire breaks walls, not crates. We scan a tile-coord
-      // AABB around the cone and test each tile center against the wedge.
+      // Burn down interior wall tiles inside the cone every server tick.
+      // Outer-perimeter walls are spared so the playfield stays bounded;
+      // cover (low) is also spared — fire breaks walls, not crates.
       this.destroyWallsInCone(
         mapData,
         player.position.x,
@@ -1148,11 +1144,19 @@ export class Match implements MatchContext {
         halfTileDiag,
       );
 
+      // Decide whether a scheduled damage tick fires this server tick.
+      // Tick k fires once elapsed >= k * tickInterval. The activation
+      // server tick has elapsed = 0 (tickFireBreath runs before
+      // tickAbilities decrements), so tick 0 lands on activation.
+      const elapsed = duration - player.abilityActiveSeconds;
+      const ticksFired = this.fireBreathTicksByPlayer.get(playerId) ?? 0;
+      const expected = Math.min(tickCount, Math.floor(elapsed / tickInterval) + 1);
+      if (expected <= ticksFired) continue;
+
       for (const [otherId, other] of this.players) {
         if (otherId === playerId) continue;
         if (other.isDead) continue;
         if (other.invulnerableTimer > 0) continue;
-        if (hitSet.has(otherId)) continue;
 
         const hitDist = rayIntersectsAABB(
           player.position.x,
@@ -1166,21 +1170,14 @@ export class Match implements MatchContext {
         );
         if (hitDist === null || hitDist <= 0 || hitDist > range) continue;
 
-        const dx = other.position.x - player.position.x;
-        const dy = other.position.y - player.position.y;
-        const centerDist = Math.sqrt(dx * dx + dy * dy);
-        const damage =
-          centerDist <= closeRange
-            ? ABILITY.BRUCE_FIRE_BREATH.CLOSE_DAMAGE
-            : ABILITY.BRUCE_FIRE_BREATH.FAR_DAMAGE;
-
-        const result = this.combatManager.applyDamage(other, damage, playerId);
-        hitSet.add(otherId);
-        this.stats.recordDamage(playerId, damage);
+        const result = this.combatManager.applyDamage(other, damagePerTick, playerId);
+        this.stats.recordDamage(playerId, damagePerTick);
         if (result.killed) {
           this.onKill(playerId, otherId, 'fire');
         }
       }
+
+      this.fireBreathTicksByPlayer.set(playerId, expected);
     }
   }
 

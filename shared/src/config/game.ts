@@ -132,12 +132,19 @@ export const ABILITY = Object.freeze({
     COOLDOWN: 45,
     /** Reach in tiles. 4 * TILE_SIZE = 192px. */
     RANGE_TILES: 4,
-    /** Inside this band the breath does CLOSE_DAMAGE; beyond it FAR_DAMAGE. */
-    CLOSE_RANGE_TILES: 2,
-    /** One-shot from full HP at 100/100. */
-    CLOSE_DAMAGE: 100,
-    /** Heavy chip outside the close band; not lethal alone from full HP. */
-    FAR_DAMAGE: 70,
+    /**
+     * Number of damage ticks fired evenly across the active window. Tick 0
+     * fires on the activation server tick (elapsed = 0), tick k fires once
+     * elapsed >= k * (DURATION / DAMAGE_TICK_COUNT). At DURATION=1.2 and
+     * TICK_COUNT=5 the spacing is 0.24s.
+     */
+    DAMAGE_TICK_COUNT: 5,
+    /**
+     * Damage applied to every player currently inside the cone on each
+     * damage tick. Distance-independent — the longer a victim stays in the
+     * breath, the more ticks they eat. Five ticks at 30 = 150 max damage.
+     */
+    DAMAGE_PER_TICK: 30,
     /** Segment thickness in pixels — gives the breath some hit forgiveness. */
     WIDTH: 14,
   },

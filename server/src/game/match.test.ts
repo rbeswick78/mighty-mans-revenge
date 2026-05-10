@@ -10,6 +10,7 @@ import {
   EVENT,
   GRENADE,
   CHARACTER_IDS,
+  ABILITY,
 } from '@shared/game';
 import type { MapData, PlayerInput, FinalMinuteEvent } from '@shared/game';
 
@@ -891,26 +892,12 @@ describe('Match', () => {
         expect(bruce.abilityCooldownSeconds).toBeGreaterThan(0);
       });
 
-      it('one-shots an opponent within close range (<= 2 tiles)', () => {
+      it('deals one DAMAGE_PER_TICK on the activation tick regardless of distance', () => {
+        // 3 tiles away — well inside the cone but past what used to be the
+        // close band. Damage is now distance-independent.
         const m = startActiveWithCharacters('bruce', 'mighty_man');
         const bruce = m.players.get('player-0')!;
         const victim = m.players.get('player-1')!;
-        // 1.5 tiles to the right at full HP.
-        bruce.position = { x: 100, y: 100 };
-        victim.position = { x: 100 + 1.5 * 48, y: 100 };
-        victim.health = PLAYER.MAX_HEALTH;
-
-        m.queueInput('player-0', makeInput(1, { abilityPressed: true, aimAngle: 0 }));
-        m.update(0.05);
-
-        expect(victim.isDead).toBe(true);
-      });
-
-      it('chips for 70 (not lethal from full HP) when opponent is in the far band', () => {
-        const m = startActiveWithCharacters('bruce', 'mighty_man');
-        const bruce = m.players.get('player-0')!;
-        const victim = m.players.get('player-1')!;
-        // 3 tiles to the right (> 2, < 4).
         bruce.position = { x: 100, y: 100 };
         victim.position = { x: 100 + 3 * 48, y: 100 };
         victim.health = PLAYER.MAX_HEALTH;
@@ -919,7 +906,9 @@ describe('Match', () => {
         m.update(0.05);
 
         expect(victim.isDead).toBe(false);
-        expect(victim.health).toBe(PLAYER.MAX_HEALTH - 70);
+        expect(victim.health).toBe(
+          PLAYER.MAX_HEALTH - ABILITY.BRUCE_FIRE_BREATH.DAMAGE_PER_TICK,
+        );
       });
 
       it('does nothing to opponents beyond the 4-tile range', () => {
@@ -937,9 +926,13 @@ describe('Match', () => {
         expect(victim.health).toBe(PLAYER.MAX_HEALTH);
       });
 
-      it('hits each victim once per cast even though the breath sustains for 1.2s', () => {
-        // Far-band sustained victim: if per-tick damage stacked, 70 × ~24 ticks
-        // would kill them many times over. The hit-set must guard against that.
+      it('stacks 30 damage per scheduled tick — 3 ticks = 90 damage', () => {
+        // Tick spacing = DURATION / DAMAGE_TICK_COUNT = 0.24s. With dt=0.05
+        // per update, tick 0 lands on the activation update; tick 1 lands
+        // once elapsed crosses 0.24 (the 5th sustain update); tick 2 lands
+        // once elapsed crosses 0.48 (the 10th sustain update). 11 sustain
+        // updates puts elapsed at 0.55 — past 0.48, before 0.72 — so
+        // exactly 3 damage ticks should have fired.
         const m = startActiveWithCharacters('bruce', 'mighty_man');
         const bruce = m.players.get('player-0')!;
         const victim = m.players.get('player-1')!;
@@ -948,11 +941,52 @@ describe('Match', () => {
         victim.health = PLAYER.MAX_HEALTH;
 
         m.queueInput('player-0', makeInput(1, { abilityPressed: true, aimAngle: 0 }));
-        // Sustain for the full 1.2s active window.
-        for (let i = 0; i < 30; i++) m.update(0.05);
+        m.update(0.05); // activation tick → tick 0 fires
+        for (let i = 0; i < 11; i++) m.update(0.05); // through tick 2
 
         expect(victim.isDead).toBe(false);
-        expect(victim.health).toBe(PLAYER.MAX_HEALTH - 70);
+        expect(victim.health).toBe(
+          PLAYER.MAX_HEALTH - 3 * ABILITY.BRUCE_FIRE_BREATH.DAMAGE_PER_TICK,
+        );
+      });
+
+      it('kills a full-HP victim who stays in the cone for the full cast (5 ticks)', () => {
+        // 5 ticks × 30 = 150 damage > 100 HP, so the victim should die
+        // somewhere during the cast.
+        const m = startActiveWithCharacters('bruce', 'mighty_man');
+        const bruce = m.players.get('player-0')!;
+        const victim = m.players.get('player-1')!;
+        bruce.position = { x: 100, y: 100 };
+        victim.position = { x: 100 + 3 * 48, y: 100 };
+        victim.health = PLAYER.MAX_HEALTH;
+
+        m.queueInput('player-0', makeInput(1, { abilityPressed: true, aimAngle: 0 }));
+        for (let i = 0; i < 30; i++) m.update(0.05); // sustain past full duration
+
+        expect(victim.isDead).toBe(true);
+      });
+
+      it('fires exactly DAMAGE_TICK_COUNT damage ticks over the active window', () => {
+        // A victim who survives every tick (low DAMAGE_PER_TICK relative to
+        // a very large HP pool) should take exactly TICK_COUNT × PER_TICK
+        // damage — no over-fire from the per-tick wall-burn loop, no
+        // under-fire near the duration boundary.
+        const m = startActiveWithCharacters('bruce', 'mighty_man');
+        const bruce = m.players.get('player-0')!;
+        const victim = m.players.get('player-1')!;
+        bruce.position = { x: 100, y: 100 };
+        victim.position = { x: 100 + 3 * 48, y: 100 };
+        const bigHp = 10_000;
+        victim.maxHealth = bigHp;
+        victim.health = bigHp;
+
+        m.queueInput('player-0', makeInput(1, { abilityPressed: true, aimAngle: 0 }));
+        for (let i = 0; i < 30; i++) m.update(0.05);
+
+        const expectedTotal =
+          ABILITY.BRUCE_FIRE_BREATH.DAMAGE_TICK_COUNT *
+          ABILITY.BRUCE_FIRE_BREATH.DAMAGE_PER_TICK;
+        expect(victim.health).toBe(bigHp - expectedTotal);
       });
 
       it('locks movement while breathing but lets aim sweep with input', () => {
