@@ -5,16 +5,44 @@ import { ABILITY, MAP } from '@shared/config/game.js';
 const FIRE_DEPTH = 40;
 const FIRE_RANGE = ABILITY.BRUCE_FIRE_BREATH.RANGE_TILES * MAP.TILE_SIZE;
 
+// Screen-space size of one cone "pixel". Matches the SPRITE_SCALE used by
+// player/effects renderers (3) so cone pixels visually line up with the
+// character sprite pixels.
+const PIXEL = 3;
+const COLS = Math.ceil(FIRE_RANGE / PIXEL);
+const ROWS = 14;
+const HALF_ROWS = ROWS / 2;
+
+// Internal flame animation steps at ~12.5 fps, matching the cadence of
+// the existing fire_* muzzle flash sheets and giving the cone discrete
+// pixel-art frames instead of a smooth sine fade.
+const FRAME_STEP_MS = 80;
+
+// Cone silhouette in cells: narrow at the mouth, fans out at the tip.
+const BASE_HW_CELLS = 1.5;
+const TIP_HW_CELLS = 6;
+
+// Resurrect-64 warm ramp: cream → yellow → orange → red. Same family as
+// the muzzle-flash and explosion palette so the breath reads as part of
+// the same visual vocabulary.
+const TIERS = [0xfbff86, 0xf9c22b, 0xfb6b1d, 0xea4f36] as const;
+const EMPTY = 4;
+
 interface ActiveCone {
-  phase: number;
+  elapsedMs: number;
+  lastStep: number;
+  grid: Uint8Array;
 }
 
 /**
  * Draws Bruce's fire-breath cone for any player whose abilityActiveSeconds
- * is currently positive and characterId === 'bruce'. Three stacked layers
- * (hot core, mid orange, outer red) plus a per-frame flicker on length and
- * tip-width sell the flame motion. Stateless across players: cleared and
- * rebuilt from the snapshot every frame.
+ * is currently positive and characterId === 'bruce'.
+ *
+ * Renders on a chunky pixel grid (3×3 screen px per cell) in cone-local
+ * space, then rotates to the player's aim. Hard-edged cells + a 4-tier
+ * Resurrect-64 color ramp + ~12 fps stepped flame animation make it
+ * match the rest of the game's pixel art instead of looking like a
+ * vector gradient.
  */
 export class FireBreathFx {
   private readonly graphics: Phaser.GameObjects.Graphics;
@@ -28,7 +56,6 @@ export class FireBreathFx {
   update(players: SerializedPlayerState[], deltaMs: number): void {
     this.graphics.clear();
     const seen = new Set<string>();
-    const dt = deltaMs / 1000;
 
     for (const p of players) {
       if (p.characterId !== 'bruce') continue;
@@ -37,12 +64,22 @@ export class FireBreathFx {
 
       let entry = this.active.get(p.id);
       if (!entry) {
-        entry = { phase: 0 };
+        entry = {
+          elapsedMs: 0,
+          lastStep: -1,
+          grid: new Uint8Array(COLS * ROWS),
+        };
         this.active.set(p.id, entry);
       }
-      entry.phase += dt;
+      entry.elapsedMs += deltaMs;
 
-      this.drawCone(p.position.x, p.position.y, p.aimAngle, entry.phase);
+      const step = Math.floor(entry.elapsedMs / FRAME_STEP_MS);
+      if (step !== entry.lastStep) {
+        regenerateGrid(entry.grid, step);
+        entry.lastStep = step;
+      }
+
+      this.drawCone(p.position.x, p.position.y, p.aimAngle, entry.grid);
     }
 
     for (const id of [...this.active.keys()]) {
@@ -50,50 +87,26 @@ export class FireBreathFx {
     }
   }
 
-  private drawCone(originX: number, originY: number, aim: number, phase: number): void {
+  private drawCone(originX: number, originY: number, aim: number, grid: Uint8Array): void {
     const dirX = Math.cos(aim);
     const dirY = Math.sin(aim);
     const perpX = -dirY;
     const perpY = dirX;
+    const half = PIXEL / 2;
 
-    // Four stacked layers: hot white core → orange → red → outer dark-red
-    // halo. Higher alphas than v1 so the cone reads even under bloom + CRT
-    // post-FX. Tip widths grow per layer so the outer halo bleeds beyond
-    // the hot core, which is what sells the "flame fanning out" silhouette.
-    const layers = [
-      { color: 0xffffff, alpha: 1.0, scale: 0.45, tipW: 12 },
-      { color: 0xfff4d6, alpha: 0.95, scale: 0.65, tipW: 20 },
-      { color: 0xfca72a, alpha: 0.85, scale: 0.85, tipW: 28 },
-      { color: 0xff3a1e, alpha: 0.65, scale: 1.05, tipW: 36 },
-    ];
+    for (let col = 0; col < COLS; col++) {
+      const uLocal = (col + 0.5) * PIXEL;
+      for (let row = 0; row < ROWS; row++) {
+        const tier = grid[col * ROWS + row];
+        if (tier === EMPTY) continue;
 
-    const baseHalfWidth = 7;
+        const vLocal = (row - HALF_ROWS + 0.5) * PIXEL;
+        const wx = originX + dirX * uLocal + perpX * vLocal;
+        const wy = originY + dirY * uLocal + perpY * vLocal;
 
-    for (const layer of layers) {
-      const flicker = 0.88 + 0.12 * Math.sin(phase * 24 + layer.scale * 7);
-      const length = FIRE_RANGE * layer.scale * flicker;
-      const tipW = layer.tipW * flicker;
-
-      this.graphics.fillStyle(layer.color, layer.alpha);
-      this.graphics.beginPath();
-      this.graphics.moveTo(
-        originX + perpX * baseHalfWidth,
-        originY + perpY * baseHalfWidth,
-      );
-      this.graphics.lineTo(
-        originX - perpX * baseHalfWidth,
-        originY - perpY * baseHalfWidth,
-      );
-      this.graphics.lineTo(
-        originX + dirX * length - perpX * tipW,
-        originY + dirY * length - perpY * tipW,
-      );
-      this.graphics.lineTo(
-        originX + dirX * length + perpX * tipW,
-        originY + dirY * length + perpY * tipW,
-      );
-      this.graphics.closePath();
-      this.graphics.fillPath();
+        this.graphics.fillStyle(TIERS[tier], 1);
+        this.graphics.fillRect(wx - half, wy - half, PIXEL, PIXEL);
+      }
     }
   }
 
@@ -101,4 +114,33 @@ export class FireBreathFx {
     this.graphics.destroy();
     this.active.clear();
   }
+}
+
+function regenerateGrid(grid: Uint8Array, step: number): void {
+  for (let col = 0; col < COLS; col++) {
+    const u = col / COLS;
+    const halfW = BASE_HW_CELLS + (TIP_HW_CELLS - BASE_HW_CELLS) * u;
+    const edgeJitter = (hash(col, 0, step) - 0.5) * 3;
+    const widened = halfW + edgeJitter;
+
+    for (let row = 0; row < ROWS; row++) {
+      const idx = col * ROWS + row;
+      const v = row - HALF_ROWS + 0.5;
+      const dist = Math.abs(v) / Math.max(0.5, widened);
+      if (dist > 1) {
+        grid[idx] = EMPTY;
+        continue;
+      }
+      const tierJitter = hash(col, row, step) * 0.6 - 0.3;
+      const combined = u * 0.6 + dist * 0.4 + tierJitter;
+      const tier = Math.floor(combined * 4);
+      grid[idx] = tier < 0 ? 0 : tier > 3 ? 3 : tier;
+    }
+  }
+}
+
+function hash(a: number, b: number, c: number): number {
+  let h = Math.imul(a, 374761393) ^ Math.imul(b, 668265263) ^ Math.imul(c, 2147483647);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 0xffffffff;
 }
