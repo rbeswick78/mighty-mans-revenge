@@ -10,12 +10,26 @@ import { MENU_FONTS } from './menu/fonts.js';
 const EVENT_BANNER_PIXEL_FONT_SIZE = '22px';
 const EVENT_BANNER_PIXEL_LINE_SPACING = 12;
 
+// Strip body text uses Silkscreen — a clean pixel font with widths close
+// to Courier so the existing layout offsets still line up. Headers (score,
+// timer, active-event label) use Press Start 2P at smaller sizes (PS2P is
+// much wider per glyph than Courier).
 const FONT_STYLE: Phaser.Types.GameObjects.Text.TextStyle = {
-  fontFamily: 'Courier, monospace',
-  fontSize: '14px',
+  fontFamily: MENU_FONTS.BODY,
+  fontSize: '16px',
   color: cssHex(Wasteland.TEXT_PRIMARY),
 };
 
+const HEADER_STYLE: Phaser.Types.GameObjects.Text.TextStyle = {
+  fontFamily: MENU_FONTS.HEADER,
+  fontSize: '12px',
+  color: cssHex(Wasteland.TEXT_PRIMARY),
+};
+
+// Map-centered overlays (countdown, death overlay, ability activation
+// banner) stay in Courier — they are gameplay-language UI, separate from
+// the menu-style HUD strip. Only the final-minute event banner swaps to
+// MENU_FONTS.HEADER inside showEventBanner.
 const LARGE_FONT_STYLE: Phaser.Types.GameObjects.Text.TextStyle = {
   fontFamily: 'Courier, monospace',
   fontSize: '48px',
@@ -35,6 +49,7 @@ export class HUD {
   // Strip chrome (dedicated HUD band below the gameboard)
   private stripBg: Phaser.GameObjects.Rectangle;
   private stripBorder: Phaser.GameObjects.Rectangle;
+  private stripBevel: Phaser.GameObjects.Rectangle;
 
   // Left column: player stats
   private healthBarBg: Phaser.GameObjects.Rectangle;
@@ -80,16 +95,24 @@ export class HUD {
     const stripTop = MAP_HEIGHT_PX;
     const margin = 16;
 
-    // --- Strip background + 1px top border ---
+    // --- Strip background + beveled top edge ---
+    // 2px dark stroke at the gameboard/strip boundary reads as a hardware
+    // panel seam; a 1px highlight just below it sells the bevel without
+    // adding visual weight on top of the gameplay area.
     this.stripBg = scene.add.rectangle(0, stripTop, MAP_WIDTH_PX, HUD_STRIP_HEIGHT, Wasteland.HUD_STRIP_BG);
     this.stripBg.setOrigin(0, 0);
     this.stripBg.setScrollFactor(0);
     this.stripBg.setDepth(500);
 
-    this.stripBorder = scene.add.rectangle(0, stripTop, MAP_WIDTH_PX, 1, Wasteland.HUD_STRIP_BORDER);
+    this.stripBorder = scene.add.rectangle(0, stripTop, MAP_WIDTH_PX, 2, Wasteland.CANVAS_BG);
     this.stripBorder.setOrigin(0, 0);
     this.stripBorder.setScrollFactor(0);
     this.stripBorder.setDepth(501);
+
+    this.stripBevel = scene.add.rectangle(0, stripTop + 2, MAP_WIDTH_PX, 1, Wasteland.TEXT_PRIMARY, 0.35);
+    this.stripBevel.setOrigin(0, 0);
+    this.stripBevel.setScrollFactor(0);
+    this.stripBevel.setDepth(501);
 
     // --- Left column: health, stamina, ammo, grenades ---
     const hbX = margin;
@@ -109,9 +132,8 @@ export class HUD {
 
     this.healthText = scene.add.text(hbX + hbW / 2, hbY + hbH / 2, '100', {
       ...FONT_STYLE,
-      fontSize: '12px',
+      fontSize: '14px',
       color: '#000000',
-      fontStyle: 'bold',
     });
     this.healthText.setOrigin(0.5, 0.5);
     this.healthText.setScrollFactor(0);
@@ -130,7 +152,7 @@ export class HUD {
     this.staminaBarFg.setScrollFactor(0);
     this.staminaBarFg.setDepth(1001);
 
-    const ammoY = stY + stH + 10;
+    const ammoY = stY + stH + 12;
     this.ammoText = scene.add.text(hbX, ammoY, `${GUN.MAGAZINE_SIZE} / ${GUN.MAGAZINE_SIZE}`, {
       ...FONT_STYLE,
     });
@@ -138,14 +160,15 @@ export class HUD {
     this.ammoText.setDepth(1000);
 
     this.reloadingText = scene.add.text(hbX + 80, ammoY, 'RELOADING', {
-      ...FONT_STYLE,
+      ...HEADER_STYLE,
+      fontSize: '10px',
       color: cssHex(Wasteland.TEXT_RELOAD_WARNING),
     });
     this.reloadingText.setScrollFactor(0);
     this.reloadingText.setDepth(1000);
     this.reloadingText.setVisible(false);
 
-    const grenadeY = ammoY + 22;
+    const grenadeY = ammoY + 24;
     this.grenadeText = scene.add.text(hbX, grenadeY, 'GRN: ready', {
       ...FONT_STYLE,
     });
@@ -184,8 +207,8 @@ export class HUD {
       this.abilityCenterY + this.abilityRadius + 6,
       '',
       {
-        ...FONT_STYLE,
-        fontSize: '11px',
+        ...HEADER_STYLE,
+        fontSize: '9px',
       },
     );
     this.abilityCountdownText.setOrigin(0.5, 0);
@@ -195,18 +218,17 @@ export class HUD {
 
     // --- Middle column: score + timer ---
     const middleX = MAP_WIDTH_PX / 2;
-    this.scoreText = scene.add.text(middleX, stripTop + 24, 'YOU: 0 | ENEMY: 0', {
-      ...FONT_STYLE,
-      fontSize: '18px',
-      fontStyle: 'bold',
+    this.scoreText = scene.add.text(middleX, stripTop + 22, 'YOU: 0 | ENEMY: 0', {
+      ...HEADER_STYLE,
+      fontSize: '14px',
     });
     this.scoreText.setOrigin(0.5, 0);
     this.scoreText.setScrollFactor(0);
     this.scoreText.setDepth(1000);
 
     this.timerText = scene.add.text(middleX, stripTop + 58, '5:00', {
-      ...FONT_STYLE,
-      fontSize: '16px',
+      ...HEADER_STYLE,
+      fontSize: '13px',
     });
     this.timerText.setOrigin(0.5, 0);
     this.timerText.setScrollFactor(0);
@@ -214,10 +236,9 @@ export class HUD {
 
     // Persistent active-event label, sits right under the timer. Hidden
     // until an event activates; never moves, just toggles text + visibility.
-    this.activeEventLabel = scene.add.text(middleX, stripTop + 80, '', {
-      ...FONT_STYLE,
-      fontSize: '14px',
-      fontStyle: 'bold',
+    this.activeEventLabel = scene.add.text(middleX, stripTop + 84, '', {
+      ...HEADER_STYLE,
+      fontSize: '10px',
       color: cssHex(Wasteland.TEXT_RELOAD_WARNING),
     });
     this.activeEventLabel.setOrigin(0.5, 0);
@@ -336,7 +357,7 @@ export class HUD {
 
     const text = this.scene.add.text(0, 0, `${killerName} [${weapon}] ${victimName}`, {
       ...FONT_STYLE,
-      fontSize: '12px',
+      fontSize: '14px',
     });
     text.setOrigin(1, 0);
 
@@ -371,7 +392,7 @@ export class HUD {
 
   private layoutKillFeed(): void {
     for (let i = 0; i < this.killFeedEntries.length; i++) {
-      this.killFeedEntries[i].text.setY(i * 18);
+      this.killFeedEntries[i].text.setY(i * 20);
     }
   }
 
@@ -640,6 +661,7 @@ export class HUD {
   destroy(): void {
     this.stripBg.destroy();
     this.stripBorder.destroy();
+    this.stripBevel.destroy();
     this.healthBarBg.destroy();
     this.healthBarFg.destroy();
     this.healthText.destroy();
