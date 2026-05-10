@@ -468,6 +468,22 @@ export class MatchmakingManager {
       }
     }
 
+    // Walls burned away by a fire-breath this tick. Reliable: a drop
+    // would leave the client rendering a wall the server already treats
+    // as passable, which is a hard desync (player walks through what
+    // looks like a solid wall).
+    const destroyedTiles = match.getTickDestroyedTiles();
+    if (destroyedTiles.length > 0) {
+      const tilesPayload = destroyedTiles.map(({ col, row }) => ({ col, row }));
+      for (const [playerId] of match.players) {
+        this.server.sendTo(
+          playerId,
+          { type: 'server:tilesDestroyed', tiles: tilesPayload },
+          { reliable: true },
+        );
+      }
+    }
+
     // Broadcast a one-shot event warning (5s before activation) if generated
     // this tick. Drives the HUD pre-event banner + horn.
     const warning = match.consumeTickEventWarning();

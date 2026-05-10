@@ -14,6 +14,7 @@ import {
   calculateMovement,
   eventToMovementModifiers,
   rayIntersectsAABB,
+  TileType,
 } from '@shared/game';
 import type {
   PlayerId,
@@ -95,6 +96,8 @@ export class Match implements MatchContext {
   private tickKillFeedEntries: KillFeedEntry[] = [];
   /** Pickups collected this tick, cleared after broadcast. */
   private tickPickupCollections: Array<{ pickupId: string; playerId: PlayerId }> = [];
+  /** Wall tiles destroyed this tick (currently only by fire-breath), cleared after broadcast. */
+  private tickDestroyedTiles: Array<{ col: number; row: number }> = [];
   /** Ordered input queue per player. Inputs are acked only after consumption. */
   private inputQueues: Map<PlayerId, InputQueue> = new Map();
   /** Active 3-shot bursts in flight, keyed by player. */
@@ -446,6 +449,11 @@ export class Match implements MatchContext {
     return this.tickPickupCollections;
   }
 
+  /** Wall tiles destroyed during the most recent tick, for broadcasting. */
+  getTickDestroyedTiles(): Array<{ col: number; row: number }> {
+    return this.tickDestroyedTiles;
+  }
+
   /** Active grenades in flight, for broadcasting. */
   getActiveGrenades(): GrenadeState[] {
     return this.combatManager.getGrenades();
@@ -518,6 +526,7 @@ export class Match implements MatchContext {
     this.tickBulletTrails = [];
     this.tickKillFeedEntries = [];
     this.tickPickupCollections = [];
+    this.tickDestroyedTiles = [];
 
     // Snapshot positions BEFORE this tick's inputs move anyone. A shot
     // that arrives this tick will rewind opponents to the snapshot taken
@@ -1103,6 +1112,10 @@ export class Match implements MatchContext {
     const closeRange = ABILITY.BRUCE_FIRE_BREATH.CLOSE_RANGE_TILES * MAP.TILE_SIZE;
     const halfW = PLAYER.HITBOX_WIDTH / 2 + ABILITY.BRUCE_FIRE_BREATH.WIDTH / 2;
     const halfH = PLAYER.HITBOX_HEIGHT / 2 + ABILITY.BRUCE_FIRE_BREATH.WIDTH / 2;
+    const breathHalfWidth = ABILITY.BRUCE_FIRE_BREATH.WIDTH / 2;
+    const tileSize = MAP.TILE_SIZE;
+    const halfTileDiag = (tileSize * Math.SQRT2) / 2;
+    const mapData = this.mapManager.getMapData();
 
     for (const [playerId, player] of this.players) {
       if (player.characterId !== 'bruce') continue;
@@ -1117,6 +1130,22 @@ export class Match implements MatchContext {
 
       const dirX = Math.cos(player.abilityLockedAim);
       const dirY = Math.sin(player.abilityLockedAim);
+
+      // Burn down interior wall tiles inside the cone. Outer-perimeter
+      // walls are spared so the playfield stays bounded. Cover (low) is
+      // also spared — fire breaks walls, not crates. We scan a tile-coord
+      // AABB around the cone and test each tile center against the wedge.
+      this.destroyWallsInCone(
+        mapData,
+        player.position.x,
+        player.position.y,
+        dirX,
+        dirY,
+        range,
+        breathHalfWidth,
+        tileSize,
+        halfTileDiag,
+      );
 
       for (const [otherId, other] of this.players) {
         if (otherId === playerId) continue;
@@ -1149,6 +1178,73 @@ export class Match implements MatchContext {
         this.stats.recordDamage(playerId, damage);
         if (result.killed) {
           this.onKill(playerId, otherId, 'fire');
+        }
+      }
+    }
+  }
+
+  /**
+   * Destroy any interior WALL tile whose centre lies within the
+   * fire-breath wedge. Mutates the live collision grid and queues a
+   * broadcast entry for each newly destroyed tile so clients can hide
+   * the wall sprite and clear their prediction grid.
+   *
+   * Outer-perimeter walls are intentionally spared (same rule as the
+   * piercing-grenade containment fix) so the playfield stays bounded.
+   * COVER_LOW is also spared — fire breaks walls, not crates.
+   *
+   * Each cast clears all reachable walls on the first active tick (the
+   * cone is locked in place for the 1.2 s duration), so subsequent ticks
+   * of the same cast find no remaining walls and broadcast nothing.
+   */
+  private destroyWallsInCone(
+    mapData: MapData,
+    originX: number,
+    originY: number,
+    dirX: number,
+    dirY: number,
+    range: number,
+    breathHalfWidth: number,
+    tileSize: number,
+    halfTileDiag: number,
+  ): void {
+    const perpX = -dirY;
+    const perpY = dirX;
+
+    // Cone AABB → tile range. Use the origin-to-tip segment expanded by
+    // the breath half-width + one tile of margin in each axis. Cheap;
+    // costs us a few extra candidate tiles outside the wedge that the
+    // perp test below rejects.
+    const aabbMinX = Math.min(originX, originX + dirX * range) - breathHalfWidth - tileSize;
+    const aabbMaxX = Math.max(originX, originX + dirX * range) + breathHalfWidth + tileSize;
+    const aabbMinY = Math.min(originY, originY + dirY * range) - breathHalfWidth - tileSize;
+    const aabbMaxY = Math.max(originY, originY + dirY * range) + breathHalfWidth + tileSize;
+
+    const colMin = Math.max(0, Math.floor(aabbMinX / tileSize));
+    const colMax = Math.min(mapData.width - 1, Math.floor(aabbMaxX / tileSize));
+    const rowMin = Math.max(0, Math.floor(aabbMinY / tileSize));
+    const rowMax = Math.min(mapData.height - 1, Math.floor(aabbMaxY / tileSize));
+
+    const widthMargin = breathHalfWidth + halfTileDiag;
+
+    for (let row = rowMin; row <= rowMax; row++) {
+      // Outer perimeter row: nothing here is destructible.
+      if (row === 0 || row === mapData.height - 1) continue;
+      for (let col = colMin; col <= colMax; col++) {
+        if (col === 0 || col === mapData.width - 1) continue;
+        if (mapData.tiles[row][col] !== TileType.WALL) continue;
+
+        const cx = col * tileSize + tileSize / 2;
+        const cy = row * tileSize + tileSize / 2;
+        const relX = cx - originX;
+        const relY = cy - originY;
+        const along = relX * dirX + relY * dirY;
+        if (along < -halfTileDiag || along > range + halfTileDiag) continue;
+        const perp = Math.abs(relX * perpX + relY * perpY);
+        if (perp > widthMargin) continue;
+
+        if (this.mapManager.destroyTile(col, row)) {
+          this.tickDestroyedTiles.push({ col, row });
         }
       }
     }

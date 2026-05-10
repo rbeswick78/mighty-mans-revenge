@@ -30,6 +30,31 @@ export class MapManager {
   }
 
   /**
+   * Mark a tile as passable in the live collision grid. Used when Bruce's
+   * fire-breath burns through an interior wall. Returns true if the tile
+   * was solid before this call (i.e. a destruction actually happened) so
+   * the caller can decide whether to broadcast.
+   *
+   * Only mutates the collision grid, never the underlying MapData — the
+   * map JSON is shared with the registry across matches, and mutating it
+   * would leak destruction state into the next match.
+   */
+  destroyTile(col: number, row: number): boolean {
+    if (!this.collisionGrid) return false;
+    if (
+      row < 0 ||
+      row >= this.collisionGrid.height ||
+      col < 0 ||
+      col >= this.collisionGrid.width
+    ) {
+      return false;
+    }
+    if (!this.collisionGrid.solid[row][col]) return false;
+    this.collisionGrid.solid[row][col] = false;
+    return true;
+  }
+
+  /**
    * Returns a random spawn point position in pixel coordinates.
    * Tile center = tile * tileSize + tileSize / 2
    */

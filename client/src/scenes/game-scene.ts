@@ -152,6 +152,7 @@ export class GameScene extends Phaser.Scene {
   private onLocalCorrection: ((correction: LocalCorrection) => void) | null = null;
   private onEventWarning: ((payload: EventWarningPayload) => void) | null = null;
   private onEventStart: ((payload: EventStartPayload) => void) | null = null;
+  private onTilesDestroyed: ((tiles: Array<{ col: number; row: number }>) => void) | null = null;
   /** Cached so we can detect changes (incl. mid-match-join) and resync the label. */
   private lastSyncedActiveEvent: FinalMinuteEvent | null = null;
 
@@ -940,6 +941,13 @@ export class GameScene extends Phaser.Scene {
       AudioManager.getInstance()?.play('matchStartHorn');
     };
 
+    this.onTilesDestroyed = (tiles) => {
+      if (!this.mapRenderer) return;
+      for (const { col, row } of tiles) {
+        this.mapRenderer.destroyTileAt(col, row);
+      }
+    };
+
     this.gameService.on('matchCountdown', this.onMatchCountdown);
     this.gameService.on('matchStart', this.onMatchStart);
     this.gameService.on('matchEnd', this.onMatchEnd);
@@ -952,6 +960,7 @@ export class GameScene extends Phaser.Scene {
     this.gameService.on('localCorrection', this.onLocalCorrection);
     this.gameService.on('eventWarning', this.onEventWarning);
     this.gameService.on('eventStart', this.onEventStart);
+    this.gameService.on('tilesDestroyed', this.onTilesDestroyed);
   }
 
   /**
@@ -1030,6 +1039,10 @@ export class GameScene extends Phaser.Scene {
     if (this.onEventWarning) {
       this.gameService.off('eventWarning', this.onEventWarning);
       this.onEventWarning = null;
+    }
+    if (this.onTilesDestroyed) {
+      this.gameService.off('tilesDestroyed', this.onTilesDestroyed);
+      this.onTilesDestroyed = null;
     }
     if (this.onEventStart) {
       this.gameService.off('eventStart', this.onEventStart);

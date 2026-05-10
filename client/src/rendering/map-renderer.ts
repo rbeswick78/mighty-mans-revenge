@@ -417,6 +417,32 @@ export class MapRenderer {
     return this.collisionGrid;
   }
 
+  /**
+   * Mirror a server `server:tilesDestroyed` event: hide the wall sprite
+   * (the floor underlay is already painted for inner walls — see the
+   * isInnerWall branch in renderMap), flip the tile to FLOOR in the
+   * local type grid, and mark the collision cell passable so the
+   * client's prediction grid stops blocking movement.
+   *
+   * No-op if the tile is out of range or already a non-solid type.
+   */
+  destroyTileAt(col: number, row: number): void {
+    if (row < 0 || row >= this.mapHeight || col < 0 || col >= this.mapWidth) {
+      return;
+    }
+    if (this.tileTypes[row][col] !== TileType.WALL) return;
+
+    const sprite = this.tileSprites[row][col];
+    if (sprite) {
+      sprite.destroy();
+      this.tileSprites[row][col] = null;
+    }
+    this.tileTypes[row][col] = TileType.FLOOR;
+    if (this.collisionGrid) {
+      this.collisionGrid.solid[row][col] = false;
+    }
+  }
+
   destroy(): void {
     if (this.container) {
       this.container.destroy(true);

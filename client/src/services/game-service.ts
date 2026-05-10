@@ -44,7 +44,8 @@ type GameServiceEvent =
   | 'grenadeExploded'
   | 'localCorrection'
   | 'eventWarning'
-  | 'eventStart';
+  | 'eventStart'
+  | 'tilesDestroyed';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type GameServiceCallback = (...args: any[]) => void;
@@ -235,6 +236,10 @@ export class GameService {
 
     this.networkManager.on('eventStart', (payload: EventStartPayload) => {
       this.emit('eventStart', payload);
+    });
+
+    this.networkManager.on('tilesDestroyed', (tiles: Array<{ col: number; row: number }>) => {
+      this.emit('tilesDestroyed', tiles);
     });
   }
 

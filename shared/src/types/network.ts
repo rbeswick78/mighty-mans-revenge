@@ -83,6 +83,7 @@ export type ServerMessage =
   | ServerOpponentDisconnectedMessage
   | ServerEventWarningMessage
   | ServerEventStartMessage
+  | ServerTilesDestroyedMessage
   | ServerPongMessage
   | ServerErrorMessage;
 
@@ -261,6 +262,17 @@ export interface ServerEventWarningMessage {
 export interface ServerEventStartMessage {
   type: 'server:eventStart';
   event: FinalMinuteEvent;
+}
+
+/**
+ * One-shot notification that one or more wall tiles have been destroyed
+ * (currently only by Bruce's fire-breath ability). Broadcast reliably
+ * because a drop would leave the client rendering a wall the server
+ * already treats as passable.
+ */
+export interface ServerTilesDestroyedMessage {
+  type: 'server:tilesDestroyed';
+  tiles: Array<{ col: number; row: number }>;
 }
 
 export interface ServerPongMessage {

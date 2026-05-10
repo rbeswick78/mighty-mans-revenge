@@ -39,6 +39,7 @@ type EventName =
   | 'localCorrection'
   | 'eventWarning'
   | 'eventStart'
+  | 'tilesDestroyed'
   | 'error';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -343,6 +344,10 @@ export class NetworkManager {
 
       case 'server:pickupCollected':
         this.emit('pickupCollected', msg.pickupId, msg.playerId);
+        break;
+
+      case 'server:tilesDestroyed':
+        this.emit('tilesDestroyed', msg.tiles);
         break;
 
       case 'server:matchmakingStatus':
