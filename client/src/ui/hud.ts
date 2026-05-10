@@ -3,6 +3,12 @@ import { GUN, ABILITY } from '@shared/config/game.js';
 import type { CharacterId } from '@shared/config/game.js';
 import { Wasteland, cssHex, healthColor } from '@shared/config/palette.js';
 import { HUD_STRIP_HEIGHT, MAP_HEIGHT_PX, MAP_WIDTH_PX } from './layout.js';
+import { MENU_FONTS } from './menu/fonts.js';
+
+// Press Start 2P is much wider per glyph than Courier, so the final-minute
+// banner size drops to compensate (Courier 40px ≈ PS2P 22-24px in width).
+const EVENT_BANNER_PIXEL_FONT_SIZE = '22px';
+const EVENT_BANNER_PIXEL_LINE_SPACING = 12;
 
 const FONT_STYLE: Phaser.Types.GameObjects.Text.TextStyle = {
   fontFamily: 'Courier, monospace',
@@ -397,6 +403,15 @@ export class HUD {
    */
   showEventBanner(line1: string, line2?: string, tintColor?: number): void {
     const text = line2 ? `${line1}\n${line2}` : line1;
+    // Final-minute event banner uses the menu's chunky pixel font for
+    // distinct visual weight from the in-game Courier countdown / death
+    // overlay (which share this text element). Switch the font family +
+    // size here; showAbilityActivation resets back to LARGE_FONT_STYLE.
+    this.eventBannerText.setStyle({
+      fontFamily: MENU_FONTS.HEADER,
+      fontSize: EVENT_BANNER_PIXEL_FONT_SIZE,
+    });
+    this.eventBannerText.setLineSpacing(EVENT_BANNER_PIXEL_LINE_SPACING);
     this.eventBannerText.setText(text);
     if (tintColor !== undefined) {
       this.eventBannerText.setColor(cssHex(tintColor));
@@ -583,6 +598,12 @@ export class HUD {
    * the ability went off even if they can't see the world-space VFX.
    */
   showAbilityActivation(label: string, tintColor: number): void {
+    // Reset back to LARGE_FONT_STYLE — the event banner element is shared
+    // with showEventBanner, which swaps to the menu pixel font. Ability
+    // activation stays in-game Courier per the gameplay UX language.
+    this.eventBannerText.setStyle(LARGE_FONT_STYLE);
+    this.eventBannerText.setFontSize('40px');
+    this.eventBannerText.setLineSpacing(0);
     this.eventBannerText.setText(label);
     this.eventBannerText.setColor(cssHex(tintColor));
     this.eventBannerText.setVisible(true);

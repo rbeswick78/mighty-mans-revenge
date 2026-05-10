@@ -9,17 +9,17 @@ import {
 import { Wasteland, cssHex } from '@shared/config/palette.js';
 import { GameService, type MatchData } from '../services/game-service.js';
 import { isTouchDevice } from '../input/is-touch-device.js';
+import { WastelandStreet } from '../ui/menu/wasteland-street.js';
+import { PixelButton } from '../ui/menu/pixel-button.js';
+import { TitleLogo } from '../ui/menu/title-logo.js';
+import { MENU_FONTS } from '../ui/menu/fonts.js';
+import { drawBeveledChrome } from '../ui/menu/menu-panel.js';
 
-// --- Wasteland palette mapping for the character-select chrome (TUNABLE) ---
-// HEALTH_GOOD (mint) doubles as the "you" highlight — pops against the
-// dark plum background and visually reinforces "this is your slot" using
-// the same color the HUD uses for your own health bar. Magenta has no
-// clean Resurrect-64 match for "opponent claim," so we tune a saturated
-// pink-magenta from the palette family (eaaded family) up to a punchier
-// 0xff58d8 to keep contrast against the mint while staying tonally
-// adjacent to the existing TEXT_DAMAGE / lavender slots.
-const TITLE_COLOR = Wasteland.LOADING_BAR_FILL;
-const TITLE_STROKE = Wasteland.CANVAS_BG;
+// Scene-local color decisions. HEALTH_GOOD (mint) doubles as the "you"
+// highlight — same color the HUD uses for the local player's health bar,
+// so the affordance reads consistently. Magenta has no clean Resurrect-64
+// match, so the opponent-claim color is a punchy 0xff58d8 outside the
+// palette — tonally adjacent to TEXT_DAMAGE / lavender slots.
 const SUBTITLE_COLOR = Wasteland.COVER_FILL;
 const LABEL_COLOR = Wasteland.COVER_FILL;
 const VALUE_COLOR = Wasteland.TEXT_PRIMARY;
@@ -30,16 +30,11 @@ const OPP_HOVER_COLOR = 0xff58d8;
 const LOCKED_BADGE_COLOR = Wasteland.HEALTH_GOOD;
 const TIMER_COLOR = Wasteland.HEALTH_WARNING;
 const TIMER_URGENT_COLOR = Wasteland.HIT_FLASH;
-const PRIMARY_BTN_COLOR = Wasteland.LOADING_BAR_FILL;
-const BTN_LABEL_COLOR = Wasteland.TEXT_PRIMARY;
-const CARD_BG_COLOR = Wasteland.HUD_STRIP_BG;
-const CARD_BORDER_COLOR = Wasteland.WALL_FILL;
-const FOOTER_COLOR = Wasteland.WALL_LINE;
-const HOVER_LIGHTEN = 20;
+const FOOTER_COLOR = Wasteland.COVER_FILL; // weathered tan — readable against the near-ground band
 
 const SPRITE_SCALE = 6;
-const CARD_WIDTH = 220;
-const CARD_HEIGHT = 220;
+const CARD_WIDTH = 240;
+const CARD_HEIGHT = 260;
 const DOUBLE_TAP_MS = 400;
 
 interface CharacterSelectSceneData {
@@ -59,9 +54,6 @@ interface CardWidgets {
   pulseTween: Phaser.Tweens.Tween | null;
 }
 
-const lighten = (hex: number, amount: number): number =>
-  Phaser.Display.Color.ValueToColor(hex).lighten(amount).color;
-
 function abilityBlurb(id: CharacterId): string {
   if (id === 'bruce') return 'FIRE BREATH\nthrough walls (45s)';
   if (id === 'mighty_man') return 'X-RAY VISION\nshoot through walls (30s)';
@@ -76,7 +68,7 @@ export class CharacterSelectScene extends Phaser.Scene {
   private cards = new Map<CharacterId, CardWidgets>();
   private statusText!: Phaser.GameObjects.Text;
   private timerText!: Phaser.GameObjects.Text;
-  private lockButton!: Phaser.GameObjects.Container;
+  private lockButton!: PixelButton;
 
   private localHoveredId: CharacterId | null = null;
   private latestSelections: ServerCharacterSelectStateMessage['selections'] = [];
@@ -109,55 +101,99 @@ export class CharacterSelectScene extends Phaser.Scene {
     this.gameService = GameService.getInstance();
 
     const centerX = this.cameras.main.width / 2;
-    const centerY = this.cameras.main.height / 2;
-    const yOffset = Math.max(0, (this.cameras.main.height - 540) / 2);
+    const camHeight = this.cameras.main.height;
 
-    this.add.text(centerX, 50 + yOffset, 'CHOOSE YOUR FIGHTER', {
-      fontFamily: '"Courier New", Courier, monospace',
-      fontSize: '28px',
-      color: cssHex(TITLE_COLOR),
-      stroke: cssHex(TITLE_STROKE),
-      strokeThickness: 4,
-    }).setOrigin(0.5);
+    // ────────────────────────────────────────────────────────────────────
+    // Backdrop: same wasteland street as the lobby + results so the
+    // menu trio reads as one continuous place.
+    // ────────────────────────────────────────────────────────────────────
+    new WastelandStreet(this, { lowDetail: this.isLikelyMobile() });
 
-    this.add.text(centerX, 86 + yOffset, 'POST-APOCALYPTIC SHOWDOWN', {
-      fontFamily: '"Courier New", Courier, monospace',
-      fontSize: '11px',
-      color: cssHex(SUBTITLE_COLOR),
-    }).setOrigin(0.5);
+    // ────────────────────────────────────────────────────────────────────
+    // Logo + subtitle
+    // ────────────────────────────────────────────────────────────────────
+    new TitleLogo(this, centerX, 70, ['CHOOSE YOUR FIGHTER'], {
+      fontSize: 24,
+      strokeThickness: 3,
+    }).setDepth(WastelandStreet.DEPTH.UI);
 
-    // Lay out cards horizontally, centered. Spacing scales with card
-    // count so a future 3rd character still fits the canvas.
-    const totalWidth = CHARACTER_IDS.length * CARD_WIDTH + (CHARACTER_IDS.length - 1) * 40;
+    this.add
+      .text(centerX, 118, 'POST-APOCALYPTIC SHOWDOWN', {
+        fontFamily: MENU_FONTS.BODY,
+        fontSize: '14px',
+        color: cssHex(SUBTITLE_COLOR),
+      })
+      .setOrigin(0.5)
+      .setDepth(WastelandStreet.DEPTH.UI);
+
+    // ────────────────────────────────────────────────────────────────────
+    // Character cards — laid out horizontally, centered. Spacing scales
+    // with card count so a future 3rd character still fits.
+    // ────────────────────────────────────────────────────────────────────
+    const totalWidth =
+      CHARACTER_IDS.length * CARD_WIDTH + (CHARACTER_IDS.length - 1) * 48;
     const startX = centerX - totalWidth / 2 + CARD_WIDTH / 2;
-    const cardY = centerY - 30;
+    const cardY = 280;
 
     CHARACTER_IDS.forEach((id, idx) => {
-      const x = startX + idx * (CARD_WIDTH + 40);
+      const x = startX + idx * (CARD_WIDTH + 48);
       this.cards.set(id, this.createCard(id, x, cardY));
     });
 
-    this.statusText = this.add.text(centerX, cardY + CARD_HEIGHT / 2 + 30, '', {
-      fontFamily: '"Courier New", Courier, monospace',
-      fontSize: '13px',
-      color: cssHex(LABEL_COLOR),
-      align: 'center',
-      lineSpacing: 4,
-    }).setOrigin(0.5);
+    // ────────────────────────────────────────────────────────────────────
+    // Status, timer, lock button
+    // ────────────────────────────────────────────────────────────────────
+    const statusY = cardY + CARD_HEIGHT / 2 + 26;
+    this.statusText = this.add
+      .text(centerX, statusY, '', {
+        fontFamily: MENU_FONTS.BODY,
+        fontSize: '14px',
+        color: cssHex(LABEL_COLOR),
+        align: 'center',
+        lineSpacing: 4,
+      })
+      .setOrigin(0.5)
+      .setDepth(WastelandStreet.DEPTH.UI);
 
-    this.timerText = this.add.text(centerX, cardY + CARD_HEIGHT / 2 + 78, 'AUTO-LOCK IN 0:30', {
-      fontFamily: '"Courier New", Courier, monospace',
-      fontSize: '14px',
-      color: cssHex(TIMER_COLOR),
-    }).setOrigin(0.5);
+    this.timerText = this.add
+      .text(centerX, statusY + 56, 'AUTO-LOCK IN 0:30', {
+        fontFamily: MENU_FONTS.HEADER,
+        fontSize: '11px',
+        color: cssHex(TIMER_COLOR),
+      })
+      .setOrigin(0.5)
+      .setDepth(WastelandStreet.DEPTH.UI);
 
-    this.lockButton = this.createLockButton(centerX, cardY + CARD_HEIGHT / 2 + 110);
+    const btnW = 220;
+    const btnH = 46;
+    this.lockButton = new PixelButton(
+      this,
+      centerX - btnW / 2,
+      statusY + 76,
+      btnW,
+      btnH,
+      'LOCK IN',
+      {
+        variant: 'primary',
+        fontSize: 14,
+        onClick: () => this.tryLockCurrent(),
+      },
+    );
+    this.lockButton.setDepth(WastelandStreet.DEPTH.UI);
 
-    this.add.text(centerX, this.cameras.main.height - 18, 'TAP / CLICK TO HOVER  •  ENTER OR LOCK IN BUTTON TO LOCK', {
-      fontFamily: '"Courier New", Courier, monospace',
-      fontSize: '9px',
-      color: cssHex(FOOTER_COLOR),
-    }).setOrigin(0.5);
+    this.add
+      .text(
+        centerX,
+        camHeight - 24,
+        'TAP / CLICK TO HOVER  •  ENTER OR LOCK IN BUTTON TO LOCK',
+        {
+          fontFamily: MENU_FONTS.BODY,
+          fontSize: '12px',
+          color: cssHex(FOOTER_COLOR),
+        },
+      )
+      .setOrigin(0.5)
+      .setDepth(WastelandStreet.DEPTH.UI);
 
     this.input.keyboard?.on('keydown-LEFT', () => this.cycleHover(-1));
     this.input.keyboard?.on('keydown-A', () => this.cycleHover(-1));
@@ -179,42 +215,53 @@ export class CharacterSelectScene extends Phaser.Scene {
   private createCard(id: CharacterId, x: number, y: number): CardWidgets {
     const def = CHARACTERS[id];
 
+    // Beveled pixel-art card chrome (square corners), matching the menu
+    // panels on the lobby + results screens.
     const bg = this.add.graphics();
-    bg.fillStyle(CARD_BG_COLOR, 1);
-    bg.fillRoundedRect(-CARD_WIDTH / 2, -CARD_HEIGHT / 2, CARD_WIDTH, CARD_HEIGHT, 6);
-    bg.lineStyle(1, CARD_BORDER_COLOR, 0.7);
-    bg.strokeRoundedRect(-CARD_WIDTH / 2, -CARD_HEIGHT / 2, CARD_WIDTH, CARD_HEIGHT, 6);
+    drawBeveledChrome(bg, -CARD_WIDTH / 2, -CARD_HEIGHT / 2, CARD_WIDTH, CARD_HEIGHT, {
+      fillColor: Wasteland.HUD_STRIP_BG,
+      fillAlpha: 0.92,
+      strokeColor: Wasteland.CANVAS_BG,
+      highlightColor: Wasteland.TEXT_PRIMARY,
+      shadowColor: Wasteland.WALL_LINE,
+    });
 
+    // Border highlight (drawn on top of bg, toggled in drawCardBorder).
     const border = this.add.graphics();
 
-    // Sprite is centered slightly above the name label. anims/textures
-    // were registered in BootScene with key `<spritePrefix>_down_idle`.
-    const sprite = this.add.sprite(0, -20, `${def.spritePrefix}_down_idle`);
+    // Character preview sprite — same animation key style as elsewhere.
+    const sprite = this.add.sprite(0, -32, `${def.spritePrefix}_down_idle`);
     sprite.setScale(SPRITE_SCALE);
     sprite.play(`${def.spritePrefix}_down_idle`);
 
-    const nameText = this.add.text(0, CARD_HEIGHT / 2 - 56, def.displayName.toUpperCase(), {
-      fontFamily: '"Courier New", Courier, monospace',
-      fontSize: '16px',
-      color: cssHex(VALUE_COLOR),
-      fontStyle: 'bold',
-    }).setOrigin(0.5);
+    const nameText = this.add
+      .text(0, CARD_HEIGHT / 2 - 70, def.displayName.toUpperCase(), {
+        fontFamily: MENU_FONTS.HEADER,
+        fontSize: '14px',
+        color: cssHex(VALUE_COLOR),
+      })
+      .setOrigin(0.5);
 
-    const abilityText = this.add.text(0, CARD_HEIGHT / 2 - 32, abilityBlurb(id), {
-      fontFamily: '"Courier New", Courier, monospace',
-      fontSize: '10px',
-      color: cssHex(LABEL_COLOR),
-      align: 'center',
-      lineSpacing: 2,
-    }).setOrigin(0.5);
+    const abilityText = this.add
+      .text(0, CARD_HEIGHT / 2 - 42, abilityBlurb(id), {
+        fontFamily: MENU_FONTS.BODY,
+        fontSize: '13px',
+        color: cssHex(LABEL_COLOR),
+        align: 'center',
+        lineSpacing: 4,
+      })
+      .setOrigin(0.5);
 
-    const lockedBadge = this.add.text(0, CARD_HEIGHT / 2 - 18, '', {
-      fontFamily: '"Courier New", Courier, monospace',
-      fontSize: '12px',
-      color: cssHex(LOCKED_BADGE_COLOR),
-    }).setOrigin(0.5);
+    const lockedBadge = this.add
+      .text(0, CARD_HEIGHT / 2 - 16, '', {
+        fontFamily: MENU_FONTS.HEADER,
+        fontSize: '10px',
+        color: cssHex(LOCKED_BADGE_COLOR),
+      })
+      .setOrigin(0.5);
 
-    const hitZone = this.add.zone(0, 0, CARD_WIDTH, CARD_HEIGHT)
+    const hitZone = this.add
+      .zone(0, 0, CARD_WIDTH, CARD_HEIGHT)
       .setInteractive({ useHandCursor: true });
 
     hitZone.on('pointerdown', () => this.onCardTap(id));
@@ -228,6 +275,7 @@ export class CharacterSelectScene extends Phaser.Scene {
       lockedBadge,
       hitZone,
     ]);
+    container.setDepth(WastelandStreet.DEPTH.UI);
 
     return {
       characterId: id,
@@ -242,40 +290,6 @@ export class CharacterSelectScene extends Phaser.Scene {
     };
   }
 
-  private createLockButton(centerX: number, buttonY: number): Phaser.GameObjects.Container {
-    const baseColor = PRIMARY_BTN_COLOR;
-    const hoverColor = lighten(baseColor, HOVER_LIGHTEN);
-
-    const bg = this.add.graphics();
-    bg.fillStyle(baseColor, 1);
-    bg.fillRoundedRect(-90, 0, 180, 38, 4);
-
-    const text = this.add.text(0, 19, 'LOCK IN', {
-      fontFamily: '"Courier New", Courier, monospace',
-      fontSize: '16px',
-      color: cssHex(BTN_LABEL_COLOR),
-      fontStyle: 'bold',
-    }).setOrigin(0.5);
-
-    const zone = this.add.zone(0, 19, 180, 38).setInteractive({ useHandCursor: true });
-
-    zone.on('pointerover', () => {
-      bg.clear();
-      bg.fillStyle(hoverColor, 1);
-      bg.fillRoundedRect(-90, 0, 180, 38, 4);
-    });
-
-    zone.on('pointerout', () => {
-      bg.clear();
-      bg.fillStyle(baseColor, 1);
-      bg.fillRoundedRect(-90, 0, 180, 38, 4);
-    });
-
-    zone.on('pointerdown', () => this.tryLockCurrent());
-
-    return this.add.container(centerX, buttonY, [bg, text, zone]);
-  }
-
   private wireGameServiceEvents(): void {
     this.onCharacterSelectState = (msg: ServerCharacterSelectStateMessage) => {
       this.latestSelections = msg.selections;
@@ -287,7 +301,7 @@ export class CharacterSelectScene extends Phaser.Scene {
       // to GameScene. Same fade-with-fallback-timer pattern as LobbyScene.
       if (this.transitioned) return;
       this.transitioned = true;
-      const goToGame = () => {
+      const goToGame = (): void => {
         this.cleanupEvents();
         this.scene.start('GameScene', {
           nickname: this.nickname,
@@ -295,7 +309,7 @@ export class CharacterSelectScene extends Phaser.Scene {
         });
       };
       let started = false;
-      const fadeAndGo = () => {
+      const fadeAndGo = (): void => {
         if (started) return;
         started = true;
         goToGame();
@@ -341,12 +355,12 @@ export class CharacterSelectScene extends Phaser.Scene {
   private bailToLobby(): void {
     if (this.transitioned) return;
     this.transitioned = true;
-    const go = () => {
+    const go = (): void => {
       this.cleanupEvents();
       this.scene.start('LobbyScene');
     };
     let started = false;
-    const fadeAndGo = () => {
+    const fadeAndGo = (): void => {
       if (started) return;
       started = true;
       go();
@@ -387,8 +401,10 @@ export class CharacterSelectScene extends Phaser.Scene {
 
       if (isSelfLocked || isOppLocked) {
         const who = isSelfLocked ? 'YOU' : 'OPPONENT';
-        card.lockedBadge.setText(`✓ LOCKED (${who})`);
-        card.lockedBadge.setColor(cssHex(isSelfLocked ? LOCKED_BADGE_COLOR : OPPONENT_NICK_COLOR));
+        card.lockedBadge.setText(`LOCKED · ${who}`);
+        card.lockedBadge.setColor(
+          cssHex(isSelfLocked ? LOCKED_BADGE_COLOR : OPPONENT_NICK_COLOR),
+        );
         if (!card.pulseTween) {
           card.pulseTween = this.tweens.add({
             targets: card.sprite,
@@ -419,25 +435,30 @@ export class CharacterSelectScene extends Phaser.Scene {
     this.updateLockButton(self ?? null);
   }
 
-  private drawCardBorder(card: CardWidgets, selfActive: boolean, oppActive: boolean): void {
+  private drawCardBorder(
+    card: CardWidgets,
+    selfActive: boolean,
+    oppActive: boolean,
+  ): void {
     card.border.clear();
     if (!selfActive && !oppActive) return;
 
+    // Square corners — match the beveled chrome aesthetic.
     const inset = 3;
-    const w = CARD_WIDTH - inset * 2;
-    const h = CARD_HEIGHT - inset * 2;
     const x = -CARD_WIDTH / 2 + inset;
     const y = -CARD_HEIGHT / 2 + inset;
+    const w = CARD_WIDTH - inset * 2;
+    const h = CARD_HEIGHT - inset * 2;
 
     if (selfActive) {
       card.border.lineStyle(3, SELF_HOVER_COLOR, 1);
-      card.border.strokeRoundedRect(x, y, w, h, 5);
+      card.border.strokeRect(x, y, w, h);
     }
     if (oppActive) {
       // Inset the opponent border slightly so both can show simultaneously.
       const off = selfActive ? 4 : 0;
       card.border.lineStyle(2, OPP_HOVER_COLOR, 1);
-      card.border.strokeRoundedRect(x + off, y + off, w - off * 2, h - off * 2, 4);
+      card.border.strokeRect(x + off, y + off, w - off * 2, h - off * 2);
     }
   }
 
@@ -451,18 +472,19 @@ export class CharacterSelectScene extends Phaser.Scene {
       const isSelf = s.playerId === localId;
       const prefix = isSelf ? 'YOU' : s.nickname.toUpperCase();
       const status = s.lockedCharacterId
-        ? `✓ LOCKED — ${CHARACTERS[s.lockedCharacterId].displayName}`
-        : '⏳ choosing...';
+        ? `LOCKED · ${CHARACTERS[s.lockedCharacterId].displayName.toUpperCase()}`
+        : 'choosing...';
       lines.push(`${prefix}: ${status}`);
-      colors.push(isSelf ? cssHex(LOCAL_NICK_COLOR) : cssHex(OPPONENT_NICK_COLOR));
+      colors.push(
+        isSelf ? cssHex(LOCAL_NICK_COLOR) : cssHex(OPPONENT_NICK_COLOR),
+      );
     }
     if (lines.length === 0) {
       this.statusText.setText('Waiting for players...');
       return;
     }
     // Phaser.Text doesn't support per-line colors without rich-text setup;
-    // join with a separator and use the local color since "you" line is
-    // most actionable — opponent name still reads clearly in the same hue.
+    // use the local color since the "you" line is most actionable.
     this.statusText.setColor(colors[0]);
     this.statusText.setText(lines.join('\n'));
   }
@@ -472,12 +494,16 @@ export class CharacterSelectScene extends Phaser.Scene {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     this.timerText.setText(`AUTO-LOCK IN ${mins}:${secs.toString().padStart(2, '0')}`);
-    this.timerText.setColor(cssHex(seconds <= 5 ? TIMER_URGENT_COLOR : TIMER_COLOR));
+    this.timerText.setColor(
+      cssHex(seconds <= 5 ? TIMER_URGENT_COLOR : TIMER_COLOR),
+    );
   }
 
-  private updateLockButton(self: ServerCharacterSelectStateMessage['selections'][number] | null): void {
+  private updateLockButton(
+    self: ServerCharacterSelectStateMessage['selections'][number] | null,
+  ): void {
     const isLocked = !!self?.lockedCharacterId;
-    this.lockButton.setAlpha(isLocked ? 0.4 : 1);
+    this.lockButton.setDisabled(isLocked);
   }
 
   private onCardTap(id: CharacterId): void {
@@ -513,7 +539,9 @@ export class CharacterSelectScene extends Phaser.Scene {
   private cycleHover(direction: 1 | -1): void {
     if (this.findSelfLocked()) return;
 
-    const selectable = CHARACTER_IDS.filter((id) => !this.isCardLockedByOther(id));
+    const selectable = CHARACTER_IDS.filter(
+      (id) => !this.isCardLockedByOther(id),
+    );
     if (selectable.length === 0) return;
 
     const current = this.localHoveredId ?? selectable[0];
@@ -542,6 +570,13 @@ export class CharacterSelectScene extends Phaser.Scene {
     const localId = this.gameService.getPlayerId();
     return this.latestSelections.some(
       (s) => s.playerId !== localId && s.lockedCharacterId === id,
+    );
+  }
+
+  private isLikelyMobile(): boolean {
+    return (
+      'ontouchstart' in window &&
+      Math.min(window.innerWidth, window.innerHeight) < 600
     );
   }
 }
