@@ -11,10 +11,16 @@ const HEALTH_BAR_HEIGHT = 4;
 const HEALTH_BAR_OFFSET_Y = -32;
 const NICKNAME_OFFSET_Y = -42;
 
-/** Frost Wizard body tint when not frozen — light icy blue. */
-const FROST_WIZARD_TINT = 0xcfeaff;
-/** Tint applied to any player while their frozenTimer > 0. */
-const FROZEN_TARGET_TINT = 0xaaccff;
+/**
+ * Frost Wizard tint — vertical gradient via Phaser's per-corner setTint.
+ * White at the head, saturated ice-blue at the feet, so he reads
+ * unambiguously as a frost-themed character instead of a slightly cooler
+ * Mighty Man (a flat tint mostly just darkens the existing palette).
+ */
+const FROST_WIZARD_TINT_TOP = 0xffffff;
+const FROST_WIZARD_TINT_BOTTOM = 0x4aa3ff;
+/** Tint applied to any player while their frozenTimer > 0 — flat saturated cyan, unmistakable. */
+const FROZEN_TARGET_TINT = 0x6fcfff;
 /** Wand colors: dark shaft + glowing cyan tip. */
 const WAND_SHAFT_COLOR = 0x2e222f;
 const WAND_TIP_COLOR = 0xaaddff;
@@ -23,15 +29,24 @@ const FROST_MIST_COLOR = 0xcfeaff;
 /** Cyan crystal sparkle around frozen targets. */
 const FROZEN_CRYSTAL_COLOR = 0xeaf6ff;
 const FROZEN_CRYSTAL_OUTLINE = 0x6fa9c8;
-/** Local-space pixel offsets/rotation for the wand by 4-way direction. */
+/**
+ * Local-space pixel offsets and rotation for the wand by 4-way direction.
+ * The wand graphic is drawn horizontally pointing right from local origin
+ * (handle at 0,0), so rotation pivots around the held-hand point.
+ *   - rot = -π/4: tip swings up-right (held in the right hand)
+ *   - rot = -3π/4: tip swings up-left (held in the left hand, mirrored)
+ * Per-direction we put it on the visible "near" hand and angle it
+ * outward and up, like a held wand — small, off-center, never centered
+ * on the body like a two-handed gun.
+ */
 const WAND_DIR_OFFSETS: Record<
   Direction4,
   { x: number; y: number; rot: number }
 > = {
-  down: { x: 6, y: 4, rot: Math.PI / 2 },
-  up: { x: -6, y: -4, rot: -Math.PI / 2 },
-  side: { x: 12, y: 0, rot: 0 },
-  'side-left': { x: -12, y: 0, rot: Math.PI },
+  down: { x: -3, y: 1, rot: (-3 * Math.PI) / 4 },
+  up: { x: 3, y: 1, rot: -Math.PI / 4 },
+  side: { x: 4, y: 1, rot: -Math.PI / 4 },
+  'side-left': { x: -4, y: 1, rot: (-3 * Math.PI) / 4 },
 };
 
 /**
@@ -104,11 +119,13 @@ export class PlayerRenderer {
     this.sprite.setOrigin(0.5, 0.5);
     this.sprite.setScale(SPRITE_SCALE);
     this.sprite.play(this.animKey('down', 'idle'));
-    // Frost Wizard reuses Mighty Man's sprite sheets — runtime tint is the
-    // primary differentiator. A frozen player overrides this tint while
-    // their freeze is active (handled in update()).
+    // Frost Wizard reuses Mighty Man's sprite sheets — a vertical
+    // white-to-ice-blue gradient via per-corner tint is the primary
+    // differentiator (flat tint barely shifts the palette). A frozen
+    // player overrides this with FROZEN_TARGET_TINT while their freeze
+    // is active (handled in update()).
     if (this.characterId === 'frost_wizard') {
-      this.sprite.setTint(FROST_WIZARD_TINT);
+      this.applyFrostWizardTint();
     }
 
     // Gun overlay: shared across characters (not character-specific art).
@@ -139,13 +156,15 @@ export class PlayerRenderer {
       mist.fillEllipse(0, 12, 18, 6);
       this.frostMistGraphics = mist;
 
-      // Wand — drawn in local pixels so the SPRITE_SCALE container scales
-      // it to match the body. Repositioned/rotated by setAimAngle.
+      // Small one-handed wand. Drawn horizontally from local origin (0,0
+      // is the held-hand point) so per-direction setRotation pivots cleanly
+      // at the grip, with the tip swinging out diagonally. Roughly half the
+      // sprite's width — reads as a stick, not a rifle.
       const wand = scene.add.graphics();
       wand.fillStyle(WAND_SHAFT_COLOR, 1);
-      wand.fillRect(-7, -1, 14, 2);
+      wand.fillRect(0, 0, 5, 1);
       wand.fillStyle(WAND_TIP_COLOR, 1);
-      wand.fillRect(5, -2, 4, 4);
+      wand.fillRect(4, -1, 2, 2);
       wand.setScale(SPRITE_SCALE);
       this.wandGraphics = wand;
     }
@@ -223,7 +242,7 @@ export class PlayerRenderer {
       if (isFrozen) {
         this.sprite.setTint(FROZEN_TARGET_TINT);
       } else if (this.characterId === 'frost_wizard') {
-        this.sprite.setTint(FROST_WIZARD_TINT);
+        this.applyFrostWizardTint();
       } else {
         this.sprite.clearTint();
       }
@@ -263,6 +282,21 @@ export class PlayerRenderer {
     const o = WAND_DIR_OFFSETS[direction];
     this.wandGraphics.setPosition(o.x, o.y);
     this.wandGraphics.setRotation(o.rot);
+  }
+
+  /**
+   * Apply the white→ice-blue vertical gradient tint to the body sprite.
+   * Phaser's setTint(topLeft, topRight, bottomLeft, bottomRight) interpolates
+   * across the quad on the GPU — no per-pixel work. Cheaper than recoloring
+   * frames and dramatically more visible than a flat tint.
+   */
+  private applyFrostWizardTint(): void {
+    this.sprite.setTint(
+      FROST_WIZARD_TINT_TOP,
+      FROST_WIZARD_TINT_TOP,
+      FROST_WIZARD_TINT_BOTTOM,
+      FROST_WIZARD_TINT_BOTTOM,
+    );
   }
 
   setPosition(x: number, y: number): void {
