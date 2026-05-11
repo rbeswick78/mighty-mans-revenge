@@ -57,6 +57,7 @@ interface CardWidgets {
 function abilityBlurb(id: CharacterId): string {
   if (id === 'bruce') return 'FIRE BREATH\nthrough walls (45s)';
   if (id === 'mighty_man') return 'X-RAY VISION\nshoot through walls (30s)';
+  if (id === 'frost_wizard') return 'FROST LOCK\nfreeze nearest enemy 2s (30s)';
   return '';
 }
 

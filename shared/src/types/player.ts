@@ -53,6 +53,17 @@ export interface PlayerState {
   abilityActiveSeconds: number;
   abilityCooldownSeconds: number;
   abilityLockedAim: number;
+  /**
+   * Generic status-effect timer for the Frost Wizard's freeze. Seconds
+   * remaining; 0 when not frozen. Anyone can be frozen, not just wizards.
+   * While > 0:
+   *   - shared physics zeros movement (calculateMovement frozen modifier),
+   *   - server input loop suppresses ability/fire/throw/detonate/reload,
+   *   - clients render a cyan tint + orbiting frost crystals on the target.
+   * Cleared on respawn. Aim still updates so the cosmetic facing tracks
+   * the cursor — being frozen is total inertia, not blindness.
+   */
+  frozenTimer: number;
 }
 
 export interface PlayerInput {

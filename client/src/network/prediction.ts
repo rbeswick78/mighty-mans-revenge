@@ -19,6 +19,20 @@ export class ClientPrediction {
   ): PlayerState {
     const dt = 1 / SERVER.TICK_RATE;
 
+    // Mirror the server's frozen branch: full lockout, position holds, no
+    // sprint, no movement. Aim still tracks so the cosmetic facing follows
+    // the cursor. Sits above Bruce-locked so a frozen Bruce mid-breath
+    // also stops re-aiming locally (matching server behavior).
+    if (currentState.frozenTimer > 0) {
+      return {
+        ...currentState,
+        velocity: { x: 0, y: 0 },
+        isSprinting: false,
+        aimAngle: input.aimAngle,
+        lastProcessedInput: input.sequenceNumber,
+      };
+    }
+
     // Mirror the server's Bruce-locked branch: while Bruce is breathing fire
     // his movement is pinned (predicting it would drift the sprite forward,
     // then reconcile would snap it back when the server's authoritative

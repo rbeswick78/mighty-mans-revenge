@@ -568,6 +568,19 @@ export class Match implements MatchContext {
       const infiniteAmmo = this.activeEvent === 'infinite_ammo';
 
       for (const input of inputs) {
+        // Frost Wizard freeze: full action lockout while frozenTimer > 0.
+        // Aim still updates so the cosmetic rotation tracks the cursor, but
+        // ability activation, fire, throw, detonate, reload, and movement
+        // are all suppressed. Sits above the Bruce-locked check so a Bruce
+        // who gets frozen mid-breath also stops re-aiming his cone.
+        if (player.frozenTimer > 0) {
+          player.aimAngle = input.aimAngle;
+          player.velocity = { x: 0, y: 0 };
+          player.isSprinting = false;
+          player.lastProcessedInput = input.sequenceNumber;
+          continue;
+        }
+
         // Spacebar / ability button: try to activate before everything else
         // so the Bruce-locked check below picks up the just-activated state.
         if (input.abilityPressed) {
@@ -914,6 +927,9 @@ export class Match implements MatchContext {
     player.grenades =
       this.activeEvent === 'grenades_only' ? GRENADE.MAX_COUNT : GRENADE.STARTING_COUNT;
     player.grenadeRegenSeconds = 0;
+    // Don't carry a freeze through death — respawning frozen would be
+    // unrecoverable and is never the intent.
+    player.frozenTimer = 0;
   }
 
   private createPlayerState(id: PlayerId, nickname: string, position: { x: number; y: number }): PlayerState {
@@ -944,6 +960,7 @@ export class Match implements MatchContext {
       abilityActiveSeconds: 0,
       abilityCooldownSeconds: 0,
       abilityLockedAim: 0,
+      frozenTimer: 0,
     };
   }
 
@@ -1062,6 +1079,30 @@ export class Match implements MatchContext {
       player.abilityActiveSeconds = ABILITY.MIGHTY_MAN_XRAY.DURATION;
       player.abilityCooldownSeconds =
         ABILITY.MIGHTY_MAN_XRAY.DURATION + ABILITY.MIGHTY_MAN_XRAY.COOLDOWN;
+    } else if (player.characterId === 'frost_wizard') {
+      // Auto-target nearest non-self, non-dead opponent by squared distance.
+      // No range cap, no aim required. If no eligible target exists (e.g.
+      // the only opponent is mid-respawn), abort without consuming the
+      // cooldown — pressing into an empty room shouldn't burn 30s.
+      let nearestId: string | null = null;
+      let nearestDistSq = Infinity;
+      for (const [otherId, other] of this.players) {
+        if (otherId === player.id) continue;
+        if (other.isDead) continue;
+        const dx = other.position.x - player.position.x;
+        const dy = other.position.y - player.position.y;
+        const distSq = dx * dx + dy * dy;
+        if (distSq < nearestDistSq) {
+          nearestDistSq = distSq;
+          nearestId = otherId;
+        }
+      }
+      if (nearestId === null) return;
+      const target = this.players.get(nearestId)!;
+      target.frozenTimer = ABILITY.FROST_WIZARD_FREEZE.DURATION;
+      player.abilityCooldownSeconds = ABILITY.FROST_WIZARD_FREEZE.COOLDOWN;
+      // Frost Lock is instant — no active window. abilityActiveSeconds
+      // stays 0 so the HUD only animates the cooldown arc.
     }
   }
 
@@ -1094,6 +1135,11 @@ export class Match implements MatchContext {
       }
       if (player.abilityCooldownSeconds > 0) {
         player.abilityCooldownSeconds = Math.max(0, player.abilityCooldownSeconds - dt);
+      }
+      // Decrement Frost Wizard freeze on every player — anyone can be
+      // frozen, not just wizards.
+      if (player.frozenTimer > 0) {
+        player.frozenTimer = Math.max(0, player.frozenTimer - dt);
       }
     }
   }

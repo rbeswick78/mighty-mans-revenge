@@ -869,7 +869,7 @@ describe('Match', () => {
   });
 
   describe('character abilities (spacebar)', () => {
-    function startActiveWithCharacters(p0Char: 'mighty_man' | 'bruce', p1Char: 'mighty_man' | 'bruce'): Match {
+    function startActiveWithCharacters(p0Char: 'mighty_man' | 'bruce' | 'frost_wizard', p1Char: 'mighty_man' | 'bruce' | 'frost_wizard'): Match {
       const m = createMatch();
       m.setLock('player-0', p0Char);
       m.setLock('player-1', p1Char);
@@ -1083,6 +1083,74 @@ describe('Match', () => {
         expect(mm.abilityActiveSeconds).toBe(0);
         // Reset to ABILITY.MIGHTY_MAN_XRAY.COOLDOWN (30s).
         expect(mm.abilityCooldownSeconds).toBeCloseTo(30, 5);
+      });
+    });
+
+    describe('Frost Wizard freeze', () => {
+      it('freezes the nearest opponent and starts the wizard cooldown', () => {
+        const m = startActiveWithCharacters('frost_wizard', 'bruce');
+        const wizard = m.players.get('player-0')!;
+        const target = m.players.get('player-1')!;
+        expect(target.frozenTimer).toBe(0);
+        expect(wizard.abilityCooldownSeconds).toBe(0);
+
+        m.queueInput('player-0', makeInput(1, { abilityPressed: true }));
+        m.update(0.001);
+
+        expect(target.frozenTimer).toBeGreaterThan(0);
+        expect(target.frozenTimer).toBeCloseTo(ABILITY.FROST_WIZARD_FREEZE.DURATION, 2);
+        // Frost Lock has no active window — only cooldown advances.
+        expect(wizard.abilityActiveSeconds).toBe(0);
+        expect(wizard.abilityCooldownSeconds).toBeCloseTo(
+          ABILITY.FROST_WIZARD_FREEZE.COOLDOWN,
+          2,
+        );
+      });
+
+      it('is a no-op when on cooldown — second press does nothing', () => {
+        const m = startActiveWithCharacters('frost_wizard', 'bruce');
+        const wizard = m.players.get('player-0')!;
+        const target = m.players.get('player-1')!;
+
+        m.queueInput('player-0', makeInput(1, { abilityPressed: true }));
+        m.update(0.05);
+        // Let the freeze fully tick down so we can prove it doesn't refresh.
+        m.update(ABILITY.FROST_WIZARD_FREEZE.DURATION + 0.5);
+        expect(target.frozenTimer).toBe(0);
+        expect(wizard.abilityCooldownSeconds).toBeGreaterThan(0);
+
+        m.queueInput('player-0', makeInput(2, { abilityPressed: true }));
+        m.update(0.05);
+
+        // Second press should not freeze the target again — still on cooldown.
+        expect(target.frozenTimer).toBe(0);
+      });
+
+      it('does not consume the cooldown if no living opponents exist', () => {
+        const m = startActiveWithCharacters('frost_wizard', 'bruce');
+        const wizard = m.players.get('player-0')!;
+        const target = m.players.get('player-1')!;
+        target.isDead = true;
+        target.respawnTimer = 5;
+
+        m.queueInput('player-0', makeInput(1, { abilityPressed: true }));
+        m.update(0.001);
+
+        expect(wizard.abilityCooldownSeconds).toBe(0);
+        expect(target.frozenTimer).toBe(0);
+      });
+
+      it('clears frozenTimer on respawn', () => {
+        const m = startActiveWithCharacters('frost_wizard', 'bruce');
+        const target = m.players.get('player-1')!;
+        target.frozenTimer = ABILITY.FROST_WIZARD_FREEZE.DURATION;
+
+        m.onKill('player-0', 'player-1', 'gun');
+        // Advance past the respawn delay so the player respawns.
+        m.update(RESPAWN.DELAY + 0.05);
+
+        expect(target.isDead).toBe(false);
+        expect(target.frozenTimer).toBe(0);
       });
     });
 

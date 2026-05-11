@@ -31,6 +31,7 @@ function makePlayer(id: PlayerId, score = 0, deaths = 0): PlayerState {
     abilityActiveSeconds: 0,
     abilityCooldownSeconds: 0,
     abilityLockedAim: 0,
+    frozenTimer: 0,
   };
 }
 

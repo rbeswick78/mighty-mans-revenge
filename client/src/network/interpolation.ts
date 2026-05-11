@@ -34,6 +34,7 @@ interface BufferedState {
   nickname: string;
   abilityActiveSeconds: number;
   abilityCooldownSeconds: number;
+  frozenTimer: number;
   /** Local receive time in ms (performance.now()). */
   timestamp: number;
   serverTick: number;
@@ -86,6 +87,7 @@ function toInterpolated(s: BufferedState): InterpolatedState {
     nickname: s.nickname,
     abilityActiveSeconds: s.abilityActiveSeconds,
     abilityCooldownSeconds: s.abilityCooldownSeconds,
+    frozenTimer: s.frozenTimer,
   };
 }
 
@@ -140,6 +142,7 @@ export class EntityInterpolation {
       nickname: state.nickname,
       abilityActiveSeconds: state.abilityActiveSeconds,
       abilityCooldownSeconds: state.abilityCooldownSeconds,
+      frozenTimer: state.frozenTimer,
       timestamp: performance.now(),
       serverTick,
     };
@@ -221,6 +224,7 @@ export class EntityInterpolation {
           nickname: curr.nickname,
           abilityActiveSeconds: curr.abilityActiveSeconds,
           abilityCooldownSeconds: curr.abilityCooldownSeconds,
+          frozenTimer: curr.frozenTimer,
         };
       }
     }

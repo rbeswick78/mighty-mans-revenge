@@ -515,6 +515,10 @@ export class NetworkManager {
       // fire-cone VFX, x-ray tint, and aim-line piercing for the local player.
       abilityActiveSeconds: serverState.abilityActiveSeconds,
       abilityCooldownSeconds: serverState.abilityCooldownSeconds,
+      // Frost Wizard freeze is server-authoritative — forward so the local
+      // player's prediction next tick respects the lockout via the shared
+      // calculateMovement frozen modifier.
+      frozenTimer: serverState.frozenTimer,
     };
 
     const dx = result.position.x - previousPosition.x;
@@ -563,6 +567,7 @@ export class NetworkManager {
       abilityActiveSeconds: s.abilityActiveSeconds,
       abilityCooldownSeconds: s.abilityCooldownSeconds,
       abilityLockedAim: 0,
+      frozenTimer: s.frozenTimer,
     };
   }
 

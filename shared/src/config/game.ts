@@ -152,6 +152,18 @@ export const ABILITY = Object.freeze({
     DURATION: 7,
     COOLDOWN: 30,
   },
+  /**
+   * Frost Wizard. Auto-targets the nearest non-self living opponent and
+   * pins them in place for DURATION seconds — no movement, no shooting,
+   * no grenade, no reload, no counter-ability. Instant cast, no active
+   * window: caster's `abilityActiveSeconds` stays 0 and cooldown begins
+   * at activation. Cycle = COOLDOWN seconds. If no eligible target
+   * exists, the cooldown is not consumed (see Match.tryActivateAbility).
+   */
+  FROST_WIZARD_FREEZE: {
+    DURATION: 2,
+    COOLDOWN: 30,
+  },
 });
 
 /**
@@ -204,6 +216,33 @@ export const CHARACTERS = Object.freeze({
       up: { w: 13, h: 16 },
       side: { w: 13, h: 15 },
       'side-left': { w: 13, h: 15 },
+    },
+  },
+  // Frost Wizard intentionally shares Mighty Man's spritePrefix, asset
+  // folder, base name, and frame dimensions — he reuses the exact same
+  // sheets at runtime and is differentiated visually by the renderer
+  // (cyan tint + always-on frost mist + drawn wand overlay). BootScene
+  // dedupes sheet loading and animation creation by spritePrefix so this
+  // doesn't cause duplicate-key warnings. `hasGun: false` because the
+  // wand overlay replaces the gun overlay.
+  frost_wizard: {
+    id: 'frost_wizard',
+    displayName: 'Frost Wizard',
+    spritePrefix: 'mighty_man',
+    assetFolder: 'player',
+    assetBaseName: 'character',
+    hasGun: false,
+    idleFrames: {
+      down: { w: 11, h: 16 },
+      up: { w: 11, h: 16 },
+      side: { w: 10, h: 16 },
+      'side-left': { w: 10, h: 16 },
+    },
+    runFrames: {
+      down: { w: 11, h: 17 },
+      up: { w: 11, h: 17 },
+      side: { w: 10, h: 17 },
+      'side-left': { w: 10, h: 17 },
     },
   },
 }) satisfies Readonly<Record<string, CharacterDef>>;

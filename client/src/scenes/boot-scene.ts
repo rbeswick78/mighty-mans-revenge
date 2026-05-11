@@ -142,7 +142,15 @@ export class BootScene extends Phaser.Scene {
     // Driven by the CHARACTERS registry in /shared so adding a new
     // character only requires registering it there + dropping assets in
     // the right folder.
+    //
+    // Dedupe by spritePrefix: characters that intentionally share another
+    // character's sheets (e.g. Frost Wizard → mighty_man, runtime-tinted)
+    // would otherwise hit Phaser with duplicate texture keys and log a
+    // noisy warning per direction × state.
+    const loadedPrefixes = new Set<string>();
     for (const char of Object.values(CHARACTERS)) {
+      if (loadedPrefixes.has(char.spritePrefix)) continue;
+      loadedPrefixes.add(char.spritePrefix);
       for (const dir of DIRECTIONS) {
         this.loadCharacterSheet(
           char.spritePrefix,
@@ -259,7 +267,12 @@ export class BootScene extends Phaser.Scene {
    * in separate registries so this isn't ambiguous).
    */
   private createCharacterAnimations(): void {
+    // Same dedupe rationale as loadRealAssets — sharing a spritePrefix
+    // means sharing the animation keys.
+    const animatedPrefixes = new Set<string>();
     for (const char of Object.values(CHARACTERS)) {
+      if (animatedPrefixes.has(char.spritePrefix)) continue;
+      animatedPrefixes.add(char.spritePrefix);
       for (const dir of DIRECTIONS) {
         for (const state of ['idle', 'run'] as const) {
           const key = `${char.spritePrefix}_${dir}_${state}`;

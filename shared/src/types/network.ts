@@ -158,6 +158,13 @@ export interface SerializedPlayerState {
    */
   abilityActiveSeconds: number;
   abilityCooldownSeconds: number;
+  /**
+   * Frost Wizard's freeze status — seconds remaining; 0 when not frozen.
+   * Broadcast so clients can render the cyan tint + crystal VFX on the
+   * frozen target and so the local frozen player can mirror the action
+   * lockout in client prediction. See PlayerState.frozenTimer.
+   */
+  frozenTimer: number;
 }
 
 export interface ServerMatchFoundMessage {

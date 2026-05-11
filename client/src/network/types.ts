@@ -37,4 +37,5 @@ export interface InterpolatedState {
   nickname: string;
   abilityActiveSeconds: number;
   abilityCooldownSeconds: number;
+  frozenTimer: number;
 }

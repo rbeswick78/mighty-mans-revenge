@@ -35,8 +35,18 @@ export class InputManager {
   /**
    * Sample input for one server tick. `hasActiveGrenade` controls whether
    * RMB / the grenade button is in throw-aim mode or detonate mode.
+   * `localFrozen` mirrors the server's freeze gate: when true, every
+   * actionable field is zeroed before the input ships, so client
+   * prediction agrees with the server-authoritative lockout (no phantom
+   * muzzle flashes, grenade arcs, or movement during the freeze). Aim
+   * angle is preserved so the cosmetic rotation still tracks the cursor.
    */
-  update(playerWorldPos: Vec2, currentTick: number, hasActiveGrenade: boolean): PlayerInput {
+  update(
+    playerWorldPos: Vec2,
+    currentTick: number,
+    hasActiveGrenade: boolean,
+    localFrozen: boolean = false,
+  ): PlayerInput {
     let raw: RawInput;
 
     if (this.activeMode === 'touch') {
@@ -48,21 +58,37 @@ export class InputManager {
     this.lastRawInput = raw;
     this.sequenceNumber++;
 
-    const input: PlayerInput = {
-      sequenceNumber: this.sequenceNumber,
-      moveX: raw.moveX,
-      moveY: raw.moveY,
-      aimAngle: raw.aimAngle,
-      aimingGun: raw.aimingGun,
-      firePressed: raw.firePressed,
-      aimingGrenade: raw.aimingGrenade,
-      throwPressed: raw.throwPressed,
-      detonatePressed: raw.detonatePressed,
-      sprint: raw.sprint,
-      reload: raw.reload,
-      abilityPressed: raw.abilityPressed,
-      tick: currentTick,
-    };
+    const input: PlayerInput = localFrozen
+      ? {
+          sequenceNumber: this.sequenceNumber,
+          moveX: 0,
+          moveY: 0,
+          aimAngle: raw.aimAngle,
+          aimingGun: false,
+          firePressed: false,
+          aimingGrenade: false,
+          throwPressed: false,
+          detonatePressed: false,
+          sprint: false,
+          reload: false,
+          abilityPressed: false,
+          tick: currentTick,
+        }
+      : {
+          sequenceNumber: this.sequenceNumber,
+          moveX: raw.moveX,
+          moveY: raw.moveY,
+          aimAngle: raw.aimAngle,
+          aimingGun: raw.aimingGun,
+          firePressed: raw.firePressed,
+          aimingGrenade: raw.aimingGrenade,
+          throwPressed: raw.throwPressed,
+          detonatePressed: raw.detonatePressed,
+          sprint: raw.sprint,
+          reload: raw.reload,
+          abilityPressed: raw.abilityPressed,
+          tick: currentTick,
+        };
 
     this.inputBuffer.push(input);
 

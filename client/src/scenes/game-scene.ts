@@ -98,6 +98,13 @@ export class GameScene extends Phaser.Scene {
    * once per cast — not every frame the ability is active.
    */
   private prevAbilityActive = false;
+  /**
+   * Last-seen `abilityCooldownSeconds > 0` for the local player. Used by
+   * instant-cast abilities (Frost Wizard's Frost Lock) that have no
+   * active window — abilityActiveSeconds never goes above 0, so the
+   * banner-trigger edge is the cooldown rising instead.
+   */
+  private prevAbilityCoolingDown = false;
   private decalRenderer: DecalRenderer | null = null;
   private cameraKick: CameraKick | null = null;
   private zoomPulse: ZoomPulse | null = null;
@@ -289,6 +296,7 @@ export class GameScene extends Phaser.Scene {
         localState.position,
         this.currentTick,
         hasActiveGrenade,
+        localState.frozenTimer > 0,
       );
       this.gameService.sendInput(input);
 
@@ -367,6 +375,7 @@ export class GameScene extends Phaser.Scene {
           nickname: currentLocalState.nickname,
           abilityActiveSeconds: currentLocalState.abilityActiveSeconds,
           abilityCooldownSeconds: currentLocalState.abilityCooldownSeconds,
+          frozenTimer: currentLocalState.frozenTimer,
         }];
 
         // Add interpolated remote players
@@ -394,6 +403,7 @@ export class GameScene extends Phaser.Scene {
             nickname: interpState.nickname,
             abilityActiveSeconds: interpState.abilityActiveSeconds,
             abilityCooldownSeconds: interpState.abilityCooldownSeconds,
+            frozenTimer: interpState.frozenTimer,
           });
         }
 
@@ -454,6 +464,21 @@ export class GameScene extends Phaser.Scene {
           this.zoomPulse?.trigger();
         }
         this.prevAbilityActive = localAbilityActive;
+
+        // Frost Lock has no active window, so the active-edge above never
+        // fires for it. Detect the cooldown's leading edge instead — the
+        // server only flips cooldownSeconds from 0 → 30 on a successful
+        // cast, so this is a clean activation signal.
+        const localCoolingDown = currentLocalState.abilityCooldownSeconds > 0;
+        if (
+          currentLocalState.characterId === 'frost_wizard' &&
+          localCoolingDown &&
+          !this.prevAbilityCoolingDown
+        ) {
+          this.hud.showAbilityActivation('FROST LOCK!', 0xaaddff);
+          this.zoomPulse?.trigger();
+        }
+        this.prevAbilityCoolingDown = localCoolingDown;
 
         // Update HUD
         this.hud.updateHealth(currentLocalState.health, PLAYER.MAX_HEALTH);
@@ -648,6 +673,7 @@ export class GameScene extends Phaser.Scene {
         abilityActiveSeconds: 0,
         abilityCooldownSeconds: 0,
         abilityLockedAim: 0,
+        frozenTimer: interp.frozenTimer,
       });
     }
     return players;

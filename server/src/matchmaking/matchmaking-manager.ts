@@ -428,6 +428,7 @@ export class MatchmakingManager {
         nickname: player.nickname,
         abilityActiveSeconds: player.abilityActiveSeconds,
         abilityCooldownSeconds: player.abilityCooldownSeconds,
+        frozenTimer: player.frozenTimer,
       });
     }
 

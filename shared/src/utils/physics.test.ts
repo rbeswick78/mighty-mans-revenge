@@ -271,4 +271,36 @@ describe('calculateMovement', () => {
       expect(result.velocity.y).toBeCloseTo(0, 10);
     });
   });
+
+  describe('frozen modifier (Frost Wizard freeze)', () => {
+    it('returns zero velocity and holds position regardless of move input', () => {
+      const input = makeInput({ moveX: 1, moveY: 1, sprint: true });
+      const result = calculateMovement(
+        input,
+        center,
+        PLAYER.SPRINT_DURATION,
+        dt,
+        grid,
+        { frozen: true },
+      );
+      expect(result.newPos.x).toBe(center.x);
+      expect(result.newPos.y).toBe(center.y);
+      expect(result.velocity.x).toBe(0);
+      expect(result.velocity.y).toBe(0);
+    });
+
+    it('preserves stamina exactly while frozen', () => {
+      const input = makeInput({ moveX: 1, moveY: 0, sprint: true });
+      const startingStamina = 1.5;
+      const result = calculateMovement(
+        input,
+        center,
+        startingStamina,
+        dt,
+        grid,
+        { frozen: true },
+      );
+      expect(result.newStamina).toBe(startingStamina);
+    });
+  });
 });

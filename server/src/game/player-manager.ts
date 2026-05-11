@@ -50,6 +50,7 @@ export class PlayerManager {
       abilityActiveSeconds: 0,
       abilityCooldownSeconds: 0,
       abilityLockedAim: 0,
+      frozenTimer: 0,
     };
 
     this.players.set(id, player);
@@ -168,6 +169,7 @@ export class PlayerManager {
     player.respawnTimer = 0;
     player.invulnerableTimer = RESPAWN.INVULNERABILITY_DURATION;
     player.stamina = PLAYER.SPRINT_DURATION;
+    player.frozenTimer = 0;
 
     logger.info({ playerId: player.id, spawn: spawnPos }, 'Player respawned');
   }

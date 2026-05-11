@@ -480,18 +480,31 @@ export class HUD {
       return;
     }
 
-    const isBruce = characterId === 'bruce';
     // Per-character "ready" color — the icon background is filled with this
     // when the ability is up, and a flat dark-grey when on cooldown so the
     // status reads at a glance.
-    const readyColor = isBruce ? 0xff7b2a : 0x4ad8e8;
+    const readyColor =
+      characterId === 'bruce' ? 0xff7b2a
+      : characterId === 'mighty_man' ? 0x4ad8e8
+      : 0xaaddff; // frost_wizard
     const cooldownColor = 0x3a4252;
-    const totalCycle = isBruce
-      ? ABILITY.BRUCE_FIRE_BREATH.COOLDOWN
-      : ABILITY.MIGHTY_MAN_XRAY.DURATION + ABILITY.MIGHTY_MAN_XRAY.COOLDOWN;
-    const activeDuration = isBruce
-      ? ABILITY.BRUCE_FIRE_BREATH.DURATION
-      : ABILITY.MIGHTY_MAN_XRAY.DURATION;
+    // Total recharge cycle from the moment activation should be measured.
+    // Bruce: cooldown begins at activation (DURATION overlaps cooldown).
+    // Mighty Man: cooldown begins after the active window ends.
+    // Frost Wizard: instant cast, no active window — total is just COOLDOWN.
+    const totalCycle =
+      characterId === 'bruce' ? ABILITY.BRUCE_FIRE_BREATH.COOLDOWN
+      : characterId === 'mighty_man'
+        ? ABILITY.MIGHTY_MAN_XRAY.DURATION + ABILITY.MIGHTY_MAN_XRAY.COOLDOWN
+        : ABILITY.FROST_WIZARD_FREEZE.COOLDOWN;
+    // Frost Lock has no active window — activeDuration is unused on its
+    // path (isActive can't be true), but we keep a sane fallback so the
+    // sweep math doesn't divide by zero if a future bug pushes activeSeconds
+    // above 0 for a wizard.
+    const activeDuration =
+      characterId === 'bruce' ? ABILITY.BRUCE_FIRE_BREATH.DURATION
+      : characterId === 'mighty_man' ? ABILITY.MIGHTY_MAN_XRAY.DURATION
+      : ABILITY.FROST_WIZARD_FREEZE.DURATION;
 
     this.abilityBg.setVisible(true);
     this.abilityIconGfx.setVisible(true);
@@ -538,10 +551,12 @@ export class HUD {
 
     this.abilityBg.setFillStyle(fillColor, 1);
     this.abilityBg.setStrokeStyle(2, strokeColor, 1);
-    if (isBruce) {
+    if (characterId === 'bruce') {
       this.drawFireIcon(iconColorNum, iconAlpha);
-    } else {
+    } else if (characterId === 'mighty_man') {
       this.drawGlassesIcon(iconColorNum, iconAlpha);
+    } else {
+      this.drawSnowflakeIcon(iconColorNum, iconAlpha);
     }
     this.abilityCountdownText.setText(countdownText);
     this.abilityCountdownText.setVisible(true);
@@ -591,6 +606,39 @@ export class HUD {
     g.lineTo(-3, -7);
     g.closePath();
     g.fillPath();
+  }
+
+  /**
+   * Pixel-art snowflake silhouette for Frost Wizard's freeze ability
+   * indicator. Six radial arms with a small notch near each tip — reads
+   * as a snowflake even at small sizes.
+   * Drawn into abilityIconGfx; coordinates are relative to the icon center.
+   */
+  private drawSnowflakeIcon(color: number, alpha: number): void {
+    const g = this.abilityIconGfx;
+    g.clear();
+    g.lineStyle(2, color, alpha);
+    const arms = 6;
+    const armLen = 11;
+    const branchAt = 6;
+    const branchLen = 3;
+    for (let i = 0; i < arms; i++) {
+      const ang = (i * 2 * Math.PI) / arms;
+      const cos = Math.cos(ang);
+      const sin = Math.sin(ang);
+      // Main arm
+      g.lineBetween(0, 0, cos * armLen, sin * armLen);
+      // Two short branches angled off the arm at branchAt, like a snowflake.
+      const bx = cos * branchAt;
+      const by = sin * branchAt;
+      const left = ang + Math.PI / 3;
+      const right = ang - Math.PI / 3;
+      g.lineBetween(bx, by, bx + Math.cos(left) * branchLen, by + Math.sin(left) * branchLen);
+      g.lineBetween(bx, by, bx + Math.cos(right) * branchLen, by + Math.sin(right) * branchLen);
+    }
+    // Center pip so the arms read as anchored to a hub.
+    g.fillStyle(color, alpha);
+    g.fillCircle(0, 0, 1.5);
   }
 
   /**

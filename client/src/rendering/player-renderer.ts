@@ -11,6 +11,29 @@ const HEALTH_BAR_HEIGHT = 4;
 const HEALTH_BAR_OFFSET_Y = -32;
 const NICKNAME_OFFSET_Y = -42;
 
+/** Frost Wizard body tint when not frozen — light icy blue. */
+const FROST_WIZARD_TINT = 0xcfeaff;
+/** Tint applied to any player while their frozenTimer > 0. */
+const FROZEN_TARGET_TINT = 0xaaccff;
+/** Wand colors: dark shaft + glowing cyan tip. */
+const WAND_SHAFT_COLOR = 0x2e222f;
+const WAND_TIP_COLOR = 0xaaddff;
+/** Frost mist beneath the wizard's feet — always on. */
+const FROST_MIST_COLOR = 0xcfeaff;
+/** Cyan crystal sparkle around frozen targets. */
+const FROZEN_CRYSTAL_COLOR = 0xeaf6ff;
+const FROZEN_CRYSTAL_OUTLINE = 0x6fa9c8;
+/** Local-space pixel offsets/rotation for the wand by 4-way direction. */
+const WAND_DIR_OFFSETS: Record<
+  Direction4,
+  { x: number; y: number; rot: number }
+> = {
+  down: { x: 6, y: 4, rot: Math.PI / 2 },
+  up: { x: -6, y: -4, rot: -Math.PI / 2 },
+  side: { x: 12, y: 0, rot: 0 },
+  'side-left': { x: -12, y: 0, rot: Math.PI },
+};
+
 /**
  * If the player moved more than √MOVING_THRESHOLD_SQ pixels between renders,
  * play the run animation. Bigger than reconciliation jitter (sub-pixel
@@ -59,10 +82,21 @@ export class PlayerRenderer {
   private hasLastPos = false;
   private lastX = 0;
   private lastY = 0;
+  /** Frost Wizard cosmetic ID — gates wand/mist + base tint. */
+  private readonly characterId: CharacterId;
+  /** Drawn wand graphic (Frost Wizard only). Replaces the gun overlay. */
+  private wandGraphics: Phaser.GameObjects.Graphics | null = null;
+  /** Always-on cyan mist puddle under the Frost Wizard's feet. */
+  private frostMistGraphics: Phaser.GameObjects.Graphics | null = null;
+  /** Orbiting crystal sparkles, drawn per-frame while frozenTimer > 0. */
+  private frozenCrystalGraphics: Phaser.GameObjects.Graphics | null = null;
+  /** Last frozen-state edge so we only flip tint on transitions. */
+  private wasFrozen = false;
 
   constructor(scene: Phaser.Scene, characterId: CharacterId) {
     this.scene = scene;
     const def = CHARACTERS[characterId];
+    this.characterId = characterId;
     this.texturePrefix = def.spritePrefix;
     this.hasGun = def.hasGun;
 
@@ -70,6 +104,12 @@ export class PlayerRenderer {
     this.sprite.setOrigin(0.5, 0.5);
     this.sprite.setScale(SPRITE_SCALE);
     this.sprite.play(this.animKey('down', 'idle'));
+    // Frost Wizard reuses Mighty Man's sprite sheets — runtime tint is the
+    // primary differentiator. A frozen player overrides this tint while
+    // their freeze is active (handled in update()).
+    if (this.characterId === 'frost_wizard') {
+      this.sprite.setTint(FROST_WIZARD_TINT);
+    }
 
     // Gun overlay: shared across characters (not character-specific art).
     // Layered on top of the no-hands character sprite so the asset-pack's
@@ -84,6 +124,37 @@ export class PlayerRenderer {
     } else {
       this.gunSprite = null;
     }
+
+    // Frost Wizard cosmetics: an always-on mist puddle under the feet and a
+    // drawn wand that takes the gun overlay's role. Both are local-space
+    // graphics inside the container, so they follow the player automatically.
+    if (this.characterId === 'frost_wizard') {
+      // Mist puddle — soft elliptical wash sitting at the feet. Drawn once
+      // and never rebuilt; only its alpha could change later if we want
+      // pulsing, which we intentionally don't (always-on, not telegraphed).
+      const mist = scene.add.graphics();
+      mist.fillStyle(FROST_MIST_COLOR, 0.18);
+      mist.fillEllipse(0, 12, 30, 10);
+      mist.fillStyle(FROST_MIST_COLOR, 0.32);
+      mist.fillEllipse(0, 12, 18, 6);
+      this.frostMistGraphics = mist;
+
+      // Wand — drawn in local pixels so the SPRITE_SCALE container scales
+      // it to match the body. Repositioned/rotated by setAimAngle.
+      const wand = scene.add.graphics();
+      wand.fillStyle(WAND_SHAFT_COLOR, 1);
+      wand.fillRect(-7, -1, 14, 2);
+      wand.fillStyle(WAND_TIP_COLOR, 1);
+      wand.fillRect(5, -2, 4, 4);
+      wand.setScale(SPRITE_SCALE);
+      this.wandGraphics = wand;
+    }
+
+    // Frozen-target sparkle layer — empty until update() draws crystals on
+    // a frame where state.frozenTimer > 0. Lives on every player so any
+    // character can be frozen (not just Frost Wizard).
+    this.frozenCrystalGraphics = scene.add.graphics();
+    this.frozenCrystalGraphics.setVisible(false);
 
     this.healthBarBg = scene.add.rectangle(
       0,
@@ -111,10 +182,17 @@ export class PlayerRenderer {
     });
     this.nicknameText.setOrigin(0.5, 0.5);
 
-    const children: Phaser.GameObjects.GameObject[] = [this.sprite];
+    const children: Phaser.GameObjects.GameObject[] = [];
+    // Mist sits under the body so the sprite paints over the puddle's center.
+    if (this.frostMistGraphics) children.push(this.frostMistGraphics);
+    children.push(this.sprite);
     if (this.gunSprite) children.push(this.gunSprite);
+    if (this.wandGraphics) children.push(this.wandGraphics);
+    if (this.frozenCrystalGraphics) children.push(this.frozenCrystalGraphics);
     children.push(this.healthBarBg, this.healthBarFg, this.nicknameText);
     this.container = scene.add.container(0, 0, children);
+    // Position the wand for the initial 'down' direction.
+    if (this.wandGraphics) this.applyWandTransform('down');
   }
 
   update(state: PlayerState): void {
@@ -131,6 +209,60 @@ export class PlayerRenderer {
     }
 
     this.setSprintEffect(state.isSprinting);
+    this.updateFrozenVfx(state.frozenTimer);
+  }
+
+  /**
+   * Sync sprite tint and crystal sparkles to the player's frozen state.
+   * Tint flips on the leading edge so we don't fight Phaser's tint cache
+   * every frame, but the crystals are redrawn every frame so they orbit.
+   */
+  private updateFrozenVfx(frozenTimer: number): void {
+    const isFrozen = frozenTimer > 0;
+    if (isFrozen !== this.wasFrozen) {
+      if (isFrozen) {
+        this.sprite.setTint(FROZEN_TARGET_TINT);
+      } else if (this.characterId === 'frost_wizard') {
+        this.sprite.setTint(FROST_WIZARD_TINT);
+      } else {
+        this.sprite.clearTint();
+      }
+      this.wasFrozen = isFrozen;
+    }
+
+    const crystals = this.frozenCrystalGraphics;
+    if (!crystals) return;
+    if (!isFrozen) {
+      if (crystals.visible) crystals.setVisible(false);
+      return;
+    }
+
+    // Six tiny diamonds orbiting at shoulder height. Period ~1.6s gives a
+    // gentle, readable rotation that doesn't strobe at 60 fps.
+    const tNow = this.scene.time.now / 1000;
+    crystals.setVisible(true);
+    crystals.clear();
+    const radiusX = 14;
+    const radiusY = 6;
+    const yCenter = -6;
+    for (let i = 0; i < 6; i++) {
+      const phase = tNow * 2 * Math.PI * 0.6 + (i * Math.PI * 2) / 6;
+      const x = Math.cos(phase) * radiusX;
+      const y = yCenter + Math.sin(phase) * radiusY;
+      crystals.fillStyle(FROZEN_CRYSTAL_COLOR, 0.95);
+      crystals.fillTriangle(x, y - 2, x + 1.5, y, x, y + 2);
+      crystals.fillTriangle(x, y - 2, x - 1.5, y, x, y + 2);
+      crystals.lineStyle(1, FROZEN_CRYSTAL_OUTLINE, 0.85);
+      crystals.strokeTriangle(x, y - 2, x + 1.5, y, x, y + 2);
+      crystals.strokeTriangle(x, y - 2, x - 1.5, y, x, y + 2);
+    }
+  }
+
+  private applyWandTransform(direction: Direction4): void {
+    if (!this.wandGraphics) return;
+    const o = WAND_DIR_OFFSETS[direction];
+    this.wandGraphics.setPosition(o.x, o.y);
+    this.wandGraphics.setRotation(o.rot);
   }
 
   setPosition(x: number, y: number): void {
@@ -162,6 +294,7 @@ export class PlayerRenderer {
       this.currentDirection = direction;
       this.playCurrentAnim();
       if (this.gunSprite) this.playCurrentGunAnim();
+      if (this.wandGraphics) this.applyWandTransform(direction);
     }
   }
 
@@ -277,6 +410,8 @@ export class PlayerRenderer {
     }
     this.gunShootTimer?.remove(false);
     this.gunShootTimer = null;
+    // Container.destroy disposes children, so wand/mist/crystal graphics
+    // are torn down with the container — no extra cleanup needed.
     this.container.destroy();
   }
 

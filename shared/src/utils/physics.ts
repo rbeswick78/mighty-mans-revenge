@@ -18,6 +18,14 @@ export interface MovementModifiers {
   sprintEnabled?: boolean;
   /** When true, stamina is held constant (no drain, no recharge). Default false. */
   staminaFrozen?: boolean;
+  /**
+   * When true, the player is frozen in place (Frost Wizard's freeze).
+   * Position holds, velocity returns zero, stamina is held constant.
+   * Acts as the single shared gate so client prediction and server
+   * simulation never disagree on frozen movement. Sprint and input
+   * direction are ignored entirely.
+   */
+  frozen?: boolean;
 }
 
 export function calculateMovement(
@@ -31,6 +39,15 @@ export function calculateMovement(
   const speedMultiplier = modifiers?.speedMultiplier ?? 1;
   const sprintEnabled = modifiers?.sprintEnabled ?? true;
   const staminaFrozen = modifiers?.staminaFrozen ?? false;
+  const frozen = modifiers?.frozen ?? false;
+
+  if (frozen) {
+    return {
+      newPos: { x: currentPos.x, y: currentPos.y },
+      newStamina: stamina,
+      velocity: { x: 0, y: 0 },
+    };
+  }
 
   // Determine speed and update stamina
   let newStamina = stamina;
