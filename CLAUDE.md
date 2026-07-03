@@ -202,3 +202,4 @@ Tile-based maps stored as JSON in `/shared/maps/`. Tile types: `floor`, `wall`, 
 - [Geckos.io docs](https://github.com/geckosio/geckos.io) — WebRTC networking library
 - [Phaser 3 docs](https://photonstorm.github.io/phaser3-docs/) — game engine
 - User stories and full spec: `USER_STORIES.md` in repo root
+- Replayability build plan (multi-session, in progress): `docs/REPLAYABILITY_ROADMAP.md` — read it before working on weapons, modes, maps, mutators, characters, or stats/awards
