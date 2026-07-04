@@ -75,6 +75,7 @@ export const KILL_WEAPONS = Object.freeze([
   'grenade',
   'fire',
   'shotgun',
+  'axe',
 ] as const) satisfies readonly KillWeapon[];
 
 /** Fresh all-zero per-weapon kill record (PlayerStats.killsByWeapon). */
@@ -382,18 +383,51 @@ export const ABILITY = Object.freeze({
     DURATION: 2,
     COOLDOWN: 30,
   },
+  /**
+   * Bubba's Iron Hide: all incoming damage is multiplied by
+   * (1 - DAMAGE_REDUCTION) while the active window runs. Applied inside
+   * CombatManager.applyDamage — the single damage choke point — so every
+   * source (rifle, pellets, grenades, fire breath, thrown axes, future
+   * weapons) is covered automatically. Bruce-style cooldown anchor:
+   * cooldown starts at activation, so the total cycle is COOLDOWN seconds
+   * with the DURATION overlapping its first 4.
+   */
+  BUBBA_IRON_HIDE: {
+    DURATION: 4,
+    COOLDOWN: 30,
+    DAMAGE_REDUCTION: 0.5,
+  },
+  /**
+   * Jack's Axe Throw: a straight-line thrown-axe projectile fired along
+   * the activation aim angle. Server-simulated like grenades (no client
+   * damage prediction); flat DAMAGE on the first victim hit; blocked by
+   * walls; the axe lands after RANGE_TILES of flight. Instant cast (no
+   * active window) — cooldown begins at activation, like Frost Lock.
+   */
+  JACK_AXE_THROW: {
+    COOLDOWN: 12,
+    DAMAGE: 60,
+    /** Max flight distance in tiles. 6 * TILE_SIZE = 288px. */
+    RANGE_TILES: 6,
+    /** Flight speed in px/s (~0.55s to reach max range). */
+    SPEED: 520,
+  },
 });
 
 /**
  * Character roster. Frame dimensions are sourced from the actual sprite
- * sheets shipped under `client/public/assets/{assetFolder}/`. Each sheet
- * is 6 frames laid horizontally (sheet width = w * 6).
+ * sheets shipped under `client/public/assets/{assetFolder}/`. Sheets are
+ * horizontal strips of idleFrameCount / runFrameCount frames (sheet width
+ * = w * frameCount; the original roster is 6/6, the Session 6 zombies ship
+ * 8-frame walks).
  *
  * Adding a new character: add an entry here, drop the assets into
  * `client/public/assets/<folder>/`, and the BootScene loader picks it up
  * automatically. No further code changes needed for the sprite pipeline.
  *
- * Special abilities are not modeled yet — they will be added in a follow-up.
+ * Stat identities (maxHealth / speedMultiplier / hitbox) are the Session 6
+ * counterpick axes — see CharacterDef for exactly which systems consume
+ * each. Starting values from the replayability roadmap; tune in playtest.
  */
 export const CHARACTERS = Object.freeze({
   mighty_man: {
@@ -403,6 +437,11 @@ export const CHARACTERS = Object.freeze({
     assetFolder: 'player',
     assetBaseName: 'character',
     hasGun: true,
+    maxHealth: 100,
+    speedMultiplier: 1.0,
+    hitbox: { width: 24, height: 24 },
+    idleFrameCount: 6,
+    runFrameCount: 6,
     idleFrames: {
       down: { w: 11, h: 16 },
       up: { w: 11, h: 16 },
@@ -423,6 +462,11 @@ export const CHARACTERS = Object.freeze({
     assetFolder: 'enemies',
     assetBaseName: 'zombie',
     hasGun: false,
+    maxHealth: 115,
+    speedMultiplier: 0.95,
+    hitbox: { width: 24, height: 24 },
+    idleFrameCount: 6,
+    runFrameCount: 6,
     idleFrames: {
       down: { w: 13, h: 16 },
       up: { w: 13, h: 15 },
@@ -450,6 +494,11 @@ export const CHARACTERS = Object.freeze({
     assetFolder: 'player',
     assetBaseName: 'character',
     hasGun: false,
+    maxHealth: 85,
+    speedMultiplier: 1.08,
+    hitbox: { width: 24, height: 24 },
+    idleFrameCount: 6,
+    runFrameCount: 6,
     idleFrames: {
       down: { w: 11, h: 16 },
       up: { w: 11, h: 16 },
@@ -463,10 +512,92 @@ export const CHARACTERS = Object.freeze({
       'side-left': { w: 10, h: 17 },
     },
   },
+  // Bubba — the tank. Pack's Zombie_Big: huge HP pool, slow, and a bigger
+  // hit-validation box (he's simply easier to hit). Ability: Iron Hide
+  // (ABILITY.BUBBA_IRON_HIDE) — brief 50% damage reduction on demand.
+  bubba: {
+    id: 'bubba',
+    displayName: 'Bubba',
+    spritePrefix: 'bubba',
+    assetFolder: 'enemies',
+    assetBaseName: 'zombie-big',
+    hasGun: false,
+    maxHealth: 150,
+    speedMultiplier: 0.85,
+    hitbox: { width: 30, height: 30 },
+    idleFrameCount: 6,
+    runFrameCount: 8,
+    idleFrames: {
+      down: { w: 16, h: 23 },
+      up: { w: 16, h: 22 },
+      side: { w: 16, h: 22 },
+      'side-left': { w: 16, h: 22 },
+    },
+    runFrames: {
+      down: { w: 16, h: 24 },
+      up: { w: 16, h: 24 },
+      side: { w: 16, h: 24 },
+      'side-left': { w: 16, h: 24 },
+    },
+  },
+  // Jack — the skirmisher. Pack's Zombie_Axe (with-axe body variant).
+  // Baseline stats; his identity is the Axe Throw projectile
+  // (ABILITY.JACK_AXE_THROW) — the roster's first non-hitscan character
+  // attack, server-simulated like grenades.
+  jack: {
+    id: 'jack',
+    displayName: 'Jack',
+    spritePrefix: 'jack',
+    assetFolder: 'enemies',
+    assetBaseName: 'zombie-axe',
+    hasGun: false,
+    maxHealth: 100,
+    speedMultiplier: 1.0,
+    hitbox: { width: 24, height: 24 },
+    idleFrameCount: 6,
+    runFrameCount: 8,
+    idleFrames: {
+      down: { w: 13, h: 18 },
+      up: { w: 12, h: 23 },
+      side: { w: 22, h: 18 },
+      'side-left': { w: 22, h: 18 },
+    },
+    runFrames: {
+      down: { w: 12, h: 20 },
+      up: { w: 12, h: 23 },
+      side: { w: 21, h: 19 },
+      'side-left': { w: 21, h: 19 },
+    },
+  },
 }) satisfies Readonly<Record<string, CharacterDef>>;
 
 export type CharacterId = keyof typeof CHARACTERS;
 export const CHARACTER_IDS = Object.keys(CHARACTERS) as CharacterId[];
+
+/**
+ * Stat-identity accessors. All take `CharacterId | null` because
+ * PlayerState.characterId is null until the select screen locks —
+ * pre-lock callers get the baseline PLAYER constants.
+ */
+export function characterMaxHealth(id: CharacterId | null): number {
+  return id ? CHARACTERS[id].maxHealth : PLAYER.MAX_HEALTH;
+}
+
+export function characterSpeedMultiplier(id: CharacterId | null): number {
+  return id ? CHARACTERS[id].speedMultiplier : 1;
+}
+
+/**
+ * HIT-VALIDATION hitbox dims (bullets, pellets, fire breath, thrown axes —
+ * live and lag-comp-rewound alike). Movement collision does NOT use this;
+ * it stays on PLAYER.HITBOX_* for every character so map geometry plays
+ * identically across the roster (same contract as big_heads).
+ */
+export function characterHitbox(id: CharacterId | null): { width: number; height: number } {
+  return id
+    ? CHARACTERS[id].hitbox
+    : { width: PLAYER.HITBOX_WIDTH, height: PLAYER.HITBOX_HEIGHT };
+}
 
 /** Convenience alias for SERVER.TICK_RATE */
 export const TICK_RATE = SERVER.TICK_RATE;

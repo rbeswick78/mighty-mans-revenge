@@ -1,6 +1,6 @@
 import { PlayerId, MatchId, Tick, Vec2 } from './common.js';
 import { PlayerInput } from './player.js';
-import { GrenadeState, BulletTrail } from './projectile.js';
+import { AxeState, GrenadeState, BulletTrail } from './projectile.js';
 import { PickupState } from './pickup.js';
 import { MatchPhase, KillFeedEntry, MatchResult, GameModeType } from './game.js';
 import type { CharacterId, WeaponId, MutatorId } from '../config/game.js';
@@ -102,6 +102,8 @@ export interface ServerGameStateMessage {
   matchTimer: number;
   players: SerializedPlayerState[];
   grenades: GrenadeState[];
+  /** Jack's thrown axes in flight (usually empty — one per Jack per 12s). */
+  axes: AxeState[];
   bulletTrails: BulletTrail[];
   pickups: PickupState[];
   /**

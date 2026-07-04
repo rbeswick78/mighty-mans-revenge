@@ -1,7 +1,7 @@
 import { Vec2, PlayerId } from '../types/common.js';
 import { PlayerState } from '../types/player.js';
 import { CollisionGrid } from '../types/map.js';
-import { WEAPONS, GRENADE, PLAYER, TRAJECTORY } from '../config/game.js';
+import { WEAPONS, GRENADE, TRAJECTORY, characterHitbox } from '../config/game.js';
 import type { WeaponDef } from '../types/weapon.js';
 import { raycastAgainstGrid } from './collision.js';
 import { rayIntersectsAABB } from './ray-aabb.js';
@@ -51,10 +51,12 @@ export function predictBulletRay(
     if (playerState.isDead) continue;
     if (playerState.invulnerableTimer > 0) continue;
 
-    // hitboxScale mirrors the server's big_heads hit validation so the
-    // aim line agrees with what the server will actually count as a hit.
-    const halfW = (PLAYER.HITBOX_WIDTH / 2) * hitboxScale;
-    const halfH = (PLAYER.HITBOX_HEIGHT / 2) * hitboxScale;
+    // Per-character hit-validation dims × the big_heads scale — mirrors
+    // the server's CombatManager.processShot exactly so the aim line
+    // agrees with what the server will actually count as a hit.
+    const hitbox = characterHitbox(playerState.characterId);
+    const halfW = (hitbox.width / 2) * hitboxScale;
+    const halfH = (hitbox.height / 2) * hitboxScale;
 
     const hitDist = rayIntersectsAABB(
       origin.x,

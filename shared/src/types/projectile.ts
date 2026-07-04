@@ -14,6 +14,25 @@ export interface BulletTrail {
   weaponId: WeaponId;
 }
 
+/**
+ * Jack's thrown axe — a straight-line, server-simulated projectile
+ * (ABILITY.JACK_AXE_THROW). No client damage prediction, same contract as
+ * grenades: the server broadcasts the authoritative in-flight list every
+ * snapshot and the client mirrors it with sprites. An axe vanishing from
+ * the list means it resolved (hit a player, hit a wall, or reached max
+ * range) — the client plays its landing animation at the last-known spot.
+ */
+export interface AxeState {
+  id: string;
+  position: Vec2;
+  velocity: Vec2;
+  throwerId: PlayerId;
+  /** Flight direction in radians — drives the client's sprite variant. */
+  angle: number;
+  /** Px flown so far; the server retires the axe at RANGE_TILES * TILE_SIZE. */
+  distanceTraveled: number;
+}
+
 export interface GrenadeState {
   id: string;
   position: Vec2;

@@ -1,4 +1,9 @@
-import { MUTATORS, type MutatorId } from '../config/game.js';
+import {
+  MUTATORS,
+  characterSpeedMultiplier,
+  type CharacterId,
+  type MutatorId,
+} from '../config/game.js';
 import { MovementModifiers } from './physics.js';
 
 /**
@@ -38,6 +43,33 @@ export function mutatorsToMovementModifiers(
 
   if (!any) return {};
   return { speedMultiplier, sprintEnabled, staminaFrozen };
+}
+
+/**
+ * The full per-player movement modifier set: the character's stat-identity
+ * speed multiplier folded into whatever the active mutators say. This is
+ * THE function both sides must call for movement — server authority
+ * (match.ts input loop) and client prediction + reconciliation
+ * (network-manager.ts) — so per-character speed can never drift between
+ * them. Character speed composes multiplicatively with mutator speed
+ * (a super_speed Bubba runs 0.85 × 1.6).
+ *
+ * `characterId` is nullable because PlayerState.characterId is null until
+ * select locks; movement can't happen before COUNTDOWN, so the neutral
+ * fallback is never observable in play.
+ */
+export function playerMovementModifiers(
+  characterId: CharacterId | null,
+  active: readonly MutatorId[],
+  secondWindTimer: number = 0,
+): MovementModifiers {
+  const base = mutatorsToMovementModifiers(active, secondWindTimer);
+  const charSpeed = characterSpeedMultiplier(characterId);
+  if (charSpeed === 1) return base;
+  return {
+    ...base,
+    speedMultiplier: (base.speedMultiplier ?? 1) * charSpeed,
+  };
 }
 
 /** Display name for HUD banners and the active-mutator label. */

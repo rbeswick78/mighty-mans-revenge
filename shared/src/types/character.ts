@@ -24,8 +24,11 @@ export type FramesByDirection = Record<Direction4, FrameDim>;
  * `client/public/assets/{assetFolder}/{assetBaseName}_{direction}_{state}.png`.
  * Animation keys derived as `${spritePrefix}_${direction}_${state}`.
  *
- * idleFrames / runFrames hold per-direction sprite-sheet frame dimensions
- * (each sheet is 6 frames laid horizontally; total sheet width = w * 6).
+ * idleFrames / runFrames hold per-direction sprite-sheet frame dimensions;
+ * idleFrameCount / runFrameCount hold the number of horizontal frames per
+ * sheet (total sheet width = w * frameCount). Frame counts vary by pack
+ * character: the original roster ships 6-frame idles AND runs, while the
+ * Zombie_Big / Zombie_Axe walk sheets are 8-frame.
  */
 export interface CharacterDef {
   readonly id: string;
@@ -35,6 +38,10 @@ export interface CharacterDef {
   readonly assetBaseName: string;
   readonly idleFrames: FramesByDirection;
   readonly runFrames: FramesByDirection;
+  /** Horizontal frames per idle sheet (pack `-SheetN` suffix). */
+  readonly idleFrameCount: number;
+  /** Horizontal frames per run/walk sheet (pack `-SheetN` suffix). */
+  readonly runFrameCount: number;
   /**
    * Whether to render the held-gun overlay and matching muzzle flash for
    * this character. Gameplay (bullets, damage) is identical regardless —
@@ -43,4 +50,17 @@ export interface CharacterDef {
    * his hands, so an extra gun would look glued-on.
    */
   readonly hasGun: boolean;
+  /**
+   * Stat identity — what makes picking this character a real decision.
+   * maxHealth is committed onto PlayerState when the character is locked;
+   * speedMultiplier flows through the shared MovementModifiers (so client
+   * prediction and server authority stay identical); hitbox is the
+   * HIT-VALIDATION AABB only (bullets, pellets, fire breath, thrown axes).
+   * Movement collision intentionally keeps PLAYER.HITBOX_* for everyone —
+   * same rule as the big_heads mutator ("movement untouched") — so map
+   * geometry plays identically for the whole roster.
+   */
+  readonly maxHealth: number;
+  readonly speedMultiplier: number;
+  readonly hitbox: { readonly width: number; readonly height: number };
 }

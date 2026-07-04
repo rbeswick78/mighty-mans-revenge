@@ -5,10 +5,16 @@ import {
   WEAPONS,
   WEAPON_IDS,
   PICKUP,
+  PLAYER,
+  ABILITY,
+  KILL_WEAPONS,
   GAME_MODES,
   GAME_MODE_ROTATION,
   getNextGameMode,
   gameModeDisplayName,
+  characterMaxHealth,
+  characterSpeedMultiplier,
+  characterHitbox,
   KOTH,
   OVERTIME,
   MATCH,
@@ -120,6 +126,90 @@ describe('CHARACTERS registry', () => {
 
   it('CHARACTERS is frozen', () => {
     expect(Object.isFrozen(CHARACTERS)).toBe(true);
+  });
+
+  it('ships the full session-6 roster of five', () => {
+    expect(CHARACTER_IDS).toEqual([
+      'mighty_man',
+      'bruce',
+      'frost_wizard',
+      'bubba',
+      'jack',
+    ]);
+  });
+
+  it('every entry declares positive frame counts', () => {
+    for (const def of Object.values(CHARACTERS)) {
+      expect(def.idleFrameCount).toBeGreaterThan(0);
+      expect(def.runFrameCount).toBeGreaterThan(0);
+    }
+    // The pack's Zombie_Big / Zombie_Axe walk sheets are 8-frame; their
+    // idles (and the whole original roster) are 6-frame.
+    expect(CHARACTERS.bubba.runFrameCount).toBe(8);
+    expect(CHARACTERS.jack.runFrameCount).toBe(8);
+    expect(CHARACTERS.bubba.idleFrameCount).toBe(6);
+    expect(CHARACTERS.mighty_man.runFrameCount).toBe(6);
+  });
+
+  it('every entry has a coherent stat identity', () => {
+    for (const def of Object.values(CHARACTERS)) {
+      expect(def.maxHealth).toBeGreaterThan(0);
+      expect(def.speedMultiplier).toBeGreaterThan(0);
+      expect(def.hitbox.width).toBeGreaterThan(0);
+      expect(def.hitbox.height).toBeGreaterThan(0);
+    }
+  });
+
+  it('stat identities match the roadmap table', () => {
+    expect(CHARACTERS.mighty_man.maxHealth).toBe(100);
+    expect(CHARACTERS.mighty_man.speedMultiplier).toBe(1.0);
+    expect(CHARACTERS.bruce.maxHealth).toBe(115);
+    expect(CHARACTERS.bruce.speedMultiplier).toBe(0.95);
+    expect(CHARACTERS.frost_wizard.maxHealth).toBe(85);
+    expect(CHARACTERS.frost_wizard.speedMultiplier).toBe(1.08);
+    expect(CHARACTERS.bubba.maxHealth).toBe(150);
+    expect(CHARACTERS.bubba.speedMultiplier).toBe(0.85);
+    expect(CHARACTERS.bubba.hitbox).toEqual({ width: 30, height: 30 });
+    expect(CHARACTERS.jack.maxHealth).toBe(100);
+    expect(CHARACTERS.jack.speedMultiplier).toBe(1.0);
+    expect(CHARACTERS.jack.hitbox).toEqual({ width: 24, height: 24 });
+  });
+});
+
+describe('character stat accessors', () => {
+  it('return the registry values for known ids', () => {
+    expect(characterMaxHealth('bubba')).toBe(150);
+    expect(characterSpeedMultiplier('bubba')).toBe(0.85);
+    expect(characterHitbox('bubba')).toEqual({ width: 30, height: 30 });
+  });
+
+  it('fall back to PLAYER baselines for null (pre-select)', () => {
+    expect(characterMaxHealth(null)).toBe(PLAYER.MAX_HEALTH);
+    expect(characterSpeedMultiplier(null)).toBe(1);
+    expect(characterHitbox(null)).toEqual({
+      width: PLAYER.HITBOX_WIDTH,
+      height: PLAYER.HITBOX_HEIGHT,
+    });
+  });
+});
+
+describe('session-6 ability tuning', () => {
+  it('Iron Hide reduces damage by half for a short window inside its cooldown', () => {
+    expect(ABILITY.BUBBA_IRON_HIDE.DAMAGE_REDUCTION).toBe(0.5);
+    expect(ABILITY.BUBBA_IRON_HIDE.DURATION).toBeLessThan(
+      ABILITY.BUBBA_IRON_HIDE.COOLDOWN,
+    );
+  });
+
+  it('Axe Throw flight tuning is coherent', () => {
+    expect(ABILITY.JACK_AXE_THROW.DAMAGE).toBe(60);
+    expect(ABILITY.JACK_AXE_THROW.RANGE_TILES).toBe(6);
+    expect(ABILITY.JACK_AXE_THROW.SPEED).toBeGreaterThan(0);
+    expect(ABILITY.JACK_AXE_THROW.COOLDOWN).toBeGreaterThan(0);
+  });
+
+  it("KILL_WEAPONS includes the axe so Jack's kills attribute cleanly", () => {
+    expect(KILL_WEAPONS).toContain('axe');
   });
 });
 
