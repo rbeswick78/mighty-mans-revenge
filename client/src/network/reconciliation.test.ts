@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { WEAPONS, PLAYER } from '@shared/config/game.js';
-import type { PlayerState } from '@shared/types/player.js';
+import { CHARACTERS, SERVER, WEAPONS, PLAYER } from '@shared/config/game.js';
+import type { CollisionGrid } from '@shared/types/map.js';
+import type { PlayerInput, PlayerState } from '@shared/types/player.js';
 import type { SerializedPlayerState } from '@shared/types/network.js';
+import { playerMovementModifiers } from '@shared/utils/event-modifiers.js';
+import { calculateMovement } from '@shared/utils/physics.js';
 import { ServerReconciliation } from './reconciliation.js';
 
 function makePlayerState(overrides: Partial<PlayerState> = {}): PlayerState {
@@ -109,5 +112,65 @@ describe('ServerReconciliation', () => {
 
     expect(result.shouldSnap).toBe(true);
     expect(result.position).toEqual({ x: 140, y: 100 });
+  });
+
+  it('replays unacked inputs with the character speed multiplier — zero drift for Bubba', () => {
+    // The rubber-banding regression guard for per-character speed: replaying
+    // an unacked input with playerMovementModifiers('bubba') must land on
+    // exactly the position the server will compute for that same input.
+    const grid: CollisionGrid = {
+      width: 20,
+      height: 20,
+      tileSize: 48,
+      solid: Array.from({ length: 20 }, () => Array.from({ length: 20 }, () => false)),
+    };
+    const dt = 1 / SERVER.TICK_RATE;
+    const input: PlayerInput = {
+      sequenceNumber: 5,
+      moveX: 1,
+      moveY: 0,
+      aimAngle: 0,
+      aimingGun: false,
+      firePressed: false,
+      aimingGrenade: false,
+      throwPressed: false,
+      detonatePressed: false,
+      sprint: false,
+      reload: false,
+      abilityPressed: false,
+      tick: 5,
+    };
+    const modifiers = playerMovementModifiers('bubba', []);
+
+    // What the server will authoritatively compute for this input:
+    const serverSide = calculateMovement(input, { x: 200, y: 200 }, 3, dt, grid, modifiers);
+    expect(serverSide.newPos.x).toBeCloseTo(
+      200 + PLAYER.BASE_SPEED * CHARACTERS.bubba.speedMultiplier * dt,
+      8,
+    );
+
+    // Client reconciliation: server acked seq 4 at (200,200); replay seq 5.
+    const reconciliation = new ServerReconciliation();
+    const server = makeServerState({
+      characterId: 'bubba',
+      position: { x: 200, y: 200 },
+      lastProcessedInput: 4,
+    });
+    const predicted = makePlayerState({
+      characterId: 'bubba',
+      position: serverSide.newPos,
+      lastProcessedInput: 5,
+    });
+    const result = reconciliation.reconcile(
+      server,
+      [{ input, predictedState: predicted }],
+      grid,
+      modifiers,
+    );
+
+    // Identical physics → identical endpoint → no correction at all.
+    expect(result.shouldSnap).toBe(false);
+    expect(result.position.x).toBeCloseTo(serverSide.newPos.x, 8);
+    expect(result.position.y).toBeCloseTo(serverSide.newPos.y, 8);
   });
 });

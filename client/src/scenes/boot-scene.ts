@@ -72,6 +72,29 @@ const SHOTGUN_RACK_FRAMES: Record<Direction4, FrameDim> = {
 
 const IDLE_FPS = 6;
 const RUN_FPS = 12;
+/** Thrown axe spins fast — 9 frames looping in ~0.5s. */
+const AXE_THROWN_FPS = 18;
+/** Axe landing one-shot — 5 frames in ~0.25s. */
+const AXE_LANDING_FPS = 20;
+
+/**
+ * Thrown-axe projectile sheets (Jack's Axe Throw). The pack ships thrown
+ * spins for side / side-left / vertical (vertical covers both up and
+ * down), and landing/landed for all four directions. Frame dims measured
+ * from the extracted sheets.
+ */
+const AXE_THROWN_DIRS = ['side', 'side-left', 'vertical'] as const;
+const AXE_THROWN_FRAMES: Record<(typeof AXE_THROWN_DIRS)[number], FrameDim> = {
+  side: { w: 14, h: 14 },          // 126 × 14, 9 frames
+  'side-left': { w: 14, h: 14 },   // 126 × 14, 9 frames
+  vertical: { w: 3, h: 16 },       // 27 × 16, 9 frames
+};
+const AXE_LANDING_FRAMES: Record<Direction4, FrameDim> = {
+  down: { w: 13, h: 18 },          // 65 × 18, 5 frames
+  up: { w: 13, h: 15 },            // 65 × 15, 5 frames
+  side: { w: 19, h: 16 },          // 95 × 16, 5 frames
+  'side-left': { w: 19, h: 16 },   // 95 × 16, 5 frames
+};
 const GUN_HOLD_FPS = 9;     // between idle and run — visually close enough either way
 const GUN_SHOOT_FPS = 24;   // 3 frames in ~125 ms
 const FIRE_FPS = 30;        // 3 frames in ~100 ms — matches old procedural flash duration
@@ -197,6 +220,25 @@ export class BootScene extends Phaser.Scene {
           char.assetBaseName,
         );
       }
+    }
+
+    // Thrown-axe projectile (Jack's Axe Throw): spinning flight loops for
+    // side/side-left/vertical, landing one-shots + landed stills for all
+    // four directions.
+    for (const dir of AXE_THROWN_DIRS) {
+      this.load.spritesheet(
+        `axe_${dir}_thrown`,
+        `/assets/enemies/axe_${dir}_thrown.png`,
+        { frameWidth: AXE_THROWN_FRAMES[dir].w, frameHeight: AXE_THROWN_FRAMES[dir].h },
+      );
+    }
+    for (const dir of DIRECTIONS) {
+      this.load.spritesheet(
+        `axe_${dir}_landing`,
+        `/assets/enemies/axe_${dir}_landing.png`,
+        { frameWidth: AXE_LANDING_FRAMES[dir].w, frameHeight: AXE_LANDING_FRAMES[dir].h },
+      );
+      this.load.image(`axe_${dir}_landed`, `/assets/enemies/axe_${dir}_landed.png`);
     }
 
     // Gun overlay + muzzle flash — 4 directions each. Shared across all
@@ -365,14 +407,44 @@ export class BootScene extends Phaser.Scene {
       for (const dir of DIRECTIONS) {
         for (const state of ['idle', 'run'] as const) {
           const key = `${char.spritePrefix}_${dir}_${state}`;
+          // Explicit per-state frame counts from the registry — the pack
+          // mixes 6-frame idles with 8-frame walks (Zombie_Big/Zombie_Axe),
+          // so "all frames in the sheet" is only trustworthy if the
+          // frameWidth divided the sheet exactly; the explicit range also
+          // guards against sheets with trailing padding.
+          const frameCount =
+            state === 'run' ? char.runFrameCount : char.idleFrameCount;
           this.anims.create({
             key,
-            frames: this.anims.generateFrameNumbers(key, {}),
+            frames: this.anims.generateFrameNumbers(key, {
+              start: 0,
+              end: frameCount - 1,
+            }),
             frameRate: state === 'run' ? RUN_FPS : IDLE_FPS,
             repeat: -1,
           });
         }
       }
+    }
+
+    // Thrown-axe projectile: spinning flight loop + landing one-shot.
+    for (const dir of AXE_THROWN_DIRS) {
+      const key = `axe_${dir}_thrown`;
+      this.anims.create({
+        key,
+        frames: this.anims.generateFrameNumbers(key, { start: 0, end: 8 }),
+        frameRate: AXE_THROWN_FPS,
+        repeat: -1,
+      });
+    }
+    for (const dir of DIRECTIONS) {
+      const key = `axe_${dir}_landing`;
+      this.anims.create({
+        key,
+        frames: this.anims.generateFrameNumbers(key, { start: 0, end: 4 }),
+        frameRate: AXE_LANDING_FPS,
+        repeat: 0,
+      });
     }
 
     // Gun hold loops (one anim per direction, played continuously while

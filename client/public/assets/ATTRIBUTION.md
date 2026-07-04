@@ -40,6 +40,13 @@ This game uses pixel art assets from third-party packs. Source archives are
 - `decor/car-scrap_gray.png` (+ `_red`) — Objects/Vehicles/Normal/Car_6_Scrap
 - `decor/container-overgrown_gray.png` — Objects/Container/Container_4_Gray_Horizontal_Overgrown_Dark-Green
 - `decor/container-overgrown_red.png` — Objects/Container/Container_8_Red_Horizontal_Overgrown_Dark-Green
+- `enemies/zombie-big_*_idle.png` — Enemies/Zombie_Big idle Sheet6 (4 directions)
+- `enemies/zombie-big_*_run.png` — Enemies/Zombie_Big walk Sheet8 (4 directions)
+- `enemies/zombie-axe_*_idle.png` — Enemies/Zombie_Axe (with-axe) idle Sheet6 (4 directions)
+- `enemies/zombie-axe_*_run.png` — Enemies/Zombie_Axe (with-axe) walk Sheet8 (4 directions)
+- `enemies/axe_{side,side-left,vertical}_thrown.png` — Enemies/Zombie_Axe/Axe thrown Sheet9
+- `enemies/axe_*_landing.png` — Enemies/Zombie_Axe/Axe landing Sheet5 (4 directions)
+- `enemies/axe_*_landed.png` — Enemies/Zombie_Axe/Axe landed singles (4 directions)
 
 If we ever ship this commercially (charge money, run ads, promote a paid
 product) we owe the author at least $2 — pay before release.

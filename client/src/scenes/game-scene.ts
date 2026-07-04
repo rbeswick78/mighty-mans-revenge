@@ -18,6 +18,7 @@ import { ClientPlayerManager } from '../rendering/player-manager.js';
 import { EffectsRenderer } from '../rendering/effects-renderer.js';
 import { PickupRenderer } from '../rendering/pickup-renderer.js';
 import { GrenadeRenderer } from '../rendering/grenade-renderer.js';
+import { AxeRenderer } from '../rendering/axe-renderer.js';
 import { LightingRenderer } from '../rendering/lighting-renderer.js';
 import { KillJuice } from '../rendering/kill-juice.js';
 import { HealFlash } from '../rendering/heal-flash.js';
@@ -98,6 +99,7 @@ export class GameScene extends Phaser.Scene {
   private effectsRenderer: EffectsRenderer | null = null;
   private pickupRenderer: PickupRenderer | null = null;
   private grenadeRenderer: GrenadeRenderer | null = null;
+  private axeRenderer: AxeRenderer | null = null;
   private lightingRenderer: LightingRenderer | null = null;
   private killJuice: KillJuice | null = null;
   private healFlash: HealFlash | null = null;
@@ -183,6 +185,8 @@ export class GameScene extends Phaser.Scene {
   private onPickupCollected: ((pickupId: string, playerId: PlayerId) => void) | null = null;
   private onGrenadeThrown: ((pos: Vec2) => void) | null = null;
   private onGrenadeExploded: ((pos: Vec2) => void) | null = null;
+  private onAxeThrown: ((pos: Vec2) => void) | null = null;
+  private onAxeResolved: ((payload: { position: Vec2; angle: number }) => void) | null = null;
   private onLocalCorrection: ((correction: LocalCorrection) => void) | null = null;
   private onEventWarning: ((payload: EventWarningPayload) => void) | null = null;
   private onEventStart: ((payload: EventStartPayload) => void) | null = null;
@@ -258,6 +262,7 @@ export class GameScene extends Phaser.Scene {
     this.effectsRenderer = new EffectsRenderer(this);
     this.pickupRenderer = new PickupRenderer(this);
     this.grenadeRenderer = new GrenadeRenderer(this);
+    this.axeRenderer = new AxeRenderer(this);
     this.lightingRenderer = new LightingRenderer(this);
     this.killJuice = new KillJuice(this);
     this.healFlash = new HealFlash(this);
@@ -516,28 +521,32 @@ export class GameScene extends Phaser.Scene {
             this.hud.showAbilityActivation('FIRE BREATH!', 0xff7b2a);
           } else if (currentLocalState.characterId === 'mighty_man') {
             this.hud.showAbilityActivation('X-RAY VISION!', 0x4ad8e8);
+          } else if (currentLocalState.characterId === 'bubba') {
+            this.hud.showAbilityActivation('IRON HIDE!', 0xb8c4d0);
           }
           this.zoomPulse?.trigger();
         }
         this.prevAbilityActive = localAbilityActive;
 
-        // Frost Lock has no active window, so the active-edge above never
-        // fires for it. Detect the cooldown's leading edge instead — the
-        // server only flips cooldownSeconds from 0 → 30 on a successful
-        // cast, so this is a clean activation signal.
+        // Frost Lock and Axe Throw have no active window, so the
+        // active-edge above never fires for them. Detect the cooldown's
+        // leading edge instead — the server only flips cooldownSeconds
+        // from 0 upward on a successful cast, so this is a clean
+        // activation signal.
         const localCoolingDown = currentLocalState.abilityCooldownSeconds > 0;
-        if (
-          currentLocalState.characterId === 'frost_wizard' &&
-          localCoolingDown &&
-          !this.prevAbilityCoolingDown
-        ) {
-          this.hud.showAbilityActivation('FROST LOCK!', 0xaaddff);
-          this.zoomPulse?.trigger();
+        if (localCoolingDown && !this.prevAbilityCoolingDown) {
+          if (currentLocalState.characterId === 'frost_wizard') {
+            this.hud.showAbilityActivation('FROST LOCK!', 0xaaddff);
+            this.zoomPulse?.trigger();
+          } else if (currentLocalState.characterId === 'jack') {
+            this.hud.showAbilityActivation('AXE THROW!', 0xffb347);
+            this.zoomPulse?.trigger();
+          }
         }
         this.prevAbilityCoolingDown = localCoolingDown;
 
-        // Update HUD
-        this.hud.updateHealth(currentLocalState.health, PLAYER.MAX_HEALTH);
+        // Update HUD — per-character HP pool, not the baseline constant.
+        this.hud.updateHealth(currentLocalState.health, currentLocalState.maxHealth);
         this.hud.updateAmmo(
           currentLocalState.ammo,
           WEAPONS.rifle.magazineSize,
@@ -626,6 +635,11 @@ export class GameScene extends Phaser.Scene {
     // Render in-flight grenades from the server's authoritative list.
     if (this.grenadeRenderer) {
       this.grenadeRenderer.updateGrenades(networkManager.getActiveGrenades());
+    }
+
+    // Render Jack's thrown axes — same authoritative-list mirror.
+    if (this.axeRenderer) {
+      this.axeRenderer.updateAxes(networkManager.getActiveAxes());
     }
 
     // KOTH hill zone overlay (draws nothing when the snapshot carries no
@@ -1042,6 +1056,33 @@ export class GameScene extends Phaser.Scene {
       }
     };
 
+    // Axe events are message-granularity (see NetworkManager) so even a
+    // one-snapshot flight — thrown point-blank into a wall — still plays
+    // its throw sound and landing animation.
+    this.onAxeThrown = (pos: Vec2) => {
+      const audio = AudioManager.getInstance();
+      if (!audio) return;
+      const localState = this.gameService.getNetworkManager().getLocalPlayerState();
+      // Whippy pitched-up grenade-throw variant reads as a hurled axe.
+      const sfxOptions = { detune: 700, rate: 1.5 };
+      if (localState) {
+        audio.playAtPosition(
+          'grenadeThrow',
+          pos.x,
+          pos.y,
+          localState.position.x,
+          localState.position.y,
+          sfxOptions,
+        );
+      } else {
+        audio.play('grenadeThrow', sfxOptions);
+      }
+    };
+
+    this.onAxeResolved = (payload: { position: Vec2; angle: number }) => {
+      this.axeRenderer?.playLandingAt(payload.position.x, payload.position.y, payload.angle);
+    };
+
     this.onGrenadeExploded = (pos: Vec2) => {
       this.effectsRenderer?.showExplosion(pos.x, pos.y);
       this.lightingRenderer?.addExplosionFlash(pos.x, pos.y);
@@ -1161,6 +1202,8 @@ export class GameScene extends Phaser.Scene {
     this.gameService.on('pickupCollected', this.onPickupCollected);
     this.gameService.on('grenadeThrown', this.onGrenadeThrown);
     this.gameService.on('grenadeExploded', this.onGrenadeExploded);
+    this.gameService.on('axeThrown', this.onAxeThrown);
+    this.gameService.on('axeResolved', this.onAxeResolved);
     this.gameService.on('localCorrection', this.onLocalCorrection);
     this.gameService.on('eventWarning', this.onEventWarning);
     this.gameService.on('eventStart', this.onEventStart);
@@ -1233,6 +1276,14 @@ export class GameScene extends Phaser.Scene {
     if (this.onGrenadeThrown) {
       this.gameService.off('grenadeThrown', this.onGrenadeThrown);
       this.onGrenadeThrown = null;
+    }
+    if (this.onAxeThrown) {
+      this.gameService.off('axeThrown', this.onAxeThrown);
+      this.onAxeThrown = null;
+    }
+    if (this.onAxeResolved) {
+      this.gameService.off('axeResolved', this.onAxeResolved);
+      this.onAxeResolved = null;
     }
     if (this.onGrenadeExploded) {
       this.gameService.off('grenadeExploded', this.onGrenadeExploded);
@@ -1316,6 +1367,10 @@ export class GameScene extends Phaser.Scene {
     if (this.pickupRenderer) {
       this.pickupRenderer.destroy();
       this.pickupRenderer = null;
+    }
+    if (this.axeRenderer) {
+      this.axeRenderer.destroy();
+      this.axeRenderer = null;
     }
     if (this.grenadeRenderer) {
       this.grenadeRenderer.destroy();

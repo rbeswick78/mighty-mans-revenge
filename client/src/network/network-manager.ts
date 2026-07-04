@@ -1,7 +1,7 @@
 import type { PlayerId, Vec2 } from '@shared/types/common.js';
 import type { CollisionGrid } from '@shared/types/map.js';
 import type { PlayerInput, PlayerState } from '@shared/types/player.js';
-import type { GrenadeState } from '@shared/types/projectile.js';
+import type { AxeState, GrenadeState } from '@shared/types/projectile.js';
 import type { PickupState } from '@shared/types/pickup.js';
 import type {
   ServerMessage,
@@ -10,7 +10,7 @@ import type {
 } from '@shared/types/network.js';
 import { MatchPhase } from '@shared/types/game.js';
 import { SERVER, type CharacterId, type MutatorId } from '@shared/config/game.js';
-import { mutatorsToMovementModifiers } from '@shared/utils/event-modifiers.js';
+import { playerMovementModifiers } from '@shared/utils/event-modifiers.js';
 import { NetworkConnection } from './connection.js';
 import { ClientPrediction } from './prediction.js';
 import { ServerReconciliation } from './reconciliation.js';
@@ -36,6 +36,8 @@ type EventName =
   | 'bulletTrail'
   | 'grenadeThrown'
   | 'grenadeExploded'
+  | 'axeThrown'
+  | 'axeResolved'
   | 'localCorrection'
   | 'eventWarning'
   | 'eventStart'
@@ -72,6 +74,18 @@ export class NetworkManager {
    */
   private latestGrenades: GrenadeState[] = [];
   private lastGrenadePositions = new Map<string, Vec2>();
+
+  /**
+   * Most recent thrown axes from server gameState, polled per frame for
+   * flight rendering. Throw/landing effects are NOT frame-driven: an axe
+   * thrown point-blank at a wall lives for as little as one snapshot, and
+   * bursty message delivery can overwrite that snapshot before the next
+   * render frame samples it. So handleGameState diffs axes per MESSAGE
+   * (same rationale as grenadeExploded below) and emits axeThrown /
+   * axeResolved events that can never be swallowed.
+   */
+  private latestAxes: AxeState[] = [];
+  private lastAxeStates = new Map<string, { position: Vec2; angle: number }>();
 
   /** Most recent pickups from server gameState. Scene polls for rendering. */
   private latestPickups: PickupState[] = [];
@@ -182,7 +196,8 @@ export class NetworkManager {
       input,
       this.localPlayerState,
       this.collisionGrid,
-      mutatorsToMovementModifiers(
+      playerMovementModifiers(
+        this.localPlayerState.characterId,
         this._activeMutators,
         this.localPlayerState.secondWindTimer,
       ),
@@ -265,6 +280,11 @@ export class NetworkManager {
   /** Most recent active grenades from the server, for rendering. */
   getActiveGrenades(): GrenadeState[] {
     return this.latestGrenades;
+  }
+
+  /** Most recent thrown axes from the server, for rendering. */
+  getActiveAxes(): AxeState[] {
+    return this.latestAxes;
   }
 
   /** Most recent pickups from the server, for rendering. */
@@ -456,6 +476,29 @@ export class NetworkManager {
       }
     }
     this.latestGrenades = msg.grenades;
+
+    // Axes: same per-message diffing as grenades. An axe's whole flight
+    // can span a single snapshot (point-blank wall throw), so throw SFX
+    // and landing FX must key off message transitions — a frame-rate poll
+    // of latestAxes can miss the entire lifetime under bursty delivery.
+    const incomingAxeIds = new Set<string>();
+    for (const axe of msg.axes ?? []) {
+      incomingAxeIds.add(axe.id);
+      if (!this.lastAxeStates.has(axe.id)) {
+        this.emit('axeThrown', { x: axe.position.x, y: axe.position.y });
+      }
+      this.lastAxeStates.set(axe.id, {
+        position: { x: axe.position.x, y: axe.position.y },
+        angle: axe.angle,
+      });
+    }
+    for (const [id, last] of this.lastAxeStates) {
+      if (!incomingAxeIds.has(id)) {
+        this.emit('axeResolved', { position: last.position, angle: last.angle });
+        this.lastAxeStates.delete(id);
+      }
+    }
+    this.latestAxes = msg.axes ?? [];
     this.latestPickups = msg.pickups;
     // Server is authoritative for the active mutators. Mirror every
     // snapshot so reconnects pick up the modifiers without an extra
@@ -532,7 +575,11 @@ export class NetworkManager {
       serverState,
       predictions,
       this.collisionGrid,
-      mutatorsToMovementModifiers(this._activeMutators, serverState.secondWindTimer),
+      playerMovementModifiers(
+        serverState.characterId,
+        this._activeMutators,
+        serverState.secondWindTimer,
+      ),
     );
 
     this.applyReconciledLocalState(serverState, result);

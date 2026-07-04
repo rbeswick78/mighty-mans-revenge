@@ -1,6 +1,5 @@
 import Phaser from 'phaser';
 import type { SerializedPlayerState } from '@shared/types/network.js';
-import { PLAYER } from '@shared/config/game.js';
 import { PlayerRenderer } from './player-renderer.js';
 
 export class ClientPlayerManager {
@@ -41,7 +40,9 @@ export class ClientPlayerManager {
       renderer.setBigHeads(this.bigHeadsActive);
       renderer.setPosition(playerState.position.x, playerState.position.y);
       renderer.setAimAngle(playerState.aimAngle);
-      renderer.updateHealthBar(playerState.health, PLAYER.MAX_HEALTH);
+      // Per-character HP pool (Bubba 150, Frost Wizard 85, ...) — the
+      // serialized state carries the authoritative max.
+      renderer.updateHealthBar(playerState.health, playerState.maxHealth);
 
       if (playerState.id === localPlayerId) {
         localRenderer = renderer;

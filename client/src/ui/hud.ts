@@ -649,24 +649,27 @@ export class HUD {
     const readyColor =
       characterId === 'bruce' ? 0xff7b2a
       : characterId === 'mighty_man' ? 0x4ad8e8
+      : characterId === 'bubba' ? 0xb8c4d0
+      : characterId === 'jack' ? 0xffb347
       : 0xaaddff; // frost_wizard
     const cooldownColor = 0x3a4252;
     // Total recharge cycle from the moment activation should be measured.
-    // Bruce: cooldown begins at activation (DURATION overlaps cooldown).
+    // Bruce/Bubba: cooldown begins at activation (DURATION overlaps it).
     // Mighty Man: cooldown begins after the active window ends.
-    // Frost Wizard: instant cast, no active window — total is just COOLDOWN.
+    // Frost Wizard/Jack: instant cast, no active window — just COOLDOWN.
     const totalCycle =
       characterId === 'bruce' ? ABILITY.BRUCE_FIRE_BREATH.COOLDOWN
       : characterId === 'mighty_man'
         ? ABILITY.MIGHTY_MAN_XRAY.DURATION + ABILITY.MIGHTY_MAN_XRAY.COOLDOWN
-        : ABILITY.FROST_WIZARD_FREEZE.COOLDOWN;
-    // Frost Lock has no active window — activeDuration is unused on its
-    // path (isActive can't be true), but we keep a sane fallback so the
-    // sweep math doesn't divide by zero if a future bug pushes activeSeconds
-    // above 0 for a wizard.
+      : characterId === 'bubba' ? ABILITY.BUBBA_IRON_HIDE.COOLDOWN
+      : characterId === 'jack' ? ABILITY.JACK_AXE_THROW.COOLDOWN
+      : ABILITY.FROST_WIZARD_FREEZE.COOLDOWN;
+    // Instant-cast characters (Frost Wizard, Jack) never take the isActive
+    // path — the fallback just keeps the sweep math from dividing by zero.
     const activeDuration =
       characterId === 'bruce' ? ABILITY.BRUCE_FIRE_BREATH.DURATION
       : characterId === 'mighty_man' ? ABILITY.MIGHTY_MAN_XRAY.DURATION
+      : characterId === 'bubba' ? ABILITY.BUBBA_IRON_HIDE.DURATION
       : ABILITY.FROST_WIZARD_FREEZE.DURATION;
 
     this.abilityBg.setVisible(true);
@@ -718,6 +721,10 @@ export class HUD {
       this.drawFireIcon(iconColorNum, iconAlpha);
     } else if (characterId === 'mighty_man') {
       this.drawGlassesIcon(iconColorNum, iconAlpha);
+    } else if (characterId === 'bubba') {
+      this.drawShieldIcon(iconColorNum, iconAlpha);
+    } else if (characterId === 'jack') {
+      this.drawAxeIcon(iconColorNum, iconAlpha);
     } else {
       this.drawSnowflakeIcon(iconColorNum, iconAlpha);
     }
@@ -802,6 +809,50 @@ export class HUD {
     // Center pip so the arms read as anchored to a hub.
     g.fillStyle(color, alpha);
     g.fillCircle(0, 0, 1.5);
+  }
+
+  /**
+   * Pixel-art kite-shield silhouette for Bubba's Iron Hide indicator.
+   * Drawn into abilityIconGfx; coordinates are relative to the icon center.
+   */
+  private drawShieldIcon(color: number, alpha: number): void {
+    const g = this.abilityIconGfx;
+    g.clear();
+    g.fillStyle(color, alpha);
+    // Shield body: flat top, tapering to a point at the bottom.
+    g.beginPath();
+    g.moveTo(-8, -9);
+    g.lineTo(8, -9);
+    g.lineTo(8, 1);
+    g.lineTo(0, 11);
+    g.lineTo(-8, 1);
+    g.closePath();
+    g.fillPath();
+    // Center boss — small punched-out dot so it reads as armor, not a blob.
+    g.fillStyle(0xffffff, alpha * 0.35);
+    g.fillCircle(0, -1, 2.5);
+  }
+
+  /**
+   * Pixel-art hand-axe silhouette for Jack's Axe Throw indicator: a
+   * diagonal haft with a wedge blade at the top end.
+   * Drawn into abilityIconGfx; coordinates are relative to the icon center.
+   */
+  private drawAxeIcon(color: number, alpha: number): void {
+    const g = this.abilityIconGfx;
+    g.clear();
+    // Haft: bottom-left to top-right diagonal.
+    g.lineStyle(3, color, alpha);
+    g.lineBetween(-8, 10, 5, -5);
+    // Blade: wedge hanging off the top of the haft.
+    g.fillStyle(color, alpha);
+    g.beginPath();
+    g.moveTo(2, -8);
+    g.lineTo(10, -6);
+    g.lineTo(9, 2);
+    g.lineTo(4, -1);
+    g.closePath();
+    g.fillPath();
   }
 
   /**

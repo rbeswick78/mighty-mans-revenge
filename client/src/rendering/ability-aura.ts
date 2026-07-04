@@ -4,6 +4,8 @@ import type { SerializedPlayerState } from '@shared/types/network.js';
 const AURA_DEPTH = 12;
 const BRUCE_COLOR = 0xff7b2a;
 const MIGHTY_MAN_COLOR = 0x4ad8e8;
+/** Bubba's Iron Hide — steel gray, reads as "armored right now". */
+const BUBBA_COLOR = 0xb8c4d0;
 
 /**
  * Per-player floor aura that fires whenever a player's ability is active.
@@ -37,7 +39,10 @@ export class AbilityAura {
     for (const p of players) {
       if (p.abilityActiveSeconds <= 0) continue;
       if (p.isDead) continue;
-      const color = p.characterId === 'bruce' ? BRUCE_COLOR : MIGHTY_MAN_COLOR;
+      const color =
+        p.characterId === 'bruce' ? BRUCE_COLOR
+        : p.characterId === 'bubba' ? BUBBA_COLOR
+        : MIGHTY_MAN_COLOR;
       this.drawAura(p.position.x, p.position.y, color, pulseA, pulseB);
     }
   }

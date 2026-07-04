@@ -33,10 +33,38 @@ const TIMER_COLOR = Wasteland.HEALTH_WARNING;
 const TIMER_URGENT_COLOR = Wasteland.HIT_FLASH;
 const FOOTER_COLOR = Wasteland.COVER_FILL; // weathered tan — readable against the near-ground band
 
-const SPRITE_SCALE = 6;
-const CARD_WIDTH = 240;
+// Card sizing scales with roster count: the original 3-card layout used
+// 240px cards with 48px gaps, but 5 cards at that size would need 1392px
+// against a 960px canvas. Past 3 cards, shrink card + gap + type so the
+// whole roster fits with margins (5 × 172 + 4 × 16 = 924 ≤ 960).
+const CARD_COUNT = CHARACTER_IDS.length;
+const COMPACT = CARD_COUNT > 3;
+const SPRITE_SCALE = COMPACT ? 4 : 6;
+const CARD_WIDTH = COMPACT ? 172 : 240;
 const CARD_HEIGHT = 260;
+const CARD_GAP = COMPACT ? 16 : 48;
+const NAME_FONT_PX = COMPACT ? 12 : 14;
+const BLURB_FONT_PX = COMPACT ? 10 : 13;
 const DOUBLE_TAP_MS = 400;
+
+// Stat-bar normalization for the HP/SPD pips: HP fills relative to the
+// roster's biggest pool; speed lerps across the roster's min..max range
+// (floored at 20% so the slowest character still shows a bar, not a sliver).
+const ROSTER_DEFS = CHARACTER_IDS.map((id) => CHARACTERS[id]);
+const HP_MAX = Math.max(...ROSTER_DEFS.map((d) => d.maxHealth));
+const SPD_MIN = Math.min(...ROSTER_DEFS.map((d) => d.speedMultiplier));
+const SPD_MAX = Math.max(...ROSTER_DEFS.map((d) => d.speedMultiplier));
+const HP_BAR_COLOR = Wasteland.HEALTH_GOOD;
+const SPD_BAR_COLOR = Wasteland.HEALTH_WARNING;
+
+function hpFraction(maxHealth: number): number {
+  return maxHealth / HP_MAX;
+}
+
+function spdFraction(multiplier: number): number {
+  if (SPD_MAX === SPD_MIN) return 1;
+  return 0.2 + 0.8 * ((multiplier - SPD_MIN) / (SPD_MAX - SPD_MIN));
+}
 
 interface CharacterSelectSceneData {
   nickname?: string;
@@ -57,8 +85,10 @@ interface CardWidgets {
 
 function abilityBlurb(id: CharacterId): string {
   if (id === 'bruce') return 'FIRE BREATH\nthrough walls (45s)';
-  if (id === 'mighty_man') return 'X-RAY VISION\nshoot through walls (30s)';
-  if (id === 'frost_wizard') return 'FROST LOCK\nfreeze nearest enemy 2s (30s)';
+  if (id === 'mighty_man') return 'X-RAY VISION\nshoot thru walls (30s)';
+  if (id === 'frost_wizard') return 'FROST LOCK\nfreeze enemy 2s (30s)';
+  if (id === 'bubba') return 'IRON HIDE\nhalf damage 4s (30s)';
+  if (id === 'jack') return 'AXE THROW\n60 dmg axe (12s)';
   return '';
 }
 
@@ -148,12 +178,12 @@ export class CharacterSelectScene extends Phaser.Scene {
     // with card count so a future 3rd character still fits.
     // ────────────────────────────────────────────────────────────────────
     const totalWidth =
-      CHARACTER_IDS.length * CARD_WIDTH + (CHARACTER_IDS.length - 1) * 48;
+      CHARACTER_IDS.length * CARD_WIDTH + (CHARACTER_IDS.length - 1) * CARD_GAP;
     const startX = centerX - totalWidth / 2 + CARD_WIDTH / 2;
     const cardY = 280;
 
     CHARACTER_IDS.forEach((id, idx) => {
-      const x = startX + idx * (CARD_WIDTH + 48);
+      const x = startX + idx * (CARD_WIDTH + CARD_GAP);
       this.cards.set(id, this.createCard(id, x, cardY));
     });
 
@@ -247,22 +277,36 @@ export class CharacterSelectScene extends Phaser.Scene {
     const border = this.add.graphics();
 
     // Character preview sprite — same animation key style as elsewhere.
-    const sprite = this.add.sprite(0, -32, `${def.spritePrefix}_down_idle`);
+    // Raised to make room for the stat identity rows underneath.
+    const sprite = this.add.sprite(0, -56, `${def.spritePrefix}_down_idle`);
     sprite.setScale(SPRITE_SCALE);
     sprite.play(`${def.spritePrefix}_down_idle`);
 
     const nameText = this.add
-      .text(0, CARD_HEIGHT / 2 - 70, def.displayName.toUpperCase(), {
+      .text(0, 4, def.displayName.toUpperCase(), {
         fontFamily: MENU_FONTS.HEADER,
-        fontSize: '14px',
+        fontSize: `${NAME_FONT_PX}px`,
         color: cssHex(VALUE_COLOR),
       })
       .setOrigin(0.5);
 
+    // Stat identity rows — HP and SPD bars normalized across the roster
+    // so the counterpick differences are legible at a glance.
+    const statWidgets = [
+      ...this.createStatRow(28, 'HP', hpFraction(def.maxHealth), HP_BAR_COLOR, `${def.maxHealth}`),
+      ...this.createStatRow(
+        46,
+        'SPD',
+        spdFraction(def.speedMultiplier),
+        SPD_BAR_COLOR,
+        `${def.speedMultiplier.toFixed(2)}x`,
+      ),
+    ];
+
     const abilityText = this.add
-      .text(0, CARD_HEIGHT / 2 - 42, abilityBlurb(id), {
+      .text(0, 78, abilityBlurb(id), {
         fontFamily: MENU_FONTS.BODY,
-        fontSize: '13px',
+        fontSize: `${BLURB_FONT_PX}px`,
         color: cssHex(LABEL_COLOR),
         align: 'center',
         lineSpacing: 4,
@@ -270,9 +314,9 @@ export class CharacterSelectScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     const lockedBadge = this.add
-      .text(0, CARD_HEIGHT / 2 - 16, '', {
+      .text(0, CARD_HEIGHT / 2 - 22, '', {
         fontFamily: MENU_FONTS.HEADER,
-        fontSize: '10px',
+        fontSize: COMPACT ? '9px' : '10px',
         color: cssHex(LOCKED_BADGE_COLOR),
       })
       .setOrigin(0.5);
@@ -288,6 +332,7 @@ export class CharacterSelectScene extends Phaser.Scene {
       border,
       sprite,
       nameText,
+      ...statWidgets,
       abilityText,
       lockedBadge,
       hitZone,
@@ -305,6 +350,47 @@ export class CharacterSelectScene extends Phaser.Scene {
       hitZone,
       pulseTween: null,
     };
+  }
+
+  /**
+   * One labeled stat bar row inside a card: "HP ▮▮▮▮▯ 150". Local-space
+   * coordinates (card center = 0,0), returned as loose game objects for
+   * the card container to adopt.
+   */
+  private createStatRow(
+    y: number,
+    label: string,
+    fraction: number,
+    color: number,
+    value: string,
+  ): Phaser.GameObjects.GameObject[] {
+    const inset = 14;
+    const labelText = this.add
+      .text(-CARD_WIDTH / 2 + inset, y, label, {
+        fontFamily: MENU_FONTS.BODY,
+        fontSize: COMPACT ? '11px' : '13px',
+        color: cssHex(LABEL_COLOR),
+      })
+      .setOrigin(0, 0.5);
+
+    const valueText = this.add
+      .text(CARD_WIDTH / 2 - inset, y, value, {
+        fontFamily: MENU_FONTS.BODY,
+        fontSize: COMPACT ? '11px' : '13px',
+        color: cssHex(VALUE_COLOR),
+      })
+      .setOrigin(1, 0.5);
+
+    const barX = -CARD_WIDTH / 2 + inset + (COMPACT ? 34 : 42);
+    const barW = CARD_WIDTH - inset * 2 - (COMPACT ? 76 : 92);
+    const barH = 7;
+    const bar = this.add.graphics();
+    bar.fillStyle(Wasteland.CANVAS_BG, 1);
+    bar.fillRect(barX, y - barH / 2, barW, barH);
+    bar.fillStyle(color, 1);
+    bar.fillRect(barX + 1, y - barH / 2 + 1, Math.max(2, (barW - 2) * Math.min(1, fraction)), barH - 2);
+
+    return [labelText, bar, valueText];
   }
 
   private wireGameServiceEvents(): void {

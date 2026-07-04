@@ -52,6 +52,8 @@ type GameServiceEvent =
   | 'bulletTrail'
   | 'grenadeThrown'
   | 'grenadeExploded'
+  | 'axeThrown'
+  | 'axeResolved'
   | 'localCorrection'
   | 'eventWarning'
   | 'eventStart'
@@ -237,6 +239,14 @@ export class GameService {
 
     this.networkManager.on('grenadeExploded', (pos: unknown) => {
       this.emit('grenadeExploded', pos);
+    });
+
+    this.networkManager.on('axeThrown', (pos: unknown) => {
+      this.emit('axeThrown', pos);
+    });
+
+    this.networkManager.on('axeResolved', (payload: unknown) => {
+      this.emit('axeResolved', payload);
     });
 
     this.networkManager.on('localCorrection', (correction: LocalCorrection) => {
