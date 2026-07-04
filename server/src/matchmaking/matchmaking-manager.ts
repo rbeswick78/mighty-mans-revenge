@@ -2,8 +2,11 @@ import {
   MatchPhase,
   GameModeType,
   getMap,
-  DEFAULT_MAP_NAME,
+  getNextMapName,
+  listMapNames,
+  MAP_REGISTRY,
 } from '@shared/game';
+import type { MapData } from '@shared/game';
 import type {
   PlayerId,
   MatchResult,
@@ -34,6 +37,11 @@ interface PostMatchState {
   rematchRequests: Set<PlayerId>;
   returnedToLobby: Set<PlayerId>;
   timeoutHandle: ReturnType<typeof setTimeout>;
+  /**
+   * Map a rematch will be played on — pinned at match end so it always
+   * agrees with the "NEXT MAP: X" line the results screen promised.
+   */
+  nextMapName: string;
 }
 
 export class MatchmakingManager {
@@ -61,6 +69,13 @@ export class MatchmakingManager {
    * with rivalry: null.
    */
   private readonly statsStore: PersistentStatsStore | undefined;
+  /**
+   * Round-robin cursor over registry order for FRESH (queue-created)
+   * matches. Rematches don't consult it — they play the nextMapName
+   * pinned in their PostMatchState so consecutive matches of the same
+   * pairing never repeat a map.
+   */
+  private mapRotationIndex = 0;
 
   constructor(
     server: GameServer,
@@ -317,14 +332,38 @@ export class MatchmakingManager {
 
   // ──────────────────────────── Private ────────────────────────────
 
+  /**
+   * FORCE_MAP env override for manual smoke tests (mirrors FORCE_EVENT):
+   * a valid map name pins every match to that map AND freezes the
+   * rotation. Invalid values are ignored with a warning.
+   */
+  private forcedMap(): MapData | null {
+    const forced = process.env.FORCE_MAP;
+    if (!forced) return null;
+    if (!MAP_REGISTRY.has(forced)) {
+      logger.warn({ forced, known: listMapNames() }, 'Ignoring unknown FORCE_MAP');
+      return null;
+    }
+    return getMap(forced);
+  }
+
+  /** Next fresh-match map: FORCE_MAP if set, else advance the rotation. */
+  private pickRotationMap(): MapData {
+    const forced = this.forcedMap();
+    if (forced) return forced;
+    const names = listMapNames();
+    const name = names[this.mapRotationIndex % names.length];
+    this.mapRotationIndex++;
+    return getMap(name);
+  }
+
   private tryCreateMatch(): void {
     const pair = this.queue.tryMatch();
     if (!pair) return;
 
     const { player1, player2 } = pair;
     const matchId = crypto.randomUUID();
-    const mapName = DEFAULT_MAP_NAME;
-    const mapData = getMap(mapName);
+    const mapData = this.pickRotationMap();
 
     const playerEntries = [
       { id: player1.playerId, nickname: player1.nickname },
@@ -542,6 +581,14 @@ export class MatchmakingManager {
   private onMatchEnded(matchId: string, match: Match): void {
     const result = match.getResult();
 
+    // Rotation: a rematch plays the map AFTER this one (registry order).
+    // Attached to the result so the results screen's "NEXT MAP: X" line
+    // and the map the rematch actually starts on can never disagree.
+    const nextMapName =
+      this.forcedMap()?.name ??
+      getNextMapName(match.mapManager.getMapData().name);
+    result.nextMapName = nextMapName;
+
     // Fold this match into the lifetime records and attach the pairing's
     // all-time rivalry line before shipping the result. The in-memory
     // update is synchronous and O(players); the file write is queued onto
@@ -603,6 +650,7 @@ export class MatchmakingManager {
       rematchRequests: new Set(),
       returnedToLobby: new Set(),
       timeoutHandle,
+      nextMapName,
     });
 
     // Remove from active matches
@@ -641,8 +689,8 @@ export class MatchmakingManager {
     clearTimeout(postMatch.timeoutHandle);
 
     const matchId = crypto.randomUUID();
-    const mapName = DEFAULT_MAP_NAME;
-    const mapData = getMap(mapName);
+    // The map promised on the results screen ("NEXT MAP: X").
+    const mapData = getMap(postMatch.nextMapName);
 
     const playerEntries = postMatch.playerIds.map((pid) => ({
       id: pid,

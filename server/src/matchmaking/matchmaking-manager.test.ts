@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { MatchPhase, MATCH, MUTATORS } from '@shared/game';
+import { MatchPhase, MATCH, MUTATORS, listMapNames } from '@shared/game';
 import type { PlayerId, ServerMessage } from '@shared/game';
 import { MatchmakingManager } from './matchmaking-manager.js';
 import { PersistentStatsStore } from '../persistence/persistent-stats-store.js';
@@ -128,6 +128,113 @@ describe('MatchmakingManager rematch flow', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('MatchmakingManager map rotation', () => {
+  let mgr: MatchmakingManager;
+  let sent: SentMessage[];
+
+  beforeEach(() => {
+    const { fake, sent: bucket } = makeFakeServer();
+    sent = bucket;
+    mgr = new MatchmakingManager(fake);
+  });
+
+  afterEach(() => {
+    delete process.env.FORCE_MAP;
+  });
+
+  function matchFoundMapName(playerId: PlayerId): string {
+    const msg = sent.find(
+      (s) => s.playerId === playerId && s.message.type === 'server:matchFound',
+    );
+    if (!msg || msg.message.type !== 'server:matchFound') {
+      throw new Error(`no matchFound for ${playerId}`);
+    }
+    return msg.message.mapName;
+  }
+
+  function endActiveMatch(): void {
+    const matches = mgr.getActiveMatches();
+    expect(matches).toHaveLength(1);
+    matches[0].phase = MatchPhase.ENDED;
+    mgr.tick(0.05, 1);
+  }
+
+  function lastMatchEndNextMap(): string | null {
+    const msgs = sent.filter((s) => s.message.type === 'server:matchEnd');
+    expect(msgs.length).toBeGreaterThan(0);
+    const last = msgs[msgs.length - 1];
+    if (last.message.type !== 'server:matchEnd') throw new Error('unreachable');
+    return last.message.result.nextMapName;
+  }
+
+  it('fresh matches cycle the registry order and wrap', () => {
+    const names = listMapNames();
+    const pairs: Array<[PlayerId, PlayerId]> = [
+      ['A', 'B'],
+      ['C', 'D'],
+      ['E', 'F'],
+      ['G', 'H'],
+    ];
+    pairs.forEach(([p1, p2], i) => {
+      sent.length = 0;
+      mgr.handleJoinMatchmaking(p1, p1);
+      mgr.handleJoinMatchmaking(p2, p2);
+      expect(matchFoundMapName(p1)).toBe(names[i % names.length]);
+      expect(matchFoundMapName(p2)).toBe(names[i % names.length]);
+    });
+    expect(matchFoundMapName('G')).toBe(names[0]); // wrapped
+  });
+
+  it('matchEnd promises the next map and the rematch delivers it', () => {
+    const names = listMapNames();
+    mgr.handleJoinMatchmaking('A', 'A');
+    mgr.handleJoinMatchmaking('B', 'B');
+    expect(matchFoundMapName('A')).toBe(names[0]);
+
+    // First match ends → results promise map #2 → rematch plays map #2.
+    endActiveMatch();
+    expect(lastMatchEndNextMap()).toBe(names[1]);
+    sent.length = 0;
+    mgr.handleRematchRequest('A');
+    mgr.handleRematchRequest('B');
+    expect(matchFoundMapName('A')).toBe(names[1]);
+
+    // Chain continues: second rematch plays map #3, then wraps to #1.
+    endActiveMatch();
+    expect(lastMatchEndNextMap()).toBe(names[2]);
+    sent.length = 0;
+    mgr.handleRematchRequest('A');
+    mgr.handleRematchRequest('B');
+    expect(matchFoundMapName('A')).toBe(names[2]);
+
+    endActiveMatch();
+    expect(lastMatchEndNextMap()).toBe(names[0]);
+  });
+
+  it('FORCE_MAP pins fresh matches, the promised next map, and rematches', () => {
+    const names = listMapNames();
+    process.env.FORCE_MAP = names[2];
+
+    mgr.handleJoinMatchmaking('A', 'A');
+    mgr.handleJoinMatchmaking('B', 'B');
+    expect(matchFoundMapName('A')).toBe(names[2]);
+
+    endActiveMatch();
+    expect(lastMatchEndNextMap()).toBe(names[2]);
+    sent.length = 0;
+    mgr.handleRematchRequest('A');
+    mgr.handleRematchRequest('B');
+    expect(matchFoundMapName('A')).toBe(names[2]);
+  });
+
+  it('ignores an unknown FORCE_MAP and falls back to rotation', () => {
+    process.env.FORCE_MAP = 'No Such Arena';
+    mgr.handleJoinMatchmaking('A', 'A');
+    mgr.handleJoinMatchmaking('B', 'B');
+    expect(matchFoundMapName('A')).toBe(listMapNames()[0]);
   });
 });
 

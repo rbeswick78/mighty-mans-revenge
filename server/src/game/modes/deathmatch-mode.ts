@@ -54,6 +54,9 @@ export class DeathmatchMode implements GameMode {
       // Attached by the matchmaking manager once the persistent store has
       // folded this match in — the mode has no access to lifetime records.
       rivalry: null,
+      // Also the matchmaking manager's job — modes know nothing about the
+      // map rotation.
+      nextMapName: null,
     };
   }
 
