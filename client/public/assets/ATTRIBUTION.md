@@ -32,6 +32,14 @@ This game uses pixel art assets from third-party packs. Source archives are
 - `player/shotgun-bullet.png` — Character/Guns/Bullets/Shotgun-bullet
 - `ui/shotgun-bullet-indicator.png` (+ `_empty`) — UI/Bullet Indicators/Shotgun-Bullet
 - `ui/shotgun-bullet-indicator_small.png` (+ `_small_empty`) — UI/Bullet Indicators/Small
+- `tiles/background_green.png` — Tiles/Background_Green_TileSet
+- `tiles/background_dark-green.png` — Tiles/Background_Dark-Green_TileSet
+- `tiles/garbage.png` — Tiles/Garbage_TileSet
+- `tiles/roof.png` — Tiles/Roof_TileSet
+- `decor/car-overgrown_red.png` (+ `_blue`) — Objects/Vehicles/Overgrown/Car_1_Overgrown/Green
+- `decor/car-scrap_gray.png` (+ `_red`) — Objects/Vehicles/Normal/Car_6_Scrap
+- `decor/container-overgrown_gray.png` — Objects/Container/Container_4_Gray_Horizontal_Overgrown_Dark-Green
+- `decor/container-overgrown_red.png` — Objects/Container/Container_8_Red_Horizontal_Overgrown_Dark-Green
 
 If we ever ship this commercially (charge money, run ads, promote a paid
 product) we owe the author at least $2 — pay before release.

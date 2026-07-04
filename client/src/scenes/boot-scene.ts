@@ -266,6 +266,38 @@ export class BootScene extends Phaser.Scene {
       '/assets/tiles/iron-fence.png',
       { frameWidth: 16, frameHeight: 16 },
     );
+    // Theme tilesets (see map-themes.ts). The green/dark-green background
+    // sheets are palette swaps of the bleak-yellow layout (24×17 frames);
+    // roof is 16×5 (corrugated walls), garbage 8×4 (cover accents).
+    this.load.spritesheet(
+      'tiles_green',
+      '/assets/tiles/background_green.png',
+      { frameWidth: 16, frameHeight: 16 },
+    );
+    this.load.spritesheet(
+      'tiles_dark_green',
+      '/assets/tiles/background_dark-green.png',
+      { frameWidth: 16, frameHeight: 16 },
+    );
+    this.load.spritesheet(
+      'tiles_roof',
+      '/assets/tiles/roof.png',
+      { frameWidth: 16, frameHeight: 16 },
+    );
+    this.load.spritesheet(
+      'tiles_garbage',
+      '/assets/tiles/garbage.png',
+      { frameWidth: 16, frameHeight: 16 },
+    );
+
+    // Map decorations — free-placed cosmetic sprites referenced by
+    // texture key from map JSON `decorations` (see MapRenderer).
+    this.load.image('deco_car_overgrown_red', '/assets/decor/car-overgrown_red.png');
+    this.load.image('deco_car_overgrown_blue', '/assets/decor/car-overgrown_blue.png');
+    this.load.image('deco_car_scrap_gray', '/assets/decor/car-scrap_gray.png');
+    this.load.image('deco_car_scrap_red', '/assets/decor/car-scrap_red.png');
+    this.load.image('deco_container_gray', '/assets/decor/container-overgrown_gray.png');
+    this.load.image('deco_container_red', '/assets/decor/container-overgrown_red.png');
 
     // Pickups — single static images, scaled at render time.
     // Ammo uses the asset-pack crate; grenade is generated procedurally

@@ -38,6 +38,7 @@ const NO_DATA_COLOR = Wasteland.COVER_FILL;
 const LOSER_TINT = 0x55454f;
 const AWARD_NAME_COLOR = Wasteland.LOADING_BAR_FILL;  // hot orange accent
 const RIVALRY_COLOR = Wasteland.HEALTH_WARNING;       // amber
+const NEXT_MAP_COLOR = Wasteland.LOADING_BAR_FILL;    // hot orange accent
 
 // Awards + rivalry strip sits between the stats panel (ends at y=460) and
 // the rematch status line (camHeight - 130 = 590 on the 960x720 canvas).
@@ -109,6 +110,22 @@ export class ResultsScene extends Phaser.Scene {
       fillColor: titleColor,
       strokeThickness: 4,
     }).setDepth(WastelandStreet.DEPTH.UI);
+
+    // Map-rotation teaser under the banner — the map a rematch will be
+    // played on (server-pinned, so this can't lie). Absent on old/partial
+    // payloads → render nothing.
+    if (this.result?.nextMapName) {
+      const nextMap = this.add
+        .text(centerX, 112, `NEXT MAP: ${this.result.nextMapName.toUpperCase()}`, {
+          fontFamily: MENU_FONTS.HEADER,
+          fontSize: '10px',
+          color: cssHex(NEXT_MAP_COLOR),
+        })
+        .setOrigin(0.5)
+        .setAlpha(0)
+        .setDepth(WastelandStreet.DEPTH.UI);
+      this.tweens.add({ targets: nextMap, alpha: 1, duration: 400, delay: 200 });
+    }
 
     // ────────────────────────────────────────────────────────────────────
     // Winner / loser sprite tableau. Winner stands tall on the left,
