@@ -570,6 +570,11 @@ eyeballed, WASD wandering, zero page errors.
 - e2e note: the geckos disconnect → forfeit → results transition takes
   ~30s after a hard page close (WebRTC detection latency); any future
   spec waiting on ResultsScene needs a 60s allowance.
+- **Deploys NOT run this session:** the auto-mode permission classifier
+  blocked both production deploys (Firebase hosting + GCE ssh). All
+  commits are pushed to origin/main and the client bundle builds clean —
+  run the two deploy commands from CLAUDE.md → Deployment in an
+  interactive session, then health-check + load the web app.
 
 ### Session 3 — 2026-07-04 — Mutator expansion
 
