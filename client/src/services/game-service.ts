@@ -1,6 +1,6 @@
 import type { PlayerId } from '@shared/types/common.js';
 import type { PlayerInput } from '@shared/types/player.js';
-import type { MatchResult } from '@shared/types/game.js';
+import type { MatchResult, GameModeType } from '@shared/types/game.js';
 import type {
   ServerMatchFoundMessage,
   ServerMatchmakingStatusMessage,
@@ -32,6 +32,8 @@ export interface MatchData {
   matchId: string;
   opponents: { id: PlayerId; nickname: string }[];
   mapName: string;
+  /** Mode this match will be played in — drives the pre-match mode label. */
+  gameMode: GameModeType;
 }
 
 type GameServiceEvent =
@@ -54,7 +56,8 @@ type GameServiceEvent =
   | 'eventWarning'
   | 'eventStart'
   | 'weaponIncoming'
-  | 'tilesDestroyed';
+  | 'tilesDestroyed'
+  | 'overtimeStart';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type GameServiceCallback = (...args: any[]) => void;
@@ -182,6 +185,7 @@ export class GameService {
         matchId: msg.matchId,
         opponents: msg.opponents,
         mapName: msg.mapName,
+        gameMode: msg.gameMode,
       };
       this.emit('matchFound', this.currentMatch);
     });
@@ -253,6 +257,10 @@ export class GameService {
 
     this.networkManager.on('tilesDestroyed', (tiles: Array<{ col: number; row: number }>) => {
       this.emit('tilesDestroyed', tiles);
+    });
+
+    this.networkManager.on('overtimeStart', () => {
+      this.emit('overtimeStart');
     });
   }
 

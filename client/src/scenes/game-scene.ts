@@ -37,6 +37,7 @@ import { FireBreathFx } from '../rendering/fire-breath-fx.js';
 import { XrayFx } from '../rendering/xray-fx.js';
 import { AbilityAura } from '../rendering/ability-aura.js';
 import { DecalRenderer } from '../rendering/decal-renderer.js';
+import { KothHillRenderer } from '../rendering/koth-hill-renderer.js';
 import { CameraKick } from '../rendering/camera-kick.js';
 import { ZoomPulse } from '../rendering/zoom-pulse.js';
 import { CameraRoll, ROLL_DAMAGE_THRESHOLD } from '../rendering/camera-roll.js';
@@ -65,6 +66,15 @@ import { getMap, DEFAULT_MAP_NAME } from '@shared/maps/registry.js';
 
 const LOCAL_CORRECTION_SMOOTH_MS = 120;
 const LOCAL_CORRECTION_EPSILON = 0.01;
+
+/**
+ * How long the displayed clock must sit at 0:00 before the LOCAL
+ * end-of-match fade fires. Covers the overtime race: a tied match
+ * re-anchors the clock to sudden death within ~1 tick + RTT of zero, and
+ * server:matchEnd (the authoritative fade trigger) also lands well inside
+ * this window when the match really ended.
+ */
+const END_FADE_GRACE_MS = 600;
 
 /**
  * Hard cap on how many catch-up ticks can run in a single Phaser frame.
@@ -112,6 +122,7 @@ export class GameScene extends Phaser.Scene {
    */
   private prevAbilityCoolingDown = false;
   private decalRenderer: DecalRenderer | null = null;
+  private kothHillRenderer: KothHillRenderer | null = null;
   private cameraKick: CameraKick | null = null;
   private zoomPulse: ZoomPulse | null = null;
   private cameraRoll: CameraRoll | null = null;
@@ -143,6 +154,16 @@ export class GameScene extends Phaser.Scene {
   private endTransitionStarted = false;
   private fadeComplete = false;
   private pendingResult: MatchResult | null = null;
+  /**
+   * Local-clock timestamp when the displayed match timer first read 0:00,
+   * or null while it's above zero. The local end-of-match fade only fires
+   * after the clock has sat at zero for a short grace window — a tied
+   * match re-anchors the clock to overtime within ~1 tick + RTT, and
+   * fading out over a match that's actually entering sudden death would
+   * be wrong. Real ends aren't delayed in practice: server:matchEnd
+   * arrives well inside the grace window and starts the fade itself.
+   */
+  private zeroClockSinceMs: number | null = null;
 
   /** Previous and current predicted positions for render-rate interpolation. */
   private prevLocalPos: Vec2 | null = null;
@@ -167,6 +188,7 @@ export class GameScene extends Phaser.Scene {
   private onEventStart: ((payload: EventStartPayload) => void) | null = null;
   private onWeaponIncoming: ((payload: WeaponIncomingPayload) => void) | null = null;
   private onTilesDestroyed: ((tiles: Array<{ col: number; row: number }>) => void) | null = null;
+  private onOvertimeStart: (() => void) | null = null;
   /**
    * Timestamp of the most recent shotgun blast per shooter. A blast
    * broadcasts one BulletTrail per pellet in the same tick; muzzle flash,
@@ -221,6 +243,11 @@ export class GameScene extends Phaser.Scene {
     // grid is also used to bake a wall mask so decals are clipped to
     // wall pixels (no spillage onto floor at tile edges).
     this.decalRenderer = new DecalRenderer(this, grid);
+    // KOTH hill zone overlay: same insertion-order contract — above tiles
+    // and decals, below the player containers created later. Draws
+    // nothing until snapshots carry hill state (i.e. in DM matches it
+    // stays empty for free).
+    this.kothHillRenderer = new KothHillRenderer(this);
     // Scorch is now a hard tile-frame swap on the map sprites themselves
     // (see MapRenderer.scorchArea), so no separate RT renderer here. The
     // ScorchRenderer module file is still in the repo for easy revert if
@@ -552,15 +579,31 @@ export class GameScene extends Phaser.Scene {
         const remainingSeconds = networkManager.getMatchTimer();
         this.hud.updateTimer(remainingSeconds);
 
-        // Start the end-of-match fade the moment the local clock hits 0,
-        // rather than waiting for server:matchEnd to round-trip back. Saves
-        // ~50–150ms of "stuck on 0:00" before the screen reacts.
+        // KOTH capture bar + sudden-death clock styling, both driven from
+        // the latest snapshot (null hill state hides the bar — DM matches
+        // and overtime).
+        this.hud.updateKothState(networkManager.getKothState(), playerId);
+        this.hud.setOvertime(networkManager.isOvertime());
+
+        // Start the end-of-match fade from the local clock reaching 0:00 —
+        // but only after it has SAT at zero for a grace window. A tied
+        // match doesn't end at 0:00: the server re-anchors the clock to
+        // sudden-death overtime within ~1 tick + RTT, which cancels this
+        // trigger. Real ends fade via server:matchEnd (arrives well inside
+        // the window), so the grace costs nothing when a winner exists.
         if (
           this.matchPhase === MatchPhase.ACTIVE &&
           !this.endTransitionStarted &&
           remainingSeconds <= 0
         ) {
-          this.beginEndTransition();
+          const now = this.time.now;
+          if (this.zeroClockSinceMs === null) {
+            this.zeroClockSinceMs = now;
+          } else if (now - this.zeroClockSinceMs >= END_FADE_GRACE_MS) {
+            this.beginEndTransition();
+          }
+        } else {
+          this.zeroClockSinceMs = null;
         }
 
         // Sync the persistent active-mutator label. The eventStart handler
@@ -584,6 +627,15 @@ export class GameScene extends Phaser.Scene {
     if (this.grenadeRenderer) {
       this.grenadeRenderer.updateGrenades(networkManager.getActiveGrenades());
     }
+
+    // KOTH hill zone overlay (draws nothing when the snapshot carries no
+    // hill state). Runs outside the local-player block so the hill stays
+    // visible while dead/respawning.
+    this.kothHillRenderer?.update(
+      networkManager.getKothState(),
+      networkManager.getPlayerId(),
+      this.time.now,
+    );
 
     // Render pickups (active ones visible, collected ones hidden).
     const pickups = networkManager.getPickups();
@@ -1091,6 +1143,15 @@ export class GameScene extends Phaser.Scene {
       }
     };
 
+    // Sudden-death overtime: the tie banner beat. The clock re-anchor is
+    // handled inside NetworkManager; a deep slow horn distinguishes it
+    // from mutator/weapon announcements.
+    this.onOvertimeStart = () => {
+      this.hud?.showEventBanner('OVERTIME!', 'SUDDEN DEATH - FIRST KILL WINS', 0xb33831);
+      AudioManager.getInstance()?.play('matchStartHorn', { detune: -800, rate: 0.7 });
+      this.zoomPulse?.trigger();
+    };
+
     this.gameService.on('matchCountdown', this.onMatchCountdown);
     this.gameService.on('matchStart', this.onMatchStart);
     this.gameService.on('matchEnd', this.onMatchEnd);
@@ -1105,6 +1166,7 @@ export class GameScene extends Phaser.Scene {
     this.gameService.on('eventStart', this.onEventStart);
     this.gameService.on('weaponIncoming', this.onWeaponIncoming);
     this.gameService.on('tilesDestroyed', this.onTilesDestroyed);
+    this.gameService.on('overtimeStart', this.onOvertimeStart);
   }
 
   /**
@@ -1196,6 +1258,10 @@ export class GameScene extends Phaser.Scene {
       this.gameService.off('weaponIncoming', this.onWeaponIncoming);
       this.onWeaponIncoming = null;
     }
+    if (this.onOvertimeStart) {
+      this.gameService.off('overtimeStart', this.onOvertimeStart);
+      this.onOvertimeStart = null;
+    }
   }
 
   private decayLocalCorrectionOffset(deltaMs: number): void {
@@ -1234,6 +1300,10 @@ export class GameScene extends Phaser.Scene {
     if (this.mapRenderer) {
       this.mapRenderer.destroy();
       this.mapRenderer = null;
+    }
+    if (this.kothHillRenderer) {
+      this.kothHillRenderer.destroy();
+      this.kothHillRenderer = null;
     }
     if (this.playerManager) {
       this.playerManager.destroy();

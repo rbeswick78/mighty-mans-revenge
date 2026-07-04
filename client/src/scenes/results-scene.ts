@@ -3,7 +3,7 @@ import type { PlayerId } from '@shared/types/common.js';
 import type { PlayerStats } from '@shared/types/player.js';
 import type { MatchResult } from '@shared/types/game.js';
 import type { ServerMatchmakingStatusMessage } from '@shared/types/network.js';
-import { AWARD_DEFS, createEmptyKillsByWeapon } from '@shared/config/game.js';
+import { AWARD_DEFS, createEmptyKillsByWeapon, gameModeDisplayName } from '@shared/config/game.js';
 import { Wasteland, cssHex } from '@shared/config/palette.js';
 import { AudioManager } from '../audio/audio-manager.js';
 import { GameService, type MatchData } from '../services/game-service.js';
@@ -111,12 +111,31 @@ export class ResultsScene extends Phaser.Scene {
       strokeThickness: 4,
     }).setDepth(WastelandStreet.DEPTH.UI);
 
-    // Map-rotation teaser under the banner — the map a rematch will be
+    // Mode label above the banner: what was just played, plus a sudden-
+    // death callout when the match needed overtime to settle.
+    if (this.result?.gameMode) {
+      const modeLabel = this.result.wentToOvertime
+        ? `${gameModeDisplayName(this.result.gameMode)} - OVERTIME`
+        : gameModeDisplayName(this.result.gameMode);
+      this.add
+        .text(centerX, 26, modeLabel, {
+          fontFamily: MENU_FONTS.HEADER,
+          fontSize: '10px',
+          color: cssHex(this.result.wentToOvertime ? DRAW_COLOR : LABEL_COLOR),
+        })
+        .setOrigin(0.5)
+        .setDepth(WastelandStreet.DEPTH.UI);
+    }
+
+    // Rotation teaser under the banner — the mode + map a rematch will be
     // played on (server-pinned, so this can't lie). Absent on old/partial
-    // payloads → render nothing.
+    // payloads → render what's available, or nothing.
     if (this.result?.nextMapName) {
+      const nextModePrefix = this.result.nextGameMode
+        ? `${gameModeDisplayName(this.result.nextGameMode)} ON `
+        : 'MAP ';
       const nextMap = this.add
-        .text(centerX, 112, `NEXT MAP: ${this.result.nextMapName.toUpperCase()}`, {
+        .text(centerX, 112, `NEXT: ${nextModePrefix}${this.result.nextMapName.toUpperCase()}`, {
           fontFamily: MENU_FONTS.HEADER,
           fontSize: '10px',
           color: cssHex(NEXT_MAP_COLOR),

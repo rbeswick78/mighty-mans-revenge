@@ -4,6 +4,7 @@ import type { ServerCharacterSelectStateMessage } from '@shared/types/network.js
 import {
   CHARACTERS,
   CHARACTER_IDS,
+  gameModeDisplayName,
   type CharacterId,
 } from '@shared/config/game.js';
 import { Wasteland, cssHex } from '@shared/config/palette.js';
@@ -126,6 +127,21 @@ export class CharacterSelectScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
       .setDepth(WastelandStreet.DEPTH.UI);
+
+    // Up-next line: the mode + map this match will be played in (from
+    // matchFound via matchData). Mode rotation's pre-match surface — the
+    // lobby fades straight into this screen.
+    if (this.matchData) {
+      const modeName = gameModeDisplayName(this.matchData.gameMode);
+      this.add
+        .text(centerX, 142, `NEXT: ${modeName} - ${this.matchData.mapName.toUpperCase()}`, {
+          fontFamily: MENU_FONTS.HEADER,
+          fontSize: '11px',
+          color: cssHex(TIMER_COLOR),
+        })
+        .setOrigin(0.5)
+        .setDepth(WastelandStreet.DEPTH.UI);
+    }
 
     // ────────────────────────────────────────────────────────────────────
     // Character cards — laid out horizontally, centered. Spacing scales

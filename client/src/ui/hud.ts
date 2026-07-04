@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { WEAPONS, ABILITY } from '@shared/config/game.js';
 import type { CharacterId, WeaponId } from '@shared/config/game.js';
+import type { KothHudState } from '@shared/types/network.js';
 import { Wasteland, cssHex, healthColor } from '@shared/config/palette.js';
 import { HUD_STRIP_HEIGHT, MAP_HEIGHT_PX, MAP_WIDTH_PX } from './layout.js';
 import { MENU_FONTS } from './menu/fonts.js';
@@ -70,6 +71,14 @@ export class HUD {
   // Middle column: match state
   private scoreText: Phaser.GameObjects.Text;
   private timerText: Phaser.GameObjects.Text;
+
+  // KOTH capture bar (middle column, between score and timer). Hidden in
+  // deathmatch and while the hill is retired for overtime.
+  private kothLabel: Phaser.GameObjects.Text;
+  private kothBarBg: Phaser.GameObjects.Rectangle;
+  private kothBarFg: Phaser.GameObjects.Rectangle;
+  /** True while the timer renders in the sudden-death style. */
+  private overtimeStyle = false;
 
   // Right column: kill feed
   private killFeedEntries: KillFeedItem[] = [];
@@ -277,6 +286,44 @@ export class HUD {
     this.timerText.setScrollFactor(0);
     this.timerText.setDepth(1000);
 
+    // --- KOTH capture bar: "HILL" label + progress toward the next point.
+    // Lives in the gap between the score line and the timer; hidden until
+    // updateKothState sees hill state in the snapshot.
+    const kothBarW = 140;
+    const kothBarY = stripTop + 44;
+    this.kothLabel = scene.add.text(middleX - kothBarW / 2 - 8, kothBarY - 1, 'HILL', {
+      ...HEADER_STYLE,
+      fontSize: '8px',
+    });
+    this.kothLabel.setOrigin(1, 0);
+    this.kothLabel.setScrollFactor(0);
+    this.kothLabel.setDepth(1000);
+    this.kothLabel.setVisible(false);
+
+    this.kothBarBg = scene.add.rectangle(
+      middleX - kothBarW / 2,
+      kothBarY,
+      kothBarW,
+      8,
+      Wasteland.HEALTH_BAR_BG,
+    );
+    this.kothBarBg.setOrigin(0, 0);
+    this.kothBarBg.setScrollFactor(0);
+    this.kothBarBg.setDepth(1000);
+    this.kothBarBg.setVisible(false);
+
+    this.kothBarFg = scene.add.rectangle(
+      middleX - kothBarW / 2,
+      kothBarY,
+      0,
+      8,
+      Wasteland.HEALTH_GOOD,
+    );
+    this.kothBarFg.setOrigin(0, 0);
+    this.kothBarFg.setScrollFactor(0);
+    this.kothBarFg.setDepth(1001);
+    this.kothBarFg.setVisible(false);
+
     // Persistent active-event label, sits right under the timer. Hidden
     // until an event activates; never moves, just toggles text + visibility.
     this.activeEventLabel = scene.add.text(middleX, stripTop + 84, '', {
@@ -400,6 +447,58 @@ export class HUD {
   ): void {
     this.scoreText.setText(
       `${localName}: ${localScore} | ${opponentName}: ${opponentScore}`,
+    );
+  }
+
+  /**
+   * Sync the KOTH capture bar from the latest snapshot. null hides the
+   * whole row (DM matches, and overtime — the hill is retired for sudden
+   * death). Bar semantics: fraction of the way to the occupant's next
+   * point, colored by who benefits — mint for the local player, blood red
+   * for an enemy, flashing orange full-width while contested.
+   */
+  updateKothState(state: KothHudState | null, localPlayerId: string | null): void {
+    // .hill guard: treat a malformed snapshot (serialization dropped the
+    // hill) the same as "no hill state" instead of trusting the type.
+    const visible = !!state?.hill;
+    this.kothLabel.setVisible(visible);
+    this.kothBarBg.setVisible(visible);
+    this.kothBarFg.setVisible(visible);
+    if (!state?.hill) return;
+
+    const fullWidth = this.kothBarBg.width;
+    if (state.contested) {
+      // Full-width blink — nobody is scoring until the hill clears.
+      const blink = Math.floor(this.scene.time.now / 250) % 2 === 0;
+      this.kothBarFg.setSize(fullWidth, 8);
+      this.kothBarFg.setFillStyle(Wasteland.TEXT_LOADING, blink ? 0.9 : 0.35);
+      this.kothLabel.setText('CONTESTED');
+      return;
+    }
+
+    this.kothLabel.setText('HILL');
+    if (state.occupantId === null) {
+      this.kothBarFg.setSize(0, 8);
+      return;
+    }
+    const mine = state.occupantId === localPlayerId;
+    this.kothBarFg.setFillStyle(
+      mine ? Wasteland.HEALTH_GOOD : Wasteland.TEXT_DEATH,
+      1,
+    );
+    const fraction = Math.max(0, Math.min(1, state.captureFraction));
+    this.kothBarFg.setSize(fullWidth * fraction, 8);
+  }
+
+  /**
+   * Toggle the sudden-death timer style: the clock turns blood red for
+   * the duration of overtime.
+   */
+  setOvertime(active: boolean): void {
+    if (active === this.overtimeStyle) return;
+    this.overtimeStyle = active;
+    this.timerText.setColor(
+      cssHex(active ? Wasteland.TEXT_DEATH : Wasteland.TEXT_PRIMARY),
     );
   }
 

@@ -6,6 +6,7 @@ import type { PickupState } from '@shared/types/pickup.js';
 import type {
   ServerMessage,
   ServerGameStateMessage,
+  KothHudState,
 } from '@shared/types/network.js';
 import { MatchPhase } from '@shared/types/game.js';
 import { SERVER, type CharacterId, type MutatorId } from '@shared/config/game.js';
@@ -40,6 +41,7 @@ type EventName =
   | 'eventStart'
   | 'weaponIncoming'
   | 'tilesDestroyed'
+  | 'overtimeStart'
   | 'error';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -93,6 +95,20 @@ export class NetworkManager {
    */
   private _activeMutators: MutatorId[] = [];
 
+  /**
+   * King of the Hill HUD state from the latest snapshot; null in DM
+   * matches and while the hill is retired for overtime. Scene polls this
+   * each frame like grenades/pickups.
+   */
+  private _kothState: KothHudState | null = null;
+
+  /**
+   * True while the match is in sudden-death overtime. Mirrored from every
+   * snapshot (the one-shot overtimeStart message additionally re-anchors
+   * the clock and fires the banner).
+   */
+  private _isOvertime = false;
+
   private listeners = new Map<EventName, EventCallback[]>();
 
   constructor(serverUrl?: string) {
@@ -127,11 +143,23 @@ export class NetworkManager {
     this.localPlayerState = null;
     this.matchEndsAtLocalMs = null;
     this._activeMutators = [];
+    this._kothState = null;
+    this._isOvertime = false;
   }
 
   /** Currently active mutators, in activation order (empty if none). */
   getActiveMutators(): readonly MutatorId[] {
     return this._activeMutators;
+  }
+
+  /** Latest KOTH hill state; null in DM matches and during overtime. */
+  getKothState(): KothHudState | null {
+    return this._kothState;
+  }
+
+  /** True while the match is in sudden-death overtime. */
+  isOvertime(): boolean {
+    return this._isOvertime;
   }
 
   /**
@@ -327,7 +355,18 @@ export class NetworkManager {
       case 'server:matchEnd':
         this.matchEndsAtLocalMs = null;
         this._activeMutators = [];
+        this._kothState = null;
+        this._isOvertime = false;
         this.emit('matchEnd', msg);
+        break;
+
+      case 'server:overtimeStart':
+        // Sudden death: re-anchor the clock the same way matchStart does
+        // (the per-snapshot re-anchor would fix it within a tick anyway,
+        // but the banner beat shouldn't show a stale 0:00).
+        this.matchEndsAtLocalMs = performance.now() + msg.overtimeEndsInMs;
+        this._isOvertime = true;
+        this.emit('overtimeStart');
         break;
 
       case 'server:eventWarning':
@@ -422,6 +461,9 @@ export class NetworkManager {
     // snapshot so reconnects pick up the modifiers without an extra
     // round-trip.
     this._activeMutators = msg.activeMutators;
+    // Same contract for KOTH hill state and the overtime flag.
+    this._kothState = msg.koth ?? null;
+    this._isOvertime = msg.isOvertime;
 
     // Re-anchor the match clock from every active-phase snapshot. The
     // initial anchor came from ServerMatchStartMessage; this corrects
