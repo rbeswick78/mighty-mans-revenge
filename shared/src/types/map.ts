@@ -14,6 +14,24 @@ export interface MapTile {
   pickupType?: PickupSpawnType;
 }
 
+/**
+ * A purely cosmetic sprite the client draws centered on a tile rect
+ * (e.g. a wrecked car spanning 1×2 COVER_LOW tiles). Collision comes
+ * exclusively from the tile types underneath — decorations never affect
+ * physics, so the server ignores them entirely.
+ */
+export interface MapDecoration {
+  /** Tile rect the sprite is centered on (tile coords, w/h in tiles). */
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** Client texture key (see client boot-scene). Unknown keys are skipped. */
+  texture: string;
+  /** Mirror the sprite horizontally for cheap variety. */
+  flipX?: boolean;
+}
+
 export interface MapData {
   name: string;
   width: number;
@@ -22,6 +40,14 @@ export interface MapData {
   tiles: TileType[][];
   spawnPoints: { x: number; y: number }[];
   pickupSpawns: { x: number; y: number; type: PickupSpawnType }[];
+  /**
+   * Visual theme id resolved by the client tile renderer (see
+   * client/src/rendering/map-themes.ts). Absent/unknown ids fall back to
+   * the default wasteland look. Purely cosmetic — no gameplay effect.
+   */
+  theme?: string;
+  /** Cosmetic overlay sprites; see MapDecoration. */
+  decorations?: MapDecoration[];
 }
 
 export interface CollisionGrid {

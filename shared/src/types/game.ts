@@ -90,4 +90,10 @@ export interface MatchResult {
    * null when persistence is unavailable or the match wasn't 1v1.
    */
   rivalry: RivalryRecord | null;
+  /**
+   * Map the rematch (if accepted) will be played on — drives the results
+   * screen's "NEXT MAP: X" line. Like rivalry, attached by the matchmaking
+   * manager (game modes know nothing about rotation); null until then.
+   */
+  nextMapName: string | null;
 }

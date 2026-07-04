@@ -182,4 +182,34 @@ describe('validateMap', () => {
       expect.stringContaining('out of map bounds'),
     );
   });
+
+  it('accepts in-bounds decorations and maps with none', () => {
+    expect(validateMap(makeValidMap({})).valid).toBe(true);
+    const map = makeValidMap({
+      decorations: [{ x: 1, y: 1, w: 2, h: 1, texture: 'deco_test' }],
+    });
+    expect(validateMap(map).valid).toBe(true);
+  });
+
+  it('catches decoration rects that leave the map', () => {
+    const map = makeValidMap({
+      decorations: [{ x: 3, y: 1, w: 2, h: 1, texture: 'deco_test' }],
+    });
+    const result = validateMap(map);
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContainEqual(
+      expect.stringContaining('extends out of map bounds'),
+    );
+  });
+
+  it('catches decorations with non-positive size', () => {
+    const map = makeValidMap({
+      decorations: [{ x: 1, y: 1, w: 0, h: 1, texture: 'deco_test' }],
+    });
+    const result = validateMap(map);
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContainEqual(
+      expect.stringContaining('non-positive size'),
+    );
+  });
 });

@@ -78,6 +78,28 @@ export function validateMap(mapData: MapData): ValidationResult {
     }
   }
 
+  // Check decoration rects are sane and fully inside the map. Textures
+  // can't be validated here (they're a client concern); the renderer
+  // skips unknown keys.
+  for (const deco of mapData.decorations ?? []) {
+    if (deco.w < 1 || deco.h < 1) {
+      errors.push(
+        `Decoration "${deco.texture}" at (${deco.x}, ${deco.y}) has non-positive size ${deco.w}x${deco.h}`,
+      );
+      continue;
+    }
+    if (
+      deco.x < 0 ||
+      deco.y < 0 ||
+      deco.x + deco.w > mapData.width ||
+      deco.y + deco.h > mapData.height
+    ) {
+      errors.push(
+        `Decoration "${deco.texture}" rect (${deco.x}, ${deco.y}, ${deco.w}x${deco.h}) extends out of map bounds`,
+      );
+    }
+  }
+
   // Check all spawn points are reachable from each other (BFS flood fill)
   if (mapData.spawnPoints.length >= 2 && errors.length === 0) {
     const reachabilityErrors = checkSpawnReachability(mapData);
