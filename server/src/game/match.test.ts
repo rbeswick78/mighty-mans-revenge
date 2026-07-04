@@ -12,6 +12,9 @@ import {
   GRENADE,
   CHARACTER_IDS,
   ABILITY,
+  OVERTIME,
+  KOTH,
+  GameModeType,
 } from '@shared/game';
 import type { MapData, PlayerInput, MutatorId } from '@shared/game';
 
@@ -251,10 +254,14 @@ describe('Match', () => {
       expect(match.phase).toBe(MatchPhase.ENDED);
     });
 
-    it('should end when time runs out', () => {
+    it('should end when time runs out with a scoreboard leader', () => {
       match.startCountdown();
       match.update(MATCH.COUNTDOWN_DURATION + 0.1);
       expect(match.phase).toBe(MatchPhase.ACTIVE);
+
+      // Break the 0-0 tie first — a tied clock-out now enters overtime
+      // instead of ending (see the overtime describe block).
+      match.onKill('player-0', 'player-1', 'gun');
 
       // Run through the entire match time
       match.update(MATCH.TIME_LIMIT + 1);
@@ -1911,6 +1918,219 @@ describe('Match', () => {
           .find((p) => p.type === 'bandage')!;
         expect(bandage.isActive).toBe(true);
       });
+    });
+  });
+
+  describe('overtime (sudden death)', () => {
+    function startActiveMatchForOvertime(): Match {
+      const m = createMatch();
+      m.startCountdown();
+      m.update(MATCH.COUNTDOWN_DURATION + 0.05);
+      return m;
+    }
+
+    it('a tie at time-out enters overtime instead of ending', () => {
+      const m = startActiveMatchForOvertime();
+      // Run the clock out with scores 0-0, deaths 0-0 — a genuine tie.
+      m.update(MATCH.TIME_LIMIT + 1);
+
+      expect(m.phase).toBe(MatchPhase.ACTIVE);
+      expect(m.isOvertime).toBe(true);
+      expect(m.matchTimer).toBeCloseTo(OVERTIME.DURATION, 5);
+
+      // The one-shot announcement is queued exactly once.
+      expect(m.consumeTickOvertimeStart()).toEqual({
+        overtimeEndsInMs: OVERTIME.DURATION * 1000,
+      });
+      expect(m.consumeTickOvertimeStart()).toBeNull();
+    });
+
+    it('everyone gets a fresh single life at overtime start, dead players included', () => {
+      const m = startActiveMatchForOvertime();
+      m.update(MATCH.TIME_LIMIT - 1);
+      // Mutual kill just before the horn: scores 1-1, deaths 1-1, both dead.
+      m.onKill('player-0', 'player-1', 'gun');
+      m.onKill('player-1', 'player-0', 'gun');
+      m.update(1.5); // clock hits 0 while both are still down
+
+      expect(m.isOvertime).toBe(true);
+      for (const p of m.players.values()) {
+        expect(p.isDead).toBe(false);
+        expect(p.health).toBe(p.maxHealth);
+        expect(p.weaponId).toBe('rifle');
+      }
+    });
+
+    it('the first overtime kill ends the match immediately, killer wins', () => {
+      const m = startActiveMatchForOvertime();
+      m.update(MATCH.TIME_LIMIT + 1);
+      expect(m.isOvertime).toBe(true);
+
+      m.onKill('player-1', 'player-0', 'gun');
+      expect(m.checkMatchEnd()).toBe(true);
+      expect(m.phase).toBe(MatchPhase.ENDED);
+
+      const result = m.getResult();
+      expect(result.winnerId).toBe('player-1');
+      expect(result.wentToOvertime).toBe(true);
+    });
+
+    it('overtime expiring with no kill ends as a true draw', () => {
+      const m = startActiveMatchForOvertime();
+      m.update(MATCH.TIME_LIMIT + 1);
+      m.update(OVERTIME.DURATION + 1);
+
+      expect(m.phase).toBe(MatchPhase.ENDED);
+      const result = m.getResult();
+      expect(result.winnerId).toBeNull();
+      expect(result.wentToOvertime).toBe(true);
+      // Duration counts regulation plus the full overtime.
+      expect(result.duration).toBeCloseTo(MATCH.TIME_LIMIT + OVERTIME.DURATION, 5);
+    });
+
+    it('does not enter overtime when the scoreboard has a winner at time-out', () => {
+      const m = startActiveMatchForOvertime();
+      m.onKill('player-0', 'player-1', 'gun'); // 1-0
+      m.update(MATCH.TIME_LIMIT + 1);
+
+      expect(m.isOvertime).toBe(false);
+      expect(m.phase).toBe(MatchPhase.ENDED);
+      const result = m.getResult();
+      expect(result.winnerId).toBe('player-0');
+      expect(result.wentToOvertime).toBe(false);
+    });
+
+    it('freezes respawns during overtime (single life)', () => {
+      const m = startActiveMatchForOvertime();
+      m.update(MATCH.TIME_LIMIT + 1);
+      expect(m.isOvertime).toBe(true);
+
+      // Simulate the FFA no-kill-credit death path (no overtime winner set).
+      const p0 = m.players.get('player-0')!;
+      p0.isDead = true;
+      p0.respawnTimer = RESPAWN.DELAY;
+      m.update(RESPAWN.DELAY + 1);
+
+      expect(p0.isDead).toBe(true);
+      expect(p0.respawnTimer).toBe(RESPAWN.DELAY);
+    });
+
+    it('activates no new mutators during overtime', () => {
+      const m = startActiveMatchForOvertime();
+      m.update(0.05);
+      m.consumeTickMutatorWarnings();
+      m.consumeTickMutatorStarts();
+
+      // Mid-clock tie: both reach the kill target the same tick.
+      for (const p of m.players.values()) p.score = MATCH.KILL_TARGET;
+      m.checkMatchEnd();
+      expect(m.isOvertime).toBe(true);
+
+      // Ungated, both mutator slots would fire immediately (elapsed is deep
+      // past the mid-match window and matchTimer sits under the
+      // final-minute threshold).
+      let warnings = 0;
+      let starts = 0;
+      for (let i = 0; i < 100; i++) {
+        m.update(0.05);
+        warnings += m.consumeTickMutatorWarnings().length;
+        starts += m.consumeTickMutatorStarts().length;
+      }
+      expect(warnings).toBe(0);
+      expect(starts).toBe(0);
+    });
+  });
+
+  describe('KOTH mode integration', () => {
+    function makeKothMapData(): MapData {
+      return {
+        ...makeMapData(),
+        kothHills: [
+          { x: 4, y: 4 },
+          { x: 1, y: 1 },
+          { x: 7, y: 7 },
+        ],
+      };
+    }
+
+    function startActiveKothMatch(): Match {
+      const m = new Match(
+        'koth-1',
+        makeKothMapData(),
+        [
+          { id: 'player-0', nickname: 'P0' },
+          { id: 'player-1', nickname: 'P1' },
+        ],
+        GameModeType.KOTH,
+      );
+      m.startCountdown();
+      m.update(MATCH.COUNTDOWN_DURATION + 0.05);
+      return m;
+    }
+
+    it('broadcasts hill state and scores sole occupancy through the real tick', () => {
+      const m = startActiveKothMatch();
+      const initial = m.getKothHudState();
+      expect(initial).not.toBeNull();
+      expect(initial!.hill).toEqual({ x: 4, y: 4 });
+
+      // Park player-0 in the hill center (hill spans 192..288px), the
+      // opponent far outside.
+      const p0 = m.players.get('player-0')!;
+      const p1 = m.players.get('player-1')!;
+      p0.position = { x: 5 * 48, y: 5 * 48 };
+      p1.position = { x: 8.5 * 48, y: 1.5 * 48 };
+
+      for (let i = 0; i < 25; i++) m.update(0.05); // 1.25s
+      expect(p0.score).toBe(1);
+      expect(p1.score).toBe(0);
+      expect(m.getKothHudState()!.occupantId).toBe('player-0');
+    });
+
+    it('ends at the hill score target with the leader as winner', () => {
+      const m = startActiveKothMatch();
+      m.players.get('player-0')!.score = KOTH.SCORE_TARGET;
+
+      expect(m.checkMatchEnd()).toBe(true);
+      const result = m.getResult();
+      expect(result.gameMode).toBe(GameModeType.KOTH);
+      expect(result.winnerId).toBe('player-0');
+    });
+
+    it('retires the hill during overtime', () => {
+      const m = startActiveKothMatch();
+      // Park both players outside every declared hill so the clock can run
+      // out at 0-0 (a random spawn point may sit inside one).
+      for (const p of m.players.values()) {
+        p.position = { x: 8.5 * 48, y: 1.5 * 48 };
+      }
+      m.update(MATCH.TIME_LIMIT + 1); // 0-0 hill points → tie → overtime
+
+      expect(m.isOvertime).toBe(true);
+      expect(m.getKothHudState()).toBeNull();
+    });
+
+    it('deathmatch matches broadcast no koth state', () => {
+      const m = createMatch();
+      m.startCountdown();
+      m.update(MATCH.COUNTDOWN_DURATION + 0.05);
+      expect(m.getKothHudState()).toBeNull();
+    });
+
+    it('broadcasts no hill state before ACTIVE (onStart has not initialized hills)', () => {
+      const m = new Match(
+        'koth-cd',
+        makeKothMapData(),
+        [
+          { id: 'player-0', nickname: 'P0' },
+          { id: 'player-1', nickname: 'P1' },
+        ],
+        GameModeType.KOTH,
+      );
+      expect(m.getKothHudState()).toBeNull(); // character select
+      m.startCountdown();
+      m.update(0.05);
+      expect(m.getKothHudState()).toBeNull(); // countdown
     });
   });
 });

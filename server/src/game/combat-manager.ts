@@ -74,6 +74,15 @@ export class CombatManager {
     return this.grenades.find((g) => g.throwerId === playerId);
   }
 
+  /**
+   * Remove every in-flight grenade without detonating it. Used when the
+   * match enters sudden-death overtime — a leftover regulation grenade
+   * deciding the first-kill-wins duel would be nonsense.
+   */
+  clearGrenades(): void {
+    this.grenades = [];
+  }
+
   processShot(
     shooterId: PlayerId,
     aimAngle: number,

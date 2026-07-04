@@ -2,7 +2,15 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { MatchPhase, MATCH, MUTATORS, listMapNames } from '@shared/game';
+import {
+  MatchPhase,
+  MATCH,
+  MUTATORS,
+  OVERTIME,
+  listMapNames,
+  GameModeType,
+  GAME_MODE_ROTATION,
+} from '@shared/game';
 import type { PlayerId, ServerMessage } from '@shared/game';
 import { MatchmakingManager } from './matchmaking-manager.js';
 import { PersistentStatsStore } from '../persistence/persistent-stats-store.js';
@@ -235,6 +243,167 @@ describe('MatchmakingManager map rotation', () => {
     mgr.handleJoinMatchmaking('A', 'A');
     mgr.handleJoinMatchmaking('B', 'B');
     expect(matchFoundMapName('A')).toBe(listMapNames()[0]);
+  });
+});
+
+describe('MatchmakingManager mode rotation', () => {
+  let mgr: MatchmakingManager;
+  let sent: SentMessage[];
+
+  beforeEach(() => {
+    const { fake, sent: bucket } = makeFakeServer();
+    sent = bucket;
+    mgr = new MatchmakingManager(fake);
+  });
+
+  afterEach(() => {
+    delete process.env.FORCE_MODE;
+  });
+
+  function matchFoundMode(playerId: PlayerId): GameModeType {
+    const msg = sent.find(
+      (s) => s.playerId === playerId && s.message.type === 'server:matchFound',
+    );
+    if (!msg || msg.message.type !== 'server:matchFound') {
+      throw new Error(`no matchFound for ${playerId}`);
+    }
+    return msg.message.gameMode;
+  }
+
+  function endActiveMatch(): void {
+    const matches = mgr.getActiveMatches();
+    expect(matches).toHaveLength(1);
+    matches[0].phase = MatchPhase.ENDED;
+    mgr.tick(0.05, 1);
+  }
+
+  function lastMatchEndNextMode(): GameModeType | null {
+    const msgs = sent.filter((s) => s.message.type === 'server:matchEnd');
+    expect(msgs.length).toBeGreaterThan(0);
+    const last = msgs[msgs.length - 1];
+    if (last.message.type !== 'server:matchEnd') throw new Error('unreachable');
+    return last.message.result.nextGameMode;
+  }
+
+  it('fresh matches cycle DM → KOTH and wrap', () => {
+    const pairs: Array<[PlayerId, PlayerId]> = [
+      ['A', 'B'],
+      ['C', 'D'],
+      ['E', 'F'],
+    ];
+    pairs.forEach(([p1, p2], i) => {
+      sent.length = 0;
+      mgr.handleJoinMatchmaking(p1, p1);
+      mgr.handleJoinMatchmaking(p2, p2);
+      const expected = GAME_MODE_ROTATION[i % GAME_MODE_ROTATION.length];
+      expect(matchFoundMode(p1)).toBe(expected);
+      expect(matchFoundMode(p2)).toBe(expected);
+    });
+    expect(matchFoundMode('E')).toBe(GAME_MODE_ROTATION[0]); // wrapped
+  });
+
+  it('matchEnd promises the next mode and the rematch delivers it', () => {
+    mgr.handleJoinMatchmaking('A', 'A');
+    mgr.handleJoinMatchmaking('B', 'B');
+    expect(matchFoundMode('A')).toBe(GameModeType.DEATHMATCH);
+
+    endActiveMatch();
+    expect(lastMatchEndNextMode()).toBe(GameModeType.KOTH);
+    sent.length = 0;
+    mgr.handleRematchRequest('A');
+    mgr.handleRematchRequest('B');
+    expect(matchFoundMode('A')).toBe(GameModeType.KOTH);
+
+    // Chain wraps back to DM.
+    endActiveMatch();
+    expect(lastMatchEndNextMode()).toBe(GameModeType.DEATHMATCH);
+    sent.length = 0;
+    mgr.handleRematchRequest('A');
+    mgr.handleRematchRequest('B');
+    expect(matchFoundMode('A')).toBe(GameModeType.DEATHMATCH);
+  });
+
+  it('FORCE_MODE pins fresh matches, the promised next mode, and rematches', () => {
+    process.env.FORCE_MODE = GameModeType.KOTH;
+
+    mgr.handleJoinMatchmaking('A', 'A');
+    mgr.handleJoinMatchmaking('B', 'B');
+    expect(matchFoundMode('A')).toBe(GameModeType.KOTH);
+
+    endActiveMatch();
+    expect(lastMatchEndNextMode()).toBe(GameModeType.KOTH);
+    sent.length = 0;
+    mgr.handleRematchRequest('A');
+    mgr.handleRematchRequest('B');
+    expect(matchFoundMode('A')).toBe(GameModeType.KOTH);
+  });
+
+  it('ignores an unknown FORCE_MODE and falls back to rotation', () => {
+    process.env.FORCE_MODE = 'no_such_mode';
+    mgr.handleJoinMatchmaking('A', 'A');
+    mgr.handleJoinMatchmaking('B', 'B');
+    expect(matchFoundMode('A')).toBe(GAME_MODE_ROTATION[0]);
+  });
+
+  it('KOTH gameState snapshots carry hill state; DM ones do not', () => {
+    process.env.FORCE_MODE = GameModeType.KOTH;
+    const dt = 0.05;
+
+    mgr.handleJoinMatchmaking('A', 'A');
+    mgr.handleJoinMatchmaking('B', 'B');
+    mgr.handleCharacterLock('A', 'mighty_man');
+    mgr.handleCharacterLock('B', 'bruce');
+
+    const totalTicks = Math.ceil(MATCH.COUNTDOWN_DURATION / dt) + 10;
+    for (let i = 1; i <= totalTicks; i++) mgr.tick(dt, i);
+
+    const active = sent.filter(
+      (s) => s.message.type === 'server:gameState' && s.message.phase === MatchPhase.ACTIVE,
+    );
+    expect(active.length).toBeGreaterThan(0);
+    for (const { message } of active) {
+      if (message.type !== 'server:gameState') throw new Error('unreachable');
+      expect(message.koth).toBeDefined();
+      expect(message.koth!.hill).toBeDefined();
+      expect(message.isOvertime).toBe(false);
+    }
+  });
+
+  it('broadcasts overtimeStart and flags gameState when a tie runs out the clock', () => {
+    const dt = 0.05;
+    mgr.handleJoinMatchmaking('A', 'A');
+    mgr.handleJoinMatchmaking('B', 'B');
+    mgr.handleCharacterLock('A', 'mighty_man');
+    mgr.handleCharacterLock('B', 'bruce');
+
+    const toActive = Math.ceil(MATCH.COUNTDOWN_DURATION / dt) + 5;
+    for (let i = 1; i <= toActive; i++) mgr.tick(dt, i);
+
+    // Fast-forward the authoritative clock to the final moment; the 0-0
+    // scoreboard is a genuine tie when it expires.
+    const match = mgr.getActiveMatches()[0];
+    match.matchTimer = 0.06;
+    sent.length = 0;
+    mgr.tick(dt, toActive + 1);
+    mgr.tick(dt, toActive + 2);
+
+    const overtimeMsgs = sent.filter((s) => s.message.type === 'server:overtimeStart');
+    expect(overtimeMsgs.map((m) => m.playerId).sort()).toEqual(['A', 'B']);
+    for (const { message, reliable } of overtimeMsgs) {
+      if (message.type !== 'server:overtimeStart') throw new Error('unreachable');
+      expect(message.overtimeEndsInMs).toBe(OVERTIME.DURATION * 1000);
+      expect(reliable).toBe(true);
+    }
+
+    const lastState = [...sent]
+      .reverse()
+      .find((s) => s.message.type === 'server:gameState');
+    if (!lastState || lastState.message.type !== 'server:gameState') {
+      throw new Error('missing gameState');
+    }
+    expect(lastState.message.isOvertime).toBe(true);
+    expect(lastState.message.matchTimer).toBeLessThanOrEqual(OVERTIME.DURATION);
+    expect(lastState.message.matchTimer).toBeGreaterThan(OVERTIME.DURATION - 1);
   });
 });
 

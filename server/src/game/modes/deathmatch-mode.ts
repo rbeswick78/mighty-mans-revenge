@@ -45,7 +45,7 @@ export class DeathmatchMode implements GameMode {
       matchId: match.matchId,
       winnerId,
       playerStats,
-      duration: match.getTimeLimit() - match.matchTimer,
+      duration: match.getElapsedSeconds(),
       gameMode: GameModeType.DEATHMATCH,
       awards: computeAwards(
         playerStats,
@@ -55,16 +55,18 @@ export class DeathmatchMode implements GameMode {
       // folded this match in — the mode has no access to lifetime records.
       rivalry: null,
       // Also the matchmaking manager's job — modes know nothing about the
-      // map rotation.
+      // map/mode rotation.
       nextMapName: null,
+      nextGameMode: null,
+      wentToOvertime: match.isOvertime,
     };
   }
 
-  private determineWinner(match: MatchContext): PlayerId | null {
+  determineWinner(match: MatchContext): PlayerId | null {
     const players = Array.from(match.players.values());
     if (players.length === 0) return null;
 
-    // Sort by score descending, then by fewer deaths, then first to reach max
+    // Sort by score descending, then by fewer deaths.
     players.sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
       if (a.deaths !== b.deaths) return a.deaths - b.deaths;
@@ -74,12 +76,11 @@ export class DeathmatchMode implements GameMode {
     const top = players[0];
     const second = players[1];
 
-    // If there's a tie in score AND deaths, no winner
+    // Equal score AND equal deaths is a genuine tie — report it as one so
+    // the match flows into sudden-death overtime (and, if overtime also
+    // resolves nothing, ends as a true draw).
     if (second && top.score === second.score && top.deaths === second.deaths) {
-      // Tie-break: first to reach max score wins.
-      // Since we can't track that easily here, return the first player (arbitrary but deterministic).
-      // In practice the kill order matters - the player whose kill was processed first wins.
-      return top.id;
+      return null;
     }
 
     return top.id;

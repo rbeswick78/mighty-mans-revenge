@@ -2,6 +2,7 @@ import {
   MatchPhase,
   GameModeType,
   MATCH,
+  OVERTIME,
   RESPAWN,
   PLAYER,
   WEAPONS,
@@ -31,6 +32,7 @@ import type {
   MutatorId,
   CharacterId,
   WeaponId,
+  KothHudState,
   ServerCharacterSelectStateMessage,
 } from '@shared/game';
 import { logger } from '../utils/logger.js';
@@ -68,6 +70,8 @@ export class Match implements MatchContext {
   readonly stats: StatsTracker;
   readonly pickupManager: PickupManager;
   readonly mapManager: MapManager;
+  /** Mode this match runs — the matchmaking manager reads it for rotation. */
+  readonly gameModeType: GameModeType;
   private readonly gameMode: GameMode;
   private readonly killFeed: KillFeedEntry[] = [];
   readonly combatManager: CombatManager = new CombatManager();
@@ -131,6 +135,25 @@ export class Match implements MatchContext {
    * Overrides the game mode's scoreboard winner in getResult().
    */
   private forfeitWinnerId: PlayerId | null = null;
+  /**
+   * True from the moment a would-be tie sends the match into sudden-death
+   * overtime. Part of MatchContext — modes stop accruing score during it.
+   */
+  isOvertime = false;
+  /**
+   * The player whose kill decided overtime. Set by onKill during overtime;
+   * checkMatchEnd ends the match the same tick. Overrides the mode's
+   * scoreboard winner in getResult() (forfeit still outranks it).
+   */
+  private overtimeWinnerId: PlayerId | null = null;
+  /** One-shot overtime announcement to broadcast this tick. */
+  private _tickOvertimeStart: { overtimeEndsInMs: number } | null = null;
+  /**
+   * Regulation seconds played when overtime began. Usually TIME_LIMIT
+   * (time-out ties), but a simultaneous-kill tie at the score target can
+   * start overtime mid-clock.
+   */
+  private regulationElapsedAtOvertime = 0;
 
   /**
    * Mutator scheduling state — two slots per match, each with the same
@@ -178,6 +201,7 @@ export class Match implements MatchContext {
     this.stats = new StatsTracker();
     this.pickupManager = new PickupManager();
     this.mapManager = new MapManager();
+    this.gameModeType = gameModeType;
     this.gameMode = getGameMode(gameModeType);
 
     this.mapManager.loadMap(mapData);
@@ -397,6 +421,13 @@ export class Match implements MatchContext {
 
     this.gameMode.onKill(this, killerId, victimId);
 
+    // Sudden death: the first kill decides the match. checkMatchEnd ends
+    // it later this same tick, so the victim never sits dead-unrespawnable
+    // for more than one tick.
+    if (this.isOvertime && this.overtimeWinnerId === null && killerId !== victimId) {
+      this.overtimeWinnerId = killerId;
+    }
+
     const victim = this.players.get(victimId);
     if (victim) {
       victim.isDead = true;
@@ -445,9 +476,22 @@ export class Match implements MatchContext {
 
     let shouldEnd = false;
 
-    // Game mode says it's over (kill target reached or time out)
-    if (this.gameMode.isMatchOver(this)) {
+    if (this.isOvertime && this.overtimeWinnerId !== null) {
+      // Sudden death resolved — first kill wins, immediately.
       shouldEnd = true;
+    } else if (this.gameMode.isMatchOver(this)) {
+      // Game mode says it's over (score target reached or time out). A
+      // genuine tie gets ONE shot at sudden-death overtime instead of
+      // ending; a tie that survives overtime ends as a true draw.
+      if (
+        !this.isOvertime &&
+        this.players.size > 1 &&
+        this.gameMode.determineWinner(this) === null
+      ) {
+        this.enterOvertime();
+      } else {
+        shouldEnd = true;
+      }
     } else if (this.connectedPlayers.size <= 1 && this.players.size > 1) {
       // Only one player still connected: the match ends as a forfeit and
       // the win goes to whoever stayed, regardless of the scoreboard —
@@ -465,9 +509,35 @@ export class Match implements MatchContext {
     return false;
   }
 
+  /**
+   * Enter sudden-death overtime: reset the clock to OVERTIME.DURATION and
+   * give everyone a fresh single life — full health, rifle, fresh spawn.
+   * Respawning everyone (dead players included) keeps sudden death fair:
+   * a player who happened to be mid-respawn at the tie moment would
+   * otherwise start overtime with no life to play.
+   */
+  private enterOvertime(): void {
+    this.isOvertime = true;
+    this.regulationElapsedAtOvertime = MATCH.TIME_LIMIT - this.matchTimer;
+    this.matchTimer = OVERTIME.DURATION;
+    for (const player of this.players.values()) {
+      this.respawnPlayer(player);
+    }
+    // Nothing from regulation may decide the duel: no in-flight bursts,
+    // pump-racking, or live grenades carry over.
+    this.pendingBursts.clear();
+    this.rackingTimers.clear();
+    this.combatManager.clearGrenades();
+    this._tickOvertimeStart = { overtimeEndsInMs: OVERTIME.DURATION * 1000 };
+    logger.info({ matchId: this.matchId }, 'Match tied — entering sudden-death overtime');
+  }
+
   /** Build the match result. */
   getResult(): MatchResult {
     const result = this.gameMode.getResults(this);
+    if (this.overtimeWinnerId !== null) {
+      result.winnerId = this.overtimeWinnerId;
+    }
     if (this.forfeitWinnerId !== null) {
       result.winnerId = this.forfeitWinnerId;
     }
@@ -484,6 +554,41 @@ export class Match implements MatchContext {
 
   getTimeLimit(): number {
     return MATCH.TIME_LIMIT;
+  }
+
+  getMapData(): MapData {
+    return this.mapManager.getMapData();
+  }
+
+  /**
+   * Seconds of play so far, overtime included. matchTimer alone can't
+   * express this — entering overtime resets it to OVERTIME.DURATION.
+   */
+  getElapsedSeconds(): number {
+    return this.isOvertime
+      ? this.regulationElapsedAtOvertime + (OVERTIME.DURATION - this.matchTimer)
+      : MATCH.TIME_LIMIT - this.matchTimer;
+  }
+
+  /**
+   * King of the Hill HUD state for gameState broadcasts. Null for modes
+   * without a hill, during overtime (the hill is retired for sudden
+   * death), and outside ACTIVE — gameState also broadcasts during
+   * COUNTDOWN, before the mode's onStart has initialized its hills.
+   */
+  getKothHudState(): KothHudState | null {
+    if (this.isOvertime || this.phase !== MatchPhase.ACTIVE) return null;
+    return this.gameMode.getKothState?.(this) ?? null;
+  }
+
+  /**
+   * Consume the one-shot overtime announcement generated this tick (if
+   * any) for broadcasting. Returns null on subsequent calls.
+   */
+  consumeTickOvertimeStart(): { overtimeEndsInMs: number } | null {
+    const o = this._tickOvertimeStart;
+    this._tickOvertimeStart = null;
+    return o;
   }
 
   /** Bullet trails created in the most recent tick, for broadcasting. */
@@ -600,7 +705,12 @@ export class Match implements MatchContext {
       this.players,
     );
 
-    this.updateMutatorSchedule();
+    // No NEW mutator activations during overtime — resetting matchTimer to
+    // OVERTIME.DURATION would otherwise re-trip the final-minute
+    // thresholds mid-sudden-death. Mutators already active keep running.
+    if (!this.isOvertime) {
+      this.updateMutatorSchedule();
+    }
 
     const grid = this.mapManager.getCollisionGrid();
 
@@ -856,9 +966,11 @@ export class Match implements MatchContext {
       }
     }
 
-    // Update respawn timers for dead players
+    // Update respawn timers for dead players. Sudden-death overtime is
+    // single-life: the timer freezes and nobody comes back (in practice
+    // the first overtime death ends the match this same tick anyway).
     for (const player of this.players.values()) {
-      if (player.isDead && player.respawnTimer > 0) {
+      if (player.isDead && player.respawnTimer > 0 && !this.isOvertime) {
         player.respawnTimer -= dt;
         if (player.respawnTimer <= 0) {
           this.respawnPlayer(player);

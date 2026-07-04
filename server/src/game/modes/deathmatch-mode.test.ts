@@ -1,9 +1,36 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { DeathmatchMode } from './deathmatch-mode.js';
-import { MATCH, GameModeType } from '@shared/game';
-import type { PlayerId, PlayerState } from '@shared/game';
+import { MATCH, OVERTIME, TileType } from '@shared/game';
+import { GameModeType } from '@shared/game';
+import type { MapData, PlayerId, PlayerState } from '@shared/game';
 import { StatsTracker } from '../stats-tracker.js';
 import type { MatchContext } from './game-mode.js';
+
+/** Minimal valid-shaped map for MatchContext.getMapData in mode tests. */
+function makeTestMapData(kothHills?: { x: number; y: number }[]): MapData {
+  const width = 10;
+  const height = 8;
+  const tiles: TileType[][] = Array.from({ length: height }, (_, row) =>
+    Array.from({ length: width }, (_, col) =>
+      row === 0 || row === height - 1 || col === 0 || col === width - 1
+        ? TileType.WALL
+        : TileType.FLOOR,
+    ),
+  );
+  return {
+    name: 'Test Arena',
+    width,
+    height,
+    tileSize: 48,
+    tiles,
+    spawnPoints: [
+      { x: 1, y: 1 },
+      { x: 8, y: 6 },
+    ],
+    pickupSpawns: [],
+    ...(kothHills ? { kothHills } : {}),
+  };
+}
 
 function makePlayer(id: PlayerId, score = 0, deaths = 0): PlayerState {
   return {
@@ -42,6 +69,7 @@ function makePlayer(id: PlayerId, score = 0, deaths = 0): PlayerState {
 function makeContext(
   players: PlayerState[],
   matchTimer: number = MATCH.TIME_LIMIT,
+  isOvertime = false,
 ): MatchContext {
   const playerMap = new Map<PlayerId, PlayerState>();
   const stats = new StatsTracker();
@@ -51,14 +79,21 @@ function makeContext(
     stats.initPlayer(p.id);
   }
 
-  return {
+  const ctx: MatchContext = {
     matchId: 'test-match',
     matchTimer,
     players: playerMap,
     stats,
+    isOvertime,
     getKillTarget: () => MATCH.KILL_TARGET,
     getTimeLimit: () => MATCH.TIME_LIMIT,
+    getMapData: () => makeTestMapData(),
+    getElapsedSeconds: () =>
+      isOvertime
+        ? MATCH.TIME_LIMIT + (OVERTIME.DURATION - matchTimer)
+        : MATCH.TIME_LIMIT - matchTimer,
   };
+  return ctx;
 }
 
 describe('DeathmatchMode', () => {
@@ -140,15 +175,29 @@ describe('DeathmatchMode', () => {
       expect(result.winnerId).toBe('p2');
     });
 
-    it('should handle equal score and equal deaths', () => {
+    it('reports a genuine tie (equal score and deaths) as winnerId null', () => {
       const ctx = makeContext([
         makePlayer('p1', 5, 3),
         makePlayer('p2', 5, 3),
       ]);
 
-      // With identical stats, the first player in the sort wins (deterministic)
+      // A real tie flows into overtime (Match handles that); the mode must
+      // NOT invent an arbitrary winner.
       const result = mode.getResults(ctx);
-      expect(result.winnerId).toBeDefined();
+      expect(result.winnerId).toBeNull();
+      expect(mode.determineWinner(ctx)).toBeNull();
+    });
+
+    it('flags wentToOvertime and extends duration when the match is in overtime', () => {
+      const ctx = makeContext(
+        [makePlayer('p1', 5, 3), makePlayer('p2', 5, 3)],
+        OVERTIME.DURATION - 10,
+        true,
+      );
+
+      const result = mode.getResults(ctx);
+      expect(result.wentToOvertime).toBe(true);
+      expect(result.duration).toBe(MATCH.TIME_LIMIT + 10);
     });
 
     it('should calculate correct duration', () => {

@@ -1,6 +1,8 @@
 import {
   MatchPhase,
   GameModeType,
+  GAME_MODE_ROTATION,
+  getNextGameMode,
   getMap,
   getNextMapName,
   listMapNames,
@@ -42,6 +44,11 @@ interface PostMatchState {
    * agrees with the "NEXT MAP: X" line the results screen promised.
    */
   nextMapName: string;
+  /**
+   * Mode a rematch will be played in — same pinning contract as
+   * nextMapName.
+   */
+  nextGameMode: GameModeType;
 }
 
 export class MatchmakingManager {
@@ -76,6 +83,12 @@ export class MatchmakingManager {
    * pairing never repeat a map.
    */
   private mapRotationIndex = 0;
+  /**
+   * Same contract for game modes: fresh matches walk GAME_MODE_ROTATION
+   * with this cursor; rematches play the nextGameMode pinned in their
+   * PostMatchState.
+   */
+  private modeRotationIndex = 0;
 
   constructor(
     server: GameServer,
@@ -357,6 +370,30 @@ export class MatchmakingManager {
     return getMap(name);
   }
 
+  /**
+   * FORCE_MODE env override for manual smoke tests (mirrors FORCE_MAP):
+   * a valid mode id pins every match to that mode AND freezes the
+   * rotation. Invalid values are ignored with a warning.
+   */
+  private forcedMode(): GameModeType | null {
+    const forced = process.env.FORCE_MODE;
+    if (!forced) return null;
+    if (!(GAME_MODE_ROTATION as readonly string[]).includes(forced)) {
+      logger.warn({ forced, known: GAME_MODE_ROTATION }, 'Ignoring unknown FORCE_MODE');
+      return null;
+    }
+    return forced as GameModeType;
+  }
+
+  /** Next fresh-match mode: FORCE_MODE if set, else advance the rotation. */
+  private pickRotationMode(): GameModeType {
+    const forced = this.forcedMode();
+    if (forced) return forced;
+    const mode = GAME_MODE_ROTATION[this.modeRotationIndex % GAME_MODE_ROTATION.length];
+    this.modeRotationIndex++;
+    return mode;
+  }
+
   private tryCreateMatch(): void {
     const pair = this.queue.tryMatch();
     if (!pair) return;
@@ -364,13 +401,14 @@ export class MatchmakingManager {
     const { player1, player2 } = pair;
     const matchId = crypto.randomUUID();
     const mapData = this.pickRotationMap();
+    const gameMode = this.pickRotationMode();
 
     const playerEntries = [
       { id: player1.playerId, nickname: player1.nickname },
       { id: player2.playerId, nickname: player2.nickname },
     ];
 
-    const match = new Match(matchId, mapData, playerEntries, GameModeType.DEATHMATCH);
+    const match = new Match(matchId, mapData, playerEntries, gameMode);
     match.setRttResolver(this.getPlayerRTT);
     this.activeMatches.set(matchId, match);
     this.playerMatchMap.set(player1.playerId, matchId);
@@ -382,6 +420,7 @@ export class MatchmakingManager {
         player1: player1.playerId,
         player2: player2.playerId,
         map: mapData.name,
+        gameMode,
       },
       'Match created',
     );
@@ -392,6 +431,7 @@ export class MatchmakingManager {
       matchId,
       opponents: [{ id: player2.playerId, nickname: player2.nickname }],
       mapName: mapData.name,
+      gameMode,
     }, { reliable: true });
 
     this.server.sendTo(player2.playerId, {
@@ -399,6 +439,7 @@ export class MatchmakingManager {
       matchId,
       opponents: [{ id: player1.playerId, nickname: player1.nickname }],
       mapName: mapData.name,
+      gameMode,
     }, { reliable: true });
 
     // Send matchmaking status update
@@ -495,6 +536,8 @@ export class MatchmakingManager {
       bulletTrails: match.getTickBulletTrails(),
       pickups: match.pickupManager.getPickups(),
       activeMutators: [...match.activeMutators],
+      isOvertime: match.isOvertime,
+      koth: match.getKothHudState() ?? undefined,
     };
 
     // Send only to players in this match
@@ -576,18 +619,35 @@ export class MatchmakingManager {
         }, { reliable: true });
       }
     }
+
+    // Broadcast the one-shot overtime announcement. Reliable: it carries
+    // the clock re-anchor and the banner beat — a drop would leave the
+    // client's countdown stuck at 0:00 until the next snapshot fixes it.
+    const overtimeStart = match.consumeTickOvertimeStart();
+    if (overtimeStart) {
+      for (const [playerId] of match.players) {
+        this.server.sendTo(playerId, {
+          type: 'server:overtimeStart',
+          overtimeEndsInMs: overtimeStart.overtimeEndsInMs,
+        }, { reliable: true });
+      }
+    }
   }
 
   private onMatchEnded(matchId: string, match: Match): void {
     const result = match.getResult();
 
-    // Rotation: a rematch plays the map AFTER this one (registry order).
-    // Attached to the result so the results screen's "NEXT MAP: X" line
-    // and the map the rematch actually starts on can never disagree.
+    // Rotation: a rematch plays the map AND mode AFTER this one (registry/
+    // rotation order). Attached to the result so the results screen's
+    // "NEXT: X" promises and what the rematch actually starts can never
+    // disagree.
     const nextMapName =
       this.forcedMap()?.name ??
       getNextMapName(match.mapManager.getMapData().name);
     result.nextMapName = nextMapName;
+    const nextGameMode =
+      this.forcedMode() ?? getNextGameMode(match.gameModeType);
+    result.nextGameMode = nextGameMode;
 
     // Fold this match into the lifetime records and attach the pairing's
     // all-time rivalry line before shipping the result. The in-memory
@@ -651,6 +711,7 @@ export class MatchmakingManager {
       returnedToLobby: new Set(),
       timeoutHandle,
       nextMapName,
+      nextGameMode,
     });
 
     // Remove from active matches
@@ -689,15 +750,16 @@ export class MatchmakingManager {
     clearTimeout(postMatch.timeoutHandle);
 
     const matchId = crypto.randomUUID();
-    // The map promised on the results screen ("NEXT MAP: X").
+    // The map and mode promised on the results screen ("NEXT: X").
     const mapData = getMap(postMatch.nextMapName);
+    const gameMode = postMatch.nextGameMode;
 
     const playerEntries = postMatch.playerIds.map((pid) => ({
       id: pid,
       nickname: this.playerNicknames.get(pid) ?? `Player_${pid.slice(0, 4)}`,
     }));
 
-    const match = new Match(matchId, mapData, playerEntries, GameModeType.DEATHMATCH);
+    const match = new Match(matchId, mapData, playerEntries, gameMode);
     match.setRttResolver(this.getPlayerRTT);
     this.activeMatches.set(matchId, match);
 
@@ -731,6 +793,7 @@ export class MatchmakingManager {
         matchId,
         opponents,
         mapName: mapData.name,
+        gameMode,
       }, { reliable: true });
     }
 
