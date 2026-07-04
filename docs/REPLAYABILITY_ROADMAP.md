@@ -603,6 +603,15 @@ zero page errors on both clients across both viewports.
   built from older code. Kill anything on 3000/3001/5173 before every
   e2e run, not just at session start (cost a full debug cycle this
   session).
+- **Deploys NOT run this session:** the auto-mode permission classifier
+  blocked the Firebase hosting deploy (and would block the GCE ssh the
+  same way — same as Session 4). All commits are pushed to origin/main
+  and the client bundle builds clean — run the two deploy commands from
+  CLAUDE.md → Deployment in an interactive session, then
+  `curl http://34.24.140.207:3001/health` and play a match at
+  https://mighty-mans-revenge.web.app. Both clients must refresh
+  together after the deploy: old clients don't know the new
+  characterIds or the gameState `axes` field.
 
 ### Session 5 — 2026-07-04 — King of the Hill + overtime
 
