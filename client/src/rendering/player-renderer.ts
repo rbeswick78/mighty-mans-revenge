@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import type { PlayerState } from '@shared/types/player.js';
-import { CHARACTERS, type CharacterId, type WeaponId } from '@shared/config/game.js';
+import { CHARACTERS, MUTATORS, type CharacterId, type WeaponId } from '@shared/config/game.js';
 import { Wasteland, cssHex, healthColor } from '@shared/config/palette.js';
 import { bucketAimAngle, type Direction4 } from './sprite-direction.js';
 
@@ -114,6 +114,8 @@ export class PlayerRenderer {
   private frozenCrystalGraphics: Phaser.GameObjects.Graphics | null = null;
   /** Last frozen-state edge so we only flip tint on transitions. */
   private wasFrozen = false;
+  /** Extra sprite scale while the big_heads mutator is active (1 otherwise). */
+  private renderScaleMultiplier = 1;
 
   constructor(scene: Phaser.Scene, characterId: CharacterId) {
     this.scene = scene;
@@ -388,6 +390,21 @@ export class PlayerRenderer {
   /** Whether this character renders a held gun (and matching muzzle flash). */
   rendersGun(): boolean {
     return this.gunSprite !== null;
+  }
+
+  /**
+   * Toggle the big_heads render scale. Scales only the body/weapon art —
+   * the health bar and nickname stay put, and the matching hitbox scale
+   * lives server-side (hit validation) plus the aim-line preview.
+   */
+  setBigHeads(active: boolean): void {
+    const multiplier = active ? MUTATORS.BIG_HEADS_RENDER_SCALE : 1;
+    if (multiplier === this.renderScaleMultiplier) return;
+    this.renderScaleMultiplier = multiplier;
+    const scale = SPRITE_SCALE * multiplier;
+    this.sprite.setScale(scale);
+    this.gunSprite?.setScale(scale);
+    this.wandGraphics?.setScale(scale);
   }
 
   updateHealthBar(health: number, maxHealth: number): void {

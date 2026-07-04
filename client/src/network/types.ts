@@ -41,4 +41,5 @@ export interface InterpolatedState {
   abilityActiveSeconds: number;
   abilityCooldownSeconds: number;
   frozenTimer: number;
+  secondWindTimer: number;
 }

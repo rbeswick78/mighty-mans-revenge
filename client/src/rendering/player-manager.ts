@@ -6,9 +6,16 @@ import { PlayerRenderer } from './player-renderer.js';
 export class ClientPlayerManager {
   private scene: Phaser.Scene;
   private renderers: Map<string, PlayerRenderer> = new Map();
+  /** big_heads mutator flag — applied to every renderer each update. */
+  private bigHeadsActive = false;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
+  }
+
+  /** Toggle the big_heads render scale for all players (current and future). */
+  setBigHeads(active: boolean): void {
+    this.bigHeadsActive = active;
   }
 
   updatePlayers(
@@ -31,6 +38,7 @@ export class ClientPlayerManager {
       }
 
       // Convert SerializedPlayerState to a shape update expects
+      renderer.setBigHeads(this.bigHeadsActive);
       renderer.setPosition(playerState.position.x, playerState.position.y);
       renderer.setAimAngle(playerState.aimAngle);
       renderer.updateHealthBar(playerState.health, PLAYER.MAX_HEALTH);

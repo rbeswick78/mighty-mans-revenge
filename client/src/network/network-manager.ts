@@ -6,11 +6,10 @@ import type { PickupState } from '@shared/types/pickup.js';
 import type {
   ServerMessage,
   ServerGameStateMessage,
-  FinalMinuteEvent,
 } from '@shared/types/network.js';
 import { MatchPhase } from '@shared/types/game.js';
-import { SERVER, type CharacterId } from '@shared/config/game.js';
-import { eventToMovementModifiers } from '@shared/utils/event-modifiers.js';
+import { SERVER, type CharacterId, type MutatorId } from '@shared/config/game.js';
+import { mutatorsToMovementModifiers } from '@shared/utils/event-modifiers.js';
 import { NetworkConnection } from './connection.js';
 import { ClientPrediction } from './prediction.js';
 import { ServerReconciliation } from './reconciliation.js';
@@ -87,12 +86,12 @@ export class NetworkManager {
   private matchEndsAtLocalMs: number | null = null;
 
   /**
-   * The active final-minute event, or null. Driven authoritatively from
-   * ServerGameStateMessage.activeEvent (every snapshot) and bumped early
-   * by ServerEventStartMessage so the modifier engages on the same frame
-   * the banner shows.
+   * All currently active mutators, in activation order. Driven
+   * authoritatively from ServerGameStateMessage.activeMutators (every
+   * snapshot) and bumped early by ServerEventStartMessage so each
+   * modifier engages on the same frame its banner shows.
    */
-  private _activeEvent: FinalMinuteEvent | null = null;
+  private _activeMutators: MutatorId[] = [];
 
   private listeners = new Map<EventName, EventCallback[]>();
 
@@ -127,12 +126,12 @@ export class NetworkManager {
     this.localPlayerId = null;
     this.localPlayerState = null;
     this.matchEndsAtLocalMs = null;
-    this._activeEvent = null;
+    this._activeMutators = [];
   }
 
-  /** The currently active final-minute event, or null if none. */
-  getActiveEvent(): FinalMinuteEvent | null {
-    return this._activeEvent;
+  /** Currently active mutators, in activation order (empty if none). */
+  getActiveMutators(): readonly MutatorId[] {
+    return this._activeMutators;
   }
 
   /**
@@ -146,14 +145,19 @@ export class NetworkManager {
 
     if (!this.localPlayerState || !this.collisionGrid) return;
 
-    // Predict locally using shared physics, applying the active event's
-    // movement modifier so prediction matches server authority during e.g.
-    // super_speed.
+    // Predict locally using shared physics, applying the active mutators'
+    // movement modifiers so prediction matches server authority during
+    // e.g. super_speed or a second_wind respawn boost. The boost timer
+    // comes from the last snapshot — the server consumes the same value
+    // when it processes this input, so the two stay aligned.
     const predicted = this.prediction.predictInput(
       input,
       this.localPlayerState,
       this.collisionGrid,
-      eventToMovementModifiers(this._activeEvent),
+      mutatorsToMovementModifiers(
+        this._activeMutators,
+        this.localPlayerState.secondWindTimer,
+      ),
     );
 
     this.prediction.addPrediction(input, predicted);
@@ -322,17 +326,23 @@ export class NetworkManager {
 
       case 'server:matchEnd':
         this.matchEndsAtLocalMs = null;
-        this._activeEvent = null;
+        this._activeMutators = [];
         this.emit('matchEnd', msg);
         break;
 
       case 'server:eventWarning':
-        this.emit('eventWarning', { event: msg.event, activatesInMs: msg.activatesInMs });
+        this.emit('eventWarning', {
+          event: msg.event,
+          activatesInMs: msg.activatesInMs,
+          isFinalMinute: msg.isFinalMinute,
+        });
         break;
 
       case 'server:eventStart':
-        this._activeEvent = msg.event;
-        this.emit('eventStart', { event: msg.event });
+        if (!this._activeMutators.includes(msg.event)) {
+          this._activeMutators.push(msg.event);
+        }
+        this.emit('eventStart', { event: msg.event, isFinalMinute: msg.isFinalMinute });
         break;
 
       case 'server:weaponIncoming':
@@ -408,9 +418,10 @@ export class NetworkManager {
     }
     this.latestGrenades = msg.grenades;
     this.latestPickups = msg.pickups;
-    // Server is authoritative for the active event. Mirror every snapshot
-    // so reconnects pick up the modifier without an extra round-trip.
-    this._activeEvent = msg.activeEvent;
+    // Server is authoritative for the active mutators. Mirror every
+    // snapshot so reconnects pick up the modifiers without an extra
+    // round-trip.
+    this._activeMutators = msg.activeMutators;
 
     // Re-anchor the match clock from every active-phase snapshot. The
     // initial anchor came from ServerMatchStartMessage; this corrects
@@ -479,7 +490,7 @@ export class NetworkManager {
       serverState,
       predictions,
       this.collisionGrid,
-      eventToMovementModifiers(this._activeEvent),
+      mutatorsToMovementModifiers(this._activeMutators, serverState.secondWindTimer),
     );
 
     this.applyReconciledLocalState(serverState, result);
@@ -529,6 +540,9 @@ export class NetworkManager {
       // player's prediction next tick respects the lockout via the shared
       // calculateMovement frozen modifier.
       frozenTimer: serverState.frozenTimer,
+      // second_wind boost timer — forwarded so the next predictInput
+      // applies the same speed multiplier the server will.
+      secondWindTimer: serverState.secondWindTimer,
     };
 
     const dx = result.position.x - previousPosition.x;
@@ -581,6 +595,7 @@ export class NetworkManager {
       abilityCooldownSeconds: s.abilityCooldownSeconds,
       abilityLockedAim: 0,
       frozenTimer: s.frozenTimer,
+      secondWindTimer: s.secondWindTimer,
     };
   }
 

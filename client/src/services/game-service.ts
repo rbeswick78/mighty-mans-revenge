@@ -6,18 +6,20 @@ import type {
   ServerMatchmakingStatusMessage,
   ServerPlayerKilledMessage,
   ServerCharacterSelectStateMessage,
-  FinalMinuteEvent,
 } from '@shared/types/network.js';
-import type { CharacterId, WeaponId } from '@shared/config/game.js';
+import type { CharacterId, WeaponId, MutatorId } from '@shared/config/game.js';
 import { NetworkManager, type LocalCorrection } from '../network/network-manager.js';
 
 export interface EventWarningPayload {
-  event: FinalMinuteEvent;
+  event: MutatorId;
   activatesInMs: number;
+  /** True for the guaranteed final-minute slot, false for mid-match. */
+  isFinalMinute: boolean;
 }
 
 export interface EventStartPayload {
-  event: FinalMinuteEvent;
+  event: MutatorId;
+  isFinalMinute: boolean;
 }
 
 /** "SHOTGUN INCOMING" — a weapon pickup is about to (re)spawn. */

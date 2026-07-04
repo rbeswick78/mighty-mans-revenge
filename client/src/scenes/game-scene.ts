@@ -23,7 +23,8 @@ import { KillJuice } from '../rendering/kill-juice.js';
 import { HealFlash } from '../rendering/heal-flash.js';
 import { EventFlash } from '../rendering/event-flash.js';
 import { eventDisplayName } from '@shared/utils/event-modifiers.js';
-import type { FinalMinuteEvent, SerializedPlayerState } from '@shared/types/network.js';
+import type { SerializedPlayerState } from '@shared/types/network.js';
+import { MUTATORS, type MutatorId } from '@shared/config/game.js';
 import type {
   EventStartPayload,
   EventWarningPayload,
@@ -174,7 +175,8 @@ export class GameScene extends Phaser.Scene {
    */
   private lastShotgunBlastAt: Map<PlayerId, number> = new Map();
   /** Cached so we can detect changes (incl. mid-match-join) and resync the label. */
-  private lastSyncedActiveEvent: FinalMinuteEvent | null = null;
+  /** Joined display names of the synced active mutators, or null when none. */
+  private lastSyncedMutatorLabel: string | null = null;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -392,6 +394,7 @@ export class GameScene extends Phaser.Scene {
           abilityActiveSeconds: currentLocalState.abilityActiveSeconds,
           abilityCooldownSeconds: currentLocalState.abilityCooldownSeconds,
           frozenTimer: currentLocalState.frozenTimer,
+          secondWindTimer: currentLocalState.secondWindTimer,
         }];
 
         // Add interpolated remote players
@@ -423,6 +426,7 @@ export class GameScene extends Phaser.Scene {
             abilityActiveSeconds: interpState.abilityActiveSeconds,
             abilityCooldownSeconds: interpState.abilityCooldownSeconds,
             frozenTimer: interpState.frozenTimer,
+            secondWindTimer: interpState.secondWindTimer,
           });
         }
 
@@ -457,6 +461,12 @@ export class GameScene extends Phaser.Scene {
           if (!seenIds.has(id)) this.prevDeadStates.delete(id);
         }
 
+        // big_heads: scale every player sprite up while active (visual
+        // only — the matching hitbox scale lives in server validation and
+        // the aim-line preview).
+        this.playerManager.setBigHeads(
+          networkManager.getActiveMutators().includes('big_heads'),
+        );
         this.playerManager.updatePlayers(allPlayers, playerId);
 
         // Ability VFX. Fire cone for any active Bruce; screen-edge border +
@@ -553,13 +563,19 @@ export class GameScene extends Phaser.Scene {
           this.beginEndTransition();
         }
 
-        // Sync the persistent active-event label. The eventStart handler
-        // also sets this, but mid-match joiners only learn the active event
-        // through snapshots, so polling here covers that case too.
-        const activeEvent = networkManager.getActiveEvent();
-        if (activeEvent !== this.lastSyncedActiveEvent) {
-          this.lastSyncedActiveEvent = activeEvent;
-          this.hud.setActiveEventLabel(activeEvent ? eventDisplayName(activeEvent) : null);
+        // Sync the persistent active-mutator label. The eventStart handler
+        // also sets this, but mid-match joiners only learn active mutators
+        // through snapshots, so polling here covers that case too. With
+        // two mutators stacked (mid-match + final-minute) the label joins
+        // both names.
+        const activeMutators = networkManager.getActiveMutators();
+        const mutatorLabel =
+          activeMutators.length > 0
+            ? activeMutators.map(eventDisplayName).join(' + ')
+            : null;
+        if (mutatorLabel !== this.lastSyncedMutatorLabel) {
+          this.lastSyncedMutatorLabel = mutatorLabel;
+          this.hud.setActiveEventLabel(mutatorLabel);
         }
       }
     }
@@ -632,6 +648,11 @@ export class GameScene extends Phaser.Scene {
       // current/interpolated positions so the preview matches what the
       // server will see at firing time.
       const players = this.collectPlayersForAim(localState, networkManager);
+      // Mirror the server's big_heads hit-validation scale so the preview
+      // marks hits the server will actually count.
+      const hitboxScale = networkManager.getActiveMutators().includes('big_heads')
+        ? MUTATORS.BIG_HEADS_HITBOX_SCALE
+        : 1;
       const aim = predictBulletRay(
         localState.id,
         localState.position,
@@ -640,6 +661,7 @@ export class GameScene extends Phaser.Scene {
         grid,
         piercing,
         WEAPONS[localState.weaponId],
+        hitboxScale,
       );
       this.effectsRenderer.showBulletAim(
         localState.position.x,
@@ -649,6 +671,13 @@ export class GameScene extends Phaser.Scene {
         localState.ammo === 0,
       );
     } else if (raw.aimingGrenade) {
+      // turbo_grenades: preview at the boosted throw speed so the arc
+      // matches the server's actual flight.
+      const grenadeSpeedMultiplier = networkManager
+        .getActiveMutators()
+        .includes('turbo_grenades')
+        ? MUTATORS.TURBO_GRENADES_SPEED_MULTIPLIER
+        : 1;
       const path = predictGrenadePath(
         localState.position,
         raw.aimAngle,
@@ -656,6 +685,7 @@ export class GameScene extends Phaser.Scene {
         undefined,
         undefined,
         piercing,
+        grenadeSpeedMultiplier,
       );
       this.effectsRenderer.showGrenadeAim(path, localState.grenades === 0);
     } else {
@@ -706,6 +736,7 @@ export class GameScene extends Phaser.Scene {
         abilityCooldownSeconds: 0,
         abilityLockedAim: 0,
         frozenTimer: interp.frozenTimer,
+        secondWindTimer: interp.secondWindTimer,
       });
     }
     return players;
@@ -1015,16 +1046,23 @@ export class GameScene extends Phaser.Scene {
     // Per-event tint, kept in lock-step with EventFlash so the banner color
     // matches the screen flash. Picked for high contrast against the
     // wasteland palette.
-    const EVENT_BANNER_COLORS: Record<FinalMinuteEvent, number> = {
+    const EVENT_BANNER_COLORS: Record<MutatorId, number> = {
       super_speed: 0xfff200,
       grenades_only: 0xff8a00,
       infinite_ammo: 0x39c5ff,
       low_health: 0xff2e3a,
+      big_heads: 0xff7ae0,
+      vampire: 0x9b30d9,
+      turbo_grenades: 0x7cff4f,
+      second_wind: 0x4fe3c1,
     };
 
     this.onEventWarning = (payload: EventWarningPayload) => {
       const name = eventDisplayName(payload.event);
-      this.hud?.showEventBanner('FINAL MINUTE INCOMING', name, EVENT_BANNER_COLORS[payload.event]);
+      const headline = payload.isFinalMinute
+        ? 'FINAL MINUTE INCOMING'
+        : 'MUTATOR INCOMING';
+      this.hud?.showEventBanner(headline, name, EVENT_BANNER_COLORS[payload.event]);
       AudioManager.getInstance()?.play('matchStartHorn');
     };
 
@@ -1223,7 +1261,7 @@ export class GameScene extends Phaser.Scene {
     }
     this.healFlash = null;
     this.eventFlash = null;
-    this.lastSyncedActiveEvent = null;
+    this.lastSyncedMutatorLabel = null;
     if (this.impactFx) {
       this.impactFx.destroy();
       this.impactFx = null;

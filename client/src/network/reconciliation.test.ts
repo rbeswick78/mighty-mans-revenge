@@ -34,6 +34,7 @@ function makePlayerState(overrides: Partial<PlayerState> = {}): PlayerState {
     abilityCooldownSeconds: 0,
     abilityLockedAim: 0,
     frozenTimer: 0,
+    secondWindTimer: 0,
     ...overrides,
   };
 }
@@ -67,6 +68,7 @@ function makeServerState(
     abilityActiveSeconds: 0,
     abilityCooldownSeconds: 0,
     frozenTimer: 0,
+    secondWindTimer: 0,
     ...overrides,
   };
 }
