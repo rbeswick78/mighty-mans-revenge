@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–2 complete (weapons, awards + persistent rivalry stats). Next up: **Session 3**.
+- **Status:** Sessions 1–3 complete (weapons, awards + rivalry stats, mutator expansion). Next up: **Session 4**.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -34,7 +34,7 @@ Each session below attacks one of these.
 |---|-------|-----------|--------|
 | 1 | Weapon system + Shotgun + health pickups | Fights stop being identical; map control begins | **DONE** (2026-07-04) |
 | 2 | Match awards + persistent rivalry stats | Bragging rights: the friend-group replay engine | **DONE** (2026-07-04) |
-| 3 | Mutator expansion | Matches stop repeating; chaos moments | not started |
+| 3 | Mutator expansion | Matches stop repeating; chaos moments | **DONE** (2026-07-04) |
 | 4 | Two new maps + rotation | New spaces to master | not started |
 | 5 | King of the Hill + overtime | A second way to play; no more anticlimactic ties | not started |
 | 6 | New characters + stat identities | Counterpicks and mains | not started |
@@ -311,13 +311,13 @@ fire at random times, and grow the pool, so no two matches feel alike.
 
 **Acceptance criteria**
 
-- [ ] Mid-match mutator fires at a random (seeded-in-tests) time with
+- [x] Mid-match mutator fires at a random (seeded-in-tests) time with
       warning; final-minute event unchanged; no duplicate mutator per match.
-- [ ] `big_heads` scales both hit validation and rendering; a shot that
+- [x] `big_heads` scales both hit validation and rendering; a shot that
       misses a normal hitbox hits a big one (server test).
-- [ ] `second_wind` produces identical movement client/server (no
+- [x] `second_wind` produces identical movement client/server (no
       reconciliation snap in manual test).
-- [ ] All mutators covered by deterministic unit tests; HUD banner names
+- [x] All mutators covered by deterministic unit tests; HUD banner names
       via `eventDisplayName`.
 
 **Parallelizable workstreams:** (a) timing/scheduler + pool refactor,
@@ -488,6 +488,81 @@ to be specced properly when its turn comes:
 
 Append one entry per session. Include: date, what shipped (commits), design
 deviations from this doc, known issues, tuning notes from play-testing.
+
+### Session 3 — 2026-07-04 — Mutator expansion
+
+**Shipped:** the final-minute event system generalized into a two-slot
+mutator scheduler (`server/src/game/match.ts`): one mid-match activation
+at a random time in the 40–70% elapsed window (rolled from the match's
+injectable rng at the COUNTDOWN→ACTIVE transition) plus the guaranteed
+final-minute event on its unchanged 65s/60s thresholds, each with a 5s
+warning banner, no repeats per match. Pool grown from 4 to 8:
+`big_heads` (hit-validation AABB ×1.5 server-side + aim-line preview,
+sprite render ×1.3), `vampire` (attacker heals 50% of damage dealt —
+rifle, pellets, grenades, fire-breath; never self; capped at maxHealth),
+`turbo_grenades` (throw speed ×1.5 incl. the client preview arc, +1
+grenade per 5s up to max), `second_wind` (1.3× speed for 3s after
+respawn via a new `secondWindTimer` on PlayerState, applied through the
+shared `mutatorsToMovementModifiers`). All constants in
+`shared/src/config/game.ts` under `MUTATORS`.
+
+**Design decisions made in-session (roadmap was silent):**
+- **Mutators stack.** The 70% window edge (51.9s remaining at
+  TIME_LIMIT 173) lies inside the final minute, so both slots can be
+  live at once — active state is an ordered list (`activeMutators` in
+  the gameState message, replacing `activeEvent`). Both run to match
+  end. Composition rules: speed multipliers multiply (super_speed ×
+  second_wind = 2.08×), grenade regen takes the fastest active interval,
+  grenades_only's gun gate wins over infinite_ammo, low_health's 1-HP
+  cap makes vampire moot but harmless. HUD label joins both names
+  ("BIG HEADS + SUPER SPEED").
+- `FinalMinuteEvent` renamed to `MutatorId`, now derived from
+  `MUTATORS.POOL` in shared config (no legacy alias, same as the
+  Session 1 `GUN`→`WEAPONS` migration).
+- `server:eventWarning`/`server:eventStart` gained `isFinalMinute` —
+  drives the "MUTATOR INCOMING" vs "FINAL MINUTE INCOMING" headline and
+  lets the clock-alignment regression test filter out the mid-match
+  start. Wire type names kept (`eventWarning`/`eventStart`).
+- `FORCE_EVENT` still pins the FINAL-MINUTE pick (its old semantics —
+  the matchmaking clock test depends on it); new `FORCE_MIDMATCH_MUTATOR`
+  pins the mid-match pick. The random mid-match draw excludes
+  FORCE_EVENT's value so a forced final pick can't be stolen.
+- second_wind client/server parity: the boost timer is broadcast in
+  every snapshot and fed to the same shared modifier function on both
+  sides. Prediction consumes the last-snapshot value, which matches the
+  server's processing order exactly in steady state; at the expiry
+  boundary the worst-case divergence is ~RTT/2 of 30% extra speed
+  (a few px, absorbed by the smooth-correction lerp, far under the 50px
+  snap threshold). Unit tests assert the 1.3× movement server-side and
+  the modifier composition shared-side.
+- big_heads scales the victim-hitbox term everywhere hits are
+  validated (rifle rays, shotgun pellets through lag-comp rewind,
+  fire-breath cone) but NOT movement collision or pickup radii, per the
+  spec's "movement untouched".
+- `ice_rink` stretch skipped, as the roadmap sanctioned — an
+  acceleration/friction model can't be expressed in the current shared
+  `calculateMovement` without forking prediction physics (the
+  rubber-banding landmine the spec warned about).
+
+**Verified:** 475 unit tests green (three consecutive full runs), full
+Playwright e2e suite green (desktop-chromium/firefox + mobile-landscape),
+plus a throwaway two-client Playwright drive-through with
+`FORCE_MIDMATCH_MUTATOR=big_heads`: mid-match banner fired ~59% elapsed,
+both clients synced the HUD label, sprites visibly scaled on both ends,
+no snap/rubber-banding while moving, screenshots eyeballed. Spec deleted
+after the run.
+
+**Known issues / notes for later sessions:**
+- Mutator activation VFX is the existing flash + banner + horn; no
+  per-mutator world VFX (e.g. no heal number popups for vampire). Cheap
+  polish later — HealFlash exists and could fire on vampire heals.
+- The mid-match roll is uniform per match; across a rematch session the
+  same mutator can recur match-over-match (only within-match repeats are
+  prevented). If the group notices, add a per-pairing recent-mutator
+  memory in a later session.
+- A stray Vite dev server on 5173 hijacked e2e AGAIN this session —
+  killed PID before the suite. The gotcha note in Session 2's log
+  stands.
 
 ### Session 2 — 2026-07-04 — Match awards + persistent rivalry stats
 
