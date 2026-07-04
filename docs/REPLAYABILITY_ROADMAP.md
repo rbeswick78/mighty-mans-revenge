@@ -472,17 +472,162 @@ character and two new roster members with ability art from the pack.
 
 ## Session 7 — (Stretch) Gun Game + Pistol + melee
 
-Only start this once 1–6 are live and the group still wants more. Sketch,
-to be specced properly when its turn comes:
+**Goal:** the party mode — a third rotation mode where every kill marches
+you down a weapon ladder ending in bare fists, plus the two attacks that
+ladder needs: a Pistol and a Punch melee.
 
-- **Pistol** weapon from the pack (fast fire, low damage, infinite reserve?)
-  — completes the weapon triad.
-- **Punch** melee using `Character/Main/Punch` sheets (short-range,
-  high-damage, lag-comp validated melee arc).
-- **Gun Game mode**: every kill advances your weapon down a ladder
-  (rifle → shotgun → pistol → grenades-only → punch); first through the
-  ladder wins. Mode rotation includes it.
-- Bat-creature map hazard if we're feeling spicy.
+**Locked design decisions**
+
+- **Ladder:** `rifle → shotgun → pistol → grenades → punch`, kills
+  required per rung `[2, 2, 2, 2, 1]` (9 ladder kills total; first
+  punch-rung kill wins immediately). Config in
+  `shared/src/config/game.ts` as `GUN_GAME` (`LADDER`, `RUNG_KILLS`,
+  grenade refill interval, ammo reserve floors). Only kills made **with
+  your current rung weapon** advance the ladder (ability kills — axe,
+  fire — and self-kills never advance). No demotion on death (v1).
+- **Score = ladder kills.** `PlayerState.score` carries total ladder
+  kills; a pure shared helper (`shared/src/utils/gun-game.ts`:
+  `rungForScore(score)` → `{ rungIndex, killsIntoRung, weapon }`) derives
+  the rung on BOTH server and client, so no new per-player wire state is
+  needed — the HUD reads `score` + the already-broadcast `weaponId`.
+- **GunGameMode** (`server/src/game/modes/gun-game-mode.ts`) implements
+  `GameMode`. `GameMode.onKill` gains a `weapon: KillWeapon` parameter
+  (DM/KOTH ignore it). The mode is the loadout authority: `onTick`
+  enforces each living player's rung loadout (weaponId, mag/reserve
+  floors, grenade refill), which also self-heals the rifle reset done by
+  death/respawn/overtime. On rung advance the killer's pending bursts /
+  racking / reload state are cleared and the new weapon arrives with a
+  full mag. No score accrual during overtime (guard `match.isOvertime`);
+  overtime is fought with rung weapons — a genuine tie means equal
+  score, hence the same rung, hence a fair duel.
+- **Ammo never strands anyone:** rifle reloads are already free;
+  shotgun/pistol rungs keep `specialReserve` topped to a floor
+  (shotgun 6 / pistol 24) so auto-revert can't fire; the grenade rung
+  refills 1 grenade per 3s up to max (fill on rung entry). Rung-weapon
+  rendering on the grenade rung keeps the rifle in hand but gun fire is
+  gated (see mode hooks) — the HUD ladder line is the source of truth.
+- **New `GameMode` extension points** (all optional, other modes
+  untouched):
+  - `excludedMutators?: readonly MutatorId[]` — Gun Game excludes
+    `grenades_only` + `infinite_ammo` from BOTH mutator rolls
+    (`FORCE_EVENT`/`FORCE_MIDMATCH_MUTATOR` pins still bypass — they're
+    smoke tools).
+  - `isPickupTypeEnabled?(type)` — Gun Game disables `weapon_shotgun`,
+    `gun_ammo`, `grenade` pickups (never spawn, never announce);
+    bandages stay.
+  - `areGunsDisabled?(match, player)` — grenade-rung fire gate, OR'd
+    with the existing `grenades_only` mutator check in the input loop.
+- **Rotation:** `GameModeType.GUN_GAME = 'gun_game'`, display name
+  "GUN GAME", rotation `DM → KOTH → GUN GAME` (same cursor/rematch-pin
+  contract), `FORCE_MODE=gun_game` for smokes. Character select
+  ("NEXT: GUN GAME - MAP") and results labels come free via
+  `gameModeDisplayName`.
+- **Pistol** (`WEAPONS.pistol`, starting values — tune in playtest):
+  damage 14→7 over falloff 48→320px, semi-auto (burstSize 1,
+  `fireCooldown` 0.22s via the racking-timer mechanism), magazine 12,
+  reload 1.0s, `pickupAmmo` 0 — **not a map pickup in v1** (Gun Game
+  only; a DM pickup is a cheap follow-up if the group wants the triad
+  everywhere). Rides the special-weapon slot fields
+  (`specialAmmo`/`specialReserve`) and the generalized reload path.
+- **Punch** (`WEAPONS.punch`): flat 60 damage, range 56px (~1.2 tiles),
+  arc ~100° validated as **7 deterministic even-fan rays** (new pure
+  helper `evenFanAngles` next to the pellet-spread util — NO jitter, so
+  the fan can't gap past a 24px hitbox) through
+  `processMultiShotWithRewind` — per-victim character hitboxes
+  (Bubba 30px), big_heads scale, wall blocking, and lag-comp rewind all
+  come free. `WeaponDef` gains optional `maxRange` (hard ray cap —
+  without it rays extend to `falloffRangeMax * 2`). One damage
+  application per victim per swing (dedupe across rays; an arc CAN hit
+  multiple victims — N-player). Swing cooldown 0.5s via the same
+  fire-cooldown timers. Accuracy bookkeeping mirrors the shotgun: one
+  swing = 1 shot fired, 1 hit if anyone was struck. Iron Hide applies
+  via `applyDamage` (consume returned `damageApplied`). No bullet
+  trails; instead a one-shot punch event rides gameState (mirroring the
+  `axeThrown` message-granularity pattern) driving remote+local swing
+  anims and SFX.
+- **Fire dispatch generalizes:** input loop routes `firePressed` by
+  `player.weaponId` — rifle/pistol → parametrized hitscan path
+  (burst only when `burstSize > 1`), shotgun → existing pellet path,
+  punch → melee path. `WeaponId` grows `'pistol' | 'punch'`;
+  `KillWeapon` + `KILL_WEAPONS` grow `'pistol' | 'punch'` (persistence
+  must default missing `killsByWeapon` keys to 0 when loading an older
+  `persistent-stats.json`). New award: *Bare Knuckles* — most punch
+  kills (≥1).
+- **Punch animations are body-level states** (unlike gun overlays):
+  `CharacterDef` gains `attackFrames`/`attackFrameCount`; every roster
+  character has pack attack sheets (Main Punch Sheet4 — with-hands
+  variant; Zombie_Small First-Attack Sheet4; Zombie_Big Sheet8;
+  Zombie_Axe Sheet7; Frost Wizard reuses Main). Anims normalize to a
+  ~350ms play regardless of frame count. While `weaponId === 'punch'`
+  the gun overlay hides. Pistol gets held overlays
+  (`pistol_{dir}_{hold,shoot}`, Mighty Man only — the only
+  `hasGun` character; skip the Sheet11 reloads, fixed timer like the
+  shotgun).
+- **Mobile untouched:** right-stick release already fires; the server
+  decides what firing means from the rung. Grenade rung uses the
+  existing grenade button. HUD ladder element + pistol ammo row must
+  work in mobile landscape; rifle-ammo row hides on grenade/punch rungs
+  so it can't mislead.
+- **SFX:** rate/detune variants of existing files (pack has no audio):
+  pistol = gunshot pitched up, punch whoosh = grenade-throw pitched
+  up hard, punch impact = existing hit sound.
+- Bat-creature hazard: **skipped** (stretch-of-a-stretch; roadmap ends
+  at Session 7 unless the group asks for more).
+
+**Type/plumbing checklist:** `WEAPONS.pistol`/`WEAPONS.punch` +
+`WeaponDef.maxRange?`; `GUN_GAME` config block; `GameModeType.GUN_GAME`
++ rotation + registry entries; `GameMode.onKill(…, weapon)` signature
+change; three optional mode hooks (mutator exclusion, pickup filter,
+gun gate); punch one-shot event on the gameState message
+(`shared/src/types/network.ts`); `KillWeapon`/`KILL_WEAPONS` growth;
+`CharacterDef.attackFrames`/`attackFrameCount`; shared
+`gun-game.ts` + `evenFanAngles` utils (100% coverage, deterministic).
+
+**Assets to extract:** pistol hold/shoot overlays (4 dirs × 2 states),
+`UI/Bullet Indicators/Pistol-Bullet{,_Empty}.png` (+ Small variants if
+the HUD needs them), per-character attack sheets (Main Punch
+with-hands Sheet4 ×4 dirs, Zombie_Small First-Attack Sheet4 ×4,
+Zombie_Big First-Attack Sheet8 ×4, Zombie_Axe First-Attack Sheet7 ×4).
+Rename per convention; update ATTRIBUTION.md "Files used".
+
+**Acceptance criteria**
+
+- [ ] Pistol fires semi-auto through lag comp with falloff; reload +
+      HUD ammo row work; Mighty Man overlay animates; kills attribute
+      to `'pistol'`. Rifle/shotgun behavior unchanged (regression).
+- [ ] Punch validates through the lag-comp rewind: a rewound graze hits
+      Bubba's 30px box and misses a 24px character; walls block it;
+      `maxRange` caps it; one damage application per victim per swing;
+      a two-victim arc damages both; Iron Hide halves it; kills
+      attribute to `'punch'`.
+- [ ] Full Gun Game match start→results: rung-weapon kills advance per
+      `RUNG_KILLS`; wrong-weapon/ability/self kills don't; first
+      through the ladder wins immediately; timer expiry crowns the
+      highest score; an equal top score enters overtime fought with
+      rung weapons; loadout enforcement survives death/respawn/
+      overtime resets.
+- [ ] In Gun Game: shotgun/ammo/grenade pickups never spawn (bandages
+      do); `grenades_only`/`infinite_ammo` never roll; grenade rung
+      refills; no rung can strand a player without a usable attack.
+- [ ] Rotation cycles DM → KOTH → GUN GAME (rematch pin included);
+      `FORCE_MODE=gun_game` pins; character select + results label the
+      mode; results scoreboard/awards render (incl. Bare Knuckles).
+- [ ] HUD desktop + mobile landscape: ladder position ("PISTOL 1/2",
+      rung n/5) always legible; misleading ammo rows hidden on
+      grenade/punch rungs; pistol/punch SFX distinct.
+- [ ] Old `persistent-stats.json` (pre-pistol/punch) loads cleanly with
+      new weapon keys defaulted to 0.
+- [ ] Deterministic unit tests ≥90% on new server/shared logic; DM/KOTH
+      regression suites green; no client-prediction changes (movement
+      physics untouched — zero new rubber-banding).
+
+**Parallelizable workstreams:** (a) shared config/types/utils
+(`GUN_GAME`, weapons, `evenFanAngles`, `rungForScore`, mode enum,
+network type) + tests; (b) server — generalized fire dispatch, punch
+melee, pistol path, `GunGameMode` + mode hooks + tests; (c) client —
+asset extraction/ATTRIBUTION, pistol overlay + HUD row, punch body
+anims + event FX/SFX, Gun Game HUD ladder + mode surfaces. (b) and (c)
+are independent once (a) lands.
 
 ---
 
