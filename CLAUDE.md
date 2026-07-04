@@ -126,7 +126,11 @@ Match logic is behind a `GameMode` interface (`onStart`, `onKill`, `onTick`, `is
 
 ### Map System
 
-Tile-based maps stored as JSON in `/shared/maps/`. Tile types: `floor`, `wall`, `cover_low`, `spawn_point`, `pickup_spawn`. Map fits entirely in viewport (no scrolling). Collision grid generated from tile data and used by both client (prediction) and server (authority).
+Tile-based maps stored as JSON in `/shared/maps/`. Tile types: `floor`, `wall`, `cover_low`, `spawn_point`, `pickup_spawn`. Map fits entirely in viewport (no scrolling). Collision grid generated from tile data and used by both client (prediction) and server (authority). Note `cover_low` is solid in that grid — it blocks movement AND bullets (only fire-breath wall destruction treats walls and cover differently).
+
+Maps are visually themed: map JSON carries an optional `theme` id resolved client-side in `client/src/rendering/map-themes.ts` (floor/cover variant pools + auto-tiled wall styles; unknown ids fall back to the wasteland look), plus optional `decorations` — purely cosmetic sprites (wrecked cars, containers) centered on tile rects whose underlying tiles carry the collision. The server ignores both fields.
+
+The server rotates maps round-robin in registry order (`shared/src/maps/registry.ts`): fresh matches advance a global cursor; a rematch plays the map after the one just played (`MatchResult.nextMapName`, rendered as "NEXT MAP: X" on the results screen). `FORCE_MAP=<map name>` pins every match to one map for manual smoke tests.
 
 ## Code Conventions
 

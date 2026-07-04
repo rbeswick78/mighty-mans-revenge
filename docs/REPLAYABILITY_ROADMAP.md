@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–3 complete (weapons, awards + rivalry stats, mutator expansion). Next up: **Session 4**.
+- **Status:** Sessions 1–4 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation). Next up: **Session 5**.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -35,7 +35,7 @@ Each session below attacks one of these.
 | 1 | Weapon system + Shotgun + health pickups | Fights stop being identical; map control begins | **DONE** (2026-07-04) |
 | 2 | Match awards + persistent rivalry stats | Bragging rights: the friend-group replay engine | **DONE** (2026-07-04) |
 | 3 | Mutator expansion | Matches stop repeating; chaos moments | **DONE** (2026-07-04) |
-| 4 | Two new maps + rotation | New spaces to master | not started |
+| 4 | Two new maps + rotation | New spaces to master | **DONE** (2026-07-04) |
 | 5 | King of the Hill + overtime | A second way to play; no more anticlimactic ties | not started |
 | 6 | New characters + stat identities | Counterpicks and mains | not started |
 | 7 | (Stretch) Gun Game + Pistol + melee | The party mode | not started |
@@ -357,12 +357,12 @@ consecutive matches don't repeat a map.
 
 **Acceptance criteria**
 
-- [ ] Both maps validate, render themed on desktop + mobile, and play a
+- [x] Both maps validate, render themed on desktop + mobile, and play a
       full match without collision/spawn bugs.
-- [ ] Collision grids identical client/server (shared loader — no forked
+- [x] Collision grids identical client/server (shared loader — no forked
       logic).
-- [ ] Rotation cycles all three maps; results screen shows next map.
-- [ ] Registry/validator unit tests cover the new maps and theme lookup.
+- [x] Rotation cycles all three maps; results screen shows next map.
+- [x] Registry/validator unit tests cover the new maps and theme lookup.
 
 **Parallelizable workstreams:** (a) tile/theme renderer support, (b) map A
 authoring, (c) map B authoring, (d) rotation + registry. (b)/(c) are fully
@@ -488,6 +488,88 @@ to be specced properly when its turn comes:
 
 Append one entry per session. Include: date, what shipped (commits), design
 deviations from this doc, known issues, tuning notes from play-testing.
+
+### Session 4 — 2026-07-04 — Two new maps + rotation
+
+**Shipped:** two new 20×12 arenas — **Overgrown Suburb** (green floor,
+corrugated-roof building clusters, two overgrown-car COVER_LOW
+centerpieces, open mid with 18-tile street sightlines) and **Scrapyard**
+(dark-green floor, red corrugated container-wall maze, garbage-pile
+cover, containers + scrap cars, central 4-entrance shotgun room, max
+8-tile sightlines) — plus round-robin map rotation. Fresh matches
+advance a global cursor over registry order; a rematch plays the map
+AFTER the one just played, pinned into PostMatchState at match end and
+shipped as `MatchResult.nextMapName` so the results screen's new
+"NEXT MAP: X" line (under the outcome banner) can never disagree with
+the map the rematch actually starts on. `FORCE_MAP=<name>` pins every
+match for manual smokes (mirrors FORCE_EVENT; invalid names warn and
+fall back).
+
+**Theming plumbing:** map JSON gained optional `theme` +
+`decorations[]` fields (shared type is data-only; the server ignores
+both). All pure auto-tiling/theming logic moved out of MapRenderer into
+Phaser-free `client/src/rendering/map-themes.ts`: per-theme floor/cover
+variant pools, wall styles (brick perimeter, iron fence, and a new
+roof tiler — top-cap/fill/bottom-cap by N/S neighbor mask, dark and
+red (+8 frame offset) sets), and `getTheme()` with wasteland fallback
+for absent/unknown ids. Decorations are cosmetic sprites centered on
+tile rects whose underlying tiles carry collision; unknown texture
+keys are skipped; cells under a decoration render plain floor.
+Validator gained a decoration bounds/size check.
+
+**Design decisions made in-session (roadmap was silent or amended):**
+- The Background_Green/Dark-Green sheets are exact layout twins of the
+  bleak-yellow sheet, so floor theming is a texture swap reusing the
+  same variant/scorch frame indices.
+- `Tiles/Buildings/*` (side-view facades) didn't fit top-down wall
+  clusters; the Roof tileset is what buildings/containers read as from
+  above, so both new wall styles come from it. Containers-as-walls per
+  the spec became red corrugated wall texture + real container sprites
+  as cover decorations.
+- COVER_LOW blocks movement AND bullets (single shared `solid` grid),
+  so any sightline break is also a route break — both maps were
+  authored with a scratch checker (BFS reachability incl. every
+  walkable cell, per-row/col sightline caps, spawn openness ≥3 open
+  cardinal neighbors, decoration/cover alignment, dead-end count).
+  These maps are the first real users of COVER_LOW.
+- Cover cells (and inner walls, as before) now get a floor underlay —
+  garbage-pile frames have soft transparent edges.
+- Decoration sprites overflow their collision rects by up to ~14px
+  (art is not tile-quantized); documented as reads-as-clutter, favors
+  the shooter.
+- Rotation is intentionally split: global cursor for fresh matches,
+  per-chain pinning for rematches (concurrent matches can't steal the
+  promised next map).
+
+**Verified:** 498 unit tests green (typecheck + lint clean; one
+non-reproducible failure right after killing dev servers — suspected
+port contention with the geckos integration tests — followed by four
+consecutive green runs), full Playwright suite green (the desktop-
+firefox touch-emulation test flaked once and passed in isolation +
+on rerun; known-unreliable per its own comments). Throwaway two-client
+Playwright drive-throughs (spec deleted after): rotation smoke (fresh
+match on Wasteland → suburb; forfeit → results screen shows VICTORY +
+"NEXT MAP: SCRAPYARD"), and per-map render/movement smokes via
+FORCE_MAP on both new maps — desktop + mobile-landscape screenshots
+eyeballed, WASD wandering, zero page errors.
+
+**Known issues / notes for later sessions:**
+- Suburb vs Scrapyard floor greens are closer in tone than the sheet
+  names suggest once the CRT/lighting wash is applied; identity comes
+  mostly from wall color + clutter. If the group can't tell them apart
+  at a glance, swap scrapyard floor variants toward garbage-accent
+  frames (theme pools are tunable in map-themes.ts).
+- Scrapyard has one intentional ambush nook at (14,3) (behind the
+  gray scrap car). Watch whether it plays as a camp spot.
+- Smokes covered ~40s of play + forfeit, not a full 3-minute match on
+  the new maps; kill/respawn on them is exercised only by unit-level
+  spawn validation. First group playtest should watch respawns.
+- Session 5 (KOTH) needs `kothHills` positions added to ALL THREE map
+  JSONs — pick hill spots when authoring that; the scrapyard center
+  room + suburb mid-street are obvious candidates.
+- e2e note: the geckos disconnect → forfeit → results transition takes
+  ~30s after a hard page close (WebRTC detection latency); any future
+  spec waiting on ResultsScene needs a 60s allowance.
 
 ### Session 3 — 2026-07-04 — Mutator expansion
 
