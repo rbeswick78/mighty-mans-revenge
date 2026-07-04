@@ -1,5 +1,6 @@
 import { PlayerId, Vec2, Tick } from './common.js';
 import type { CharacterId, WeaponId } from '../config/game.js';
+import type { KillWeapon } from './game.js';
 
 export interface PlayerState {
   id: PlayerId;
@@ -125,7 +126,17 @@ export interface PlayerStats {
   damageDealt: number;
   damageTaken: number;
   grenadesThrown: number;
-  grenadeKills: number;
-  shotgunKills: number;
+  /**
+   * Kills broken down by attribution source. Values sum to `kills`.
+   * Initialize with createEmptyKillsByWeapon() so every KillWeapon key is
+   * present. Replaces the former grenadeKills/shotgunKills fields.
+   */
+  killsByWeapon: Record<KillWeapon, number>;
   longestKillStreak: number;
+  /**
+   * Total px of server-authoritative movement this match (drives the
+   * Tourist award). Accumulated in the server movement loop only — never
+   * part of prediction/reconciliation.
+   */
+  distanceTraveled: number;
 }

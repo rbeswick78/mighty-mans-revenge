@@ -2,6 +2,7 @@ import { PlayerId, MatchId, Tick } from './common.js';
 import { PlayerState, PlayerStats } from './player.js';
 import { GrenadeState, BulletTrail } from './projectile.js';
 import { PickupState } from './pickup.js';
+import type { AwardId } from '../config/game.js';
 
 export enum MatchPhase {
   WAITING = 'waiting',
@@ -48,10 +49,45 @@ export interface KillFeedEntry {
   timestamp: number;
 }
 
+/**
+ * A single end-of-match award, computed server-side from final
+ * StatsTracker data. The results screen shows these in array order (the
+ * server has already applied priority + the DISPLAY_COUNT cap).
+ */
+export interface MatchAward {
+  id: AwardId;
+  playerId: PlayerId;
+  /** Winner's nickname at match time, so the client needs no id lookup. */
+  nickname: string;
+  /** Pre-formatted stat line that earned it, e.g. "87% ACCURACY". */
+  detail: string;
+}
+
+/**
+ * Lifetime head-to-head record for a 1v1 pairing, from the server's
+ * persistent stats file. A/B are ordered by lowercased nickname
+ * (alphabetical), matching the persistence key "a|b".
+ */
+export interface RivalryRecord {
+  nicknameA: string;
+  nicknameB: string;
+  winsA: number;
+  winsB: number;
+  draws: number;
+}
+
 export interface MatchResult {
   matchId: MatchId;
   winnerId: PlayerId | null;
   playerStats: Map<PlayerId, PlayerStats>;
   duration: number;
   gameMode: GameModeType;
+  /** Top awards in display order; empty when nobody qualified. */
+  awards: MatchAward[];
+  /**
+   * All-time record for this pairing including the match that just ended.
+   * Attached by the matchmaking manager from the persistent stats store;
+   * null when persistence is unavailable or the match wasn't 1v1.
+   */
+  rivalry: RivalryRecord | null;
 }

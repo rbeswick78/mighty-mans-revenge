@@ -1,4 +1,5 @@
 import type { CharacterDef } from '../types/character.js';
+import type { KillWeapon } from '../types/game.js';
 import type { WeaponDef } from '../types/weapon.js';
 
 export const PLAYER = Object.freeze({
@@ -61,6 +62,28 @@ export const WEAPONS = Object.freeze({
 
 export type WeaponId = keyof typeof WEAPONS;
 export const WEAPON_IDS = Object.keys(WEAPONS) as WeaponId[];
+
+/**
+ * Runtime list of every kill-attribution source, for keying per-weapon
+ * kill counters. Must stay in sync with the KillWeapon union in
+ * shared/src/types/game.ts (the `satisfies` clause catches typos but not
+ * omissions — extend both when adding a weapon).
+ */
+export const KILL_WEAPONS = Object.freeze([
+  'gun',
+  'grenade',
+  'fire',
+  'shotgun',
+] as const) satisfies readonly KillWeapon[];
+
+/** Fresh all-zero per-weapon kill record (PlayerStats.killsByWeapon). */
+export function createEmptyKillsByWeapon(): Record<KillWeapon, number> {
+  const record = {} as Record<KillWeapon, number>;
+  for (const weapon of KILL_WEAPONS) {
+    record[weapon] = 0;
+  }
+  return record;
+}
 
 export const GRENADE = Object.freeze({
   DAMAGE: 100,
@@ -146,6 +169,43 @@ export const EVENT = Object.freeze({
   GRENADES_ONLY_REFILL_SECONDS: 3.0,
   /** Max-HP cap during low_health (clamps current HP and respawn HP). */
   LOW_HEALTH_HP: 1,
+});
+
+/**
+ * End-of-match awards. Declaration order IS the priority order: the server
+ * walks AWARD_IDS top to bottom and ships the first AWARDS.DISPLAY_COUNT
+ * awards that have an outright winner (ties earn nobody the award).
+ * Display names are final per the replayability roadmap; thresholds are
+ * tunable.
+ */
+export const AWARD_DEFS = Object.freeze({
+  sharpshooter: Object.freeze({ displayName: 'Sharpshooter' }),
+  spray_and_pray: Object.freeze({ displayName: 'Spray & Pray' }),
+  demolition_man: Object.freeze({ displayName: 'Demolition Man' }),
+  buckshot_barber: Object.freeze({ displayName: 'Buckshot Barber' }),
+  untouchable: Object.freeze({ displayName: 'Untouchable' }),
+  pincushion: Object.freeze({ displayName: 'Pincushion' }),
+  pin_puller_no_payoff: Object.freeze({ displayName: 'Pin Puller, No Payoff' }),
+  tourist: Object.freeze({ displayName: 'Tourist' }),
+});
+
+export type AwardId = keyof typeof AWARD_DEFS;
+/** Award ids in priority order (= declaration order of AWARD_DEFS). */
+export const AWARD_IDS = Object.keys(AWARD_DEFS) as readonly AwardId[];
+
+export const AWARDS = Object.freeze({
+  /** How many awards the results screen shows, by priority. */
+  DISPLAY_COUNT: 3,
+  /** Sharpshooter requires at least this many shots fired. */
+  SHARPSHOOTER_MIN_SHOTS: 10,
+  /** Spray & Pray requires at least this many shots fired... */
+  SPRAY_AND_PRAY_MIN_SHOTS: 10,
+  /** ...and an accuracy strictly below this fraction. */
+  SPRAY_AND_PRAY_MAX_ACCURACY: 0.25,
+  /** Untouchable requires a kill streak at least this long. */
+  UNTOUCHABLE_MIN_STREAK: 3,
+  /** Pin Puller requires at least this many grenades thrown (and 0 grenade kills). */
+  PIN_PULLER_MIN_THROWN: 3,
 });
 
 export const SERVER = Object.freeze({
