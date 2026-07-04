@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Session 1 (weapon system + shotgun + bandages) complete. Next up: **Session 2**.
+- **Status:** Sessions 1–2 complete (weapons, awards + persistent rivalry stats). Next up: **Session 3**.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -33,7 +33,7 @@ Each session below attacks one of these.
 | # | Title | Fun payoff | Status |
 |---|-------|-----------|--------|
 | 1 | Weapon system + Shotgun + health pickups | Fights stop being identical; map control begins | **DONE** (2026-07-04) |
-| 2 | Match awards + persistent rivalry stats | Bragging rights: the friend-group replay engine | not started |
+| 2 | Match awards + persistent rivalry stats | Bragging rights: the friend-group replay engine | **DONE** (2026-07-04) |
 | 3 | Mutator expansion | Matches stop repeating; chaos moments | not started |
 | 4 | Two new maps + rotation | New spaces to master | not started |
 | 5 | King of the Hill + overtime | A second way to play; no more anticlimactic ties | not started |
@@ -266,13 +266,13 @@ screen and lifetime head-to-head records that survive restarts.
 
 **Acceptance criteria**
 
-- [ ] Awards appear on results for both players, deterministic given stats,
+- [x] Awards appear on results for both players, deterministic given stats,
       with unit tests over the selection/priority logic.
-- [ ] Lifetime records persist across server restarts (integration test with
+- [x] Lifetime records persist across server restarts (integration test with
       a temp DATA_DIR).
-- [ ] Rivalry line renders on results (desktop + mobile landscape).
-- [ ] File writes are async, at match end only; tick budget unaffected.
-- [ ] Draws recorded as draws (don't let Session 5's overtime change land
+- [x] Rivalry line renders on results (desktop + mobile landscape).
+- [x] File writes are async, at match end only; tick budget unaffected.
+- [x] Draws recorded as draws (don't let Session 5's overtime change land
       first — if it did, adjust).
 
 **Parallelizable workstreams:** (a) server awards computation + persistence +
@@ -488,6 +488,64 @@ to be specced properly when its turn comes:
 
 Append one entry per session. Include: date, what shipped (commits), design
 deviations from this doc, known issues, tuning notes from play-testing.
+
+### Session 2 — 2026-07-04 — Match awards + persistent rivalry stats
+
+**Shipped:** end-of-match awards (all 8 from the spec, incl. Tourist —
+distance tracking turned out to be one `Math.hypot` per processed input in
+the movement loop), computed in `server/src/game/awards.ts` and shipped in
+`MatchResult.awards`; persistent lifetime stats + head-to-head records in
+`server/src/persistence/persistent-stats-store.ts`
+(`server/data/persistent-stats.json`, `DATA_DIR` env override, gitignored,
+temp-file + rename writes queued on a promise chain — match-end path never
+touches fs synchronously); results screen renders the top-3 award rows and
+the amber "ALL-TIME: RYAN 14 - 9 DAVE" rivalry line, verified on desktop +
+mobile-landscape viewports via a throwaway Playwright drive-through.
+
+**Design decisions made in-session (roadmap was silent):**
+- `PlayerStats.grenadeKills`/`shotgunKills` were replaced by a
+  `killsByWeapon: Record<KillWeapon, number>` (runtime key list
+  `KILL_WEAPONS` in shared config) so lifetime per-weapon kills and
+  Session 6's axe come free. `KillWeapon` moved semantics: still the same
+  union, now with a runtime companion list.
+- Award ties: an award needs a **strict maximum** — a tie means nobody
+  earns it (deterministic without inventing an arbitrary winner). Also
+  Sharpshooter requires ≥1 hit, and Spray & Pray gained the same 10-shot
+  minimum as Sharpshooter.
+- Awards are computed inside `DeathmatchMode.getResults` via the pure
+  `computeAwards()` (future modes just call it); the rivalry record is
+  attached afterwards by `MatchmakingManager.onMatchEnded`, the only
+  component with store access. `MatchResult.rivalry` is null for non-1v1.
+- **Forfeit fix:** a match that ends because the opponent disconnected now
+  awards the win to the player who stayed, overriding the scoreboard —
+  otherwise a leaver who was ahead would bank a now-persistent win.
+- Draws are fully plumbed + tested in persistence, but currently
+  unreachable in DM play (`determineWinner`'s arbitrary tie-break —
+  Session 5 fixes that and awards/overtime will just work).
+- Rivalry line uses a plain "-" instead of an em dash (Press Start 2P
+  glyph coverage).
+- Head-to-head pairs are only recorded for exactly-2-player matches.
+
+**Fixed in passing:**
+- Session 1's last commit left `pnpm lint` red: the Playwright
+  `_fixtures` fix introduced empty destructuring patterns
+  (`no-empty-pattern`) in `e2e/tests/character-select.test.ts` — now
+  suppressed with targeted disables (Playwright forces that shape).
+
+**Known issues / notes for later sessions:**
+- Lobby leaderboard (stretch goal) skipped — the store already has the
+  data (`getLifetime`); a `/stats` HTTP endpoint or lobby panel is a
+  cheap follow-up.
+- **Dev-loop gotcha discovered:** `@shared/game` resolves to `dist/` at
+  runtime (server tsx + Playwright webServer). After editing shared
+  source, run `pnpm --filter @shared/game build` or dev/e2e behavior
+  won't change. Vitest aliases to src and is unaffected.
+- e2e teardown of any test that reaches GameScene records a real
+  (forfeit) match into the server's store — harmless locally (data dir
+  is disposable), but don't point a dev server's DATA_DIR at the
+  production file.
+- Persistence is keyed by lowercased nickname — friends changing
+  nicknames fork their history; fine for the <10-player use case.
 
 ### Session 1 — 2026-07-04 — Weapon system + Shotgun + health pickups
 
