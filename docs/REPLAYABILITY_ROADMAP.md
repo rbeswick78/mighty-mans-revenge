@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Session 0 (planning) complete. Next up: **Session 1**.
+- **Status:** Session 1 (weapon system + shotgun + bandages) complete. Next up: **Session 2**.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -32,7 +32,7 @@ Each session below attacks one of these.
 
 | # | Title | Fun payoff | Status |
 |---|-------|-----------|--------|
-| 1 | Weapon system + Shotgun + health pickups | Fights stop being identical; map control begins | not started |
+| 1 | Weapon system + Shotgun + health pickups | Fights stop being identical; map control begins | **DONE** (2026-07-04) |
 | 2 | Match awards + persistent rivalry stats | Bragging rights: the friend-group replay engine | not started |
 | 3 | Mutator expansion | Matches stop repeating; chaos moments | not started |
 | 4 | Two new maps + rotation | New spaces to master | not started |
@@ -210,17 +210,18 @@ Small). Rename per convention (`shotgun_down_shoot.png`, …).
 
 **Acceptance criteria**
 
-- [ ] Rifle behavior is unchanged (regression: existing tests still pass).
-- [ ] Shotgun spawns center-map with pre-announcement, auto-equips, racks
+- [x] Rifle behavior is unchanged (regression: existing tests still pass).
+- [x] Shotgun spawns center-map with pre-announcement, auto-equips, racks
       between shots, reverts to rifle on empty.
-- [ ] Shotgun kills validate through lag compensation and attribute to
+- [x] Shotgun kills validate through lag compensation and attribute to
       `'shotgun'` in stats.
-- [ ] Bandages heal, cap at max HP, respawn on their own timer.
-- [ ] Client prediction/reconciliation shows no new rubber-banding (weapon
-      state changes don't touch movement physics).
-- [ ] HUD (desktop + mobile landscape) shows special-weapon ammo; pickup
+- [x] Bandages heal, cap at max HP, respawn on their own timer.
+- [x] Client prediction/reconciliation shows no new rubber-banding (weapon
+      state changes don't touch movement physics; firing/ammo are not
+      client-predicted).
+- [x] HUD (desktop + mobile landscape) shows special-weapon ammo; pickup
       and shotgun-fire have distinct SFX (rate/detune variants OK).
-- [ ] Unit tests for weapon defs, pellet spread determinism, pickup/equip/
+- [x] Unit tests for weapon defs, pellet spread determinism, pickup/equip/
       revert state machine; ≥90% on new server/shared logic.
 
 **Parallelizable workstreams:** (a) shared weapon defs + server combat/pickup
@@ -487,6 +488,62 @@ to be specced properly when its turn comes:
 
 Append one entry per session. Include: date, what shipped (commits), design
 deviations from this doc, known issues, tuning notes from play-testing.
+
+### Session 1 — 2026-07-04 — Weapon system + Shotgun + health pickups
+
+**Shipped:** generic weapon system (`WEAPONS` frozen record in
+`shared/src/config/game.ts`, `GUN` fully migrated to `WEAPONS.rifle`, no
+legacy alias), Shotgun as a contested center-map power weapon with
+"SHOTGUN INCOMING" banner + down-pitched horn, Bandage pickups on both
+map edges, HUD shell indicators, held-overlay/racking animations, and
+deterministic pellet spread (`shared/src/utils/pellet-spread.ts`,
+mulberry32 seeded by the firing input's sequence number).
+
+**Design decisions made in-session (roadmap was silent):**
+- `WeaponDef` gained a `fireCooldown` field — the 0.6 s pump-racking is a
+  between-trigger-pulls delay, which none of the spec'd fields could
+  express. Rifle: 0.
+- Special ammo is two fields on PlayerState: `specialAmmo` (mag) +
+  `specialReserve`. Rifle `ammo` is never touched while the shotgun is
+  held, so revert is lossless.
+- Weapon pickups start the match INACTIVE on their full 30 s respawn
+  timer, so the first drop gets the same pre-announcement as every
+  respawn (also stops spawn-camping mid at the opening whistle).
+- Shotgun auto-reloads when the mag empties (there is no switch key — a
+  dead trigger would strand the player), and picking up a second shotgun
+  while holding one refreshes shells to full 8.
+- Death drops the shotgun; you respawn on the rifle.
+- The infinite_ammo final-minute event pins the shotgun mag too — the
+  holder keeps it until match end (consistent with the event's promise).
+- Accuracy bookkeeping: one blast = 1 shot fired, 1 hit if ≥1 pellet
+  lands (else the shotgun would wreck the accuracy stat / Session 2's
+  Sharpshooter award).
+- Kill-feed weapon union became shared `KillWeapon`; `PlayerStats` gained
+  `shotgunKills` now so Session 2's Buckshot Barber can consume it.
+
+**Fixed in passing:**
+- Pre-existing double-count: every kill incremented `PlayerState.deaths`
+  in BOTH `CombatManager.applyDamage` and `Match.onKill` (surfaced by the
+  multi-pellet kill test). `onKill` now owns the counter.
+- Removed dead `Match.tryCollectPickup` (no callers).
+- Pre-existing lint error (NBSP inside a lobby-scene comment) and a
+  pre-existing Playwright collection error in
+  `e2e/tests/character-select.test.ts` (`_fixtures` positional arg —
+  newer Playwright requires destructuring) that had the whole e2e suite
+  failing before any test ran.
+
+**Known issues / notes for later sessions:**
+- Bruce and Frost Wizard have `hasGun: false`, so they show no held
+  shotgun overlay (same as the rifle today). Pellets/SFX still fire.
+- Shotgun pellet trails reuse the rifle tracer visuals; the extracted
+  `shotgun-bullet.png` is loaded (`'shotgun-bullet'` texture) but not yet
+  wired into a distinct trail renderer. Cosmetic only.
+- `server/src/game/player-manager.ts` is dead code (only its test
+  imports it) and duplicates reload/respawn logic — candidate for
+  deletion in a cleanup pass.
+- Tuning untouched from the spec (6 pellets, 8→3 dmg over 32→180 px,
+  mag 2, 0.6 s rack, 1.5 s reload, 8 shells, 30 s respawn, bandage +30 HP
+  / 20 s). Playtest with the group before tweaking.
 
 ### Session 0 — 2026-07-03 — Planning
 - Reviewed game for repetitiveness causes; wrote this roadmap.
