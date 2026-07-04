@@ -126,6 +126,11 @@ export class Match implements MatchContext {
   }
   private _matchStartTimeMs = 0;
   private connectedPlayers: Set<PlayerId> = new Set();
+  /**
+   * Set when the match ended because everyone else disconnected/forfeited.
+   * Overrides the game mode's scoreboard winner in getResult().
+   */
+  private forfeitWinnerId: PlayerId | null = null;
 
   /** Final-minute event state. */
   private _activeEvent: FinalMinuteEvent | null = null;
@@ -420,11 +425,14 @@ export class Match implements MatchContext {
     // Game mode says it's over (kill target reached or time out)
     if (this.gameMode.isMatchOver(this)) {
       shouldEnd = true;
-    }
-
-    // Only one player connected
-    if (this.connectedPlayers.size <= 1 && this.players.size > 1) {
+    } else if (this.connectedPlayers.size <= 1 && this.players.size > 1) {
+      // Only one player still connected: the match ends as a forfeit and
+      // the win goes to whoever stayed, regardless of the scoreboard —
+      // otherwise a leaver who was ahead would bank a (now persistent)
+      // win, and the player who stuck around would eat a loss.
       shouldEnd = true;
+      const remaining = [...this.connectedPlayers];
+      this.forfeitWinnerId = remaining.length === 1 ? remaining[0] : null;
     }
 
     if (shouldEnd) {
@@ -436,7 +444,11 @@ export class Match implements MatchContext {
 
   /** Build the match result. */
   getResult(): MatchResult {
-    return this.gameMode.getResults(this);
+    const result = this.gameMode.getResults(this);
+    if (this.forfeitWinnerId !== null) {
+      result.winnerId = this.forfeitWinnerId;
+    }
+    return result;
   }
 
   getKillFeed(): KillFeedEntry[] {
@@ -610,6 +622,7 @@ export class Match implements MatchContext {
 
         // Movement. Each client input represents one fixed simulation tick,
         // so replay queued inputs one at a time with the server tick dt.
+        const prevPos = player.position;
         const result = calculateMovement(
           input,
           player.position,
@@ -617,6 +630,12 @@ export class Match implements MatchContext {
           dt,
           grid,
           movementModifiers,
+        );
+        // Distance stat for the Tourist award: one hypot per processed
+        // input, accumulated server-side only (never predicted).
+        this.stats.recordDistance(
+          playerId,
+          Math.hypot(result.newPos.x - prevPos.x, result.newPos.y - prevPos.y),
         );
         player.position = result.newPos;
         player.velocity = result.velocity;

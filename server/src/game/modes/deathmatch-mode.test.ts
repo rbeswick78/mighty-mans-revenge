@@ -171,5 +171,28 @@ describe('DeathmatchMode', () => {
       const result = mode.getResults(ctx);
       expect(result.playerStats.size).toBe(3);
     });
+
+    it('computes awards from match stats with nicknames attached', () => {
+      const ctx = makeContext([makePlayer('p1'), makePlayer('p2')]);
+      ctx.stats.recordDamageTaken('p1', 120);
+
+      const result = mode.getResults(ctx);
+      expect(result.awards).toEqual([
+        {
+          id: 'pincushion',
+          playerId: 'p1',
+          nickname: 'Player p1',
+          detail: '120 DAMAGE TAKEN',
+        },
+      ]);
+    });
+
+    it('ships empty awards and null rivalry on a no-action match', () => {
+      const ctx = makeContext([makePlayer('p1'), makePlayer('p2')]);
+
+      const result = mode.getResults(ctx);
+      expect(result.awards).toEqual([]);
+      expect(result.rivalry).toBeNull();
+    });
   });
 });

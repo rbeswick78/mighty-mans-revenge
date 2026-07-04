@@ -129,15 +129,26 @@ describe('StatsTracker', () => {
     it('records grenade kills', () => {
       tracker.recordKill('p1', 'p2', 'grenade');
 
-      expect(tracker.getStats('p1').grenadeKills).toBe(1);
+      expect(tracker.getStats('p1').killsByWeapon.grenade).toBe(1);
       expect(tracker.getStats('p1').kills).toBe(1);
     });
 
     it('does not count gun kills as grenade kills', () => {
       tracker.recordKill('p1', 'p2', 'gun');
 
-      expect(tracker.getStats('p1').grenadeKills).toBe(0);
+      expect(tracker.getStats('p1').killsByWeapon.grenade).toBe(0);
       expect(tracker.getStats('p1').kills).toBe(1);
+    });
+
+    it('attributes each kill to exactly one weapon; totals sum to kills', () => {
+      tracker.recordKill('p1', 'p2', 'gun');
+      tracker.recordKill('p1', 'p2', 'shotgun');
+      tracker.recordKill('p1', 'p2', 'shotgun');
+      tracker.recordKill('p1', 'p2', 'fire');
+
+      const s = tracker.getStats('p1');
+      expect(s.killsByWeapon).toEqual({ gun: 1, grenade: 0, fire: 1, shotgun: 2 });
+      expect(s.kills).toBe(4);
     });
   });
 
@@ -164,6 +175,17 @@ describe('StatsTracker', () => {
     });
   });
 
+  describe('record distance traveled', () => {
+    it('accumulates distance per player', () => {
+      tracker.recordDistance('p1', 10);
+      tracker.recordDistance('p1', 4.5);
+      tracker.recordDistance('p2', 3);
+
+      expect(tracker.getStats('p1').distanceTraveled).toBeCloseTo(14.5, 5);
+      expect(tracker.getStats('p2').distanceTraveled).toBe(3);
+    });
+  });
+
   describe('get stats for individual player', () => {
     it('returns stats for an initialized player', () => {
       const stats = tracker.getStats('p1');
@@ -175,8 +197,9 @@ describe('StatsTracker', () => {
       expect(stats.damageDealt).toBe(0);
       expect(stats.damageTaken).toBe(0);
       expect(stats.grenadesThrown).toBe(0);
-      expect(stats.grenadeKills).toBe(0);
+      expect(stats.killsByWeapon).toEqual({ gun: 0, grenade: 0, fire: 0, shotgun: 0 });
       expect(stats.longestKillStreak).toBe(0);
+      expect(stats.distanceTraveled).toBe(0);
     });
 
     it('throws for non-initialized player', () => {

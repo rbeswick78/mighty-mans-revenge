@@ -1,5 +1,6 @@
 import { GameModeType } from '@shared/game';
 import type { PlayerId, MatchResult } from '@shared/game';
+import { computeAwards } from '../awards.js';
 import type { GameMode, MatchContext } from './game-mode.js';
 
 export class DeathmatchMode implements GameMode {
@@ -38,13 +39,21 @@ export class DeathmatchMode implements GameMode {
 
   getResults(match: MatchContext): MatchResult {
     const winnerId = this.determineWinner(match);
+    const playerStats = match.stats.getAllStats();
 
     return {
       matchId: match.matchId,
       winnerId,
-      playerStats: match.stats.getAllStats(),
+      playerStats,
       duration: match.getTimeLimit() - match.matchTimer,
       gameMode: GameModeType.DEATHMATCH,
+      awards: computeAwards(
+        playerStats,
+        (id) => match.players.get(id)?.nickname ?? 'UNKNOWN',
+      ),
+      // Attached by the matchmaking manager once the persistent store has
+      // folded this match in — the mode has no access to lifetime records.
+      rivalry: null,
     };
   }
 

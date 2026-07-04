@@ -270,6 +270,19 @@ describe('Match', () => {
       match.checkMatchEnd();
       expect(match.phase).toBe(MatchPhase.ENDED);
     });
+
+    it('awards a forfeit win to the player who stayed, even if behind on score', () => {
+      match.startCountdown();
+      match.update(MATCH.COUNTDOWN_DURATION + 0.1);
+
+      // player-1 is ahead on the scoreboard, then rage-quits.
+      match.onKill('player-1', 'player-0', 'gun');
+      match.onPlayerDisconnect('player-1');
+      match.checkMatchEnd();
+
+      expect(match.phase).toBe(MatchPhase.ENDED);
+      expect(match.getResult().winnerId).toBe('player-0');
+    });
   });
 
   describe('respawning', () => {
@@ -455,6 +468,21 @@ describe('Match', () => {
         5,
       );
       expect(player.lastProcessedInput).toBe(2);
+    });
+
+    it('accumulates distance traveled in stats as inputs are simulated', () => {
+      const m = startActiveMatch();
+
+      m.queueInput('player-0', makeInput(1, { moveX: 1 }));
+      m.queueInput('player-0', makeInput(2, { moveX: 1 }));
+      m.update(1 / SERVER.TICK_RATE);
+
+      expect(m.stats.getStats('player-0').distanceTraveled).toBeCloseTo(
+        PLAYER.BASE_SPEED * (1 / SERVER.TICK_RATE) * 2,
+        5,
+      );
+      // The stationary opponent walked nowhere.
+      expect(m.stats.getStats('player-1').distanceTraveled).toBe(0);
     });
 
     it('caps catch-up inputs without acknowledging unprocessed inputs', () => {
@@ -1508,7 +1536,7 @@ describe('Match', () => {
         // The victim died exactly once even though multiple pellets connected.
         expect(victim.deaths).toBe(1);
         const stats = m.stats.getStats('player-0');
-        expect(stats.shotgunKills).toBe(1);
+        expect(stats.killsByWeapon.shotgun).toBe(1);
         expect(stats.kills).toBe(1);
         const entry = m.getKillFeed().find((e) => e.victimId === 'player-1')!;
         expect(entry.weapon).toBe('shotgun');

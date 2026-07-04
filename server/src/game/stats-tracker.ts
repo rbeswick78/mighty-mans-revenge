@@ -1,3 +1,4 @@
+import { createEmptyKillsByWeapon } from '@shared/game';
 import type { PlayerId, PlayerStats, KillWeapon } from '@shared/game';
 
 export class StatsTracker {
@@ -14,9 +15,9 @@ export class StatsTracker {
       damageDealt: 0,
       damageTaken: 0,
       grenadesThrown: 0,
-      grenadeKills: 0,
-      shotgunKills: 0,
+      killsByWeapon: createEmptyKillsByWeapon(),
       longestKillStreak: 0,
+      distanceTraveled: 0,
     });
     this.currentStreaks.set(playerId, 0);
   }
@@ -34,12 +35,7 @@ export class StatsTracker {
   recordKill(killerId: PlayerId, _victimId: PlayerId, weapon: KillWeapon): void {
     const s = this.getStatsOrThrow(killerId);
     s.kills++;
-
-    if (weapon === 'grenade') {
-      s.grenadeKills++;
-    } else if (weapon === 'shotgun') {
-      s.shotgunKills++;
-    }
+    s.killsByWeapon[weapon]++;
 
     // Update kill streak
     const streak = (this.currentStreaks.get(killerId) ?? 0) + 1;
@@ -69,6 +65,12 @@ export class StatsTracker {
   recordDamageTaken(playerId: PlayerId, amount: number): void {
     const s = this.getStatsOrThrow(playerId);
     s.damageTaken += amount;
+  }
+
+  /** Accumulate distance moved (px) by server-authoritative movement. */
+  recordDistance(playerId: PlayerId, px: number): void {
+    const s = this.getStatsOrThrow(playerId);
+    s.distanceTraveled += px;
   }
 
   getStats(playerId: PlayerId): PlayerStats {
