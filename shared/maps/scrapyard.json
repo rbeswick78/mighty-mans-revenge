@@ -37,5 +37,12 @@
     { "x": 5, "y": 6, "w": 2, "h": 1, "texture": "deco_container_red" },
     { "x": 15, "y": 6, "w": 2, "h": 1, "texture": "deco_car_scrap_red", "flipX": true },
     { "x": 3, "y": 7, "w": 2, "h": 1, "texture": "deco_container_gray" }
+  ],
+  "kothHills": [
+    { "x": 9, "y": 5 },
+    { "x": 7, "y": 2 },
+    { "x": 17, "y": 7 },
+    { "x": 7, "y": 8 },
+    { "x": 3, "y": 5 }
   ]
 }

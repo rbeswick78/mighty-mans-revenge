@@ -16,6 +16,12 @@ for (const m of ALL) {
   if (!r.valid) {
     throw new Error(`Invalid map "${m.name}": ${r.errors.join('; ')}`);
   }
+  // Presence check lives here, not in validateMap: fixtures without hills
+  // are valid maps, but every SHIPPED map must support King of the Hill
+  // because mode rotation can put KOTH on any of them.
+  if (!m.kothHills || m.kothHills.length === 0) {
+    throw new Error(`Map "${m.name}" declares no kothHills — required for mode rotation`);
+  }
 }
 
 export const MAP_REGISTRY: ReadonlyMap<string, MapData> = new Map(

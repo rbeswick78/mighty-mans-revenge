@@ -5,10 +5,60 @@ import {
   WEAPONS,
   WEAPON_IDS,
   PICKUP,
+  GAME_MODES,
+  GAME_MODE_ROTATION,
+  getNextGameMode,
+  gameModeDisplayName,
+  KOTH,
+  OVERTIME,
+  MATCH,
   type CharacterId,
   type WeaponId,
 } from './game.js';
+import { GameModeType } from '../types/game.js';
 import { DIRECTIONS } from '../types/character.js';
+
+describe('game mode rotation', () => {
+  it('rotation covers every GameModeType exactly once', () => {
+    const allModes = Object.values(GameModeType).sort();
+    expect([...GAME_MODE_ROTATION].sort()).toEqual(allModes);
+  });
+
+  it('getNextGameMode cycles DM → KOTH → DM', () => {
+    expect(getNextGameMode(GameModeType.DEATHMATCH)).toBe(GameModeType.KOTH);
+    expect(getNextGameMode(GameModeType.KOTH)).toBe(GameModeType.DEATHMATCH);
+  });
+
+  it('restarts the cycle for unknown values instead of throwing', () => {
+    expect(getNextGameMode('bogus' as GameModeType)).toBe(GAME_MODE_ROTATION[0]);
+  });
+
+  it('every mode has display copy', () => {
+    for (const mode of GAME_MODE_ROTATION) {
+      expect(GAME_MODES[mode].displayName.length).toBeGreaterThan(0);
+      expect(gameModeDisplayName(mode)).toBe(GAME_MODES[mode].displayName);
+    }
+    expect(gameModeDisplayName(GameModeType.KOTH)).toBe('KING OF THE HILL');
+  });
+});
+
+describe('KOTH and overtime tuning', () => {
+  it('hill cadence fits the match: several relocations per match, warning inside the interval', () => {
+    expect(KOTH.HILL_MOVE_WARNING).toBeLessThan(KOTH.HILL_MOVE_INTERVAL);
+    expect(MATCH.TIME_LIMIT / KOTH.HILL_MOVE_INTERVAL).toBeGreaterThanOrEqual(3);
+  });
+
+  it('the score target is reachable within the match clock', () => {
+    // 1 point/second of sole occupancy — the target must fit inside the
+    // total match time or nobody could ever win by score.
+    expect(KOTH.SCORE_TARGET).toBeLessThan(MATCH.TIME_LIMIT);
+  });
+
+  it('overtime is short and positive', () => {
+    expect(OVERTIME.DURATION).toBeGreaterThan(0);
+    expect(OVERTIME.DURATION).toBeLessThan(MATCH.TIME_LIMIT);
+  });
+});
 
 describe('CHARACTERS registry', () => {
   it('contains at least mighty_man and bruce', () => {

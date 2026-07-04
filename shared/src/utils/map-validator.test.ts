@@ -212,4 +212,78 @@ describe('validateMap', () => {
       expect.stringContaining('non-positive size'),
     );
   });
+
+  describe('kothHills', () => {
+    /** 8x6 open interior — room for several distinct 2x2 hills. */
+    function makeHillMap(kothHills?: { x: number; y: number }[]): MapData {
+      return {
+        name: 'Hill Test',
+        width: 8,
+        height: 6,
+        tileSize: 48,
+        tiles: [
+          [1, 1, 1, 1, 1, 1, 1, 1],
+          [1, 3, 0, 0, 0, 0, 3, 1],
+          [1, 0, 0, 0, 0, 2, 0, 1],
+          [1, 0, 0, 0, 0, 0, 0, 1],
+          [1, 3, 0, 0, 0, 0, 3, 1],
+          [1, 1, 1, 1, 1, 1, 1, 1],
+        ],
+        spawnPoints: [
+          { x: 1, y: 1 },
+          { x: 6, y: 4 },
+        ],
+        pickupSpawns: [],
+        ...(kothHills ? { kothHills } : {}),
+      };
+    }
+
+    it('accepts maps without hills (fixtures) and with 3+ walkable hills', () => {
+      expect(validateMap(makeHillMap()).valid).toBe(true);
+      const result = validateMap(
+        makeHillMap([
+          { x: 1, y: 1 },
+          { x: 3, y: 2 },
+          { x: 1, y: 3 },
+        ]),
+      );
+      expect(result.valid, result.errors.join('; ')).toBe(true);
+    });
+
+    it('rejects fewer than 3 declared hills', () => {
+      const result = validateMap(makeHillMap([{ x: 1, y: 1 }, { x: 3, y: 2 }]));
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContainEqual(
+        expect.stringContaining('at least 3 entries'),
+      );
+    });
+
+    it('rejects hills extending out of bounds', () => {
+      const result = validateMap(
+        makeHillMap([
+          { x: 7, y: 1 }, // 2 wide from col 7 leaves an 8-wide map
+          { x: 1, y: 1 },
+          { x: 3, y: 2 },
+        ]),
+      );
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContainEqual(
+        expect.stringContaining('extends out of map bounds'),
+      );
+    });
+
+    it('rejects hills covering walls or cover (COVER_LOW blocks movement)', () => {
+      const result = validateMap(
+        makeHillMap([
+          { x: 4, y: 1 }, // covers the COVER_LOW at (5,2)
+          { x: 1, y: 1 },
+          { x: 1, y: 3 },
+        ]),
+      );
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContainEqual(
+        expect.stringContaining('non-walkable tile at (5, 2)'),
+      );
+    });
+  });
 });

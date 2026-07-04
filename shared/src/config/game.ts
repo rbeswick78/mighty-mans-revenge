@@ -1,6 +1,7 @@
 import type { CharacterDef } from '../types/character.js';
 import type { KillWeapon } from '../types/game.js';
 import type { WeaponDef } from '../types/weapon.js';
+import { GameModeType } from '../types/game.js';
 
 export const PLAYER = Object.freeze({
   BASE_SPEED: 200,
@@ -152,6 +153,67 @@ export const MATCH = Object.freeze({
    * countdown begins.
    */
   CHARACTER_SELECT_TIMEOUT_SEC: 30,
+});
+
+/**
+ * Game mode metadata + rotation. Rotation order doubles as the cycle fresh
+ * matches walk through (mirrors the map registry's rotation contract):
+ * fresh matches advance a global cursor, rematches play the mode AFTER the
+ * one just played (pinned at match end so the results-screen promise can't
+ * lie). Display names are HUD/lobby/results copy.
+ */
+export const GAME_MODES = Object.freeze({
+  [GameModeType.DEATHMATCH]: Object.freeze({ displayName: 'DEATHMATCH' }),
+  [GameModeType.KOTH]: Object.freeze({ displayName: 'KING OF THE HILL' }),
+}) satisfies Readonly<Record<GameModeType, { displayName: string }>>;
+
+/** Rotation cycle for fresh matches and rematch succession. */
+export const GAME_MODE_ROTATION: readonly GameModeType[] = Object.freeze([
+  GameModeType.DEATHMATCH,
+  GameModeType.KOTH,
+]);
+
+/**
+ * The mode that follows `current` in rotation order, wrapping at the end.
+ * Unknown values restart the cycle at the first mode rather than throwing —
+ * rotation should never kill a match (same contract as getNextMapName).
+ */
+export function getNextGameMode(current: GameModeType): GameModeType {
+  const idx = GAME_MODE_ROTATION.indexOf(current);
+  return GAME_MODE_ROTATION[(idx + 1) % GAME_MODE_ROTATION.length];
+}
+
+/** HUD/lobby/results display name for a mode. */
+export function gameModeDisplayName(mode: GameModeType): string {
+  return GAME_MODES[mode]?.displayName ?? String(mode).toUpperCase();
+}
+
+/**
+ * King of the Hill. One square hill zone is live at a time; a player scores
+ * 1 point per full second as the zone's sole living occupant (contested =
+ * nobody scores; fractional progress resets whenever sole occupancy is
+ * broken). The hill relocates round-robin through the map's kothHills list
+ * on a fixed interval, with a warning marker at the next spot.
+ */
+export const KOTH = Object.freeze({
+  /** First player to this many hill points wins (else highest at time-out). */
+  SCORE_TARGET: 60,
+  /** Hill zone edge length in tiles (zones are square). */
+  HILL_SIZE_TILES: 2,
+  /** Seconds between hill relocations. */
+  HILL_MOVE_INTERVAL: 25,
+  /** Seconds before relocation that the next-hill warning marker appears. */
+  HILL_MOVE_WARNING: 3,
+});
+
+/**
+ * Sudden-death overtime, all modes: entered when a match would otherwise
+ * end in a tie. Everyone respawns fresh with a single life; the first kill
+ * wins; if nobody dies before the clock runs out the match is a true draw.
+ */
+export const OVERTIME = Object.freeze({
+  /** Overtime length in seconds. */
+  DURATION: 30,
 });
 
 /**

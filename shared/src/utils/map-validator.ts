@@ -1,4 +1,5 @@
 import { MapData, TileType } from '../types/map.js';
+import { KOTH } from '../config/game.js';
 
 export interface ValidationResult {
   valid: boolean;
@@ -97,6 +98,42 @@ export function validateMap(mapData: MapData): ValidationResult {
       errors.push(
         `Decoration "${deco.texture}" rect (${deco.x}, ${deco.y}, ${deco.w}x${deco.h}) extends out of map bounds`,
       );
+    }
+  }
+
+  // Check KOTH hills when declared: at least 3 (round-robin relocation
+  // needs variety), every zone fully inside the map, and every tile of
+  // each HILL_SIZE_TILES² zone walkable — COVER_LOW blocks movement, so a
+  // hill overlapping cover would be partially unstandable.
+  if (mapData.kothHills !== undefined) {
+    if (mapData.kothHills.length < 3) {
+      errors.push(
+        `kothHills must have at least 3 entries, found ${mapData.kothHills.length}`,
+      );
+    }
+    const size = KOTH.HILL_SIZE_TILES;
+    for (const hill of mapData.kothHills) {
+      if (
+        hill.x < 0 ||
+        hill.y < 0 ||
+        hill.x + size > mapData.width ||
+        hill.y + size > mapData.height
+      ) {
+        errors.push(
+          `KOTH hill (${hill.x}, ${hill.y}) extends out of map bounds`,
+        );
+        continue;
+      }
+      for (let dy = 0; dy < size; dy++) {
+        for (let dx = 0; dx < size; dx++) {
+          const tile = mapData.tiles[hill.y + dy]?.[hill.x + dx];
+          if (tile === undefined || !isWalkable(tile)) {
+            errors.push(
+              `KOTH hill (${hill.x}, ${hill.y}) covers non-walkable tile at (${hill.x + dx}, ${hill.y + dy})`,
+            );
+          }
+        }
+      }
     }
   }
 

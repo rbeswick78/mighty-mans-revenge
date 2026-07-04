@@ -48,6 +48,14 @@ export interface MapData {
   theme?: string;
   /** Cosmetic overlay sprites; see MapDecoration. */
   decorations?: MapDecoration[];
+  /**
+   * King of the Hill zone positions — top-left tile of each
+   * KOTH.HILL_SIZE_TILES² zone, in round-robin rotation order (the match
+   * starts on the first entry). Every registry map must declare ≥3 (the
+   * validator checks bounds/walkability when present; the registry
+   * enforces presence so mode rotation can put KOTH on any map).
+   */
+  kothHills?: { x: number; y: number }[];
 }
 
 export interface CollisionGrid {

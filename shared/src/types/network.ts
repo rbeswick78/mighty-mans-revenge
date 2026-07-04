@@ -2,7 +2,7 @@ import { PlayerId, MatchId, Tick, Vec2 } from './common.js';
 import { PlayerInput } from './player.js';
 import { GrenadeState, BulletTrail } from './projectile.js';
 import { PickupState } from './pickup.js';
-import { MatchPhase, KillFeedEntry, MatchResult } from './game.js';
+import { MatchPhase, KillFeedEntry, MatchResult, GameModeType } from './game.js';
 import type { CharacterId, WeaponId, MutatorId } from '../config/game.js';
 
 // === Client -> Server Messages ===
@@ -74,6 +74,7 @@ export type ServerMessage =
   | ServerEventStartMessage
   | ServerWeaponIncomingMessage
   | ServerTilesDestroyedMessage
+  | ServerOvertimeStartMessage
   | ServerPongMessage
   | ServerErrorMessage;
 
@@ -111,6 +112,39 @@ export interface ServerGameStateMessage {
    * the modifiers without an extra round-trip.
    */
   activeMutators: MutatorId[];
+  /**
+   * True while the match is in sudden-death overtime. matchTimer counts
+   * down OVERTIME.DURATION during it. Sent every snapshot (like
+   * activeMutators) so a client that missed the one-shot
+   * server:overtimeStart still renders the right clock and HUD state.
+   */
+  isOvertime: boolean;
+  /**
+   * King of the Hill state — present only in KOTH matches, and omitted
+   * during overtime (the hill is retired for sudden death). Hill points
+   * ride in each player's `score` field like DM kills do.
+   */
+  koth?: KothHudState;
+}
+
+/** Per-snapshot King of the Hill HUD state. Tile coords, not pixels. */
+export interface KothHudState {
+  /** Top-left tile of the live KOTH.HILL_SIZE_TILES² hill zone. */
+  hill: { x: number; y: number };
+  /**
+   * Top-left tile of the NEXT hill — non-null only during the last
+   * KOTH.HILL_MOVE_WARNING seconds before relocation (warning marker).
+   */
+  nextHill: { x: number; y: number } | null;
+  /** Sole living occupant currently accruing points; null if none. */
+  occupantId: PlayerId | null;
+  /** True when 2+ living players stand in the zone (nobody scores). */
+  contested: boolean;
+  /**
+   * Fractional progress toward the occupant's next point, 0..1. Resets
+   * whenever sole occupancy breaks. Drives the capture progress bar.
+   */
+  captureFraction: number;
 }
 
 export interface SerializedPlayerState {
@@ -176,6 +210,8 @@ export interface ServerMatchFoundMessage {
   matchId: MatchId;
   opponents: { id: PlayerId; nickname: string }[];
   mapName: string;
+  /** Mode this match will be played in — drives the lobby's "NEXT: X" line. */
+  gameMode: GameModeType;
 }
 
 /**
@@ -304,6 +340,19 @@ export interface ServerWeaponIncomingMessage {
 export interface ServerTilesDestroyedMessage {
   type: 'server:tilesDestroyed';
   tiles: Array<{ col: number; row: number }>;
+}
+
+/**
+ * One-shot notification that the match just entered sudden-death overtime:
+ * everyone respawned fresh with a single life, first kill wins, true draw
+ * if the overtime clock expires. Drives the OVERTIME banner + sting and
+ * re-anchors the client match clock (like server:matchStart). Reliable —
+ * it's a single dramatic beat and the clock reset depends on it.
+ */
+export interface ServerOvertimeStartMessage {
+  type: 'server:overtimeStart';
+  /** Overtime duration from now, in milliseconds. */
+  overtimeEndsInMs: number;
 }
 
 export interface ServerPongMessage {

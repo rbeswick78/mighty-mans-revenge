@@ -35,5 +35,12 @@
   "decorations": [
     { "x": 11, "y": 3, "w": 1, "h": 2, "texture": "deco_car_overgrown_red" },
     { "x": 8, "y": 7, "w": 1, "h": 2, "texture": "deco_car_overgrown_blue", "flipX": true }
+  ],
+  "kothHills": [
+    { "x": 9, "y": 5 },
+    { "x": 8, "y": 3 },
+    { "x": 15, "y": 5 },
+    { "x": 9, "y": 8 },
+    { "x": 6, "y": 5 }
   ]
 }

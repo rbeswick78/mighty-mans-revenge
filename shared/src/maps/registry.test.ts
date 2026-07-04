@@ -64,6 +64,13 @@ describe('MAP_REGISTRY', () => {
       expect([m.width, m.height, m.tileSize], m.name).toEqual([20, 12, 48]);
     }
   });
+
+  it('every map declares at least 3 KOTH hills (mode rotation contract)', () => {
+    for (const m of MAP_REGISTRY.values()) {
+      expect(m.kothHills, `${m.name} kothHills`).toBeDefined();
+      expect(m.kothHills!.length, `${m.name} hill count`).toBeGreaterThanOrEqual(3);
+    }
+  });
 });
 
 describe('getNextMapName', () => {

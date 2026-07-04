@@ -20,6 +20,7 @@ export enum MatchPhase {
 
 export enum GameModeType {
   DEATHMATCH = 'deathmatch',
+  KOTH = 'koth',
 }
 
 export interface GameState {
@@ -96,4 +97,16 @@ export interface MatchResult {
    * manager (game modes know nothing about rotation); null until then.
    */
   nextMapName: string | null;
+  /**
+   * Mode the rematch (if accepted) will be played in — same contract as
+   * nextMapName: pinned by the matchmaking manager at match end so the
+   * results screen's promise always matches what the rematch starts.
+   */
+  nextGameMode: GameModeType | null;
+  /**
+   * True when the match went to sudden-death overtime (regardless of
+   * whether it produced a winner or a double-timeout draw). Drives the
+   * results screen's overtime callout.
+   */
+  wentToOvertime: boolean;
 }
