@@ -3,6 +3,7 @@ import type { PlayerId } from '@shared/types/common.js';
 import type { PlayerStats } from '@shared/types/player.js';
 import type { MatchResult } from '@shared/types/game.js';
 import type { ServerMatchmakingStatusMessage } from '@shared/types/network.js';
+import { AWARD_DEFS, createEmptyKillsByWeapon } from '@shared/config/game.js';
 import { Wasteland, cssHex } from '@shared/config/palette.js';
 import { AudioManager } from '../audio/audio-manager.js';
 import { GameService, type MatchData } from '../services/game-service.js';
@@ -35,6 +36,14 @@ const OPPONENT_LEFT_COLOR = Wasteland.HIT_FLASH;
 const FOOTER_COLOR = Wasteland.WALL_LINE;
 const NO_DATA_COLOR = Wasteland.COVER_FILL;
 const LOSER_TINT = 0x55454f;
+const AWARD_NAME_COLOR = Wasteland.LOADING_BAR_FILL;  // hot orange accent
+const RIVALRY_COLOR = Wasteland.HEALTH_WARNING;       // amber
+
+// Awards + rivalry strip sits between the stats panel (ends at y=460) and
+// the rematch status line (camHeight - 130 = 590 on the 960x720 canvas).
+const RIVALRY_Y = 480;
+const AWARDS_START_Y = 512;
+const AWARD_ROW_H = 28;
 
 export class ResultsScene extends Phaser.Scene {
   private gameService!: GameService;
@@ -125,6 +134,7 @@ export class ResultsScene extends Phaser.Scene {
 
     if (this.result) {
       this.renderStats(panel, localPlayerId, isWinner, isDraw);
+      this.renderAwardsAndRivalry(centerX);
     } else {
       const noData = this.add
         .text(panel.centerX, panel.centerY, 'No match data available', {
@@ -416,6 +426,67 @@ export class ResultsScene extends Phaser.Scene {
     });
   }
 
+  /**
+   * Awards strip + lifetime rivalry line, rendered below the stats panel.
+   * The server ships at most three awards (priority-capped) and a rivalry
+   * record for 1v1 matches; both are absent on old/partial payloads, so
+   * everything here degrades to rendering nothing.
+   */
+  private renderAwardsAndRivalry(centerX: number): void {
+    if (!this.result) return;
+
+    const rivalry = this.result.rivalry;
+    if (rivalry) {
+      const drawsSuffix = rivalry.draws > 0 ? `  (${rivalry.draws} DRAWS)` : '';
+      const line =
+        `ALL-TIME: ${rivalry.nicknameA.toUpperCase()} ${rivalry.winsA}` +
+        ` - ${rivalry.winsB} ${rivalry.nicknameB.toUpperCase()}${drawsSuffix}`;
+      const rivalryText = this.add
+        .text(centerX, RIVALRY_Y, line, {
+          fontFamily: MENU_FONTS.HEADER,
+          fontSize: '11px',
+          color: cssHex(RIVALRY_COLOR),
+        })
+        .setOrigin(0.5)
+        .setAlpha(0)
+        .setDepth(WastelandStreet.DEPTH.UI);
+      this.tweens.add({ targets: rivalryText, alpha: 1, duration: 400, delay: 300 });
+    }
+
+    const awards = this.result.awards ?? [];
+    awards.forEach((award, i) => {
+      const y = AWARDS_START_Y + i * AWARD_ROW_H;
+      const def = AWARD_DEFS[award.id] as { displayName: string } | undefined;
+      const name = this.add
+        .text(centerX - 10, y, (def?.displayName ?? award.id).toUpperCase(), {
+          fontFamily: MENU_FONTS.HEADER,
+          fontSize: '10px',
+          color: cssHex(AWARD_NAME_COLOR),
+        })
+        .setOrigin(1, 0.5)
+        .setAlpha(0)
+        .setDepth(WastelandStreet.DEPTH.UI);
+      const detail = this.add
+        .text(centerX + 10, y, `${award.nickname.toUpperCase()} - ${award.detail}`, {
+          fontFamily: MENU_FONTS.BODY,
+          fontSize: '13px',
+          color: cssHex(VALUE_COLOR),
+        })
+        .setOrigin(0, 0.5)
+        .setAlpha(0)
+        .setDepth(WastelandStreet.DEPTH.UI);
+
+      this.tweens.add({
+        targets: [name, detail],
+        alpha: 1,
+        y: { from: y + 8, to: y },
+        duration: 400,
+        delay: 500 + i * 200,
+        ease: 'Back.easeOut',
+      });
+    });
+  }
+
   private buildStatRows(
     stats1: PlayerStats | null,
     stats2: PlayerStats | null,
@@ -436,7 +507,7 @@ export class ResultsScene extends Phaser.Scene {
       { label: 'DMG DEALT', left: `${Math.round(s1.damageDealt)}`, right: `${Math.round(s2.damageDealt)}` },
       { label: 'DMG TAKEN', left: `${Math.round(s1.damageTaken)}`, right: `${Math.round(s2.damageTaken)}` },
       { label: 'GRENADES', left: `${s1.grenadesThrown}`, right: `${s2.grenadesThrown}` },
-      { label: 'GREN KILLS', left: `${s1.grenadeKills}`, right: `${s2.grenadeKills}` },
+      { label: 'GREN KILLS', left: `${s1.killsByWeapon.grenade}`, right: `${s2.killsByWeapon.grenade}` },
       { label: 'BEST STREAK', left: `${s1.longestKillStreak}`, right: `${s2.longestKillStreak}` },
     ];
   }
@@ -450,9 +521,9 @@ export class ResultsScene extends Phaser.Scene {
       damageDealt: 0,
       damageTaken: 0,
       grenadesThrown: 0,
-      grenadeKills: 0,
-      shotgunKills: 0,
+      killsByWeapon: createEmptyKillsByWeapon(),
       longestKillStreak: 0,
+      distanceTraveled: 0,
     };
   }
 
