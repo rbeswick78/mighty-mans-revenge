@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–5 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime). Next up: **Session 6**.
+- **Status:** Sessions 1–6 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities). Next up: **Session 7** (stretch — only if the group wants more).
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -37,7 +37,7 @@ Each session below attacks one of these.
 | 3 | Mutator expansion | Matches stop repeating; chaos moments | **DONE** (2026-07-04) |
 | 4 | Two new maps + rotation | New spaces to master | **DONE** (2026-07-04) |
 | 5 | King of the Hill + overtime | A second way to play; no more anticlimactic ties | **DONE** (2026-07-04) |
-| 6 | New characters + stat identities | Counterpicks and mains | not started |
+| 6 | New characters + stat identities | Counterpicks and mains | **DONE** (2026-07-04) |
 | 7 | (Stretch) Gun Game + Pistol + melee | The party mode | not started |
 
 ---
@@ -454,15 +454,15 @@ character and two new roster members with ability art from the pack.
 
 **Acceptance criteria**
 
-- [ ] All five characters selectable with correct sheets/animations
+- [x] All five characters selectable with correct sheets/animations
       (8-frame walks animate correctly).
-- [ ] Speed differences produce zero reconciliation drift (client/server
+- [x] Speed differences produce zero reconciliation drift (client/server
       identical — manual + automated where possible).
-- [ ] Big hitbox is honored by live hits AND rewound hits (lag-comp test).
-- [ ] Iron Hide reduces all damage sources (rifle/shotgun/grenade/fire/axe);
+- [x] Big hitbox is honored by live hits AND rewound hits (lag-comp test).
+- [x] Iron Hide reduces all damage sources (rifle/shotgun/grenade/fire/axe);
       Axe Throw damages on direct hit, blocked by walls, attributed in
       stats (extend weapon union again).
-- [ ] Existing three characters' ability behavior unchanged.
+- [x] Existing three characters' ability behavior unchanged.
 
 **Parallelizable workstreams:** (a) stat plumbing (HP/speed/hitbox) + tests,
 (b) Big Zombie assets + Iron Hide, (c) Axe Zombie assets + projectile.
@@ -490,6 +490,119 @@ to be specced properly when its turn comes:
 
 Append one entry per session. Include: date, what shipped (commits), design
 deviations from this doc, known issues, tuning notes from play-testing.
+
+### Session 6 — 2026-07-04 — New characters + stat identities
+
+**Shipped:** the roster grew from 3 to 5 and character select became a
+real decision. **Bubba** (pack Zombie_Big — display name keeps the
+horror-icon first-name theme next to Bruce): 150 HP, 0.85× speed, 30px
+hit-validation box, ability **Iron Hide** — 50% damage reduction for 4s
+on a 30s from-activation cooldown, applied inside
+`CombatManager.applyDamage` (the single choke point every damage source
+flows through: rifle, pellets, grenades, fire breath, axes — covered by
+per-source tests). **Jack** (pack Zombie_Axe, with-axe body variant):
+baseline 100/1.0×/24px, ability **Axe Throw** — the roster's first
+non-hitscan character projectile, server-simulated like grenades (no
+client damage prediction): 60 dmg direct hit, 6-tile range, wall-blocked,
+per-victim character hitbox × big_heads scale, kills attributed to the
+new `'axe'` KillWeapon, cleared on overtime entry, 12s instant-cast
+cooldown. Whole-roster stat identities live on `CHARACTERS`
+(maxHealth / speedMultiplier / hitbox + per-state sheet frame counts —
+the new zombies' walk sheets are 8-frame). Character select shows
+normalized HP/SPD stat bars per card and shrinks cards/type when the
+roster exceeds 3 (5×172px cards fit the 960px canvas). Client: axe
+flight/landing renderer, Iron Hide steel aura + shield HUD icon +
+banner, Jack axe HUD icon + pitched-up throw SFX.
+
+**Design decisions made in-session (roadmap was silent or amended):**
+- Display names: **Bubba** and **Jack** (Bruce/Bubba/Jack — horror-icon
+  first names; "Big Zombie"/"Axe Zombie" were placeholders).
+- Per-character hitbox affects HIT VALIDATION ONLY. Movement collision
+  keeps `PLAYER.HITBOX_*` for the whole roster (same contract as
+  big_heads' "movement untouched") so map geometry plays identically —
+  documented on CharacterDef.
+- Per-character speed flows through a new shared
+  `playerMovementModifiers(characterId, mutators, secondWindTimer)` —
+  THE function all three movement call sites (server input loop, client
+  prediction, client reconciliation) now use, so prediction can't drift.
+  Composes multiplicatively with mutator speed (super_speed Bubba =
+  0.85 × 1.6). Zero-drift replay covered by a reconciliation unit test.
+- Per-character max HP commits at the select→lock moment (before ACTIVE,
+  so low_health can't have touched maxHealth yet); low_health still
+  clamps everyone to 1 (Bubba included) and respawn uses the live
+  `player.maxHealth`, so the mutator interplay needed no special cases.
+- Iron Hide anchors its cooldown at activation (Bruce-style, 30s total
+  cycle); `applyDamage` now returns `damageApplied` and every call site
+  records stats/vampire healing off the post-reduction value.
+- Axe Throw is instant-cast like Frost Lock (no active window) — the
+  activation banner keys off the cooldown leading edge; the cooldown
+  edge handler was generalized for both.
+- **Axes get an "armed" spawn tick** (hold position for one tick before
+  moving): spawn and updateAxes run in the same match tick, so an axe
+  thrown point-blank at a wall used to spawn AND retire before a single
+  broadcast — the thrower saw nothing. Found live by the smoke (spawn
+  nooks are fenced; Jack kept eating the fence).
+- **Axe throw/landing FX are message-granularity client events**
+  (`axeThrown`/`axeResolved`, diffed per gameState in NetworkManager —
+  exact mirror of `grenadeExploded`'s rationale): a one-snapshot flight
+  can be overwritten by bursty message delivery before a render frame
+  samples it, so frame-polling alone swallowed the whole flight. Flight
+  sprites stay frame-driven; landing anim + throw SFX ride the events.
+- `RewindPlayerState` dropped its hitbox field — it stored a hardcoded
+  24 that NOTHING read (the lag-comp hybrid states carry characterId,
+  and validation derives dims from it; characterId is immutable
+  per-match so the derivation is exact). Contract documented in
+  rewind-buffer.ts; a new lag-compensator test proves a rewound graze
+  hits Bubba's 30px box and misses a 24px character.
+- The aim-line preview (`predictBulletRay`) uses per-victim character
+  hitboxes so the preview marks exactly what the server counts.
+- Fire breath now computes per-victim hitbox sums (Bubba eats more cone).
+
+**Fixed in passing:**
+- `rewind-buffer.ts` line 37 stored `state.maxHealth !== undefined ? 24
+  : 24` — a hardcoded hitbox pretending to be conditional, never read.
+- HUD health bar (`game-scene.ts`) and world-space health bars
+  (`player-manager.ts`) passed `PLAYER.MAX_HEALTH` instead of the
+  player's own `maxHealth` — wrong for the whole roster now, previously
+  only wrong during low_health.
+
+**Verified:** 592 unit tests green (+46 this session: stat-identity
+accessors + roadmap-table values, playerMovementModifiers composition,
+per-character speed through the match loop, live + fire-breath hitbox
+grazes, Iron Hide over all five damage sources incl. expiry/cooldown/
+death-cancel, axe spawn/flight/wall/range/thrower-exclusion/
+invuln-skip/big_heads/armed-tick/overtime-clear, lag-comp rewound
+30px-box hit/miss pair, reconciliation zero-drift replay for Bubba).
+Typecheck + lint clean; full Playwright suite green. Throwaway
+two-client Playwright smokes (spec deleted after) through the real dev
+servers: 5-card select screen with stat bars (desktop + mobile-landscape
+viewport, screenshots eyeballed), Bubba locked → 150 HP bar, IRON HIDE!
+banner + steel aura + shield icon with active countdown; Jack → AXE
+THROW! banner, axe HUD icon with 12s cooldown arc, axe render asserted
+via a display-list probe + a wire tap counting axe-carrying snapshots;
+zero page errors on both clients across both viewports.
+
+**Known issues / notes for later sessions:**
+- Point-blank wall throws show only the landing animation at the
+  thrower's feet (the axe lives one snapshot). Acceptable — it was
+  fully invisible before the armed-tick + event fixes.
+- Axe SFX is the grenade throw pitched up (detune 700 / rate 1.5) —
+  the pack ships no audio; revisit if the group notices.
+- The zombies' 8-frame walks play at the same 12fps as the 6-frame
+  originals → slightly slower stride cycle. Reads right for Bubba (slow
+  tank); watch whether Jack's walk feels sluggish in playtest.
+- Jack always renders the with-axe body, even while his axe is in
+  flight/cooldown — cosmetic simplification (no-axe variant sheets
+  exist in the pack if it ever bothers anyone).
+- Session 5 leftovers still unclaimed: "Hill Hog" award (needs a
+  StatsTracker hill-seconds column) and overtime music (plays over
+  silence after the sting).
+- **e2e gotcha (recorded in memory):** Playwright's
+  `reuseExistingServer` leaves the dev servers RUNNING after a suite
+  finishes on this machine — a later run silently reuses a stale server
+  built from older code. Kill anything on 3000/3001/5173 before every
+  e2e run, not just at session start (cost a full debug cycle this
+  session).
 
 ### Session 5 — 2026-07-04 — King of the Hill + overtime
 
