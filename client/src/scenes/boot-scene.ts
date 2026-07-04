@@ -44,11 +44,39 @@ const FIRE_FRAMES: Record<Direction4, FrameDim> = {
   'side-left': { w: 10, h: 7 },   // 30 × 7
 };
 
+/**
+ * Shotgun held-overlay frame dimensions (same layering trick as the gun:
+ * overlay both sprites at the same origin and the weapon sits in the held
+ * hand). hold = idle-and-run Sheet6, shoot = Sheet3, racking = Sheet2.
+ */
+const SHOTGUN_HOLD_FRAMES: Record<Direction4, FrameDim> = {
+  down: { w: 6, h: 14 },          // 36 × 14
+  up: { w: 6, h: 16 },            // 36 × 16
+  side: { w: 15, h: 8 },          // 90 × 8
+  'side-left': { w: 15, h: 8 },   // 90 × 8
+};
+
+const SHOTGUN_SHOOT_FRAMES: Record<Direction4, FrameDim> = {
+  down: { w: 6, h: 15 },          // 18 × 15
+  up: { w: 6, h: 17 },            // 18 × 17
+  side: { w: 18, h: 8 },          // 54 × 8
+  'side-left': { w: 18, h: 8 },   // 54 × 8
+};
+
+const SHOTGUN_RACK_FRAMES: Record<Direction4, FrameDim> = {
+  down: { w: 6, h: 14 },          // 12 × 14
+  up: { w: 6, h: 16 },            // 12 × 16
+  side: { w: 16, h: 7 },          // 32 × 7
+  'side-left': { w: 16, h: 7 },   // 32 × 7
+};
+
 const IDLE_FPS = 6;
 const RUN_FPS = 12;
 const GUN_HOLD_FPS = 9;     // between idle and run — visually close enough either way
 const GUN_SHOOT_FPS = 24;   // 3 frames in ~125 ms
 const FIRE_FPS = 30;        // 3 frames in ~100 ms — matches old procedural flash duration
+/** 2 racking frames spread over the shotgun's 0.6 s pump delay. */
+const SHOTGUN_RACK_FPS = 2 / 0.6;
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -191,6 +219,25 @@ export class BootScene extends Phaser.Scene {
       );
     }
 
+    // Shotgun held overlay — 4 directions × (hold loop / shoot / racking).
+    for (const dir of DIRECTIONS) {
+      this.load.spritesheet(
+        `shotgun_${dir}_hold`,
+        `/assets/player/shotgun_${dir}_hold.png`,
+        { frameWidth: SHOTGUN_HOLD_FRAMES[dir].w, frameHeight: SHOTGUN_HOLD_FRAMES[dir].h },
+      );
+      this.load.spritesheet(
+        `shotgun_${dir}_shoot`,
+        `/assets/player/shotgun_${dir}_shoot.png`,
+        { frameWidth: SHOTGUN_SHOOT_FRAMES[dir].w, frameHeight: SHOTGUN_SHOOT_FRAMES[dir].h },
+      );
+      this.load.spritesheet(
+        `shotgun_${dir}_racking`,
+        `/assets/player/shotgun_${dir}_racking.png`,
+        { frameWidth: SHOTGUN_RACK_FRAMES[dir].w, frameHeight: SHOTGUN_RACK_FRAMES[dir].h },
+      );
+    }
+
     // Bleak-yellow tileset (16×16 tiles, 24 cols × 17 rows = 408 frames).
     // Specific frame indices are tunable in map-renderer.ts.
     this.load.spritesheet(
@@ -224,10 +271,20 @@ export class BootScene extends Phaser.Scene {
     // Ammo uses the asset-pack crate; grenade is generated procedurally
     // (see generateProceduralAssets) so it actually reads as a grenade.
     this.load.image('pickup_ammo', '/assets/pickups/ammo-crate_blue.png');
+    this.load.image('pickup_shotgun', '/assets/pickups/shotgun.png');
+    this.load.image('pickup_bandage', '/assets/pickups/bandage.png');
 
     // Bullet head — 2×1 px sprite, rotated to bullet angle and tweened
     // start→end. Replaces the procedural 'bullet-trail' streak.
     this.load.image('bullet', '/assets/player/bullet.png');
+    // Shotgun pellet head — 3×1 px, one per pellet trail.
+    this.load.image('shotgun-bullet', '/assets/player/shotgun-bullet.png');
+
+    // HUD shell indicators for the special-weapon ammo panel.
+    this.load.image('shotgun_shell', '/assets/ui/shotgun-bullet-indicator.png');
+    this.load.image('shotgun_shell_empty', '/assets/ui/shotgun-bullet-indicator_empty.png');
+    this.load.image('shotgun_shell_small', '/assets/ui/shotgun-bullet-indicator_small.png');
+    this.load.image('shotgun_shell_small_empty', '/assets/ui/shotgun-bullet-indicator_small_empty.png');
 
     // Music tracks. Played via AudioManager.playMusic(<key>) on scene
     // entry; gameplay match length is tied to game-play track length.
@@ -309,6 +366,30 @@ export class BootScene extends Phaser.Scene {
         key: fireKey,
         frames: this.anims.generateFrameNumbers(fireKey, {}),
         frameRate: FIRE_FPS,
+        repeat: 0,
+      });
+
+      // Shotgun overlay: hold loops; shoot and racking are one-shots
+      // (racking is chained after shoot by the player renderer).
+      const sgHoldKey = `shotgun_${dir}_hold`;
+      this.anims.create({
+        key: sgHoldKey,
+        frames: this.anims.generateFrameNumbers(sgHoldKey, {}),
+        frameRate: GUN_HOLD_FPS,
+        repeat: -1,
+      });
+      const sgShootKey = `shotgun_${dir}_shoot`;
+      this.anims.create({
+        key: sgShootKey,
+        frames: this.anims.generateFrameNumbers(sgShootKey, {}),
+        frameRate: GUN_SHOOT_FPS,
+        repeat: 0,
+      });
+      const sgRackKey = `shotgun_${dir}_racking`;
+      this.anims.create({
+        key: sgRackKey,
+        frames: this.anims.generateFrameNumbers(sgRackKey, {}),
+        frameRate: SHOTGUN_RACK_FPS,
         repeat: 0,
       });
     }

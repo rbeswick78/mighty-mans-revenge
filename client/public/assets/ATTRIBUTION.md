@@ -24,6 +24,14 @@ This game uses pixel art assets from third-party packs. Source archives are
 - `tiles/iron-fence.png` — Tiles/Iron-Fence_TileSet
 - `pickups/ammo-crate_blue.png` — Objects/Pickable
 - `pickups/ammo-crate_red.png` — Objects/Pickable
+- `pickups/shotgun.png` — Objects/Pickable/Shotgun
+- `pickups/bandage.png` — Objects/Pickable/Bandage
+- `player/shotgun_*_hold.png` — Character/Guns/Shotgun idle-and-run Sheet6 (4 directions)
+- `player/shotgun_*_shoot.png` — Character/Guns/Shotgun shoot Sheet3 (4 directions)
+- `player/shotgun_*_racking.png` — Character/Guns/Shotgun racking Sheet2 (4 directions)
+- `player/shotgun-bullet.png` — Character/Guns/Bullets/Shotgun-bullet
+- `ui/shotgun-bullet-indicator.png` (+ `_empty`) — UI/Bullet Indicators/Shotgun-Bullet
+- `ui/shotgun-bullet-indicator_small.png` (+ `_small_empty`) — UI/Bullet Indicators/Small
 
 If we ever ship this commercially (charge money, run ads, promote a paid
 product) we owe the author at least $2 — pay before release.

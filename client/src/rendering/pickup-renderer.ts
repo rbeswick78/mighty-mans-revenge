@@ -4,6 +4,13 @@ import { PickupType } from '@shared/types/pickup.js';
 
 const PICKUP_SCALE = 3;
 
+const PICKUP_TEXTURES: Record<PickupType, string> = {
+  [PickupType.GUN_AMMO]: 'pickup_ammo',
+  [PickupType.GRENADE]: 'pickup_grenade',
+  [PickupType.WEAPON_SHOTGUN]: 'pickup_shotgun',
+  [PickupType.BANDAGE]: 'pickup_bandage',
+};
+
 interface PickupSprite {
   container: Phaser.GameObjects.Container;
   sprite: Phaser.GameObjects.Sprite;
@@ -70,8 +77,7 @@ export class PickupRenderer {
   }
 
   private createPickup(state: PickupState): PickupSprite {
-    const textureKey =
-      state.type === PickupType.GUN_AMMO ? 'pickup_ammo' : 'pickup_grenade';
+    const textureKey = PICKUP_TEXTURES[state.type] ?? 'pickup_ammo';
 
     const sprite = this.scene.add.sprite(0, 0, textureKey);
     sprite.setOrigin(0.5, 0.5);

@@ -5,7 +5,8 @@ import type { PlayerId, Vec2 } from '@shared/types/common.js';
 import type { MatchResult, KillFeedEntry } from '@shared/types/game.js';
 import { MatchPhase } from '@shared/types/game.js';
 import type { BulletTrail } from '@shared/types/projectile.js';
-import { PLAYER, SERVER } from '@shared/config/game.js';
+import { PickupType } from '@shared/types/pickup.js';
+import { PLAYER, SERVER, WEAPONS } from '@shared/config/game.js';
 import { Wasteland, cssHex } from '@shared/config/palette.js';
 import {
   predictBulletRay,
@@ -23,7 +24,11 @@ import { HealFlash } from '../rendering/heal-flash.js';
 import { EventFlash } from '../rendering/event-flash.js';
 import { eventDisplayName } from '@shared/utils/event-modifiers.js';
 import type { FinalMinuteEvent, SerializedPlayerState } from '@shared/types/network.js';
-import type { EventStartPayload, EventWarningPayload } from '../services/game-service.js';
+import type {
+  EventStartPayload,
+  EventWarningPayload,
+  WeaponIncomingPayload,
+} from '../services/game-service.js';
 import { ImpactFx } from '../rendering/impact-fx.js';
 import { ExplosionFx } from '../rendering/explosion-fx.js';
 import { SmokeFx } from '../rendering/smoke-fx.js';
@@ -159,7 +164,15 @@ export class GameScene extends Phaser.Scene {
   private onLocalCorrection: ((correction: LocalCorrection) => void) | null = null;
   private onEventWarning: ((payload: EventWarningPayload) => void) | null = null;
   private onEventStart: ((payload: EventStartPayload) => void) | null = null;
+  private onWeaponIncoming: ((payload: WeaponIncomingPayload) => void) | null = null;
   private onTilesDestroyed: ((tiles: Array<{ col: number; row: number }>) => void) | null = null;
+  /**
+   * Timestamp of the most recent shotgun blast per shooter. A blast
+   * broadcasts one BulletTrail per pellet in the same tick; muzzle flash,
+   * boom SFX, shoot anim, and camera kick should fire once per blast, not
+   * once per pellet.
+   */
+  private lastShotgunBlastAt: Map<PlayerId, number> = new Map();
   /** Cached so we can detect changes (incl. mid-match-join) and resync the label. */
   private lastSyncedActiveEvent: FinalMinuteEvent | null = null;
 
@@ -362,6 +375,9 @@ export class GameScene extends Phaser.Scene {
           health: currentLocalState.health,
           maxHealth: currentLocalState.maxHealth,
           ammo: currentLocalState.ammo,
+          weaponId: currentLocalState.weaponId,
+          specialAmmo: currentLocalState.specialAmmo,
+          specialReserve: currentLocalState.specialReserve,
           grenades: currentLocalState.grenades,
           isReloading: currentLocalState.isReloading,
           isSprinting: currentLocalState.isSprinting,
@@ -390,6 +406,9 @@ export class GameScene extends Phaser.Scene {
             health: interpState.health,
             maxHealth: interpState.maxHealth,
             ammo: interpState.ammo,
+            weaponId: interpState.weaponId,
+            specialAmmo: interpState.specialAmmo,
+            specialReserve: interpState.specialReserve,
             grenades: interpState.grenades,
             isReloading: interpState.isReloading,
             isSprinting: interpState.isSprinting,
@@ -482,7 +501,16 @@ export class GameScene extends Phaser.Scene {
 
         // Update HUD
         this.hud.updateHealth(currentLocalState.health, PLAYER.MAX_HEALTH);
-        this.hud.updateAmmo(currentLocalState.ammo, 30, currentLocalState.isReloading);
+        this.hud.updateAmmo(
+          currentLocalState.ammo,
+          WEAPONS.rifle.magazineSize,
+          currentLocalState.isReloading,
+        );
+        this.hud.updateSpecialWeapon(
+          currentLocalState.weaponId,
+          currentLocalState.specialAmmo,
+          currentLocalState.specialReserve,
+        );
         this.hud.updateGrenadeStatus(
           networkManager.hasActiveGrenadeFor(playerId),
           currentLocalState.grenades,
@@ -611,6 +639,7 @@ export class GameScene extends Phaser.Scene {
         players,
         grid,
         piercing,
+        WEAPONS[localState.weaponId],
       );
       this.effectsRenderer.showBulletAim(
         localState.position.x,
@@ -659,6 +688,9 @@ export class GameScene extends Phaser.Scene {
         ammo: interp.ammo,
         isReloading: interp.isReloading,
         reloadTimer: 0,
+        weaponId: interp.weaponId,
+        specialAmmo: interp.specialAmmo,
+        specialReserve: interp.specialReserve,
         grenades: interp.grenades,
         grenadeRegenSeconds: 0,
         isSprinting: interp.isSprinting,
@@ -778,20 +810,38 @@ export class GameScene extends Phaser.Scene {
         trail.endPos.x - trail.startPos.x,
       );
 
+      // A shotgun blast arrives as one trail per pellet (same tick, same
+      // shooter). Render every pellet's trail/impact, but fire the
+      // one-per-blast effects (muzzle flash, boom SFX, shoot anim, camera
+      // kick) only for the first pellet of the blast.
+      const isShotgun = trail.weaponId === 'shotgun';
+      let primaryOfBlast = true;
+      if (isShotgun) {
+        const last = this.lastShotgunBlastAt.get(trail.shooterId) ?? -Infinity;
+        if (trail.timestamp - last < 100) {
+          primaryOfBlast = false;
+        } else {
+          this.lastShotgunBlastAt.set(trail.shooterId, trail.timestamp);
+        }
+      }
+
       // Muzzle flash + lighting flash are gun-specific visuals. Skip for
       // characters that don't render a held gun (e.g. Bruce) — fire
       // emerging from a fist would read as a bug. The bullet trail itself
       // still plays so the shot is legible.
       const shooter = this.playerManager?.getRenderer(trail.shooterId);
-      if (shooter?.rendersGun() ?? true) {
+      if (primaryOfBlast && (shooter?.rendersGun() ?? true)) {
         this.effectsRenderer?.showMuzzleFlash(trail.startPos.x, trail.startPos.y, bulletAngle);
         this.lightingRenderer?.addMuzzleFlash(trail.startPos.x, trail.startPos.y);
       }
 
-      // Three trails per burst (server-authoritative, GUN.BURST_INTERVAL apart),
-      // so this naturally produces three shots spaced to match the bullets.
+      // Rifle: three trails per burst (server-authoritative, burstInterval
+      // apart), so per-trail playback naturally produces three shots.
+      // Shotgun: one deeper boom per blast — the same source WAV slowed
+      // down (rate/detune variant per the roadmap; no new audio file).
       const audio = AudioManager.getInstance();
-      if (audio) {
+      if (audio && primaryOfBlast) {
+        const sfxOptions = isShotgun ? { rate: 0.55, detune: -250 } : undefined;
         const localState = this.gameService.getNetworkManager().getLocalPlayerState();
         if (localState) {
           audio.playAtPosition(
@@ -800,16 +850,19 @@ export class GameScene extends Phaser.Scene {
             trail.startPos.y,
             localState.position.x,
             localState.position.y,
+            sfxOptions,
           );
         } else {
-          audio.play('gunshot');
+          audio.play('gunshot', sfxOptions);
         }
       }
 
-      // Trigger the shooter's gun shoot animation. Characters without a
-      // rendered gun (CharacterDef.hasGun=false) silently no-op inside
-      // playShootAnimation.
-      shooter?.playShootAnimation();
+      // Trigger the shooter's weapon shoot animation (the shotgun chains
+      // its pump-racking anim). Characters without a rendered gun
+      // (CharacterDef.hasGun=false) silently no-op inside playShootAnimation.
+      if (primaryOfBlast) {
+        shooter?.playShootAnimation();
+      }
 
       const grid = this.mapRenderer?.getCollisionGrid() ?? null;
       this.impactFx?.spawnBulletImpact(
@@ -827,7 +880,10 @@ export class GameScene extends Phaser.Scene {
 
       // Recoil kick — only the local player's shot moves the local camera.
       // Watching a remote player fire must not jitter your view.
-      if (trail.shooterId === this.gameService.getNetworkManager().getPlayerId()) {
+      if (
+        primaryOfBlast &&
+        trail.shooterId === this.gameService.getNetworkManager().getPlayerId()
+      ) {
         this.cameraKick?.trigger(bulletAngle + Math.PI);
       }
     };
@@ -848,7 +904,7 @@ export class GameScene extends Phaser.Scene {
       }
     };
 
-    this.onPickupCollected = (_pickupId: string, collectorId: PlayerId) => {
+    this.onPickupCollected = (pickupId: string, collectorId: PlayerId) => {
       const audio = AudioManager.getInstance();
       if (!audio) return;
       const networkManager = this.gameService.getNetworkManager();
@@ -866,6 +922,18 @@ export class GameScene extends Phaser.Scene {
         collectorPos = remote ? remote.position : null;
       }
 
+      // Rate variants distinguish pickups without new audio files: the
+      // shotgun lands as a heavier clunk, the bandage as a lighter snip.
+      const pickupType = networkManager
+        .getPickups()
+        .find((p) => p.id === pickupId)?.type;
+      let sfxOptions: { rate: number } | undefined;
+      if (pickupType === PickupType.WEAPON_SHOTGUN) {
+        sfxOptions = { rate: 0.6 };
+      } else if (pickupType === PickupType.BANDAGE) {
+        sfxOptions = { rate: 1.35 };
+      }
+
       if (collectorPos && localState) {
         audio.playAtPosition(
           'pickupCollect',
@@ -873,9 +941,10 @@ export class GameScene extends Phaser.Scene {
           collectorPos.y,
           localState.position.x,
           localState.position.y,
+          sfxOptions,
         );
       } else {
-        audio.play('pickupCollect');
+        audio.play('pickupCollect', sfxOptions);
       }
     };
 
@@ -967,6 +1036,16 @@ export class GameScene extends Phaser.Scene {
       AudioManager.getInstance()?.play('matchStartHorn');
     };
 
+    // Weapon pickup pre-announcement — "SHOTGUN INCOMING" ~5s before the
+    // pickup lands at map center. Reuses the event banner (gold tint, to
+    // match the shell indicators) with a down-pitched horn so it doesn't
+    // read as a final-minute event.
+    this.onWeaponIncoming = (payload: WeaponIncomingPayload) => {
+      const name = payload.weaponId === 'shotgun' ? 'SHOTGUN' : payload.weaponId.toUpperCase();
+      this.hud?.showEventBanner(`${name} INCOMING`, undefined, 0xf9c22b);
+      AudioManager.getInstance()?.play('matchStartHorn', { detune: -400 });
+    };
+
     this.onTilesDestroyed = (tiles) => {
       if (!this.mapRenderer) return;
       for (const { col, row } of tiles) {
@@ -986,6 +1065,7 @@ export class GameScene extends Phaser.Scene {
     this.gameService.on('localCorrection', this.onLocalCorrection);
     this.gameService.on('eventWarning', this.onEventWarning);
     this.gameService.on('eventStart', this.onEventStart);
+    this.gameService.on('weaponIncoming', this.onWeaponIncoming);
     this.gameService.on('tilesDestroyed', this.onTilesDestroyed);
   }
 
@@ -1073,6 +1153,10 @@ export class GameScene extends Phaser.Scene {
     if (this.onEventStart) {
       this.gameService.off('eventStart', this.onEventStart);
       this.onEventStart = null;
+    }
+    if (this.onWeaponIncoming) {
+      this.gameService.off('weaponIncoming', this.onWeaponIncoming);
+      this.onWeaponIncoming = null;
     }
   }
 

@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
-import { GUN, ABILITY } from '@shared/config/game.js';
-import type { CharacterId } from '@shared/config/game.js';
+import { WEAPONS, ABILITY } from '@shared/config/game.js';
+import type { CharacterId, WeaponId } from '@shared/config/game.js';
 import { Wasteland, cssHex, healthColor } from '@shared/config/palette.js';
 import { HUD_STRIP_HEIGHT, MAP_HEIGHT_PX, MAP_WIDTH_PX } from './layout.js';
 import { MENU_FONTS } from './menu/fonts.js';
@@ -60,6 +60,12 @@ export class HUD {
   private ammoText: Phaser.GameObjects.Text;
   private reloadingText: Phaser.GameObjects.Text;
   private grenadeText: Phaser.GameObjects.Text;
+
+  // Special-weapon row (shotgun): label + per-shell indicator icons +
+  // reserve count. Hidden while the player is on the rifle.
+  private specialWeaponLabel: Phaser.GameObjects.Text;
+  private specialShellIcons: Phaser.GameObjects.Image[] = [];
+  private specialReserveText: Phaser.GameObjects.Text;
 
   // Middle column: match state
   private scoreText: Phaser.GameObjects.Text;
@@ -153,9 +159,14 @@ export class HUD {
     this.staminaBarFg.setDepth(1001);
 
     const ammoY = stY + stH + 12;
-    this.ammoText = scene.add.text(hbX, ammoY, `${GUN.MAGAZINE_SIZE} / ${GUN.MAGAZINE_SIZE}`, {
-      ...FONT_STYLE,
-    });
+    this.ammoText = scene.add.text(
+      hbX,
+      ammoY,
+      `${WEAPONS.rifle.magazineSize} / ${WEAPONS.rifle.magazineSize}`,
+      {
+        ...FONT_STYLE,
+      },
+    );
     this.ammoText.setScrollFactor(0);
     this.ammoText.setDepth(1000);
 
@@ -174,6 +185,38 @@ export class HUD {
     });
     this.grenadeText.setScrollFactor(0);
     this.grenadeText.setDepth(1000);
+
+    // --- Special-weapon row (hidden until a shotgun is picked up) ---
+    const specialY = grenadeY + 26;
+    this.specialWeaponLabel = scene.add.text(hbX, specialY + 4, 'SHOTGUN', {
+      ...HEADER_STYLE,
+      fontSize: '10px',
+      color: cssHex(Wasteland.TEXT_RELOAD_WARNING),
+    });
+    this.specialWeaponLabel.setScrollFactor(0);
+    this.specialWeaponLabel.setDepth(1000);
+    this.specialWeaponLabel.setVisible(false);
+
+    const shellStartX = hbX + 96;
+    for (let i = 0; i < WEAPONS.shotgun.magazineSize; i++) {
+      const icon = scene.add.image(shellStartX + i * 24, specialY, 'shotgun_shell');
+      icon.setOrigin(0, 0);
+      icon.setScale(2);
+      icon.setScrollFactor(0);
+      icon.setDepth(1000);
+      icon.setVisible(false);
+      this.specialShellIcons.push(icon);
+    }
+
+    this.specialReserveText = scene.add.text(
+      shellStartX + WEAPONS.shotgun.magazineSize * 24 + 8,
+      specialY + 4,
+      '',
+      { ...FONT_STYLE },
+    );
+    this.specialReserveText.setScrollFactor(0);
+    this.specialReserveText.setDepth(1000);
+    this.specialReserveText.setVisible(false);
 
     // --- Ability indicator: themed icon + radial sweep cooldown ---
     this.abilityRadius = 18;
@@ -296,6 +339,27 @@ export class HUD {
   updateAmmo(current: number, max: number, isReloading: boolean): void {
     this.ammoText.setText(`${current} / ${max}`);
     this.reloadingText.setVisible(isReloading);
+  }
+
+  /**
+   * Sync the special-weapon row. Hidden entirely while on the rifle;
+   * while a shotgun is held, shows one filled/empty icon per magazine
+   * shell plus the reserve count ("+6").
+   */
+  updateSpecialWeapon(weaponId: WeaponId, magAmmo: number, reserve: number): void {
+    const visible = weaponId === 'shotgun';
+    this.specialWeaponLabel.setVisible(visible);
+    this.specialReserveText.setVisible(visible);
+    for (let i = 0; i < this.specialShellIcons.length; i++) {
+      const icon = this.specialShellIcons[i];
+      icon.setVisible(visible);
+      if (visible) {
+        icon.setTexture(i < magAmmo ? 'shotgun_shell' : 'shotgun_shell_empty');
+      }
+    }
+    if (visible) {
+      this.specialReserveText.setText(`+${reserve}`);
+    }
   }
 
   /** Show "YOU DIED" with a respawn countdown, or hide it when alive. */

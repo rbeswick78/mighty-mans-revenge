@@ -8,7 +8,7 @@ import type {
   ServerCharacterSelectStateMessage,
   FinalMinuteEvent,
 } from '@shared/types/network.js';
-import type { CharacterId } from '@shared/config/game.js';
+import type { CharacterId, WeaponId } from '@shared/config/game.js';
 import { NetworkManager, type LocalCorrection } from '../network/network-manager.js';
 
 export interface EventWarningPayload {
@@ -18,6 +18,12 @@ export interface EventWarningPayload {
 
 export interface EventStartPayload {
   event: FinalMinuteEvent;
+}
+
+/** "SHOTGUN INCOMING" — a weapon pickup is about to (re)spawn. */
+export interface WeaponIncomingPayload {
+  weaponId: WeaponId;
+  landsInMs: number;
 }
 
 export interface MatchData {
@@ -45,6 +51,7 @@ type GameServiceEvent =
   | 'localCorrection'
   | 'eventWarning'
   | 'eventStart'
+  | 'weaponIncoming'
   | 'tilesDestroyed';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -236,6 +243,10 @@ export class GameService {
 
     this.networkManager.on('eventStart', (payload: EventStartPayload) => {
       this.emit('eventStart', payload);
+    });
+
+    this.networkManager.on('weaponIncoming', (payload: WeaponIncomingPayload) => {
+      this.emit('weaponIncoming', payload);
     });
 
     this.networkManager.on('tilesDestroyed', (tiles: Array<{ col: number; row: number }>) => {

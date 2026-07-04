@@ -84,6 +84,14 @@ type SoundName = keyof typeof SOUND_MAP;
 interface PlayOptions {
   volume?: number;
   loop?: boolean;
+  /**
+   * Playback speed multiplier (1 = normal). Used to derive weapon SFX
+   * variants from one source file (e.g. gun-shot.wav slowed down reads
+   * as a deeper shotgun boom).
+   */
+  rate?: number;
+  /** Pitch shift in cents (100 = one semitone), applied on top of rate. */
+  detune?: number;
 }
 
 /** Cancellable handle for an in-flight volume fade. */
@@ -160,6 +168,8 @@ export class AudioManager {
     this.game.sound.play(config.key, {
       volume: effectiveVolume,
       loop: options?.loop ?? false,
+      rate: options?.rate ?? 1,
+      detune: options?.detune ?? 0,
     });
   }
 

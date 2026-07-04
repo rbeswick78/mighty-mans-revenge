@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import type { PlayerState } from '@shared/types/player.js';
-import { CHARACTERS, type CharacterId } from '@shared/config/game.js';
+import { CHARACTERS, type CharacterId, type WeaponId } from '@shared/config/game.js';
 import { Wasteland, cssHex, healthColor } from '@shared/config/palette.js';
 import { bucketAimAngle, type Direction4 } from './sprite-direction.js';
 
@@ -62,9 +62,14 @@ const MOVING_THRESHOLD_SQ = 1.0;
  * boot-scene.ts (~125 ms).
  */
 const GUN_SHOOT_DURATION_MS = 125;
+/**
+ * Shotgun pump animation shown after each shot. Together with the shoot
+ * anim this fills the weapon's 0.6 s fireCooldown (125 + 475 ms).
+ */
+const SHOTGUN_RACK_DURATION_MS = 475;
 
 type AnimState = 'idle' | 'run';
-type GunState = 'hold' | 'shoot';
+type GunState = 'hold' | 'shoot' | 'racking';
 
 export class PlayerRenderer {
   private container: Phaser.GameObjects.Container;
@@ -93,6 +98,8 @@ export class PlayerRenderer {
   private currentDirection: Direction4 = 'down';
   private currentAnimState: AnimState = 'idle';
   private currentGunState: GunState = 'hold';
+  /** Weapon driving the held-overlay sheets: 'gun_*' keys for the rifle, 'shotgun_*' for the shotgun. */
+  private currentWeaponId: WeaponId = 'rifle';
   private gunShootTimer: Phaser.Time.TimerEvent | null = null;
   private hasLastPos = false;
   private lastX = 0;
@@ -217,6 +224,7 @@ export class PlayerRenderer {
   update(state: PlayerState): void {
     this.setPosition(state.position.x, state.position.y);
     this.setAimAngle(state.aimAngle);
+    this.setWeapon(state.weaponId);
     this.updateHealthBar(state.health, state.maxHealth);
     this.nicknameText.setText(state.nickname);
     this.container.setVisible(!state.isDead);
@@ -333,10 +341,27 @@ export class PlayerRenderer {
   }
 
   /**
-   * Trigger the gun's 3-frame shoot animation. Routed from
+   * Swap the held-weapon overlay when the server says the equipped weapon
+   * changed (shotgun picked up / spent). Cancels any in-flight shoot/rack
+   * chain so we never play a shotgun anim with rifle sheets or vice versa.
+   */
+  setWeapon(weaponId: WeaponId): void {
+    if (weaponId === this.currentWeaponId) return;
+    this.currentWeaponId = weaponId;
+    if (!this.gunSprite) return;
+    this.gunShootTimer?.remove(false);
+    this.gunShootTimer = null;
+    this.currentGunState = 'hold';
+    this.playCurrentGunAnim();
+  }
+
+  /**
+   * Trigger the weapon's 3-frame shoot animation. Routed from
    * GameScene.onBulletTrail by shooterId. Each new shot restarts the
-   * shoot anim (no stacking); after GUN_SHOOT_DURATION_MS we revert to
-   * the looping hold anim. No-op for characters without a rendered gun.
+   * shoot anim (no stacking). The rifle reverts straight to the looping
+   * hold anim; the shotgun chains its pump-racking anim first, filling
+   * the server's 0.6 s fire cooldown. No-op for characters without a
+   * rendered gun.
    */
   playShootAnimation(): void {
     if (!this.gunSprite) return;
@@ -344,9 +369,19 @@ export class PlayerRenderer {
     this.playCurrentGunAnim();
     this.gunShootTimer?.remove(false);
     this.gunShootTimer = this.scene.time.delayedCall(GUN_SHOOT_DURATION_MS, () => {
-      this.currentGunState = 'hold';
-      this.playCurrentGunAnim();
-      this.gunShootTimer = null;
+      if (this.currentWeaponId === 'shotgun') {
+        this.currentGunState = 'racking';
+        this.playCurrentGunAnim();
+        this.gunShootTimer = this.scene.time.delayedCall(SHOTGUN_RACK_DURATION_MS, () => {
+          this.currentGunState = 'hold';
+          this.playCurrentGunAnim();
+          this.gunShootTimer = null;
+        });
+      } else {
+        this.currentGunState = 'hold';
+        this.playCurrentGunAnim();
+        this.gunShootTimer = null;
+      }
     });
   }
 
@@ -467,6 +502,11 @@ export class PlayerRenderer {
   }
 
   private gunKey(direction: Direction4, state: GunState): string {
-    return `gun_${direction}_${state}`;
+    // Only the shotgun has racking sheets; a stray 'racking' on the rifle
+    // (weapon swapped mid-chain) falls back to hold.
+    if (this.currentWeaponId === 'shotgun') {
+      return `shotgun_${direction}_${state}`;
+    }
+    return `gun_${direction}_${state === 'racking' ? 'hold' : state}`;
   }
 }

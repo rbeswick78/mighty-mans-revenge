@@ -451,6 +451,7 @@ export class ResultsScene extends Phaser.Scene {
       damageTaken: 0,
       grenadesThrown: 0,
       grenadeKills: 0,
+      shotgunKills: 0,
       longestKillStreak: 0,
     };
   }

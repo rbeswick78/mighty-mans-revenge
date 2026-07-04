@@ -39,6 +39,7 @@ type EventName =
   | 'localCorrection'
   | 'eventWarning'
   | 'eventStart'
+  | 'weaponIncoming'
   | 'tilesDestroyed'
   | 'error';
 
@@ -334,6 +335,10 @@ export class NetworkManager {
         this.emit('eventStart', { event: msg.event });
         break;
 
+      case 'server:weaponIncoming':
+        this.emit('weaponIncoming', { weaponId: msg.weaponId, landsInMs: msg.landsInMs });
+        break;
+
       case 'server:playerKilled':
         this.emit('playerKilled', msg);
         break;
@@ -502,6 +507,11 @@ export class NetworkManager {
       health: serverState.health,
       maxHealth: serverState.maxHealth,
       ammo: serverState.ammo,
+      // Weapon slot is server-authoritative (auto-equip on pickup,
+      // auto-revert on empty) — the client never predicts it.
+      weaponId: serverState.weaponId,
+      specialAmmo: serverState.specialAmmo,
+      specialReserve: serverState.specialReserve,
       grenades: serverState.grenades,
       isReloading: serverState.isReloading,
       isDead: serverState.isDead,
@@ -553,6 +563,9 @@ export class NetworkManager {
       ammo: s.ammo,
       isReloading: s.isReloading,
       reloadTimer: 0,
+      weaponId: s.weaponId,
+      specialAmmo: s.specialAmmo,
+      specialReserve: s.specialReserve,
       grenades: s.grenades,
       grenadeRegenSeconds: 0,
       isSprinting: s.isSprinting,

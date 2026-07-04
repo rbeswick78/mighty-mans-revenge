@@ -1,6 +1,6 @@
 import type { Vec2 } from '@shared/types/common.js';
 import type { PlayerInput, PlayerState } from '@shared/types/player.js';
-import type { CharacterId } from '@shared/config/game.js';
+import type { CharacterId, WeaponId } from '@shared/config/game.js';
 
 export type ConnectionState = 'connecting' | 'connected' | 'disconnected' | 'reconnecting';
 export type ConnectionQuality = 'good' | 'fair' | 'poor';
@@ -25,6 +25,9 @@ export interface InterpolatedState {
   health: number;
   maxHealth: number;
   ammo: number;
+  weaponId: WeaponId;
+  specialAmmo: number;
+  specialReserve: number;
   grenades: number;
   isSprinting: boolean;
   isDead: boolean;

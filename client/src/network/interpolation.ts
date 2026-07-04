@@ -1,6 +1,6 @@
 import type { PlayerId, Vec2 } from '@shared/types/common.js';
 import type { SerializedPlayerState } from '@shared/types/network.js';
-import type { CharacterId } from '@shared/config/game.js';
+import type { CharacterId, WeaponId } from '@shared/config/game.js';
 import type { InterpolatedState } from './types.js';
 
 /** Stop extrapolating if we haven't received an update in this many ms. */
@@ -22,6 +22,9 @@ interface BufferedState {
   health: number;
   maxHealth: number;
   ammo: number;
+  weaponId: WeaponId;
+  specialAmmo: number;
+  specialReserve: number;
   grenades: number;
   isSprinting: boolean;
   isDead: boolean;
@@ -75,6 +78,9 @@ function toInterpolated(s: BufferedState): InterpolatedState {
     health: s.health,
     maxHealth: s.maxHealth,
     ammo: s.ammo,
+    weaponId: s.weaponId,
+    specialAmmo: s.specialAmmo,
+    specialReserve: s.specialReserve,
     grenades: s.grenades,
     isSprinting: s.isSprinting,
     isDead: s.isDead,
@@ -130,6 +136,9 @@ export class EntityInterpolation {
       health: state.health,
       maxHealth: state.maxHealth,
       ammo: state.ammo,
+      weaponId: state.weaponId,
+      specialAmmo: state.specialAmmo,
+      specialReserve: state.specialReserve,
       grenades: state.grenades,
       isSprinting: state.isSprinting,
       isDead: state.isDead,
@@ -212,6 +221,9 @@ export class EntityInterpolation {
           health: curr.health, // discrete -- don't interpolate
           maxHealth: curr.maxHealth,
           ammo: curr.ammo,
+          weaponId: curr.weaponId,
+          specialAmmo: curr.specialAmmo,
+          specialReserve: curr.specialReserve,
           grenades: curr.grenades,
           isSprinting: curr.isSprinting,
           isDead: curr.isDead,
