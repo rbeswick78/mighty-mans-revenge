@@ -122,13 +122,19 @@ The game launches as 1v1 but is architected for N players. Use arrays/maps of pl
 
 ### Game Mode Abstraction
 
-Match logic is behind a `GameMode` interface (`onStart`, `onKill`, `onTick`, `isMatchOver`, `getResults`). Only `DeathmatchMode` exists now. New modes = new class + registry entry, no core changes.
+Match logic is behind a `GameMode` interface (`onStart`, `onKill`, `onTick`, `isMatchOver`, `getResults`, `determineWinner`, optional `getKothState`). Two modes exist: `DeathmatchMode` and `KothMode` (King of the Hill — 1 hill point per full second as sole living occupant, contested = nobody scores, hill relocates round-robin through the map's `kothHills` every 25s, first to 60 or highest at time-out; hill points ride in `PlayerState.score`). New modes = new class + registry entry, no core changes.
+
+Modes rotate DM → KOTH per match, mirroring the map-rotation contract: fresh matches advance a global cursor in `MatchmakingManager`; a rematch plays the mode after the one just played (pinned at match end, shipped as `MatchResult.nextGameMode`). `FORCE_MODE=<deathmatch|koth>` pins every match to one mode for manual smoke tests.
+
+**Overtime (all modes):** when `determineWinner` reports a genuine tie at match end, the match enters 30s sudden-death overtime instead of ending — everyone respawns with a fresh single life (no respawns, live grenades cleared, no new mutators, hill retired), first kill wins, and a kill-less overtime is a true draw (`winnerId: null`). `MatchResult.wentToOvertime` drives the results-screen callout.
 
 ### Map System
 
 Tile-based maps stored as JSON in `/shared/maps/`. Tile types: `floor`, `wall`, `cover_low`, `spawn_point`, `pickup_spawn`. Map fits entirely in viewport (no scrolling). Collision grid generated from tile data and used by both client (prediction) and server (authority). Note `cover_low` is solid in that grid — it blocks movement AND bullets (only fire-breath wall destruction treats walls and cover differently).
 
 Maps are visually themed: map JSON carries an optional `theme` id resolved client-side in `client/src/rendering/map-themes.ts` (floor/cover variant pools + auto-tiled wall styles; unknown ids fall back to the wasteland look), plus optional `decorations` — purely cosmetic sprites (wrecked cars, containers) centered on tile rects whose underlying tiles carry the collision. The server ignores both fields.
+
+Map JSON also carries `kothHills` — top-left tiles of the 2×2 King of the Hill zones, in relocation order. The validator checks bounds/walkability (≥3 entries when present); the registry requires every shipped map to declare them, because mode rotation can put KOTH on any map.
 
 The server rotates maps round-robin in registry order (`shared/src/maps/registry.ts`): fresh matches advance a global cursor; a rematch plays the map after the one just played (`MatchResult.nextMapName`, rendered as "NEXT MAP: X" on the results screen). `FORCE_MAP=<map name>` pins every match to one map for manual smoke tests.
 

@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–4 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation). Next up: **Session 5**.
+- **Status:** Sessions 1–5 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime). Next up: **Session 6**.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -36,7 +36,7 @@ Each session below attacks one of these.
 | 2 | Match awards + persistent rivalry stats | Bragging rights: the friend-group replay engine | **DONE** (2026-07-04) |
 | 3 | Mutator expansion | Matches stop repeating; chaos moments | **DONE** (2026-07-04) |
 | 4 | Two new maps + rotation | New spaces to master | **DONE** (2026-07-04) |
-| 5 | King of the Hill + overtime | A second way to play; no more anticlimactic ties | not started |
+| 5 | King of the Hill + overtime | A second way to play; no more anticlimactic ties | **DONE** (2026-07-04) |
 | 6 | New characters + stat identities | Counterpicks and mains | not started |
 | 7 | (Stretch) Gun Game + Pistol + melee | The party mode | not started |
 
@@ -401,12 +401,14 @@ death overtime so ties stop being decided arbitrarily.
 
 **Acceptance criteria**
 
-- [ ] Full KOTH match playable start→results, hill moves on schedule,
+- [x] Full KOTH match playable start→results, hill moves on schedule,
       contested logic correct (unit tests on occupancy/scoring).
-- [ ] DM tie now flows into overtime; overtime kill ends match immediately;
+- [x] DM tie now flows into overtime; overtime kill ends match immediately;
       double-timeout = draw, recorded as such in Session 2's persistence.
-- [ ] Mode rotation surfaces in lobby; results screen labels the mode.
-- [ ] Tick budget unaffected (zone checks are O(players), trivial).
+- [x] Mode rotation surfaces in lobby; results screen labels the mode.
+      (Surfaced on the character-select screen — the lobby fades straight
+      into it, so that IS the pre-match surface.)
+- [x] Tick budget unaffected (zone checks are O(players), trivial).
 
 **Parallelizable workstreams:** (a) KothMode + tests, (b) overtime state
 machine, (c) HUD/lobby UI. (a) and (b) are independent.
@@ -488,6 +490,122 @@ to be specced properly when its turn comes:
 
 Append one entry per session. Include: date, what shipped (commits), design
 deviations from this doc, known issues, tuning notes from play-testing.
+
+### Session 5 — 2026-07-04 — King of the Hill + overtime
+
+**Shipped:** `KothMode` (`server/src/game/modes/koth-mode.ts`) — the
+`GameMode` interface's first real second implementation: one 2×2-tile
+hill live at a time, 1 point per full second as sole living occupant
+(contested = nobody scores; fractional progress resets whenever sole
+occupancy breaks), hill relocates round-robin through the map's
+`kothHills` every 25s with a 3s blinking warning marker at the next
+spot, first to 60 or highest at time-out. Hill points ride in
+`PlayerState.score`, so the HUD score line, results scoreboard, and
+persistence all worked unchanged. Plus sudden-death **overtime for all
+modes**: `DeathmatchMode.determineWinner`'s arbitrary tie-break now
+returns a genuine tie, and a tie at match end sends the match into a
+30s single-life overtime (everyone respawned fresh, live grenades
+cleared, no new mutator activations, hill retired) — first kill wins
+immediately, a kill-less overtime is a true draw recorded in the
+Session 2 persistence. Mode rotation DM → KOTH mirrors the map-rotation
+contract exactly: global cursor for fresh matches, `nextGameMode`
+pinned into PostMatchState at match end and shipped in `MatchResult`,
+`FORCE_MODE=<deathmatch|koth>` smoke pin. Client: pulsing corner-bracket
+hill zone overlay (`koth-hill-renderer.ts`, occupancy-colored), HUD
+capture-progress bar between score and timer (CONTESTED blink state),
+blood-red overtime clock, "OVERTIME! SUDDEN DEATH" banner with a deep
+slow horn, "NEXT: KING OF THE HILL - <MAP>" line on character select,
+and results-screen mode label + "- OVERTIME" callout + "NEXT: <MODE>
+ON <MAP>" teaser. All three maps gained 5 hills each (validator checks
+bounds/2×2-walkability; the registry requires hills on every shipped
+map).
+
+**Design decisions made in-session (roadmap was silent or amended):**
+- "3-minute timer" is interpreted as the existing MATCH.TIME_LIMIT
+  (173s, music-synced) — no per-mode time limit.
+- KOTH ties break on hill points ONLY (no deaths tie-break — hill time
+  IS the score); DM keeps score-then-deaths and ties only when both
+  are equal.
+- `GameMode` interface grew `determineWinner` (Match consults it at end
+  to detect ties without computing full results) and optional
+  `getKothState`; `MatchContext` grew `isOvertime`, `getMapData()`, and
+  `getElapsedSeconds()` (duration can't be derived from matchTimer once
+  overtime resets it). Modes must NOT accrue score during overtime, or
+  an overtime timeout would crown a camper instead of drawing.
+- Overtime entry does a full fresh-life reset via respawnPlayer for ALL
+  players (a player mid-respawn at the tie moment would otherwise start
+  sudden death with no life). Regulation leftovers (bursts, pump
+  racking, live grenades) are cleared.
+- `MatchResult` gained `nextGameMode` and `wentToOvertime`;
+  `server:matchFound` gained `gameMode`; gameState gained `isOvertime`
+  + optional `koth` (KothHudState); new one-shot `server:overtimeStart`
+  re-anchors the client clock exactly like matchStart.
+- The client's local 0:00 fade-out now waits a 600ms grace window
+  (END_FADE_GRACE_MS) before firing — a tied match re-anchors the clock
+  to overtime within ~1 tick + RTT, and the old instant trigger would
+  have faded out over a match that was actually entering sudden death.
+  Real ends fade via server:matchEnd inside the window, so nothing is
+  slower in practice.
+- "Mode rotation surfaces in lobby" landed on the character-select
+  screen — the lobby fades straight into it, so it IS the pre-match
+  surface. The lobby itself shows nothing new.
+- 5 hills per map (spec floor was 3): center-ish opener, then N/E/S/W
+  spread so the fight relocates meaningfully. First hill is always the
+  contested center (shotgun room on Scrapyard).
+
+**Fixed in passing:**
+- gameState broadcasts run from COUNTDOWN onward, but KothMode's hills
+  are only initialized by onStart at the COUNTDOWN→ACTIVE transition —
+  the countdown snapshots carried `koth.hill: undefined` (JSON drops
+  it), which the smoke caught as a per-frame client TypeError. Match
+  now returns null hill state outside ACTIVE, and the client renderer/
+  HUD treat a hill-less payload as "no hill" defensively.
+
+**Verified:** 546 unit tests green (+48 this session: KothMode
+occupancy/scoring/relocation/contested, overtime state machine incl.
+respawn freeze + no-new-mutators gate + fresh-life reset, DM tie fix,
+mode rotation + FORCE_MODE pinning + overtime broadcast + KOTH snapshot
+plumbing, kothHills validation, rotation-config helpers, and a
+regression test for the countdown hill-state bug). Typecheck + lint
+clean; full standard Playwright suite green. Throwaway two-client
+Playwright smokes with FORCE_MODE=koth (spec deleted after), driven
+through the real dev servers + netcode:
+- Desktop KOTH: character-select "NEXT: KING OF THE HILL - WASTELAND
+  OUTPOST" line, hill zone overlay at (9,5), BFS-walked a client onto
+  the hill → occupantId flipped, capture bar filled mint, +2 score in
+  3.2s of sole occupancy (screenshot showed 9→17 points accruing),
+  relocation warning fired and the hill moved on cadence, ZERO uncaught
+  page errors, forfeit → VICTORY results with the mode label + "NEXT:
+  KING OF THE HILL ON OVERGROWN SUBURB" teaser + a rivalry line showing
+  3 recorded DRAWS from earlier tied smoke matches.
+- Mobile-landscape (844×390): KOTH HUD + hill overlay render (Phaser
+  snapshot eyeballed).
+- Overtime: two idle clients ran the full 173s to a genuine 0-0 tie —
+  server logged "Match tied — entering sudden-death overtime", clock
+  re-anchored to 0:30, hill retired (koth state null), then a kill-less
+  overtime ended as a true draw on both results screens.
+
+**Known issues / notes for later sessions:**
+- The smoke surfaced and fixed a real bug in review: countdown-phase
+  gameState carried koth.hill undefined (onStart hadn't run) → client
+  TypeError per frame. Fixed server-side + defensive client guards +
+  regression test.
+- Awards in KOTH are the DM set (kills/accuracy-based) — a hill-time
+  award ("Hill Hog": most hill seconds) would need a StatsTracker
+  column; cheap polish for Session 6+.
+- The KOTH capture bar's CONTESTED blink is unit-tested but wasn't
+  live-verified (needs two players in the zone simultaneously) — have
+  the first group playtest eyeball it.
+- Overtime music: the gameplay track ends with regulation (tuned to
+  173s); overtime currently plays over silence after the sting. If it
+  feels dead, loop the last 30s of the track or reuse the countdown
+  loop in a later session.
+- e2e/dev-machine gotchas discovered (recorded in memory + smoke spec
+  comments): GameScene screenshots need Phaser renderer.snapshot
+  (page.screenshot is black over WebGL); the server tick loop drifts
+  ~25% under Playwright load so timed match waits need headroom;
+  page.close() does NOT drop the WebRTC transport (close the browser
+  context to trigger forfeit detection).
 
 ### Session 4 — 2026-07-04 — Two new maps + rotation
 
