@@ -13,8 +13,10 @@ import {
   CHARACTER_IDS,
   MAP,
   calculateMovement,
+  characterHitbox,
+  characterMaxHealth,
   computePelletAngles,
-  mutatorsToMovementModifiers,
+  playerMovementModifiers,
   rayIntersectsAABB,
   TileType,
   PickupType,
@@ -28,6 +30,7 @@ import type {
   KillFeedEntry,
   KillWeapon,
   BulletTrail,
+  AxeState,
   GrenadeState,
   MutatorId,
   CharacterId,
@@ -332,6 +335,11 @@ export class Match implements MatchContext {
       // sel.locked is non-null here: either the all-locked branch made it so,
       // or the timeout branch just auto-locked any stragglers.
       player.characterId = sel.locked;
+      // Stat identity: the character's HP pool replaces the pre-select
+      // baseline. This runs before ACTIVE, so no mutator (low_health)
+      // can have touched maxHealth yet.
+      player.maxHealth = characterMaxHealth(player.characterId);
+      player.health = player.maxHealth;
     }
 
     this.startCountdown();
@@ -524,10 +532,11 @@ export class Match implements MatchContext {
       this.respawnPlayer(player);
     }
     // Nothing from regulation may decide the duel: no in-flight bursts,
-    // pump-racking, or live grenades carry over.
+    // pump-racking, live grenades, or thrown axes carry over.
     this.pendingBursts.clear();
     this.rackingTimers.clear();
     this.combatManager.clearGrenades();
+    this.combatManager.clearAxes();
     this._tickOvertimeStart = { overtimeEndsInMs: OVERTIME.DURATION * 1000 };
     logger.info({ matchId: this.matchId }, 'Match tied — entering sudden-death overtime');
   }
@@ -614,6 +623,11 @@ export class Match implements MatchContext {
   /** Active grenades in flight, for broadcasting. */
   getActiveGrenades(): GrenadeState[] {
     return this.combatManager.getGrenades();
+  }
+
+  /** Jack's thrown axes in flight, for broadcasting. */
+  getActiveAxes(): AxeState[] {
+    return this.combatManager.getAxes();
   }
 
   /** Mutators currently active, in activation order (empty before the first). */
@@ -733,10 +747,12 @@ export class Match implements MatchContext {
       if (inputs.length === 0) continue;
 
       // Per-player because second_wind's boost rides on the player's own
-      // respawn timer. Constant across this tick's queued inputs — the
+      // respawn timer and the character speed multiplier is a per-player
+      // stat identity. Constant across this tick's queued inputs — the
       // timer decrements later in the tick, matching the client, which
       // predicts each input with the timer value from the last snapshot.
-      const movementModifiers = mutatorsToMovementModifiers(
+      const movementModifiers = playerMovementModifiers(
+        player.characterId,
         this._activeMutators,
         player.secondWindTimer,
       );
@@ -904,6 +920,25 @@ export class Match implements MatchContext {
     const { explosions } = this.combatManager.updateGrenades(dt, this.players, grid);
     for (const explosion of explosions) {
       this.recordExplosion(explosion);
+    }
+
+    // Advance Jack's thrown axes and book their hits. Damage was already
+    // applied inside updateAxes (through applyDamage, so Iron Hide is
+    // honored); here we own the kill/stat/vampire bookkeeping, mirroring
+    // the explosion path. Axes never hit their thrower, so no suicide
+    // handling is needed.
+    const { hits: axeHits } = this.combatManager.updateAxes(
+      dt,
+      this.players,
+      grid,
+      this.hitValidationScale(),
+    );
+    for (const hit of axeHits) {
+      this.stats.recordDamage(hit.throwerId, hit.damage);
+      this.applyVampireHeal(hit.throwerId, hit.victimId, hit.damage);
+      if (hit.killed) {
+        this.onKill(hit.throwerId, hit.victimId, 'axe');
+      }
     }
 
     // Reload timers — short-circuited under infinite_ammo so the mag is
@@ -1111,8 +1146,9 @@ export class Match implements MatchContext {
       if (victim) {
         const result = this.combatManager.applyDamage(victim, shot.damage, playerId);
         this.stats.recordHit(playerId);
-        this.stats.recordDamage(playerId, shot.damage);
-        this.applyVampireHeal(playerId, shot.victimId, shot.damage);
+        // damageApplied, not shot.damage — Iron Hide may have halved it.
+        this.stats.recordDamage(playerId, result.damageApplied);
+        this.applyVampireHeal(playerId, shot.victimId, result.damageApplied);
         if (result.killed && result.entry) {
           this.onKill(playerId, shot.victimId, 'gun');
         }
@@ -1175,8 +1211,9 @@ export class Match implements MatchContext {
       if (!victim || victim.isDead) continue;
       const result = this.combatManager.applyDamage(victim, shot.damage, player.id);
       anyPelletHit = true;
-      this.stats.recordDamage(player.id, shot.damage);
-      this.applyVampireHeal(player.id, shot.victimId, shot.damage);
+      // damageApplied, not shot.damage — Iron Hide may have halved it.
+      this.stats.recordDamage(player.id, result.damageApplied);
+      this.applyVampireHeal(player.id, shot.victimId, result.damageApplied);
       if (result.killed) {
         this.onKill(player.id, shot.victimId, 'shotgun');
       }
@@ -1566,6 +1603,18 @@ export class Match implements MatchContext {
       player.abilityCooldownSeconds = ABILITY.FROST_WIZARD_FREEZE.COOLDOWN;
       // Frost Lock is instant — no active window. abilityActiveSeconds
       // stays 0 so the HUD only animates the cooldown arc.
+    } else if (player.characterId === 'bubba') {
+      // Iron Hide: the active window IS the effect — applyDamage halves
+      // everything that lands while it runs. Bruce-style cooldown anchor
+      // (starts at activation), so the total cycle is 30s.
+      player.abilityActiveSeconds = ABILITY.BUBBA_IRON_HIDE.DURATION;
+      player.abilityCooldownSeconds = ABILITY.BUBBA_IRON_HIDE.COOLDOWN;
+    } else if (player.characterId === 'jack') {
+      // Axe Throw: instant cast, like Frost Lock — the projectile does the
+      // work. The axe is server-simulated by CombatManager; the kill/stat
+      // bookkeeping happens where updateActive consumes updateAxes' hits.
+      this.combatManager.spawnAxe(player.id, player.position, aimAngle);
+      player.abilityCooldownSeconds = ABILITY.JACK_AXE_THROW.COOLDOWN;
     }
   }
 
@@ -1621,10 +1670,6 @@ export class Match implements MatchContext {
     const range = ABILITY.BRUCE_FIRE_BREATH.RANGE_TILES * MAP.TILE_SIZE;
     // big_heads scales the victim-hitbox half of the sum, not the breath width.
     const hitboxScale = this.hitValidationScale();
-    const halfW =
-      (PLAYER.HITBOX_WIDTH / 2) * hitboxScale + ABILITY.BRUCE_FIRE_BREATH.WIDTH / 2;
-    const halfH =
-      (PLAYER.HITBOX_HEIGHT / 2) * hitboxScale + ABILITY.BRUCE_FIRE_BREATH.WIDTH / 2;
     const breathHalfWidth = ABILITY.BRUCE_FIRE_BREATH.WIDTH / 2;
     const tileSize = MAP.TILE_SIZE;
     const halfTileDiag = (tileSize * Math.SQRT2) / 2;
@@ -1671,6 +1716,12 @@ export class Match implements MatchContext {
         if (other.isDead) continue;
         if (other.invulnerableTimer > 0) continue;
 
+        // Per-victim hit-validation dims (Bubba's 30px box eats more
+        // breath), scaled by big_heads, plus the breath's own thickness.
+        const victimBox = characterHitbox(other.characterId);
+        const halfW = (victimBox.width / 2) * hitboxScale + breathHalfWidth;
+        const halfH = (victimBox.height / 2) * hitboxScale + breathHalfWidth;
+
         const hitDist = rayIntersectsAABB(
           player.position.x,
           player.position.y,
@@ -1684,8 +1735,8 @@ export class Match implements MatchContext {
         if (hitDist === null || hitDist <= 0 || hitDist > range) continue;
 
         const result = this.combatManager.applyDamage(other, damagePerTick, playerId);
-        this.stats.recordDamage(playerId, damagePerTick);
-        this.applyVampireHeal(playerId, otherId, damagePerTick);
+        this.stats.recordDamage(playerId, result.damageApplied);
+        this.applyVampireHeal(playerId, otherId, result.damageApplied);
         if (result.killed) {
           this.onKill(playerId, otherId, 'fire');
         }

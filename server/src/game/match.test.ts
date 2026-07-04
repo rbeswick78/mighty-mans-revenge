@@ -10,13 +10,14 @@ import {
   SERVER,
   MUTATORS,
   GRENADE,
+  CHARACTERS,
   CHARACTER_IDS,
   ABILITY,
   OVERTIME,
   KOTH,
   GameModeType,
 } from '@shared/game';
-import type { MapData, PlayerInput, MutatorId } from '@shared/game';
+import type { CharacterId, MapData, PlayerInput, MutatorId } from '@shared/game';
 
 function makeInput(seq: number, overrides: Partial<PlayerInput> = {}): PlayerInput {
   return {
@@ -2131,6 +2132,302 @@ describe('Match', () => {
       m.startCountdown();
       m.update(0.05);
       expect(m.getKothHudState()).toBeNull(); // countdown
+    });
+  });
+
+  describe('Session 6: stat identities + Bubba/Jack abilities', () => {
+    /** Lock arbitrary roster characters and run the match to ACTIVE. */
+    function startActiveWithRoster(p0Char: CharacterId, p1Char: CharacterId): Match {
+      const m = createMatch();
+      m.setLock('player-0', p0Char);
+      m.setLock('player-1', p1Char);
+      m.update(0.05); // commits the locks → COUNTDOWN
+      m.update(MATCH.COUNTDOWN_DURATION + 0.05); // → ACTIVE
+      return m;
+    }
+
+    describe('per-character max HP', () => {
+      it('commits the character HP pool when the lock lands', () => {
+        const m = startActiveWithRoster('bubba', 'frost_wizard');
+        const bubba = m.players.get('player-0')!;
+        const wizard = m.players.get('player-1')!;
+        expect(bubba.maxHealth).toBe(CHARACTERS.bubba.maxHealth);
+        expect(bubba.health).toBe(CHARACTERS.bubba.maxHealth);
+        expect(wizard.maxHealth).toBe(CHARACTERS.frost_wizard.maxHealth);
+        expect(wizard.health).toBe(CHARACTERS.frost_wizard.maxHealth);
+      });
+
+      it('respawn refills to the character pool, not the baseline', () => {
+        const m = startActiveWithRoster('bubba', 'mighty_man');
+        const bubba = m.players.get('player-0')!;
+        m.onKill('player-1', 'player-0', 'gun');
+        const respawnTicks = Math.ceil(RESPAWN.DELAY / 0.05) + 1;
+        for (let i = 0; i < respawnTicks; i++) m.update(0.05);
+        expect(bubba.isDead).toBe(false);
+        expect(bubba.health).toBe(CHARACTERS.bubba.maxHealth);
+      });
+    });
+
+    describe('per-character speed', () => {
+      /** Distance traveled from one full-right input over a single tick. */
+      function distancePerTick(char: CharacterId): number {
+        // Lock-to-one rule: the opponent must pick a different character.
+        const m = startActiveWithRoster(char, char === 'mighty_man' ? 'bruce' : 'mighty_man');
+        const p0 = m.players.get('player-0')!;
+        p0.position = { x: 200, y: 200 };
+        m.queueInput('player-0', makeInput(1, { moveX: 1 }));
+        const dt = 0.05;
+        m.update(dt);
+        return p0.position.x - 200;
+      }
+
+      it('moves each character at BASE_SPEED × its multiplier', () => {
+        expect(distancePerTick('mighty_man')).toBeCloseTo(PLAYER.BASE_SPEED * 0.05, 5);
+        expect(distancePerTick('bubba')).toBeCloseTo(
+          PLAYER.BASE_SPEED * CHARACTERS.bubba.speedMultiplier * 0.05,
+          5,
+        );
+        expect(distancePerTick('frost_wizard')).toBeCloseTo(
+          PLAYER.BASE_SPEED * CHARACTERS.frost_wizard.speedMultiplier * 0.05,
+          5,
+        );
+      });
+    });
+
+    describe('per-character hitbox (live hits)', () => {
+      /**
+       * Grazing shot 14px off the victim's center: outside a 24px box
+       * (half 12), inside Bubba's 30px one (half 15).
+       */
+      function grazeVictim(m: Match): void {
+        const p0 = m.players.get('player-0')!;
+        const p1 = m.players.get('player-1')!;
+        p0.position = { x: 100, y: 100 };
+        p1.position = { x: 250, y: 114 };
+      }
+
+      it('the graze hits Bubba but not a 24px character', () => {
+        const hitMatch = startActiveWithRoster('mighty_man', 'bubba');
+        grazeVictim(hitMatch);
+        const bubba = hitMatch.players.get('player-1')!;
+        hitMatch.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+        hitMatch.update(0.05);
+        expect(bubba.health).toBeLessThan(bubba.maxHealth);
+
+        const missMatch = startActiveWithRoster('mighty_man', 'jack');
+        grazeVictim(missMatch);
+        const jack = missMatch.players.get('player-1')!;
+        missMatch.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+        missMatch.update(0.05);
+        expect(jack.health).toBe(jack.maxHealth);
+      });
+
+      it("Bruce's fire breath also honors the wider box", () => {
+        // Breath along y=100; victim offset 26px: outside 12 + 7 (=19)
+        // for a 24px character, inside 15 + 7 (=22)... 26 > 22, so use
+        // 21px: outside 19, inside 22.
+        const m = startActiveWithRoster('bruce', 'bubba');
+        const bruce = m.players.get('player-0')!;
+        const bubba = m.players.get('player-1')!;
+        bruce.position = { x: 100, y: 100 };
+        bubba.position = { x: 196, y: 121 };
+        m.queueInput('player-0', makeInput(1, { abilityPressed: true, aimAngle: 0 }));
+        m.update(0.05);
+        expect(bubba.health).toBeLessThan(bubba.maxHealth);
+
+        const control = startActiveWithRoster('bruce', 'mighty_man');
+        const cBruce = control.players.get('player-0')!;
+        const victim = control.players.get('player-1')!;
+        cBruce.position = { x: 100, y: 100 };
+        victim.position = { x: 196, y: 121 };
+        control.queueInput('player-0', makeInput(1, { abilityPressed: true, aimAngle: 0 }));
+        control.update(0.05);
+        expect(victim.health).toBe(victim.maxHealth);
+      });
+    });
+
+    describe('Bubba: Iron Hide', () => {
+      function activateIronHide(m: Match, seq = 1): void {
+        m.queueInput('player-0', makeInput(seq, { abilityPressed: true, aimAngle: 0 }));
+        m.update(0.001);
+      }
+
+      it('activates with the roadmap window and a from-activation cooldown', () => {
+        const m = startActiveWithRoster('bubba', 'mighty_man');
+        const bubba = m.players.get('player-0')!;
+        activateIronHide(m);
+        expect(bubba.abilityActiveSeconds).toBeCloseTo(ABILITY.BUBBA_IRON_HIDE.DURATION, 2);
+        expect(bubba.abilityCooldownSeconds).toBeCloseTo(ABILITY.BUBBA_IRON_HIDE.COOLDOWN, 2);
+      });
+
+      it('halves rifle damage while active (control: full damage after expiry)', () => {
+        const m = startActiveWithRoster('bubba', 'mighty_man');
+        const bubba = m.players.get('player-0')!;
+        const shooter = m.players.get('player-1')!;
+        bubba.position = { x: 250, y: 100 };
+        shooter.position = { x: 100, y: 100 };
+
+        activateIronHide(m);
+        m.queueInput('player-1', makeInput(1, { firePressed: true, aimAngle: 0 }));
+        m.update(0.001);
+        const damagedWhileActive = bubba.maxHealth - bubba.health;
+        expect(damagedWhileActive).toBeGreaterThan(0);
+
+        // Let the window (and the burst) fully expire, then shoot again
+        // from the same spot: same distance → same raw damage, now unhalved.
+        bubba.health = bubba.maxHealth;
+        for (let i = 0; i < 120; i++) m.update(0.05);
+        expect(bubba.abilityActiveSeconds).toBe(0);
+        bubba.health = bubba.maxHealth;
+
+        m.queueInput('player-1', makeInput(2, { firePressed: true, aimAngle: 0 }));
+        m.update(0.001);
+        const damagedAfterExpiry = bubba.maxHealth - bubba.health;
+        expect(damagedAfterExpiry).toBeCloseTo(damagedWhileActive * 2, 5);
+      });
+
+      it('halves grenade damage while active', () => {
+        const m = startActiveWithRoster('bubba', 'mighty_man');
+        const bubba = m.players.get('player-0')!;
+        const thrower = m.players.get('player-1')!;
+        // Stand apart so the throw arms cleanly, then detonate point-blank.
+        bubba.position = { x: 200, y: 100 };
+        thrower.position = { x: 148, y: 100 };
+
+        activateIronHide(m);
+        m.queueInput('player-1', makeInput(1, { throwPressed: true, aimAngle: 0 }));
+        m.update(0.001);
+        m.queueInput('player-1', makeInput(2, { detonatePressed: true }));
+        m.update(0.001);
+
+        const taken = bubba.maxHealth - bubba.health;
+        expect(taken).toBeGreaterThan(0);
+        // A near-point-blank grenade deals close to full 100 damage raw;
+        // halved it can never exceed 50.
+        expect(taken).toBeLessThanOrEqual(GRENADE.DAMAGE / 2);
+        expect(bubba.isDead).toBe(false);
+      });
+
+      it("halves Bruce's fire breath and Jack's axe (choke-point coverage)", () => {
+        const fire = startActiveWithRoster('bubba', 'bruce');
+        const fBubba = fire.players.get('player-0')!;
+        const fBruce = fire.players.get('player-1')!;
+        fBubba.position = { x: 250, y: 100 };
+        fBruce.position = { x: 100, y: 100 };
+        activateIronHide(fire);
+        fire.queueInput('player-1', makeInput(1, { abilityPressed: true, aimAngle: 0 }));
+        fire.update(0.001);
+        expect(fBubba.maxHealth - fBubba.health).toBeCloseTo(
+          ABILITY.BRUCE_FIRE_BREATH.DAMAGE_PER_TICK / 2,
+          5,
+        );
+
+        const axe = startActiveWithRoster('bubba', 'jack');
+        const aBubba = axe.players.get('player-0')!;
+        const aJack = axe.players.get('player-1')!;
+        aBubba.position = { x: 250, y: 100 };
+        aJack.position = { x: 100, y: 100 };
+        activateIronHide(axe);
+        axe.queueInput('player-1', makeInput(1, { abilityPressed: true, aimAngle: 0 }));
+        // Fly the axe into Bubba (150px at 520px/s ≈ 0.29s).
+        for (let i = 0; i < 10; i++) axe.update(0.05);
+        expect(aBubba.maxHealth - aBubba.health).toBeCloseTo(
+          ABILITY.JACK_AXE_THROW.DAMAGE / 2,
+          5,
+        );
+      });
+
+      it('death cancels the active window but the cooldown keeps running', () => {
+        const m = startActiveWithRoster('bubba', 'mighty_man');
+        const bubba = m.players.get('player-0')!;
+        activateIronHide(m);
+        m.onKill('player-1', 'player-0', 'gun');
+        expect(bubba.abilityActiveSeconds).toBe(0);
+        expect(bubba.abilityCooldownSeconds).toBeGreaterThan(0);
+      });
+    });
+
+    describe('Jack: Axe Throw', () => {
+      it('spawns an axe along the aim angle and starts the 12s cooldown', () => {
+        const m = startActiveWithRoster('jack', 'mighty_man');
+        const jack = m.players.get('player-0')!;
+        jack.position = { x: 200, y: 200 };
+
+        m.queueInput('player-0', makeInput(1, { abilityPressed: true, aimAngle: Math.PI / 2 }));
+        m.update(0.001);
+
+        const axes = m.getActiveAxes();
+        expect(axes).toHaveLength(1);
+        expect(axes[0].throwerId).toBe('player-0');
+        expect(axes[0].angle).toBeCloseTo(Math.PI / 2, 5);
+        expect(jack.abilityCooldownSeconds).toBeCloseTo(ABILITY.JACK_AXE_THROW.COOLDOWN, 2);
+        // Instant cast — no active window (HUD animates only the cooldown arc).
+        expect(jack.abilityActiveSeconds).toBe(0);
+      });
+
+      it('a direct hit deals 60, attributes the kill to the axe, and retires the axe', () => {
+        const m = startActiveWithRoster('jack', 'frost_wizard');
+        const jack = m.players.get('player-0')!;
+        const victim = m.players.get('player-1')!;
+        jack.position = { x: 100, y: 100 };
+        victim.position = { x: 250, y: 100 };
+        victim.health = 50; // one axe (60) is lethal
+
+        m.queueInput('player-0', makeInput(1, { abilityPressed: true, aimAngle: 0 }));
+        for (let i = 0; i < 10; i++) m.update(0.05);
+
+        expect(victim.isDead).toBe(true);
+        expect(m.getActiveAxes()).toHaveLength(0);
+        expect(m.stats.getStats('player-0').killsByWeapon.axe).toBe(1);
+        const feed = m.getKillFeed();
+        expect(feed[feed.length - 1].weapon).toBe('axe');
+      });
+
+      it('lands (despawns) after ~6 tiles without a hit', () => {
+        const m = startActiveWithRoster('jack', 'mighty_man');
+        const jack = m.players.get('player-0')!;
+        const bystander = m.players.get('player-1')!;
+        jack.position = { x: 100, y: 100 };
+        bystander.position = { x: 100 + 8 * 48, y: 300 }; // far off-line
+
+        m.queueInput('player-0', makeInput(1, { abilityPressed: true, aimAngle: 0 }));
+        m.update(0.001);
+        expect(m.getActiveAxes()).toHaveLength(1);
+
+        // 288px at 520px/s ≈ 0.55s of flight; run a full second.
+        for (let i = 0; i < 20; i++) m.update(0.05);
+        expect(m.getActiveAxes()).toHaveLength(0);
+        expect(bystander.health).toBe(bystander.maxHealth);
+      });
+
+      it('cooldown gates a second throw', () => {
+        const m = startActiveWithRoster('jack', 'mighty_man');
+        m.queueInput('player-0', makeInput(1, { abilityPressed: true, aimAngle: 0 }));
+        m.update(0.001);
+        m.queueInput('player-0', makeInput(2, { abilityPressed: true, aimAngle: 0 }));
+        m.update(0.001);
+        expect(m.getActiveAxes()).toHaveLength(1);
+      });
+
+      it('overtime entry clears in-flight axes with the other regulation leftovers', () => {
+        const m = startActiveWithRoster('jack', 'mighty_man');
+        const jack = m.players.get('player-0')!;
+        const opponent = m.players.get('player-1')!;
+        // Keep the opponent far off the flight line so the axe stays live.
+        jack.position = { x: 100, y: 100 };
+        opponent.position = { x: 100, y: 400 };
+
+        m.queueInput('player-0', makeInput(1, { abilityPressed: true, aimAngle: 0 }));
+        m.update(0.001);
+        expect(m.getActiveAxes()).toHaveLength(1);
+
+        // Expire regulation on the NEXT small tick, while the axe has
+        // flown only a few px of its 288px range — 0-0 → tie → overtime.
+        m.matchTimer = 0.01;
+        m.update(0.05);
+        expect(m.isOvertime).toBe(true);
+        expect(m.getActiveAxes()).toHaveLength(0);
+      });
     });
   });
 });

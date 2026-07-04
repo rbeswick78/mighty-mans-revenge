@@ -74,7 +74,7 @@ describe('PersistentStatsStore', () => {
     expect(ryan.losses).toBe(1);
     expect(ryan.draws).toBe(0);
     expect(ryan.matches).toBe(2);
-    expect(ryan.weaponKills).toEqual({ gun: 7, grenade: 5, fire: 0, shotgun: 3 });
+    expect(ryan.weaponKills).toEqual({ gun: 7, grenade: 5, fire: 0, shotgun: 3, axe: 0 });
     expect(ryan.nickname).toBe('Ryan');
   });
 

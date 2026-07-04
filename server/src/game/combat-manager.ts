@@ -4,15 +4,18 @@ import {
   type PlayerState,
   type CollisionGrid,
   type BulletTrail,
+  type AxeState,
   type GrenadeState,
   type KillFeedEntry,
   type WeaponId,
-  PLAYER,
+  ABILITY,
   WEAPONS,
   GRENADE,
+  MAP,
   RESPAWN,
   calculateDamage,
   calculateGrenadeDamage,
+  characterHitbox,
   isInBlastRadius,
   vecDistance,
   vecFromAngle,
@@ -37,10 +40,26 @@ export interface ShotResult {
   trail: BulletTrail;
 }
 
+/** One thrown axe connecting with a player this tick. */
+export interface AxeHit {
+  axeId: string;
+  throwerId: PlayerId;
+  victimId: PlayerId;
+  /** Post-Iron-Hide damage actually applied. */
+  damage: number;
+  killed: boolean;
+}
+
 let nextGrenadeId = 0;
 
 function generateGrenadeId(): string {
   return `grenade_${Date.now()}_${nextGrenadeId++}`;
+}
+
+let nextAxeId = 0;
+
+function generateAxeId(): string {
+  return `axe_${Date.now()}_${nextAxeId++}`;
 }
 
 /**
@@ -64,6 +83,17 @@ function hasLineOfSight(
 
 export class CombatManager {
   private grenades: GrenadeState[] = [];
+  private axes: AxeState[] = [];
+  /**
+   * Axes spawned since the last updateAxes pass. A newly thrown axe sits
+   * out its spawn tick unmoved: input processing (which spawns it) and
+   * updateAxes run in the SAME match tick, before the broadcast — without
+   * this, an axe thrown point-blank at a wall would spawn AND retire
+   * inside one tick, never reach a single snapshot, and give the thrower
+   * zero visual feedback. One armed tick costs 50ms of flight and
+   * guarantees every throw renders at least once (plus its landing).
+   */
+  private justSpawnedAxes = new Set<string>();
 
   getGrenades(): GrenadeState[] {
     return this.grenades;
@@ -81,6 +111,136 @@ export class CombatManager {
    */
   clearGrenades(): void {
     this.grenades = [];
+  }
+
+  getAxes(): AxeState[] {
+    return this.axes;
+  }
+
+  /** Same overtime contract as clearGrenades — no regulation leftovers. */
+  clearAxes(): void {
+    this.axes = [];
+    this.justSpawnedAxes.clear();
+  }
+
+  /**
+   * Spawn Jack's thrown axe at the thrower's position, flying along the
+   * aim angle. Straight-line flight at ABILITY.JACK_AXE_THROW.SPEED;
+   * resolution happens in updateAxes.
+   */
+  spawnAxe(throwerId: PlayerId, position: Vec2, aimAngle: number): AxeState {
+    const axe: AxeState = {
+      id: generateAxeId(),
+      position: { x: position.x, y: position.y },
+      velocity: vecScale(vecFromAngle(aimAngle), ABILITY.JACK_AXE_THROW.SPEED),
+      throwerId,
+      angle: aimAngle,
+      distanceTraveled: 0,
+    };
+    this.axes.push(axe);
+    this.justSpawnedAxes.add(axe.id);
+    return axe;
+  }
+
+  /**
+   * Advance every in-flight axe one tick and resolve hits. Per axe, in
+   * order along the flight path: the nearest living, non-invulnerable,
+   * non-thrower player whose hit-validation AABB (per-character dims ×
+   * the big_heads scale) the step segment crosses takes the flat axe
+   * damage and the axe retires; otherwise the axe retires against the
+   * first wall the segment crosses, or after RANGE_TILES of total flight.
+   * Damage goes through applyDamage, so Iron Hide is honored; the caller
+   * (Match) owns kill bookkeeping via the returned hits.
+   */
+  updateAxes(
+    dt: number,
+    players: Map<PlayerId, PlayerState>,
+    grid: CollisionGrid,
+    hitboxScale: number = 1,
+  ): { hits: AxeHit[] } {
+    const hits: AxeHit[] = [];
+    if (this.axes.length === 0) return { hits };
+
+    const maxRange = ABILITY.JACK_AXE_THROW.RANGE_TILES * MAP.TILE_SIZE;
+    const surviving: AxeState[] = [];
+
+    for (const axe of this.axes) {
+      // Armed tick: an axe thrown this very tick holds position so it
+      // reaches at least one broadcast before it can resolve.
+      if (this.justSpawnedAxes.delete(axe.id)) {
+        surviving.push(axe);
+        continue;
+      }
+
+      const remaining = maxRange - axe.distanceTraveled;
+      const stepLen = Math.min(
+        Math.hypot(axe.velocity.x, axe.velocity.y) * dt,
+        remaining,
+      );
+      const dir = vecFromAngle(axe.angle);
+
+      // Walls first: the axe can't reach anything standing behind one.
+      const wallHit = raycastAgainstGrid(
+        grid,
+        axe.position.x,
+        axe.position.y,
+        axe.angle,
+        stepLen,
+      );
+      const travelCap = wallHit.hitTile ? wallHit.distance : stepLen;
+
+      // Nearest victim whose AABB the step segment crosses within the cap.
+      let closest: { player: PlayerState; distance: number } | null = null;
+      for (const [playerId, player] of players) {
+        if (playerId === axe.throwerId) continue;
+        if (player.isDead) continue;
+        if (player.invulnerableTimer > 0) continue;
+
+        const hitbox = characterHitbox(player.characterId);
+        const hitDist = rayIntersectsAABB(
+          axe.position.x,
+          axe.position.y,
+          dir.x,
+          dir.y,
+          player.position.x,
+          player.position.y,
+          (hitbox.width / 2) * hitboxScale,
+          (hitbox.height / 2) * hitboxScale,
+        );
+        if (hitDist === null || hitDist <= 0 || hitDist > travelCap) continue;
+        if (!closest || hitDist < closest.distance) {
+          closest = { player, distance: hitDist };
+        }
+      }
+
+      if (closest) {
+        const result = this.applyDamage(
+          closest.player,
+          ABILITY.JACK_AXE_THROW.DAMAGE,
+          axe.throwerId,
+        );
+        hits.push({
+          axeId: axe.id,
+          throwerId: axe.throwerId,
+          victimId: closest.player.id,
+          damage: result.damageApplied,
+          killed: result.killed,
+        });
+        continue; // axe retires in the victim
+      }
+
+      if (wallHit.hitTile) continue; // axe retires against the wall
+
+      axe.position = vecAdd(axe.position, vecScale(dir, stepLen));
+      axe.distanceTraveled += stepLen;
+      if (axe.distanceTraveled < maxRange) {
+        surviving.push(axe); // still flying
+      }
+      // else: max range reached — the axe lands and retires
+    }
+
+    this.axes = surviving;
+    return { hits };
   }
 
   processShot(
@@ -138,10 +298,15 @@ export class CombatManager {
       if (!currentState || currentState.isDead) continue;
       if (currentState.invulnerableTimer > 0) continue;
 
-      // big_heads scales the hit-validation AABB only — movement collision
-      // and pickup radii are untouched by design.
-      const halfW = (PLAYER.HITBOX_WIDTH / 2) * hitboxScale;
-      const halfH = (PLAYER.HITBOX_HEIGHT / 2) * hitboxScale;
+      // Per-character hit-validation dims × the big_heads scale. Applies
+      // identically to live and rewound targets: the lag-comp hybrid map
+      // spreads the victim's current state, and characterId is immutable
+      // once the match starts, so deriving from it here IS the rewound
+      // hitbox. Movement collision and pickup radii are untouched by
+      // design (they stay on PLAYER.HITBOX_* for the whole roster).
+      const hitbox = characterHitbox(playerState.characterId);
+      const halfW = (hitbox.width / 2) * hitboxScale;
+      const halfH = (hitbox.height / 2) * hitboxScale;
 
       const hitDist = rayIntersectsAABB(
         startPos.x,
@@ -273,7 +438,15 @@ export class CombatManager {
     victim: PlayerState,
     damage: number,
     attackerId: PlayerId,
-  ): { killed: boolean; entry?: KillFeedEntry } {
+  ): { killed: boolean; entry?: KillFeedEntry; damageApplied: number } {
+    // Bubba's Iron Hide: all incoming damage is halved while his ability
+    // window runs. Applied HERE — the single choke point every damage
+    // source flows through (rifle, pellets, grenades, fire breath, axes) —
+    // so no source can forget it. Callers must use the returned
+    // damageApplied for stats and vampire healing, not their raw number.
+    if (victim.characterId === 'bubba' && victim.abilityActiveSeconds > 0) {
+      damage *= 1 - ABILITY.BUBBA_IRON_HIDE.DAMAGE_REDUCTION;
+    }
     victim.health = Math.max(0, victim.health - damage);
 
     if (victim.health <= 0) {
@@ -291,10 +464,10 @@ export class CombatManager {
         timestamp: Date.now(),
       };
 
-      return { killed: true, entry };
+      return { killed: true, entry, damageApplied: damage };
     }
 
-    return { killed: false };
+    return { killed: false, damageApplied: damage };
   }
 
   /** Internal: apply explosion damage to all players in range with LOS. */
@@ -319,7 +492,8 @@ export class CombatManager {
         const result = this.applyDamage(playerState, damage, grenade.throwerId);
         damages.push({
           playerId,
-          damage,
+          // Post-Iron-Hide value, so stats/vampire credit what actually landed.
+          damage: result.damageApplied,
           killed: result.killed,
         });
       }

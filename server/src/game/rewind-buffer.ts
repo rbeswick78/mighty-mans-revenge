@@ -6,9 +6,17 @@ import {
   vecLerp,
 } from '@shared/game';
 
+/**
+ * What a rewind snapshot stores per player: position only. Hit-validation
+ * hitbox dims are NOT snapshotted — they derive from the victim's
+ * characterId (immutable once the match starts) inside
+ * CombatManager.processShot, and the lag compensator's hybrid states carry
+ * that characterId through. Dynamic scales (big_heads) are likewise applied
+ * at validation time, never stored. If hitboxes ever become mutable
+ * mid-match, THIS is where they'd need to be captured.
+ */
 export interface RewindPlayerState {
   position: Vec2;
-  hitbox: { width: number; height: number };
 }
 
 export interface RewindState {
@@ -33,10 +41,6 @@ export class RewindBuffer {
     for (const [id, state] of players) {
       playerMap.set(id, {
         position: { x: state.position.x, y: state.position.y },
-        hitbox: {
-          width: state.maxHealth !== undefined ? 24 : 24, // always use hitbox from PLAYER constants
-          height: 24,
-        },
       });
     }
 
@@ -121,7 +125,6 @@ export class RewindBuffer {
       if (afterPlayer) {
         players.set(id, {
           position: vecLerp(beforePlayer.position, afterPlayer.position, t),
-          hitbox: beforePlayer.hitbox,
         });
       } else {
         // Player only in before state — keep their position
