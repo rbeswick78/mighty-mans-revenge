@@ -108,6 +108,9 @@ test.describe('Character select (desktop)', () => {
     await ctxB?.close().catch(() => {});
   });
 
+  // Playwright insists the first test arg is an object-destructuring
+  // pattern even when no fixtures are used, so `{}` is unavoidable here.
+  // eslint-disable-next-line no-empty-pattern
   test('two players land on CharacterSelectScene after QUICK MATCH', async ({}, testInfo) => {
     // Two-context pair-up is reliable on Chromium but flaky on Firefox in
     // this environment — Firefox's second context sometimes fails to
@@ -132,6 +135,7 @@ test.describe('Character select (desktop)', () => {
     ]);
   });
 
+  // eslint-disable-next-line no-empty-pattern
   test('lock-and-go: both players Enter and transition to GameScene', async ({}, testInfo) => {
     test.fixme(
       testInfo.project.name === 'desktop-firefox',
