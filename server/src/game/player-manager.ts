@@ -1,6 +1,6 @@
 import {
   PLAYER,
-  GUN,
+  WEAPONS,
   GRENADE,
   RESPAWN,
   calculateMovement,
@@ -33,9 +33,12 @@ export class PlayerManager {
       aimAngle: 0,
       health: PLAYER.MAX_HEALTH,
       maxHealth: PLAYER.MAX_HEALTH,
-      ammo: GUN.MAGAZINE_SIZE,
+      ammo: WEAPONS.rifle.magazineSize,
       isReloading: false,
       reloadTimer: 0,
+      weaponId: 'rifle',
+      specialAmmo: 0,
+      specialReserve: 0,
       grenades: GRENADE.STARTING_COUNT,
       grenadeRegenSeconds: 0,
       isSprinting: false,
@@ -116,7 +119,7 @@ export class PlayerManager {
         if (player.reloadTimer <= 0) {
           player.isReloading = false;
           player.reloadTimer = 0;
-          player.ammo = GUN.MAGAZINE_SIZE;
+          player.ammo = WEAPONS.rifle.magazineSize;
         }
       }
 
@@ -130,9 +133,9 @@ export class PlayerManager {
         player.aimAngle = input.aimAngle;
 
         // Handle reload request
-        if (input.reload && !player.isReloading && player.ammo < GUN.MAGAZINE_SIZE) {
+        if (input.reload && !player.isReloading && player.ammo < WEAPONS.rifle.magazineSize) {
           player.isReloading = true;
-          player.reloadTimer = GUN.RELOAD_TIME;
+          player.reloadTimer = WEAPONS.rifle.reloadTime;
         }
 
         // Calculate movement using shared physics
@@ -160,7 +163,7 @@ export class PlayerManager {
     player.position = { x: spawnPos.x, y: spawnPos.y };
     player.velocity = { x: 0, y: 0 };
     player.health = player.maxHealth;
-    player.ammo = GUN.MAGAZINE_SIZE;
+    player.ammo = WEAPONS.rifle.magazineSize;
     player.isReloading = false;
     player.reloadTimer = 0;
     player.grenades = GRENADE.STARTING_COUNT;

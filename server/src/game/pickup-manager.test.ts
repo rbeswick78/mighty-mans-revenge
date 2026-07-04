@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { PickupManager } from './pickup-manager.js';
-import { PickupType, PICKUP, GUN, GRENADE } from '@shared/game';
-import type { MapData, PlayerState, Vec2 } from '@shared/game';
+import { PickupType, PICKUP, WEAPONS, GRENADE } from '@shared/game';
+import type { MapData, PlayerState, Vec2, PickupSpawnType } from '@shared/game';
 
 function makeMapData(
-  pickupSpawns: Array<{ x: number; y: number; type: 'gun_ammo' | 'grenade' }> = [],
+  pickupSpawns: Array<{ x: number; y: number; type: PickupSpawnType }> = [],
 ): MapData {
   return {
     name: 'test-map',
@@ -30,6 +30,9 @@ function makePlayer(overrides: Partial<PlayerState> = {}): PlayerState {
     ammo: 10,
     isReloading: false,
     reloadTimer: 0,
+    weaponId: 'rifle',
+    specialAmmo: 0,
+    specialReserve: 0,
     grenades: 3,
     grenadeRegenSeconds: 0,
     isSprinting: false,
@@ -172,7 +175,7 @@ describe('PickupManager', () => {
     });
 
     it('should cap ammo at MAGAZINE_SIZE * 2', () => {
-      const maxAmmo = GUN.MAGAZINE_SIZE * 2;
+      const maxAmmo = WEAPONS.rifle.magazineSize * 2;
       const player = makePlayer({ ammo: maxAmmo - 5 });
       const pickup = {
         id: 'p1',
@@ -187,7 +190,7 @@ describe('PickupManager', () => {
     });
 
     it('should not apply GUN_AMMO when at max', () => {
-      const maxAmmo = GUN.MAGAZINE_SIZE * 2;
+      const maxAmmo = WEAPONS.rifle.magazineSize * 2;
       const player = makePlayer({ ammo: maxAmmo });
       const pickup = {
         id: 'p1',
@@ -244,6 +247,140 @@ describe('PickupManager', () => {
       const result = manager.applyPickup(pickup, player);
       expect(result).toBe(false);
       expect(player.grenades).toBe(GRENADE.MAX_COUNT);
+    });
+
+    it('WEAPON_SHOTGUN equips the shotgun with full mag + reserve and cancels a reload', () => {
+      const player = makePlayer({ isReloading: true, reloadTimer: 1.2 });
+      const pickup = {
+        id: 'p1',
+        type: PickupType.WEAPON_SHOTGUN,
+        position: { x: 0, y: 0 },
+        isActive: true,
+        respawnTimer: 0,
+      };
+
+      const result = manager.applyPickup(pickup, player);
+      expect(result).toBe(true);
+      expect(player.weaponId).toBe('shotgun');
+      expect(player.specialAmmo).toBe(WEAPONS.shotgun.magazineSize);
+      expect(player.specialReserve).toBe(
+        WEAPONS.shotgun.pickupAmmo - WEAPONS.shotgun.magazineSize,
+      );
+      expect(player.isReloading).toBe(false);
+      expect(player.reloadTimer).toBe(0);
+    });
+
+    it('WEAPON_SHOTGUN refreshes shells when already holding a shotgun', () => {
+      const player = makePlayer({
+        weaponId: 'shotgun',
+        specialAmmo: 0,
+        specialReserve: 1,
+      });
+      const pickup = {
+        id: 'p1',
+        type: PickupType.WEAPON_SHOTGUN,
+        position: { x: 0, y: 0 },
+        isActive: true,
+        respawnTimer: 0,
+      };
+
+      const result = manager.applyPickup(pickup, player);
+      expect(result).toBe(true);
+      expect(player.specialAmmo).toBe(WEAPONS.shotgun.magazineSize);
+      expect(player.specialReserve).toBe(
+        WEAPONS.shotgun.pickupAmmo - WEAPONS.shotgun.magazineSize,
+      );
+    });
+
+    it('BANDAGE heals by BANDAGE_HEAL capped at max health', () => {
+      const player = makePlayer({ health: 85 });
+      const pickup = {
+        id: 'p1',
+        type: PickupType.BANDAGE,
+        position: { x: 0, y: 0 },
+        isActive: true,
+        respawnTimer: 0,
+      };
+
+      const result = manager.applyPickup(pickup, player);
+      expect(result).toBe(true);
+      expect(player.health).toBe(100);
+    });
+
+    it('BANDAGE is refused at full health and for dead players', () => {
+      const full = makePlayer({ health: 100 });
+      const dead = makePlayer({ health: 40, isDead: true });
+      const pickup = {
+        id: 'p1',
+        type: PickupType.BANDAGE,
+        position: { x: 0, y: 0 },
+        isActive: true,
+        respawnTimer: 0,
+      };
+
+      expect(manager.applyPickup(pickup, full)).toBe(false);
+      expect(full.health).toBe(100);
+      expect(manager.applyPickup(pickup, dead)).toBe(false);
+      expect(dead.health).toBe(40);
+    });
+  });
+
+  describe('weapon pickups', () => {
+    it('spawns inactive with the weapon respawn timer running', () => {
+      manager.initFromMap(makeMapData([{ x: 5, y: 5, type: 'weapon_shotgun' }]));
+      const [pickup] = manager.getPickups();
+      expect(pickup.type).toBe(PickupType.WEAPON_SHOTGUN);
+      expect(pickup.isActive).toBe(false);
+      expect(pickup.respawnTimer).toBe(PICKUP.WEAPON_RESPAWN_TIME);
+    });
+
+    it('announces once when crossing the announce lead, then lands', () => {
+      manager.initFromMap(makeMapData([{ x: 5, y: 5, type: 'weapon_shotgun' }]));
+
+      // Before the lead: no announcements.
+      let announcements = manager.update(
+        PICKUP.WEAPON_RESPAWN_TIME - PICKUP.WEAPON_ANNOUNCE_LEAD - 1,
+      );
+      expect(announcements).toHaveLength(0);
+
+      // Crossing the lead: exactly one announcement.
+      announcements = manager.update(2);
+      expect(announcements).toHaveLength(1);
+      expect(announcements[0].type).toBe(PickupType.WEAPON_SHOTGUN);
+      expect(announcements[0].landsInMs).toBeGreaterThan(0);
+
+      // Further ticks before landing: no repeat announcement.
+      expect(manager.update(1)).toHaveLength(0);
+
+      // Landing.
+      manager.update(PICKUP.WEAPON_ANNOUNCE_LEAD);
+      const [pickup] = manager.getPickups();
+      expect(pickup.isActive).toBe(true);
+    });
+
+    it('re-announces on the next respawn cycle after collection', () => {
+      manager.initFromMap(makeMapData([{ x: 5, y: 5, type: 'weapon_shotgun' }]));
+      // Land it.
+      manager.update(PICKUP.WEAPON_RESPAWN_TIME - 2);
+      manager.update(3);
+      const [pickup] = manager.getPickups();
+      expect(pickup.isActive).toBe(true);
+
+      manager.collectPickup(pickup.id);
+      expect(pickup.respawnTimer).toBe(PICKUP.WEAPON_RESPAWN_TIME);
+
+      const announcements = manager.update(
+        PICKUP.WEAPON_RESPAWN_TIME - PICKUP.WEAPON_ANNOUNCE_LEAD + 1,
+      );
+      expect(announcements).toHaveLength(1);
+    });
+
+    it('bandages use their own respawn time', () => {
+      manager.initFromMap(makeMapData([{ x: 5, y: 5, type: 'bandage' }]));
+      const [pickup] = manager.getPickups();
+      expect(pickup.isActive).toBe(true);
+      manager.collectPickup(pickup.id);
+      expect(pickup.respawnTimer).toBe(PICKUP.BANDAGE_RESPAWN_TIME);
     });
   });
 });

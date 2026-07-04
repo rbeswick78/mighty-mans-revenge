@@ -1,4 +1,4 @@
-import type { PlayerId, PlayerStats } from '@shared/game';
+import type { PlayerId, PlayerStats, KillWeapon } from '@shared/game';
 
 export class StatsTracker {
   private stats: Map<PlayerId, PlayerStats> = new Map();
@@ -15,6 +15,7 @@ export class StatsTracker {
       damageTaken: 0,
       grenadesThrown: 0,
       grenadeKills: 0,
+      shotgunKills: 0,
       longestKillStreak: 0,
     });
     this.currentStreaks.set(playerId, 0);
@@ -30,12 +31,14 @@ export class StatsTracker {
     s.shotsHit++;
   }
 
-  recordKill(killerId: PlayerId, _victimId: PlayerId, weapon: 'gun' | 'grenade' | 'fire'): void {
+  recordKill(killerId: PlayerId, _victimId: PlayerId, weapon: KillWeapon): void {
     const s = this.getStatsOrThrow(killerId);
     s.kills++;
 
     if (weapon === 'grenade') {
       s.grenadeKills++;
+    } else if (weapon === 'shotgun') {
+      s.shotgunKills++;
     }
 
     // Update kill streak

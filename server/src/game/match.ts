@@ -4,7 +4,7 @@ import {
   MATCH,
   RESPAWN,
   PLAYER,
-  GUN,
+  WEAPONS,
   GRENADE,
   SERVER,
   EVENT,
@@ -12,9 +12,11 @@ import {
   CHARACTER_IDS,
   MAP,
   calculateMovement,
+  computePelletAngles,
   eventToMovementModifiers,
   rayIntersectsAABB,
   TileType,
+  PickupType,
 } from '@shared/game';
 import type {
   PlayerId,
@@ -23,11 +25,12 @@ import type {
   MapData,
   MatchResult,
   KillFeedEntry,
-  PickupState,
+  KillWeapon,
   BulletTrail,
   GrenadeState,
   FinalMinuteEvent,
   CharacterId,
+  WeaponId,
   ServerCharacterSelectStateMessage,
 } from '@shared/game';
 import { logger } from '../utils/logger.js';
@@ -102,6 +105,13 @@ export class Match implements MatchContext {
   private inputQueues: Map<PlayerId, InputQueue> = new Map();
   /** Active 3-shot bursts in flight, keyed by player. */
   private pendingBursts: Map<PlayerId, PendingBurst> = new Map();
+  /**
+   * Seconds until each player can pump the shotgun again. Only present
+   * (and > 0) between shotgun shots; server-internal, like pendingBursts.
+   */
+  private rackingTimers: Map<PlayerId, number> = new Map();
+  /** Weapon-incoming warnings generated this tick, cleared after broadcast. */
+  private tickWeaponIncoming: Array<{ weaponId: WeaponId; landsInMs: number }> = [];
   /**
    * Per-cast count of fire-breath damage ticks that have already fired
    * for each Bruce. The cast schedules DAMAGE_TICK_COUNT evenly-spaced
@@ -353,7 +363,7 @@ export class Match implements MatchContext {
   }
 
   /** Record a kill event. */
-  onKill(killerId: PlayerId, victimId: PlayerId, weapon: 'gun' | 'grenade' | 'fire'): void {
+  onKill(killerId: PlayerId, victimId: PlayerId, weapon: KillWeapon): void {
     this.stats.recordKill(killerId, victimId, weapon);
     this.stats.recordDeath(victimId);
 
@@ -376,8 +386,15 @@ export class Match implements MatchContext {
       }
     }
 
-    // Cancel any in-flight burst for the killed player.
+    // Cancel any in-flight burst / pump-racking for the killed player, and
+    // drop their special weapon — death costs you the shotgun.
     this.pendingBursts.delete(victimId);
+    this.rackingTimers.delete(victimId);
+    if (victim && victim.weaponId !== 'rifle') {
+      victim.weaponId = 'rifle';
+      victim.specialAmmo = 0;
+      victim.specialReserve = 0;
+    }
 
     const entry: KillFeedEntry = {
       killerId,
@@ -484,22 +501,15 @@ export class Match implements MatchContext {
     return e;
   }
 
-  /** Collect a pickup for a player, applying its effect. */
-  tryCollectPickup(playerId: PlayerId): PickupState | null {
-    const player = this.players.get(playerId);
-    if (!player || player.isDead) return null;
-
-    const pickup = this.pickupManager.checkCollection(player.position, {
-      width: PLAYER.HITBOX_WIDTH,
-      height: PLAYER.HITBOX_HEIGHT,
-    });
-    if (!pickup) return null;
-
-    const applied = this.pickupManager.applyPickup(pickup, player);
-    if (!applied) return null;
-
-    this.pickupManager.collectPickup(pickup.id);
-    return pickup;
+  /**
+   * Consume the weapon-incoming warnings generated this tick (if any) for
+   * broadcasting ("SHOTGUN INCOMING"). Returns [] on subsequent calls in
+   * the same tick.
+   */
+  consumeTickWeaponIncoming(): Array<{ weaponId: WeaponId; landsInMs: number }> {
+    const w = this.tickWeaponIncoming;
+    this.tickWeaponIncoming = [];
+    return w;
   }
 
   // ──────────────────────────── Private ────────────────────────────
@@ -616,35 +626,43 @@ export class Match implements MatchContext {
         player.aimAngle = input.aimAngle;
 
         // Reload — gated off during infinite_ammo (mag is always full).
-        if (
-          !infiniteAmmo &&
-          input.reload &&
-          !player.isReloading &&
-          player.ammo < GUN.MAGAZINE_SIZE
-        ) {
-          player.isReloading = true;
-          player.reloadTimer = GUN.RELOAD_TIME;
+        // Reloads apply to whichever weapon is in hand: the shotgun tops
+        // its 2-shell magazine up from reserve, the rifle refills outright.
+        if (!infiniteAmmo && input.reload && !player.isReloading) {
+          if (player.weaponId === 'shotgun') {
+            if (
+              player.specialAmmo < WEAPONS.shotgun.magazineSize &&
+              player.specialReserve > 0
+            ) {
+              player.isReloading = true;
+              player.reloadTimer = WEAPONS.shotgun.reloadTime;
+            }
+          } else if (player.ammo < WEAPONS.rifle.magazineSize) {
+            player.isReloading = true;
+            player.reloadTimer = WEAPONS.rifle.reloadTime;
+          }
         }
 
-        // Start a burst on the LMB-release edge. Refuse if the player is
-        // already mid-burst, reloading, or out of ammo. During grenades_only
-        // the gun is disabled entirely.
-        const alreadyBursting = this.pendingBursts.has(playerId);
-        if (
-          !grenadesOnly &&
-          input.firePressed &&
-          !alreadyBursting &&
-          !player.isReloading &&
-          player.ammo > 0
-        ) {
-          this.fireOneShot(playerId, input.aimAngle, grid);
-          // Queue the remaining shots if the burst has more than one round.
-          if (GUN.BURST_SIZE > 1) {
-            this.pendingBursts.set(playerId, {
-              shotsRemaining: GUN.BURST_SIZE - 1,
-              nextShotIn: GUN.BURST_INTERVAL,
-              lockedAngle: input.aimAngle,
-            });
+        // Fire on the LMB-release edge. During grenades_only all guns are
+        // disabled entirely.
+        if (!grenadesOnly && input.firePressed) {
+          if (player.weaponId === 'shotgun') {
+            this.tryFireShotgun(player, input, grid, infiniteAmmo);
+          } else {
+            // Rifle: start a burst. Refuse if the player is already
+            // mid-burst, reloading, or out of ammo.
+            const alreadyBursting = this.pendingBursts.has(playerId);
+            if (!alreadyBursting && !player.isReloading && player.ammo > 0) {
+              this.fireOneShot(playerId, input.aimAngle, grid);
+              // Queue the remaining shots if the burst has more than one round.
+              if (WEAPONS.rifle.burstSize > 1) {
+                this.pendingBursts.set(playerId, {
+                  shotsRemaining: WEAPONS.rifle.burstSize - 1,
+                  nextShotIn: WEAPONS.rifle.burstInterval,
+                  lockedAngle: input.aimAngle,
+                });
+              }
+            }
           }
         }
 
@@ -688,6 +706,16 @@ export class Match implements MatchContext {
     // Advance any pending bursts.
     this.advanceBursts(dt, grid);
 
+    // Tick down shotgun pump-racking timers.
+    for (const [playerId, remaining] of this.rackingTimers) {
+      const next = remaining - dt;
+      if (next <= 0) {
+        this.rackingTimers.delete(playerId);
+      } else {
+        this.rackingTimers.set(playerId, next);
+      }
+    }
+
     // Bruce's fire-breath: per-tick segment hit check while abilityActiveSeconds
     // > 0. Runs BEFORE tickAbilities so the activation tick fires once before
     // the first decrement.
@@ -703,13 +731,18 @@ export class Match implements MatchContext {
     }
 
     // Reload timers — short-circuited under infinite_ammo so the mag is
-    // never empty and reloads can never start.
+    // never empty and reloads can never start. Infinite ammo applies to
+    // whichever weapon is in hand: a shotgun holder keeps a full 2-shell
+    // mag (and therefore never auto-reverts) for the rest of the match.
     const infiniteAmmoActive = this.activeEvent === 'infinite_ammo';
     for (const player of this.players.values()) {
       if (infiniteAmmoActive) {
         player.isReloading = false;
         player.reloadTimer = 0;
-        player.ammo = GUN.MAGAZINE_SIZE;
+        player.ammo = WEAPONS.rifle.magazineSize;
+        if (player.weaponId === 'shotgun') {
+          player.specialAmmo = WEAPONS.shotgun.magazineSize;
+        }
         continue;
       }
       if (player.isReloading) {
@@ -717,7 +750,16 @@ export class Match implements MatchContext {
         if (player.reloadTimer <= 0) {
           player.isReloading = false;
           player.reloadTimer = 0;
-          player.ammo = GUN.MAGAZINE_SIZE;
+          if (player.weaponId === 'shotgun') {
+            const take = Math.min(
+              WEAPONS.shotgun.magazineSize - player.specialAmmo,
+              player.specialReserve,
+            );
+            player.specialAmmo += take;
+            player.specialReserve -= take;
+          } else {
+            player.ammo = WEAPONS.rifle.magazineSize;
+          }
         }
       }
     }
@@ -755,8 +797,15 @@ export class Match implements MatchContext {
       }
     }
 
-    // Update pickups
-    this.pickupManager.update(dt);
+    // Update pickups. Weapon pickups about to land generate one-shot
+    // "INCOMING" warnings for the HUD banner.
+    const weaponAnnouncements = this.pickupManager.update(dt);
+    for (const announcement of weaponAnnouncements) {
+      this.tickWeaponIncoming.push({
+        weaponId: 'shotgun',
+        landsInMs: announcement.landsInMs,
+      });
+    }
 
     // Pickup collection
     for (const player of this.players.values()) {
@@ -770,6 +819,12 @@ export class Match implements MatchContext {
         if (applied) {
           this.pickupManager.collectPickup(pickup.id);
           this.tickPickupCollections.push({ pickupId: pickup.id, playerId: player.id });
+          if (pickup.type === PickupType.WEAPON_SHOTGUN) {
+            // Auto-equip side effects that live on Match: stop any rifle
+            // burst mid-flight and clear a stale racking timer.
+            this.pendingBursts.delete(player.id);
+            this.rackingTimers.delete(player.id);
+          }
         }
       }
     }
@@ -802,7 +857,7 @@ export class Match implements MatchContext {
           // Out of ammo mid-burst: drop remaining shots and start a reload.
           if (!player.isReloading) {
             player.isReloading = true;
-            player.reloadTimer = GUN.RELOAD_TIME;
+            player.reloadTimer = WEAPONS.rifle.reloadTime;
           }
           burst.shotsRemaining = 0;
           break;
@@ -810,7 +865,7 @@ export class Match implements MatchContext {
 
         this.fireOneShot(playerId, burst.lockedAngle, grid);
         burst.shotsRemaining -= 1;
-        burst.nextShotIn += GUN.BURST_INTERVAL;
+        burst.nextShotIn += WEAPONS.rifle.burstInterval;
       }
 
       if (burst.shotsRemaining <= 0) {
@@ -868,6 +923,107 @@ export class Match implements MatchContext {
     }
   }
 
+  /**
+   * Fire one shotgun blast: pelletCount rays fanned deterministically
+   * around the aim angle (seeded by the firing input's sequence number so
+   * server validation and any client preview agree), each validated
+   * against a single lag-comp rewind snapshot. Refuses while pump-racking,
+   * reloading, or with an empty magazine.
+   *
+   * Accuracy bookkeeping counts the blast as ONE shot, and one hit if any
+   * pellet connects — otherwise a shotgun would triple a player's
+   * shots-fired column and wreck the accuracy stat.
+   */
+  private tryFireShotgun(
+    player: PlayerState,
+    input: PlayerInput,
+    grid: ReturnType<MapManager['getCollisionGrid']>,
+    infiniteAmmo: boolean,
+  ): void {
+    const shotgun = WEAPONS.shotgun;
+    const racking = (this.rackingTimers.get(player.id) ?? 0) > 0;
+    if (racking || player.isReloading || player.specialAmmo <= 0) return;
+
+    const angles = computePelletAngles(
+      input.aimAngle,
+      shotgun.pelletCount,
+      shotgun.spreadAngle,
+      input.sequenceNumber,
+    );
+
+    const rtt = this.rttForShooter(player.id);
+    const piercing =
+      player.characterId === 'mighty_man' && player.abilityActiveSeconds > 0;
+    const shots = this.lagCompensator.processMultiShotWithRewind(
+      player.id,
+      angles,
+      this.players,
+      grid,
+      rtt,
+      piercing,
+      'shotgun',
+    );
+
+    this.stats.recordShot(player.id);
+    let anyPelletHit = false;
+
+    for (const shot of shots) {
+      this.tickBulletTrails.push(shot.trail);
+      if (!shot.hit || !shot.victimId || shot.damage === undefined) continue;
+      const victim = this.players.get(shot.victimId);
+      // A victim killed by an earlier pellet of this same blast absorbs no
+      // further pellets — without this guard each extra pellet would
+      // re-trigger the death path and inflate the death counter.
+      if (!victim || victim.isDead) continue;
+      const result = this.combatManager.applyDamage(victim, shot.damage, player.id);
+      anyPelletHit = true;
+      this.stats.recordDamage(player.id, shot.damage);
+      if (result.killed) {
+        this.onKill(player.id, shot.victimId, 'shotgun');
+      }
+    }
+
+    if (anyPelletHit) {
+      this.stats.recordHit(player.id);
+    }
+
+    if (!infiniteAmmo) {
+      player.specialAmmo = Math.max(0, player.specialAmmo - 1);
+    }
+
+    if (player.specialAmmo > 0) {
+      // Shells left in the mag — pump before the next shot.
+      this.rackingTimers.set(player.id, shotgun.fireCooldown);
+    } else if (player.specialReserve > 0) {
+      // Mag empty, reserve remains — auto-reload (no switch key exists,
+      // so the player should never be stuck holding an unusable weapon).
+      player.isReloading = true;
+      player.reloadTimer = shotgun.reloadTime;
+    } else if (!infiniteAmmo) {
+      // Completely dry: the shotgun vanishes and the rifle comes back out.
+      this.revertToRifle(player);
+    }
+  }
+
+  /**
+   * Put the rifle back in the player's hands after their special weapon
+   * runs dry (or on respawn). The rifle's magazine was untouched while
+   * stowed; if it happens to be empty, start its reload immediately so
+   * the player isn't left with a dead trigger.
+   */
+  private revertToRifle(player: PlayerState): void {
+    player.weaponId = 'rifle';
+    player.specialAmmo = 0;
+    player.specialReserve = 0;
+    this.rackingTimers.delete(player.id);
+    player.isReloading = false;
+    player.reloadTimer = 0;
+    if (player.ammo <= 0) {
+      player.isReloading = true;
+      player.reloadTimer = WEAPONS.rifle.reloadTime;
+    }
+  }
+
   /** Apply stats and kill credit for an explosion that just happened. */
   private recordExplosion(explosion: { throwerId: PlayerId; damages: { playerId: PlayerId; damage: number; killed: boolean }[] }): void {
     for (const dmg of explosion.damages) {
@@ -919,9 +1075,14 @@ export class Match implements MatchContext {
     player.isDead = false;
     player.respawnTimer = 0;
     player.invulnerableTimer = RESPAWN.INVULNERABILITY_DURATION;
-    player.ammo = GUN.MAGAZINE_SIZE;
+    player.ammo = WEAPONS.rifle.magazineSize;
     player.isReloading = false;
     player.reloadTimer = 0;
+    // Death drops the special weapon — you respawn on the rifle.
+    player.weaponId = 'rifle';
+    player.specialAmmo = 0;
+    player.specialReserve = 0;
+    this.rackingTimers.delete(player.id);
     player.stamina = PLAYER.SPRINT_DURATION;
     // During grenades_only, top up to MAX so respawning isn't a death sentence.
     player.grenades =
@@ -944,9 +1105,12 @@ export class Match implements MatchContext {
       aimAngle: 0,
       health: PLAYER.MAX_HEALTH,
       maxHealth: PLAYER.MAX_HEALTH,
-      ammo: GUN.MAGAZINE_SIZE,
+      ammo: WEAPONS.rifle.magazineSize,
       isReloading: false,
       reloadTimer: 0,
+      weaponId: 'rifle',
+      specialAmmo: 0,
+      specialReserve: 0,
       grenades: GRENADE.STARTING_COUNT,
       grenadeRegenSeconds: 0,
       isSprinting: false,
@@ -1023,12 +1187,17 @@ export class Match implements MatchContext {
           player.grenades = GRENADE.MAX_COUNT;
           player.grenadeRegenSeconds = 0;
         }
-        // Cancel in-flight bursts; the gun is gated off from this tick on.
+        // Cancel in-flight bursts and pump-racking; guns are gated off
+        // from this tick on.
         this.pendingBursts.clear();
+        this.rackingTimers.clear();
         return;
       case 'infinite_ammo':
         for (const player of this.players.values()) {
-          player.ammo = GUN.MAGAZINE_SIZE;
+          player.ammo = WEAPONS.rifle.magazineSize;
+          if (player.weaponId === 'shotgun') {
+            player.specialAmmo = WEAPONS.shotgun.magazineSize;
+          }
           player.isReloading = false;
           player.reloadTimer = 0;
         }

@@ -6,8 +6,9 @@ import {
   type BulletTrail,
   type GrenadeState,
   type KillFeedEntry,
+  type WeaponId,
   PLAYER,
-  GUN,
+  WEAPONS,
   GRENADE,
   RESPAWN,
   calculateDamage,
@@ -80,7 +81,9 @@ export class CombatManager {
     grid: CollisionGrid,
     rewindStates?: Map<PlayerId, PlayerState>,
     piercing: boolean = false,
+    weaponId: WeaponId = 'rifle',
   ): ShotResult {
+    const weapon = WEAPONS[weaponId];
     const shooter = (rewindStates ?? players).get(shooterId) ?? players.get(shooterId);
     if (!shooter) {
       // Shooter not found — return a miss
@@ -91,6 +94,7 @@ export class CombatManager {
           endPos: { x: 0, y: 0 },
           shooterId,
           timestamp: Date.now(),
+          weaponId,
         },
       };
     }
@@ -101,7 +105,7 @@ export class CombatManager {
     // Raycast against grid to find max distance (wall hit). When piercing
     // is true (shot fired during Mighty Man's x-ray), walls are ignored so
     // the bullet can hit a target through tiles.
-    const maxRayDistance = GUN.FALLOFF_RANGE_MAX * 2; // extend past falloff for actual hits
+    const maxRayDistance = weapon.falloffRangeMax * 2; // extend past falloff for actual hits
     const wallHit = raycastAgainstGrid(
       grid,
       startPos.x,
@@ -146,7 +150,7 @@ export class CombatManager {
     }
 
     if (closestHit) {
-      const damage = calculateDamage(closestHit.distance);
+      const damage = calculateDamage(closestHit.distance, weapon);
       const endPos = vecAdd(startPos, vecScale(dir, closestHit.distance));
       return {
         hit: true,
@@ -157,6 +161,7 @@ export class CombatManager {
           endPos,
           shooterId,
           timestamp: Date.now(),
+          weaponId,
         },
       };
     }
@@ -173,6 +178,7 @@ export class CombatManager {
         endPos,
         shooterId,
         timestamp: Date.now(),
+        weaponId,
       },
     };
   }
@@ -257,7 +263,10 @@ export class CombatManager {
     if (victim.health <= 0) {
       victim.isDead = true;
       victim.respawnTimer = RESPAWN.DELAY;
-      victim.deaths += 1;
+      // NOTE: victim.deaths is NOT incremented here — Match.onKill (or the
+      // suicide fallback in recordExplosion) owns the death counter. Doing
+      // it in both places double-counted every death on the broadcast
+      // PlayerState (caught by the shotgun multi-pellet tests).
 
       const entry: KillFeedEntry = {
         killerId: attackerId,

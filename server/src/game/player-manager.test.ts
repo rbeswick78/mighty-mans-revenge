@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { PlayerManager } from './player-manager.js';
 import {
   PLAYER,
-  GUN,
+  WEAPONS,
   RESPAWN,
 } from '@shared/game';
 import type { CollisionGrid, PlayerInput } from '@shared/game';
@@ -67,7 +67,7 @@ describe('PlayerManager', () => {
       expect(player.id).toBe('p1');
       expect(player.nickname).toBe('Alice');
       expect(player.health).toBe(PLAYER.MAX_HEALTH);
-      expect(player.ammo).toBe(GUN.MAGAZINE_SIZE);
+      expect(player.ammo).toBe(WEAPONS.rifle.magazineSize);
       expect(player.isDead).toBe(false);
       expect(player.score).toBe(0);
       expect(player.deaths).toBe(0);
@@ -237,22 +237,22 @@ describe('PlayerManager', () => {
       const player = manager.getPlayer('p1')!;
       player.ammo = 10;
       player.isReloading = true;
-      player.reloadTimer = GUN.RELOAD_TIME;
+      player.reloadTimer = WEAPONS.rifle.reloadTime;
 
       const grid = createOpenGrid();
 
       // Advance past reload time
-      manager.update(GUN.RELOAD_TIME + 0.1, grid);
+      manager.update(WEAPONS.rifle.reloadTime + 0.1, grid);
 
       expect(player.isReloading).toBe(false);
       expect(player.reloadTimer).toBe(0);
-      expect(player.ammo).toBe(GUN.MAGAZINE_SIZE);
+      expect(player.ammo).toBe(WEAPONS.rifle.magazineSize);
     });
 
     it('does not start reload when ammo is full', () => {
       manager.addPlayer('p1', 'Alice');
       const player = manager.getPlayer('p1')!;
-      expect(player.ammo).toBe(GUN.MAGAZINE_SIZE);
+      expect(player.ammo).toBe(WEAPONS.rifle.magazineSize);
 
       const grid = createOpenGrid();
       manager.processInput('p1', makeInput(0, { reload: true }));
@@ -277,7 +277,7 @@ describe('PlayerManager', () => {
 
       expect(player.isDead).toBe(false);
       expect(player.health).toBe(PLAYER.MAX_HEALTH);
-      expect(player.ammo).toBe(GUN.MAGAZINE_SIZE);
+      expect(player.ammo).toBe(WEAPONS.rifle.magazineSize);
       expect(player.invulnerableTimer).toBe(RESPAWN.INVULNERABILITY_DURATION);
     });
 

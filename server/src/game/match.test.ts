@@ -5,7 +5,8 @@ import {
   MATCH,
   RESPAWN,
   PLAYER,
-  GUN,
+  WEAPONS,
+  PICKUP,
   SERVER,
   EVENT,
   GRENADE,
@@ -302,7 +303,7 @@ describe('Match', () => {
       expect(victim.health).toBe(PLAYER.MAX_HEALTH);
       expect(victim.invulnerableTimer).toBeGreaterThan(0);
       expect(victim.invulnerableTimer).toBeLessThanOrEqual(RESPAWN.INVULNERABILITY_DURATION);
-      expect(victim.ammo).toBe(GUN.MAGAZINE_SIZE);
+      expect(victim.ammo).toBe(WEAPONS.rifle.magazineSize);
     });
 
     it('should send co-dying players to different spawn points', () => {
@@ -390,7 +391,7 @@ describe('Match', () => {
     it('should initialize all players with correct defaults', () => {
       const player = match.players.get('player-0')!;
       expect(player.health).toBe(PLAYER.MAX_HEALTH);
-      expect(player.ammo).toBe(GUN.MAGAZINE_SIZE);
+      expect(player.ammo).toBe(WEAPONS.rifle.magazineSize);
       expect(player.isDead).toBe(false);
       expect(player.score).toBe(0);
     });
@@ -778,7 +779,7 @@ describe('Match', () => {
       const player = m.players.get('player-0')!;
       m.update(0.05); // activation tick
 
-      expect(player.ammo).toBe(GUN.MAGAZINE_SIZE);
+      expect(player.ammo).toBe(WEAPONS.rifle.magazineSize);
 
       // Fire a burst: magazine should not deplete.
       m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
@@ -786,7 +787,7 @@ describe('Match', () => {
       for (let i = 0; i < 10; i++) {
         m.update(0.05);
       }
-      expect(player.ammo).toBe(GUN.MAGAZINE_SIZE);
+      expect(player.ammo).toBe(WEAPONS.rifle.magazineSize);
       expect(player.isReloading).toBe(false);
     });
 
@@ -840,15 +841,15 @@ describe('Match', () => {
         return 0;
       });
 
-      // One press, one burst — three shots at GUN.BURST_INTERVAL apart.
+      // One press, one burst — three shots at WEAPONS.rifle.burstInterval apart.
       m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
       m.update(SERVER.TICK_INTERVAL / 1000);
       // Drain the rest of the burst.
-      for (let i = 0; i < GUN.BURST_SIZE; i++) {
-        m.update(GUN.BURST_INTERVAL + 0.01);
+      for (let i = 0; i < WEAPONS.rifle.burstSize; i++) {
+        m.update(WEAPONS.rifle.burstInterval + 0.01);
       }
 
-      expect(seen.length).toBeGreaterThanOrEqual(GUN.BURST_SIZE);
+      expect(seen.length).toBeGreaterThanOrEqual(WEAPONS.rifle.burstSize);
       for (const id of seen) {
         expect(id).toBe('player-0');
       }
@@ -1244,6 +1245,344 @@ describe('Match', () => {
         m.update(0.05);
 
         expect(target.health).toBeLessThan(startHp);
+      });
+    });
+  });
+  describe('shotgun weapon system', () => {
+    /**
+     * 10x10 open map with a shotgun spawn at tile (5,5) -> world (264,264)
+     * and a bandage at (3,3) -> world (168,168).
+     */
+    function makeWeaponMapData(): MapData {
+      return {
+        ...makeMapData(),
+        pickupSpawns: [
+          { x: 5, y: 5, type: 'weapon_shotgun' as const },
+          { x: 3, y: 3, type: 'bandage' as const },
+        ],
+      };
+    }
+
+    function startActiveWeaponMatch(): Match {
+      const m = new Match('match-sg', makeWeaponMapData(), [
+        { id: 'player-0', nickname: 'P0' },
+        { id: 'player-1', nickname: 'P1' },
+      ]);
+      m.startCountdown();
+      m.update(MATCH.COUNTDOWN_DURATION + 0.05);
+      return m;
+    }
+
+    /** Advance the match in small ticks (keeps announce-crossing detectable). */
+    function advance(m: Match, seconds: number, step = 0.1): void {
+      let remaining = seconds;
+      while (remaining > 0) {
+        const dt = Math.min(step, remaining);
+        m.update(dt);
+        remaining -= dt;
+      }
+    }
+
+    /** Put a shotgun with full shells directly in the player's hands. */
+    function equipShotgun(m: Match, playerId: string): void {
+      const player = m.players.get(playerId)!;
+      player.weaponId = 'shotgun';
+      player.specialAmmo = WEAPONS.shotgun.magazineSize;
+      player.specialReserve = WEAPONS.shotgun.pickupAmmo - WEAPONS.shotgun.magazineSize;
+    }
+
+    describe('map spawn + announcement', () => {
+      it('starts the match with the shotgun pickup inactive on its respawn timer', () => {
+        const m = startActiveWeaponMatch();
+        const shotgunPickup = m.pickupManager
+          .getPickups()
+          .find((p) => p.type === 'weapon_shotgun')!;
+        expect(shotgunPickup.isActive).toBe(false);
+        expect(shotgunPickup.respawnTimer).toBeGreaterThan(0);
+      });
+
+      it('emits exactly one weaponIncoming warning ~5s before landing, then activates', () => {
+        const m = startActiveWeaponMatch();
+        // The countdown tick already consumed some time; drain any warnings
+        // (there should be none this early).
+        expect(m.consumeTickWeaponIncoming()).toHaveLength(0);
+
+        const warnings: Array<{ weaponId: string; landsInMs: number }> = [];
+        let remaining = PICKUP.WEAPON_RESPAWN_TIME + 1;
+        while (remaining > 0) {
+          m.update(0.1);
+          warnings.push(...m.consumeTickWeaponIncoming());
+          remaining -= 0.1;
+        }
+
+        expect(warnings).toHaveLength(1);
+        expect(warnings[0].weaponId).toBe('shotgun');
+        expect(warnings[0].landsInMs).toBeGreaterThan(0);
+        expect(warnings[0].landsInMs).toBeLessThanOrEqual(
+          PICKUP.WEAPON_ANNOUNCE_LEAD * 1000,
+        );
+
+        const shotgunPickup = m.pickupManager
+          .getPickups()
+          .find((p) => p.type === 'weapon_shotgun')!;
+        expect(shotgunPickup.isActive).toBe(true);
+      });
+    });
+
+    describe('pickup / equip', () => {
+      it('auto-equips with full shells when the player walks over it', () => {
+        const m = startActiveWeaponMatch();
+        advance(m, PICKUP.WEAPON_RESPAWN_TIME + 0.5);
+
+        const player = m.players.get('player-0')!;
+        player.position = { x: 5 * 48 + 24, y: 5 * 48 + 24 };
+        m.update(0.05);
+
+        expect(player.weaponId).toBe('shotgun');
+        expect(player.specialAmmo).toBe(WEAPONS.shotgun.magazineSize);
+        expect(player.specialReserve).toBe(
+          WEAPONS.shotgun.pickupAmmo - WEAPONS.shotgun.magazineSize,
+        );
+        // Rifle magazine untouched by the equip.
+        expect(player.ammo).toBe(WEAPONS.rifle.magazineSize);
+        expect(m.getTickPickupCollections().some((c) => c.playerId === 'player-0')).toBe(
+          true,
+        );
+      });
+    });
+
+    describe('firing + racking', () => {
+      it('fires pelletCount trails per blast, all tagged shotgun', () => {
+        const m = startActiveWeaponMatch();
+        equipShotgun(m, 'player-0');
+
+        m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+        m.update(0.05);
+
+        const trails = m.getTickBulletTrails();
+        expect(trails).toHaveLength(WEAPONS.shotgun.pelletCount);
+        for (const trail of trails) {
+          expect(trail.weaponId).toBe('shotgun');
+        }
+        expect(m.players.get('player-0')!.specialAmmo).toBe(
+          WEAPONS.shotgun.magazineSize - 1,
+        );
+      });
+
+      it('pump-racking blocks a second shot until fireCooldown elapses', () => {
+        const m = startActiveWeaponMatch();
+        equipShotgun(m, 'player-0');
+        const player = m.players.get('player-0')!;
+
+        m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+        m.update(0.05);
+        expect(player.specialAmmo).toBe(1);
+
+        // Immediate re-fire: still racking -> refused.
+        m.queueInput('player-0', makeInput(2, { firePressed: true, aimAngle: 0 }));
+        m.update(0.05);
+        expect(player.specialAmmo).toBe(1);
+
+        // Wait out the racking, then fire again.
+        advance(m, WEAPONS.shotgun.fireCooldown, 0.05);
+        m.queueInput('player-0', makeInput(3, { firePressed: true, aimAngle: 0 }));
+        m.update(0.05);
+        expect(player.specialAmmo).toBe(0);
+      });
+
+      it('auto-reloads from reserve when the mag empties, refusing fire mid-reload', () => {
+        const m = startActiveWeaponMatch();
+        equipShotgun(m, 'player-0');
+        const player = m.players.get('player-0')!;
+
+        m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+        m.update(0.05);
+        advance(m, WEAPONS.shotgun.fireCooldown, 0.05);
+        m.queueInput('player-0', makeInput(2, { firePressed: true, aimAngle: 0 }));
+        m.update(0.05);
+
+        // Mag is dry with reserve remaining -> auto-reload started.
+        expect(player.specialAmmo).toBe(0);
+        expect(player.isReloading).toBe(true);
+
+        // Firing during the reload is refused.
+        m.queueInput('player-0', makeInput(3, { firePressed: true, aimAngle: 0 }));
+        m.update(0.05);
+        expect(m.getTickBulletTrails()).toHaveLength(0);
+
+        // Reload completes: mag refilled from reserve.
+        advance(m, WEAPONS.shotgun.reloadTime, 0.05);
+        expect(player.isReloading).toBe(false);
+        expect(player.specialAmmo).toBe(WEAPONS.shotgun.magazineSize);
+        expect(player.specialReserve).toBe(
+          WEAPONS.shotgun.pickupAmmo - 2 * WEAPONS.shotgun.magazineSize,
+        );
+      });
+
+      it('reverts to the rifle when the last shell is spent', () => {
+        const m = startActiveWeaponMatch();
+        equipShotgun(m, 'player-0');
+        const player = m.players.get('player-0')!;
+        player.specialAmmo = 1;
+        player.specialReserve = 0;
+
+        m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+        m.update(0.05);
+
+        expect(player.weaponId).toBe('rifle');
+        expect(player.specialAmmo).toBe(0);
+        expect(player.specialReserve).toBe(0);
+        // Rifle mag was stowed untouched -> no forced reload.
+        expect(player.ammo).toBe(WEAPONS.rifle.magazineSize);
+        expect(player.isReloading).toBe(false);
+      });
+
+      it('starts a rifle reload on revert if the stowed rifle mag was empty', () => {
+        const m = startActiveWeaponMatch();
+        equipShotgun(m, 'player-0');
+        const player = m.players.get('player-0')!;
+        player.ammo = 0;
+        player.specialAmmo = 1;
+        player.specialReserve = 0;
+
+        m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+        m.update(0.05);
+
+        expect(player.weaponId).toBe('rifle');
+        expect(player.isReloading).toBe(true);
+      });
+
+      it('death drops the shotgun and respawn is back on the rifle', () => {
+        const m = startActiveWeaponMatch();
+        equipShotgun(m, 'player-0');
+        const player = m.players.get('player-0')!;
+
+        m.onKill('player-1', 'player-0', 'gun');
+        expect(player.weaponId).toBe('rifle');
+        expect(player.specialAmmo).toBe(0);
+
+        advance(m, RESPAWN.DELAY + 0.2, 0.05);
+        expect(player.isDead).toBe(false);
+        expect(player.weaponId).toBe('rifle');
+        expect(player.ammo).toBe(WEAPONS.rifle.magazineSize);
+      });
+    });
+
+    describe('damage + attribution', () => {
+      it('point-blank blast sums pellet damage; stats count one shot and one hit', () => {
+        const m = startActiveWeaponMatch();
+        equipShotgun(m, 'player-0');
+        const shooter = m.players.get('player-0')!;
+        const victim = m.players.get('player-1')!;
+        shooter.position = { x: 100, y: 100 };
+        victim.position = { x: 150, y: 100 };
+        victim.invulnerableTimer = 0;
+        const startHp = victim.health;
+
+        m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+        m.update(0.05);
+
+        const damage = startHp - victim.health;
+        // All pellets land at ~50px: total well above a single pellet's max.
+        expect(damage).toBeGreaterThan(WEAPONS.shotgun.damageMax);
+        const stats = m.stats.getStats('player-0');
+        expect(stats.shotsFired).toBe(1);
+        expect(stats.shotsHit).toBe(1);
+        expect(stats.damageDealt).toBeCloseTo(damage, 5);
+      });
+
+      it('a shotgun kill is attributed to shotgun in stats and the kill feed', () => {
+        const m = startActiveWeaponMatch();
+        equipShotgun(m, 'player-0');
+        const shooter = m.players.get('player-0')!;
+        const victim = m.players.get('player-1')!;
+        shooter.position = { x: 100, y: 100 };
+        victim.position = { x: 150, y: 100 };
+        victim.invulnerableTimer = 0;
+        victim.health = 10;
+
+        m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+        m.update(0.05);
+
+        expect(victim.isDead).toBe(true);
+        // The victim died exactly once even though multiple pellets connected.
+        expect(victim.deaths).toBe(1);
+        const stats = m.stats.getStats('player-0');
+        expect(stats.shotgunKills).toBe(1);
+        expect(stats.kills).toBe(1);
+        const entry = m.getKillFeed().find((e) => e.victimId === 'player-1')!;
+        expect(entry.weapon).toBe('shotgun');
+      });
+
+      it('shotgun pellets stop at walls', () => {
+        const map = makeWeaponMapData();
+        // Vertical wall at column 5.
+        for (let row = 1; row < 9; row++) map.tiles[row][5] = 1;
+        map.pickupSpawns = [];
+        const m = new Match('match-sg-wall', map, [
+          { id: 'player-0', nickname: 'P0' },
+          { id: 'player-1', nickname: 'P1' },
+        ]);
+        m.startCountdown();
+        m.update(MATCH.COUNTDOWN_DURATION + 0.05);
+        equipShotgun(m, 'player-0');
+        const shooter = m.players.get('player-0')!;
+        const victim = m.players.get('player-1')!;
+        shooter.position = { x: 2.5 * 48, y: 4.5 * 48 };
+        victim.position = { x: 7.5 * 48, y: 4.5 * 48 };
+        victim.invulnerableTimer = 0;
+        const startHp = victim.health;
+
+        m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+        m.update(0.05);
+
+        expect(victim.health).toBe(startHp);
+      });
+    });
+
+    describe('bandage pickup', () => {
+      it('heals BANDAGE_HEAL capped at max health and starts its respawn timer', () => {
+        const m = startActiveWeaponMatch();
+        const player = m.players.get('player-0')!;
+        player.health = 50;
+        player.position = { x: 3 * 48 + 24, y: 3 * 48 + 24 };
+        m.update(0.05);
+
+        expect(player.health).toBe(Math.min(player.maxHealth, 50 + PICKUP.BANDAGE_HEAL));
+        const bandage = m.pickupManager
+          .getPickups()
+          .find((p) => p.type === 'bandage')!;
+        expect(bandage.isActive).toBe(false);
+        expect(bandage.respawnTimer).toBeCloseTo(PICKUP.BANDAGE_RESPAWN_TIME, 1);
+      });
+
+      it('is not consumed at full health', () => {
+        const m = startActiveWeaponMatch();
+        const player = m.players.get('player-0')!;
+        player.position = { x: 3 * 48 + 24, y: 3 * 48 + 24 };
+        m.update(0.05);
+
+        expect(player.health).toBe(player.maxHealth);
+        const bandage = m.pickupManager
+          .getPickups()
+          .find((p) => p.type === 'bandage')!;
+        expect(bandage.isActive).toBe(true);
+      });
+
+      it('respawns on its own timer after collection', () => {
+        const m = startActiveWeaponMatch();
+        const player = m.players.get('player-0')!;
+        player.health = 50;
+        player.position = { x: 3 * 48 + 24, y: 3 * 48 + 24 };
+        m.update(0.05);
+        // Step away so the respawned bandage isn't instantly re-collected.
+        player.position = { x: 100, y: 400 };
+
+        advance(m, PICKUP.BANDAGE_RESPAWN_TIME + 0.5);
+        const bandage = m.pickupManager
+          .getPickups()
+          .find((p) => p.type === 'bandage')!;
+        expect(bandage.isActive).toBe(true);
       });
     });
   });

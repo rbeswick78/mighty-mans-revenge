@@ -5,7 +5,7 @@ import {
   type CollisionGrid,
   type PlayerId,
   PLAYER,
-  GUN,
+  WEAPONS,
   GRENADE,
   RESPAWN,
 } from '@shared/game';
@@ -18,9 +18,12 @@ function createPlayer(overrides: Partial<PlayerState> & { id: PlayerId }): Playe
     aimAngle: 0,
     health: PLAYER.MAX_HEALTH,
     maxHealth: PLAYER.MAX_HEALTH,
-    ammo: GUN.MAGAZINE_SIZE,
+    ammo: WEAPONS.rifle.magazineSize,
     isReloading: false,
     reloadTimer: 0,
+    weaponId: 'rifle',
+    specialAmmo: 0,
+    specialReserve: 0,
     grenades: GRENADE.STARTING_COUNT,
     grenadeRegenSeconds: 0,
     isSprinting: false,
@@ -186,7 +189,7 @@ describe('CombatManager', () => {
       const result = combat.processShot('shooter', 0, players, grid);
 
       expect(result.hit).toBe(true);
-      expect(result.damage).toBe(GUN.DAMAGE_MAX);
+      expect(result.damage).toBe(WEAPONS.rifle.damageMax);
     });
 
     it('calculates reduced damage at long range', () => {
@@ -202,7 +205,7 @@ describe('CombatManager', () => {
       const result = combat.processShot('shooter', 0, players, grid);
 
       expect(result.hit).toBe(true);
-      expect(result.damage).toBe(GUN.DAMAGE_MIN);
+      expect(result.damage).toBe(WEAPONS.rifle.damageMin);
     });
 
     it('does not hit the shooter themselves', () => {
@@ -376,11 +379,11 @@ describe('CombatManager', () => {
       expect(result.killed).toBe(true);
     });
 
-    it('increments death count on kill', () => {
+    it('leaves the death counter to Match.onKill (no double count)', () => {
       const victim = createPlayer({ id: 'victim', health: 10, deaths: 2 });
       combat.applyDamage(victim, 10, 'attacker');
 
-      expect(victim.deaths).toBe(3);
+      expect(victim.deaths).toBe(2);
     });
 
     it('returns kill feed entry on kill', () => {

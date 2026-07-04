@@ -415,6 +415,9 @@ export class MatchmakingManager {
         health: player.health,
         maxHealth: player.maxHealth,
         ammo: player.ammo,
+        weaponId: player.weaponId,
+        specialAmmo: player.specialAmmo,
+        specialReserve: player.specialReserve,
         grenades: player.grenades,
         isReloading: player.isReloading,
         isSprinting: player.isSprinting,
@@ -494,6 +497,19 @@ export class MatchmakingManager {
           type: 'server:eventWarning',
           event: warning.event,
           activatesInMs: warning.activatesInMs,
+        }, { reliable: true });
+      }
+    }
+
+    // Broadcast one-shot weapon-incoming warnings ("SHOTGUN INCOMING") —
+    // fired ~5s before a weapon pickup (re)spawns. Reliable: it's a single
+    // dramatic beat and a drop would kill the whole point.
+    for (const incoming of match.consumeTickWeaponIncoming()) {
+      for (const [playerId] of match.players) {
+        this.server.sendTo(playerId, {
+          type: 'server:weaponIncoming',
+          weaponId: incoming.weaponId,
+          landsInMs: incoming.landsInMs,
         }, { reliable: true });
       }
     }
