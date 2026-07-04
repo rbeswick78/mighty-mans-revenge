@@ -3,18 +3,7 @@ import { PlayerInput } from './player.js';
 import { GrenadeState, BulletTrail } from './projectile.js';
 import { PickupState } from './pickup.js';
 import { MatchPhase, KillFeedEntry, MatchResult } from './game.js';
-import type { CharacterId, WeaponId } from '../config/game.js';
-
-/**
- * Final-minute events: a single one is picked at random ~5s before
- * activation, broadcast on warning, then on activation it runs until
- * the match ends.
- */
-export type FinalMinuteEvent =
-  | 'super_speed'
-  | 'grenades_only'
-  | 'infinite_ammo'
-  | 'low_health';
+import type { CharacterId, WeaponId, MutatorId } from '../config/game.js';
 
 // === Client -> Server Messages ===
 
@@ -115,11 +104,13 @@ export interface ServerGameStateMessage {
   bulletTrails: BulletTrail[];
   pickups: PickupState[];
   /**
-   * The active final-minute event, or null if no event has activated yet.
-   * Sent every snapshot so reconnecting / late-joining clients pick up the
-   * modifier without an extra round-trip.
+   * All currently active mutators, in activation order (empty until the
+   * first activation). The mid-match mutator and the final-minute event
+   * both run to match end, so late in a match this holds two entries.
+   * Sent every snapshot so reconnecting / late-joining clients pick up
+   * the modifiers without an extra round-trip.
    */
-  activeEvent: FinalMinuteEvent | null;
+  activeMutators: MutatorId[];
 }
 
 export interface SerializedPlayerState {
@@ -172,6 +163,12 @@ export interface SerializedPlayerState {
    * lockout in client prediction. See PlayerState.frozenTimer.
    */
   frozenTimer: number;
+  /**
+   * second_wind respawn boost — seconds remaining; 0 when not boosted.
+   * Broadcast so the local player's prediction applies the same speed
+   * multiplier the server does. See PlayerState.secondWindTimer.
+   */
+  secondWindTimer: number;
 }
 
 export interface ServerMatchFoundMessage {
@@ -268,14 +265,22 @@ export interface ServerOpponentDisconnectedMessage {
 
 export interface ServerEventWarningMessage {
   type: 'server:eventWarning';
-  event: FinalMinuteEvent;
-  /** Ms from now until the event activates. */
+  event: MutatorId;
+  /** Ms from now until the mutator activates. */
   activatesInMs: number;
+  /**
+   * True for the guaranteed final-minute slot, false for the random
+   * mid-match slot. Drives the banner headline ("FINAL MINUTE INCOMING"
+   * vs "MUTATOR INCOMING").
+   */
+  isFinalMinute: boolean;
 }
 
 export interface ServerEventStartMessage {
   type: 'server:eventStart';
-  event: FinalMinuteEvent;
+  event: MutatorId;
+  /** See ServerEventWarningMessage.isFinalMinute. */
+  isFinalMinute: boolean;
 }
 
 /**

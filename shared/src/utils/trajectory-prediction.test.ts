@@ -50,6 +50,7 @@ function makePlayer(overrides: Partial<PlayerState> = {}): PlayerState {
     abilityCooldownSeconds: 0,
     abilityLockedAim: 0,
     frozenTimer: 0,
+    secondWindTimer: 0,
     ...overrides,
   };
 }

@@ -82,6 +82,14 @@ export interface PlayerState {
    * the cursor — being frozen is total inertia, not blindness.
    */
   frozenTimer: number;
+  /**
+   * Seconds remaining on the second_wind respawn speed boost; 0 when not
+   * boosted. Set by the server on respawn while the second_wind mutator is
+   * active, decremented per tick, and consumed by the shared
+   * mutatorsToMovementModifiers so client prediction and server authority
+   * apply the identical speed multiplier.
+   */
+  secondWindTimer: number;
 }
 
 export interface PlayerInput {

@@ -154,22 +154,67 @@ export const MATCH = Object.freeze({
   CHARACTER_SELECT_TIMEOUT_SEC: 30,
 });
 
-export const EVENT = Object.freeze({
-  /**
-   * Final-minute events: when the match timer crosses these thresholds (in
-   * seconds remaining), the server fires a warning, then activates a
-   * randomly chosen modifier that runs until match end.
-   */
+/**
+ * Mutators: match-wide rule modifiers that activate mid-match and run until
+ * the match ends. Each match schedules TWO activations from POOL, no
+ * repeats:
+ *
+ *   1. Mid-match — at a random time inside the 40%–70% elapsed window
+ *      (rolled from the match's injectable RNG, so tests can seed it).
+ *   2. Final-minute — guaranteed, at the fixed remaining-time thresholds
+ *      below (the pre-mutator "final-minute event" system, unchanged).
+ *
+ * Both get a warning banner WARNING_LEAD_SECONDS before activation, and
+ * both run to match end — the 70% window edge lies inside the final
+ * minute, so the two mutators can be active simultaneously (stacking is
+ * intended; movement multipliers compose multiplicatively).
+ */
+export const MUTATORS = Object.freeze({
+  POOL: [
+    'super_speed',
+    'grenades_only',
+    'infinite_ammo',
+    'low_health',
+    'big_heads',
+    'vampire',
+    'turbo_grenades',
+    'second_wind',
+  ] as const,
+  /** Final-minute slot: warning/activation thresholds in seconds REMAINING. */
   WARNING_AT_REMAINING: 65,
   ACTIVATION_AT_REMAINING: 60,
-  POOL: ['super_speed', 'grenades_only', 'infinite_ammo', 'low_health'] as const,
+  /** Mid-match slot: activation window as fractions of match time ELAPSED. */
+  MIDMATCH_MIN_ELAPSED_FRACTION: 0.4,
+  MIDMATCH_MAX_ELAPSED_FRACTION: 0.7,
+  /** Seconds between the mid-match warning banner and its activation. */
+  WARNING_LEAD_SECONDS: 5,
   /** BASE_SPEED multiplier during super_speed. */
   SUPER_SPEED_MULTIPLIER: 1.6,
   /** Seconds to refill one grenade during grenades_only. */
   GRENADES_ONLY_REFILL_SECONDS: 3.0,
   /** Max-HP cap during low_health (clamps current HP and respawn HP). */
   LOW_HEALTH_HP: 1,
+  /** big_heads: hit-validation AABB scale (server + aim-line preview only). */
+  BIG_HEADS_HITBOX_SCALE: 1.5,
+  /** big_heads: sprite render scale multiplier (client visual only). */
+  BIG_HEADS_RENDER_SCALE: 1.3,
+  /** vampire: fraction of damage dealt returned to the attacker as healing. */
+  VAMPIRE_HEAL_FRACTION: 0.5,
+  /** turbo_grenades: multiplier on grenade throw speed. */
+  TURBO_GRENADES_SPEED_MULTIPLIER: 1.5,
+  /** turbo_grenades: seconds to refill one grenade, up to GRENADE.MAX_COUNT. */
+  TURBO_GRENADES_REFILL_SECONDS: 5.0,
+  /** second_wind: speed multiplier granted on respawn... */
+  SECOND_WIND_SPEED_MULTIPLIER: 1.3,
+  /** ...for this many seconds (PlayerState.secondWindTimer). */
+  SECOND_WIND_DURATION_SECONDS: 3,
 });
+
+/**
+ * A mutator's id. Formerly `FinalMinuteEvent` — renamed when the pool grew
+ * a second, randomly-timed mid-match activation slot.
+ */
+export type MutatorId = (typeof MUTATORS.POOL)[number];
 
 /**
  * End-of-match awards. Declaration order IS the priority order: the server

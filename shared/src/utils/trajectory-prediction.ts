@@ -26,6 +26,7 @@ export function predictBulletRay(
   grid: CollisionGrid,
   piercing: boolean = false,
   weapon: WeaponDef = WEAPONS.rifle,
+  hitboxScale: number = 1,
 ): BulletAim {
   const dir = vecFromAngle(aimAngle);
   const maxRayDistance = weapon.falloffRangeMax * 2;
@@ -50,8 +51,10 @@ export function predictBulletRay(
     if (playerState.isDead) continue;
     if (playerState.invulnerableTimer > 0) continue;
 
-    const halfW = PLAYER.HITBOX_WIDTH / 2;
-    const halfH = PLAYER.HITBOX_HEIGHT / 2;
+    // hitboxScale mirrors the server's big_heads hit validation so the
+    // aim line agrees with what the server will actually count as a hit.
+    const halfW = (PLAYER.HITBOX_WIDTH / 2) * hitboxScale;
+    const halfH = (PLAYER.HITBOX_HEIGHT / 2) * hitboxScale;
 
     const hitDist = rayIntersectsAABB(
       origin.x,
@@ -98,8 +101,12 @@ export function predictGrenadePath(
   durationSeconds: number = TRAJECTORY.PREVIEW_SECONDS,
   stepDt: number = TRAJECTORY.PREVIEW_STEP_DT,
   piercing: boolean = false,
+  speedMultiplier: number = 1,
 ): Vec2[] {
-  const velocity = vecScale(vecFromAngle(aimAngle), GRENADE.THROW_SPEED);
+  const velocity = vecScale(
+    vecFromAngle(aimAngle),
+    GRENADE.THROW_SPEED * speedMultiplier,
+  );
   const sim: { position: Vec2; velocity: Vec2; piercing?: boolean } = {
     position: { x: origin.x, y: origin.y },
     velocity: { x: velocity.x, y: velocity.y },
