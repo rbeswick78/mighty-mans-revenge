@@ -1,5 +1,5 @@
 import { PlayerId, Vec2, Tick } from './common.js';
-import type { CharacterId } from '../config/game.js';
+import type { CharacterId, WeaponId } from '../config/game.js';
 
 export interface PlayerState {
   id: PlayerId;
@@ -14,9 +14,26 @@ export interface PlayerState {
   aimAngle: number;
   health: number;
   maxHealth: number;
+  /**
+   * Rounds in the RIFLE's magazine. Always tracks the rifle even while a
+   * special weapon is equipped, so reverting is lossless.
+   */
   ammo: number;
   isReloading: boolean;
   reloadTimer: number;
+  /**
+   * Currently equipped weapon. 'rifle' by default; a map-spawned special
+   * weapon (shotgun) after walking over its pickup. Reverts to 'rifle'
+   * when the special weapon's ammo is fully spent, and on death.
+   */
+  weaponId: WeaponId;
+  /**
+   * Shells in the special weapon's magazine. Only meaningful while
+   * weaponId !== 'rifle'; 0 otherwise.
+   */
+  specialAmmo: number;
+  /** Reserve shells for the special weapon (outside the magazine). */
+  specialReserve: number;
   /** Number of grenades the player can still throw. */
   grenades: number;
   /**
@@ -109,5 +126,6 @@ export interface PlayerStats {
   damageTaken: number;
   grenadesThrown: number;
   grenadeKills: number;
+  shotgunKills: number;
   longestKillStreak: number;
 }

@@ -1,10 +1,17 @@
 import { PlayerId, Vec2 } from './common.js';
+import type { WeaponId } from '../config/game.js';
 
 export interface BulletTrail {
   startPos: Vec2;
   endPos: Vec2;
   shooterId: PlayerId;
   timestamp: number;
+  /**
+   * Weapon that produced this trail. A shotgun blast broadcasts one trail
+   * per pellet; the client renders every trail but plays the muzzle
+   * flash/SFX once per blast (grouped by shooter + timestamp).
+   */
+  weaponId: WeaponId;
 }
 
 export interface GrenadeState {

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { predictBulletRay, predictGrenadePath } from './trajectory-prediction.js';
 import { stepGrenade } from './grenade-physics.js';
-import { GRENADE, GUN, PLAYER, TRAJECTORY } from '../config/game.js';
+import { GRENADE, WEAPONS, PLAYER, TRAJECTORY } from '../config/game.js';
 import { CollisionGrid } from '../types/map.js';
 import { PlayerState } from '../types/player.js';
 import { vecFromAngle, vecScale } from './math.js';
@@ -33,6 +33,9 @@ function makePlayer(overrides: Partial<PlayerState> = {}): PlayerState {
     ammo: 30,
     isReloading: false,
     reloadTimer: 0,
+    weaponId: 'rifle',
+    specialAmmo: 0,
+    specialReserve: 0,
     grenades: 3,
     grenadeRegenSeconds: 0,
     isSprinting: false,
@@ -180,10 +183,10 @@ describe('predictGrenadePath', () => {
   });
 });
 
-// Sanity: GUN constant is used in predictBulletRay's max-distance fallback.
+// Sanity: the rifle's falloff is used in predictBulletRay's max-distance fallback.
 describe('module wiring', () => {
-  it('exports a sane GUN.FALLOFF_RANGE_MAX', () => {
-    expect(GUN.FALLOFF_RANGE_MAX).toBeGreaterThan(0);
+  it('exports a sane WEAPONS.rifle.falloffRangeMax', () => {
+    expect(WEAPONS.rifle.falloffRangeMax).toBeGreaterThan(0);
   });
   it('exports a sane TRAJECTORY.PREVIEW_SECONDS', () => {
     expect(TRAJECTORY.PREVIEW_SECONDS).toBeGreaterThan(0);

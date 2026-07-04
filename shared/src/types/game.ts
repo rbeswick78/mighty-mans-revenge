@@ -34,10 +34,17 @@ export interface GameState {
   killFeed: KillFeedEntry[];
 }
 
+/**
+ * Kill-attribution source. 'gun' is the rifle (legacy name kept for wire
+ * compatibility); abilities and special weapons get their own entries so
+ * stats/awards can distinguish them.
+ */
+export type KillWeapon = 'gun' | 'grenade' | 'fire' | 'shotgun';
+
 export interface KillFeedEntry {
   killerId: PlayerId;
   victimId: PlayerId;
-  weapon: 'gun' | 'grenade' | 'fire';
+  weapon: KillWeapon;
   timestamp: number;
 }
 

@@ -6,9 +6,12 @@ export enum TileType {
   PICKUP_SPAWN = 4,
 }
 
+/** Pickup spawn kinds a map may declare. Mirrors PickupType values. */
+export type PickupSpawnType = 'gun_ammo' | 'grenade' | 'weapon_shotgun' | 'bandage';
+
 export interface MapTile {
   type: TileType;
-  pickupType?: 'gun_ammo' | 'grenade';
+  pickupType?: PickupSpawnType;
 }
 
 export interface MapData {
@@ -18,7 +21,7 @@ export interface MapData {
   tileSize: number;
   tiles: TileType[][];
   spawnPoints: { x: number; y: number }[];
-  pickupSpawns: { x: number; y: number; type: 'gun_ammo' | 'grenade' }[];
+  pickupSpawns: { x: number; y: number; type: PickupSpawnType }[];
 }
 
 export interface CollisionGrid {

@@ -1,4 +1,5 @@
 import type { CharacterDef } from '../types/character.js';
+import type { WeaponDef } from '../types/weapon.js';
 
 export const PLAYER = Object.freeze({
   BASE_SPEED: 200,
@@ -10,18 +11,56 @@ export const PLAYER = Object.freeze({
   HITBOX_HEIGHT: 24,
 });
 
-export const GUN = Object.freeze({
-  DAMAGE_MIN: 8,
-  DAMAGE_MAX: 25,
-  FALLOFF_RANGE_MIN: 64,
-  FALLOFF_RANGE_MAX: 400,
-  /** Number of rounds in a single burst fired on left-click release. */
-  BURST_SIZE: 3,
-  /** Seconds between each round in a burst. */
-  BURST_INTERVAL: 0.15,
-  MAGAZINE_SIZE: 30,
-  RELOAD_TIME: 2.0,
-});
+/**
+ * Weapon roster. The rifle is the always-carried default (the pre-weapon-
+ * system "GUN"); everything else is a map-spawned special weapon that
+ * occupies the single pickup slot until its ammo runs out.
+ */
+export const WEAPONS = Object.freeze({
+  rifle: Object.freeze({
+    id: 'rifle',
+    displayName: 'Rifle',
+    damageMin: 8,
+    damageMax: 25,
+    falloffRangeMin: 64,
+    falloffRangeMax: 400,
+    /** Number of rounds in a single burst fired on left-click release. */
+    burstSize: 3,
+    /** Seconds between each round in a burst. */
+    burstInterval: 0.15,
+    magazineSize: 30,
+    reloadTime: 2.0,
+    pelletCount: 1,
+    spreadAngle: 0,
+    fireCooldown: 0,
+    /** The rifle is never a map pickup. */
+    pickupAmmo: 0,
+  }),
+  shotgun: Object.freeze({
+    id: 'shotgun',
+    displayName: 'Shotgun',
+    /** Per-pellet damage — brutal close, useless far. */
+    damageMin: 3,
+    damageMax: 8,
+    falloffRangeMin: 32,
+    falloffRangeMax: 180,
+    /** Single shot per trigger pull; pump racking gates the fire rate. */
+    burstSize: 1,
+    burstInterval: 0,
+    magazineSize: 2,
+    reloadTime: 1.5,
+    pelletCount: 6,
+    /** Full fan width ≈ 20°. */
+    spreadAngle: 0.35,
+    /** Pump-racking delay between shots. */
+    fireCooldown: 0.6,
+    /** Picked up with 8 shells total (2 in the mag + 6 reserve). */
+    pickupAmmo: 8,
+  }),
+}) satisfies Readonly<Record<string, WeaponDef>>;
+
+export type WeaponId = keyof typeof WEAPONS;
+export const WEAPON_IDS = Object.keys(WEAPONS) as WeaponId[];
 
 export const GRENADE = Object.freeze({
   DAMAGE: 100,
@@ -54,7 +93,19 @@ export const TRAJECTORY = Object.freeze({
 
 export const PICKUP = Object.freeze({
   GUN_AMMO_AMOUNT: 15,
+  /** Respawn time for ammo/grenade top-off pickups. */
   RESPAWN_TIME: 15,
+  /** HP restored by a bandage, capped at the player's max health. */
+  BANDAGE_HEAL: 30,
+  BANDAGE_RESPAWN_TIME: 20,
+  /**
+   * Respawn cycle for special-weapon pickups (shotgun). Weapon pickups
+   * also start the match on this timer rather than pre-placed, so every
+   * drop — including the first — gets the same pre-announcement.
+   */
+  WEAPON_RESPAWN_TIME: 30,
+  /** Seconds before a weapon pickup lands that the warning banner fires. */
+  WEAPON_ANNOUNCE_LEAD: 5,
 });
 
 export const RESPAWN = Object.freeze({

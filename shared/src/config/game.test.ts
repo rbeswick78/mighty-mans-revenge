@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { CHARACTERS, CHARACTER_IDS, type CharacterId } from './game.js';
+import {
+  CHARACTERS,
+  CHARACTER_IDS,
+  WEAPONS,
+  WEAPON_IDS,
+  PICKUP,
+  type CharacterId,
+  type WeaponId,
+} from './game.js';
 import { DIRECTIONS } from '../types/character.js';
 
 describe('CHARACTERS registry', () => {
@@ -62,5 +70,67 @@ describe('CHARACTERS registry', () => {
 
   it('CHARACTERS is frozen', () => {
     expect(Object.isFrozen(CHARACTERS)).toBe(true);
+  });
+});
+
+describe('WEAPONS registry', () => {
+  it('contains the rifle and the shotgun', () => {
+    expect(WEAPONS).toHaveProperty('rifle');
+    expect(WEAPONS).toHaveProperty('shotgun');
+  });
+
+  it('WEAPON_IDS contains exactly the keys of WEAPONS', () => {
+    const keys = Object.keys(WEAPONS) as WeaponId[];
+    expect([...WEAPON_IDS].sort()).toEqual([...keys].sort());
+  });
+
+  it('every entry has coherent tuning values', () => {
+    for (const [key, def] of Object.entries(WEAPONS)) {
+      expect(def.id).toBe(key);
+      expect(def.displayName.length).toBeGreaterThan(0);
+      expect(def.damageMin).toBeGreaterThan(0);
+      expect(def.damageMax).toBeGreaterThanOrEqual(def.damageMin);
+      expect(def.falloffRangeMin).toBeGreaterThan(0);
+      expect(def.falloffRangeMax).toBeGreaterThan(def.falloffRangeMin);
+      expect(def.burstSize).toBeGreaterThanOrEqual(1);
+      expect(def.burstInterval).toBeGreaterThanOrEqual(0);
+      expect(def.magazineSize).toBeGreaterThan(0);
+      expect(def.reloadTime).toBeGreaterThan(0);
+      expect(def.pelletCount).toBeGreaterThanOrEqual(1);
+      expect(def.spreadAngle).toBeGreaterThanOrEqual(0);
+      expect(def.fireCooldown).toBeGreaterThanOrEqual(0);
+      expect(def.pickupAmmo).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it('rifle keeps the pre-weapon-system tuning (regression)', () => {
+    const r = WEAPONS.rifle;
+    expect(r.damageMin).toBe(8);
+    expect(r.damageMax).toBe(25);
+    expect(r.falloffRangeMin).toBe(64);
+    expect(r.falloffRangeMax).toBe(400);
+    expect(r.burstSize).toBe(3);
+    expect(r.burstInterval).toBeCloseTo(0.15, 10);
+    expect(r.magazineSize).toBe(30);
+    expect(r.reloadTime).toBeCloseTo(2.0, 10);
+    expect(r.pelletCount).toBe(1);
+    expect(r.spreadAngle).toBe(0);
+    expect(r.fireCooldown).toBe(0);
+  });
+
+  it('a shotgun weapon pickup fills the magazine plus a non-negative reserve', () => {
+    const s = WEAPONS.shotgun;
+    expect(s.pickupAmmo).toBeGreaterThanOrEqual(s.magazineSize);
+  });
+
+  it('weapon announce lead fits inside the weapon respawn cycle', () => {
+    expect(PICKUP.WEAPON_ANNOUNCE_LEAD).toBeLessThan(PICKUP.WEAPON_RESPAWN_TIME);
+  });
+
+  it('WEAPONS and every entry are frozen', () => {
+    expect(Object.isFrozen(WEAPONS)).toBe(true);
+    for (const def of Object.values(WEAPONS)) {
+      expect(Object.isFrozen(def)).toBe(true);
+    }
   });
 });

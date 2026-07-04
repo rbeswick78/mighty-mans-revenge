@@ -4,40 +4,52 @@ import {
   calculateGrenadeDamage,
   isInBlastRadius,
 } from './damage.js';
-import { GUN, GRENADE } from '../config/game.js';
+import { WEAPONS, GRENADE } from '../config/game.js';
+
+const RIFLE = WEAPONS.rifle;
 
 describe('calculateDamage', () => {
-  it('returns max damage at zero distance', () => {
-    expect(calculateDamage(0)).toBeCloseTo(GUN.DAMAGE_MAX, 5);
+  it('defaults to the rifle profile at zero distance', () => {
+    expect(calculateDamage(0)).toBeCloseTo(RIFLE.damageMax, 5);
   });
 
   it('returns max damage at min falloff range', () => {
-    expect(calculateDamage(GUN.FALLOFF_RANGE_MIN)).toBeCloseTo(GUN.DAMAGE_MAX, 5);
+    expect(calculateDamage(RIFLE.falloffRangeMin)).toBeCloseTo(RIFLE.damageMax, 5);
   });
 
   it('returns min damage at max falloff range', () => {
-    expect(calculateDamage(GUN.FALLOFF_RANGE_MAX)).toBeCloseTo(GUN.DAMAGE_MIN, 5);
+    expect(calculateDamage(RIFLE.falloffRangeMax)).toBeCloseTo(RIFLE.damageMin, 5);
   });
 
   it('returns min damage beyond max falloff range', () => {
-    expect(calculateDamage(GUN.FALLOFF_RANGE_MAX + 100)).toBeCloseTo(
-      GUN.DAMAGE_MIN,
+    expect(calculateDamage(RIFLE.falloffRangeMax + 100)).toBeCloseTo(
+      RIFLE.damageMin,
       5,
     );
   });
 
   it('linearly interpolates between min and max range', () => {
     const midRange =
-      (GUN.FALLOFF_RANGE_MIN + GUN.FALLOFF_RANGE_MAX) / 2;
-    const expectedDamage = (GUN.DAMAGE_MAX + GUN.DAMAGE_MIN) / 2;
+      (RIFLE.falloffRangeMin + RIFLE.falloffRangeMax) / 2;
+    const expectedDamage = (RIFLE.damageMax + RIFLE.damageMin) / 2;
     expect(calculateDamage(midRange)).toBeCloseTo(expectedDamage, 5);
   });
 
   it('returns damage between min and max for intermediate distance', () => {
-    const dist = GUN.FALLOFF_RANGE_MIN + 10;
+    const dist = RIFLE.falloffRangeMin + 10;
     const dmg = calculateDamage(dist);
-    expect(dmg).toBeLessThanOrEqual(GUN.DAMAGE_MAX);
-    expect(dmg).toBeGreaterThanOrEqual(GUN.DAMAGE_MIN);
+    expect(dmg).toBeLessThanOrEqual(RIFLE.damageMax);
+    expect(dmg).toBeGreaterThanOrEqual(RIFLE.damageMin);
+  });
+
+  it('applies the shotgun profile per pellet when passed explicitly', () => {
+    const SG = WEAPONS.shotgun;
+    expect(calculateDamage(0, SG)).toBeCloseTo(SG.damageMax, 5);
+    expect(calculateDamage(SG.falloffRangeMin, SG)).toBeCloseTo(SG.damageMax, 5);
+    expect(calculateDamage(SG.falloffRangeMax, SG)).toBeCloseTo(SG.damageMin, 5);
+    expect(calculateDamage(SG.falloffRangeMax + 500, SG)).toBeCloseTo(SG.damageMin, 5);
+    const mid = (SG.falloffRangeMin + SG.falloffRangeMax) / 2;
+    expect(calculateDamage(mid, SG)).toBeCloseTo((SG.damageMax + SG.damageMin) / 2, 5);
   });
 });
 

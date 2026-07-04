@@ -1,25 +1,30 @@
 import { Vec2 } from '../types/common.js';
-import { GUN, GRENADE } from '../config/game.js';
+import { WEAPONS, GRENADE } from '../config/game.js';
+import type { WeaponDef } from '../types/weapon.js';
 import { clamp } from './math.js';
 import { vecDistance } from './math.js';
 
 /**
- * Calculate gun damage with linear falloff based on distance.
- * Full damage (DAMAGE_MAX) within FALLOFF_RANGE_MIN,
- * minimum damage (DAMAGE_MIN) beyond FALLOFF_RANGE_MAX,
- * linear interpolation in between.
+ * Calculate per-bullet/pellet damage with linear falloff based on distance.
+ * Full damage (damageMax) within falloffRangeMin, minimum damage
+ * (damageMin) beyond falloffRangeMax, linear interpolation in between.
+ * Defaults to the rifle so pre-weapon-system call sites keep their
+ * behavior.
  */
-export function calculateDamage(distance: number): number {
-  if (distance <= GUN.FALLOFF_RANGE_MIN) {
-    return GUN.DAMAGE_MAX;
+export function calculateDamage(
+  distance: number,
+  weapon: WeaponDef = WEAPONS.rifle,
+): number {
+  if (distance <= weapon.falloffRangeMin) {
+    return weapon.damageMax;
   }
-  if (distance >= GUN.FALLOFF_RANGE_MAX) {
-    return GUN.DAMAGE_MIN;
+  if (distance >= weapon.falloffRangeMax) {
+    return weapon.damageMin;
   }
   const t =
-    (distance - GUN.FALLOFF_RANGE_MIN) /
-    (GUN.FALLOFF_RANGE_MAX - GUN.FALLOFF_RANGE_MIN);
-  return GUN.DAMAGE_MAX - (GUN.DAMAGE_MAX - GUN.DAMAGE_MIN) * t;
+    (distance - weapon.falloffRangeMin) /
+    (weapon.falloffRangeMax - weapon.falloffRangeMin);
+  return weapon.damageMax - (weapon.damageMax - weapon.damageMin) * t;
 }
 
 /**

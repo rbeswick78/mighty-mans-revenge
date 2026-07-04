@@ -24,9 +24,11 @@
     { "x": 17, "y": 2 }
   ],
   "pickupSpawns": [
-    { "x": 9, "y": 5, "type": "gun_ammo" },
+    { "x": 9, "y": 5, "type": "weapon_shotgun" },
     { "x": 10, "y": 6, "type": "gun_ammo" },
     { "x": 3, "y": 5, "type": "grenade" },
-    { "x": 16, "y": 6, "type": "grenade" }
+    { "x": 16, "y": 6, "type": "grenade" },
+    { "x": 1, "y": 6, "type": "bandage" },
+    { "x": 18, "y": 5, "type": "bandage" }
   ]
 }

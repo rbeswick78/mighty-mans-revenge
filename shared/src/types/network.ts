@@ -3,7 +3,7 @@ import { PlayerInput } from './player.js';
 import { GrenadeState, BulletTrail } from './projectile.js';
 import { PickupState } from './pickup.js';
 import { MatchPhase, KillFeedEntry, MatchResult } from './game.js';
-import type { CharacterId } from '../config/game.js';
+import type { CharacterId, WeaponId } from '../config/game.js';
 
 /**
  * Final-minute events: a single one is picked at random ~5s before
@@ -83,6 +83,7 @@ export type ServerMessage =
   | ServerOpponentDisconnectedMessage
   | ServerEventWarningMessage
   | ServerEventStartMessage
+  | ServerWeaponIncomingMessage
   | ServerTilesDestroyedMessage
   | ServerPongMessage
   | ServerErrorMessage;
@@ -140,6 +141,12 @@ export interface SerializedPlayerState {
    */
   maxHealth: number;
   ammo: number;
+  /** Equipped weapon; drives the held-overlay sprite and HUD ammo panel. */
+  weaponId: WeaponId;
+  /** Special weapon's magazine (shells loaded). 0 while on the rifle. */
+  specialAmmo: number;
+  /** Special weapon's reserve shells. 0 while on the rifle. */
+  specialReserve: number;
   grenades: number;
   isReloading: boolean;
   isSprinting: boolean;
@@ -269,6 +276,18 @@ export interface ServerEventWarningMessage {
 export interface ServerEventStartMessage {
   type: 'server:eventStart';
   event: FinalMinuteEvent;
+}
+
+/**
+ * One-shot pre-announcement that a special-weapon pickup is about to
+ * (re)spawn — "SHOTGUN INCOMING". Fired PICKUP.WEAPON_ANNOUNCE_LEAD
+ * seconds before the pickup activates. Drives a HUD banner + sound.
+ */
+export interface ServerWeaponIncomingMessage {
+  type: 'server:weaponIncoming';
+  weaponId: WeaponId;
+  /** Ms from now until the pickup lands (becomes collectible). */
+  landsInMs: number;
 }
 
 /**

@@ -1,5 +1,6 @@
 export * from './common.js';
 export * from './character.js';
+export * from './weapon.js';
 export * from './player.js';
 export * from './projectile.js';
 export * from './pickup.js';

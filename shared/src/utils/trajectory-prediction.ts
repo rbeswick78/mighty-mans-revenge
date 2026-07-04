@@ -1,7 +1,8 @@
 import { Vec2, PlayerId } from '../types/common.js';
 import { PlayerState } from '../types/player.js';
 import { CollisionGrid } from '../types/map.js';
-import { GUN, GRENADE, PLAYER, TRAJECTORY } from '../config/game.js';
+import { WEAPONS, GRENADE, PLAYER, TRAJECTORY } from '../config/game.js';
+import type { WeaponDef } from '../types/weapon.js';
 import { raycastAgainstGrid } from './collision.js';
 import { rayIntersectsAABB } from './ray-aabb.js';
 import { vecAdd, vecFromAngle, vecScale } from './math.js';
@@ -24,9 +25,10 @@ export function predictBulletRay(
   players: Map<PlayerId, PlayerState> | Iterable<PlayerState>,
   grid: CollisionGrid,
   piercing: boolean = false,
+  weapon: WeaponDef = WEAPONS.rifle,
 ): BulletAim {
   const dir = vecFromAngle(aimAngle);
-  const maxRayDistance = GUN.FALLOFF_RANGE_MAX * 2;
+  const maxRayDistance = weapon.falloffRangeMax * 2;
 
   const wallHit = raycastAgainstGrid(
     grid,
