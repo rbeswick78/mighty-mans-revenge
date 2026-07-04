@@ -66,8 +66,16 @@ cd client && firebase deploy --only hosting
 
 Prerequisite: the commit you want live must already be on `origin/main` (the VM does `git pull --ff-only` from there).
 
+The VM lives in GCP project `mighty-mans-revenge` under the
+`rbeswick@team.couple.com` account — NOT this machine's gcloud defaults
+(active account `rybeswick@gmail.com`, project `mighty-coach`), so both
+flags below are required or the SSH fails with a SERVICE_DISABLED error
+against the wrong project.
+
 ```bash
-gcloud compute ssh deploy@mighty-mans-server --zone=us-east1-b --command="\
+gcloud compute ssh deploy@mighty-mans-server --zone=us-east1-b \
+  --project=mighty-mans-revenge --account=rbeswick@team.couple.com \
+  --command="\
   sudo -u rybes bash -c 'set -e; \
     cd /opt/mighty-mans-revenge && \
     git pull --ff-only && \
