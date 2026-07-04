@@ -8,12 +8,12 @@ import {
   WEAPONS,
   PICKUP,
   SERVER,
-  EVENT,
+  MUTATORS,
   GRENADE,
   CHARACTER_IDS,
   ABILITY,
 } from '@shared/game';
-import type { MapData, PlayerInput, FinalMinuteEvent } from '@shared/game';
+import type { MapData, PlayerInput, MutatorId } from '@shared/game';
 
 function makeInput(seq: number, overrides: Partial<PlayerInput> = {}): PlayerInput {
   return {
@@ -726,17 +726,23 @@ describe('Match', () => {
     });
   });
 
-  describe('final-minute event', () => {
+  describe('mutators', () => {
+    /** Internal fields the mutator tests reach into (same style as matchTimer). */
+    type MatchInternals = {
+      matchTimer: number;
+      midMatchSlot: { activateAtElapsed: number };
+    };
+
     /**
-     * Build a match with a deterministic RNG so the picker always lands on
-     * the chosen event. The picker indexes into EVENT.POOL, so the rng
-     * value is the index normalized to [0, 1).
+     * Build a match with a deterministic constant RNG that makes the given
+     * mutator the pick. The picker indexes into the candidate list (the
+     * full 8-entry POOL when nothing else has been chosen), so the rng
+     * value is the pool index normalized to [0, 1).
      */
-    function createMatchWithEvent(event: FinalMinuteEvent): Match {
-      const idx = (EVENT.POOL as readonly FinalMinuteEvent[]).indexOf(event);
-      if (idx === -1) throw new Error(`unknown event: ${event}`);
-      // Math.floor(rng() * POOL.length) === idx → rng = idx/POOL.length + tiny epsilon.
-      const rng = () => idx / EVENT.POOL.length + 0.0001;
+    function createMatchWithPick(mutator: MutatorId): Match {
+      const idx = (MUTATORS.POOL as readonly MutatorId[]).indexOf(mutator);
+      if (idx === -1) throw new Error(`unknown mutator: ${mutator}`);
+      const rng = () => idx / MUTATORS.POOL.length + 0.0001;
       return new Match(
         'match-1',
         makeMapData(),
@@ -749,102 +755,395 @@ describe('Match', () => {
       );
     }
 
-    function startActiveMatchAt(remaining: number, event: FinalMinuteEvent): Match {
-      const m = createMatchWithEvent(event);
+    /**
+     * Fast-forward to the final-minute window with the mid-match slot
+     * pushed out of reach, so these tests exercise the final-minute slot
+     * alone. Mutates internals directly, then callers run a single update
+     * tick — that's the boundary the production code checks.
+     */
+    function startActiveMatchAt(remaining: number, mutator: MutatorId): Match {
+      const m = createMatchWithPick(mutator);
       m.startCountdown();
       m.update(MATCH.COUNTDOWN_DURATION + 0.05);
-      // Fast-forward by mutating matchTimer directly, then run a single
-      // update tick — that's the boundary the production code checks.
-      (m as unknown as { matchTimer: number }).matchTimer = remaining;
+      const internals = m as unknown as MatchInternals;
+      internals.matchTimer = remaining;
+      internals.midMatchSlot.activateAtElapsed = Number.POSITIVE_INFINITY;
       return m;
     }
 
-    it('broadcasts an eventWarning the tick the timer crosses the warning threshold', () => {
-      const m = startActiveMatchAt(EVENT.WARNING_AT_REMAINING + 0.01, 'super_speed');
-
-      // First tick: should NOT have crossed yet (0.05s before cross).
-      // Actually 65.01 - 0.05 = 64.96 which IS <= 65 — so the crossing fires.
+    /**
+     * Start a match and drive the MID-MATCH slot to activation with the
+     * given mutator. The activation time is pinned to a fixed elapsed
+     * value comfortably before the final-minute window, so only the
+     * mid-match slot fires. Warning + start land on the same update tick.
+     */
+    function startActiveMatchWithMidMutator(mutator: MutatorId): Match {
+      const m = createMatchWithPick(mutator);
+      m.startCountdown();
+      m.update(MATCH.COUNTDOWN_DURATION + 0.05);
+      const internals = m as unknown as MatchInternals;
+      internals.midMatchSlot.activateAtElapsed = 80;
+      internals.matchTimer = MATCH.TIME_LIMIT - 80.1;
       m.update(0.05);
-      const warning = m.consumeTickEventWarning();
-      expect(warning).not.toBeNull();
-      expect(warning!.event).toBe('super_speed');
-      expect(warning!.activatesInMs).toBeGreaterThan(0);
-      // Activation is still pending — activeEvent should still be null.
-      expect(m.activeEvent).toBeNull();
+      return m;
+    }
 
-      // Subsequent tick: warning is single-shot.
-      m.update(0.05);
-      expect(m.consumeTickEventWarning()).toBeNull();
-    });
+    describe('final-minute slot', () => {
+      it('broadcasts a warning the tick the timer crosses the warning threshold', () => {
+        const m = startActiveMatchAt(MUTATORS.WARNING_AT_REMAINING + 0.01, 'super_speed');
 
-    it('broadcasts an eventStart the tick the timer crosses the activation threshold', () => {
-      const m = startActiveMatchAt(EVENT.ACTIVATION_AT_REMAINING + 0.01, 'grenades_only');
-      m.update(0.05);
-
-      const started = m.consumeTickEventStart();
-      expect(started).toBe('grenades_only');
-      expect(m.activeEvent).toBe('grenades_only');
-    });
-
-    it('grenades_only refills grenades to MAX on activation and gates gun fire', () => {
-      const m = startActiveMatchAt(EVENT.ACTIVATION_AT_REMAINING + 0.01, 'grenades_only');
-      const player = m.players.get('player-0')!;
-      player.grenades = 0;
-      const startingAmmo = player.ammo;
-
-      m.update(0.05); // activation tick
-
-      expect(player.grenades).toBe(GRENADE.MAX_COUNT);
-
-      // Pressing fire after activation: gun is gated off, ammo unchanged.
-      m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
-      m.update(0.05);
-      expect(player.ammo).toBe(startingAmmo);
-    });
-
-    it('infinite_ammo keeps the magazine full when firing', () => {
-      const m = startActiveMatchAt(EVENT.ACTIVATION_AT_REMAINING + 0.01, 'infinite_ammo');
-      const player = m.players.get('player-0')!;
-      m.update(0.05); // activation tick
-
-      expect(player.ammo).toBe(WEAPONS.rifle.magazineSize);
-
-      // Fire a burst: magazine should not deplete.
-      m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
-      // Run several ticks so the burst fires fully (BURST_INTERVAL spaced).
-      for (let i = 0; i < 10; i++) {
         m.update(0.05);
+        const warnings = m.consumeTickMutatorWarnings();
+        expect(warnings).toHaveLength(1);
+        expect(warnings[0].event).toBe('super_speed');
+        expect(warnings[0].activatesInMs).toBeGreaterThan(0);
+        expect(warnings[0].isFinalMinute).toBe(true);
+        // Activation is still pending — nothing active yet.
+        expect(m.activeMutators).toHaveLength(0);
+
+        // Subsequent tick: warning is single-shot.
+        m.update(0.05);
+        expect(m.consumeTickMutatorWarnings()).toHaveLength(0);
+      });
+
+      it('broadcasts a start the tick the timer crosses the activation threshold', () => {
+        const m = startActiveMatchAt(MUTATORS.ACTIVATION_AT_REMAINING + 0.01, 'grenades_only');
+        m.update(0.05);
+
+        const starts = m.consumeTickMutatorStarts();
+        expect(starts).toHaveLength(1);
+        expect(starts[0].event).toBe('grenades_only');
+        expect(starts[0].isFinalMinute).toBe(true);
+        expect(m.activeMutators).toContain('grenades_only');
+      });
+
+      it('grenades_only refills grenades to MAX on activation and gates gun fire', () => {
+        const m = startActiveMatchAt(MUTATORS.ACTIVATION_AT_REMAINING + 0.01, 'grenades_only');
+        const player = m.players.get('player-0')!;
+        player.grenades = 0;
+        const startingAmmo = player.ammo;
+
+        m.update(0.05); // activation tick
+
+        expect(player.grenades).toBe(GRENADE.MAX_COUNT);
+
+        // Pressing fire after activation: gun is gated off, ammo unchanged.
+        m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+        m.update(0.05);
+        expect(player.ammo).toBe(startingAmmo);
+      });
+
+      it('infinite_ammo keeps the magazine full when firing', () => {
+        const m = startActiveMatchAt(MUTATORS.ACTIVATION_AT_REMAINING + 0.01, 'infinite_ammo');
+        const player = m.players.get('player-0')!;
+        m.update(0.05); // activation tick
+
+        expect(player.ammo).toBe(WEAPONS.rifle.magazineSize);
+
+        // Fire a burst: magazine should not deplete.
+        m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+        // Run several ticks so the burst fires fully (BURST_INTERVAL spaced).
+        for (let i = 0; i < 10; i++) {
+          m.update(0.05);
+        }
+        expect(player.ammo).toBe(WEAPONS.rifle.magazineSize);
+        expect(player.isReloading).toBe(false);
+      });
+
+      it('low_health snaps maxHealth and current HP to 1 on activation', () => {
+        const m = startActiveMatchAt(MUTATORS.ACTIVATION_AT_REMAINING + 0.01, 'low_health');
+        const p0 = m.players.get('player-0')!;
+        const p1 = m.players.get('player-1')!;
+        p0.health = 100;
+        p1.health = 50;
+
+        m.update(0.05); // activation tick
+
+        expect(p0.maxHealth).toBe(MUTATORS.LOW_HEALTH_HP);
+        expect(p1.maxHealth).toBe(MUTATORS.LOW_HEALTH_HP);
+        expect(p0.health).toBe(MUTATORS.LOW_HEALTH_HP);
+        expect(p1.health).toBe(MUTATORS.LOW_HEALTH_HP);
+      });
+
+      it('super_speed has no on-trigger state mutation but is reported active', () => {
+        const m = startActiveMatchAt(MUTATORS.ACTIVATION_AT_REMAINING + 0.01, 'super_speed');
+        const p0 = m.players.get('player-0')!;
+        const startingHealth = p0.health;
+        const startingMag = p0.ammo;
+
+        m.update(0.05);
+
+        expect(p0.health).toBe(startingHealth);
+        expect(p0.ammo).toBe(startingMag);
+        expect(m.activeMutators).toEqual(['super_speed']);
+      });
+    });
+
+    describe('mid-match slot scheduling', () => {
+      it('rolls the activation time inside the 40–70% elapsed window from the injected rng', () => {
+        const low = createMatchWithPick(MUTATORS.POOL[0]); // rng ≈ 0
+        low.startCountdown();
+        low.update(MATCH.COUNTDOWN_DURATION + 0.05);
+        const lowAt = (low as unknown as MatchInternals).midMatchSlot.activateAtElapsed;
+        expect(lowAt).toBeGreaterThanOrEqual(
+          MATCH.TIME_LIMIT * MUTATORS.MIDMATCH_MIN_ELAPSED_FRACTION,
+        );
+
+        const idx = MUTATORS.POOL.length - 1; // rng ≈ 0.875 → near the top of the window
+        const high = createMatchWithPick(MUTATORS.POOL[idx]);
+        high.startCountdown();
+        high.update(MATCH.COUNTDOWN_DURATION + 0.05);
+        const highAt = (high as unknown as MatchInternals).midMatchSlot.activateAtElapsed;
+        expect(highAt).toBeLessThanOrEqual(
+          MATCH.TIME_LIMIT * MUTATORS.MIDMATCH_MAX_ELAPSED_FRACTION,
+        );
+        expect(highAt).toBeGreaterThan(lowAt);
+      });
+
+      it('warns 5s ahead with isFinalMinute:false, then starts at the rolled time', () => {
+        const m = createMatchWithPick('big_heads'); // rng = 4/8 → activation at 55% elapsed
+        m.startCountdown();
+        m.update(MATCH.COUNTDOWN_DURATION + 0.05);
+        const internals = m as unknown as MatchInternals;
+        const activateAt = internals.midMatchSlot.activateAtElapsed;
+
+        // Just before the warning threshold: nothing yet.
+        internals.matchTimer =
+          MATCH.TIME_LIMIT - (activateAt - MUTATORS.WARNING_LEAD_SECONDS - 0.2);
+        m.update(0.05);
+        expect(m.consumeTickMutatorWarnings()).toHaveLength(0);
+
+        // Crossing the warning threshold: one mid-match warning.
+        internals.matchTimer =
+          MATCH.TIME_LIMIT - (activateAt - MUTATORS.WARNING_LEAD_SECONDS + 0.1);
+        m.update(0.05);
+        const warnings = m.consumeTickMutatorWarnings();
+        expect(warnings).toHaveLength(1);
+        expect(warnings[0].event).toBe('big_heads');
+        expect(warnings[0].isFinalMinute).toBe(false);
+        expect(warnings[0].activatesInMs).toBeGreaterThan(0);
+        expect(m.activeMutators).toHaveLength(0);
+
+        // Crossing the activation time: the mutator starts.
+        internals.matchTimer = MATCH.TIME_LIMIT - (activateAt + 0.1);
+        m.update(0.05);
+        const starts = m.consumeTickMutatorStarts();
+        expect(starts).toHaveLength(1);
+        expect(starts[0]).toEqual({ event: 'big_heads', isFinalMinute: false });
+        expect(m.activeMutators).toEqual(['big_heads']);
+      });
+
+      it('never repeats the mid-match mutator in the final minute', () => {
+        // Constant rng ≈ 0: mid-match picks POOL[0]; the final-minute draw
+        // must then pick from the remaining pool.
+        const m = startActiveMatchWithMidMutator(MUTATORS.POOL[0]);
+        expect(m.activeMutators).toEqual([MUTATORS.POOL[0]]);
+
+        const internals = m as unknown as MatchInternals;
+        internals.matchTimer = MUTATORS.ACTIVATION_AT_REMAINING - 0.01;
+        m.update(0.05);
+
+        expect(m.activeMutators).toHaveLength(2);
+        expect(m.activeMutators[1]).not.toBe(m.activeMutators[0]);
+      });
+
+      it('FORCE_EVENT pins the final-minute pick and the mid-match draw avoids it', () => {
+        process.env.FORCE_EVENT = 'super_speed';
+        try {
+          // Constant rng ≈ 0 would pick POOL[0] ('super_speed'), but the
+          // forced final-minute value is excluded from the mid-match draw.
+          const m = startActiveMatchWithMidMutator(MUTATORS.POOL[0]);
+          expect(m.activeMutators[0]).not.toBe('super_speed');
+
+          const internals = m as unknown as MatchInternals;
+          internals.matchTimer = MUTATORS.ACTIVATION_AT_REMAINING - 0.01;
+          m.update(0.05);
+          expect(m.activeMutators[1]).toBe('super_speed');
+        } finally {
+          delete process.env.FORCE_EVENT;
+        }
+      });
+
+      it('FORCE_MIDMATCH_MUTATOR pins the mid-match pick', () => {
+        process.env.FORCE_MIDMATCH_MUTATOR = 'vampire';
+        try {
+          const m = startActiveMatchWithMidMutator(MUTATORS.POOL[0]);
+          expect(m.activeMutators).toEqual(['vampire']);
+        } finally {
+          delete process.env.FORCE_MIDMATCH_MUTATOR;
+        }
+      });
+    });
+
+    describe('big_heads', () => {
+      /**
+       * Place the victim so the shot ray passes 15px off their center:
+       * outside the normal 12px half-hitbox, inside the scaled 18px one
+       * (24/2 × 1.5).
+       */
+      function positionGrazingShot(m: Match): void {
+        const p0 = m.players.get('player-0')!;
+        const p1 = m.players.get('player-1')!;
+        p0.position = { x: 100, y: 100 };
+        p1.position = { x: 250, y: 115 };
+        p0.aimAngle = 0;
       }
-      expect(player.ammo).toBe(WEAPONS.rifle.magazineSize);
-      expect(player.isReloading).toBe(false);
+
+      it('a shot that misses a normal hitbox hits a scaled one', () => {
+        const m = startActiveMatchWithMidMutator('big_heads');
+        positionGrazingShot(m);
+        const p1 = m.players.get('player-1')!;
+
+        m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+        m.update(0.05);
+
+        expect(p1.health).toBeLessThan(PLAYER.MAX_HEALTH);
+      });
+
+      it('control: the same grazing shot misses without big_heads', () => {
+        const m = createMatch();
+        m.startCountdown();
+        m.update(MATCH.COUNTDOWN_DURATION + 0.05);
+        positionGrazingShot(m);
+        const p1 = m.players.get('player-1')!;
+
+        m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+        m.update(0.05);
+
+        expect(p1.health).toBe(PLAYER.MAX_HEALTH);
+      });
     });
 
-    it('low_health snaps maxHealth and current HP to 1 on activation', () => {
-      const m = startActiveMatchAt(EVENT.ACTIVATION_AT_REMAINING + 0.01, 'low_health');
-      const p0 = m.players.get('player-0')!;
-      const p1 = m.players.get('player-1')!;
-      p0.health = 100;
-      p1.health = 50;
+    describe('vampire', () => {
+      it('heals the attacker for half the damage dealt', () => {
+        const m = startActiveMatchWithMidMutator('vampire');
+        const p0 = m.players.get('player-0')!;
+        const p1 = m.players.get('player-1')!;
+        p0.position = { x: 100, y: 100 };
+        p1.position = { x: 250, y: 100 };
+        p0.health = 40;
 
-      m.update(0.05); // activation tick
+        m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+        m.update(0.05);
 
-      expect(p0.maxHealth).toBe(EVENT.LOW_HEALTH_HP);
-      expect(p1.maxHealth).toBe(EVENT.LOW_HEALTH_HP);
-      expect(p0.health).toBe(EVENT.LOW_HEALTH_HP);
-      expect(p1.health).toBe(EVENT.LOW_HEALTH_HP);
+        const damageDealt = PLAYER.MAX_HEALTH - p1.health;
+        expect(damageDealt).toBeGreaterThan(0);
+        expect(p0.health).toBeCloseTo(
+          40 + damageDealt * MUTATORS.VAMPIRE_HEAL_FRACTION,
+          5,
+        );
+      });
+
+      it('never heals above maxHealth', () => {
+        const m = startActiveMatchWithMidMutator('vampire');
+        const p0 = m.players.get('player-0')!;
+        const p1 = m.players.get('player-1')!;
+        p0.position = { x: 100, y: 100 };
+        p1.position = { x: 250, y: 100 };
+        p0.health = PLAYER.MAX_HEALTH;
+
+        m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+        m.update(0.05);
+
+        expect(p1.health).toBeLessThan(PLAYER.MAX_HEALTH);
+        expect(p0.health).toBe(PLAYER.MAX_HEALTH);
+      });
     });
 
-    it('super_speed has no on-trigger state mutation but is reported on the snapshot', () => {
-      const m = startActiveMatchAt(EVENT.ACTIVATION_AT_REMAINING + 0.01, 'super_speed');
-      const p0 = m.players.get('player-0')!;
-      const startingHealth = p0.health;
-      const startingMag = p0.ammo;
+    describe('turbo_grenades', () => {
+      it('throws grenades at 1.5× speed', () => {
+        const m = startActiveMatchWithMidMutator('turbo_grenades');
 
-      m.update(0.05);
+        m.queueInput('player-0', makeInput(1, { throwPressed: true, aimAngle: 0 }));
+        m.update(0.05);
 
-      expect(p0.health).toBe(startingHealth);
-      expect(p0.ammo).toBe(startingMag);
-      expect(m.activeEvent).toBe('super_speed');
+        const grenades = m.getActiveGrenades();
+        expect(grenades).toHaveLength(1);
+        const speed = Math.hypot(grenades[0].velocity.x, grenades[0].velocity.y);
+        expect(speed).toBeCloseTo(
+          GRENADE.THROW_SPEED * MUTATORS.TURBO_GRENADES_SPEED_MULTIPLIER,
+          5,
+        );
+      });
+
+      it('refills one grenade per refill interval, up to max', () => {
+        const m = startActiveMatchWithMidMutator('turbo_grenades');
+        const p0 = m.players.get('player-0')!;
+        p0.grenades = 0;
+        p0.grenadeRegenSeconds = 0;
+
+        const ticks = Math.ceil(MUTATORS.TURBO_GRENADES_REFILL_SECONDS / 0.05) + 1;
+        for (let i = 0; i < ticks; i++) {
+          m.update(0.05);
+        }
+        expect(p0.grenades).toBe(1);
+      });
+    });
+
+    describe('second_wind', () => {
+      it('grants the respawn boost timer and 1.3× movement while it runs', () => {
+        const m = startActiveMatchWithMidMutator('second_wind');
+        const p1 = m.players.get('player-1')!;
+
+        m.onKill('player-0', 'player-1', 'gun');
+        expect(p1.isDead).toBe(true);
+
+        // Tick through the respawn delay.
+        const respawnTicks = Math.ceil(RESPAWN.DELAY / 0.05) + 1;
+        for (let i = 0; i < respawnTicks; i++) {
+          m.update(0.05);
+        }
+        expect(p1.isDead).toBe(false);
+        expect(p1.secondWindTimer).toBeGreaterThan(
+          MUTATORS.SECOND_WIND_DURATION_SECONDS - 0.2,
+        );
+
+        // One boosted movement tick: BASE_SPEED × 1.3 × dt.
+        const startX = p1.position.x;
+        m.queueInput('player-1', makeInput(1, { moveX: 1 }));
+        m.update(0.05);
+        expect(p1.position.x - startX).toBeCloseTo(
+          PLAYER.BASE_SPEED * MUTATORS.SECOND_WIND_SPEED_MULTIPLIER * 0.05,
+          5,
+        );
+      });
+
+      it('movement returns to normal after the boost expires', () => {
+        const m = startActiveMatchWithMidMutator('second_wind');
+        const p1 = m.players.get('player-1')!;
+
+        m.onKill('player-0', 'player-1', 'gun');
+        const respawnTicks = Math.ceil(RESPAWN.DELAY / 0.05) + 1;
+        for (let i = 0; i < respawnTicks; i++) {
+          m.update(0.05);
+        }
+        // Run out the boost window.
+        const boostTicks = Math.ceil(MUTATORS.SECOND_WIND_DURATION_SECONDS / 0.05) + 1;
+        for (let i = 0; i < boostTicks; i++) {
+          m.update(0.05);
+        }
+        expect(p1.secondWindTimer).toBe(0);
+
+        const startX = p1.position.x;
+        m.queueInput('player-1', makeInput(1, { moveX: 1 }));
+        m.update(0.05);
+        expect(p1.position.x - startX).toBeCloseTo(PLAYER.BASE_SPEED * 0.05, 5);
+      });
+
+      it('respawning without the mutator grants no boost', () => {
+        const m = createMatch();
+        m.startCountdown();
+        m.update(MATCH.COUNTDOWN_DURATION + 0.05);
+        const p1 = m.players.get('player-1')!;
+
+        m.onKill('player-0', 'player-1', 'gun');
+        const respawnTicks = Math.ceil(RESPAWN.DELAY / 0.05) + 1;
+        for (let i = 0; i < respawnTicks; i++) {
+          m.update(0.05);
+        }
+        expect(p1.isDead).toBe(false);
+        expect(p1.secondWindTimer).toBe(0);
+      });
     });
   });
 

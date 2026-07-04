@@ -441,6 +441,7 @@ export class MatchmakingManager {
         abilityActiveSeconds: player.abilityActiveSeconds,
         abilityCooldownSeconds: player.abilityCooldownSeconds,
         frozenTimer: player.frozenTimer,
+        secondWindTimer: player.secondWindTimer,
       });
     }
 
@@ -454,7 +455,7 @@ export class MatchmakingManager {
       grenades: match.getActiveGrenades(),
       bulletTrails: match.getTickBulletTrails(),
       pickups: match.pickupManager.getPickups(),
-      activeEvent: match.activeEvent,
+      activeMutators: [...match.activeMutators],
     };
 
     // Send only to players in this match
@@ -497,15 +498,16 @@ export class MatchmakingManager {
       }
     }
 
-    // Broadcast a one-shot event warning (5s before activation) if generated
-    // this tick. Drives the HUD pre-event banner + horn.
-    const warning = match.consumeTickEventWarning();
-    if (warning) {
+    // Broadcast one-shot mutator warnings (5s before activation) generated
+    // this tick. Drives the HUD pre-mutator banner + horn. Usually 0 or 1;
+    // both slots can warn in the same tick in degenerate timings.
+    for (const warning of match.consumeTickMutatorWarnings()) {
       for (const [playerId] of match.players) {
         this.server.sendTo(playerId, {
           type: 'server:eventWarning',
           event: warning.event,
           activatesInMs: warning.activatesInMs,
+          isFinalMinute: warning.isFinalMinute,
         }, { reliable: true });
       }
     }
@@ -523,15 +525,15 @@ export class MatchmakingManager {
       }
     }
 
-    // Broadcast a one-shot event start at activation. Drives the HUD reveal
-    // banner + flash + horn; client modifier kicks in immediately so
-    // prediction matches authority.
-    const started = match.consumeTickEventStart();
-    if (started) {
+    // Broadcast one-shot mutator starts at activation. Drives the HUD
+    // reveal banner + flash + horn; client modifier kicks in immediately
+    // so prediction matches authority.
+    for (const started of match.consumeTickMutatorStarts()) {
       for (const [playerId] of match.players) {
         this.server.sendTo(playerId, {
           type: 'server:eventStart',
-          event: started,
+          event: started.event,
+          isFinalMinute: started.isFinalMinute,
         }, { reliable: true });
       }
     }

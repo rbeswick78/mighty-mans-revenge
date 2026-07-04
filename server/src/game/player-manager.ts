@@ -54,6 +54,7 @@ export class PlayerManager {
       abilityCooldownSeconds: 0,
       abilityLockedAim: 0,
       frozenTimer: 0,
+      secondWindTimer: 0,
     };
 
     this.players.set(id, player);

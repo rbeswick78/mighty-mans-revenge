@@ -82,6 +82,7 @@ export class CombatManager {
     rewindStates?: Map<PlayerId, PlayerState>,
     piercing: boolean = false,
     weaponId: WeaponId = 'rifle',
+    hitboxScale: number = 1,
   ): ShotResult {
     const weapon = WEAPONS[weaponId];
     const shooter = (rewindStates ?? players).get(shooterId) ?? players.get(shooterId);
@@ -128,8 +129,10 @@ export class CombatManager {
       if (!currentState || currentState.isDead) continue;
       if (currentState.invulnerableTimer > 0) continue;
 
-      const halfW = PLAYER.HITBOX_WIDTH / 2;
-      const halfH = PLAYER.HITBOX_HEIGHT / 2;
+      // big_heads scales the hit-validation AABB only — movement collision
+      // and pickup radii are untouched by design.
+      const halfW = (PLAYER.HITBOX_WIDTH / 2) * hitboxScale;
+      const halfH = (PLAYER.HITBOX_HEIGHT / 2) * hitboxScale;
 
       const hitDist = rayIntersectsAABB(
         startPos.x,
@@ -188,8 +191,12 @@ export class CombatManager {
     position: Vec2,
     aimAngle: number,
     piercing: boolean = false,
+    speedMultiplier: number = 1,
   ): GrenadeState {
-    const velocity = vecScale(vecFromAngle(aimAngle), GRENADE.THROW_SPEED);
+    const velocity = vecScale(
+      vecFromAngle(aimAngle),
+      GRENADE.THROW_SPEED * speedMultiplier,
+    );
     const grenade: GrenadeState = {
       id: generateGrenadeId(),
       position: { x: position.x, y: position.y },

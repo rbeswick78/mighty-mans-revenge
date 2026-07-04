@@ -7,13 +7,13 @@ import {
   WEAPONS,
   GRENADE,
   SERVER,
-  EVENT,
+  MUTATORS,
   ABILITY,
   CHARACTER_IDS,
   MAP,
   calculateMovement,
   computePelletAngles,
-  eventToMovementModifiers,
+  mutatorsToMovementModifiers,
   rayIntersectsAABB,
   TileType,
   PickupType,
@@ -28,7 +28,7 @@ import type {
   KillWeapon,
   BulletTrail,
   GrenadeState,
-  FinalMinuteEvent,
+  MutatorId,
   CharacterId,
   WeaponId,
   ServerCharacterSelectStateMessage,
@@ -132,15 +132,38 @@ export class Match implements MatchContext {
    */
   private forfeitWinnerId: PlayerId | null = null;
 
-  /** Final-minute event state. */
-  private _activeEvent: FinalMinuteEvent | null = null;
-  private _warningSent = false;
-  private _eventStarted = false;
-  /** One-shot warning to broadcast this tick (consumed by matchmaking-manager). */
-  private _eventWarningThisTick: { event: FinalMinuteEvent; activatesInMs: number } | null = null;
-  /** One-shot start to broadcast this tick (consumed by matchmaking-manager). */
-  private _eventStartThisTick: FinalMinuteEvent | null = null;
-  /** Injected RNG for event selection — defaults to Math.random, override in tests. */
+  /**
+   * Mutator scheduling state — two slots per match, each with the same
+   * warn-then-start lifecycle. Slots choose their mutator at warning time,
+   * excluding whatever the other slot already picked (no repeats within a
+   * match). Both mutators run to match end, so they can stack: the
+   * mid-match window's upper edge (70% elapsed) lies inside the final
+   * minute.
+   */
+  private readonly midMatchSlot = {
+    /**
+     * Seconds of match ELAPSED at which the mutator activates. Rolled from
+     * the injectable rng when the match transitions to ACTIVE, uniform in
+     * the MIDMATCH_*_ELAPSED_FRACTION window.
+     */
+    activateAtElapsed: Number.POSITIVE_INFINITY,
+    mutator: null as MutatorId | null,
+    warningSent: false,
+    started: false,
+  };
+  /** Final-minute slot — fixed thresholds in seconds REMAINING. */
+  private readonly finalMinuteSlot = {
+    mutator: null as MutatorId | null,
+    warningSent: false,
+    started: false,
+  };
+  /** Mutators that have activated, in activation order. */
+  private readonly _activeMutators: MutatorId[] = [];
+  /** One-shot warnings to broadcast this tick (consumed by matchmaking-manager). */
+  private _tickMutatorWarnings: Array<{ event: MutatorId; activatesInMs: number; isFinalMinute: boolean }> = [];
+  /** One-shot starts to broadcast this tick (consumed by matchmaking-manager). */
+  private _tickMutatorStarts: Array<{ event: MutatorId; isFinalMinute: boolean }> = [];
+  /** Injected RNG for mutator timing/selection — defaults to Math.random, override in tests. */
   private readonly rng: () => number;
 
   constructor(
@@ -488,29 +511,35 @@ export class Match implements MatchContext {
     return this.combatManager.getGrenades();
   }
 
-  /** The final-minute event that is currently active, or null. */
-  get activeEvent(): FinalMinuteEvent | null {
-    return this._eventStarted ? this._activeEvent : null;
+  /** Mutators currently active, in activation order (empty before the first). */
+  get activeMutators(): readonly MutatorId[] {
+    return this._activeMutators;
+  }
+
+  /** Whether the given mutator has activated in this match. */
+  private mutatorActive(mutator: MutatorId): boolean {
+    return this._activeMutators.includes(mutator);
   }
 
   /**
-   * Consume the eventWarning generated this tick (if any) for broadcasting.
-   * Returns null on subsequent calls in the same tick.
+   * Consume the mutator warnings generated this tick for broadcasting.
+   * Returns [] on subsequent calls in the same tick. Usually 0 or 1
+   * entries; both slots can warn in the same tick in degenerate timings.
    */
-  consumeTickEventWarning(): { event: FinalMinuteEvent; activatesInMs: number } | null {
-    const w = this._eventWarningThisTick;
-    this._eventWarningThisTick = null;
+  consumeTickMutatorWarnings(): Array<{ event: MutatorId; activatesInMs: number; isFinalMinute: boolean }> {
+    const w = this._tickMutatorWarnings;
+    this._tickMutatorWarnings = [];
     return w;
   }
 
   /**
-   * Consume the eventStart generated this tick (if any) for broadcasting.
-   * Returns null on subsequent calls in the same tick.
+   * Consume the mutator starts generated this tick for broadcasting.
+   * Returns [] on subsequent calls in the same tick.
    */
-  consumeTickEventStart(): FinalMinuteEvent | null {
-    const e = this._eventStartThisTick;
-    this._eventStartThisTick = null;
-    return e;
+  consumeTickMutatorStarts(): Array<{ event: MutatorId; isFinalMinute: boolean }> {
+    const s = this._tickMutatorStarts;
+    this._tickMutatorStarts = [];
+    return s;
   }
 
   /**
@@ -533,6 +562,14 @@ export class Match implements MatchContext {
       this.phase = MatchPhase.ACTIVE;
       this.matchTimer = MATCH.TIME_LIMIT;
       this._matchStartTimeMs = Date.now();
+      // Roll the mid-match mutator's activation time now, from the
+      // injectable rng so tests can pin it: uniform inside the
+      // 40%–70% elapsed window.
+      const windowSpan =
+        MUTATORS.MIDMATCH_MAX_ELAPSED_FRACTION - MUTATORS.MIDMATCH_MIN_ELAPSED_FRACTION;
+      this.midMatchSlot.activateAtElapsed =
+        MATCH.TIME_LIMIT *
+        (MUTATORS.MIDMATCH_MIN_ELAPSED_FRACTION + this.rng() * windowSpan);
       this.gameMode.onStart(this);
     }
   }
@@ -563,7 +600,7 @@ export class Match implements MatchContext {
       this.players,
     );
 
-    this.maybeTriggerFinalMinuteEvent();
+    this.updateMutatorSchedule();
 
     const grid = this.mapManager.getCollisionGrid();
 
@@ -585,9 +622,16 @@ export class Match implements MatchContext {
       const inputs = queue.drain(SERVER.MAX_INPUTS_PER_PLAYER_PER_TICK);
       if (inputs.length === 0) continue;
 
-      const movementModifiers = eventToMovementModifiers(this.activeEvent);
-      const grenadesOnly = this.activeEvent === 'grenades_only';
-      const infiniteAmmo = this.activeEvent === 'infinite_ammo';
+      // Per-player because second_wind's boost rides on the player's own
+      // respawn timer. Constant across this tick's queued inputs — the
+      // timer decrements later in the tick, matching the client, which
+      // predicts each input with the timer value from the last snapshot.
+      const movementModifiers = mutatorsToMovementModifiers(
+        this._activeMutators,
+        player.secondWindTimer,
+      );
+      const grenadesOnly = this.mutatorActive('grenades_only');
+      const infiniteAmmo = this.mutatorActive('infinite_ammo');
 
       for (const input of inputs) {
         // Frost Wizard freeze: full action lockout while frozenTimer > 0.
@@ -702,6 +746,9 @@ export class Match implements MatchContext {
             player.position,
             input.aimAngle,
             grenadePiercing,
+            this.mutatorActive('turbo_grenades')
+              ? MUTATORS.TURBO_GRENADES_SPEED_MULTIPLIER
+              : 1,
           );
           player.grenades -= 1;
           this.stats.recordGrenade(playerId);
@@ -753,7 +800,7 @@ export class Match implements MatchContext {
     // never empty and reloads can never start. Infinite ammo applies to
     // whichever weapon is in hand: a shotgun holder keeps a full 2-shell
     // mag (and therefore never auto-reverts) for the rest of the match.
-    const infiniteAmmoActive = this.activeEvent === 'infinite_ammo';
+    const infiniteAmmoActive = this.mutatorActive('infinite_ammo');
     for (const player of this.players.values()) {
       if (infiniteAmmoActive) {
         player.isReloading = false;
@@ -783,8 +830,18 @@ export class Match implements MatchContext {
       }
     }
 
-    // Grenade auto-refill during grenades_only (single-slot regen timer).
-    if (this.activeEvent === 'grenades_only') {
+    // Grenade auto-refill (single-slot regen timer). grenades_only and
+    // turbo_grenades each grant regen on their own cadence; if both are
+    // active the faster interval wins.
+    const regenIntervals: number[] = [];
+    if (this.mutatorActive('grenades_only')) {
+      regenIntervals.push(MUTATORS.GRENADES_ONLY_REFILL_SECONDS);
+    }
+    if (this.mutatorActive('turbo_grenades')) {
+      regenIntervals.push(MUTATORS.TURBO_GRENADES_REFILL_SECONDS);
+    }
+    if (regenIntervals.length > 0) {
+      const regenInterval = Math.min(...regenIntervals);
       for (const player of this.players.values()) {
         if (player.isDead) continue;
         if (player.grenades >= GRENADE.MAX_COUNT) {
@@ -792,7 +849,7 @@ export class Match implements MatchContext {
           continue;
         }
         player.grenadeRegenSeconds += dt;
-        if (player.grenadeRegenSeconds >= EVENT.GRENADES_ONLY_REFILL_SECONDS) {
+        if (player.grenadeRegenSeconds >= regenInterval) {
           player.grenades = Math.min(GRENADE.MAX_COUNT, player.grenades + 1);
           player.grenadeRegenSeconds = 0;
         }
@@ -813,6 +870,12 @@ export class Match implements MatchContext {
         if (player.invulnerableTimer < 0) {
           player.invulnerableTimer = 0;
         }
+      }
+      // Tick the second_wind respawn boost. Runs AFTER this tick's
+      // movement consumed the pre-decrement value — mirroring the client,
+      // which predicts each input with the timer from the last snapshot.
+      if (player.secondWindTimer > 0) {
+        player.secondWindTimer = Math.max(0, player.secondWindTimer - dt);
       }
     }
 
@@ -868,7 +931,7 @@ export class Match implements MatchContext {
         continue;
       }
 
-      const infiniteAmmo = this.activeEvent === 'infinite_ammo';
+      const infiniteAmmo = this.mutatorActive('infinite_ammo');
       burst.nextShotIn -= dt;
       // Fire all shots whose timer has elapsed (handles slow ticks gracefully).
       while (burst.nextShotIn <= 0 && burst.shotsRemaining > 0) {
@@ -922,9 +985,11 @@ export class Match implements MatchContext {
       grid,
       rtt,
       piercing,
+      'rifle',
+      this.hitValidationScale(),
     );
     this.tickBulletTrails.push(shot.trail);
-    if (this.activeEvent !== 'infinite_ammo') {
+    if (!this.mutatorActive('infinite_ammo')) {
       player.ammo = Math.max(0, player.ammo - 1);
     }
     this.stats.recordShot(playerId);
@@ -935,6 +1000,7 @@ export class Match implements MatchContext {
         const result = this.combatManager.applyDamage(victim, shot.damage, playerId);
         this.stats.recordHit(playerId);
         this.stats.recordDamage(playerId, shot.damage);
+        this.applyVampireHeal(playerId, shot.victimId, shot.damage);
         if (result.killed && result.entry) {
           this.onKill(playerId, shot.victimId, 'gun');
         }
@@ -981,6 +1047,7 @@ export class Match implements MatchContext {
       rtt,
       piercing,
       'shotgun',
+      this.hitValidationScale(),
     );
 
     this.stats.recordShot(player.id);
@@ -997,6 +1064,7 @@ export class Match implements MatchContext {
       const result = this.combatManager.applyDamage(victim, shot.damage, player.id);
       anyPelletHit = true;
       this.stats.recordDamage(player.id, shot.damage);
+      this.applyVampireHeal(player.id, shot.victimId, shot.damage);
       if (result.killed) {
         this.onKill(player.id, shot.victimId, 'shotgun');
       }
@@ -1049,6 +1117,7 @@ export class Match implements MatchContext {
       // Credit damage to the thrower. Self-damage from your own grenade
       // is real and intentional, but don't award yourself a kill.
       this.stats.recordDamage(explosion.throwerId, dmg.damage);
+      this.applyVampireHeal(explosion.throwerId, dmg.playerId, dmg.damage);
       if (dmg.killed && dmg.playerId !== explosion.throwerId) {
         this.onKill(explosion.throwerId, dmg.playerId, 'grenade');
       } else if (dmg.killed) {
@@ -1105,11 +1174,16 @@ export class Match implements MatchContext {
     player.stamina = PLAYER.SPRINT_DURATION;
     // During grenades_only, top up to MAX so respawning isn't a death sentence.
     player.grenades =
-      this.activeEvent === 'grenades_only' ? GRENADE.MAX_COUNT : GRENADE.STARTING_COUNT;
+      this.mutatorActive('grenades_only') ? GRENADE.MAX_COUNT : GRENADE.STARTING_COUNT;
     player.grenadeRegenSeconds = 0;
     // Don't carry a freeze through death — respawning frozen would be
     // unrecoverable and is never the intent.
     player.frozenTimer = 0;
+    // second_wind: respawning grants a short speed boost, applied through
+    // the shared movement modifiers so prediction stays exact.
+    player.secondWindTimer = this.mutatorActive('second_wind')
+      ? MUTATORS.SECOND_WIND_DURATION_SECONDS
+      : 0;
   }
 
   private createPlayerState(id: PlayerId, nickname: string, position: { x: number; y: number }): PlayerState {
@@ -1144,62 +1218,151 @@ export class Match implements MatchContext {
       abilityCooldownSeconds: 0,
       abilityLockedAim: 0,
       frozenTimer: 0,
+      secondWindTimer: 0,
     };
   }
 
   /**
-   * Check whether the match timer has crossed the warning or activation
-   * thresholds and emit the corresponding one-shot events. Idempotent within
-   * a match — picks one event uniformly at random and uses the same one for
-   * warning and start.
+   * Advance both mutator slots: emit the one-shot warning when a slot's
+   * warn threshold passes, then activate at its activation threshold. The
+   * mid-match slot is keyed on seconds ELAPSED (rolled per match from the
+   * injectable rng); the final-minute slot on seconds REMAINING (fixed
+   * thresholds, unchanged from the pre-mutator system). If a slot's
+   * warning and activation both land in one tick, the warning still goes
+   * out first, paired with the same mutator.
    */
-  private maybeTriggerFinalMinuteEvent(): void {
+  private updateMutatorSchedule(): void {
+    const elapsed = MATCH.TIME_LIMIT - this.matchTimer;
+
+    // Mid-match slot first — chronologically it usually warns first, and
+    // warning order decides who picks from the pool first.
+    const mid = this.midMatchSlot;
     if (
-      !this._warningSent &&
-      this.matchTimer <= EVENT.WARNING_AT_REMAINING &&
-      this.matchTimer > 0
+      !mid.warningSent &&
+      this.matchTimer > 0 &&
+      elapsed >= mid.activateAtElapsed - MUTATORS.WARNING_LEAD_SECONDS
     ) {
-      this._activeEvent = this.pickRandomEvent();
-      this._warningSent = true;
-      this._eventWarningThisTick = {
-        event: this._activeEvent,
+      mid.mutator = this.pickMutator(false);
+      mid.warningSent = true;
+      this._tickMutatorWarnings.push({
+        event: mid.mutator,
+        activatesInMs: Math.max(0, (mid.activateAtElapsed - elapsed) * 1000),
+        isFinalMinute: false,
+      });
+    }
+    if (!mid.started && mid.warningSent && elapsed >= mid.activateAtElapsed) {
+      mid.started = true;
+      this.startMutator(mid.mutator!, false);
+    }
+
+    const fin = this.finalMinuteSlot;
+    if (
+      !fin.warningSent &&
+      this.matchTimer > 0 &&
+      this.matchTimer <= MUTATORS.WARNING_AT_REMAINING
+    ) {
+      fin.mutator = this.pickMutator(true);
+      fin.warningSent = true;
+      this._tickMutatorWarnings.push({
+        event: fin.mutator,
         activatesInMs: Math.max(
           0,
-          (this.matchTimer - EVENT.ACTIVATION_AT_REMAINING) * 1000,
+          (this.matchTimer - MUTATORS.ACTIVATION_AT_REMAINING) * 1000,
         ),
-      };
+        isFinalMinute: true,
+      });
+    }
+    if (
+      !fin.started &&
+      fin.warningSent &&
+      this.matchTimer <= MUTATORS.ACTIVATION_AT_REMAINING
+    ) {
+      fin.started = true;
+      this.startMutator(fin.mutator!, true);
+    }
+  }
+
+  /**
+   * Pick a slot's mutator. Env overrides win first: FORCE_EVENT pins the
+   * final-minute slot (its pre-mutator semantics), FORCE_MIDMATCH_MUTATOR
+   * the mid-match slot — both test/e2e/smoke hooks. Random picks draw
+   * uniformly from POOL minus the other slot's choice (and minus
+   * FORCE_EVENT's value, so an earlier mid-match draw can't steal a
+   * forced final-minute pick).
+   */
+  private pickMutator(isFinalMinute: boolean): MutatorId {
+    const pool = MUTATORS.POOL as readonly string[];
+    const forced = isFinalMinute
+      ? process.env.FORCE_EVENT
+      : process.env.FORCE_MIDMATCH_MUTATOR;
+    if (forced && pool.includes(forced)) {
+      return forced as MutatorId;
     }
 
-    if (!this._eventStarted && this.matchTimer <= EVENT.ACTIVATION_AT_REMAINING) {
-      // Defensive: if matchTimer crossed both thresholds in a single tick the
-      // warning still goes out first this tick, paired with the same event.
-      if (!this._activeEvent) {
-        this._activeEvent = this.pickRandomEvent();
-        this._warningSent = true;
-        this._eventWarningThisTick = {
-          event: this._activeEvent,
-          activatesInMs: 0,
-        };
+    const excluded = new Set<MutatorId>();
+    const other = isFinalMinute
+      ? this.midMatchSlot.mutator
+      : this.finalMinuteSlot.mutator;
+    if (other) excluded.add(other);
+    if (!isFinalMinute) {
+      const forcedFinal = process.env.FORCE_EVENT;
+      if (forcedFinal && pool.includes(forcedFinal)) {
+        excluded.add(forcedFinal as MutatorId);
       }
-      this._eventStarted = true;
-      this._eventStartThisTick = this._activeEvent;
-      this.applyEventOnTrigger(this._activeEvent);
     }
+
+    const candidates = MUTATORS.POOL.filter((m) => !excluded.has(m));
+    const idx = Math.floor(this.rng() * candidates.length);
+    return candidates[Math.min(idx, candidates.length - 1)];
   }
 
-  private pickRandomEvent(): FinalMinuteEvent {
-    const forced = process.env.FORCE_EVENT;
-    if (forced && (EVENT.POOL as readonly string[]).includes(forced)) {
-      return forced as FinalMinuteEvent;
-    }
-    const idx = Math.floor(this.rng() * EVENT.POOL.length);
-    return EVENT.POOL[Math.min(idx, EVENT.POOL.length - 1)];
+  /** Activate a mutator: record it, queue the broadcast, apply one-shots. */
+  private startMutator(mutator: MutatorId, isFinalMinute: boolean): void {
+    this._activeMutators.push(mutator);
+    this._tickMutatorStarts.push({ event: mutator, isFinalMinute });
+    this.applyMutatorOnTrigger(mutator);
   }
 
-  private applyEventOnTrigger(event: FinalMinuteEvent): void {
-    switch (event) {
+  /** big_heads hit-validation AABB scale; 1 while inactive. */
+  private hitValidationScale(): number {
+    return this.mutatorActive('big_heads') ? MUTATORS.BIG_HEADS_HITBOX_SCALE : 1;
+  }
+
+  /**
+   * vampire: return a fraction of damage dealt to the attacker as healing.
+   * Self-damage never heals, dead attackers stay dead (a post-mortem
+   * grenade can still explode), and the heal caps at maxHealth — which
+   * low_health may have pinned to 1, making vampire moot but harmless.
+   */
+  private applyVampireHeal(
+    attackerId: PlayerId,
+    victimId: PlayerId,
+    damage: number,
+  ): void {
+    if (!this.mutatorActive('vampire')) return;
+    if (attackerId === victimId) return;
+    const attacker = this.players.get(attackerId);
+    if (!attacker || attacker.isDead) return;
+    attacker.health = Math.min(
+      attacker.maxHealth,
+      attacker.health + damage * MUTATORS.VAMPIRE_HEAL_FRACTION,
+    );
+  }
+
+  private applyMutatorOnTrigger(mutator: MutatorId): void {
+    switch (mutator) {
       case 'super_speed':
-        // Per-tick modifier applied via calculateMovement; nothing to mutate.
+      case 'big_heads':
+      case 'vampire':
+      case 'second_wind':
+        // Per-tick behavior only; nothing to mutate at activation.
+        return;
+      case 'turbo_grenades':
+        // Restart the shared regen accumulator so the first turbo refill
+        // lands a full interval after activation.
+        for (const player of this.players.values()) {
+          player.grenadeRegenSeconds = 0;
+        }
         return;
       case 'grenades_only':
         for (const player of this.players.values()) {
@@ -1223,9 +1386,9 @@ export class Match implements MatchContext {
         return;
       case 'low_health':
         for (const player of this.players.values()) {
-          player.maxHealth = EVENT.LOW_HEALTH_HP;
+          player.maxHealth = MUTATORS.LOW_HEALTH_HP;
           if (!player.isDead) {
-            player.health = Math.min(player.health, EVENT.LOW_HEALTH_HP);
+            player.health = Math.min(player.health, MUTATORS.LOW_HEALTH_HP);
           }
         }
         return;
@@ -1344,8 +1507,12 @@ export class Match implements MatchContext {
    */
   private tickFireBreath(): void {
     const range = ABILITY.BRUCE_FIRE_BREATH.RANGE_TILES * MAP.TILE_SIZE;
-    const halfW = PLAYER.HITBOX_WIDTH / 2 + ABILITY.BRUCE_FIRE_BREATH.WIDTH / 2;
-    const halfH = PLAYER.HITBOX_HEIGHT / 2 + ABILITY.BRUCE_FIRE_BREATH.WIDTH / 2;
+    // big_heads scales the victim-hitbox half of the sum, not the breath width.
+    const hitboxScale = this.hitValidationScale();
+    const halfW =
+      (PLAYER.HITBOX_WIDTH / 2) * hitboxScale + ABILITY.BRUCE_FIRE_BREATH.WIDTH / 2;
+    const halfH =
+      (PLAYER.HITBOX_HEIGHT / 2) * hitboxScale + ABILITY.BRUCE_FIRE_BREATH.WIDTH / 2;
     const breathHalfWidth = ABILITY.BRUCE_FIRE_BREATH.WIDTH / 2;
     const tileSize = MAP.TILE_SIZE;
     const halfTileDiag = (tileSize * Math.SQRT2) / 2;
@@ -1406,6 +1573,7 @@ export class Match implements MatchContext {
 
         const result = this.combatManager.applyDamage(other, damagePerTick, playerId);
         this.stats.recordDamage(playerId, damagePerTick);
+        this.applyVampireHeal(playerId, otherId, damagePerTick);
         if (result.killed) {
           this.onKill(playerId, otherId, 'fire');
         }

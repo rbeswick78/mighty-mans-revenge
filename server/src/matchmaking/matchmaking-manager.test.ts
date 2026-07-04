@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { MatchPhase, MATCH, EVENT } from '@shared/game';
+import { MatchPhase, MATCH, MUTATORS } from '@shared/game';
 import type { PlayerId, ServerMessage } from '@shared/game';
 import { MatchmakingManager } from './matchmaking-manager.js';
 import { PersistentStatsStore } from '../persistence/persistent-stats-store.js';
@@ -217,7 +217,7 @@ describe('match clock alignment (regression: 3-second event/timer offset)', () =
       let matchEndsInMsValue = 0;
       let eventStartTick = -1;
       const totalTicks = Math.ceil(
-        (MATCH.COUNTDOWN_DURATION + MATCH.TIME_LIMIT - EVENT.ACTIVATION_AT_REMAINING + 1) / dt,
+        (MATCH.COUNTDOWN_DURATION + MATCH.TIME_LIMIT - MUTATORS.ACTIVATION_AT_REMAINING + 1) / dt,
       );
 
       for (let i = 1; i <= totalTicks; i++) {
@@ -227,7 +227,13 @@ describe('match clock alignment (regression: 3-second event/timer offset)', () =
             matchStartTick = i;
             matchEndsInMsValue = s.message.matchEndsInMs;
           }
-          if (s.message.type === 'server:eventStart' && eventStartTick === -1) {
+          // Only the FINAL-MINUTE start is clock-aligned; the mid-match
+          // mutator fires earlier at a random time and must be ignored.
+          if (
+            s.message.type === 'server:eventStart' &&
+            s.message.isFinalMinute &&
+            eventStartTick === -1
+          ) {
             eventStartTick = i;
           }
         }
@@ -247,8 +253,8 @@ describe('match clock alignment (regression: 3-second event/timer offset)', () =
       const displayAtEvent = displayAtEventMs / 1000;
 
       // Allow a 1-tick (50ms) tolerance for tick discretization.
-      expect(displayAtEvent).toBeGreaterThan(EVENT.ACTIVATION_AT_REMAINING - 0.06);
-      expect(displayAtEvent).toBeLessThan(EVENT.ACTIVATION_AT_REMAINING + 0.06);
+      expect(displayAtEvent).toBeGreaterThan(MUTATORS.ACTIVATION_AT_REMAINING - 0.06);
+      expect(displayAtEvent).toBeLessThan(MUTATORS.ACTIVATION_AT_REMAINING + 0.06);
     } finally {
       delete process.env.FORCE_EVENT;
     }

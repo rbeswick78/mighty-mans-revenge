@@ -34,6 +34,7 @@ export class LagCompensator {
     rtt: number,
     piercing: boolean = false,
     weaponId: WeaponId = 'rifle',
+    hitboxScale: number = 1,
   ): ShotResult {
     return this.processMultiShotWithRewind(
       shooterId,
@@ -43,6 +44,7 @@ export class LagCompensator {
       rtt,
       piercing,
       weaponId,
+      hitboxScale,
     )[0];
   }
 
@@ -60,6 +62,7 @@ export class LagCompensator {
     rtt: number,
     piercing: boolean = false,
     weaponId: WeaponId = 'rifle',
+    hitboxScale: number = 1,
   ): ShotResult[] {
     const currentTime = Date.now();
     const renderTime = currentTime - rtt / 2;
@@ -106,6 +109,7 @@ export class LagCompensator {
         targetStates,
         piercing,
         weaponId,
+        hitboxScale,
       ),
     );
   }
