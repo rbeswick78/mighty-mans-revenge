@@ -11,8 +11,9 @@ test.describe('Game loads', () => {
       const canvas = document.querySelector('canvas');
       return { width: canvas?.width || 0, height: canvas?.height || 0 };
     });
-    // Should be 960x540 or proportional (16:9)
+    // 960x720 (4:3): the 960x576 gameboard plus the 144px HUD strip —
+    // see client/src/ui/layout.ts (MAP_WIDTH_PX / CANVAS_HEIGHT).
     const ratio = size.width / size.height;
-    expect(ratio).toBeCloseTo(16 / 9, 1);
+    expect(ratio).toBeCloseTo(960 / 720, 1);
   });
 });

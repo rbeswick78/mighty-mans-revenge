@@ -108,7 +108,7 @@ test.describe('Character select (desktop)', () => {
     await ctxB?.close().catch(() => {});
   });
 
-  test('two players land on CharacterSelectScene after QUICK MATCH', async (_fixtures, testInfo) => {
+  test('two players land on CharacterSelectScene after QUICK MATCH', async ({}, testInfo) => {
     // Two-context pair-up is reliable on Chromium but flaky on Firefox in
     // this environment — Firefox's second context sometimes fails to
     // complete the geckos.io WebRTC handshake before Page A's
@@ -132,7 +132,7 @@ test.describe('Character select (desktop)', () => {
     ]);
   });
 
-  test('lock-and-go: both players Enter and transition to GameScene', async (_fixtures, testInfo) => {
+  test('lock-and-go: both players Enter and transition to GameScene', async ({}, testInfo) => {
     test.fixme(
       testInfo.project.name === 'desktop-firefox',
       'Two-context WebRTC pair-up is unreliable on Firefox locally',
