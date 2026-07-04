@@ -394,7 +394,7 @@ export class LobbyScene extends Phaser.Scene {
   private updateNicknameDisplay(): void {
     // Use a non-breaking space when the cursor is "off" so the text width
     // stays constant — centered text would otherwise shift horizontally on
-    // every blink. Both '_' and ' ' render the same width in the
+    // every blink. Both '_' and the NBSP render the same width in the
     // Silkscreen monospace pixel font.
     const cursor = this.cursorVisible ? '_' : ' ';
     this.nicknameText.setText(this.nickname + cursor);
