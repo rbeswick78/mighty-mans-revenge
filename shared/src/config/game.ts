@@ -59,6 +59,59 @@ export const WEAPONS = Object.freeze({
     /** Picked up with 8 shells total (2 in the mag + 6 reserve). */
     pickupAmmo: 8,
   }),
+  /**
+   * Gun Game rung weapon (Session 7). Fast semi-auto, low damage — the
+   * deliberate downgrade between shotgun and grenades. Not a map pickup
+   * in v1 (pickupAmmo 0); adding a DM/KOTH pickup later only needs a
+   * PickupType + map spawns.
+   */
+  pistol: Object.freeze({
+    id: 'pistol',
+    displayName: 'Pistol',
+    damageMin: 7,
+    damageMax: 14,
+    falloffRangeMin: 48,
+    falloffRangeMax: 320,
+    burstSize: 1,
+    burstInterval: 0,
+    magazineSize: 12,
+    reloadTime: 1.0,
+    pelletCount: 1,
+    spreadAngle: 0,
+    /** Semi-auto tap-fire cap (~4.5 shots/s). */
+    fireCooldown: 0.22,
+    pickupAmmo: 0,
+  }),
+  /**
+   * Melee punch — the Gun Game finisher rung. Validated as an arc of
+   * pelletCount deterministic even-fan rays (evenFanAngles — NO jitter,
+   * so the fan can't gap past a 24px hitbox at max range) through the
+   * same lag-comp rewind as every gun. Flat damage (min == max); maxRange
+   * hard-caps the rays at melee reach. One damage application per victim
+   * per swing regardless of how many rays connect; a wide arc CAN hit
+   * multiple victims. No ammo, no reload.
+   */
+  punch: Object.freeze({
+    id: 'punch',
+    displayName: 'Fists',
+    damageMin: 60,
+    damageMax: 60,
+    falloffRangeMin: 56,
+    falloffRangeMax: 56,
+    burstSize: 1,
+    burstInterval: 0,
+    magazineSize: 0,
+    reloadTime: 0,
+    /** Rays in the melee arc fan, not projectiles. */
+    pelletCount: 7,
+    /** Full arc width ≈ 100°. */
+    spreadAngle: 1.75,
+    /** Swing cooldown. */
+    fireCooldown: 0.5,
+    pickupAmmo: 0,
+    /** Melee reach in px (~1.2 tiles). Rays stop dead here. */
+    maxRange: 56,
+  }),
 }) satisfies Readonly<Record<string, WeaponDef>>;
 
 export type WeaponId = keyof typeof WEAPONS;
@@ -76,6 +129,8 @@ export const KILL_WEAPONS = Object.freeze([
   'fire',
   'shotgun',
   'axe',
+  'pistol',
+  'punch',
 ] as const) satisfies readonly KillWeapon[];
 
 /** Fresh all-zero per-weapon kill record (PlayerStats.killsByWeapon). */
@@ -166,12 +221,14 @@ export const MATCH = Object.freeze({
 export const GAME_MODES = Object.freeze({
   [GameModeType.DEATHMATCH]: Object.freeze({ displayName: 'DEATHMATCH' }),
   [GameModeType.KOTH]: Object.freeze({ displayName: 'KING OF THE HILL' }),
+  [GameModeType.GUN_GAME]: Object.freeze({ displayName: 'GUN GAME' }),
 }) satisfies Readonly<Record<GameModeType, { displayName: string }>>;
 
 /** Rotation cycle for fresh matches and rematch succession. */
 export const GAME_MODE_ROTATION: readonly GameModeType[] = Object.freeze([
   GameModeType.DEATHMATCH,
   GameModeType.KOTH,
+  GameModeType.GUN_GAME,
 ]);
 
 /**
@@ -216,6 +273,40 @@ export const OVERTIME = Object.freeze({
   /** Overtime length in seconds. */
   DURATION: 30,
 });
+
+/**
+ * Gun Game (Session 7): every kill made WITH YOUR CURRENT RUNG WEAPON
+ * marches you down the ladder; the first player through the final rung
+ * wins immediately. `PlayerState.score` carries total ladder kills — the
+ * pure helpers in shared/src/utils/gun-game.ts derive the rung from it on
+ * both server and client, so no extra per-player wire state exists.
+ * Ability kills (axe, fire) and self-kills never advance. No demotion.
+ *
+ * The mode is the loadout authority: it enforces each rung's weapon and
+ * keeps ammo above the floors below so no rung can strand a player
+ * (rifle reloads are already free; grenades refill on a timer during the
+ * grenade rung). Weapon/ammo/grenade pickups don't spawn in this mode and
+ * the grenades_only / infinite_ammo mutators are excluded from its rolls.
+ */
+export const GUN_GAME = Object.freeze({
+  /** Rung weapons, in ladder order. */
+  LADDER: ['rifle', 'shotgun', 'pistol', 'grenade', 'punch'] as const,
+  /**
+   * Kills required to clear each rung (same order as LADDER). The punch
+   * finisher needs only one — landing a melee kill on armed opponents is
+   * the hard part.
+   */
+  RUNG_KILLS: [2, 2, 2, 2, 1] as const,
+  /** Seconds to refill one grenade during the grenade rung, up to max. */
+  GRENADE_REFILL_SECONDS: 3.0,
+  /** specialReserve floor while on the shotgun rung (reload never strands). */
+  SHOTGUN_RESERVE_FLOOR: 6,
+  /** specialReserve floor while on the pistol rung. */
+  PISTOL_RESERVE_FLOOR: 24,
+});
+
+/** A Gun Game ladder rung's weapon: a real WeaponId or the grenade rung. */
+export type GunGameRungWeapon = (typeof GUN_GAME.LADDER)[number];
 
 /**
  * Mutators: match-wide rule modifiers that activate mid-match and run until
@@ -291,6 +382,7 @@ export const AWARD_DEFS = Object.freeze({
   spray_and_pray: Object.freeze({ displayName: 'Spray & Pray' }),
   demolition_man: Object.freeze({ displayName: 'Demolition Man' }),
   buckshot_barber: Object.freeze({ displayName: 'Buckshot Barber' }),
+  bare_knuckles: Object.freeze({ displayName: 'Bare Knuckles' }),
   untouchable: Object.freeze({ displayName: 'Untouchable' }),
   pincushion: Object.freeze({ displayName: 'Pincushion' }),
   pin_puller_no_payoff: Object.freeze({ displayName: 'Pin Puller, No Payoff' }),
@@ -442,6 +534,7 @@ export const CHARACTERS = Object.freeze({
     hitbox: { width: 24, height: 24 },
     idleFrameCount: 6,
     runFrameCount: 6,
+    attackFrameCount: 4,
     idleFrames: {
       down: { w: 11, h: 16 },
       up: { w: 11, h: 16 },
@@ -453,6 +546,12 @@ export const CHARACTERS = Object.freeze({
       up: { w: 11, h: 17 },
       side: { w: 10, h: 17 },
       'side-left': { w: 10, h: 17 },
+    },
+    attackFrames: {
+      down: { w: 12, h: 18 },
+      up: { w: 12, h: 17 },
+      side: { w: 20, h: 18 },
+      'side-left': { w: 20, h: 18 },
     },
   },
   bruce: {
@@ -467,6 +566,7 @@ export const CHARACTERS = Object.freeze({
     hitbox: { width: 24, height: 24 },
     idleFrameCount: 6,
     runFrameCount: 6,
+    attackFrameCount: 4,
     idleFrames: {
       down: { w: 13, h: 16 },
       up: { w: 13, h: 15 },
@@ -478,6 +578,12 @@ export const CHARACTERS = Object.freeze({
       up: { w: 13, h: 16 },
       side: { w: 13, h: 15 },
       'side-left': { w: 13, h: 15 },
+    },
+    attackFrames: {
+      down: { w: 13, h: 16 },
+      up: { w: 14, h: 15 },
+      side: { w: 11, h: 14 },
+      'side-left': { w: 11, h: 14 },
     },
   },
   // Frost Wizard intentionally shares Mighty Man's spritePrefix, asset
@@ -499,6 +605,7 @@ export const CHARACTERS = Object.freeze({
     hitbox: { width: 24, height: 24 },
     idleFrameCount: 6,
     runFrameCount: 6,
+    attackFrameCount: 4,
     idleFrames: {
       down: { w: 11, h: 16 },
       up: { w: 11, h: 16 },
@@ -510,6 +617,12 @@ export const CHARACTERS = Object.freeze({
       up: { w: 11, h: 17 },
       side: { w: 10, h: 17 },
       'side-left': { w: 10, h: 17 },
+    },
+    attackFrames: {
+      down: { w: 12, h: 18 },
+      up: { w: 12, h: 17 },
+      side: { w: 20, h: 18 },
+      'side-left': { w: 20, h: 18 },
     },
   },
   // Bubba — the tank. Pack's Zombie_Big: huge HP pool, slow, and a bigger
@@ -527,6 +640,7 @@ export const CHARACTERS = Object.freeze({
     hitbox: { width: 30, height: 30 },
     idleFrameCount: 6,
     runFrameCount: 8,
+    attackFrameCount: 8,
     idleFrames: {
       down: { w: 16, h: 23 },
       up: { w: 16, h: 22 },
@@ -538,6 +652,12 @@ export const CHARACTERS = Object.freeze({
       up: { w: 16, h: 24 },
       side: { w: 16, h: 24 },
       'side-left': { w: 16, h: 24 },
+    },
+    attackFrames: {
+      down: { w: 20, h: 25 },
+      up: { w: 18, h: 24 },
+      side: { w: 23, h: 23 },
+      'side-left': { w: 23, h: 23 },
     },
   },
   // Jack — the skirmisher. Pack's Zombie_Axe (with-axe body variant).
@@ -556,6 +676,7 @@ export const CHARACTERS = Object.freeze({
     hitbox: { width: 24, height: 24 },
     idleFrameCount: 6,
     runFrameCount: 8,
+    attackFrameCount: 7,
     idleFrames: {
       down: { w: 13, h: 18 },
       up: { w: 12, h: 23 },
@@ -567,6 +688,12 @@ export const CHARACTERS = Object.freeze({
       up: { w: 12, h: 23 },
       side: { w: 21, h: 19 },
       'side-left': { w: 21, h: 19 },
+    },
+    attackFrames: {
+      down: { w: 15, h: 21 },
+      up: { w: 13, h: 25 },
+      side: { w: 25, h: 19 },
+      'side-left': { w: 25, h: 19 },
     },
   },
 }) satisfies Readonly<Record<string, CharacterDef>>;

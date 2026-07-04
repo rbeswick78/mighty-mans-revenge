@@ -1,6 +1,6 @@
 import { PlayerId, MatchId, Tick, Vec2 } from './common.js';
 import { PlayerInput } from './player.js';
-import { AxeState, GrenadeState, BulletTrail } from './projectile.js';
+import { AxeState, GrenadeState, BulletTrail, PunchEvent } from './projectile.js';
 import { PickupState } from './pickup.js';
 import { MatchPhase, KillFeedEntry, MatchResult, GameModeType } from './game.js';
 import type { CharacterId, WeaponId, MutatorId } from '../config/game.js';
@@ -105,6 +105,11 @@ export interface ServerGameStateMessage {
   /** Jack's thrown axes in flight (usually empty — one per Jack per 12s). */
   axes: AxeState[];
   bulletTrails: BulletTrail[];
+  /**
+   * Punch swings resolved during this snapshot's ticks (usually empty).
+   * Transient like bulletTrails — processed per message, never diffed.
+   */
+  punches: PunchEvent[];
   pickups: PickupState[];
   /**
    * All currently active mutators, in activation order (empty until the

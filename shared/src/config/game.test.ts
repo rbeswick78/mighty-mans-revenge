@@ -23,6 +23,7 @@ import {
 } from './game.js';
 import { GameModeType } from '../types/game.js';
 import { DIRECTIONS } from '../types/character.js';
+import type { WeaponDef } from '../types/weapon.js';
 
 describe('game mode rotation', () => {
   it('rotation covers every GameModeType exactly once', () => {
@@ -30,9 +31,10 @@ describe('game mode rotation', () => {
     expect([...GAME_MODE_ROTATION].sort()).toEqual(allModes);
   });
 
-  it('getNextGameMode cycles DM → KOTH → DM', () => {
+  it('getNextGameMode cycles DM → KOTH → GUN GAME → DM', () => {
     expect(getNextGameMode(GameModeType.DEATHMATCH)).toBe(GameModeType.KOTH);
-    expect(getNextGameMode(GameModeType.KOTH)).toBe(GameModeType.DEATHMATCH);
+    expect(getNextGameMode(GameModeType.KOTH)).toBe(GameModeType.GUN_GAME);
+    expect(getNextGameMode(GameModeType.GUN_GAME)).toBe(GameModeType.DEATHMATCH);
   });
 
   it('restarts the cycle for unknown values instead of throwing', () => {
@@ -225,21 +227,39 @@ describe('WEAPONS registry', () => {
   });
 
   it('every entry has coherent tuning values', () => {
-    for (const [key, def] of Object.entries(WEAPONS)) {
+    for (const [key, def] of Object.entries(WEAPONS) as [string, WeaponDef][]) {
+      // The punch is ammo-less flat-damage melee: mag/reload are 0 and
+      // its falloff range collapses to a point (min == max == reach).
+      const isMelee = def.maxRange !== undefined;
       expect(def.id).toBe(key);
       expect(def.displayName.length).toBeGreaterThan(0);
       expect(def.damageMin).toBeGreaterThan(0);
       expect(def.damageMax).toBeGreaterThanOrEqual(def.damageMin);
       expect(def.falloffRangeMin).toBeGreaterThan(0);
-      expect(def.falloffRangeMax).toBeGreaterThan(def.falloffRangeMin);
+      if (isMelee) {
+        expect(def.falloffRangeMax).toBeGreaterThanOrEqual(def.falloffRangeMin);
+        expect(def.magazineSize).toBe(0);
+        expect(def.reloadTime).toBe(0);
+      } else {
+        expect(def.falloffRangeMax).toBeGreaterThan(def.falloffRangeMin);
+        expect(def.magazineSize).toBeGreaterThan(0);
+        expect(def.reloadTime).toBeGreaterThan(0);
+      }
       expect(def.burstSize).toBeGreaterThanOrEqual(1);
       expect(def.burstInterval).toBeGreaterThanOrEqual(0);
-      expect(def.magazineSize).toBeGreaterThan(0);
-      expect(def.reloadTime).toBeGreaterThan(0);
       expect(def.pelletCount).toBeGreaterThanOrEqual(1);
       expect(def.spreadAngle).toBeGreaterThanOrEqual(0);
       expect(def.fireCooldown).toBeGreaterThanOrEqual(0);
       expect(def.pickupAmmo).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it('melee reach never exceeds where its damage falloff ends', () => {
+    for (const def of Object.values(WEAPONS) as WeaponDef[]) {
+      if (def.maxRange !== undefined) {
+        expect(def.maxRange).toBeLessThanOrEqual(def.falloffRangeMax);
+        expect(def.maxRange).toBeGreaterThan(0);
+      }
     }
   });
 

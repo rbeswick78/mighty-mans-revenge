@@ -47,6 +47,13 @@ This game uses pixel art assets from third-party packs. Source archives are
 - `enemies/axe_{side,side-left,vertical}_thrown.png` — Enemies/Zombie_Axe/Axe thrown Sheet9
 - `enemies/axe_*_landing.png` — Enemies/Zombie_Axe/Axe landing Sheet5 (4 directions)
 - `enemies/axe_*_landed.png` — Enemies/Zombie_Axe/Axe landed singles (4 directions)
+- `player/pistol_*_hold.png` — Character/Guns/Pistol idle-and-run Sheet6 (4 directions)
+- `player/pistol_*_shoot.png` — Character/Guns/Pistol shoot Sheet3 (4 directions)
+- `ui/pistol-bullet-indicator.png` (+ `_empty`) — UI/Bullet Indicators/Pistol-Bullet
+- `player/character_*_attack.png` — Character/Main/Punch (with-hands) Sheet4 (4 directions)
+- `enemies/zombie_*_attack.png` — Enemies/Zombie_Small First-Attack Sheet4 (4 directions)
+- `enemies/zombie-big_*_attack.png` — Enemies/Zombie_Big First-Attack Sheet8 (4 directions)
+- `enemies/zombie-axe_*_attack.png` — Enemies/Zombie_Axe (with-axe) First-Attack Sheet7 (4 directions)
 
 If we ever ship this commercially (charge money, run ads, promote a paid
 product) we owe the author at least $2 — pay before release.

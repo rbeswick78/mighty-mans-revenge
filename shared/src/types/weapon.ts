@@ -41,4 +41,12 @@ export interface WeaponDef {
    * (magazine + reserve). 0 = never spawns as a weapon pickup.
    */
   readonly pickupAmmo: number;
+  /**
+   * Hard cap (px) on how far this weapon's rays travel. Rays stop dead
+   * here — no hits and no damage beyond it. Melee needs this: without it
+   * hit validation extends rays to falloffRangeMax * 2 so falloff can
+   * play out, which would let a "56px punch" connect at 112px.
+   * Omit for ranged weapons.
+   */
+  readonly maxRange?: number;
 }

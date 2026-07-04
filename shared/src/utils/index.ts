@@ -8,3 +8,4 @@ export * from './grenade-physics.js';
 export * from './trajectory-prediction.js';
 export * from './event-modifiers.js';
 export * from './pellet-spread.js';
+export * from './gun-game.js';

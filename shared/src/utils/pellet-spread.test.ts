@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computePelletAngles } from './pellet-spread.js';
+import { computePelletAngles, evenFanAngles } from './pellet-spread.js';
 import { WEAPONS } from '../config/game.js';
 
 describe('computePelletAngles', () => {
@@ -55,5 +55,44 @@ describe('computePelletAngles', () => {
     // First and last pellet jitter independently, so the midpoint is close
     // to (not exactly) the aim angle.
     expect(Math.abs(mid - 2.0)).toBeLessThan(spreadAngle / 4);
+  });
+});
+
+describe('evenFanAngles', () => {
+  const { pelletCount, spreadAngle } = WEAPONS.punch;
+
+  it('returns exactly count angles spanning the full arc', () => {
+    const angles = evenFanAngles(1.0, pelletCount, spreadAngle);
+    expect(angles).toHaveLength(pelletCount);
+    expect(angles[0]).toBeCloseTo(1.0 - spreadAngle / 2, 12);
+    expect(angles[angles.length - 1]).toBeCloseTo(1.0 + spreadAngle / 2, 12);
+  });
+
+  it('spaces rays uniformly (no jitter, no gaps wider than spacing)', () => {
+    const angles = evenFanAngles(0, pelletCount, spreadAngle);
+    const spacing = spreadAngle / (pelletCount - 1);
+    for (let i = 1; i < angles.length; i++) {
+      expect(angles[i] - angles[i - 1]).toBeCloseTo(spacing, 12);
+    }
+  });
+
+  it('is exactly centred on the aim angle', () => {
+    const angles = evenFanAngles(2.0, pelletCount, spreadAngle);
+    const mid = (angles[0] + angles[angles.length - 1]) / 2;
+    expect(mid).toBeCloseTo(2.0, 12);
+  });
+
+  it("the punch fan can't gap past a 24px hitbox at max range", () => {
+    // Arc-length between adjacent rays at the punch's reach must stay
+    // under the smallest character hitbox width, or a point-blank swing
+    // could whiff straight through a target standing dead ahead.
+    const { maxRange } = WEAPONS.punch;
+    const spacing = spreadAngle / (pelletCount - 1);
+    expect(spacing * (maxRange ?? 0)).toBeLessThan(24);
+  });
+
+  it('collapses to the aim angle for degenerate fans', () => {
+    expect(evenFanAngles(0.7, 1, 2)).toEqual([0.7]);
+    expect(evenFanAngles(0.7, 5, 0)).toEqual([0.7]);
   });
 });

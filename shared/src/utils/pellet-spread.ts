@@ -61,3 +61,27 @@ export function computePelletAngles(
   }
   return angles;
 }
+
+/**
+ * Jitter-free even fan: `count` absolute angles spaced uniformly across
+ * the full `spreadAngle` arc centred on `aimAngle`. Used for the punch
+ * melee arc, where jitter is a liability — a jittered fan can open a gap
+ * wider than a 24px hitbox at melee range, letting a point-blank swing
+ * whiff through a target. No seed because there is nothing random.
+ */
+export function evenFanAngles(
+  aimAngle: number,
+  count: number,
+  spreadAngle: number,
+): number[] {
+  if (count <= 1 || spreadAngle <= 0) {
+    return [aimAngle];
+  }
+  const spacing = spreadAngle / (count - 1);
+  const lo = aimAngle - spreadAngle / 2;
+  const angles: number[] = [];
+  for (let i = 0; i < count; i++) {
+    angles.push(lo + i * spacing);
+  }
+  return angles;
+}

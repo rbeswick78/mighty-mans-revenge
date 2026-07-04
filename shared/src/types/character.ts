@@ -38,10 +38,20 @@ export interface CharacterDef {
   readonly assetBaseName: string;
   readonly idleFrames: FramesByDirection;
   readonly runFrames: FramesByDirection;
+  /**
+   * Melee attack sheets (the Gun Game punch rung). Body-level animation
+   * states — unlike gun overlays these replace the body sprite for the
+   * swing. Frame counts vary wildly across pack characters (4/4/8/7), so
+   * the client normalizes playback to a fixed swing duration rather than
+   * a fixed FPS.
+   */
+  readonly attackFrames: FramesByDirection;
   /** Horizontal frames per idle sheet (pack `-SheetN` suffix). */
   readonly idleFrameCount: number;
   /** Horizontal frames per run/walk sheet (pack `-SheetN` suffix). */
   readonly runFrameCount: number;
+  /** Horizontal frames per attack sheet (pack `-SheetN` suffix). */
+  readonly attackFrameCount: number;
   /**
    * Whether to render the held-gun overlay and matching muzzle flash for
    * this character. Gameplay (bullets, damage) is identical regardless —

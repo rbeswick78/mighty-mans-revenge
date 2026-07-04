@@ -33,6 +33,23 @@ export interface AxeState {
   distanceTraveled: number;
 }
 
+/**
+ * One punch swing, resolved instantly on the server tick it was thrown.
+ * Punches produce no bullet trails; instead the tick's swings ride the
+ * gameState message as a transient array (same per-message delivery as
+ * bulletTrails, so a swing can't be swallowed by bursty snapshots) and the
+ * client plays the puncher's attack animation + SFX off each entry.
+ */
+export interface PunchEvent {
+  playerId: PlayerId;
+  /** Punch origin (the puncher's position at swing time). */
+  position: Vec2;
+  /** Swing direction in radians — buckets into the attack anim facing. */
+  aimAngle: number;
+  /** True if the swing connected with at least one victim (impact SFX). */
+  hit: boolean;
+}
+
 export interface GrenadeState {
   id: string;
   position: Vec2;
