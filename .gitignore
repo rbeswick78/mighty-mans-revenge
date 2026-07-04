@@ -32,6 +32,10 @@ coverage/
 test-results/
 playwright-report/
 
+# Persistent server data (lifetime stats). Untracked on purpose so the
+# git-pull deploy flow never touches the VM's live records.
+server/data/
+
 # Logs
 logs/
 *.log

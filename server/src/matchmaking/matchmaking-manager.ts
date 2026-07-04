@@ -15,6 +15,7 @@ import { Match } from '../game/match.js';
 import { GameServer } from '../network/server.js';
 import { MatchmakingQueue } from './matchmaking-queue.js';
 import { logger } from '../utils/logger.js';
+import type { PersistentStatsStore, MatchStatsEntry } from '../persistence/persistent-stats-store.js';
 
 /**
  * How long the post-match state is kept alive while waiting for both players
@@ -54,14 +55,22 @@ export class MatchmakingManager {
    * when GameManager hasn't been given one — keeps tests trivial.
    */
   private readonly getPlayerRTT: (playerId: PlayerId) => number;
+  /**
+   * Lifetime kills/wins/head-to-head store. Optional so unit tests (and
+   * any embedding without persistence) can skip it — results then ship
+   * with rivalry: null.
+   */
+  private readonly statsStore: PersistentStatsStore | undefined;
 
   constructor(
     server: GameServer,
     getPlayerRTT: (playerId: PlayerId) => number = () => 0,
+    statsStore?: PersistentStatsStore,
   ) {
     this.server = server;
     this.queue = new MatchmakingQueue();
     this.getPlayerRTT = getPlayerRTT;
+    this.statsStore = statsStore;
   }
 
   handleJoinMatchmaking(playerId: PlayerId, nickname: string): void {
@@ -530,6 +539,35 @@ export class MatchmakingManager {
 
   private onMatchEnded(matchId: string, match: Match): void {
     const result = match.getResult();
+
+    // Fold this match into the lifetime records and attach the pairing's
+    // all-time rivalry line before shipping the result. The in-memory
+    // update is synchronous and O(players); the file write is queued onto
+    // fs.promises — nothing here blocks the tick.
+    if (this.statsStore) {
+      const entries: MatchStatsEntry[] = [];
+      for (const [playerId, player] of match.players) {
+        const stats = result.playerStats.get(playerId);
+        if (!stats) continue;
+        entries.push({
+          nickname: player.nickname,
+          kills: stats.kills,
+          deaths: stats.deaths,
+          killsByWeapon: stats.killsByWeapon,
+        });
+      }
+      const winnerNickname =
+        result.winnerId !== null
+          ? (match.players.get(result.winnerId)?.nickname ?? null)
+          : null;
+      this.statsStore.recordMatch(entries, winnerNickname);
+      if (entries.length === 2) {
+        result.rivalry = this.statsStore.getRivalry(
+          entries[0].nickname,
+          entries[1].nickname,
+        );
+      }
+    }
 
     // Send match end to all players
     // MatchResult uses Map for playerStats, but JSON.stringify can't serialize Maps.

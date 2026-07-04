@@ -1,6 +1,7 @@
 import { createServer as createHttpServer } from 'node:http';
 import { GameServer } from './network/server.js';
 import { GameManager } from './game/game-manager.js';
+import { PersistentStatsStore } from './persistence/persistent-stats-store.js';
 import { logger } from './utils/logger.js';
 import { createHealthServer, type HealthCheckDeps } from './network/health.js';
 import {
@@ -15,7 +16,10 @@ const port = parseInt(process.env['PORT'] ?? '3000', 10);
 const healthPort = parseInt(process.env['HEALTH_PORT'] ?? '3001', 10);
 
 const server = new GameServer(port);
-const manager = new GameManager(server);
+// Lifetime stats + head-to-head records, persisted under DATA_DIR
+// (default server/data/) so they survive restarts and git-pull deploys.
+const statsStore = new PersistentStatsStore();
+const manager = new GameManager(server, statsStore);
 
 server.start();
 manager.start();
@@ -109,7 +113,8 @@ function shutdown(): void {
   logger.info('Shutting down...');
   manager.stop();
   httpServer.close();
-  process.exit(0);
+  // Let any queued lifetime-stats write land before the process dies.
+  void statsStore.flush().finally(() => process.exit(0));
 }
 
 process.on('SIGINT', shutdown);

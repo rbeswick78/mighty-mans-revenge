@@ -1,7 +1,11 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { MatchPhase, MATCH, EVENT } from '@shared/game';
 import type { PlayerId, ServerMessage } from '@shared/game';
 import { MatchmakingManager } from './matchmaking-manager.js';
+import { PersistentStatsStore } from '../persistence/persistent-stats-store.js';
 import type { GameServer } from '../network/server.js';
 
 interface SentMessage {
@@ -124,6 +128,71 @@ describe('MatchmakingManager rematch flow', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('MatchmakingManager persistent stats integration', () => {
+  let dataDir: string;
+  let store: PersistentStatsStore | null;
+
+  beforeEach(() => {
+    dataDir = mkdtempSync(path.join(os.tmpdir(), 'mmr-mm-stats-'));
+    store = null;
+  });
+
+  afterEach(async () => {
+    // Drain queued writes before deleting the dir so the background write
+    // doesn't race rmSync.
+    await store?.flush();
+    rmSync(dataDir, { recursive: true, force: true });
+  });
+
+  it('records the match into the store and ships the rivalry in matchEnd', () => {
+    const { fake, sent } = makeFakeServer();
+    store = new PersistentStatsStore(dataDir);
+    const mgr = new MatchmakingManager(fake, () => 0, store);
+
+    mgr.handleJoinMatchmaking('A', 'Ryan');
+    mgr.handleJoinMatchmaking('B', 'Dave');
+    const match = mgr.getActiveMatches()[0];
+    // Give Ryan a decisive scoreboard so the winner is unambiguous.
+    match.players.get('A')!.score = 3;
+    match.phase = MatchPhase.ENDED;
+    mgr.tick(0.05, 1);
+
+    // Lifetime store took the match...
+    expect(store.getLifetime('Ryan')!.wins).toBe(1);
+    expect(store.getLifetime('Dave')!.losses).toBe(1);
+
+    // ...and both matchEnd messages carry the updated rivalry.
+    const matchEndMsgs = sent.filter((s) => s.message.type === 'server:matchEnd');
+    expect(matchEndMsgs).toHaveLength(2);
+    for (const { message } of matchEndMsgs) {
+      if (message.type !== 'server:matchEnd') throw new Error('unreachable');
+      expect(message.result.rivalry).toEqual({
+        nicknameA: 'Dave',
+        nicknameB: 'Ryan',
+        winsA: 0,
+        winsB: 1,
+        draws: 0,
+      });
+    }
+  });
+
+  it('ships rivalry: null when no store is configured', () => {
+    const { fake, sent } = makeFakeServer();
+    const mgr = new MatchmakingManager(fake);
+
+    mgr.handleJoinMatchmaking('A', 'Ryan');
+    mgr.handleJoinMatchmaking('B', 'Dave');
+    mgr.getActiveMatches()[0].phase = MatchPhase.ENDED;
+    mgr.tick(0.05, 1);
+
+    const matchEnd = sent.find((s) => s.message.type === 'server:matchEnd');
+    if (!matchEnd || matchEnd.message.type !== 'server:matchEnd') {
+      throw new Error('missing matchEnd');
+    }
+    expect(matchEnd.message.result.rivalry).toBeNull();
   });
 });
 

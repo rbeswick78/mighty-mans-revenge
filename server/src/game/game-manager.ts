@@ -9,6 +9,7 @@ import { GameLoop } from './game-loop.js';
 import { GameServer } from '../network/server.js';
 import { MatchmakingManager } from '../matchmaking/matchmaking-manager.js';
 import { logger } from '../utils/logger.js';
+import type { PersistentStatsStore } from '../persistence/persistent-stats-store.js';
 
 export class GameManager {
   private readonly gameLoop: GameLoop;
@@ -22,10 +23,12 @@ export class GameManager {
    */
   private readonly playerRTTs: Map<PlayerId, number> = new Map();
 
-  constructor(server: GameServer) {
+  constructor(server: GameServer, statsStore?: PersistentStatsStore) {
     this.server = server;
-    this.matchmaking = new MatchmakingManager(server, (pid) =>
-      this.playerRTTs.get(pid) ?? 0,
+    this.matchmaking = new MatchmakingManager(
+      server,
+      (pid) => this.playerRTTs.get(pid) ?? 0,
+      statsStore,
     );
 
     this.gameLoop = new GameLoop((dt, tick) => {
