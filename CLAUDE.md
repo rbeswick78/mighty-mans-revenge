@@ -87,6 +87,12 @@ gcloud compute ssh deploy@mighty-mans-server --zone=us-east1-b \
 curl http://34.24.140.207:3001/health
 ```
 
+**Persistent state on the VM:** lifetime player stats and head-to-head
+records live in `/opt/mighty-mans-revenge/server/data/persistent-stats.json`
+(path overridable via `DATA_DIR`). The directory is untracked/gitignored, so
+the git-pull deploy flow never touches it — do not `git clean` or wipe the
+checkout without preserving it.
+
 **Note on the rsync workflow:** `.github/workflows/deploy-server.yml` rsyncs a `deploy/` artifact to `/opt/mighty-mans-revenge/` as user `deploy@`. That layout doesn't match what's actually on the VM (`server/dist/`, not `dist/`) and the live process is owned by `rybes`, not `deploy`. Don't try to make the rsync flow work — use the git-pull flow above. The CI workflow is non-functional anyway because `GCE_SSH_KEY` and `GCE_SERVER_IP` secrets aren't set.
 
 **CI deploy workflows** (`.github/workflows/deploy-client.yml`, `deploy-server.yml`) trigger on pushes to `client/**`/`server/**`/`shared/**` and also support `workflow_dispatch`. Both are currently **non-functional** because the required repo secrets are not set: `FIREBASE_TOKEN` (service account JSON for hosting), `GCE_SSH_KEY`, and `GCE_SERVER_IP`. Deploys must be done manually using the commands above.
