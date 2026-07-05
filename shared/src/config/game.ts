@@ -212,6 +212,34 @@ export const MATCH = Object.freeze({
 });
 
 /**
+ * Pre-match map/mode draft (Session 9). Every real match — fresh AND
+ * rematch — opens with a draft instead of the blind rotation: the server
+ * rolls who picks first; that player claims a category implicitly by
+ * picking EITHER a map OR a mode; the other player picks from the
+ * remaining category. Lives in MatchmakingManager BEFORE Match
+ * construction (Match takes mapData/gameMode in its constructor), so
+ * `server:matchFound` keeps meaning "match exists; final map+mode".
+ * FORCE_MAP / FORCE_MODE skip the draft entirely (smoke pins double as
+ * the kill switch); the rotation cursors survive only for that path.
+ */
+export const DRAFT = Object.freeze({
+  /**
+   * Seconds the first picker has to make their pick. Includes the
+   * client's who-picks-first spectacle (SPECTACLE_MS) — the server
+   * deadline starts at draft creation, not at spectacle end.
+   */
+  FIRST_PICK_SECONDS: 20,
+  /** Seconds the second picker has once the first pick lands. */
+  SECOND_PICK_SECONDS: 15,
+  /**
+   * Client-side duration of the "WHO PICKS FIRST?" nickname ping-pong
+   * before the option columns unlock. Purely cosmetic — the outcome is
+   * server-rolled and already in the first draftState message.
+   */
+  SPECTACLE_MS: 2600,
+});
+
+/**
  * Game mode metadata + rotation. Rotation order doubles as the cycle fresh
  * matches walk through (mirrors the map registry's rotation contract):
  * fresh matches advance a global cursor, rematches play the mode AFTER the

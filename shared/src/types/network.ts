@@ -15,6 +15,7 @@ export type ClientMessage =
   | ClientReturnToLobbyMessage
   | ClientCharacterHoverMessage
   | ClientCharacterLockMessage
+  | ClientDraftPickMessage
   | ClientPingMessage;
 
 export interface ClientInputMessage {
@@ -49,6 +50,23 @@ export interface ClientCharacterLockMessage {
   characterId: CharacterId;
 }
 
+/** Which half of the pre-match draft a pick claims. */
+export type DraftCategory = 'map' | 'mode';
+
+/**
+ * A pick in the pre-match map/mode draft. The first picker claims a
+ * category implicitly by sending their first pick (map OR mode); the
+ * second picker must send the remaining category. The server validates
+ * turn + category availability + value against the offered options and
+ * silently ignores anything invalid (stale clicks, wrong turn).
+ */
+export interface ClientDraftPickMessage {
+  type: 'client:draftPick';
+  category: DraftCategory;
+  /** Map name (registry) or GameModeType id, depending on category. */
+  value: string;
+}
+
 export interface ClientPingMessage {
   type: 'client:ping';
   clientTime: number;
@@ -60,6 +78,7 @@ export type ServerMessage =
   | ServerWelcomeMessage
   | ServerGameStateMessage
   | ServerMatchFoundMessage
+  | ServerDraftStateMessage
   | ServerCharacterSelectStateMessage
   | ServerMatchCountdownMessage
   | ServerMatchStartMessage
@@ -220,6 +239,43 @@ export interface ServerMatchFoundMessage {
   mapName: string;
   /** Mode this match will be played in — drives the lobby's "NEXT: X" line. */
   gameMode: GameModeType;
+}
+
+/**
+ * Full snapshot of the pre-match map/mode draft, broadcast every server
+ * tick while the draft runs (same cadence contract as
+ * characterSelectState — loss-tolerant, the next tick repairs a drop).
+ * The draft precedes Match construction: `matchId` here is the id the
+ * eventual `server:matchFound` will carry, so clients can correlate.
+ * The first draftState a client receives is its cue to enter the draft
+ * scene; `server:matchFound` (final map+mode) is its cue to leave.
+ */
+export interface ServerDraftStateMessage {
+  type: 'server:draftState';
+  matchId: MatchId;
+  /** Everyone in the pending match, draft roles included. */
+  players: { id: PlayerId; nickname: string }[];
+  /**
+   * Winner of the server-side who-picks-first roll. The client plays
+   * its spectacle to land on this player — the outcome is decided
+   * before the animation starts.
+   */
+  firstPickerId: PlayerId;
+  /** Whose pick the server is waiting on; null once both picks are in. */
+  currentPickerId: PlayerId | null;
+  /** Chosen map name, or null while unpicked. */
+  mapPick: string | null;
+  /** Chosen mode, or null while unpicked. */
+  modePick: GameModeType | null;
+  /** Map names on offer (registry order). */
+  mapOptions: string[];
+  /** Modes on offer (rotation order). */
+  modeOptions: GameModeType[];
+  /**
+   * Ms remaining before the server auto-picks for the current picker.
+   * Drives the client countdown; 0 once the draft is complete.
+   */
+  pickDeadlineMs: number;
 }
 
 /**
