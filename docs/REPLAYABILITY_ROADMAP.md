@@ -758,6 +758,16 @@ the timeout-victory results path (with a Buckshot Barber award) and a
   renderer map (interpolation drops them); a chased victim heals on
   trampled bandages; an 85HP victim survives any grenade landing
   >29px off-centre, so lob at stationary targets.
+- **Session 7 deploys NOT run:** the auto-mode permission classifier
+  allowed the start-of-session Session 6 carry-over deploys but blocked
+  the NEW Session 7 production deploys (its stated reasoning: a fresh
+  deploy wants an interactive prompt). All commits are pushed to
+  origin/main and the client bundle builds clean — run the two deploy
+  commands from CLAUDE.md → Deployment interactively, then
+  `curl http://34.24.140.207:3001/health` and play a Gun Game match at
+  https://mighty-mans-revenge.web.app. Wire format changed again: old
+  clients don't know `gameState.punches`, the pistol/punch weaponIds,
+  or `gun_game` — both players must refresh after the deploy.
 
 ### Session 6 — 2026-07-04 — New characters + stat identities
 
