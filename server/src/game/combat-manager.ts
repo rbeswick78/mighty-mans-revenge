@@ -8,6 +8,7 @@ import {
   type GrenadeState,
   type KillFeedEntry,
   type WeaponId,
+  type WeaponDef,
   ABILITY,
   WEAPONS,
   GRENADE,
@@ -253,7 +254,9 @@ export class CombatManager {
     weaponId: WeaponId = 'rifle',
     hitboxScale: number = 1,
   ): ShotResult {
-    const weapon = WEAPONS[weaponId];
+    // Widen to the interface type: the frozen WEAPONS literals only carry
+    // maxRange on the weapons that declare it (punch).
+    const weapon: WeaponDef = WEAPONS[weaponId];
     const shooter = (rewindStates ?? players).get(shooterId) ?? players.get(shooterId);
     if (!shooter) {
       // Shooter not found — return a miss
@@ -275,7 +278,9 @@ export class CombatManager {
     // Raycast against grid to find max distance (wall hit). When piercing
     // is true (shot fired during Mighty Man's x-ray), walls are ignored so
     // the bullet can hit a target through tiles.
-    const maxRayDistance = weapon.falloffRangeMax * 2; // extend past falloff for actual hits
+    // maxRange (melee reach) hard-caps the ray when the weapon declares
+    // it; otherwise extend past falloff so long-range hits still land.
+    const maxRayDistance = weapon.maxRange ?? weapon.falloffRangeMax * 2;
     const wallHit = raycastAgainstGrid(
       grid,
       startPos.x,

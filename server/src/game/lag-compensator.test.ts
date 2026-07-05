@@ -8,6 +8,7 @@ import {
   PLAYER,
   WEAPONS,
   GRENADE,
+  evenFanAngles,
 } from '@shared/game';
 
 function createPlayer(overrides: Partial<PlayerState> & { id: PlayerId }): PlayerState {
@@ -130,5 +131,62 @@ describe('LagCompensator — per-character hitbox through the rewind', () => {
       200,
     );
     expect(result.hit).toBe(false);
+  });
+});
+
+describe('LagCompensator — punch arc through the rewind', () => {
+  /**
+   * The punch analogue of the rifle graze pair above, at maxRange instead
+   * of off-axis: the victim's REWOUND center sits 69px out (56 + 13), so
+   * Bubba's 30px box (half 15) has its near face at 54px — inside the
+   * 56px melee reach — while a 24px box (half 12) starts at 57px, just
+   * past it. The full 7-ray even fan is validated exactly as tryPunch
+   * does it; angled rays travel even farther to reach the box, so only
+   * the center ray can decide the pair. If the rewind, the per-character
+   * dims, or the maxRange cap were dropped, the pair flips.
+   */
+  function punchGrazeThroughRewind(victimCharacter: 'bubba' | 'jack'): boolean {
+    const combat = new CombatManager();
+    const lagComp = new LagCompensator(combat);
+    const grid = createOpenGrid();
+
+    const shooter = createPlayer({ id: 'shooter', position: { x: 100, y: 100 } });
+    const victim = createPlayer({
+      id: 'victim',
+      characterId: victimCharacter,
+      // Rewound position: near hitbox face at maxRange - 2 for Bubba,
+      // maxRange + 1 for a 24px character.
+      position: { x: 100 + WEAPONS.punch.maxRange + 13, y: 100 },
+    });
+    const players = new Map<PlayerId, PlayerState>([
+      ['shooter', shooter],
+      ['victim', victim],
+    ]);
+
+    lagComp.saveCurrentState(1, Date.now() - 100, players);
+
+    // The victim has since moved far off the swing line — a hit can only
+    // come from the rewound snapshot.
+    victim.position = { x: 250, y: 400 };
+
+    const angles = evenFanAngles(0, WEAPONS.punch.pelletCount, WEAPONS.punch.spreadAngle);
+    const shots = lagComp.processMultiShotWithRewind(
+      'shooter',
+      angles,
+      players,
+      grid,
+      200,
+      false,
+      'punch',
+    );
+    return shots.some((shot) => shot.hit);
+  }
+
+  it("a rewound swing reaches Bubba's 30px box at melee range", () => {
+    expect(punchGrazeThroughRewind('bubba')).toBe(true);
+  });
+
+  it('the same rewound swing misses a 24px character just past reach', () => {
+    expect(punchGrazeThroughRewind('jack')).toBe(false);
   });
 });

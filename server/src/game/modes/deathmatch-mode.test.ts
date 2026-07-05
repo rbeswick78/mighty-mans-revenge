@@ -92,6 +92,9 @@ function makeContext(
       isOvertime
         ? MATCH.TIME_LIMIT + (OVERTIME.DURATION - matchTimer)
         : MATCH.TIME_LIMIT - matchTimer,
+    clearWeaponTransients: () => {
+      // No burst/cooldown state exists in a bare test context.
+    },
   };
   return ctx;
 }
@@ -148,7 +151,7 @@ describe('DeathmatchMode', () => {
         makePlayer('p2', 0),
       ]);
 
-      mode.onKill(ctx, 'p1', 'p2');
+      mode.onKill(ctx, 'p1', 'p2', 'gun');
       expect(ctx.players.get('p1')!.score).toBe(1);
     });
   });

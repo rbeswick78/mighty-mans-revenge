@@ -100,6 +100,9 @@ function makeContext(
     getTimeLimit: () => MATCH.TIME_LIMIT,
     getMapData: () => mapData,
     getElapsedSeconds: () => MATCH.TIME_LIMIT - ctx.matchTimer,
+    clearWeaponTransients: () => {
+      // No burst/cooldown state exists in a bare test context.
+    },
   };
   return ctx;
 }
@@ -261,7 +264,7 @@ describe('KothMode', () => {
       const ctx = makeContext([p1, p2], { hills: HILLS });
       mode.onStart(ctx);
 
-      mode.onKill(ctx, 'p1', 'p2');
+      mode.onKill(ctx, 'p1', 'p2', 'gun');
       expect(p1.score).toBe(0);
     });
   });

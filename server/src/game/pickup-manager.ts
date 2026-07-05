@@ -51,16 +51,25 @@ export class PickupManager {
    */
   private announced: Set<string> = new Set();
 
-  /** Create pickups from map data's pickupSpawns. */
-  initFromMap(mapData: MapData): void {
+  /**
+   * Create pickups from map data's pickupSpawns. The optional predicate
+   * lets the caller veto whole pickup types (game modes: Gun Game spawns
+   * nothing but bandages) — filtered spawns never exist, so they can
+   * never activate or announce. The manager itself stays mode-agnostic.
+   */
+  initFromMap(
+    mapData: MapData,
+    isTypeEnabled: (type: PickupType) => boolean = () => true,
+  ): void {
     this.pickups.clear();
     this.announced.clear();
     this.nextId = 0;
 
     for (const spawn of mapData.pickupSpawns) {
-      const id = `pickup-${this.nextId++}`;
       const tileSize = mapData.tileSize;
       const type = SPAWN_TYPE_TO_PICKUP_TYPE[spawn.type] ?? PickupType.GUN_AMMO;
+      if (!isTypeEnabled(type)) continue;
+      const id = `pickup-${this.nextId++}`;
       // Weapon pickups start the match on their full respawn timer instead
       // of pre-placed, so the first drop gets the same "INCOMING" warning
       // as every later one (and nobody camps mid at the opening whistle).

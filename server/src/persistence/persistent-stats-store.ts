@@ -203,7 +203,18 @@ export class PersistentStatsStore {
       ) {
         throw new Error('unrecognized shape');
       }
-      return parsed as PersistentStatsData;
+      const data = parsed as PersistentStatsData;
+      // Files written before newer KillWeapons existed ('pistol'/'punch',
+      // and 'axe' before them) lack those weaponKills keys. Default them
+      // to 0 so the Record<KillWeapon, number> contract holds for every
+      // consumer without per-read null checks.
+      for (const lifetime of Object.values(data.players)) {
+        lifetime.weaponKills = {
+          ...createEmptyKillsByWeapon(),
+          ...lifetime.weaponKills,
+        };
+      }
+      return data;
     } catch (err) {
       logger.warn(
         { err, file: this.filePath },

@@ -1,5 +1,5 @@
 import { GameModeType, KOTH, MAP } from '@shared/game';
-import type { PlayerId, MatchResult, KothHudState } from '@shared/game';
+import type { PlayerId, MatchResult, KothHudState, KillWeapon } from '@shared/game';
 import { computeAwards } from '../awards.js';
 import { logger } from '../../utils/logger.js';
 import type { GameMode, MatchContext } from './game-mode.js';
@@ -101,7 +101,12 @@ export class KothMode implements GameMode {
     }
   }
 
-  onKill(_match: MatchContext, _killerId: PlayerId, _victimId: PlayerId): void {
+  onKill(
+    _match: MatchContext,
+    _killerId: PlayerId,
+    _victimId: PlayerId,
+    _weapon: KillWeapon,
+  ): void {
     // Kills don't score in KOTH — they just make room on the hill.
   }
 

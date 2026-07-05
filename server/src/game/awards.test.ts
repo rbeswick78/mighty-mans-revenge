@@ -19,7 +19,9 @@ function makeStats(overrides: Partial<PlayerStats> = {}): PlayerStats {
   };
 }
 
-function kills(overrides: Partial<Record<'gun' | 'grenade' | 'fire' | 'shotgun', number>>) {
+function kills(
+  overrides: Partial<Record<'gun' | 'grenade' | 'fire' | 'shotgun' | 'pistol' | 'punch', number>>,
+) {
   return { ...createEmptyKillsByWeapon(), ...overrides };
 }
 
@@ -125,6 +127,37 @@ describe('computeAwards', () => {
         p2: makeStats({ kills: 3, killsByWeapon: kills({ shotgun: 3 }) }),
       });
       expect(awards.find((a) => a.id === 'buckshot_barber')?.playerId).toBe('p2');
+    });
+
+    it('bare knuckles needs at least one punch kill', () => {
+      const awards = compute({
+        p1: makeStats({ kills: 3, killsByWeapon: kills({ punch: 3 }) }),
+        p2: makeStats(),
+      });
+      const bare = awards.find((a) => a.id === 'bare_knuckles');
+      expect(bare?.playerId).toBe('p1');
+      expect(bare?.detail).toBe('3 PUNCH KILLS');
+    });
+
+    it('a single punch kill reads as singular', () => {
+      const awards = compute({
+        p1: makeStats({ kills: 1, killsByWeapon: kills({ punch: 1 }) }),
+      });
+      expect(awards.find((a) => a.id === 'bare_knuckles')?.detail).toBe('1 PUNCH KILL');
+    });
+
+    it('bare knuckles goes to the most punch kills; a tie earns nobody', () => {
+      const most = compute({
+        p1: makeStats({ kills: 1, killsByWeapon: kills({ punch: 1 }) }),
+        p2: makeStats({ kills: 2, killsByWeapon: kills({ punch: 2 }) }),
+      });
+      expect(most.find((a) => a.id === 'bare_knuckles')?.playerId).toBe('p2');
+
+      const tied = compute({
+        p1: makeStats({ kills: 2, killsByWeapon: kills({ punch: 2 }) }),
+        p2: makeStats({ kills: 2, killsByWeapon: kills({ punch: 2 }) }),
+      });
+      expect(tied.find((a) => a.id === 'bare_knuckles')).toBeUndefined();
     });
   });
 

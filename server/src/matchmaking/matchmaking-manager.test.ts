@@ -285,11 +285,12 @@ describe('MatchmakingManager mode rotation', () => {
     return last.message.result.nextGameMode;
   }
 
-  it('fresh matches cycle DM → KOTH and wrap', () => {
+  it('fresh matches cycle DM → KOTH → GUN GAME and wrap', () => {
     const pairs: Array<[PlayerId, PlayerId]> = [
       ['A', 'B'],
       ['C', 'D'],
       ['E', 'F'],
+      ['G', 'H'],
     ];
     pairs.forEach(([p1, p2], i) => {
       sent.length = 0;
@@ -299,7 +300,9 @@ describe('MatchmakingManager mode rotation', () => {
       expect(matchFoundMode(p1)).toBe(expected);
       expect(matchFoundMode(p2)).toBe(expected);
     });
-    expect(matchFoundMode('E')).toBe(GAME_MODE_ROTATION[0]); // wrapped
+    // The loop asserted E/F got GUN_GAME (rotation index 2); the fourth
+    // pair wraps back to the head of the rotation.
+    expect(matchFoundMode('G')).toBe(GAME_MODE_ROTATION[0]); // wrapped
   });
 
   it('matchEnd promises the next mode and the rematch delivers it', () => {
@@ -314,7 +317,15 @@ describe('MatchmakingManager mode rotation', () => {
     mgr.handleRematchRequest('B');
     expect(matchFoundMode('A')).toBe(GameModeType.KOTH);
 
-    // Chain wraps back to DM.
+    // Chain continues into Gun Game...
+    endActiveMatch();
+    expect(lastMatchEndNextMode()).toBe(GameModeType.GUN_GAME);
+    sent.length = 0;
+    mgr.handleRematchRequest('A');
+    mgr.handleRematchRequest('B');
+    expect(matchFoundMode('A')).toBe(GameModeType.GUN_GAME);
+
+    // ...then wraps back to DM.
     endActiveMatch();
     expect(lastMatchEndNextMode()).toBe(GameModeType.DEATHMATCH);
     sent.length = 0;
@@ -343,6 +354,21 @@ describe('MatchmakingManager mode rotation', () => {
     mgr.handleJoinMatchmaking('A', 'A');
     mgr.handleJoinMatchmaking('B', 'B');
     expect(matchFoundMode('A')).toBe(GAME_MODE_ROTATION[0]);
+  });
+
+  it('FORCE_MODE=gun_game pins fresh matches and rematches to Gun Game', () => {
+    process.env.FORCE_MODE = GameModeType.GUN_GAME;
+
+    mgr.handleJoinMatchmaking('A', 'A');
+    mgr.handleJoinMatchmaking('B', 'B');
+    expect(matchFoundMode('A')).toBe(GameModeType.GUN_GAME);
+
+    endActiveMatch();
+    expect(lastMatchEndNextMode()).toBe(GameModeType.GUN_GAME);
+    sent.length = 0;
+    mgr.handleRematchRequest('A');
+    mgr.handleRematchRequest('B');
+    expect(matchFoundMode('A')).toBe(GameModeType.GUN_GAME);
   });
 
   it('KOTH gameState snapshots carry hill state; DM ones do not', () => {

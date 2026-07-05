@@ -15,6 +15,7 @@ import {
   ABILITY,
   OVERTIME,
   KOTH,
+  GUN_GAME,
   GameModeType,
 } from '@shared/game';
 import type { CharacterId, MapData, PlayerInput, MutatorId } from '@shared/game';
@@ -2428,6 +2429,636 @@ describe('Match', () => {
         expect(m.isOvertime).toBe(true);
         expect(m.getActiveAxes()).toHaveLength(0);
       });
+    });
+  });
+
+  describe('Session 7: punch melee', () => {
+    function startActivePunchMatch(playerCount = 2): Match {
+      const m = createMatch(playerCount);
+      m.startCountdown();
+      m.update(MATCH.COUNTDOWN_DURATION + 0.05);
+      return m;
+    }
+
+    /** Advance the match in small fixed ticks. */
+    function advance(m: Match, seconds: number, step = 0.05): void {
+      let remaining = seconds;
+      while (remaining > 0) {
+        const dt = Math.min(step, remaining);
+        m.update(dt);
+        remaining -= dt;
+      }
+    }
+
+    function equipPunch(m: Match, playerId: string): void {
+      m.players.get(playerId)!.weaponId = 'punch';
+    }
+
+    it('one swing deals ONE flat application per victim, no trails, event with hit:true', () => {
+      const m = startActivePunchMatch();
+      equipPunch(m, 'player-0');
+      const puncher = m.players.get('player-0')!;
+      const victim = m.players.get('player-1')!;
+      puncher.position = { x: 100, y: 100 };
+      // Point-blank on the aim line: several fan rays cross the box, but
+      // the victim must absorb exactly one 60-damage application.
+      victim.position = { x: 150, y: 100 };
+      victim.invulnerableTimer = 0;
+
+      m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+      m.update(0.05);
+
+      expect(victim.health).toBe(victim.maxHealth - WEAPONS.punch.damageMax);
+      expect(m.getTickBulletTrails()).toHaveLength(0);
+      const events = m.getTickPunchEvents();
+      expect(events).toHaveLength(1);
+      expect(events[0]).toEqual({
+        playerId: 'player-0',
+        position: { x: 100, y: 100 },
+        aimAngle: 0,
+        hit: true,
+      });
+      const stats = m.stats.getStats('player-0');
+      expect(stats.shotsFired).toBe(1);
+      expect(stats.shotsHit).toBe(1);
+      expect(stats.damageDealt).toBe(WEAPONS.punch.damageMax);
+    });
+
+    it('a whiff past melee reach emits the event with hit:false and harms nobody', () => {
+      const m = startActivePunchMatch();
+      equipPunch(m, 'player-0');
+      const puncher = m.players.get('player-0')!;
+      const victim = m.players.get('player-1')!;
+      puncher.position = { x: 100, y: 100 };
+      victim.position = { x: 200, y: 100 }; // box face at 88px > 56px reach
+      victim.invulnerableTimer = 0;
+
+      m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+      m.update(0.05);
+
+      expect(victim.health).toBe(victim.maxHealth);
+      // Thrower exclusion: the fan can never hit the puncher themselves.
+      expect(puncher.health).toBe(puncher.maxHealth);
+      const events = m.getTickPunchEvents();
+      expect(events).toHaveLength(1);
+      expect(events[0].hit).toBe(false);
+      const stats = m.stats.getStats('player-0');
+      expect(stats.shotsFired).toBe(1);
+      expect(stats.shotsHit).toBe(0);
+    });
+
+    it('punch events are cleared after one tick, like bullet trails', () => {
+      const m = startActivePunchMatch();
+      equipPunch(m, 'player-0');
+      m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+      m.update(0.05);
+      expect(m.getTickPunchEvents()).toHaveLength(1);
+      m.update(0.05);
+      expect(m.getTickPunchEvents()).toHaveLength(0);
+    });
+
+    it('a wide arc CAN strike two distinct victims in one swing', () => {
+      const m = startActivePunchMatch(3);
+      equipPunch(m, 'player-0');
+      const puncher = m.players.get('player-0')!;
+      const v1 = m.players.get('player-1')!;
+      const v2 = m.players.get('player-2')!;
+      puncher.position = { x: 100, y: 100 };
+      v1.position = { x: 150, y: 100 }; // dead ahead
+      v2.position = { x: 135, y: 135 }; // ~45° into the lower half of the arc
+      v1.invulnerableTimer = 0;
+      v2.invulnerableTimer = 0;
+
+      m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+      m.update(0.05);
+
+      expect(v1.health).toBe(v1.maxHealth - WEAPONS.punch.damageMax);
+      expect(v2.health).toBe(v2.maxHealth - WEAPONS.punch.damageMax);
+      // Still one swing for accuracy purposes.
+      const stats = m.stats.getStats('player-0');
+      expect(stats.shotsFired).toBe(1);
+      expect(stats.shotsHit).toBe(1);
+      expect(stats.damageDealt).toBe(2 * WEAPONS.punch.damageMax);
+    });
+
+    it('walls block the swing (and x-ray does NOT pierce for punches)', () => {
+      const map = makeMapData();
+      // Vertical wall at column 5 (x 240–288).
+      for (let row = 1; row < 9; row++) map.tiles[row][5] = 1;
+      const m = new Match('punch-wall', map, [
+        { id: 'player-0', nickname: 'P0' },
+        { id: 'player-1', nickname: 'P1' },
+      ]);
+      m.setLock('player-0', 'mighty_man');
+      m.setLock('player-1', 'bruce');
+      m.update(0.05);
+      m.update(MATCH.COUNTDOWN_DURATION + 0.05);
+      equipPunch(m, 'player-0');
+      const puncher = m.players.get('player-0')!;
+      const victim = m.players.get('player-1')!;
+      // Victim within melee reach but on the far side of the wall.
+      puncher.position = { x: 230, y: 120 };
+      victim.position = { x: 290, y: 120 };
+      victim.invulnerableTimer = 0;
+
+      // Activate x-ray first: piercing must still not apply to fists.
+      m.queueInput('player-0', makeInput(1, { abilityPressed: true, aimAngle: 0 }));
+      m.update(0.05);
+      expect(puncher.abilityActiveSeconds).toBeGreaterThan(0);
+      m.queueInput('player-0', makeInput(2, { firePressed: true, aimAngle: 0 }));
+      m.update(0.05);
+
+      expect(victim.health).toBe(victim.maxHealth);
+
+      // Control: the same geometry without the wall connects.
+      const open = startActivePunchMatch();
+      equipPunch(open, 'player-0');
+      const oPuncher = open.players.get('player-0')!;
+      const oVictim = open.players.get('player-1')!;
+      oPuncher.position = { x: 230, y: 120 };
+      oVictim.position = { x: 290, y: 120 };
+      oVictim.invulnerableTimer = 0;
+      open.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+      open.update(0.05);
+      expect(oVictim.health).toBe(oVictim.maxHealth - WEAPONS.punch.damageMax);
+    });
+
+    it('the 0.5s swing cooldown gates the next swing', () => {
+      const m = startActivePunchMatch();
+      equipPunch(m, 'player-0');
+      const puncher = m.players.get('player-0')!;
+      const victim = m.players.get('player-1')!;
+      puncher.position = { x: 100, y: 100 };
+      victim.position = { x: 150, y: 100 };
+      victim.invulnerableTimer = 0;
+
+      m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+      m.update(0.05);
+      expect(victim.health).toBe(victim.maxHealth - WEAPONS.punch.damageMax);
+      victim.health = victim.maxHealth;
+
+      // Immediate second swing: still recovering — refused, no event.
+      m.queueInput('player-0', makeInput(2, { firePressed: true, aimAngle: 0 }));
+      m.update(0.05);
+      expect(victim.health).toBe(victim.maxHealth);
+      expect(m.getTickPunchEvents()).toHaveLength(0);
+
+      // After the cooldown the next swing lands.
+      advance(m, WEAPONS.punch.fireCooldown);
+      m.queueInput('player-0', makeInput(3, { firePressed: true, aimAngle: 0 }));
+      m.update(0.05);
+      expect(victim.health).toBe(victim.maxHealth - WEAPONS.punch.damageMax);
+    });
+
+    it("Iron Hide halves punch damage (stats credit the applied amount)", () => {
+      const m = createMatch();
+      m.setLock('player-0', 'mighty_man');
+      m.setLock('player-1', 'bubba');
+      m.update(0.05);
+      m.update(MATCH.COUNTDOWN_DURATION + 0.05);
+      equipPunch(m, 'player-0');
+      const puncher = m.players.get('player-0')!;
+      const bubba = m.players.get('player-1')!;
+      puncher.position = { x: 100, y: 100 };
+      bubba.position = { x: 150, y: 100 };
+      bubba.invulnerableTimer = 0;
+
+      m.queueInput('player-1', makeInput(1, { abilityPressed: true, aimAngle: 0 }));
+      m.update(0.001);
+      expect(bubba.abilityActiveSeconds).toBeGreaterThan(0);
+
+      m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+      m.update(0.001);
+
+      const halved = WEAPONS.punch.damageMax / 2;
+      expect(bubba.maxHealth - bubba.health).toBeCloseTo(halved, 5);
+      expect(m.stats.getStats('player-0').damageDealt).toBeCloseTo(halved, 5);
+    });
+
+    it('a frozen player cannot punch', () => {
+      const m = startActivePunchMatch();
+      equipPunch(m, 'player-0');
+      const puncher = m.players.get('player-0')!;
+      const victim = m.players.get('player-1')!;
+      puncher.position = { x: 100, y: 100 };
+      victim.position = { x: 150, y: 100 };
+      victim.invulnerableTimer = 0;
+      puncher.frozenTimer = 1;
+
+      m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+      m.update(0.05);
+
+      expect(victim.health).toBe(victim.maxHealth);
+      expect(m.getTickPunchEvents()).toHaveLength(0);
+    });
+
+    it('a punch kill is attributed to punch in stats and the kill feed', () => {
+      const m = startActivePunchMatch();
+      equipPunch(m, 'player-0');
+      const puncher = m.players.get('player-0')!;
+      const victim = m.players.get('player-1')!;
+      puncher.position = { x: 100, y: 100 };
+      victim.position = { x: 150, y: 100 };
+      victim.invulnerableTimer = 0;
+      victim.health = 50; // one punch (60) is lethal
+
+      m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+      m.update(0.05);
+
+      expect(victim.isDead).toBe(true);
+      expect(victim.deaths).toBe(1);
+      const stats = m.stats.getStats('player-0');
+      expect(stats.killsByWeapon.punch).toBe(1);
+      expect(stats.kills).toBe(1);
+      const entry = m.getKillFeed().find((e) => e.victimId === 'player-1')!;
+      expect(entry.weapon).toBe('punch');
+    });
+  });
+
+  describe('Session 7: pistol', () => {
+    function startActivePistolMatch(): Match {
+      const m = createMatch();
+      m.startCountdown();
+      m.update(MATCH.COUNTDOWN_DURATION + 0.05);
+      return m;
+    }
+
+    function advance(m: Match, seconds: number, step = 0.05): void {
+      let remaining = seconds;
+      while (remaining > 0) {
+        const dt = Math.min(step, remaining);
+        m.update(dt);
+        remaining -= dt;
+      }
+    }
+
+    /** Put a pistol with a full mag + reserve directly in the player's hands. */
+    function equipPistol(m: Match, playerId: string, reserve = 24): void {
+      const player = m.players.get(playerId)!;
+      player.weaponId = 'pistol';
+      player.specialAmmo = WEAPONS.pistol.magazineSize;
+      player.specialReserve = reserve;
+    }
+
+    it('fires one pistol-tagged trail, decrements specialAmmo, full damage up close', () => {
+      const m = startActivePistolMatch();
+      equipPistol(m, 'player-0');
+      const shooter = m.players.get('player-0')!;
+      const victim = m.players.get('player-1')!;
+      shooter.position = { x: 100, y: 100 };
+      victim.position = { x: 140, y: 100 }; // hit at 28px — inside falloffRangeMin
+      victim.invulnerableTimer = 0;
+
+      m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+      m.update(0.05);
+
+      const trails = m.getTickBulletTrails();
+      expect(trails).toHaveLength(1);
+      expect(trails[0].weaponId).toBe('pistol');
+      expect(shooter.specialAmmo).toBe(WEAPONS.pistol.magazineSize - 1);
+      // Rifle magazine untouched — the pistol has its own pool.
+      expect(shooter.ammo).toBe(WEAPONS.rifle.magazineSize);
+      expect(victim.health).toBe(victim.maxHealth - WEAPONS.pistol.damageMax);
+    });
+
+    it('deals falloff-floor damage at long range', () => {
+      const m = startActivePistolMatch();
+      equipPistol(m, 'player-0');
+      const shooter = m.players.get('player-0')!;
+      const victim = m.players.get('player-1')!;
+      shooter.position = { x: 100, y: 100 };
+      victim.position = { x: 450, y: 100 }; // hit at 338px — past falloffRangeMax
+      victim.invulnerableTimer = 0;
+
+      m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+      m.update(0.05);
+
+      expect(victim.health).toBe(victim.maxHealth - WEAPONS.pistol.damageMin);
+    });
+
+    it('the 0.22s semi-auto cooldown gates the next shot', () => {
+      const m = startActivePistolMatch();
+      equipPistol(m, 'player-0');
+      const shooter = m.players.get('player-0')!;
+
+      m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+      m.update(0.05);
+      expect(shooter.specialAmmo).toBe(WEAPONS.pistol.magazineSize - 1);
+
+      // Immediate re-fire: still pacing — refused.
+      m.queueInput('player-0', makeInput(2, { firePressed: true, aimAngle: 0 }));
+      m.update(0.05);
+      expect(shooter.specialAmmo).toBe(WEAPONS.pistol.magazineSize - 1);
+
+      // Wait out the cooldown, then fire again.
+      advance(m, WEAPONS.pistol.fireCooldown);
+      m.queueInput('player-0', makeInput(3, { firePressed: true, aimAngle: 0 }));
+      m.update(0.05);
+      expect(shooter.specialAmmo).toBe(WEAPONS.pistol.magazineSize - 2);
+    });
+
+    it('never queues a burst — exactly one round per trigger pull', () => {
+      const m = startActivePistolMatch();
+      equipPistol(m, 'player-0');
+      m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+      m.update(0.05);
+      // Run past the rifle burst interval: no follow-up rounds appear.
+      advance(m, 0.5);
+      expect(m.players.get('player-0')!.specialAmmo).toBe(
+        WEAPONS.pistol.magazineSize - 1,
+      );
+    });
+
+    it('auto-reloads from reserve when the mag empties, refusing fire mid-reload', () => {
+      const m = startActivePistolMatch();
+      equipPistol(m, 'player-0', 12);
+      const shooter = m.players.get('player-0')!;
+      shooter.specialAmmo = 1;
+
+      m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+      m.update(0.05);
+
+      expect(shooter.specialAmmo).toBe(0);
+      expect(shooter.isReloading).toBe(true);
+
+      // Firing during the reload is refused.
+      m.queueInput('player-0', makeInput(2, { firePressed: true, aimAngle: 0 }));
+      m.update(0.05);
+      expect(m.getTickBulletTrails()).toHaveLength(0);
+
+      // Reload completes: mag refilled from reserve.
+      advance(m, WEAPONS.pistol.reloadTime);
+      expect(shooter.isReloading).toBe(false);
+      expect(shooter.specialAmmo).toBe(WEAPONS.pistol.magazineSize);
+      expect(shooter.specialReserve).toBe(0);
+    });
+
+    it('reverts to the rifle when the last round is spent with no reserve', () => {
+      const m = startActivePistolMatch();
+      equipPistol(m, 'player-0', 0);
+      const shooter = m.players.get('player-0')!;
+      shooter.specialAmmo = 1;
+
+      m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+      m.update(0.05);
+
+      expect(shooter.weaponId).toBe('rifle');
+      expect(shooter.specialAmmo).toBe(0);
+      expect(shooter.specialReserve).toBe(0);
+    });
+
+    it('a pistol kill is attributed to pistol in stats and the kill feed', () => {
+      const m = startActivePistolMatch();
+      equipPistol(m, 'player-0');
+      const shooter = m.players.get('player-0')!;
+      const victim = m.players.get('player-1')!;
+      shooter.position = { x: 100, y: 100 };
+      victim.position = { x: 140, y: 100 };
+      victim.invulnerableTimer = 0;
+      victim.health = 10;
+
+      m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+      m.update(0.05);
+
+      expect(victim.isDead).toBe(true);
+      const stats = m.stats.getStats('player-0');
+      expect(stats.killsByWeapon.pistol).toBe(1);
+      const entry = m.getKillFeed().find((e) => e.victimId === 'player-1')!;
+      expect(entry.weapon).toBe('pistol');
+    });
+  });
+
+  describe('Session 7: Gun Game mode integration', () => {
+    function makeGunGameMapData(): MapData {
+      return {
+        ...makeMapData(),
+        pickupSpawns: [
+          { x: 5, y: 5, type: 'weapon_shotgun' as const },
+          { x: 3, y: 3, type: 'gun_ammo' as const },
+          { x: 6, y: 6, type: 'grenade' as const },
+          { x: 4, y: 4, type: 'bandage' as const },
+        ],
+      };
+    }
+
+    function startActiveGunGameMatch(rng: () => number = Math.random): Match {
+      const m = new Match(
+        'gg-1',
+        makeGunGameMapData(),
+        [
+          { id: 'player-0', nickname: 'P0' },
+          { id: 'player-1', nickname: 'P1' },
+        ],
+        GameModeType.GUN_GAME,
+        rng,
+      );
+      m.startCountdown();
+      m.update(MATCH.COUNTDOWN_DURATION + 0.05);
+      return m;
+    }
+
+    it('enforces the ladder loadout from score through the real tick', () => {
+      const m = startActiveGunGameMatch();
+      const p0 = m.players.get('player-0')!;
+      expect(p0.weaponId).toBe('rifle'); // rung 0
+
+      p0.score = 2;
+      m.update(0.05);
+      expect(p0.weaponId).toBe('shotgun');
+      expect(p0.specialAmmo).toBe(WEAPONS.shotgun.magazineSize);
+      expect(p0.specialReserve).toBe(GUN_GAME.SHOTGUN_RESERVE_FLOOR);
+
+      p0.score = 8;
+      m.update(0.05);
+      expect(p0.weaponId).toBe('punch');
+    });
+
+    it('gates gun fire on the grenade rung through the input loop; grenades still throw', () => {
+      const m = startActiveGunGameMatch();
+      const p0 = m.players.get('player-0')!;
+      p0.score = 6;
+      m.update(0.05); // rung equip: rifle in hand, pouch filled
+      expect(p0.weaponId).toBe('rifle');
+      expect(p0.grenades).toBe(GRENADE.MAX_COUNT);
+      const magBefore = p0.ammo;
+
+      m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+      m.update(0.05);
+      expect(m.getTickBulletTrails()).toHaveLength(0);
+      expect(p0.ammo).toBe(magBefore);
+
+      // The grenade button is the rung's whole point — still live.
+      m.queueInput('player-0', makeInput(2, { throwPressed: true, aimAngle: 0 }));
+      m.update(0.05);
+      expect(p0.grenades).toBe(GRENADE.MAX_COUNT - 1);
+    });
+
+    it('the first punch-rung kill wins the match immediately', () => {
+      const m = startActiveGunGameMatch();
+      const p0 = m.players.get('player-0')!;
+      const p1 = m.players.get('player-1')!;
+      p0.score = 8;
+      m.update(0.05); // equips the fists
+      expect(p0.weaponId).toBe('punch');
+
+      p0.position = { x: 100, y: 100 };
+      p1.position = { x: 150, y: 100 };
+      p1.invulnerableTimer = 0;
+      p1.health = 50;
+
+      m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+      m.update(0.05);
+
+      expect(p0.score).toBe(9);
+      expect(m.phase).toBe(MatchPhase.ENDED);
+      const result = m.getResult();
+      expect(result.gameMode).toBe(GameModeType.GUN_GAME);
+      expect(result.winnerId).toBe('player-0');
+    });
+
+    it('wrong-weapon kills never advance the ladder through the real kill path', () => {
+      const m = startActiveGunGameMatch();
+      const p0 = m.players.get('player-0')!;
+      const p1 = m.players.get('player-1')!;
+      p0.score = 2; // shotgun rung
+      m.update(0.05);
+
+      // Rifle-tagged kill (e.g. suicide-credit / stale weapon): no advance.
+      m.onKill('player-0', 'player-1', 'gun');
+      expect(p0.score).toBe(2);
+      expect(p1.deaths).toBe(1);
+
+      // Ability kill: no advance either.
+      m.onKill('player-0', 'player-1', 'axe');
+      expect(p0.score).toBe(2);
+    });
+
+    it('timer expiry crowns the ladder leader', () => {
+      const m = startActiveGunGameMatch();
+      m.players.get('player-0')!.score = 3;
+      m.players.get('player-1')!.score = 1;
+      m.matchTimer = 0.01;
+      m.update(0.05);
+
+      expect(m.phase).toBe(MatchPhase.ENDED);
+      expect(m.getResult().winnerId).toBe('player-0');
+    });
+
+    it('a tie at expiry enters overtime, rung weapons come back, scoring stays frozen', () => {
+      const m = startActiveGunGameMatch();
+      const p0 = m.players.get('player-0')!;
+      const p1 = m.players.get('player-1')!;
+      p0.score = 4;
+      p1.score = 4;
+      m.matchTimer = 0.01;
+      m.update(0.05);
+      expect(m.isOvertime).toBe(true);
+
+      // The overtime reset put everyone on the rifle; the mode re-equips
+      // the pistol rung within a tick.
+      m.update(0.05);
+      expect(p0.weaponId).toBe('pistol');
+      expect(p1.weaponId).toBe('pistol');
+      expect(p0.specialAmmo).toBe(WEAPONS.pistol.magazineSize);
+
+      // An overtime kill decides the duel but never moves the ladder.
+      m.onKill('player-0', 'player-1', 'pistol');
+      expect(p0.score).toBe(4);
+      m.update(0.05);
+      expect(m.phase).toBe(MatchPhase.ENDED);
+      expect(m.getResult().winnerId).toBe('player-0');
+    });
+
+    it('spawns only bandage pickups and never announces the shotgun', () => {
+      const m = startActiveGunGameMatch();
+      const pickups = m.pickupManager.getPickups();
+      expect(pickups).toHaveLength(1);
+      expect(pickups[0].type).toBe('bandage');
+
+      // Run past the weapon respawn window: no INCOMING warning can fire
+      // because the shotgun pickup was never created.
+      let warnings = 0;
+      let remaining = PICKUP.WEAPON_RESPAWN_TIME + 1;
+      while (remaining > 0) {
+        m.update(0.1);
+        warnings += m.consumeTickWeaponIncoming().length;
+        remaining -= 0.1;
+      }
+      expect(warnings).toBe(0);
+
+      // Control: the same map in deathmatch spawns all four.
+      const dm = new Match('gg-dm', makeGunGameMapData(), [
+        { id: 'player-0', nickname: 'P0' },
+        { id: 'player-1', nickname: 'P1' },
+      ]);
+      expect(dm.pickupManager.getPickups()).toHaveLength(4);
+    });
+
+    describe('mutator roll exclusion', () => {
+      type MatchInternals = {
+        matchTimer: number;
+        midMatchSlot: { activateAtElapsed: number };
+      };
+
+      it('neither roll can pick grenades_only or infinite_ammo, for any rng value', () => {
+        // Sweep constant rng values across [0, 1): every candidate index
+        // for both slots gets exercised.
+        for (let k = 0; k < 16; k++) {
+          const rng = () => k / 16 + 0.0001;
+          const m = startActiveGunGameMatch(rng);
+          const internals = m as unknown as MatchInternals;
+
+          // Fire the mid-match slot (warning + start on one tick)...
+          internals.midMatchSlot.activateAtElapsed = 80;
+          internals.matchTimer = MATCH.TIME_LIMIT - 80.1;
+          m.update(0.05);
+          // ...then the final-minute slot the same way.
+          internals.matchTimer = MUTATORS.ACTIVATION_AT_REMAINING - 0.01;
+          m.update(0.05);
+
+          expect(m.activeMutators).toHaveLength(2);
+          expect(m.activeMutators).not.toContain('grenades_only');
+          expect(m.activeMutators).not.toContain('infinite_ammo');
+        }
+      });
+
+      it('FORCE_EVENT still pins an excluded mutator (smoke tool bypass)', () => {
+        process.env.FORCE_EVENT = 'grenades_only';
+        try {
+          const m = startActiveGunGameMatch(() => 0.0001);
+          const internals = m as unknown as MatchInternals;
+          internals.midMatchSlot.activateAtElapsed = Number.POSITIVE_INFINITY;
+          internals.matchTimer = MUTATORS.ACTIVATION_AT_REMAINING - 0.01;
+          m.update(0.05);
+          expect(m.activeMutators).toEqual(['grenades_only']);
+        } finally {
+          delete process.env.FORCE_EVENT;
+        }
+      });
+    });
+  });
+
+  describe('FORCE_MATCH_SECONDS smoke pin', () => {
+    it('overrides regulation length when set to a positive number', () => {
+      process.env.FORCE_MATCH_SECONDS = '360';
+      try {
+        const m = createMatch();
+        expect(m.getTimeLimit()).toBe(360);
+      } finally {
+        delete process.env.FORCE_MATCH_SECONDS;
+      }
+    });
+
+    it('ignores invalid values and keeps MATCH.TIME_LIMIT', () => {
+      for (const bad of ['0', '-5', 'soon', '']) {
+        process.env.FORCE_MATCH_SECONDS = bad;
+        try {
+          const m = createMatch();
+          expect(m.getTimeLimit()).toBe(MATCH.TIME_LIMIT);
+        } finally {
+          delete process.env.FORCE_MATCH_SECONDS;
+        }
+      }
     });
   });
 });

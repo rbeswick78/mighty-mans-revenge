@@ -1,5 +1,5 @@
 import { GameModeType } from '@shared/game';
-import type { PlayerId, MatchResult } from '@shared/game';
+import type { PlayerId, MatchResult, KillWeapon } from '@shared/game';
 import { computeAwards } from '../awards.js';
 import type { GameMode, MatchContext } from './game-mode.js';
 
@@ -12,7 +12,12 @@ export class DeathmatchMode implements GameMode {
     // Deathmatch has no per-tick mode-specific logic
   }
 
-  onKill(match: MatchContext, killerId: PlayerId, _victimId: PlayerId): void {
+  onKill(
+    match: MatchContext,
+    killerId: PlayerId,
+    _victimId: PlayerId,
+    _weapon: KillWeapon,
+  ): void {
     const player = match.players.get(killerId);
     if (player) {
       player.score++;

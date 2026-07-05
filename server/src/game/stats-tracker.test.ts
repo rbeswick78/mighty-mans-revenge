@@ -147,7 +147,15 @@ describe('StatsTracker', () => {
       tracker.recordKill('p1', 'p2', 'fire');
 
       const s = tracker.getStats('p1');
-      expect(s.killsByWeapon).toEqual({ gun: 1, grenade: 0, fire: 1, shotgun: 2, axe: 0 });
+      expect(s.killsByWeapon).toEqual({
+        gun: 1,
+        grenade: 0,
+        fire: 1,
+        shotgun: 2,
+        axe: 0,
+        pistol: 0,
+        punch: 0,
+      });
       expect(s.kills).toBe(4);
     });
   });
@@ -197,7 +205,15 @@ describe('StatsTracker', () => {
       expect(stats.damageDealt).toBe(0);
       expect(stats.damageTaken).toBe(0);
       expect(stats.grenadesThrown).toBe(0);
-      expect(stats.killsByWeapon).toEqual({ gun: 0, grenade: 0, fire: 0, shotgun: 0, axe: 0 });
+      expect(stats.killsByWeapon).toEqual({
+        gun: 0,
+        grenade: 0,
+        fire: 0,
+        shotgun: 0,
+        axe: 0,
+        pistol: 0,
+        punch: 0,
+      });
       expect(stats.longestKillStreak).toBe(0);
       expect(stats.distanceTraveled).toBe(0);
     });

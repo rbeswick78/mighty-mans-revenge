@@ -513,6 +513,54 @@ describe('CombatManager', () => {
     });
   });
 
+  describe('processShot — maxRange (punch melee reach)', () => {
+    /**
+     * A 24px-hitbox victim whose near face sits `edgeDistance` px from the
+     * shooter along the +x ray (victim center = edgeDistance + half 12).
+     */
+    function punchAt(edgeDistance: number): boolean {
+      const shooter = createPlayer({ id: 'shooter', position: { x: 100, y: 100 } });
+      const victim = createPlayer({
+        id: 'victim',
+        position: { x: 100 + edgeDistance + 12, y: 100 },
+      });
+      const players = new Map<PlayerId, PlayerState>([
+        ['shooter', shooter],
+        ['victim', victim],
+      ]);
+      return combat.processShot(
+        'shooter',
+        0,
+        players,
+        createOpenGrid(),
+        undefined,
+        false,
+        'punch',
+      ).hit;
+    }
+
+    it('a punch ray connects at or inside maxRange (56px)', () => {
+      expect(punchAt(WEAPONS.punch.maxRange - 2)).toBe(true);
+    });
+
+    it('a punch ray cannot connect past maxRange', () => {
+      // One px past melee reach. Without the maxRange cap, the ray would
+      // extend to falloffRangeMax * 2 = 112px and this would hit.
+      expect(punchAt(WEAPONS.punch.maxRange + 1)).toBe(false);
+    });
+
+    it('control: the rifle (no maxRange) still reaches past 56px', () => {
+      const shooter = createPlayer({ id: 'shooter', position: { x: 100, y: 100 } });
+      const victim = createPlayer({ id: 'victim', position: { x: 100 + 57 + 12, y: 100 } });
+      const players = new Map<PlayerId, PlayerState>([
+        ['shooter', shooter],
+        ['victim', victim],
+      ]);
+      const result = combat.processShot('shooter', 0, players, createOpenGrid());
+      expect(result.hit).toBe(true);
+    });
+  });
+
   describe('thrown axes (Jack)', () => {
     const AXE_SPEED = ABILITY.JACK_AXE_THROW.SPEED;
     const AXE_RANGE = ABILITY.JACK_AXE_THROW.RANGE_TILES * 48;

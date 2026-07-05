@@ -74,7 +74,15 @@ describe('PersistentStatsStore', () => {
     expect(ryan.losses).toBe(1);
     expect(ryan.draws).toBe(0);
     expect(ryan.matches).toBe(2);
-    expect(ryan.weaponKills).toEqual({ gun: 7, grenade: 5, fire: 0, shotgun: 3, axe: 0 });
+    expect(ryan.weaponKills).toEqual({
+      gun: 7,
+      grenade: 5,
+      fire: 0,
+      shotgun: 3,
+      axe: 0,
+      pistol: 0,
+      punch: 0,
+    });
     expect(ryan.nickname).toBe('Ryan');
   });
 
@@ -160,6 +168,54 @@ describe('PersistentStatsStore', () => {
     ) as { version: number; headToHead: Record<string, unknown> };
     expect(file.version).toBe(1);
     expect(Object.keys(file.headToHead)).toEqual(['amy|zed']);
+  });
+
+  it('defaults weaponKills keys missing from an older file to 0 (pistol/punch back-compat)', () => {
+    // Hand-built file in the shape written BEFORE 'pistol'/'punch' joined
+    // KILL_WEAPONS — their keys are absent from weaponKills entirely.
+    const oldShape = {
+      version: 1,
+      players: {
+        ryan: {
+          nickname: 'Ryan',
+          kills: 12,
+          deaths: 9,
+          wins: 2,
+          losses: 1,
+          draws: 0,
+          matches: 3,
+          weaponKills: { gun: 7, grenade: 2, fire: 1, shotgun: 2, axe: 0 },
+        },
+      },
+      headToHead: {},
+    };
+    writeFileSync(
+      path.join(dataDir, 'persistent-stats.json'),
+      JSON.stringify(oldShape),
+      'utf8',
+    );
+
+    const store = makeStore();
+    const ryan = store.getLifetime('Ryan')!;
+    // Old keys preserved, new keys defaulted — the full KillWeapon record.
+    expect(ryan.weaponKills).toEqual({
+      gun: 7,
+      grenade: 2,
+      fire: 1,
+      shotgun: 2,
+      axe: 0,
+      pistol: 0,
+      punch: 0,
+    });
+
+    // Accumulating a new-era match on top of the migrated record works.
+    store.recordMatch(
+      [entry('Ryan', 3, 0, { pistol: 2, punch: 1 }), entry('Dave', 0, 3)],
+      'Ryan',
+    );
+    expect(store.getLifetime('Ryan')!.weaponKills.pistol).toBe(2);
+    expect(store.getLifetime('Ryan')!.weaponKills.punch).toBe(1);
+    expect(store.getLifetime('Ryan')!.weaponKills.gun).toBe(7);
   });
 
   it('starts fresh on a corrupt file without throwing', () => {

@@ -16,6 +16,7 @@ import {
   characterHitbox,
   characterMaxHealth,
   computePelletAngles,
+  evenFanAngles,
   playerMovementModifiers,
   rayIntersectsAABB,
   TileType,
@@ -30,6 +31,7 @@ import type {
   KillFeedEntry,
   KillWeapon,
   BulletTrail,
+  PunchEvent,
   AxeState,
   GrenadeState,
   MutatorId,
@@ -102,6 +104,8 @@ export class Match implements MatchContext {
   private rttForShooter: (playerId: PlayerId) => number = () => 0;
   /** Recent bullet trails from this tick, cleared after broadcast. */
   private tickBulletTrails: BulletTrail[] = [];
+  /** Punch swings resolved this tick, cleared after broadcast (like trails). */
+  private tickPunchEvents: PunchEvent[] = [];
   /** Kills recorded this tick, cleared after broadcast. */
   private tickKillFeedEntries: KillFeedEntry[] = [];
   /** Pickups collected this tick, cleared after broadcast. */
@@ -113,10 +117,12 @@ export class Match implements MatchContext {
   /** Active 3-shot bursts in flight, keyed by player. */
   private pendingBursts: Map<PlayerId, PendingBurst> = new Map();
   /**
-   * Seconds until each player can pump the shotgun again. Only present
-   * (and > 0) between shotgun shots; server-internal, like pendingBursts.
+   * Seconds until each player can pull the trigger again — the shotgun's
+   * pump-racking, the pistol's semi-auto pacing, and the punch's swing
+   * recovery all ride this one map. Only present (and > 0) between
+   * shots; server-internal, like pendingBursts.
    */
-  private rackingTimers: Map<PlayerId, number> = new Map();
+  private fireCooldownTimers: Map<PlayerId, number> = new Map();
   /** Weapon-incoming warnings generated this tick, cleared after broadcast. */
   private tickWeaponIncoming: Array<{ weaponId: WeaponId; landsInMs: number }> = [];
   /**
@@ -191,6 +197,16 @@ export class Match implements MatchContext {
   private _tickMutatorStarts: Array<{ event: MutatorId; isFinalMinute: boolean }> = [];
   /** Injected RNG for mutator timing/selection — defaults to Math.random, override in tests. */
   private readonly rng: () => number;
+  /**
+   * Regulation length in seconds — MATCH.TIME_LIMIT unless the
+   * FORCE_MATCH_SECONDS env smoke pin overrides it (same family as
+   * FORCE_MODE / FORCE_MAP / FORCE_EVENT: manual-smoke tooling for
+   * reaching long-tail states — late Gun Game rungs, timeouts, overtime —
+   * without playing full-length matches). The client needs no matching
+   * override: its clock re-anchors from server snapshots every tick.
+   * Music/timer sync is knowingly off while pinned.
+   */
+  private readonly timeLimitSeconds: number;
 
   constructor(
     matchId: string,
@@ -201,6 +217,7 @@ export class Match implements MatchContext {
   ) {
     this.matchId = matchId;
     this.rng = rng;
+    this.timeLimitSeconds = resolveTimeLimitSeconds();
     this.stats = new StatsTracker();
     this.pickupManager = new PickupManager();
     this.mapManager = new MapManager();
@@ -208,7 +225,12 @@ export class Match implements MatchContext {
     this.gameMode = getGameMode(gameModeType);
 
     this.mapManager.loadMap(mapData);
-    this.pickupManager.initFromMap(mapData);
+    // Modes can veto whole pickup categories (Gun Game: everything but
+    // bandages) — filtered spawns never exist, so they never announce.
+    this.pickupManager.initFromMap(
+      mapData,
+      (type) => this.gameMode.isPickupTypeEnabled?.(type) ?? true,
+    );
 
     const spawns = this.mapManager.pickInitialSpawns(playerEntries.length, this.rng);
     // Default-hover assignment: as we iterate over players in insertion order,
@@ -427,7 +449,7 @@ export class Match implements MatchContext {
     this.stats.recordKill(killerId, victimId, weapon);
     this.stats.recordDeath(victimId);
 
-    this.gameMode.onKill(this, killerId, victimId);
+    this.gameMode.onKill(this, killerId, victimId, weapon);
 
     // Sudden death: the first kill decides the match. checkMatchEnd ends
     // it later this same tick, so the victim never sits dead-unrespawnable
@@ -453,10 +475,10 @@ export class Match implements MatchContext {
       }
     }
 
-    // Cancel any in-flight burst / pump-racking for the killed player, and
-    // drop their special weapon — death costs you the shotgun.
+    // Cancel any in-flight burst / fire-cooldown for the killed player,
+    // and drop their special weapon — death costs you the shotgun.
     this.pendingBursts.delete(victimId);
-    this.rackingTimers.delete(victimId);
+    this.fireCooldownTimers.delete(victimId);
     if (victim && victim.weaponId !== 'rifle') {
       victim.weaponId = 'rifle';
       victim.specialAmmo = 0;
@@ -526,15 +548,15 @@ export class Match implements MatchContext {
    */
   private enterOvertime(): void {
     this.isOvertime = true;
-    this.regulationElapsedAtOvertime = MATCH.TIME_LIMIT - this.matchTimer;
+    this.regulationElapsedAtOvertime = this.timeLimitSeconds - this.matchTimer;
     this.matchTimer = OVERTIME.DURATION;
     for (const player of this.players.values()) {
       this.respawnPlayer(player);
     }
     // Nothing from regulation may decide the duel: no in-flight bursts,
-    // pump-racking, live grenades, or thrown axes carry over.
+    // fire cooldowns, live grenades, or thrown axes carry over.
     this.pendingBursts.clear();
-    this.rackingTimers.clear();
+    this.fireCooldownTimers.clear();
     this.combatManager.clearGrenades();
     this.combatManager.clearAxes();
     this._tickOvertimeStart = { overtimeEndsInMs: OVERTIME.DURATION * 1000 };
@@ -562,11 +584,22 @@ export class Match implements MatchContext {
   }
 
   getTimeLimit(): number {
-    return MATCH.TIME_LIMIT;
+    return this.timeLimitSeconds;
   }
 
   getMapData(): MapData {
     return this.mapManager.getMapData();
+  }
+
+  /**
+   * Clear a player's pending burst and fire-cooldown timer. Part of
+   * MatchContext: modes call it when they swap a player's weapon out from
+   * under them (Gun Game rung changes) so stale fire state can't leak
+   * onto the new weapon.
+   */
+  clearWeaponTransients(playerId: PlayerId): void {
+    this.pendingBursts.delete(playerId);
+    this.fireCooldownTimers.delete(playerId);
   }
 
   /**
@@ -576,7 +609,7 @@ export class Match implements MatchContext {
   getElapsedSeconds(): number {
     return this.isOvertime
       ? this.regulationElapsedAtOvertime + (OVERTIME.DURATION - this.matchTimer)
-      : MATCH.TIME_LIMIT - this.matchTimer;
+      : this.timeLimitSeconds - this.matchTimer;
   }
 
   /**
@@ -603,6 +636,11 @@ export class Match implements MatchContext {
   /** Bullet trails created in the most recent tick, for broadcasting. */
   getTickBulletTrails(): BulletTrail[] {
     return this.tickBulletTrails;
+  }
+
+  /** Punch swings resolved in the most recent tick, for broadcasting. */
+  getTickPunchEvents(): PunchEvent[] {
+    return this.tickPunchEvents;
   }
 
   /** Kill-feed entries recorded during the most recent tick, for broadcasting. */
@@ -679,7 +717,7 @@ export class Match implements MatchContext {
     if (this.countdownTimer <= 0) {
       this.countdownTimer = 0;
       this.phase = MatchPhase.ACTIVE;
-      this.matchTimer = MATCH.TIME_LIMIT;
+      this.matchTimer = this.timeLimitSeconds;
       this._matchStartTimeMs = Date.now();
       // Roll the mid-match mutator's activation time now, from the
       // injectable rng so tests can pin it: uniform inside the
@@ -687,7 +725,7 @@ export class Match implements MatchContext {
       const windowSpan =
         MUTATORS.MIDMATCH_MAX_ELAPSED_FRACTION - MUTATORS.MIDMATCH_MIN_ELAPSED_FRACTION;
       this.midMatchSlot.activateAtElapsed =
-        MATCH.TIME_LIMIT *
+        this.timeLimitSeconds *
         (MUTATORS.MIDMATCH_MIN_ELAPSED_FRACTION + this.rng() * windowSpan);
       this.gameMode.onStart(this);
     }
@@ -702,6 +740,7 @@ export class Match implements MatchContext {
     // Clear last tick's bullet trails — only trails from THIS tick are
     // broadcast in the next gameState message.
     this.tickBulletTrails = [];
+    this.tickPunchEvents = [];
     this.tickKillFeedEntries = [];
     this.tickPickupCollections = [];
     this.tickDestroyedTiles = [];
@@ -815,43 +854,42 @@ export class Match implements MatchContext {
         player.aimAngle = input.aimAngle;
 
         // Reload — gated off during infinite_ammo (mag is always full).
-        // Reloads apply to whichever weapon is in hand: the shotgun tops
-        // its 2-shell magazine up from reserve, the rifle refills outright.
+        // Reloads apply to whichever weapon is in hand: special weapons
+        // (shotgun/pistol) top their magazine up from reserve, the rifle
+        // refills outright. Fists have nothing to reload.
         if (!infiniteAmmo && input.reload && !player.isReloading) {
-          if (player.weaponId === 'shotgun') {
+          if (this.usesSpecialAmmo(player.weaponId)) {
+            const held = WEAPONS[player.weaponId];
             if (
-              player.specialAmmo < WEAPONS.shotgun.magazineSize &&
+              player.specialAmmo < held.magazineSize &&
               player.specialReserve > 0
             ) {
               player.isReloading = true;
-              player.reloadTimer = WEAPONS.shotgun.reloadTime;
+              player.reloadTimer = held.reloadTime;
             }
-          } else if (player.ammo < WEAPONS.rifle.magazineSize) {
+          } else if (
+            player.weaponId === 'rifle' &&
+            player.ammo < WEAPONS.rifle.magazineSize
+          ) {
             player.isReloading = true;
             player.reloadTimer = WEAPONS.rifle.reloadTime;
           }
         }
 
-        // Fire on the LMB-release edge. During grenades_only all guns are
-        // disabled entirely.
-        if (!grenadesOnly && input.firePressed) {
+        // Fire on the LMB-release edge, routed by the weapon in hand.
+        // During grenades_only — or when the mode gates guns (Gun Game's
+        // grenade rung) — all weapon fire is disabled entirely; grenade
+        // throws stay live. Checked per input because a kill earlier in
+        // this drain can advance the player onto a gated rung.
+        const gunsDisabled =
+          grenadesOnly || (this.gameMode.areGunsDisabled?.(this, player) ?? false);
+        if (!gunsDisabled && input.firePressed) {
           if (player.weaponId === 'shotgun') {
             this.tryFireShotgun(player, input, grid, infiniteAmmo);
+          } else if (player.weaponId === 'punch') {
+            this.tryPunch(player, input, grid);
           } else {
-            // Rifle: start a burst. Refuse if the player is already
-            // mid-burst, reloading, or out of ammo.
-            const alreadyBursting = this.pendingBursts.has(playerId);
-            if (!alreadyBursting && !player.isReloading && player.ammo > 0) {
-              this.fireOneShot(playerId, input.aimAngle, grid);
-              // Queue the remaining shots if the burst has more than one round.
-              if (WEAPONS.rifle.burstSize > 1) {
-                this.pendingBursts.set(playerId, {
-                  shotsRemaining: WEAPONS.rifle.burstSize - 1,
-                  nextShotIn: WEAPONS.rifle.burstInterval,
-                  lockedAngle: input.aimAngle,
-                });
-              }
-            }
+            this.tryFireHitscan(player, input, grid);
           }
         }
 
@@ -898,13 +936,14 @@ export class Match implements MatchContext {
     // Advance any pending bursts.
     this.advanceBursts(dt, grid);
 
-    // Tick down shotgun pump-racking timers.
-    for (const [playerId, remaining] of this.rackingTimers) {
+    // Tick down per-player fire-cooldown timers (shotgun pump-racking,
+    // pistol semi-auto pacing, punch swing recovery).
+    for (const [playerId, remaining] of this.fireCooldownTimers) {
       const next = remaining - dt;
       if (next <= 0) {
-        this.rackingTimers.delete(playerId);
+        this.fireCooldownTimers.delete(playerId);
       } else {
-        this.rackingTimers.set(playerId, next);
+        this.fireCooldownTimers.set(playerId, next);
       }
     }
 
@@ -943,16 +982,17 @@ export class Match implements MatchContext {
 
     // Reload timers — short-circuited under infinite_ammo so the mag is
     // never empty and reloads can never start. Infinite ammo applies to
-    // whichever weapon is in hand: a shotgun holder keeps a full 2-shell
-    // mag (and therefore never auto-reverts) for the rest of the match.
+    // whichever weapon is in hand: any special-weapon holder keeps a
+    // full mag (and therefore never auto-reverts) for the rest of the
+    // match. The punch has no ammo, so nothing to top up.
     const infiniteAmmoActive = this.mutatorActive('infinite_ammo');
     for (const player of this.players.values()) {
       if (infiniteAmmoActive) {
         player.isReloading = false;
         player.reloadTimer = 0;
         player.ammo = WEAPONS.rifle.magazineSize;
-        if (player.weaponId === 'shotgun') {
-          player.specialAmmo = WEAPONS.shotgun.magazineSize;
+        if (this.usesSpecialAmmo(player.weaponId)) {
+          player.specialAmmo = WEAPONS[player.weaponId].magazineSize;
         }
         continue;
       }
@@ -961,9 +1001,9 @@ export class Match implements MatchContext {
         if (player.reloadTimer <= 0) {
           player.isReloading = false;
           player.reloadTimer = 0;
-          if (player.weaponId === 'shotgun') {
+          if (this.usesSpecialAmmo(player.weaponId)) {
             const take = Math.min(
-              WEAPONS.shotgun.magazineSize - player.specialAmmo,
+              WEAPONS[player.weaponId].magazineSize - player.specialAmmo,
               player.specialReserve,
             );
             player.specialAmmo += take;
@@ -1052,7 +1092,7 @@ export class Match implements MatchContext {
             // Auto-equip side effects that live on Match: stop any rifle
             // burst mid-flight and clear a stale racking timer.
             this.pendingBursts.delete(player.id);
-            this.rackingTimers.delete(player.id);
+            this.fireCooldownTimers.delete(player.id);
           }
         }
       }
@@ -1104,13 +1144,76 @@ export class Match implements MatchContext {
   }
 
   /**
+   * Whether a weapon rides the special-weapon ammo slot
+   * (specialAmmo/specialReserve). The rifle has its own pool and the
+   * punch has no ammo at all (magazineSize 0).
+   */
+  private usesSpecialAmmo(weaponId: WeaponId): boolean {
+    return weaponId !== 'rifle' && WEAPONS[weaponId].magazineSize > 0;
+  }
+
+  /**
+   * Fire the player's single-projectile hitscan weapon (rifle or pistol)
+   * on a trigger pull. Refuses while mid-burst, cooling down between
+   * semi-auto shots, reloading, or with an empty magazine. The rifle
+   * starts its multi-round burst here; semi-auto weapons (burstSize 1)
+   * get post-shot handling that mirrors the shotgun blast — pacing
+   * cooldown, auto-reload on an empty mag, revert when completely dry.
+   */
+  private tryFireHitscan(
+    player: PlayerState,
+    input: PlayerInput,
+    grid: ReturnType<MapManager['getCollisionGrid']>,
+  ): void {
+    const weaponId = player.weaponId;
+    if (weaponId !== 'rifle' && weaponId !== 'pistol') return;
+    const weapon = WEAPONS[weaponId];
+
+    const coolingDown = (this.fireCooldownTimers.get(player.id) ?? 0) > 0;
+    const alreadyBursting = this.pendingBursts.has(player.id);
+    const magazine = weaponId === 'rifle' ? player.ammo : player.specialAmmo;
+    if (coolingDown || alreadyBursting || player.isReloading || magazine <= 0) return;
+
+    this.fireOneShot(player.id, input.aimAngle, grid, weaponId);
+
+    if (weapon.burstSize > 1) {
+      // Queue the remaining shots of the burst (rifle).
+      this.pendingBursts.set(player.id, {
+        shotsRemaining: weapon.burstSize - 1,
+        nextShotIn: weapon.burstInterval,
+        lockedAngle: input.aimAngle,
+      });
+      return;
+    }
+
+    // Semi-auto (pistol) post-shot handling, mirroring the shotgun.
+    if (weaponId !== 'pistol') return;
+    if (player.specialAmmo > 0) {
+      // Rounds left in the mag — pace the next trigger pull.
+      this.fireCooldownTimers.set(player.id, weapon.fireCooldown);
+    } else if (player.specialReserve > 0) {
+      // Mag empty, reserve remains — auto-reload (no switch key exists,
+      // so the player should never be stuck holding an unusable weapon).
+      player.isReloading = true;
+      player.reloadTimer = weapon.reloadTime;
+    } else if (!this.mutatorActive('infinite_ammo')) {
+      // Completely dry: the pistol vanishes and the rifle comes back out.
+      this.revertToRifle(player);
+    }
+  }
+
+  /**
    * Fire one round at the given angle from the player's current position.
-   * Records the shot, decrements ammo, and applies damage.
+   * Records the shot, decrements the weapon's magazine, and applies
+   * damage. Used by both hitscan weapons: the rifle (its own ammo pool,
+   * also for subsequent burst rounds via advanceBursts) and the pistol
+   * (the special-weapon slot).
    */
   private fireOneShot(
     playerId: PlayerId,
     aimAngle: number,
     grid: ReturnType<MapManager['getCollisionGrid']>,
+    weaponId: 'rifle' | 'pistol' = 'rifle',
   ): void {
     const player = this.players.get(playerId);
     if (!player) return;
@@ -1132,12 +1235,16 @@ export class Match implements MatchContext {
       grid,
       rtt,
       piercing,
-      'rifle',
+      weaponId,
       this.hitValidationScale(),
     );
     this.tickBulletTrails.push(shot.trail);
     if (!this.mutatorActive('infinite_ammo')) {
-      player.ammo = Math.max(0, player.ammo - 1);
+      if (weaponId === 'rifle') {
+        player.ammo = Math.max(0, player.ammo - 1);
+      } else {
+        player.specialAmmo = Math.max(0, player.specialAmmo - 1);
+      }
     }
     this.stats.recordShot(playerId);
 
@@ -1150,10 +1257,81 @@ export class Match implements MatchContext {
         this.stats.recordDamage(playerId, result.damageApplied);
         this.applyVampireHeal(playerId, shot.victimId, result.damageApplied);
         if (result.killed && result.entry) {
-          this.onKill(playerId, shot.victimId, 'gun');
+          this.onKill(playerId, shot.victimId, weaponId === 'rifle' ? 'gun' : weaponId);
         }
       }
     }
+  }
+
+  /**
+   * Swing the fists: pelletCount deterministic even-fan rays across the
+   * punch arc (no jitter — a jittered fan could gap past a hitbox at
+   * melee range), each validated against a single lag-comp rewind
+   * snapshot like a shotgun blast, with WEAPONS.punch.maxRange capping
+   * the reach. Every victim takes ONE flat damage application no matter
+   * how many rays cross their box; a wide arc CAN strike several
+   * distinct victims. Refuses while the swing cooldown runs or a rifle
+   * burst is somehow still in flight. Punches never pierce walls —
+   * Mighty Man's x-ray applies to bullets, not fists.
+   *
+   * Accuracy bookkeeping mirrors the shotgun: one swing = one shot
+   * fired, one hit if anyone was struck. No bullet trails — a one-shot
+   * PunchEvent rides this tick's gameState instead, driving swing anims
+   * and SFX on every client.
+   */
+  private tryPunch(
+    player: PlayerState,
+    input: PlayerInput,
+    grid: ReturnType<MapManager['getCollisionGrid']>,
+  ): void {
+    const punch = WEAPONS.punch;
+    const coolingDown = (this.fireCooldownTimers.get(player.id) ?? 0) > 0;
+    if (coolingDown || this.pendingBursts.has(player.id)) return;
+
+    const angles = evenFanAngles(input.aimAngle, punch.pelletCount, punch.spreadAngle);
+    const rtt = this.rttForShooter(player.id);
+    const shots = this.lagCompensator.processMultiShotWithRewind(
+      player.id,
+      angles,
+      this.players,
+      grid,
+      rtt,
+      false, // walls always block a punch
+      'punch',
+      this.hitValidationScale(),
+    );
+
+    this.stats.recordShot(player.id);
+    const struckVictims = new Set<PlayerId>();
+
+    for (const shot of shots) {
+      if (!shot.hit || !shot.victimId || shot.damage === undefined) continue;
+      // One damage application per victim per swing, however many rays
+      // crossed their box.
+      if (struckVictims.has(shot.victimId)) continue;
+      const victim = this.players.get(shot.victimId);
+      if (!victim || victim.isDead) continue;
+      struckVictims.add(shot.victimId);
+      const result = this.combatManager.applyDamage(victim, shot.damage, player.id);
+      // damageApplied, not shot.damage — Iron Hide may have halved it.
+      this.stats.recordDamage(player.id, result.damageApplied);
+      this.applyVampireHeal(player.id, shot.victimId, result.damageApplied);
+      if (result.killed) {
+        this.onKill(player.id, shot.victimId, 'punch');
+      }
+    }
+
+    if (struckVictims.size > 0) {
+      this.stats.recordHit(player.id);
+    }
+
+    this.fireCooldownTimers.set(player.id, punch.fireCooldown);
+    this.tickPunchEvents.push({
+      playerId: player.id,
+      position: { x: player.position.x, y: player.position.y },
+      aimAngle: input.aimAngle,
+      hit: struckVictims.size > 0,
+    });
   }
 
   /**
@@ -1174,7 +1352,7 @@ export class Match implements MatchContext {
     infiniteAmmo: boolean,
   ): void {
     const shotgun = WEAPONS.shotgun;
-    const racking = (this.rackingTimers.get(player.id) ?? 0) > 0;
+    const racking = (this.fireCooldownTimers.get(player.id) ?? 0) > 0;
     if (racking || player.isReloading || player.specialAmmo <= 0) return;
 
     const angles = computePelletAngles(
@@ -1229,7 +1407,7 @@ export class Match implements MatchContext {
 
     if (player.specialAmmo > 0) {
       // Shells left in the mag — pump before the next shot.
-      this.rackingTimers.set(player.id, shotgun.fireCooldown);
+      this.fireCooldownTimers.set(player.id, shotgun.fireCooldown);
     } else if (player.specialReserve > 0) {
       // Mag empty, reserve remains — auto-reload (no switch key exists,
       // so the player should never be stuck holding an unusable weapon).
@@ -1251,7 +1429,7 @@ export class Match implements MatchContext {
     player.weaponId = 'rifle';
     player.specialAmmo = 0;
     player.specialReserve = 0;
-    this.rackingTimers.delete(player.id);
+    this.fireCooldownTimers.delete(player.id);
     player.isReloading = false;
     player.reloadTimer = 0;
     if (player.ammo <= 0) {
@@ -1319,7 +1497,7 @@ export class Match implements MatchContext {
     player.weaponId = 'rifle';
     player.specialAmmo = 0;
     player.specialReserve = 0;
-    this.rackingTimers.delete(player.id);
+    this.fireCooldownTimers.delete(player.id);
     player.stamina = PLAYER.SPRINT_DURATION;
     // During grenades_only, top up to MAX so respawning isn't a death sentence.
     player.grenades =
@@ -1381,7 +1559,7 @@ export class Match implements MatchContext {
    * out first, paired with the same mutator.
    */
   private updateMutatorSchedule(): void {
-    const elapsed = MATCH.TIME_LIMIT - this.matchTimer;
+    const elapsed = this.timeLimitSeconds - this.matchTimer;
 
     // Mid-match slot first — chronologically it usually warns first, and
     // warning order decides who picks from the pool first.
@@ -1434,10 +1612,11 @@ export class Match implements MatchContext {
   /**
    * Pick a slot's mutator. Env overrides win first: FORCE_EVENT pins the
    * final-minute slot (its pre-mutator semantics), FORCE_MIDMATCH_MUTATOR
-   * the mid-match slot — both test/e2e/smoke hooks. Random picks draw
-   * uniformly from POOL minus the other slot's choice (and minus
-   * FORCE_EVENT's value, so an earlier mid-match draw can't steal a
-   * forced final-minute pick).
+   * the mid-match slot — both test/e2e/smoke hooks, and both bypass the
+   * mode's exclusion list by design. Random picks draw uniformly from
+   * POOL minus the mode's excluded mutators, minus the other slot's
+   * choice (and minus FORCE_EVENT's value, so an earlier mid-match draw
+   * can't steal a forced final-minute pick).
    */
   private pickMutator(isFinalMinute: boolean): MutatorId {
     const pool = MUTATORS.POOL as readonly string[];
@@ -1449,6 +1628,10 @@ export class Match implements MatchContext {
     }
 
     const excluded = new Set<MutatorId>();
+    // Mode-level exclusions (Gun Game bans grenades_only/infinite_ammo).
+    for (const modeExcluded of this.gameMode.excludedMutators ?? []) {
+      excluded.add(modeExcluded);
+    }
     const other = isFinalMinute
       ? this.midMatchSlot.mutator
       : this.finalMinuteSlot.mutator;
@@ -1521,13 +1704,13 @@ export class Match implements MatchContext {
         // Cancel in-flight bursts and pump-racking; guns are gated off
         // from this tick on.
         this.pendingBursts.clear();
-        this.rackingTimers.clear();
+        this.fireCooldownTimers.clear();
         return;
       case 'infinite_ammo':
         for (const player of this.players.values()) {
           player.ammo = WEAPONS.rifle.magazineSize;
-          if (player.weaponId === 'shotgun') {
-            player.specialAmmo = WEAPONS.shotgun.magazineSize;
+          if (this.usesSpecialAmmo(player.weaponId)) {
+            player.specialAmmo = WEAPONS[player.weaponId].magazineSize;
           }
           player.isReloading = false;
           player.reloadTimer = 0;
@@ -1812,4 +1995,21 @@ export class Match implements MatchContext {
       }
     }
   }
+}
+
+/**
+ * Resolve regulation length: the FORCE_MATCH_SECONDS smoke pin when set to
+ * a positive number of seconds, else MATCH.TIME_LIMIT. Invalid values are
+ * ignored with a warning (smoke tooling must never kill a match).
+ */
+function resolveTimeLimitSeconds(): number {
+  const forced = process.env.FORCE_MATCH_SECONDS;
+  if (forced === undefined || forced === '') return MATCH.TIME_LIMIT;
+  const seconds = Number(forced);
+  if (!Number.isFinite(seconds) || seconds <= 0) {
+    logger.warn({ forced }, 'Ignoring invalid FORCE_MATCH_SECONDS');
+    return MATCH.TIME_LIMIT;
+  }
+  logger.warn({ seconds }, 'FORCE_MATCH_SECONDS pin active — regulation length overridden');
+  return seconds;
 }

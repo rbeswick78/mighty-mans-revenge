@@ -100,6 +100,11 @@ function evaluate(id: AwardId, playerId: PlayerId, s: PlayerStats): Candidate | 
       if (shotgunKills < 1) return null;
       return { playerId, value: shotgunKills, detail: countDetail(shotgunKills, 'SHOTGUN KILL') };
     }
+    case 'bare_knuckles': {
+      const punchKills = s.killsByWeapon.punch;
+      if (punchKills < 1) return null;
+      return { playerId, value: punchKills, detail: countDetail(punchKills, 'PUNCH KILL') };
+    }
     case 'untouchable': {
       if (s.longestKillStreak < AWARDS.UNTOUCHABLE_MIN_STREAK) return null;
       return { playerId, value: s.longestKillStreak, detail: `${s.longestKillStreak} KILL STREAK` };

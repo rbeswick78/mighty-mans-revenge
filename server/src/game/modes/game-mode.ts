@@ -1,4 +1,13 @@
-import type { PlayerId, PlayerState, MatchResult, MapData, KothHudState } from '@shared/game';
+import type {
+  PlayerId,
+  PlayerState,
+  MatchResult,
+  MapData,
+  KothHudState,
+  KillWeapon,
+  MutatorId,
+  PickupType,
+} from '@shared/game';
 import type { StatsTracker } from '../stats-tracker.js';
 
 /** Context interface so game modes can read match state without tight coupling. */
@@ -22,12 +31,24 @@ export interface MatchContext {
    * express this because entering overtime resets it to OVERTIME.DURATION.
    */
   getElapsedSeconds(): number;
+  /**
+   * Clear the match's server-internal per-player fire state (pending
+   * burst + fire-cooldown timer). Modes call this when they swap a
+   * player's weapon out from under them (Gun Game rung changes), so a
+   * stale rifle burst or shotgun rack can't leak onto the new weapon.
+   */
+  clearWeaponTransients(playerId: PlayerId): void;
 }
 
 export interface GameMode {
   onStart(match: MatchContext): void;
   onTick(match: MatchContext, dt: number): void;
-  onKill(match: MatchContext, killerId: PlayerId, victimId: PlayerId): void;
+  onKill(
+    match: MatchContext,
+    killerId: PlayerId,
+    victimId: PlayerId,
+    weapon: KillWeapon,
+  ): void;
   isMatchOver(match: MatchContext): boolean;
   getResults(match: MatchContext): MatchResult;
   /**
@@ -41,4 +62,23 @@ export interface GameMode {
    * Only modes with a hill implement it.
    */
   getKothState?(match: MatchContext): KothHudState;
+  /**
+   * Mutators this mode removes from BOTH random rolls (mid-match and
+   * final-minute). The FORCE_EVENT / FORCE_MIDMATCH_MUTATOR env pins
+   * bypass the exclusion — they're smoke-test tools and keep their
+   * pre-mode semantics.
+   */
+  readonly excludedMutators?: readonly MutatorId[];
+  /**
+   * Pickup-type veto applied when the match's pickups are created from
+   * map data. Types the mode disables never spawn and never announce.
+   * Omitted = every pickup the map declares spawns.
+   */
+  isPickupTypeEnabled?(type: PickupType): boolean;
+  /**
+   * Per-player gun gate, OR'd with the grenades_only mutator check in
+   * the input loop (Gun Game's grenade rung). Blocks all firePressed
+   * weapon fire; grenade throws stay live.
+   */
+  areGunsDisabled?(match: MatchContext, player: PlayerState): boolean;
 }
