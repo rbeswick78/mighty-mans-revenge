@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–7 complete; **Session 8 (playtest response + polish backlog) in progress.** The planned roadmap is fully shipped; Session 8 clears the accumulated polish backlog. Balance tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) is intentionally untouched until a group night produces real data.
+- **Status:** Sessions 1–8 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog). **The planned roadmap is fully shipped and the pre-playtest polish backlog is cleared.** What remains is playtest-driven: balance tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) is intentionally untouched until a group night produces real data.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -39,7 +39,7 @@ Each session below attacks one of these.
 | 5 | King of the Hill + overtime | A second way to play; no more anticlimactic ties | **DONE** (2026-07-04) |
 | 6 | New characters + stat identities | Counterpicks and mains | **DONE** (2026-07-04) |
 | 7 | (Stretch) Gun Game + Pistol + melee | The party mode | **DONE** (2026-07-04) |
-| 8 | Playtest response + polish backlog | The accumulated small stuff, cleared before group night | **IN PROGRESS** |
+| 8 | Playtest response + polish backlog | The accumulated small stuff, cleared before group night | **DONE** (2026-07-04) |
 
 ---
 
@@ -733,28 +733,29 @@ noted as original, not pack assets).
 
 **Acceptance criteria**
 
-- [ ] Pistol pickup spawns on all three maps in DM/KOTH (active at
+- [x] Pistol pickup spawns on all three maps in DM/KOTH (active at
       start, silent 30s respawn, never announced), auto-equips with
       12+24, refreshes on re-grab, replaces a held shotgun (and vice
       versa); never exists in Gun Game; HUD row and kill attribution
       work unchanged (regression).
-- [ ] Hill Hog: hillSeconds accrues for every living occupant incl.
+- [x] Hill Hog: hillSeconds accrues for every living occupant incl.
       contested time, not for dead players, not outside KOTH; award
       appears on KOTH results at ≥10s with a strict max; DM/Gun Game
       results never show it; old persistent-stats files unaffected
       (hillSeconds is match-scoped only).
-- [ ] Lobby shows the all-time top-5 panel (desktop + mobile
+- [x] Lobby shows the all-time top-5 panel (desktop + mobile
       landscape); updates after a match ends without reconnecting;
       hidden on an empty store; leaderboard message flows on connect.
-- [ ] Overtime plays the gameplay track's final 30s after the sting and
-      ends cleanly on kill or draw.
-- [ ] Punch whoosh/impact, axe throw, and axe landing play the new
+- [x] Overtime plays the gameplay track's final 30s after the sting and
+      ends cleanly on kill or draw. (Logic shipped; not live-verified —
+      needs a 173s tie. See session log.)
+- [x] Punch whoosh/impact, axe throw, and axe landing play the new
       generated SFX (stand-in rate/detune calls removed); dry-fire beep
       reads the held weapon's mag.
-- [ ] Jack renders the no-axe body (idle/run/attack) exactly while his
+- [x] Jack renders the no-axe body (idle/run/attack) exactly while his
       ability cooldown runs, for local AND remote clients; with-axe
       body returns at cooldown end; no other character affected.
-- [ ] Deterministic unit tests ≥90% on new server/shared logic; full
+- [x] Deterministic unit tests ≥90% on new server/shared logic; full
       regression suites green; no shared-physics changes.
 
 **Parallelizable workstreams:** (a) shared config/types/maps + shared
@@ -770,6 +771,134 @@ dry-fire fix. (c) and (d) are independent once (a) and (b) land.
 
 Append one entry per session. Include: date, what shipped (commits), design
 deviations from this doc, known issues, tuning notes from play-testing.
+
+### Session 8 — 2026-07-04 — Playtest response + polish backlog
+
+**Session opened with the pending Session 7 deploys** (blocked in auto
+mode last session): client to Firebase, server via the GCE git-pull
+flow, health check green. Then the backlog. **Balance was deliberately
+NOT touched** — no playtest has happened, so pistol/punch/RUNG_KILLS
+and the Session 6 character stats keep their spec values.
+
+**Shipped:**
+- **Pistol as a DM/KOTH map pickup** (`PickupType.WEAPON_PISTOL`,
+  `WEAPONS.pistol.pickupAmmo` 0→36): a sidegrade, not a power weapon —
+  spawns ACTIVE at match start, silent 30s respawn, never announced
+  (the INCOMING banner stays shotgun-only via the renamed
+  `isAnnouncedWeapon`). One spawn per map: Wasteland Outpost (9,10),
+  Overgrown Suburb (9,1) on the exposed top street, Scrapyard (14,10)
+  south corridor. Last-picked-up wins the special slot (shotgun↔pistol
+  replace each other). Gun Game vetoes it automatically (bandage-only
+  hook, regression-tested). HUD row + kill attribution needed zero
+  changes.
+- **Hill Hog award** (`hill_hog`, priority right after sharpshooter):
+  `PlayerStats.hillSeconds` accrues in `KothMode.onTick` for EVERY
+  living occupant of the live hill — **contested time included**,
+  deliberately not sole-occupancy time (that integer-rounds into
+  `score` and would just re-award the winner). ≥10s
+  (`AWARDS.HILL_HOG_MIN_SECONDS`), strict max, detail "42S ON THE
+  HILL". Match-scoped only — never persisted.
+- **Lobby leaderboard, over geckos not HTTP** (an HTTP endpoint would
+  hit mixed-content walls — the production client is HTTPS and /health
+  is plain HTTP on :3001): new reliable `server:leaderboard` message,
+  top-5 lifetime players by wins (tie-break kills desc → nickname asc)
+  from `PersistentStatsStore.getTopPlayers`, sent per-connection on
+  open (GameManager, right behind server:welcome) and rebroadcast to
+  every connection after each match's stats are recorded. Client:
+  "ALL-TIME TOP 5" panel bottom-left in the lobby (rows like
+  "1. RYAN  14W 9L", names clipped to 10 chars via the pure
+  `formatLeaderboardRow`), hidden on an empty store, updates in place;
+  GameService caches entries so a lobby created after the message
+  renders immediately.
+- **Overtime music**: after the deep-horn sting (~1s), the gameplay
+  track restarts at its final stretch via the new
+  `AudioManager.playMusicFromEnd`. Deviation from spec: it seeks by the
+  clock's REMAINING seconds (already re-anchored to overtime by
+  NetworkManager) rather than a fixed 30s, so the track's finale lands
+  at 0:00 despite the sting delay and message latency.
+- **Real melee/axe SFX, procedurally synthesized** (pack has no audio;
+  third-party files are a license headache): `client/scripts/gen-sfx.mjs`
+  (deterministic, seeded mulberry32 noise — byte-exact regeneration)
+  writes punch-whoosh (band-passed noise sweep 2400→450Hz),
+  punch-impact (130→55Hz thump + click), axe-whoosh (rotation-modulated
+  noise, reads as a spinning blade), axe-chop (thunk + crack). All four
+  wired into SOUND_MAP; Session 7's rate/detune stand-ins removed. The
+  axe LANDING now has a sound at all (previously silent).
+- **Jack's no-axe body**: pack `Zombie_Axe/No-Axe` idle/walk/attack
+  sheets ×4 dirs extracted (frame counts match with-axe exactly: 6/8/7;
+  dims differ and are measured into the new optional
+  `CharacterDef.altBody`). BootScene loads a parallel `jack-noaxe` anim
+  set via a `createBodyAnimationSet` refactor; `PlayerRenderer.
+  setAxeless` swaps the body prefix while `abilityCooldownSeconds > 0`
+  (driven per-frame next to setWeapon — works for local AND remote).
+  The pack's Taking-Axe recovery flourish is skipped (v1).
+- **Dry-fire fix**: the out-of-ammo beep now reads the HELD weapon's
+  mag (shotgun/pistol → specialAmmo; punch never beeps), mirroring
+  Session 7's aim-line tint fix.
+
+**Design decisions / deviations:**
+- Session scoped as "clear the polish backlog, defer all balance" —
+  the roadmap's session title says "playtest response", but Session 7
+  only reached production at the START of this session, so there was
+  no playtest to respond to. Tuning without data would be guessing
+  twice.
+- The prompt's plan assumed a PlayerStats literal in
+  combat-manager.ts needed hillSeconds — that literal is
+  `AxeState.distanceTraveled` (axe projectile). Only stats-tracker and
+  test fixtures construct PlayerStats; the compiler confirmed.
+- Leaderboard rebroadcast uses per-connection reliable `sendTo` (like
+  every other one-shot lifecycle message), NOT `GameServer.broadcast()`
+  — that helper is unreliable geckos io.emit.
+
+**Verified:** 717 unit tests green (+32 this session: config invariants
+incl. altBody frame-dim integrity and hill_hog priority slot, KOTH
+hill-seconds accrual matrix incl. contested-both-accrue-score-frozen,
+Hill Hog threshold/tie/DM-never, pistol equip/replace/refresh/
+starts-active/never-announced/gun-game-veto, getTopPlayers ordering +
+tie-breaks + empty store, on-connect + post-match leaderboard delivery
+incl. an idle third lobby client, leaderboard row formatting).
+Typecheck + lint clean; standard Playwright suite green (11 passed).
+Throwaway two-client Playwright smoke (spec deleted after) through the
+real dev servers with FORCE_MODE=deathmatch + FORCE_MAP="Wasteland
+Outpost": lobby ALL-TIME TOP 5 panel rendered from the dev store's
+persisted players (desktop AND an 844×390 chromium mobile-landscape
+viewport), pair-up with Jack locked via 3×ArrowRight, pistol pickup
+present at match start, a BFS waypoint-walker drove a client onto
+(9,10) → weaponId flipped to pistol with exactly 12 mag + 24 reserve,
+Jack's axe throw flipped BOTH clients' body anims to `jack-noaxe_*`
+for the cooldown window and back to `jack_*` at expiry, zero uncaught
+page errors on either client.
+
+**Known issues / notes for later sessions:**
+- **The four generated SFX have not been heard by a human.** They were
+  judged by synthesis parameters (envelopes/RMS/spectra), not ears.
+  If any lands wrong at group night, retune the constants in
+  `client/scripts/gen-sfx.mjs` and rerun it (deterministic output).
+- **Overtime music is not live-verified** — reaching it needs a
+  genuine 173s tie. Logic is small (delayedCall → playMusicFromEnd)
+  and the seek math rides the already-tested clock re-anchor; the
+  first overtime at group night should confirm the finale lands at
+  0:00. FORCE_MATCH_SECONDS pins still desync it, as ever.
+- The desktop smoke's waypoint-walker stalls on wall corners
+  occasionally (2 of 3 final runs green; failures were walker
+  scripting, not game bugs). Lessons folded into this log for future
+  bots: skip-ahead waypoint matching (full speed covers ~18px between
+  90ms polls, blowing past tight arrival windows) and a perpendicular
+  nudge on 1.5s of zero movement.
+- The webkit-based mobile-landscape Playwright project can't reliably
+  complete the geckos WebRTC handshake (same class of flake as the
+  fixme'd Firefox pair-up) — mobile smokes that need a live connection
+  should use chromium with an 844×390 viewport.
+- Character select still shows Jack WITH his axe while the no-axe swap
+  is in-match only — by design, out of scope.
+- The frozen-VFX/nameplate dead-code task (PlayerRenderer.update) from
+  Session 7 still hasn't landed; it now needs rebasing over this
+  session's setAxeless additions too.
+- Remaining backlog is now purely playtest-driven: balance tuning
+  (pistol/punch/RUNG_KILLS, character stats), plus whatever group
+  night surfaces. Nice-to-haves parked indefinitely: Taking-Axe
+  recovery flourish, per-mutator world VFX, mode/map voting,
+  per-pairing mutator-recency memory.
 
 ### Session 7 — 2026-07-04 — Gun Game + Pistol + Punch melee
 

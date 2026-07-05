@@ -91,7 +91,9 @@ curl http://34.24.140.207:3001/health
 records live in `/opt/mighty-mans-revenge/server/data/persistent-stats.json`
 (path overridable via `DATA_DIR`). The directory is untracked/gitignored, so
 the git-pull deploy flow never touches it — do not `git clean` or wipe the
-checkout without preserving it.
+checkout without preserving it. This store also feeds the lobby's all-time
+top-5 leaderboard (`server:leaderboard`, sent per-connection on open and
+rebroadcast after every match) — wiping it visibly resets the lobby.
 
 **Note on the rsync workflow:** `.github/workflows/deploy-server.yml` rsyncs a `deploy/` artifact to `/opt/mighty-mans-revenge/` as user `deploy@`. That layout doesn't match what's actually on the VM (`server/dist/`, not `dist/`) and the live process is owned by `rybes`, not `deploy`. Don't try to make the rsync flow work — use the git-pull flow above. The CI workflow is non-functional anyway because `GCE_SSH_KEY` and `GCE_SERVER_IP` secrets aren't set.
 
@@ -122,7 +124,7 @@ Movement modifiers (per-character speed × active mutators × second-wind boost)
 
 The 5-character roster lives in `CHARACTERS` (`shared/src/config/game.ts`) with per-character stat identities: `maxHealth` (committed onto PlayerState at select lock), `speedMultiplier` (via `playerMovementModifiers`), and `hitbox` — the **hit-validation AABB only** (bullets/pellets/fire breath/axes, live and lag-comp-rewound alike; derive via `characterHitbox()`). Movement collision intentionally stays `PLAYER.HITBOX_*` for everyone (same contract as the big_heads mutator), so map geometry plays identically across the roster. Abilities: Mighty Man x-ray, Bruce fire breath, Frost Wizard freeze, Bubba Iron Hide (50% damage reduction, applied inside `CombatManager.applyDamage` — the single damage choke point; callers must consume the returned `damageApplied` for stats/vampire), Jack Axe Throw (server-simulated projectile like grenades; client throw/landing FX ride the message-granularity `axeThrown`/`axeResolved` events because a point-blank flight can span a single snapshot).
 
-**Weapons** live in `WEAPONS` (`shared/src/config/game.ts`): rifle (always carried), shotgun (map pickup, special slot), pistol (Gun-Game-only in v1), and punch — flat-damage melee validated as `pelletCount` deterministic even-fan rays (`evenFanAngles`, NO jitter) through the same lag-comp rewind as every gun, with `WeaponDef.maxRange` hard-capping ray length (without it rays extend to `falloffRangeMax * 2`). One damage application per victim per swing; a swing can hit multiple victims. Punch swings broadcast as the transient `punches` array on gameState (delivery like `bulletTrails`); the client plays per-character body-level attack animations (`CharacterDef.attackFrames`/`attackFrameCount`, playback normalized to ~350ms regardless of frame count).
+**Weapons** live in `WEAPONS` (`shared/src/config/game.ts`): rifle (always carried), shotgun (announced power-weapon map pickup, special slot), pistol (silent sidegrade map pickup in DM/KOTH — spawns active at match start, never announced — plus a Gun Game rung; shares the special slot, last-picked-up wins), and punch — flat-damage melee validated as `pelletCount` deterministic even-fan rays (`evenFanAngles`, NO jitter) through the same lag-comp rewind as every gun, with `WeaponDef.maxRange` hard-capping ray length (without it rays extend to `falloffRangeMax * 2`). One damage application per victim per swing; a swing can hit multiple victims. Punch swings broadcast as the transient `punches` array on gameState (delivery like `bulletTrails`); the client plays per-character body-level attack animations (`CharacterDef.attackFrames`/`attackFrameCount`, playback normalized to ~350ms regardless of frame count).
 
 ### N-Player Architecture
 
