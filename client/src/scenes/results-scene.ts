@@ -560,6 +560,7 @@ export class ResultsScene extends Phaser.Scene {
       killsByWeapon: createEmptyKillsByWeapon(),
       longestKillStreak: 0,
       distanceTraveled: 0,
+      hillSeconds: 0,
     };
   }
 

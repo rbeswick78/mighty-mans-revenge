@@ -79,6 +79,13 @@ const LOCAL_CORRECTION_EPSILON = 0.01;
 const END_FADE_GRACE_MS = 600;
 
 /**
+ * Gap between the overtime deep-horn sting and the gameplay track's finale
+ * restarting underneath it — long enough for the sting to read over
+ * silence, short enough that overtime doesn't feel score-less.
+ */
+const OVERTIME_MUSIC_DELAY_MS = 1000;
+
+/**
  * Hard cap on how many catch-up ticks can run in a single Phaser frame.
  * If `delta` ever balloons (tab hidden, GC pause, RAF throttling, OS sleep),
  * we discard the surplus instead of replaying it. Replaying causes runaway
@@ -353,10 +360,18 @@ export class GameScene extends Phaser.Scene {
       // releases the fire/throw button while their corresponding ammo pool
       // is empty. throwPressed is already gated to the throw-aim phase (not
       // detonate), so this only fires when the player intended to throw.
-      // Fists are exempt — a punch has no ammo pool, so the rifle's mag
-      // count must not produce a false out-of-ammo click.
+      // Fists are exempt — a punch has no ammo pool, so no mag count may
+      // produce a false out-of-ammo click. The beep tracks the HELD
+      // weapon's pool (same rule as the aim-line empty-mag tint):
+      // shotgun/pistol fire from specialAmmo, not the rifle magazine.
+      const heldMagEmpty =
+        localState.weaponId === 'punch'
+          ? false
+          : localState.weaponId === 'shotgun' || localState.weaponId === 'pistol'
+            ? localState.specialAmmo === 0
+            : localState.ammo === 0;
       if (
-        (input.firePressed && localState.ammo === 0 && localState.weaponId !== 'punch') ||
+        (input.firePressed && heldMagEmpty) ||
         (input.throwPressed && localState.grenades === 0)
       ) {
         this.cameras.main.shake(120, 0.004);
@@ -1053,13 +1068,16 @@ export class GameScene extends Phaser.Scene {
       }
 
       // Rate variants distinguish pickups without new audio files: the
-      // shotgun lands as a heavier clunk, the bandage as a lighter snip.
+      // shotgun lands as a heavier clunk, the pistol as a lighter clack,
+      // the bandage as a lighter snip.
       const pickupType = networkManager
         .getPickups()
         .find((p) => p.id === pickupId)?.type;
       let sfxOptions: { rate: number } | undefined;
       if (pickupType === PickupType.WEAPON_SHOTGUN) {
         sfxOptions = { rate: 0.6 };
+      } else if (pickupType === PickupType.WEAPON_PISTOL) {
+        sfxOptions = { rate: 0.85 };
       } else if (pickupType === PickupType.BANDAGE) {
         sfxOptions = { rate: 1.35 };
       }
@@ -1096,24 +1114,40 @@ export class GameScene extends Phaser.Scene {
       const audio = AudioManager.getInstance();
       if (!audio) return;
       const localState = this.gameService.getNetworkManager().getLocalPlayerState();
-      // Whippy pitched-up grenade-throw variant reads as a hurled axe.
-      const sfxOptions = { detune: 700, rate: 1.5 };
+      // Rotation-modulated whoosh — reads as a spinning blade (generated
+      // WAV, replaces the Session 7 pitched grenade-throw stand-in).
       if (localState) {
         audio.playAtPosition(
-          'grenadeThrow',
+          'axeWhoosh',
           pos.x,
           pos.y,
           localState.position.x,
           localState.position.y,
-          sfxOptions,
         );
       } else {
-        audio.play('grenadeThrow', sfxOptions);
+        audio.play('axeWhoosh');
       }
     };
 
     this.onAxeResolved = (payload: { position: Vec2; angle: number }) => {
       this.axeRenderer?.playLandingAt(payload.position.x, payload.position.y, payload.angle);
+
+      // Landing thunk (new in Session 8 — the landing previously played
+      // no sound at all).
+      const audio = AudioManager.getInstance();
+      if (!audio) return;
+      const localState = this.gameService.getNetworkManager().getLocalPlayerState();
+      if (localState) {
+        audio.playAtPosition(
+          'axeChop',
+          payload.position.x,
+          payload.position.y,
+          localState.position.x,
+          localState.position.y,
+        );
+      } else {
+        audio.play('axeChop');
+      }
     };
 
     // Punch swings ride the gameState message (message-granularity, like
@@ -1126,38 +1160,33 @@ export class GameScene extends Phaser.Scene {
       const audio = AudioManager.getInstance();
       if (!audio) return;
       const localState = this.gameService.getNetworkManager().getLocalPlayerState();
-      // Whoosh: grenade-throw pitched up hard — harder than the axe-throw
-      // variant (1.5/700) so the two swings stay tellable apart by ear.
-      const whooshOptions = { rate: 1.8, detune: 1100 };
+      // Band-passed noise-sweep whoosh (generated WAV, replaces the
+      // Session 7 pitched grenade-throw stand-in).
       if (localState) {
         audio.playAtPosition(
-          'grenadeThrow',
+          'punchWhoosh',
           punch.position.x,
           punch.position.y,
           localState.position.x,
           localState.position.y,
-          whooshOptions,
         );
       } else {
-        audio.play('grenadeThrow', whooshOptions);
+        audio.play('punchWhoosh');
       }
 
       if (punch.hit) {
-        // Impact thud: the SOUND_MAP's playerHit entry has no shipped
-        // asset, so derive a body-blow from gun-shot.wav slowed way down —
-        // well below the shotgun boom's 0.55/-250 so they don't blur.
-        const impactOptions = { rate: 0.45, detune: -600 };
+        // Body-blow thump + click (generated WAV, replaces the slowed
+        // gun-shot stand-in).
         if (localState) {
           audio.playAtPosition(
-            'gunshot',
+            'punchImpact',
             punch.position.x,
             punch.position.y,
             localState.position.x,
             localState.position.y,
-            impactOptions,
           );
         } else {
-          audio.play('gunshot', impactOptions);
+          audio.play('punchImpact');
         }
       }
     };
@@ -1270,6 +1299,19 @@ export class GameScene extends Phaser.Scene {
       this.hud?.showEventBanner('OVERTIME!', 'SUDDEN DEATH - FIRST KILL WINS', 0xb33831);
       AudioManager.getInstance()?.play('matchStartHorn', { detune: -800, rate: 0.7 });
       this.zoomPulse?.trigger();
+      // After the sting reads, restart the gameplay track at its final
+      // stretch so the already-tuned finale lands at 0:00 again. Seeking
+      // by the clock's REMAINING seconds (re-anchored to overtime by
+      // NetworkManager before this handler runs) rather than a fixed
+      // OVERTIME.DURATION keeps the finale aligned despite the sting
+      // delay and message latency. A kill just stops it early via the
+      // normal match-end stopMusic path.
+      this.time.delayedCall(OVERTIME_MUSIC_DELAY_MS, () => {
+        if (this.endTransitionStarted) return;
+        const remaining = this.gameService.getNetworkManager().getMatchTimer();
+        if (remaining <= 0) return;
+        AudioManager.getInstance()?.playMusicFromEnd('music-gameplay', remaining);
+      });
     };
 
     this.gameService.on('matchCountdown', this.onMatchCountdown);

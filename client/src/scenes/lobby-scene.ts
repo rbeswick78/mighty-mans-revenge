@@ -1,5 +1,8 @@
 import Phaser from 'phaser';
-import type { ServerMatchmakingStatusMessage } from '@shared/types/network.js';
+import type {
+  LeaderboardEntry,
+  ServerMatchmakingStatusMessage,
+} from '@shared/types/network.js';
 import { Wasteland, cssHex } from '@shared/config/palette.js';
 import { AudioManager } from '../audio/audio-manager.js';
 import { GameService, type MatchData } from '../services/game-service.js';
@@ -8,6 +11,7 @@ import { MenuPanel } from '../ui/menu/menu-panel.js';
 import { PixelButton } from '../ui/menu/pixel-button.js';
 import { TitleLogo } from '../ui/menu/title-logo.js';
 import { MENU_FONTS } from '../ui/menu/fonts.js';
+import { formatLeaderboardRow } from '../ui/leaderboard-format.js';
 
 const STORAGE_KEY_NICKNAME = 'mmr_nickname';
 
@@ -23,6 +27,8 @@ const SEARCH_TIMER_COLOR = Wasteland.COVER_FILL;
 const PLAYER_COUNT_COLOR = Wasteland.WALL_FILL;       // dim
 const FOOTER_COLOR = Wasteland.WALL_LINE;             // very dim ash-shadow
 const ERROR_COLOR = Wasteland.HIT_FLASH;              // dried blood
+const LEADERBOARD_TITLE_COLOR = Wasteland.COVER_FILL; // weathered tan
+const LEADERBOARD_ROW_COLOR = Wasteland.WALL_FILL;    // dim, matches footer
 
 export class LobbyScene extends Phaser.Scene {
   private nicknameText!: Phaser.GameObjects.Text;
@@ -31,6 +37,8 @@ export class LobbyScene extends Phaser.Scene {
   private searchTimerText!: Phaser.GameObjects.Text;
   private cancelButton!: PixelButton;
   private playerCountText!: Phaser.GameObjects.Text;
+  private leaderboardTitleText!: Phaser.GameObjects.Text;
+  private leaderboardRowsText!: Phaser.GameObjects.Text;
   private quickMatchButton!: PixelButton;
   private mightyManSprite!: Phaser.GameObjects.Sprite;
   private nickname: string;
@@ -45,6 +53,7 @@ export class LobbyScene extends Phaser.Scene {
   private onMatchFound: ((matchData: MatchData) => void) | null = null;
   private onMatchmakingStatus: ((msg: ServerMatchmakingStatusMessage) => void) | null = null;
   private onDisconnected: (() => void) | null = null;
+  private onLeaderboard: ((entries: LeaderboardEntry[]) => void) | null = null;
 
   constructor() {
     super({ key: 'LobbyScene' });
@@ -250,6 +259,37 @@ export class LobbyScene extends Phaser.Scene {
       .setOrigin(1, 0.5)
       .setDepth(WastelandStreet.DEPTH.UI);
 
+    // ────────────────────────────────────────────────────────────────────
+    // All-time top-5 leaderboard — bottom-left column, above the player
+    // count. Bottom-anchored (origin y=1) and positioned off the camera
+    // dims like the footer, so it stays in the narrow strip left of the
+    // centered menu panel on every viewport (canvas is a fixed 960×720
+    // design resolution, FIT-scaled on mobile landscape). Hidden until the
+    // server ships a non-empty server:leaderboard.
+    // ────────────────────────────────────────────────────────────────────
+    this.leaderboardRowsText = this.add
+      .text(36, camHeight - 48, '', {
+        fontFamily: MENU_FONTS.BODY,
+        fontSize: '13px',
+        color: cssHex(LEADERBOARD_ROW_COLOR),
+        lineSpacing: 6,
+      })
+      .setOrigin(0, 1)
+      .setDepth(WastelandStreet.DEPTH.UI)
+      .setVisible(false);
+    this.leaderboardTitleText = this.add
+      .text(36, camHeight - 48, 'ALL-TIME TOP 5', {
+        fontFamily: MENU_FONTS.HEADER,
+        fontSize: '10px',
+        color: cssHex(LEADERBOARD_TITLE_COLOR),
+      })
+      .setOrigin(0, 1)
+      .setDepth(WastelandStreet.DEPTH.UI)
+      .setVisible(false);
+    // GameService caches the latest entries, so a lobby created after the
+    // message (returning from a match, or reconnect) renders immediately.
+    this.updateLeaderboard(this.gameService.getLeaderboard());
+
     // Enter = quick match (works whether the nickname input has focus
     // or not, since the keydown bubbles up from the input element).
     this.input.keyboard?.on('keydown-ENTER', () => {
@@ -324,9 +364,14 @@ export class LobbyScene extends Phaser.Scene {
       this.stopSearching();
     };
 
+    this.onLeaderboard = (entries: LeaderboardEntry[]) => {
+      this.updateLeaderboard(entries);
+    };
+
     this.gameService.on('matchFound', this.onMatchFound);
     this.gameService.on('matchmakingStatus', this.onMatchmakingStatus);
     this.gameService.on('disconnected', this.onDisconnected);
+    this.gameService.on('leaderboard', this.onLeaderboard);
   }
 
   private cleanupEvents(): void {
@@ -342,6 +387,31 @@ export class LobbyScene extends Phaser.Scene {
       this.gameService.off('disconnected', this.onDisconnected);
       this.onDisconnected = null;
     }
+    if (this.onLeaderboard) {
+      this.gameService.off('leaderboard', this.onLeaderboard);
+      this.onLeaderboard = null;
+    }
+  }
+
+  /**
+   * Render (or hide) the all-time top-5 panel. Called on create with the
+   * cached entries and again whenever a leaderboard event arrives while
+   * the lobby is open — the panel updates in place, no scene restart.
+   */
+  private updateLeaderboard(entries: LeaderboardEntry[]): void {
+    const hasEntries = entries.length > 0;
+    this.leaderboardRowsText.setVisible(hasEntries);
+    this.leaderboardTitleText.setVisible(hasEntries);
+    if (!hasEntries) return;
+
+    this.leaderboardRowsText.setText(
+      entries.map((entry, i) => formatLeaderboardRow(i + 1, entry)).join('\n'),
+    );
+    // Bottom-anchored rows grow upward as entries appear; keep the title
+    // sitting just above however tall the row block currently is.
+    this.leaderboardTitleText.setY(
+      this.leaderboardRowsText.y - this.leaderboardRowsText.height - 8,
+    );
   }
 
   private createNicknameInput(x: number, y: number): HTMLInputElement {

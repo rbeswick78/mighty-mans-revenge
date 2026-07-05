@@ -59,6 +59,12 @@ const SOUND_MAP = {
   bulletImpact: { key: 'sfx-bullet-impact', volume: 0.5, category: 'sfx' },
   playerHit: { key: 'sfx-player-hit', volume: 0.6, category: 'sfx' },
   playerDeath: { key: 'sfx-player-death', volume: 0.7, category: 'sfx' },
+  // Melee/axe — generated WAVs (client/scripts/gen-sfx.mjs), replacing the
+  // Session 7 rate/detune stand-ins derived from grenade-throw/gun-shot.
+  punchWhoosh: { key: 'sfx-punch-whoosh', volume: 0.6, category: 'sfx' },
+  punchImpact: { key: 'sfx-punch-impact', volume: 0.7, category: 'sfx' },
+  axeWhoosh: { key: 'sfx-axe-whoosh', volume: 0.6, category: 'sfx' },
+  axeChop: { key: 'sfx-axe-chop', volume: 0.7, category: 'sfx' },
 
   // Movement
   footstepWalk: { key: 'sfx-footstep-walk', volume: 0.3, category: 'sfx' },
@@ -232,6 +238,34 @@ export class AudioManager {
     if (fadeIn > 0 && music instanceof Phaser.Sound.WebAudioSound) {
       this.startFade(music, targetVolume, fadeIn, () => {});
     }
+  }
+
+  /**
+   * Play a music track starting at its final `finalSeconds` seconds
+   * (seek = max(0, trackDuration - finalSeconds)). Used by sudden-death
+   * overtime to land the gameplay track's already-tuned finale at 0:00
+   * again. Manages the same current-music handle as playMusic, so
+   * stopMusic and every match-end teardown path work identically.
+   */
+  playMusicFromEnd(key: string, finalSeconds: number, loop = false): void {
+    // Same in-flight teardown as playMusic — see the comment there.
+    this.cancelFade();
+    this.destroyCurrentMusic();
+
+    if (!this.isSoundLoaded(key)) {
+      if (import.meta.env.DEV) {
+        console.debug(`[AudioManager] Music not loaded, skipping: ${key}`);
+      }
+      return;
+    }
+
+    const music = this.game.sound.add(key, {
+      volume: this.computeMusicVolume(),
+      loop,
+    });
+    this.currentMusic = music;
+    const seek = Math.max(0, music.totalDuration - finalSeconds);
+    music.play({ seek });
   }
 
   /** Stop the currently playing music with an optional fade out. */

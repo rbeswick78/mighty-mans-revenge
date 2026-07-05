@@ -1,7 +1,12 @@
 import Phaser from 'phaser';
 import { Wasteland, cssHex } from '@shared/config/palette.js';
 import { CHARACTERS } from '@shared/config/game.js';
-import { DIRECTIONS, type Direction4, type FrameDim } from '@shared/types/character.js';
+import {
+  DIRECTIONS,
+  type CharacterDef,
+  type Direction4,
+  type FrameDim,
+} from '@shared/types/character.js';
 import { AudioManager } from '../audio/audio-manager.js';
 import { generateMenuTextures } from '../ui/menu/wasteland-street.js';
 import { MENU_FONT_CHECK_LIST } from '../ui/menu/fonts.js';
@@ -227,7 +232,10 @@ export class BootScene extends Phaser.Scene {
     // would otherwise hit Phaser with duplicate texture keys and log a
     // noisy warning per direction × state.
     const loadedPrefixes = new Set<string>();
-    for (const char of Object.values(CHARACTERS)) {
+    // Annotated as CharacterDef so optional fields (altBody) are visible —
+    // the frozen registry literal narrows each entry to its own shape.
+    const roster: CharacterDef[] = Object.values(CHARACTERS);
+    for (const char of roster) {
       if (loadedPrefixes.has(char.spritePrefix)) continue;
       loadedPrefixes.add(char.spritePrefix);
       for (const dir of DIRECTIONS) {
@@ -257,6 +265,29 @@ export class BootScene extends Phaser.Scene {
           char.assetFolder,
           char.assetBaseName,
         );
+      }
+
+      // Alt-body sheets (Jack's no-axe body while his thrown axe is in
+      // flight / on cooldown). By CharacterDef.altBody contract the alt
+      // sheets share the BASE def's frame counts but carry their own
+      // frame dims (the pack crops variants differently).
+      const alt = char.altBody;
+      if (alt && !loadedPrefixes.has(alt.spritePrefix)) {
+        loadedPrefixes.add(alt.spritePrefix);
+        for (const dir of DIRECTIONS) {
+          this.loadCharacterSheet(
+            alt.spritePrefix, dir, 'idle', alt.idleFrames[dir],
+            char.assetFolder, alt.assetBaseName,
+          );
+          this.loadCharacterSheet(
+            alt.spritePrefix, dir, 'run', alt.runFrames[dir],
+            char.assetFolder, alt.assetBaseName,
+          );
+          this.loadCharacterSheet(
+            alt.spritePrefix, dir, 'attack', alt.attackFrames[dir],
+            char.assetFolder, alt.assetBaseName,
+          );
+        }
       }
     }
 
@@ -398,6 +429,7 @@ export class BootScene extends Phaser.Scene {
     // (see generateProceduralAssets) so it actually reads as a grenade.
     this.load.image('pickup_ammo', '/assets/pickups/ammo-crate_blue.png');
     this.load.image('pickup_shotgun', '/assets/pickups/shotgun.png');
+    this.load.image('pickup_pistol', '/assets/pickups/pistol.png');
     this.load.image('pickup_bandage', '/assets/pickups/bandage.png');
 
     // Bullet head — 2×1 px sprite, rotated to bullet angle and tweened
@@ -433,6 +465,13 @@ export class BootScene extends Phaser.Scene {
     this.load.audio('sfx-death', '/assets/audio/death.wav');
     this.load.audio('sfx-pickup', '/assets/audio/pickup.wav');
     this.load.audio('sfx-out-of-ammo', '/assets/audio/out-of-ammo.wav');
+    // Melee/axe SFX — procedurally generated WAVs (client/scripts/gen-sfx.mjs),
+    // replacing the Session 7 rate/detune stand-ins derived from
+    // grenade-throw/gun-shot.
+    this.load.audio('sfx-punch-whoosh', '/assets/audio/punch-whoosh.wav');
+    this.load.audio('sfx-punch-impact', '/assets/audio/punch-impact.wav');
+    this.load.audio('sfx-axe-whoosh', '/assets/audio/axe-whoosh.wav');
+    this.load.audio('sfx-axe-chop', '/assets/audio/axe-chop.wav');
   }
 
   private loadCharacterSheet(
@@ -457,43 +496,20 @@ export class BootScene extends Phaser.Scene {
     // Same dedupe rationale as loadRealAssets — sharing a spritePrefix
     // means sharing the animation keys.
     const animatedPrefixes = new Set<string>();
-    for (const char of Object.values(CHARACTERS)) {
+    // Same CharacterDef annotation rationale as loadRealAssets.
+    const roster: CharacterDef[] = Object.values(CHARACTERS);
+    for (const char of roster) {
       if (animatedPrefixes.has(char.spritePrefix)) continue;
       animatedPrefixes.add(char.spritePrefix);
-      for (const dir of DIRECTIONS) {
-        for (const state of ['idle', 'run'] as const) {
-          const key = `${char.spritePrefix}_${dir}_${state}`;
-          // Explicit per-state frame counts from the registry — the pack
-          // mixes 6-frame idles with 8-frame walks (Zombie_Big/Zombie_Axe),
-          // so "all frames in the sheet" is only trustworthy if the
-          // frameWidth divided the sheet exactly; the explicit range also
-          // guards against sheets with trailing padding.
-          const frameCount =
-            state === 'run' ? char.runFrameCount : char.idleFrameCount;
-          this.anims.create({
-            key,
-            frames: this.anims.generateFrameNumbers(key, {
-              start: 0,
-              end: frameCount - 1,
-            }),
-            frameRate: state === 'run' ? RUN_FPS : IDLE_FPS,
-            repeat: -1,
-          });
-        }
+      this.createBodyAnimationSet(char.spritePrefix, char);
 
-        // Melee attack one-shot. Frame rate normalizes to the fixed
-        // ATTACK_SWING_SECONDS duration (see that constant) because the
-        // roster's attack sheets ship 4/4/8/7 frames.
-        const attackKey = `${char.spritePrefix}_${dir}_attack`;
-        this.anims.create({
-          key: attackKey,
-          frames: this.anims.generateFrameNumbers(attackKey, {
-            start: 0,
-            end: char.attackFrameCount - 1,
-          }),
-          frameRate: char.attackFrameCount / ATTACK_SWING_SECONDS,
-          repeat: 0,
-        });
+      // Alt-body anim set (Jack's no-axe body) — same frame counts and
+      // pacing as the base set by CharacterDef.altBody contract, so it
+      // reuses the exact same creation path under the alt prefix.
+      const alt = char.altBody;
+      if (alt && !animatedPrefixes.has(alt.spritePrefix)) {
+        animatedPrefixes.add(alt.spritePrefix);
+        this.createBodyAnimationSet(alt.spritePrefix, char);
       }
     }
 
@@ -581,6 +597,50 @@ export class BootScene extends Phaser.Scene {
         key: pistolShootKey,
         frames: this.anims.generateFrameNumbers(pistolShootKey, {}),
         frameRate: GUN_SHOOT_FPS,
+        repeat: 0,
+      });
+    }
+  }
+
+  /**
+   * Create the body-level anim set (idle/run loops + attack one-shot) for
+   * one texture prefix, reading frame counts from the character def. Used
+   * for both the base sheets and any altBody variant (which shares frame
+   * counts with the base by contract).
+   */
+  private createBodyAnimationSet(prefix: string, char: CharacterDef): void {
+    for (const dir of DIRECTIONS) {
+      for (const state of ['idle', 'run'] as const) {
+        const key = `${prefix}_${dir}_${state}`;
+        // Explicit per-state frame counts from the registry — the pack
+        // mixes 6-frame idles with 8-frame walks (Zombie_Big/Zombie_Axe),
+        // so "all frames in the sheet" is only trustworthy if the
+        // frameWidth divided the sheet exactly; the explicit range also
+        // guards against sheets with trailing padding.
+        const frameCount =
+          state === 'run' ? char.runFrameCount : char.idleFrameCount;
+        this.anims.create({
+          key,
+          frames: this.anims.generateFrameNumbers(key, {
+            start: 0,
+            end: frameCount - 1,
+          }),
+          frameRate: state === 'run' ? RUN_FPS : IDLE_FPS,
+          repeat: -1,
+        });
+      }
+
+      // Melee attack one-shot. Frame rate normalizes to the fixed
+      // ATTACK_SWING_SECONDS duration (see that constant) because the
+      // roster's attack sheets ship 4/4/8/7 frames.
+      const attackKey = `${prefix}_${dir}_attack`;
+      this.anims.create({
+        key: attackKey,
+        frames: this.anims.generateFrameNumbers(attackKey, {
+          start: 0,
+          end: char.attackFrameCount - 1,
+        }),
+        frameRate: char.attackFrameCount / ATTACK_SWING_SECONDS,
         repeat: 0,
       });
     }

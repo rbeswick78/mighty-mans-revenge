@@ -8,6 +8,7 @@ const PICKUP_TEXTURES: Record<PickupType, string> = {
   [PickupType.GUN_AMMO]: 'pickup_ammo',
   [PickupType.GRENADE]: 'pickup_grenade',
   [PickupType.WEAPON_SHOTGUN]: 'pickup_shotgun',
+  [PickupType.WEAPON_PISTOL]: 'pickup_pistol',
   [PickupType.BANDAGE]: 'pickup_bandage',
 };
 

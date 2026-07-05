@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import type { PlayerState } from '@shared/types/player.js';
 import { CHARACTERS, MUTATORS, type CharacterId, type WeaponId } from '@shared/config/game.js';
+import type { CharacterDef } from '@shared/types/character.js';
 import { Wasteland, cssHex, healthColor } from '@shared/config/palette.js';
 import { bucketAimAngle, type Direction4 } from './sprite-direction.js';
 import {
@@ -106,6 +107,17 @@ export class PlayerRenderer {
    * registry stays the single source of truth.
    */
   private readonly texturePrefix: string;
+  /**
+   * Alt-body anim prefix (CharacterDef.altBody — Jack's no-axe sheets),
+   * or null for the rest of the roster. Swapped in while isAxeless.
+   */
+  private readonly altBodyPrefix: string | null;
+  /**
+   * True while the character should render its alt body — Jack's thrown
+   * axe is in flight or regrowing (abilityCooldownSeconds > 0). Driven
+   * per-frame by ClientPlayerManager; always false without an altBody.
+   */
+  private isAxeless = false;
   private currentDirection: Direction4 = 'down';
   private currentAnimState: AnimState = 'idle';
   private currentGunState: GunOverlayState = 'hold';
@@ -137,9 +149,12 @@ export class PlayerRenderer {
 
   constructor(scene: Phaser.Scene, characterId: CharacterId) {
     this.scene = scene;
-    const def = CHARACTERS[characterId];
+    // Annotated as CharacterDef so optional fields (altBody) are visible —
+    // the frozen registry literal narrows each entry to its own shape.
+    const def: CharacterDef = CHARACTERS[characterId];
     this.characterId = characterId;
     this.texturePrefix = def.spritePrefix;
+    this.altBodyPrefix = def.altBody?.spritePrefix ?? null;
     this.hasGun = def.hasGun;
 
     this.sprite = scene.add.sprite(0, 0, this.animKey('down', 'idle'), 0);
@@ -444,6 +459,22 @@ export class PlayerRenderer {
     }
   }
 
+  /**
+   * Swap the body sheets to the alt-body set (Jack's no-axe body) and
+   * back. Driven per-frame from ClientPlayerManager off the broadcast
+   * abilityCooldownSeconds — the axe is axeless exactly while it's in
+   * flight or regrowing, for local AND remote players alike. No-op for
+   * characters without a CharacterDef.altBody. Attack anims played while
+   * axeless resolve to the alt prefix too (see attackKey).
+   */
+  setAxeless(axeless: boolean): void {
+    if (!this.altBodyPrefix || axeless === this.isAxeless) return;
+    this.isAxeless = axeless;
+    // Re-resolve the current body anim under the new prefix (the key
+    // changes, so play() actually restarts even with ignoreIfPlaying).
+    this.playCurrentAnim();
+  }
+
   /** Whether this character renders a held gun (and matching muzzle flash). */
   rendersGun(): boolean {
     return this.gunSprite !== null;
@@ -581,12 +612,19 @@ export class PlayerRenderer {
     this.gunSprite.play(key, this.currentGunState === 'hold');
   }
 
+  /** Body anim prefix — the alt-body set while axeless, base otherwise. */
+  private bodyPrefix(): string {
+    return this.isAxeless && this.altBodyPrefix !== null
+      ? this.altBodyPrefix
+      : this.texturePrefix;
+  }
+
   private animKey(direction: Direction4, state: AnimState): string {
-    return `${this.texturePrefix}_${direction}_${state}`;
+    return `${this.bodyPrefix()}_${direction}_${state}`;
   }
 
   private attackKey(direction: Direction4): string {
-    return `${this.texturePrefix}_${direction}_attack`;
+    return `${this.bodyPrefix()}_${direction}_attack`;
   }
 
   private gunKey(direction: Direction4, state: GunOverlayState): string {

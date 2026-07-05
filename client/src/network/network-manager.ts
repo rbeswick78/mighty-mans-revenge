@@ -45,6 +45,7 @@ type EventName =
   | 'weaponIncoming'
   | 'tilesDestroyed'
   | 'overtimeStart'
+  | 'leaderboard'
   | 'error';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -427,6 +428,12 @@ export class NetworkManager {
 
       case 'server:matchmakingStatus':
         this.emit('matchmakingStatus', msg);
+        break;
+
+      case 'server:leaderboard':
+        // All-time top players — sent on connection open and rebroadcast
+        // after each match's stats are recorded.
+        this.emit('leaderboard', msg.entries);
         break;
 
       case 'server:rematchStatus':

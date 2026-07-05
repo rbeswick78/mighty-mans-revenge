@@ -2,6 +2,7 @@ import type { PlayerId } from '@shared/types/common.js';
 import type { PlayerInput } from '@shared/types/player.js';
 import type { MatchResult, GameModeType } from '@shared/types/game.js';
 import type {
+  LeaderboardEntry,
   ServerMatchFoundMessage,
   ServerMatchmakingStatusMessage,
   ServerPlayerKilledMessage,
@@ -60,7 +61,8 @@ type GameServiceEvent =
   | 'eventStart'
   | 'weaponIncoming'
   | 'tilesDestroyed'
-  | 'overtimeStart';
+  | 'overtimeStart'
+  | 'leaderboard';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type GameServiceCallback = (...args: any[]) => void;
@@ -75,6 +77,13 @@ export class GameService {
   private readonly networkManager: NetworkManager;
   private currentMatch: MatchData | null = null;
   private lastMatchResult: MatchResult | null = null;
+  /**
+   * Latest all-time leaderboard from the server (empty until the first
+   * server:leaderboard arrives). Cached so a scene created after the
+   * message — LobbyScene mounts before the connection opens, and again
+   * after every match — can render it immediately via getLeaderboard().
+   */
+  private latestLeaderboard: LeaderboardEntry[] = [];
   private localNickname = '';
   private listeners = new Map<GameServiceEvent, GameServiceCallback[]>();
 
@@ -124,6 +133,11 @@ export class GameService {
 
   getLastMatchResult(): MatchResult | null {
     return this.lastMatchResult;
+  }
+
+  /** Latest cached all-time top players (empty before the first message). */
+  getLeaderboard(): LeaderboardEntry[] {
+    return this.latestLeaderboard;
   }
 
   joinMatchmaking(nickname: string): void {
@@ -276,6 +290,11 @@ export class GameService {
 
     this.networkManager.on('overtimeStart', () => {
       this.emit('overtimeStart');
+    });
+
+    this.networkManager.on('leaderboard', (entries: LeaderboardEntry[]) => {
+      this.latestLeaderboard = entries;
+      this.emit('leaderboard', entries);
     });
   }
 
