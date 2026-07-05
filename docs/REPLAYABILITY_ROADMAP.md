@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–7 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch). **The planned roadmap is fully shipped.** Anything further is group-demand-driven — see the Session 7 log's "notes for later" for the accumulated polish backlog.
+- **Status:** Sessions 1–7 complete; **Session 8 (playtest response + polish backlog) in progress.** The planned roadmap is fully shipped; Session 8 clears the accumulated polish backlog. Balance tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) is intentionally untouched until a group night produces real data.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -39,6 +39,7 @@ Each session below attacks one of these.
 | 5 | King of the Hill + overtime | A second way to play; no more anticlimactic ties | **DONE** (2026-07-04) |
 | 6 | New characters + stat identities | Counterpicks and mains | **DONE** (2026-07-04) |
 | 7 | (Stretch) Gun Game + Pistol + melee | The party mode | **DONE** (2026-07-04) |
+| 8 | Playtest response + polish backlog | The accumulated small stuff, cleared before group night | **IN PROGRESS** |
 
 ---
 
@@ -628,6 +629,140 @@ melee, pistol path, `GunGameMode` + mode hooks + tests; (c) client —
 asset extraction/ATTRIBUTION, pistol overlay + HUD row, punch body
 anims + event FX/SFX, Gun Game HUD ladder + mode surfaces. (b) and (c)
 are independent once (a) lands.
+
+---
+
+## Session 8 — Playtest response + polish backlog
+
+**Goal:** clear the accumulated cross-session polish backlog so the first
+group playtest sees the fullest version of the game. **Balance tuning is
+explicitly OUT of this session** — no playtest has happened yet (Session 7
+only reached production at the start of this session), so every Gun Game
+number (pistol/punch damage, `RUNG_KILLS`) and every Session 6 character
+stat stays at its spec value. Changing them now would be guessing twice;
+the next session tunes off real group-night data.
+
+**Locked design decisions**
+
+- **Pistol as a DM/KOTH map pickup** (the Session 7 "cheap follow-up"):
+  - `PickupType.WEAPON_PISTOL` (`'weapon_pistol'`) + `PickupSpawnType`
+    union entry. `WEAPONS.pistol.pickupAmmo` 0 → **36** (mag 12 + reserve
+    24 on pickup, mirroring the shotgun's mag-plus-reserve split).
+  - **Sidegrade, not power weapon:** spawns ACTIVE at match start (unlike
+    the shotgun's announced 30s-delayed first drop), respawns on
+    `PICKUP.WEAPON_RESPAWN_TIME` (30s), and is **never announced** — the
+    "INCOMING" banner stays reserved for the shotgun so it keeps meaning.
+  - One pistol spawn per map, placed away from the center shotgun so it's
+    a consolation route, not a mid-fight bonus. Exact tiles picked against
+    each map's collision grid in-session.
+  - Walkover while holding another special: **last-picked-up wins** (the
+    slot is auto-equip by contract; picking up the same weapon refreshes
+    ammo to full, same as shotgun-on-shotgun).
+  - Gun Game untouched: `isPickupTypeEnabled` is already bandage-only, so
+    the pistol pickup never exists there. HUD pistol ammo row (Session 7)
+    already renders outside Gun Game — no HUD work needed.
+- **Hill Hog award** (Session 5 leftover):
+  - `PlayerStats.hillSeconds` + `StatsTracker.recordHillSeconds`.
+    Accrues in `KothMode.onTick` for **every living player standing in
+    the live hill, contested time included** — deliberately NOT
+    sole-occupancy time, which integer-rounds to `score` and would just
+    re-award the winner. Hill Hog rewards the brawler who lived on the
+    hill even if they never held it alone.
+  - Award id `hill_hog`, display name "Hill Hog", min
+    `HILL_HOG_MIN_SECONDS: 10`, ranked by hillSeconds (strict max, ties
+    disqualify, like every award). Priority slot: right after
+    `sharpshooter`, so it reliably surfaces on KOTH results; in DM/Gun
+    Game nobody accrues, so the threshold filters it out.
+- **Lobby leaderboard** (Session 2 stretch, still unclaimed):
+  - **Over geckos, not HTTP.** The lobby already connects on scene
+    create, and an HTTP endpoint would need HTTPS termination on the VM
+    (the production client is served over HTTPS — mixed-content rules
+    block `http://…:3001`). New reliable `server:leaderboard` message:
+    top-5 lifetime players by wins (tie-break kills desc, then nickname
+    asc), entries `{ nickname, wins, losses, draws, kills, matches }`.
+    Sent to a connection on open and rebroadcast to everyone after each
+    match's stats are recorded. `PersistentStatsStore.getTopPlayers(n)`
+    provides the data.
+  - Client: small "ALL-TIME TOP 5" panel in the lobby (MENU_FONTS
+    styling), hidden when the store is empty. New players appear after
+    their first match.
+- **Overtime music** (Session 5 leftover): on `server:overtimeStart`,
+  after the existing deep-horn sting, play the **final 30s of the
+  gameplay track** (`music-gameplay` with `seek = duration − OVERTIME
+  length`) — overtime is 30s, so the track's already-tuned finale lands
+  exactly at 0:00 again. No new audio file; a kill just stops it early
+  like any match end.
+- **Real melee/axe SFX** (Session 7 leftover): the pack ships no audio
+  and third-party files are a license headache, so the four new sounds
+  are **procedurally synthesized** 16-bit WAVs from a deterministic
+  seeded script checked in at `client/scripts/gen-sfx.mjs`
+  (regeneration is exact): `punch-whoosh` (band-passed noise sweep),
+  `punch-impact` (130→55Hz thump + click, replaces the slowed gun-shot),
+  `axe-whoosh` (rotation-modulated noise — reads as a spinning blade,
+  replaces the pitched grenade-throw), `axe-chop` (thunk + crack on
+  `axeResolved`, which previously had no landing sound). SOUND_MAP gains
+  matching keys; the Session 7 rate/detune stand-in calls are removed.
+- **Jack's no-axe body** (Session 6 leftover): extract the pack's
+  `Zombie_Axe/No-Axe` idle (Sheet6) / walk (Sheet8) / First-Attack
+  (Sheet7) sheets ×4 directions — frame counts and dims match the
+  with-axe sheets exactly, so this is a pure texture-prefix swap.
+  `CharacterDef` gains an optional alt-body field (data-only; server
+  ignores it); BootScene loads a parallel `jack-noaxe` anim set; the
+  renderer swaps prefix while `abilityCooldownSeconds > 0` (the axe is
+  in flight or "regrowing" — state already broadcast, zero wire
+  changes). The pack's Taking-Axe recovery flourish (Sheet3) is skipped
+  in v1.
+- **Dry-fire fix** (pre-existing, noted in Session 7): the out-of-ammo
+  beep reads the rifle mag even while a special weapon is held — gate it
+  on the held weapon's actual mag instead.
+
+**Type/plumbing checklist:** `PickupType.WEAPON_PISTOL` +
+`PickupSpawnType`; `WEAPONS.pistol.pickupAmmo: 36`; pistol spawn in all
+three map JSONs; `PlayerStats.hillSeconds`; `hill_hog` in
+`AWARD_DEFS`/`AWARD_IDS` + `HILL_HOG_MIN_SECONDS`;
+`server:leaderboard` in the ServerMessage union +
+`LeaderboardEntry` shared type; `CharacterDef` alt-body field (Jack
+only); new SOUND_MAP keys. No PlayerState/movement/physics changes —
+zero rubber-banding surface.
+
+**Assets:** `Objects/Pickable/Pistol.png` → `pickups/pistol.png`;
+`Enemies/Zombie_Axe/No-Axe/*_{Idle-Sheet6,Walk-Sheet8,First-Attack-Sheet7}`
+×4 dirs → `enemies/zombie-axe-noaxe_{dir}_{idle,run,attack}.png`;
+4 generated WAVs in `audio/`. ATTRIBUTION.md updated (generated WAVs
+noted as original, not pack assets).
+
+**Acceptance criteria**
+
+- [ ] Pistol pickup spawns on all three maps in DM/KOTH (active at
+      start, silent 30s respawn, never announced), auto-equips with
+      12+24, refreshes on re-grab, replaces a held shotgun (and vice
+      versa); never exists in Gun Game; HUD row and kill attribution
+      work unchanged (regression).
+- [ ] Hill Hog: hillSeconds accrues for every living occupant incl.
+      contested time, not for dead players, not outside KOTH; award
+      appears on KOTH results at ≥10s with a strict max; DM/Gun Game
+      results never show it; old persistent-stats files unaffected
+      (hillSeconds is match-scoped only).
+- [ ] Lobby shows the all-time top-5 panel (desktop + mobile
+      landscape); updates after a match ends without reconnecting;
+      hidden on an empty store; leaderboard message flows on connect.
+- [ ] Overtime plays the gameplay track's final 30s after the sting and
+      ends cleanly on kill or draw.
+- [ ] Punch whoosh/impact, axe throw, and axe landing play the new
+      generated SFX (stand-in rate/detune calls removed); dry-fire beep
+      reads the held weapon's mag.
+- [ ] Jack renders the no-axe body (idle/run/attack) exactly while his
+      ability cooldown runs, for local AND remote clients; with-axe
+      body returns at cooldown end; no other character affected.
+- [ ] Deterministic unit tests ≥90% on new server/shared logic; full
+      regression suites green; no shared-physics changes.
+
+**Parallelizable workstreams:** (a) shared config/types/maps + shared
+tests (must land first — single writer for `game.ts`); (b) asset
+extraction + SFX generation; (c) server — pickup case, hill seconds,
+award, store top-N, leaderboard broadcast + tests; (d) client — SFX
+wiring, overtime music, no-axe swap, lobby panel, pickup texture,
+dry-fire fix. (c) and (d) are independent once (a) and (b) land.
 
 ---
 
