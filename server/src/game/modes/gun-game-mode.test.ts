@@ -358,6 +358,7 @@ describe('GunGameMode', () => {
     it('enables only bandage pickups', () => {
       expect(mode.isPickupTypeEnabled(PickupType.BANDAGE)).toBe(true);
       expect(mode.isPickupTypeEnabled(PickupType.WEAPON_SHOTGUN)).toBe(false);
+      expect(mode.isPickupTypeEnabled(PickupType.WEAPON_PISTOL)).toBe(false);
       expect(mode.isPickupTypeEnabled(PickupType.GUN_AMMO)).toBe(false);
       expect(mode.isPickupTypeEnabled(PickupType.GRENADE)).toBe(false);
     });

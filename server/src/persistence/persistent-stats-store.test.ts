@@ -218,6 +218,54 @@ describe('PersistentStatsStore', () => {
     expect(store.getLifetime('Ryan')!.weaponKills.gun).toBe(7);
   });
 
+  describe('getTopPlayers', () => {
+    it('ranks by wins desc, then kills desc, then nickname asc (case-insensitive)', () => {
+      const store = makeStore();
+      // Amy: 2 wins, 5 kills. Zed: 2 wins, 9 kills. bob: 1 win. Cal: 0 wins.
+      store.recordMatch([entry('Amy', 3), entry('Cal', 1)], 'Amy');
+      store.recordMatch([entry('Amy', 2), entry('bob', 2)], 'Amy');
+      store.recordMatch([entry('Zed', 5), entry('Cal', 0)], 'Zed');
+      store.recordMatch([entry('Zed', 4), entry('bob', 3)], 'Zed');
+      store.recordMatch([entry('bob', 6), entry('Cal', 2)], 'bob');
+
+      const top = store.getTopPlayers(10);
+      // Zed beats Amy on the kills tie-break (both 2 wins); display casing
+      // is preserved even though ordering keys are lowercased.
+      expect(top.map((e) => e.nickname)).toEqual(['Zed', 'Amy', 'bob', 'Cal']);
+      expect(top[0]).toEqual({
+        nickname: 'Zed',
+        wins: 2,
+        losses: 0,
+        draws: 0,
+        kills: 9,
+        matches: 2,
+      });
+    });
+
+    it('breaks a full wins+kills tie by nickname ascending, case-insensitively', () => {
+      const store = makeStore();
+      // Both end 1 win / 0 kills; 'amy' < 'zed' regardless of casing.
+      store.recordMatch([entry('zed'), entry('Cal')], 'zed');
+      store.recordMatch([entry('Amy'), entry('Cal')], 'Amy');
+
+      const top = store.getTopPlayers(2);
+      expect(top.map((e) => e.nickname)).toEqual(['Amy', 'zed']);
+    });
+
+    it('limits the result to n entries', () => {
+      const store = makeStore();
+      store.recordMatch([entry('Amy', 1), entry('Bob', 0), entry('Cal', 0)], 'Amy');
+
+      expect(store.getTopPlayers(2)).toHaveLength(2);
+      expect(store.getTopPlayers(2)[0].nickname).toBe('Amy');
+    });
+
+    it('returns an empty array on an empty store', () => {
+      const store = makeStore();
+      expect(store.getTopPlayers(5)).toEqual([]);
+    });
+  });
+
   it('starts fresh on a corrupt file without throwing', () => {
     writeFileSync(path.join(dataDir, 'persistent-stats.json'), '{not json!!', 'utf8');
 

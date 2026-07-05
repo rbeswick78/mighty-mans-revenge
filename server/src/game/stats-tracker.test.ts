@@ -194,6 +194,17 @@ describe('StatsTracker', () => {
     });
   });
 
+  describe('record hill seconds', () => {
+    it('accumulates fractional seconds per player', () => {
+      tracker.recordHillSeconds('p1', 0.05);
+      tracker.recordHillSeconds('p1', 0.05);
+      tracker.recordHillSeconds('p2', 1.25);
+
+      expect(tracker.getStats('p1').hillSeconds).toBeCloseTo(0.1, 5);
+      expect(tracker.getStats('p2').hillSeconds).toBeCloseTo(1.25, 5);
+    });
+  });
+
   describe('get stats for individual player', () => {
     it('returns stats for an initialized player', () => {
       const stats = tracker.getStats('p1');
@@ -216,6 +227,7 @@ describe('StatsTracker', () => {
       });
       expect(stats.longestKillStreak).toBe(0);
       expect(stats.distanceTraveled).toBe(0);
+      expect(stats.hillSeconds).toBe(0);
     });
 
     it('throws for non-initialized player', () => {

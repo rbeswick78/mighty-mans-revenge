@@ -16,6 +16,7 @@ const SPAWN_TYPE_TO_PICKUP_TYPE: Record<PickupSpawnType, PickupType> = {
   gun_ammo: PickupType.GUN_AMMO,
   grenade: PickupType.GRENADE,
   weapon_shotgun: PickupType.WEAPON_SHOTGUN,
+  weapon_pistol: PickupType.WEAPON_PISTOL,
   bandage: PickupType.BANDAGE,
 };
 
@@ -29,6 +30,7 @@ export interface WeaponIncomingAnnouncement {
 function respawnTimeFor(type: PickupType): number {
   switch (type) {
     case PickupType.WEAPON_SHOTGUN:
+    case PickupType.WEAPON_PISTOL:
       return PICKUP.WEAPON_RESPAWN_TIME;
     case PickupType.BANDAGE:
       return PICKUP.BANDAGE_RESPAWN_TIME;
@@ -37,7 +39,14 @@ function respawnTimeFor(type: PickupType): number {
   }
 }
 
-function isWeaponPickup(type: PickupType): boolean {
+/**
+ * Power weapons that get the full drama treatment: start the match on
+ * their respawn timer (no camping mid at the opening whistle) and emit the
+ * "INCOMING" warning before every landing. Deliberately shotgun-only — the
+ * pistol is a sidegrade that spawns active and respawns silently, so the
+ * banner keeps its meaning.
+ */
+function isAnnouncedWeapon(type: PickupType): boolean {
   return type === PickupType.WEAPON_SHOTGUN;
 }
 
@@ -70,10 +79,11 @@ export class PickupManager {
       const type = SPAWN_TYPE_TO_PICKUP_TYPE[spawn.type] ?? PickupType.GUN_AMMO;
       if (!isTypeEnabled(type)) continue;
       const id = `pickup-${this.nextId++}`;
-      // Weapon pickups start the match on their full respawn timer instead
-      // of pre-placed, so the first drop gets the same "INCOMING" warning
-      // as every later one (and nobody camps mid at the opening whistle).
-      const weaponDelayed = isWeaponPickup(type);
+      // Announced weapons (shotgun) start the match on their full respawn
+      // timer instead of pre-placed, so the first drop gets the same
+      // "INCOMING" warning as every later one (and nobody camps mid at the
+      // opening whistle). The pistol sidegrade starts active like ammo.
+      const weaponDelayed = isAnnouncedWeapon(type);
       const pickup: PickupState = {
         id,
         type,
@@ -102,7 +112,7 @@ export class PickupManager {
       pickup.respawnTimer -= dt;
 
       if (
-        isWeaponPickup(pickup.type) &&
+        isAnnouncedWeapon(pickup.type) &&
         pickup.respawnTimer > 0 &&
         pickup.respawnTimer <= PICKUP.WEAPON_ANNOUNCE_LEAD &&
         !this.announced.has(pickup.id)
@@ -180,6 +190,18 @@ export class PickupManager {
         player.weaponId = 'shotgun';
         player.specialAmmo = shotgun.magazineSize;
         player.specialReserve = shotgun.pickupAmmo - shotgun.magazineSize;
+        player.isReloading = false;
+        player.reloadTimer = 0;
+        return true;
+      }
+      case PickupType.WEAPON_PISTOL: {
+        // Sidegrade twin of the shotgun case. Auto-equip means last-picked-
+        // up wins: grabbing a pistol while holding a shotgun replaces it
+        // (and vice versa); re-grabbing a pistol refreshes ammo to full.
+        const pistol = WEAPONS.pistol;
+        player.weaponId = 'pistol';
+        player.specialAmmo = pistol.magazineSize;
+        player.specialReserve = pistol.pickupAmmo - pistol.magazineSize;
         player.isReloading = false;
         player.reloadTimer = 0;
         return true;

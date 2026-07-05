@@ -24,13 +24,16 @@ interface SentMessage {
 
 function makeFakeServer() {
   const sent: SentMessage[] = [];
+  /** Mutable so tests can decide who the leaderboard rebroadcast reaches. */
+  const connected: PlayerId[] = [];
   const fake = {
     sendTo: vi.fn((playerId: PlayerId, message: ServerMessage, opts?: { reliable?: boolean }) => {
       sent.push({ playerId, message, reliable: !!opts?.reliable });
     }),
+    getConnectedPlayerIds: vi.fn(() => [...connected]),
     playerCount: 2,
   } as unknown as GameServer;
-  return { fake, sent };
+  return { fake, sent, connected };
 }
 
 describe('MatchmakingManager rematch flow', () => {
@@ -479,6 +482,45 @@ describe('MatchmakingManager persistent stats integration', () => {
         draws: 0,
       });
     }
+  });
+
+  it('rebroadcasts the refreshed leaderboard to every connection after stats are recorded', () => {
+    const { fake, sent, connected } = makeFakeServer();
+    store = new PersistentStatsStore(dataDir);
+    const mgr = new MatchmakingManager(fake, () => 0, store);
+
+    // A third, idle connection (lobby) must get the refresh too.
+    connected.push('A', 'B', 'C');
+
+    mgr.handleJoinMatchmaking('A', 'Ryan');
+    mgr.handleJoinMatchmaking('B', 'Dave');
+    const match = mgr.getActiveMatches()[0];
+    match.players.get('A')!.score = 3;
+    match.phase = MatchPhase.ENDED;
+    mgr.tick(0.05, 1);
+
+    const leaderboardMsgs = sent.filter((s) => s.message.type === 'server:leaderboard');
+    expect(leaderboardMsgs.map((s) => s.playerId)).toEqual(['A', 'B', 'C']);
+    for (const { message, reliable } of leaderboardMsgs) {
+      if (message.type !== 'server:leaderboard') throw new Error('unreachable');
+      expect(reliable).toBe(true);
+      // Ryan won, so he leads Dave; the just-recorded match is included.
+      expect(message.entries.map((e) => e.nickname)).toEqual(['Ryan', 'Dave']);
+      expect(message.entries[0].wins).toBe(1);
+    }
+  });
+
+  it('sends no leaderboard when no store is configured', () => {
+    const { fake, sent, connected } = makeFakeServer();
+    const mgr = new MatchmakingManager(fake);
+    connected.push('A', 'B');
+
+    mgr.handleJoinMatchmaking('A', 'Ryan');
+    mgr.handleJoinMatchmaking('B', 'Dave');
+    mgr.getActiveMatches()[0].phase = MatchPhase.ENDED;
+    mgr.tick(0.05, 1);
+
+    expect(sent.some((s) => s.message.type === 'server:leaderboard')).toBe(false);
   });
 
   it('ships rivalry: null when no store is configured', () => {

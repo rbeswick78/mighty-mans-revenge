@@ -18,6 +18,7 @@ export class StatsTracker {
       killsByWeapon: createEmptyKillsByWeapon(),
       longestKillStreak: 0,
       distanceTraveled: 0,
+      hillSeconds: 0,
     });
     this.currentStreaks.set(playerId, 0);
   }
@@ -71,6 +72,16 @@ export class StatsTracker {
   recordDistance(playerId: PlayerId, px: number): void {
     const s = this.getStatsOrThrow(playerId);
     s.distanceTraveled += px;
+  }
+
+  /**
+   * Accumulate (fractional) seconds spent alive inside the live KOTH hill,
+   * contested time included. Only KothMode calls this — every other mode
+   * leaves hillSeconds at 0, which keeps the Hill Hog award KOTH-only.
+   */
+  recordHillSeconds(playerId: PlayerId, seconds: number): void {
+    const s = this.getStatsOrThrow(playerId);
+    s.hillSeconds += seconds;
   }
 
   getStats(playerId: PlayerId): PlayerStats {

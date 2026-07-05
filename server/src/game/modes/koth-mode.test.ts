@@ -269,6 +269,82 @@ describe('KothMode', () => {
     });
   });
 
+  describe('hill seconds (Hill Hog accrual)', () => {
+    it('accrues for a sole living occupant', () => {
+      const p1 = makePlayer('p1');
+      const p2 = makePlayer('p2');
+      placeInHill(p1, HILLS[0]);
+      placeOutside(p2);
+      const ctx = makeContext([p1, p2], { hills: HILLS });
+      mode.onStart(ctx);
+
+      tickSeconds(mode, ctx, 3);
+      expect(ctx.stats.getStats('p1').hillSeconds).toBeCloseTo(3, 5);
+      expect(ctx.stats.getStats('p2').hillSeconds).toBe(0);
+    });
+
+    it('accrues for BOTH players while contested, even though score does not', () => {
+      const p1 = makePlayer('p1');
+      const p2 = makePlayer('p2');
+      placeInHill(p1, HILLS[0]);
+      placeInHill(p2, HILLS[0]);
+      const ctx = makeContext([p1, p2], { hills: HILLS });
+      mode.onStart(ctx);
+
+      tickSeconds(mode, ctx, 2);
+      // Contested time is deliberately broader than score: both bank hill
+      // seconds while neither earns a point.
+      expect(ctx.stats.getStats('p1').hillSeconds).toBeCloseTo(2, 5);
+      expect(ctx.stats.getStats('p2').hillSeconds).toBeCloseTo(2, 5);
+      expect(p1.score).toBe(0);
+      expect(p2.score).toBe(0);
+    });
+
+    it('does not accrue for a dead player inside the zone', () => {
+      const p1 = makePlayer('p1');
+      const p2 = makePlayer('p2');
+      placeInHill(p1, HILLS[0]);
+      placeInHill(p2, HILLS[0]);
+      p2.isDead = true;
+      const ctx = makeContext([p1, p2], { hills: HILLS });
+      mode.onStart(ctx);
+
+      tickSeconds(mode, ctx, 1);
+      expect(ctx.stats.getStats('p1').hillSeconds).toBeCloseTo(1, 5);
+      expect(ctx.stats.getStats('p2').hillSeconds).toBe(0);
+    });
+
+    it('does not accrue during overtime (the hill is retired)', () => {
+      const p1 = makePlayer('p1');
+      placeInHill(p1, HILLS[0]);
+      const ctx = makeContext([p1], { hills: HILLS });
+      mode.onStart(ctx);
+      ctx.isOvertime = true;
+      ctx.matchTimer = OVERTIME.DURATION;
+
+      tickSeconds(mode, ctx, 5);
+      expect(ctx.stats.getStats('p1').hillSeconds).toBe(0);
+    });
+
+    it('keeps accruing across occupancy resets — leaving and returning never wipes it', () => {
+      const p1 = makePlayer('p1');
+      placeInHill(p1, HILLS[0]);
+      const ctx = makeContext([p1], { hills: HILLS });
+      mode.onStart(ctx);
+
+      tickSeconds(mode, ctx, 0.9);
+      placeOutside(p1);
+      tickSeconds(mode, ctx, 1);
+      placeInHill(p1, HILLS[0]);
+      tickSeconds(mode, ctx, 0.5);
+
+      // Score progress died with the exit (still 0 points), but the stat
+      // is a lifetime-of-match accumulator: 0.9 + 0.5.
+      expect(p1.score).toBe(0);
+      expect(ctx.stats.getStats('p1').hillSeconds).toBeCloseTo(1.4, 5);
+    });
+  });
+
   describe('hill relocation', () => {
     it('relocates round-robin every HILL_MOVE_INTERVAL seconds and wraps', () => {
       const ctx = makeContext([makePlayer('p1')], { hills: HILLS });

@@ -15,6 +15,7 @@ function makeStats(overrides: Partial<PlayerStats> = {}): PlayerStats {
     killsByWeapon: createEmptyKillsByWeapon(),
     longestKillStreak: 0,
     distanceTraveled: 0,
+    hillSeconds: 0,
     ...overrides,
   };
 }
@@ -79,6 +80,50 @@ describe('computeAwards', () => {
         p2: makeStats({ shotsFired: 20, shotsHit: 10 }),
       });
       expect(awards.find((a) => a.id === 'sharpshooter')).toBeUndefined();
+    });
+  });
+
+  describe('hill hog', () => {
+    it('goes to the most hill seconds at or above the threshold, rounded in the detail', () => {
+      const awards = compute({
+        p1: makeStats({ hillSeconds: 42.4 }),
+        p2: makeStats({ hillSeconds: AWARDS.HILL_HOG_MIN_SECONDS }),
+      });
+      const hog = awards.find((a) => a.id === 'hill_hog');
+      expect(hog).toEqual({
+        id: 'hill_hog',
+        playerId: 'p1',
+        nickname: 'P1',
+        detail: '42S ON THE HILL',
+      });
+    });
+
+    it('exactly the threshold qualifies; just below does not', () => {
+      const at = compute({
+        p1: makeStats({ hillSeconds: AWARDS.HILL_HOG_MIN_SECONDS }),
+      });
+      expect(at.find((a) => a.id === 'hill_hog')?.playerId).toBe('p1');
+
+      const below = compute({
+        p1: makeStats({ hillSeconds: AWARDS.HILL_HOG_MIN_SECONDS - 0.01 }),
+      });
+      expect(below.find((a) => a.id === 'hill_hog')).toBeUndefined();
+    });
+
+    it('is not handed out on an exact tie', () => {
+      const awards = compute({
+        p1: makeStats({ hillSeconds: 30 }),
+        p2: makeStats({ hillSeconds: 30 }),
+      });
+      expect(awards.find((a) => a.id === 'hill_hog')).toBeUndefined();
+    });
+
+    it('never appears for a DM-like stats map where nobody accrued hill time', () => {
+      const awards = compute({
+        p1: makeStats({ kills: 5, shotsFired: 40, shotsHit: 20, damageTaken: 80 }),
+        p2: makeStats({ kills: 3, shotsFired: 30, shotsHit: 10, damageTaken: 120 }),
+      });
+      expect(awards.find((a) => a.id === 'hill_hog')).toBeUndefined();
     });
   });
 

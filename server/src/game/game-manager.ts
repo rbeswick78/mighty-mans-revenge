@@ -1,4 +1,5 @@
 import {
+  LEADERBOARD,
   SERVER,
 } from '@shared/game';
 import type {
@@ -22,9 +23,16 @@ export class GameManager {
    * time. Defaults to 0 for players who haven't yet sent a ping.
    */
   private readonly playerRTTs: Map<PlayerId, number> = new Map();
+  /**
+   * Lifetime stats store, shared with matchmaking. Kept here too so the
+   * connect handler can ship the all-time leaderboard alongside the
+   * welcome. Optional — tests and store-less embeddings just skip it.
+   */
+  private readonly statsStore: PersistentStatsStore | undefined;
 
   constructor(server: GameServer, statsStore?: PersistentStatsStore) {
     this.server = server;
+    this.statsStore = statsStore;
     this.matchmaking = new MatchmakingManager(
       server,
       (pid) => this.playerRTTs.get(pid) ?? 0,
@@ -64,9 +72,23 @@ export class GameManager {
   }
 
   private wireEvents(): void {
-    this.server.onConnect((_playerId: PlayerId) => {
+    this.server.onConnect((playerId: PlayerId) => {
       // Player connected — they'll join matchmaking via a client message
-      logger.debug({ playerId: _playerId }, 'Player connected, awaiting matchmaking join');
+      logger.debug({ playerId }, 'Player connected, awaiting matchmaking join');
+
+      // Ship the all-time leaderboard right behind the welcome. Reliable:
+      // it's a one-shot — the next refresh only comes when a match ends.
+      // Empty entries are still sent so the client knows to hide the panel.
+      if (this.statsStore) {
+        this.server.sendTo(
+          playerId,
+          {
+            type: 'server:leaderboard',
+            entries: this.statsStore.getTopPlayers(LEADERBOARD.SIZE),
+          },
+          { reliable: true },
+        );
+      }
     });
 
     this.server.onDisconnect((playerId: PlayerId) => {

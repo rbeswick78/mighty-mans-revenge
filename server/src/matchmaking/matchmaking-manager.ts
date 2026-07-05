@@ -2,6 +2,7 @@ import {
   MatchPhase,
   GameModeType,
   GAME_MODE_ROTATION,
+  LEADERBOARD,
   getNextGameMode,
   getMap,
   getNextMapName,
@@ -676,6 +677,18 @@ export class MatchmakingManager {
         result.rivalry = this.statsStore.getRivalry(
           entries[0].nickname,
           entries[1].nickname,
+        );
+      }
+
+      // The lifetime records just changed — refresh every connected
+      // client's all-time leaderboard (idle lobbies included). Reliable:
+      // one-shot per match end, the next refresh is a match away.
+      const leaderboardEntries = this.statsStore.getTopPlayers(LEADERBOARD.SIZE);
+      for (const connectedId of this.server.getConnectedPlayerIds()) {
+        this.server.sendTo(
+          connectedId,
+          { type: 'server:leaderboard', entries: leaderboardEntries },
+          { reliable: true },
         );
       }
     }

@@ -80,6 +80,16 @@ function evaluate(id: AwardId, playerId: PlayerId, s: PlayerStats): Candidate | 
       const acc = accuracy(s);
       return { playerId, value: acc, detail: `${Math.round(acc * 100)}% ACCURACY` };
     }
+    case 'hill_hog': {
+      // Only KOTH accrues hillSeconds (contested time included), so the
+      // threshold silently filters this award out of DM / Gun Game.
+      if (s.hillSeconds < AWARDS.HILL_HOG_MIN_SECONDS) return null;
+      return {
+        playerId,
+        value: s.hillSeconds,
+        detail: `${Math.round(s.hillSeconds)}S ON THE HILL`,
+      };
+    }
     case 'spray_and_pray': {
       if (s.shotsFired < AWARDS.SPRAY_AND_PRAY_MIN_SHOTS) return null;
       const acc = accuracy(s);

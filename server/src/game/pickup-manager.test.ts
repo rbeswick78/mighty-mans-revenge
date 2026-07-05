@@ -293,6 +293,93 @@ describe('PickupManager', () => {
       );
     });
 
+    it('WEAPON_PISTOL equips the pistol with full mag + reserve and cancels a reload', () => {
+      const player = makePlayer({ isReloading: true, reloadTimer: 0.6 });
+      const pickup = {
+        id: 'p1',
+        type: PickupType.WEAPON_PISTOL,
+        position: { x: 0, y: 0 },
+        isActive: true,
+        respawnTimer: 0,
+      };
+
+      const result = manager.applyPickup(pickup, player);
+      expect(result).toBe(true);
+      expect(player.weaponId).toBe('pistol');
+      expect(player.specialAmmo).toBe(WEAPONS.pistol.magazineSize);
+      expect(player.specialReserve).toBe(
+        WEAPONS.pistol.pickupAmmo - WEAPONS.pistol.magazineSize,
+      );
+      expect(player.isReloading).toBe(false);
+      expect(player.reloadTimer).toBe(0);
+    });
+
+    it('WEAPON_PISTOL refreshes ammo to full when already holding a pistol', () => {
+      const player = makePlayer({
+        weaponId: 'pistol',
+        specialAmmo: 1,
+        specialReserve: 0,
+      });
+      const pickup = {
+        id: 'p1',
+        type: PickupType.WEAPON_PISTOL,
+        position: { x: 0, y: 0 },
+        isActive: true,
+        respawnTimer: 0,
+      };
+
+      const result = manager.applyPickup(pickup, player);
+      expect(result).toBe(true);
+      expect(player.weaponId).toBe('pistol');
+      expect(player.specialAmmo).toBe(WEAPONS.pistol.magazineSize);
+      expect(player.specialReserve).toBe(
+        WEAPONS.pistol.pickupAmmo - WEAPONS.pistol.magazineSize,
+      );
+    });
+
+    it('last-picked-up wins: a pistol replaces a held shotgun, and vice versa', () => {
+      const pistolPickup = {
+        id: 'p1',
+        type: PickupType.WEAPON_PISTOL,
+        position: { x: 0, y: 0 },
+        isActive: true,
+        respawnTimer: 0,
+      };
+      const shotgunPickup = {
+        id: 'p2',
+        type: PickupType.WEAPON_SHOTGUN,
+        position: { x: 0, y: 0 },
+        isActive: true,
+        respawnTimer: 0,
+      };
+
+      // Shotgun in hand, walks over the pistol: pistol wins.
+      const shotgunHolder = makePlayer({
+        weaponId: 'shotgun',
+        specialAmmo: WEAPONS.shotgun.magazineSize,
+        specialReserve: 4,
+      });
+      expect(manager.applyPickup(pistolPickup, shotgunHolder)).toBe(true);
+      expect(shotgunHolder.weaponId).toBe('pistol');
+      expect(shotgunHolder.specialAmmo).toBe(WEAPONS.pistol.magazineSize);
+      expect(shotgunHolder.specialReserve).toBe(
+        WEAPONS.pistol.pickupAmmo - WEAPONS.pistol.magazineSize,
+      );
+
+      // Pistol in hand, walks over the shotgun: shotgun wins.
+      const pistolHolder = makePlayer({
+        weaponId: 'pistol',
+        specialAmmo: 5,
+        specialReserve: 10,
+      });
+      expect(manager.applyPickup(shotgunPickup, pistolHolder)).toBe(true);
+      expect(pistolHolder.weaponId).toBe('shotgun');
+      expect(pistolHolder.specialAmmo).toBe(WEAPONS.shotgun.magazineSize);
+      expect(pistolHolder.specialReserve).toBe(
+        WEAPONS.shotgun.pickupAmmo - WEAPONS.shotgun.magazineSize,
+      );
+    });
+
     it('BANDAGE heals by BANDAGE_HEAL capped at max health', () => {
       const player = makePlayer({ health: 85 });
       const pickup = {
@@ -327,12 +414,68 @@ describe('PickupManager', () => {
   });
 
   describe('weapon pickups', () => {
-    it('spawns inactive with the weapon respawn timer running', () => {
-      manager.initFromMap(makeMapData([{ x: 5, y: 5, type: 'weapon_shotgun' }]));
+    it('shotgun spawns inactive with the weapon respawn timer running; pistol spawns active', () => {
+      manager.initFromMap(
+        makeMapData([
+          { x: 5, y: 5, type: 'weapon_shotgun' },
+          { x: 7, y: 7, type: 'weapon_pistol' },
+        ]),
+      );
+      const pickups = manager.getPickups();
+
+      // The shotgun is the announced power weapon: first drop is delayed
+      // onto its full respawn timer.
+      const shotgun = pickups.find((p) => p.type === PickupType.WEAPON_SHOTGUN)!;
+      expect(shotgun.isActive).toBe(false);
+      expect(shotgun.respawnTimer).toBe(PICKUP.WEAPON_RESPAWN_TIME);
+
+      // The pistol is a sidegrade: collectible from the opening whistle.
+      const pistol = pickups.find((p) => p.type === PickupType.WEAPON_PISTOL)!;
+      expect(pistol.isActive).toBe(true);
+      expect(pistol.respawnTimer).toBe(0);
+    });
+
+    it('pistol respawns on the weapon respawn timer after collection', () => {
+      manager.initFromMap(makeMapData([{ x: 5, y: 5, type: 'weapon_pistol' }]));
       const [pickup] = manager.getPickups();
-      expect(pickup.type).toBe(PickupType.WEAPON_SHOTGUN);
+      manager.collectPickup(pickup.id);
+
       expect(pickup.isActive).toBe(false);
       expect(pickup.respawnTimer).toBe(PICKUP.WEAPON_RESPAWN_TIME);
+
+      manager.update(PICKUP.WEAPON_RESPAWN_TIME - 1);
+      expect(pickup.isActive).toBe(false);
+      manager.update(2);
+      expect(pickup.isActive).toBe(true);
+    });
+
+    it('never announces the pistol across a full respawn cycle', () => {
+      manager.initFromMap(makeMapData([{ x: 5, y: 5, type: 'weapon_pistol' }]));
+      const [pickup] = manager.getPickups();
+      manager.collectPickup(pickup.id);
+
+      // Walk the whole timer down in small steps so every announce window
+      // is crossed; the pistol must stay silent throughout.
+      const step = 0.5;
+      const steps = Math.ceil((PICKUP.WEAPON_RESPAWN_TIME + 1) / step);
+      for (let i = 0; i < steps; i++) {
+        expect(manager.update(step)).toHaveLength(0);
+      }
+      expect(pickup.isActive).toBe(true);
+    });
+
+    it('a bandage-only type veto (Gun Game) filters pistol spawns out entirely', () => {
+      manager.initFromMap(
+        makeMapData([
+          { x: 5, y: 5, type: 'weapon_pistol' },
+          { x: 6, y: 6, type: 'weapon_shotgun' },
+          { x: 7, y: 7, type: 'bandage' },
+        ]),
+        (type) => type === PickupType.BANDAGE,
+      );
+      const pickups = manager.getPickups();
+      expect(pickups).toHaveLength(1);
+      expect(pickups[0].type).toBe(PickupType.BANDAGE);
     });
 
     it('announces once when crossing the announce lead, then lands', () => {

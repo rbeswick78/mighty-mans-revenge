@@ -78,6 +78,14 @@ export class KothMode implements GameMode {
       }
     }
 
+    // Hill Hog accrual: EVERY living occupant banks hill time, contested
+    // time included — deliberately broader than score (sole occupancy),
+    // which integer-rounds into points and would just re-award the winner.
+    // Overtime never reaches here (hill retired by the early return above).
+    for (const id of occupants) {
+      match.stats.recordHillSeconds(id, dt);
+    }
+
     if (occupants.length !== 1) {
       // Empty or contested — either way nobody scores and progress resets.
       const wasContested = occupants.length > 1;

@@ -3,7 +3,7 @@ import { mkdir, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { KILL_WEAPONS, createEmptyKillsByWeapon } from '@shared/game';
-import type { KillWeapon, RivalryRecord } from '@shared/game';
+import type { KillWeapon, LeaderboardEntry, RivalryRecord } from '@shared/game';
 import { logger } from '../utils/logger.js';
 
 /** Lifetime totals for one player, keyed in the file by lowercased nickname. */
@@ -169,6 +169,30 @@ export class PersistentStatsStore {
   /** Lifetime totals for a nickname, or null if never seen. */
   getLifetime(nickname: string): LifetimePlayerStats | null {
     return this.data.players[normalizeKey(nickname)] ?? null;
+  }
+
+  /**
+   * The top `n` persisted players ranked by lifetime wins desc, then kills
+   * desc, then nickname asc (by the lowercased storage key, so the order is
+   * case-insensitive; entries ship the display-cased nickname). Feeds the
+   * server:leaderboard message. Empty store → empty array.
+   */
+  getTopPlayers(n: number): LeaderboardEntry[] {
+    return Object.entries(this.data.players)
+      .sort(([keyA, a], [keyB, b]) => {
+        if (b.wins !== a.wins) return b.wins - a.wins;
+        if (b.kills !== a.kills) return b.kills - a.kills;
+        return keyA < keyB ? -1 : keyA > keyB ? 1 : 0;
+      })
+      .slice(0, n)
+      .map(([, p]) => ({
+        nickname: p.nickname,
+        wins: p.wins,
+        losses: p.losses,
+        draws: p.draws,
+        kills: p.kills,
+        matches: p.matches,
+      }));
   }
 
   /** Wait for every queued file write to land (shutdown / tests). */
