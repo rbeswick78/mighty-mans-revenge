@@ -412,12 +412,13 @@ export class GameScene extends Phaser.Scene {
 
         // Build serialized state array for the player manager.
         // Inside an active match the local state always has a non-null
-        // characterId (server selects/auto-locks before COUNTDOWN), but
-        // PlayerState models it as nullable. Fall back to 'mighty_man'
-        // for the rare frame the renderer might briefly construct on a
-        // stale snapshot — this only matters for the very first render
-        // before reconciliation, where the visible difference is one
-        // tick of a placeholder sprite.
+        // characterId (server selects/auto-locks before COUNTDOWN, and
+        // NetworkManager resets localPlayerState on every matchFound so
+        // it is re-seeded from the new match's first snapshot), but
+        // PlayerState models it as nullable. The 'mighty_man' fallback
+        // only satisfies the type system: if it ever rendered, the
+        // ClientPlayerManager rebuilds the renderer the moment the real
+        // characterId disagrees, so a placeholder can't stick.
         const localCharacterId = currentLocalState.characterId ?? 'mighty_man';
         const allPlayers: SerializedPlayerState[] = [{
           id: currentLocalState.id,

@@ -481,6 +481,16 @@ export class PlayerRenderer {
   }
 
   /**
+   * The character this renderer was constructed for. Everything visual
+   * (sheets, tint, wand, gun overlay) is fixed at construction, so a
+   * state whose characterId differs means the renderer must be rebuilt —
+   * ClientPlayerManager checks this every update.
+   */
+  getCharacterId(): CharacterId {
+    return this.characterId;
+  }
+
+  /**
    * Toggle the big_heads render scale. Scales only the body/weapon art —
    * the health bar and nickname stay put, and the matching hitbox scale
    * lives server-side (hit validation) plus the aim-line preview.

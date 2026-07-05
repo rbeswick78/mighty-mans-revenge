@@ -28,6 +28,16 @@ export class ClientPlayerManager {
       currentIds.add(playerState.id);
 
       let renderer = this.renderers.get(playerState.id);
+      // A PlayerRenderer bakes its character in at construction (sheets,
+      // tint, overlays). If the authoritative characterId ever disagrees
+      // — e.g. the first frame rendered off a placeholder before the
+      // first snapshot arrived — rebuild instead of showing the wrong
+      // body for the rest of the match.
+      if (renderer && renderer.getCharacterId() !== playerState.characterId) {
+        renderer.destroy();
+        this.renderers.delete(playerState.id);
+        renderer = undefined;
+      }
       if (!renderer) {
         // SerializedPlayerState.characterId is non-null inside an active
         // match (server only ships gameState messages from COUNTDOWN

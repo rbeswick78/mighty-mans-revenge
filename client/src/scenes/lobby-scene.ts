@@ -33,6 +33,16 @@ const LEADERBOARD_ROW_COLOR = Wasteland.WALL_FILL;    // dim, matches footer
 export class LobbyScene extends Phaser.Scene {
   private nicknameText!: Phaser.GameObjects.Text;
   private nicknameInput: HTMLInputElement | null = null;
+  /** Phaser wrapper around the HTML input — hidden while searching. */
+  private nicknameDom: Phaser.GameObjects.DOMElement | null = null;
+  /**
+   * The name-entry group (callsign label, input box graphics, nickname
+   * text). The searching state occupies the same panel band (y≈70 sits
+   * inside the input box), so these swap out wholesale when a search
+   * starts — leaving them visible stamps "SEARCHING FOR OPPONENT" over
+   * the player's name.
+   */
+  private nameEntryUi: Array<Phaser.GameObjects.Text | Phaser.GameObjects.Graphics> = [];
   private searchingText!: Phaser.GameObjects.Text;
   private searchTimerText!: Phaser.GameObjects.Text;
   private cancelButton!: PixelButton;
@@ -51,6 +61,7 @@ export class LobbyScene extends Phaser.Scene {
 
   // Event handler references for cleanup
   private onMatchFound: ((matchData: MatchData) => void) | null = null;
+  private onDraftState: (() => void) | null = null;
   private onMatchmakingStatus: ((msg: ServerMatchmakingStatusMessage) => void) | null = null;
   private onDisconnected: (() => void) | null = null;
   private onLeaderboard: ((entries: LeaderboardEntry[]) => void) | null = null;
@@ -170,6 +181,9 @@ export class LobbyScene extends Phaser.Scene {
       inputCenterAbsX,
       inputCenterAbsY,
     );
+
+    // Fresh array each create() — scene restarts rebuild these objects.
+    this.nameEntryUi = [callsignLabel, inputBgGfx, this.nicknameText];
 
     // Quick Match button (primary CTA, centered in lower half of panel)
     const qmW = 260;
@@ -323,8 +337,19 @@ export class LobbyScene extends Phaser.Scene {
       this.searchTimerEvent.remove();
       this.searchTimerEvent = null;
     }
-    // DOM element is destroyed with the scene; drop the reference.
+    // DOM element is destroyed with the scene; drop the references.
     this.nicknameInput = null;
+    this.nicknameDom = null;
+    this.nameEntryUi = [];
+  }
+
+  /**
+   * Show/hide the callsign entry group (label, box, name text, HTML
+   * input). Hidden while a search runs; restored when it stops.
+   */
+  private setNameEntryVisible(visible: boolean): void {
+    for (const obj of this.nameEntryUi) obj.setVisible(visible);
+    this.nicknameDom?.setVisible(visible);
   }
 
   private wireGameServiceEvents(): void {
@@ -351,6 +376,27 @@ export class LobbyScene extends Phaser.Scene {
       this.time.delayedCall(500, goToGame);
     };
 
+    // A real (non-FORCE-pinned) match opens with the pre-match draft: the
+    // first server:draftState routes to DraftScene, and matchFound only
+    // arrives later — after both picks — while DraftScene is live. The
+    // matchFound listener above stays wired for the FORCE/no-draft path.
+    this.onDraftState = () => {
+      // draftState rebroadcasts every server tick — tear the listeners
+      // down IMMEDIATELY so the 20Hz stream can't re-enter mid-fade and
+      // start the scene twice.
+      this.cleanupEvents();
+      this.isSearching = false;
+      let transitioned = false;
+      const goToDraft = (): void => {
+        if (transitioned) return;
+        transitioned = true;
+        this.scene.start('DraftScene', { nickname: this.nickname });
+      };
+      this.cameras.main.fadeOut(300, 0, 0, 0);
+      this.cameras.main.once('camerafadeoutcomplete', goToDraft);
+      this.time.delayedCall(500, goToDraft);
+    };
+
     this.onMatchmakingStatus = (msg: ServerMatchmakingStatusMessage) => {
       if (msg.playersOnline !== undefined) {
         this.setPlayerCount(msg.playersOnline);
@@ -369,6 +415,7 @@ export class LobbyScene extends Phaser.Scene {
     };
 
     this.gameService.on('matchFound', this.onMatchFound);
+    this.gameService.on('draftState', this.onDraftState);
     this.gameService.on('matchmakingStatus', this.onMatchmakingStatus);
     this.gameService.on('disconnected', this.onDisconnected);
     this.gameService.on('leaderboard', this.onLeaderboard);
@@ -378,6 +425,10 @@ export class LobbyScene extends Phaser.Scene {
     if (this.onMatchFound) {
       this.gameService.off('matchFound', this.onMatchFound);
       this.onMatchFound = null;
+    }
+    if (this.onDraftState) {
+      this.gameService.off('draftState', this.onDraftState);
+      this.onDraftState = null;
     }
     if (this.onMatchmakingStatus) {
       this.gameService.off('matchmakingStatus', this.onMatchmakingStatus);
@@ -442,7 +493,10 @@ export class LobbyScene extends Phaser.Scene {
       textAlign: 'center',
     } as Partial<CSSStyleDeclaration>);
 
-    this.add.dom(x, y, input).setOrigin(0.5, 0.5).setDepth(WastelandStreet.DEPTH.UI + 1);
+    this.nicknameDom = this.add
+      .dom(x, y, input)
+      .setOrigin(0.5, 0.5)
+      .setDepth(WastelandStreet.DEPTH.UI + 1);
 
     input.addEventListener('input', () => {
       const sanitized = input.value
@@ -508,7 +562,10 @@ export class LobbyScene extends Phaser.Scene {
       this.scale.startFullscreen();
     }
 
-    // Swap panel content into searching state
+    // Swap panel content into searching state. The name-entry group must
+    // hide too — the searching text sits in the input box's band, and the
+    // invisible HTML <input> would otherwise keep swallowing taps.
+    this.setNameEntryVisible(false);
     this.searchingText.setVisible(true);
     this.searchTimerText.setVisible(true);
     this.cancelButton.setVisible(true);
@@ -553,6 +610,7 @@ export class LobbyScene extends Phaser.Scene {
     this.searchTimerText.setVisible(false);
     this.cancelButton.setVisible(false);
     this.quickMatchButton.setVisible(true);
+    this.setNameEntryVisible(true);
 
     if (this.searchingTween) {
       this.searchingTween.stop();

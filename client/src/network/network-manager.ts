@@ -4,6 +4,7 @@ import type { PlayerInput, PlayerState } from '@shared/types/player.js';
 import type { AxeState, GrenadeState, PunchEvent } from '@shared/types/projectile.js';
 import type { PickupState } from '@shared/types/pickup.js';
 import type {
+  DraftCategory,
   ServerMessage,
   ServerGameStateMessage,
   KothHudState,
@@ -23,6 +24,7 @@ type EventName =
   | 'reconnecting'
   | 'welcome'
   | 'matchFound'
+  | 'draftState'
   | 'matchCountdown'
   | 'matchStart'
   | 'matchEnd'
@@ -156,11 +158,32 @@ export class NetworkManager {
   disconnect(): void {
     this.connection.disconnect();
     this.localPlayerId = null;
+    this.resetMatchState();
+  }
+
+  /**
+   * Drop all per-match state. Runs on disconnect AND on every
+   * server:matchFound — the connection (and localPlayerId) persist across
+   * rematch/re-queue, so anything match-scoped that lingers here leaks
+   * into the next match. The first gameState snapshot of the new match
+   * re-seeds localPlayerState via serverStateToPlayerState (fresh
+   * characterId included).
+   */
+  private resetMatchState(): void {
     this.localPlayerState = null;
+    this.prediction = new ClientPrediction();
+    this.interpolation = new EntityInterpolation();
+    this.remotePlayerIds = [];
+    this.latestGrenades = [];
+    this.lastGrenadePositions.clear();
+    this.latestAxes = [];
+    this.lastAxeStates.clear();
+    this.latestPickups = [];
     this.matchEndsAtLocalMs = null;
     this._activeMutators = [];
     this._kothState = null;
     this._isOvertime = false;
+    this.lastCountdownEmitted = -1;
   }
 
   /** Currently active mutators, in activation order (empty if none). */
@@ -222,6 +245,16 @@ export class NetworkManager {
   /** Send a hover update during the character-select phase. */
   sendCharacterHover(characterId: CharacterId): void {
     this.connection.send({ type: 'client:characterHover', characterId });
+  }
+
+  /**
+   * Send a map/mode pick during the pre-match draft. The server validates
+   * turn + category availability + value and silently ignores anything
+   * invalid, so this is safe to fire-and-forget — the next draftState
+   * snapshot echoes an accepted pick.
+   */
+  sendDraftPick(category: DraftCategory, value: string): void {
+    this.connection.send({ type: 'client:draftPick', category, value });
   }
 
   /** Lock in the chosen character for the character-select phase. */
@@ -355,7 +388,24 @@ export class NetworkManager {
         break;
 
       case 'server:matchFound':
+        // A new match is starting on this same connection (rematch or
+        // re-queue). Drop every piece of per-match client state BEFORE
+        // the scenes react: localPlayerState survives across matches
+        // otherwise, and reconciliation never rewrites characterId — so
+        // without this reset the local player renders as their PREVIOUS
+        // character and prediction runs at the previous character's
+        // speed (permanent rubber-banding when the speeds differ).
+        // Fresh buffers also stop last match's grenades/axes/pickups
+        // from ghost-rendering during the new countdown.
+        this.resetMatchState();
         this.emit('matchFound', msg);
+        break;
+
+      case 'server:draftState':
+        // Pre-match draft snapshot, broadcast every tick while drafting
+        // (before any match exists — no per-match state to reset here;
+        // that happens on the server:matchFound that ends the draft).
+        this.emit('draftState', msg);
         break;
 
       case 'server:characterSelectState':
@@ -619,6 +669,11 @@ export class NetworkManager {
       position: result.position,
       velocity: result.velocity,
       stamina: result.stamina,
+      // Server-authoritative and immutable per match — forwarded so a
+      // localPlayerState that predates the lock commit (or survived a
+      // match boundary) can never feed a stale id into rendering or
+      // playerMovementModifiers.
+      characterId: serverState.characterId,
       // Always trust server for these values
       health: serverState.health,
       maxHealth: serverState.maxHealth,

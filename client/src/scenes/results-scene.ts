@@ -38,7 +38,7 @@ const NO_DATA_COLOR = Wasteland.COVER_FILL;
 const LOSER_TINT = 0x55454f;
 const AWARD_NAME_COLOR = Wasteland.LOADING_BAR_FILL;  // hot orange accent
 const RIVALRY_COLOR = Wasteland.HEALTH_WARNING;       // amber
-const NEXT_MAP_COLOR = Wasteland.LOADING_BAR_FILL;    // hot orange accent
+const NEXT_DRAFT_COLOR = Wasteland.LOADING_BAR_FILL;  // hot orange accent
 
 // Awards + rivalry strip sits between the stats panel (ends at y=460) and
 // the rematch status line (camHeight - 130 = 590 on the 960x720 canvas).
@@ -58,6 +58,7 @@ export class ResultsScene extends Phaser.Scene {
   // Event handler references for cleanup
   private onRematchStatus: ((opponentWantsRematch: boolean) => void) | null = null;
   private onMatchFound: ((matchData: MatchData) => void) | null = null;
+  private onDraftState: (() => void) | null = null;
   private onOpponentDisconnected: ((playerId: PlayerId) => void) | null = null;
   private onMatchmakingStatus: ((msg: ServerMatchmakingStatusMessage) => void) | null = null;
 
@@ -127,24 +128,21 @@ export class ResultsScene extends Phaser.Scene {
         .setDepth(WastelandStreet.DEPTH.UI);
     }
 
-    // Rotation teaser under the banner — the mode + map a rematch will be
-    // played on (server-pinned, so this can't lie). Absent on old/partial
-    // payloads → render what's available, or nothing.
-    if (this.result?.nextMapName) {
-      const nextModePrefix = this.result.nextGameMode
-        ? `${gameModeDisplayName(this.result.nextGameMode)} ON `
-        : 'MAP ';
-      const nextMap = this.add
-        .text(centerX, 112, `NEXT: ${nextModePrefix}${this.result.nextMapName.toUpperCase()}`, {
-          fontFamily: MENU_FONTS.HEADER,
-          fontSize: '10px',
-          color: cssHex(NEXT_MAP_COLOR),
-        })
-        .setOrigin(0.5)
-        .setAlpha(0)
-        .setDepth(WastelandStreet.DEPTH.UI);
-      this.tweens.add({ targets: nextMap, alpha: 1, duration: 400, delay: 200 });
-    }
+    // Draft teaser under the banner. A rematch's map+mode are decided by
+    // the pre-match draft now, so the old rotation promise ("NEXT: <MODE>
+    // ON <MAP>") can no longer be known at results time —
+    // MatchResult.nextMapName/nextGameMode stay populated for wire compat
+    // but only the FORCE/no-draft path honors them.
+    const nextTeaser = this.add
+      .text(centerX, 112, 'NEXT: COIN TOSS PICKS WHO DRAFTS MAP + MODE', {
+        fontFamily: MENU_FONTS.HEADER,
+        fontSize: '10px',
+        color: cssHex(NEXT_DRAFT_COLOR),
+      })
+      .setOrigin(0.5)
+      .setAlpha(0)
+      .setDepth(WastelandStreet.DEPTH.UI);
+    this.tweens.add({ targets: nextTeaser, alpha: 1, duration: 400, delay: 200 });
 
     // ────────────────────────────────────────────────────────────────────
     // Winner / loser sprite tableau. Winner stands tall on the left,
@@ -592,6 +590,24 @@ export class ResultsScene extends Phaser.Scene {
       this.time.delayedCall(500, goToGame);
     };
 
+    // Rematches draft again: an accepted rematch opens with draftState
+    // (not matchFound) unless FORCE pins skip the draft. Same routing
+    // contract as LobbyScene.onDraftState.
+    this.onDraftState = () => {
+      // draftState rebroadcasts every server tick — detach IMMEDIATELY so
+      // the 20Hz stream can't re-enter mid-fade and start the scene twice.
+      this.cleanupEvents();
+      let transitioned = false;
+      const goToDraft = (): void => {
+        if (transitioned) return;
+        transitioned = true;
+        this.scene.start('DraftScene', { nickname: this.nickname });
+      };
+      this.cameras.main.fadeOut(300, 0, 0, 0);
+      this.cameras.main.once('camerafadeoutcomplete', goToDraft);
+      this.time.delayedCall(500, goToDraft);
+    };
+
     this.onOpponentDisconnected = (_playerId: PlayerId) => {
       this.rematchUnavailable = true;
       this.rematchButton?.setDisabled(true);
@@ -614,6 +630,7 @@ export class ResultsScene extends Phaser.Scene {
 
     this.gameService.on('rematchStatus', this.onRematchStatus);
     this.gameService.on('matchFound', this.onMatchFound);
+    this.gameService.on('draftState', this.onDraftState);
     this.gameService.on('opponentDisconnected', this.onOpponentDisconnected);
     this.gameService.on('matchmakingStatus', this.onMatchmakingStatus);
   }
@@ -626,6 +643,10 @@ export class ResultsScene extends Phaser.Scene {
     if (this.onMatchFound) {
       this.gameService.off('matchFound', this.onMatchFound);
       this.onMatchFound = null;
+    }
+    if (this.onDraftState) {
+      this.gameService.off('draftState', this.onDraftState);
+      this.onDraftState = null;
     }
     if (this.onOpponentDisconnected) {
       this.gameService.off('opponentDisconnected', this.onOpponentDisconnected);

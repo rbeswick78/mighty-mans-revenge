@@ -1,0 +1,614 @@
+import Phaser from 'phaser';
+import type { PlayerId } from '@shared/types/common.js';
+import type { DraftCategory, ServerDraftStateMessage } from '@shared/types/network.js';
+import { DRAFT, gameModeDisplayName } from '@shared/config/game.js';
+import { Wasteland, cssHex } from '@shared/config/palette.js';
+import { AudioManager } from '../audio/audio-manager.js';
+import { GameService, type MatchData } from '../services/game-service.js';
+import { WastelandStreet } from '../ui/menu/wasteland-street.js';
+import { PixelButton } from '../ui/menu/pixel-button.js';
+import { TitleLogo } from '../ui/menu/title-logo.js';
+import { MENU_FONTS } from '../ui/menu/fonts.js';
+import {
+  buildHopSchedule,
+  deriveDraftView,
+  firstPickedCategory,
+  formatDraftCountdown,
+  shouldSkipSpectacle,
+} from './draft-logic.js';
+
+// Scene-local color decisions — same palette anchors as the lobby /
+// character-select so the menu flow reads as one continuous place.
+const SUBTITLE_COLOR = Wasteland.COVER_FILL;            // weathered tan
+const COLUMN_HEADER_COLOR = Wasteland.COVER_FILL;
+const STATUS_ACTIVE_COLOR = Wasteland.HEALTH_GOOD;      // mint — "you act now"
+const STATUS_WAIT_COLOR = Wasteland.COVER_FILL;
+const BADGE_COLOR = Wasteland.HEALTH_GOOD;
+const PICKED_BORDER_COLOR = Wasteland.HEALTH_GOOD;
+const TIMER_COLOR = Wasteland.HEALTH_WARNING;
+const TIMER_URGENT_COLOR = Wasteland.HIT_FLASH;
+const SPECTACLE_ACTIVE_COLOR = Wasteland.LOADING_BAR_FILL; // hot orange
+const SPECTACLE_IDLE_COLOR = Wasteland.COVER_FILL;
+const SPECTACLE_VS_COLOR = Wasteland.WALL_FILL;
+const WINNER_COLOR = Wasteland.HEALTH_GOOD;
+const FOOTER_COLOR = Wasteland.COVER_FILL;
+
+// Pick-UI layout on the 960×720 design canvas (FIT-scaled on mobile
+// landscape). Card heights stay comfortably above the 44px tap minimum.
+const CARD_WIDTH = 380;
+const LEFT_COL_CENTER_X = 270;
+const RIGHT_COL_CENTER_X = 690;
+const COLUMN_HEADER_Y = 188;
+const BADGE_Y = 210;
+const CARDS_TOP_Y = 232;
+const STATUS_Y = 508;
+const TIMER_Y = 540;
+
+// Spectacle beats inside DRAFT.SPECTACLE_MS (2600ms): hops stop by
+// SPECTACLE_MS - LAND_HOLD_MS, the "<NICK> PICKS FIRST" beat lands
+// shortly after the final hop, and the columns reveal at SPECTACLE_MS.
+const LAND_HOLD_MS = 700;
+const LAND_TEXT_DELAY_MS = 250;
+
+interface DraftSceneData {
+  nickname?: string;
+}
+
+interface DraftCard {
+  category: DraftCategory;
+  value: string;
+  button: PixelButton;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/**
+ * Pre-match map/mode draft, between lobby/results and character select.
+ * Opens on the first server:draftState (LobbyScene and ResultsScene route
+ * here); leaves on server:matchFound (final map+mode — payload identical
+ * to the FORCE/no-draft path, so CharacterSelectScene needs no changes).
+ * All pick state is a projection of the latest draftState snapshot via
+ * the pure deriveDraftView — the server echoes accepted picks per tick.
+ */
+export class DraftScene extends Phaser.Scene {
+  private gameService!: GameService;
+  private nickname = '';
+
+  private phase: 'waiting' | 'spectacle' | 'pick' = 'waiting';
+  private latestDraft: ServerDraftStateMessage | null = null;
+  /**
+   * Which category the FIRST pick claimed — cached from the one snapshot
+   * window where it's derivable (exactly one pick in), then fed back into
+   * deriveDraftView so completed drafts keep correct badge attribution.
+   */
+  private firstPicked: DraftCategory | null = null;
+  private transitioned = false;
+
+  // Spectacle widgets, destroyed wholesale when the columns reveal.
+  private spectacleObjects: Phaser.GameObjects.GameObject[] = [];
+  private spectacleNickTexts: Phaser.GameObjects.Text[] = [];
+
+  // Pick-phase widgets (built once, projected per snapshot).
+  private cards: DraftCard[] = [];
+  private pickHighlight: Phaser.GameObjects.Graphics | null = null;
+  private mapBadgeText: Phaser.GameObjects.Text | null = null;
+  private modeBadgeText: Phaser.GameObjects.Text | null = null;
+  private statusText: Phaser.GameObjects.Text | null = null;
+  private timerText: Phaser.GameObjects.Text | null = null;
+
+  /**
+   * Local-clock anchor for the pick countdown — re-anchored from
+   * pickDeadlineMs on every snapshot, ticked down locally between them
+   * (same contract as the match clock in NetworkManager).
+   */
+  private deadlineAtLocalMs: number | null = null;
+  private countdownEvent: Phaser.Time.TimerEvent | null = null;
+
+  // Event handler references for cleanup
+  private onDraftState: ((msg: ServerDraftStateMessage) => void) | null = null;
+  private onMatchFound: ((matchData: MatchData) => void) | null = null;
+  private onOpponentDisconnected: ((playerId: PlayerId) => void) | null = null;
+  private onDisconnected: (() => void) | null = null;
+
+  constructor() {
+    super({ key: 'DraftScene' });
+  }
+
+  init(data: DraftSceneData): void {
+    this.nickname = data.nickname ?? 'Player';
+    this.phase = 'waiting';
+    this.latestDraft = null;
+    this.firstPicked = null;
+    this.transitioned = false;
+    this.spectacleObjects = [];
+    this.spectacleNickTexts = [];
+    this.cards = [];
+    this.pickHighlight = null;
+    this.mapBadgeText = null;
+    this.modeBadgeText = null;
+    this.statusText = null;
+    this.timerText = null;
+    this.deadlineAtLocalMs = null;
+    this.countdownEvent = null;
+  }
+
+  create(): void {
+    this.cameras.main.fadeIn(300, 0, 0, 0);
+    this.gameService = GameService.getInstance();
+
+    new WastelandStreet(this, { lowDetail: this.isLikelyMobile() });
+
+    this.wireGameServiceEvents();
+
+    // GameService caches the snapshot that routed us here, so the flow
+    // almost always starts synchronously. The waiting branch only covers
+    // a pathological create-without-cache; the first draftState event
+    // kicks the flow off then.
+    const cached = this.gameService.getDraftState();
+    if (cached) {
+      this.acceptSnapshot(cached);
+      this.beginFlow();
+    }
+  }
+
+  shutdown(): void {
+    this.cleanupEvents();
+    if (this.countdownEvent) {
+      this.countdownEvent.remove();
+      this.countdownEvent = null;
+    }
+  }
+
+  // ──────────────────────────── Events ────────────────────────────
+
+  private wireGameServiceEvents(): void {
+    this.onDraftState = (msg: ServerDraftStateMessage) => {
+      this.acceptSnapshot(msg);
+      if (this.phase === 'waiting') {
+        this.beginFlow();
+      } else if (this.phase === 'pick') {
+        this.renderFromSnapshot();
+      }
+      // During the spectacle, snapshots just accumulate — the pick UI
+      // projects the latest one the moment it builds.
+    };
+
+    this.onMatchFound = (matchData: MatchData) => {
+      // Both picks are in — hold a short locked-in beat showing the final
+      // map+mode, then hand off to character select exactly like the
+      // lobby does (fade + fallback timer for backgrounded tabs).
+      if (this.transitioned) return;
+      this.transitioned = true;
+
+      let started = false;
+      const goToSelect = (): void => {
+        if (started) return;
+        started = true;
+        this.cleanupEvents();
+        this.scene.start('CharacterSelectScene', {
+          nickname: this.nickname,
+          matchData,
+        });
+      };
+
+      const beatMs = this.phase === 'pick' ? 900 : 0;
+      if (this.phase === 'pick') this.renderLockedBeat(matchData);
+      this.time.delayedCall(beatMs, () => {
+        this.cameras.main.fadeOut(300, 0, 0, 0);
+        this.cameras.main.once('camerafadeoutcomplete', goToSelect);
+        this.time.delayedCall(500, goToSelect);
+      });
+    };
+
+    this.onOpponentDisconnected = (_playerId: PlayerId) => {
+      this.bailToLobby();
+    };
+
+    this.onDisconnected = () => {
+      this.bailToLobby();
+    };
+
+    this.gameService.on('draftState', this.onDraftState);
+    this.gameService.on('matchFound', this.onMatchFound);
+    this.gameService.on('opponentDisconnected', this.onOpponentDisconnected);
+    this.gameService.on('disconnected', this.onDisconnected);
+  }
+
+  private cleanupEvents(): void {
+    if (this.onDraftState) {
+      this.gameService.off('draftState', this.onDraftState);
+      this.onDraftState = null;
+    }
+    if (this.onMatchFound) {
+      this.gameService.off('matchFound', this.onMatchFound);
+      this.onMatchFound = null;
+    }
+    if (this.onOpponentDisconnected) {
+      this.gameService.off('opponentDisconnected', this.onOpponentDisconnected);
+      this.onOpponentDisconnected = null;
+    }
+    if (this.onDisconnected) {
+      this.gameService.off('disconnected', this.onDisconnected);
+      this.onDisconnected = null;
+    }
+  }
+
+  private bailToLobby(): void {
+    if (this.transitioned) return;
+    this.transitioned = true;
+    let started = false;
+    const go = (): void => {
+      if (started) return;
+      started = true;
+      this.cleanupEvents();
+      this.scene.start('LobbyScene');
+    };
+    this.cameras.main.fadeOut(300, 0, 0, 0);
+    this.cameras.main.once('camerafadeoutcomplete', go);
+    this.time.delayedCall(500, go);
+  }
+
+  private acceptSnapshot(msg: ServerDraftStateMessage): void {
+    this.latestDraft = msg;
+    if (this.firstPicked === null) {
+      this.firstPicked = firstPickedCategory(msg);
+    }
+  }
+
+  // ──────────────────────────── Spectacle ────────────────────────────
+
+  private beginFlow(): void {
+    const draft = this.latestDraft;
+    if (!draft) return;
+    // Late arrival (a pick already recorded) or a degenerate roster skips
+    // straight to the columns — replaying the theater would eat into the
+    // real pick window.
+    if (shouldSkipSpectacle(draft) || draft.players.length < 2) {
+      this.buildPickUi();
+    } else {
+      this.startSpectacle(draft);
+    }
+  }
+
+  private startSpectacle(draft: ServerDraftStateMessage): void {
+    this.phase = 'spectacle';
+    const centerX = this.cameras.main.width / 2;
+
+    const contenders = draft.players.slice(0, 2);
+    const winnerIndex =
+      draft.players.findIndex((p) => p.id === draft.firstPickerId) === 1 ? 1 : 0;
+
+    const headline = new TitleLogo(this, centerX, 180, ['WHO PICKS FIRST?'], {
+      fontSize: 22,
+      strokeThickness: 3,
+    }).setDepth(WastelandStreet.DEPTH.UI);
+
+    const nickTexts = contenders.map((player, i) =>
+      this.add
+        .text(centerX + (i === 0 ? -190 : 190), 330, player.nickname.toUpperCase(), {
+          fontFamily: MENU_FONTS.HEADER,
+          fontSize: '14px',
+          color: cssHex(SPECTACLE_IDLE_COLOR),
+        })
+        .setOrigin(0.5)
+        .setDepth(WastelandStreet.DEPTH.UI),
+    );
+
+    const vsText = this.add
+      .text(centerX, 330, 'VS', {
+        fontFamily: MENU_FONTS.BODY,
+        fontSize: '18px',
+        color: cssHex(SPECTACLE_VS_COLOR),
+      })
+      .setOrigin(0.5)
+      .setDepth(WastelandStreet.DEPTH.UI);
+
+    const landingText = this.add
+      .text(centerX, 420, '', {
+        fontFamily: MENU_FONTS.HEADER,
+        fontSize: '14px',
+        color: cssHex(WINNER_COLOR),
+      })
+      .setOrigin(0.5)
+      .setVisible(false)
+      .setDepth(WastelandStreet.DEPTH.UI);
+
+    this.spectacleNickTexts = nickTexts;
+    this.spectacleObjects = [headline, ...nickTexts, vsText, landingText];
+    this.setSpectacleHighlight(0);
+
+    // The outcome is already in the snapshot — the decelerating ping-pong
+    // is pure theater, rigged (parity) to land on the server-rolled winner.
+    const schedule = buildHopSchedule(winnerIndex, {
+      budgetMs: DRAFT.SPECTACLE_MS - LAND_HOLD_MS,
+    });
+    for (const hop of schedule.hops) {
+      this.time.delayedCall(hop.atMs, () => {
+        if (this.transitioned || this.phase !== 'spectacle') return;
+        this.setSpectacleHighlight(hop.index);
+        AudioManager.getInstance()?.play('menuSelect', { volume: 0.2 });
+      });
+    }
+
+    this.time.delayedCall(schedule.landMs + LAND_TEXT_DELAY_MS, () => {
+      if (this.transitioned || this.phase !== 'spectacle') return;
+      const winnerNick = (
+        contenders[winnerIndex]?.nickname ?? 'FIRST PICKER'
+      ).toUpperCase();
+      landingText.setText(`${winnerNick} PICKS FIRST`).setVisible(true);
+      AudioManager.getInstance()?.play('matchStartHorn');
+      this.tweens.add({
+        targets: nickTexts[winnerIndex],
+        scale: { from: 1.15, to: 1.35 },
+        duration: 150,
+        yoyo: true,
+        repeat: 1,
+      });
+    });
+
+    this.time.delayedCall(DRAFT.SPECTACLE_MS, () => {
+      if (this.transitioned || this.phase !== 'spectacle') return;
+      this.destroySpectacle();
+      this.buildPickUi();
+    });
+  }
+
+  private setSpectacleHighlight(index: number): void {
+    this.spectacleNickTexts.forEach((text, i) => {
+      const active = i === index;
+      text.setColor(cssHex(active ? SPECTACLE_ACTIVE_COLOR : SPECTACLE_IDLE_COLOR));
+      text.setScale(active ? 1.15 : 1);
+    });
+  }
+
+  private destroySpectacle(): void {
+    for (const obj of this.spectacleObjects) obj.destroy();
+    this.spectacleObjects = [];
+    this.spectacleNickTexts = [];
+  }
+
+  // ──────────────────────────── Pick UI ────────────────────────────
+
+  private buildPickUi(): void {
+    const draft = this.latestDraft;
+    if (!draft || this.phase === 'pick') return;
+    this.phase = 'pick';
+
+    const centerX = this.cameras.main.width / 2;
+    const camHeight = this.cameras.main.height;
+
+    new TitleLogo(this, centerX, 64, ['PRE-MATCH DRAFT'], {
+      fontSize: 20,
+      strokeThickness: 3,
+    }).setDepth(WastelandStreet.DEPTH.UI);
+
+    this.add
+      .text(centerX, 108, 'FIRST PICK CLAIMS A COLUMN', {
+        fontFamily: MENU_FONTS.BODY,
+        fontSize: '14px',
+        color: cssHex(SUBTITLE_COLOR),
+      })
+      .setOrigin(0.5)
+      .setDepth(WastelandStreet.DEPTH.UI);
+
+    for (const [label, colX] of [
+      ['MAP', LEFT_COL_CENTER_X],
+      ['MODE', RIGHT_COL_CENTER_X],
+    ] as const) {
+      this.add
+        .text(colX, COLUMN_HEADER_Y, label, {
+          fontFamily: MENU_FONTS.HEADER,
+          fontSize: '13px',
+          color: cssHex(COLUMN_HEADER_COLOR),
+        })
+        .setOrigin(0.5)
+        .setDepth(WastelandStreet.DEPTH.UI);
+    }
+
+    this.mapBadgeText = this.createBadgeText(LEFT_COL_CENTER_X);
+    this.modeBadgeText = this.createBadgeText(RIGHT_COL_CENTER_X);
+
+    // Row metrics adapt to option count so a grown registry still fits;
+    // today both columns hold 3 cards (64px tall — well over the 44px
+    // tap-target minimum).
+    const rowCount = Math.max(draft.mapOptions.length, draft.modeOptions.length);
+    const compact = rowCount > 4;
+    const cardH = compact ? 48 : 64;
+    const gap = compact ? 10 : 14;
+
+    draft.mapOptions.forEach((mapName, i) => {
+      this.addCard(
+        'map',
+        mapName,
+        mapName.toUpperCase(),
+        LEFT_COL_CENTER_X,
+        CARDS_TOP_Y + i * (cardH + gap),
+        cardH,
+      );
+    });
+    draft.modeOptions.forEach((mode, i) => {
+      this.addCard(
+        'mode',
+        mode,
+        gameModeDisplayName(mode),
+        RIGHT_COL_CENTER_X,
+        CARDS_TOP_Y + i * (cardH + gap),
+        cardH,
+      );
+    });
+
+    this.pickHighlight = this.add
+      .graphics()
+      .setDepth(WastelandStreet.DEPTH.UI + 1);
+
+    this.statusText = this.add
+      .text(centerX, STATUS_Y, '', {
+        fontFamily: MENU_FONTS.BODY,
+        fontSize: '16px',
+        color: cssHex(STATUS_WAIT_COLOR),
+      })
+      .setOrigin(0.5)
+      .setDepth(WastelandStreet.DEPTH.UI);
+
+    this.timerText = this.add
+      .text(centerX, TIMER_Y, formatDraftCountdown(draft.pickDeadlineMs), {
+        fontFamily: MENU_FONTS.HEADER,
+        fontSize: '11px',
+        color: cssHex(TIMER_COLOR),
+      })
+      .setOrigin(0.5)
+      .setDepth(WastelandStreet.DEPTH.UI);
+
+    this.add
+      .text(
+        centerX,
+        camHeight - 24,
+        'TAP A CARD TO PICK  •  THE OTHER COLUMN GOES TO YOUR OPPONENT',
+        {
+          fontFamily: MENU_FONTS.BODY,
+          fontSize: '12px',
+          color: cssHex(FOOTER_COLOR),
+        },
+      )
+      .setOrigin(0.5)
+      .setDepth(WastelandStreet.DEPTH.UI);
+
+    // Tick the countdown locally between snapshots (each snapshot
+    // re-anchors deadlineAtLocalMs, so drift can't accumulate).
+    this.countdownEvent = this.time.addEvent({
+      delay: 200,
+      loop: true,
+      callback: () => this.updateCountdownLabel(),
+    });
+
+    this.renderFromSnapshot();
+  }
+
+  private createBadgeText(colX: number): Phaser.GameObjects.Text {
+    return this.add
+      .text(colX, BADGE_Y, '', {
+        fontFamily: MENU_FONTS.HEADER,
+        fontSize: '9px',
+        color: cssHex(BADGE_COLOR),
+      })
+      .setOrigin(0.5)
+      .setDepth(WastelandStreet.DEPTH.UI);
+  }
+
+  private addCard(
+    category: DraftCategory,
+    value: string,
+    label: string,
+    colCenterX: number,
+    y: number,
+    cardH: number,
+  ): void {
+    const x = colCenterX - CARD_WIDTH / 2;
+    const button = new PixelButton(this, x, y, CARD_WIDTH, cardH, label, {
+      variant: 'secondary',
+      fontSize: 12,
+      disabled: true,
+      onClick: () => this.onCardClick(category, value),
+    });
+    button.setDepth(WastelandStreet.DEPTH.UI);
+    this.cards.push({ category, value, button, x, y, w: CARD_WIDTH, h: cardH });
+  }
+
+  private onCardClick(category: DraftCategory, value: string): void {
+    const draft = this.latestDraft;
+    if (this.transitioned || !draft) return;
+    const view = deriveDraftView(draft, this.gameService.getPlayerId(), this.firstPicked);
+    if (!view.enabledCategories.includes(category)) return;
+
+    this.gameService.sendDraftPick(category, value);
+    // Optimistic feedback only — the server is authoritative and the next
+    // snapshot (≤1 tick) echoes the accepted pick and restyles everything.
+    const card = this.cards.find(
+      (c) => c.category === category && c.value === value,
+    );
+    card?.button.setAlpha(0.7);
+  }
+
+  /** Project the latest snapshot onto the pick UI. */
+  private renderFromSnapshot(): void {
+    const draft = this.latestDraft;
+    if (!draft || this.phase !== 'pick' || this.transitioned) return;
+
+    const view = deriveDraftView(draft, this.gameService.getPlayerId(), this.firstPicked);
+
+    this.statusText
+      ?.setText(view.statusLine)
+      .setColor(
+        cssHex(view.yourTurn || view.complete ? STATUS_ACTIVE_COLOR : STATUS_WAIT_COLOR),
+      );
+    this.mapBadgeText?.setText(view.mapBadge ?? '');
+    this.modeBadgeText?.setText(view.modeBadge ?? '');
+
+    this.pickHighlight?.clear();
+    for (const card of this.cards) {
+      const pickedValue = card.category === 'map' ? draft.mapPick : draft.modePick;
+      const isPicked = pickedValue !== null && pickedValue === card.value;
+      const enabled = view.enabledCategories.includes(card.category);
+      card.button.setDisabled(!enabled);
+      // Alpha managed here, not by setDisabled: the picked card stays
+      // full-bright while its column's losers dim harder than the mere
+      // not-your-turn dim.
+      card.button.setAlpha(isPicked || enabled ? 1 : pickedValue !== null ? 0.35 : 0.55);
+      if (isPicked) this.drawCardHighlight(card);
+    }
+
+    this.deadlineAtLocalMs = view.complete
+      ? null
+      : performance.now() + draft.pickDeadlineMs;
+    this.timerText?.setVisible(!view.complete);
+    this.updateCountdownLabel();
+  }
+
+  /**
+   * The ~900ms beat between matchFound and the character-select handoff:
+   * both final picks highlighted, driven from the matchFound payload (the
+   * final both-picks draftState may have been lost — message delivery is
+   * loss-tolerant only while the draft is still broadcasting).
+   */
+  private renderLockedBeat(matchData: MatchData): void {
+    const modeName = gameModeDisplayName(matchData.gameMode);
+    this.statusText
+      ?.setText(`NEXT: ${modeName} - ${matchData.mapName.toUpperCase()}`)
+      .setColor(cssHex(STATUS_ACTIVE_COLOR));
+    this.timerText?.setVisible(false);
+
+    this.pickHighlight?.clear();
+    for (const card of this.cards) {
+      const finalValue =
+        card.category === 'map' ? matchData.mapName : matchData.gameMode;
+      const isFinal = card.value === finalValue;
+      card.button.setDisabled(true);
+      card.button.setAlpha(isFinal ? 1 : 0.35);
+      if (isFinal) this.drawCardHighlight(card);
+    }
+  }
+
+  private drawCardHighlight(card: DraftCard): void {
+    if (!this.pickHighlight) return;
+    this.pickHighlight.lineStyle(3, PICKED_BORDER_COLOR, 1);
+    this.pickHighlight.strokeRect(card.x - 4, card.y - 4, card.w + 8, card.h + 8);
+  }
+
+  private updateCountdownLabel(): void {
+    if (!this.timerText || this.deadlineAtLocalMs === null) return;
+    const remainingMs = this.deadlineAtLocalMs - performance.now();
+    this.timerText.setText(formatDraftCountdown(remainingMs));
+    this.timerText.setColor(
+      cssHex(Math.ceil(remainingMs / 1000) <= 5 ? TIMER_URGENT_COLOR : TIMER_COLOR),
+    );
+  }
+
+  private isLikelyMobile(): boolean {
+    return (
+      'ontouchstart' in window &&
+      Math.min(window.innerWidth, window.innerHeight) < 600
+    );
+  }
+}

@@ -2,7 +2,9 @@ import type { PlayerId } from '@shared/types/common.js';
 import type { PlayerInput } from '@shared/types/player.js';
 import type { MatchResult, GameModeType } from '@shared/types/game.js';
 import type {
+  DraftCategory,
   LeaderboardEntry,
+  ServerDraftStateMessage,
   ServerMatchFoundMessage,
   ServerMatchmakingStatusMessage,
   ServerPlayerKilledMessage,
@@ -41,6 +43,7 @@ type GameServiceEvent =
   | 'connected'
   | 'disconnected'
   | 'matchFound'
+  | 'draftState'
   | 'matchCountdown'
   | 'matchStart'
   | 'matchEnd'
@@ -84,6 +87,13 @@ export class GameService {
    * after every match — can render it immediately via getLeaderboard().
    */
   private latestLeaderboard: LeaderboardEntry[] = [];
+  /**
+   * Latest pre-match draft snapshot, cached like the leaderboard so the
+   * DraftScene — created only AFTER the first draftState routed the lobby
+   * or results screen there — renders immediately from getDraftState().
+   * Cleared on matchFound (the message that ends every draft).
+   */
+  private latestDraftState: ServerDraftStateMessage | null = null;
   private localNickname = '';
   private listeners = new Map<GameServiceEvent, GameServiceCallback[]>();
 
@@ -140,6 +150,11 @@ export class GameService {
     return this.latestLeaderboard;
   }
 
+  /** Latest cached draft snapshot; null outside an active draft. */
+  getDraftState(): ServerDraftStateMessage | null {
+    return this.latestDraftState;
+  }
+
   joinMatchmaking(nickname: string): void {
     this.localNickname = nickname;
     this.networkManager.joinMatchmaking(nickname);
@@ -155,6 +170,10 @@ export class GameService {
 
   sendCharacterLock(characterId: CharacterId): void {
     this.networkManager.sendCharacterLock(characterId);
+  }
+
+  sendDraftPick(category: DraftCategory, value: string): void {
+    this.networkManager.sendDraftPick(category, value);
   }
 
   sendInput(input: PlayerInput): void {
@@ -194,6 +213,8 @@ export class GameService {
     });
 
     this.networkManager.on('disconnected', () => {
+      // A dropped connection tears down any in-flight draft server-side.
+      this.latestDraftState = null;
       this.emit('disconnected');
     });
 
@@ -204,7 +225,15 @@ export class GameService {
         mapName: msg.mapName,
         gameMode: msg.gameMode,
       };
+      // matchFound ends any draft (both picks in, or the FORCE/no-draft
+      // path) — drop the cache so a later scene can't render a stale one.
+      this.latestDraftState = null;
       this.emit('matchFound', this.currentMatch);
+    });
+
+    this.networkManager.on('draftState', (msg: ServerDraftStateMessage) => {
+      this.latestDraftState = msg;
+      this.emit('draftState', msg);
     });
 
     this.networkManager.on('matchCountdown', (countdown: number) => {
@@ -229,6 +258,9 @@ export class GameService {
     });
 
     this.networkManager.on('opponentDisconnected', (playerId: PlayerId) => {
+      // Same contract as post-match: an opponent leaving mid-draft
+      // dissolves it (the server stops broadcasting draftState).
+      this.latestDraftState = null;
       this.emit('opponentDisconnected', playerId);
     });
 
