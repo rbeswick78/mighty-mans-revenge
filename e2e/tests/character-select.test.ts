@@ -2,7 +2,9 @@ import { test, expect, type Page, type BrowserContext } from '@playwright/test';
 
 /**
  * Character-select E2E coverage. This test pairs two real browser contexts
- * via QUICK MATCH and verifies they both land on CharacterSelectScene.
+ * via QUICK MATCH, walks the pre-match map/mode draft (Session 9 — every
+ * un-pinned match drafts before character select), and verifies both
+ * contexts land on CharacterSelectScene.
  *
  * Notes on brittleness:
  *  - The cards are Phaser-rendered (no DOM accessibility tree), so we can't
@@ -12,6 +14,10 @@ import { test, expect, type Page, type BrowserContext } from '@playwright/test';
  *    LobbyScene mounts at runtime, then send Enter — LobbyScene treats
  *    Enter as QUICK MATCH (lobby-scene.ts:167-169), avoiding fragile
  *    canvas hit-zone clicks.
+ *  - Draft picks are driven by evaluating into the live DraftScene
+ *    instance (latestDraft snapshot + gameService.sendDraftPick) rather
+ *    than clicking canvas card positions — the server ignores wrong-turn
+ *    picks, so blindly attempting on both pages every poll is safe.
  */
 
 async function waitForLobby(page: Page): Promise<void> {
@@ -62,6 +68,75 @@ async function waitForActiveScene(
       message: `expected scene ${key} to become active`,
     })
     .toContain(key);
+}
+
+/**
+ * If this page's player currently holds the draft pick, send one (map
+ * first, then mode). No-op when the draft scene/snapshot isn't up yet or
+ * it's the other player's turn. Returns whether a pick was attempted.
+ */
+async function draftPickIfMyTurn(page: Page): Promise<boolean> {
+  return page.evaluate(() => {
+    const w = window as unknown as {
+      game?: { scene: { getScene: (key: string) => unknown } };
+    };
+    const scene = w.game?.scene.getScene('DraftScene') as {
+      latestDraft?: {
+        currentPickerId: string | null;
+        mapPick: string | null;
+        modePick: string | null;
+        mapOptions: string[];
+        modeOptions: string[];
+      } | null;
+      gameService?: {
+        sendDraftPick: (category: 'map' | 'mode', value: string) => void;
+        getNetworkManager: () => { getPlayerId: () => string | null };
+      };
+    } | null;
+    const draft = scene?.latestDraft;
+    const service = scene?.gameService;
+    if (!draft || !service) return false;
+    const myId = service.getNetworkManager().getPlayerId();
+    if (!myId || draft.currentPickerId !== myId) return false;
+    if (draft.mapPick === null) {
+      service.sendDraftPick('map', draft.mapOptions[0]);
+      return true;
+    }
+    if (draft.modePick === null) {
+      service.sendDraftPick('mode', draft.modeOptions[0]);
+      return true;
+    }
+    return false;
+  });
+}
+
+/**
+ * Drive both pages through the draft until CharacterSelectScene is active
+ * on both. Tolerates the ~900ms locked-in beat and either pick order.
+ */
+async function completeDraft(pageA: Page, pageB: Page): Promise<void> {
+  await Promise.all([
+    waitForActiveScene(pageA, 'DraftScene'),
+    waitForActiveScene(pageB, 'DraftScene'),
+  ]);
+  await expect
+    .poll(
+      async () => {
+        await draftPickIfMyTurn(pageA);
+        await draftPickIfMyTurn(pageB);
+        const a = (await getSceneInfo(pageA)).activeKeys;
+        const b = (await getSceneInfo(pageB)).activeKeys;
+        return (
+          a.includes('CharacterSelectScene') &&
+          b.includes('CharacterSelectScene')
+        );
+      },
+      {
+        timeout: 20000,
+        message: 'expected both players through the draft to character select',
+      },
+    )
+    .toBe(true);
 }
 
 async function startQuickMatch(page: Page, nickname: string): Promise<void> {
@@ -129,14 +204,12 @@ test.describe('Character select (desktop)', () => {
     await startQuickMatch(pageA, 'Alpha');
     await startQuickMatch(pageB, 'Bravo');
 
-    await Promise.all([
-      waitForActiveScene(pageA, 'CharacterSelectScene'),
-      waitForActiveScene(pageB, 'CharacterSelectScene'),
-    ]);
+    await completeDraft(pageA, pageB);
   });
 
   // eslint-disable-next-line no-empty-pattern
   test('lock-and-go: both players Enter and transition to GameScene', async ({}, testInfo) => {
+    test.setTimeout(45000);
     test.fixme(
       testInfo.project.name === 'desktop-firefox',
       'Two-context WebRTC pair-up is unreliable on Firefox locally',
@@ -148,10 +221,7 @@ test.describe('Character select (desktop)', () => {
     await startQuickMatch(pageA, 'Alpha');
     await startQuickMatch(pageB, 'Bravo');
 
-    await Promise.all([
-      waitForActiveScene(pageA, 'CharacterSelectScene'),
-      waitForActiveScene(pageB, 'CharacterSelectScene'),
-    ]);
+    await completeDraft(pageA, pageB);
 
     // Each scene's keyboard handler treats Enter as Lock In. The default
     // hovers (mighty_man for the first joiner, bruce for the second) are
@@ -214,9 +284,6 @@ test.describe('Character select (mobile-landscape)', () => {
     await startQuickMatch(pageA, 'Mob1');
     await startQuickMatch(pageB, 'Mob2');
 
-    await Promise.all([
-      waitForActiveScene(pageA, 'CharacterSelectScene'),
-      waitForActiveScene(pageB, 'CharacterSelectScene'),
-    ]);
+    await completeDraft(pageA, pageB);
   });
 });

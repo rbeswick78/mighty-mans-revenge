@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–8 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog). **The planned roadmap is fully shipped and the pre-playtest polish backlog is cleared.** What remains is playtest-driven: balance tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) is intentionally untouched until a group night produces real data.
+- **Status:** Sessions 1–9 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -40,6 +40,7 @@ Each session below attacks one of these.
 | 6 | New characters + stat identities | Counterpicks and mains | **DONE** (2026-07-04) |
 | 7 | (Stretch) Gun Game + Pistol + melee | The party mode | **DONE** (2026-07-04) |
 | 8 | Playtest response + polish backlog | The accumulated small stuff, cleared before group night | **DONE** (2026-07-04) |
+| 9 | Playtest response #1: two bugs + map/mode draft | The game respects your pick — and lets you pick the arena | **DONE** (2026-07-05) |
 
 ---
 
@@ -767,10 +768,297 @@ dry-fire fix. (c) and (d) are independent once (a) and (b) land.
 
 ---
 
+## Session 9 — Playtest response #1: two bugs + map/mode draft
+
+**Goal:** respond to the first group playtest (2026-07-05). The notes
+surfaced two bugs — the lobby's searching text stamps over the callsign,
+and players render as the wrong character from the second match onward —
+and one feature request: let the players pick the map and the mode
+pre-match, with a random flourish deciding who picks first.
+
+**Balance: explicitly untouched.** The playtest notes contained ZERO
+verdicts on the tuning watch items (punch-rung standoffs, grenade-rung
+drag, Jack's 8-frame walk feel, the Scrapyard (14,3) ambush nook, the
+two green map floors, the 4 generated SFX, overtime music at 0:00) — so
+every number in `shared/src/config/game.ts` keeps its spec value and the
+watch-item list carries forward verbatim to the next group night. Ask
+for those verdicts explicitly next time.
+
+**Locked design decisions**
+
+- **Lobby searching-state overlap (bug):** `LobbyScene` draws
+  "SEARCHING FOR OPPONENT" at panel y=70 — inside the callsign input box
+  (y 46–82; the nickname text centers at y=64) — and never hides the
+  name-entry UI when the search starts. Fix by swapping the panel
+  wholesale: hide the callsign label, input-box graphics, nickname text,
+  AND the transparent HTML `<input>` overlay (its Phaser DOM wrapper —
+  blur alone leaves an invisible focusable element over the panel) while
+  searching; restore all of it on stop/cancel/disconnect. No layout
+  redesign.
+- **Wrong character rendered after the first match (bug):** root cause
+  is stale client prediction state, not the select flow.
+  `NetworkManager.localPlayerState` is only nulled on `disconnect()`,
+  and `applyReconciledLocalState` never forwards `characterId` — so from
+  the SECOND match on one connection (rematch or re-queue), the local
+  player keeps the previous match's characterId forever. The renderer
+  constructs from it (wrong body — exactly what the group saw switching
+  to Jack/Bubba after match 1), and `sendInput` feeds the stale id into
+  `playerMovementModifiers`, so prediction runs at the old character's
+  speed while reconciliation uses the server's — permanent
+  jitter/rubber-banding when the speeds differ (Bubba→Frost Wizard is a
+  27% mispredict). Abilities were always right (server-authoritative).
+  Session smokes never caught it because they only ever play the FIRST
+  match on a fresh page. Fix, belt and braces:
+  - **Per-match reset on `server:matchFound`:** null `localPlayerState`,
+    fresh prediction + interpolation buffers, clear
+    remotePlayerIds/latestGrenades/latestAxes. (Also fixes latent
+    staleness: ghost grenades/axes rendered at new-match start, dead
+    interpolation samples.)
+  - `applyReconciledLocalState` forwards
+    `characterId: serverState.characterId` (server-authoritative,
+    immutable per match).
+  - `ClientPlayerManager.updatePlayers` destroys + recreates any
+    renderer whose constructed characterId no longer matches the state
+    (`PlayerRenderer` gains `getCharacterId()`). Also retires the
+    first-frame `?? 'mighty_man'` fallback trap in game-scene.ts — its
+    comment claimed "one tick of a placeholder sprite" but construction
+    was permanent; correct the comment.
+- **Map & mode draft (feature):** every real match — fresh AND rematch —
+  opens with a pre-match draft replacing the blind rotation:
+  - Server rolls **who picks first** (injectable RNG for tests). The
+    first picker claims a category *implicitly by picking*: they click
+    EITHER a map card OR a mode card — no separate "choose your
+    category" step (one action instead of two; the choice of category is
+    the choice). The other player then picks from the remaining
+    category.
+  - **Lives in `MatchmakingManager`, BEFORE `Match` construction** —
+    Match takes mapData/gameMode in its constructor (map manager,
+    pickups, mode instance all wire off them), so drafting inside Match
+    would mean rebuilding managers post-hoc. New `DraftState` keyed by
+    the future matchId (generated up front so `matchFound.matchId`
+    correlates), registered in `playerMatchMap` so queue guards and
+    disconnect routing work. `Match` is untouched; `server:matchFound`
+    keeps its exact meaning: "match exists; here are the FINAL map+mode"
+    — the character-select scene needs zero changes.
+  - **Wire:** `server:draftState` — full snapshot broadcast per tick
+    while drafting (same cadence contract as characterSelectState):
+    players, firstPickerId, currentPickerId, mapPick/modePick (null
+    until chosen), mapOptions/modeOptions, pickDeadlineMs. Plus
+    `client:draftPick` `{ category: 'map'|'mode', value }`; the server
+    validates turn + category availability + value against options and
+    silently ignores invalid picks.
+  - **Timeouts** (`DRAFT` block in shared config): first pick 20s
+    (includes the client spectacle), second pick 15s. Expiry = server
+    auto-picks uniformly random category+option (mirrors select
+    auto-lock) so an AFK player can't stall the match.
+  - Disconnect during draft = tear down the DraftState, send
+    `opponentDisconnected` to the rest, return them to lobby (same
+    contract as post-match state).
+  - **`FORCE_MAP` / `FORCE_MODE` skip the draft entirely** (map/mode
+    resolved by force + rotation exactly as today) — keeps every
+    smoke/e2e pin working and doubles as the kill switch. The rotation
+    cursors survive only for that path.
+  - **Client:** new `DraftScene` between lobby/results and character
+    select. Opens on the first `draftState` received (LobbyScene and
+    ResultsScene both route there); transitions to CharacterSelectScene
+    on `matchFound` (payload unchanged). The spectacle: "WHO PICKS
+    FIRST?" — the two nicknames flash alternately, the ping-pong
+    decelerating until it lands on the server-chosen first picker
+    (~2.6s, `DRAFT.SPECTACLE_MS`), then the two option columns reveal
+    (MAPS / MODES). Cards enabled only on your turn; a pick flips its
+    column to a locked badge for both players; countdown ticks from
+    pickDeadlineMs. Mobile landscape: two-column card grid inside the
+    960×720 FIT canvas, tap targets comfortably >44px.
+  - **Results screen:** the "NEXT: <MODE> ON <MAP>" teaser is replaced
+    by a draft teaser ("NEXT: COIN TOSS PICKS WHO DRAFTS MAP + MODE") —
+    a rematch's map/mode are no longer knowable at results time.
+    `MatchResult.nextMapName`/`nextGameMode` stay populated (wire
+    compat; the FORCE path still uses the pins) — the draft simply
+    overrides them for real play.
+  - **N-player:** first/second picker are 2 distinct random entrants;
+    any further players would spectate the draft. No 2-player
+    assumptions in DraftState (players array + two role ids).
+
+**Type/plumbing checklist:** `DRAFT` frozen config block
+(`shared/src/config/game.ts`); `client:draftPick` +
+`server:draftState` in the discriminated unions
+(`shared/src/types/network.ts`); GameManager routing case;
+MatchmakingManager `DraftState` machinery + `handleDraftPick` +
+tick-driven deadlines + seeded-RNG constructor injection; GameService
+`draftState` event + `sendDraftPick`; new
+`client/src/scenes/draft-scene.ts`; ResultsScene teaser text; e2e
+fixtures walk the draft (or pin FORCE_*).
+
+**Acceptance criteria**
+
+- [x] Searching state never overlaps the callsign UI (desktop + mobile
+      landscape); cancelling restores name entry fully (input focusable
+      again).
+- [x] Rematch/re-queue with a different character renders the correct
+      body locally AND remotely, with zero reconciliation jitter from a
+      stale speed multiplier. Unit tests: matchFound reset, characterId
+      forwarding through reconciliation, renderer rebuild on
+      characterId change.
+- [x] Draft: full flow in both orders (first picker takes map / takes
+      mode); auto-pick on first- and second-pick timeout; disconnect
+      teardown; FORCE_MAP/FORCE_MODE skip; a rematch drafts again; the
+      drafted map+mode are what the match actually plays. Deterministic
+      unit tests (seeded RNG).
+- [x] DraftScene spectacle lands on the server-chosen first picker;
+      wrong-turn/wrong-category clicks do nothing; opponent's pick
+      renders live; mobile landscape legible.
+- [x] Full regression: typecheck/lint/unit/Playwright green; no
+      shared-physics changes (the bug-2 fix touches prediction *state
+      plumbing*, not movement math).
+
+**Parallelizable workstreams:** (a) shared config/types (single writer
+to game.ts/network.ts — lands first); (b) the two client bug fixes
+(lobby-scene, network-manager/player-manager/player-renderer — lands
+second since (c) and (d) touch neighboring files); (c) server draft
+phase + tests; (d) client DraftScene + GameService plumbing + results
+teaser. (c) and (d) are independent once (a)+(b) land.
+
+---
+
 ## Session Log
 
 Append one entry per session. Include: date, what shipped (commits), design
 deviations from this doc, known issues, tuning notes from play-testing.
+
+### Session 9 — 2026-07-05 — Playtest response #1: two bugs + map/mode draft
+
+**The first group playtest happened.** Its notes drove this whole
+session: two bugs and one feature. It produced NO balance verdicts —
+so, third session running, every tunable in `shared/src/config/game.ts`
+keeps its spec value. The watch-item list (punch-rung standoffs,
+grenade-rung drag, Jack's walk feel, Scrapyard (14,3) nook, floor
+distinctness, the 4 generated SFX, overtime music at 0:00) carries
+forward verbatim — ask for explicit verdicts at the next group night.
+
+**Shipped:**
+- **Lobby searching-overlap fix**: "SEARCHING FOR OPPONENT" was drawn
+  at panel y=70 — inside the callsign input box (y 46–82) — with the
+  name-entry UI left visible. The panel now swaps wholesale: label,
+  input-box graphics, nickname text AND the transparent HTML `<input>`
+  (its Phaser DOM wrapper — blur alone left an invisible tap-swallower
+  over the panel) hide on search start, restore on stop/cancel/
+  disconnect.
+- **Wrong-character rendering fix** (the "Jack and Bubba show as a
+  different character" note): root cause was NOT the select flow —
+  `NetworkManager.localPlayerState` survives across matches (only
+  nulled on disconnect) and `applyReconciledLocalState` never forwarded
+  `characterId`, so from the SECOND match on one page load (rematch or
+  re-queue) the local player rendered as their PREVIOUS character…
+  and `sendInput` fed the stale id into `playerMovementModifiers`, so
+  prediction also ran at the previous character's speed (hidden
+  permanent rubber-banding — Bubba→Frost Wizard is a 27% mispredict).
+  Abilities were server-side and always right, exactly as the group
+  reported. Every prior session smoke missed it because smokes only
+  ever play the FIRST match on a fresh page. Fixed belt-and-braces:
+  per-match reset of ALL match-scoped client state on
+  `server:matchFound` (also kills ghost grenades/axes/pickups at
+  new-match countdown), `characterId` forwarded through
+  reconciliation, and `ClientPlayerManager` destroys+rebuilds any
+  renderer whose baked-in characterId disagrees with the state
+  (retiring the "one tick of a placeholder" comment lie in
+  game-scene.ts — construction was permanent).
+- **Pre-match map/mode draft**: every real match — fresh AND rematch —
+  now opens on a draft instead of blind rotation. Server rolls first
+  picker (injectable RNG); first picker claims a category implicitly by
+  picking a map OR a mode card; the other player picks the remaining
+  category; then the Match is constructed exactly as before
+  (`server:matchFound` still means "match exists; final map+mode", so
+  CharacterSelectScene needed zero changes). Machinery lives in
+  MatchmakingManager BEFORE Match construction, mirroring
+  PostMatchState; per-tick unreliable `server:draftState` snapshots
+  (characterSelectState cadence contract); 20s/15s pick windows with
+  rng-uniform auto-pick on expiry; disconnect/returnToLobby tear the
+  draft down; FORCE_MAP/FORCE_MODE skip the draft entirely (the smoke
+  pins double as the kill switch — rotation cursors survive only
+  there). Client: new DraftScene — "WHO PICKS FIRST?" decelerating
+  nickname ping-pong rigged to land on the server-rolled winner
+  (~2.6s, pure theater), two PixelButton card columns, live badges,
+  auto-pick countdown, 900ms locked-in beat, lobby AND results route
+  through it; results teaser is now "NEXT: COIN TOSS PICKS WHO DRAFTS
+  MAP + MODE" (a rematch's map/mode are unknowable at results time;
+  `MatchResult.nextMapName`/`nextGameMode` stay populated for wire
+  compat + the FORCE path).
+
+**The one live-debug cycle — wire allowlist:** the draft worked in
+unit tests but not end-to-end: `server/src/network/server.ts` has a
+VALID_CLIENT_MESSAGE_TYPES gate that silently drops unknown client
+message types, and `client:draftPick` was routed in GameManager but
+never registered there. Unit tests bypassed it (they call
+handleDraftPick directly); the e2e draft walk caught it. The allowlist
+is now an exhaustive `Record<ClientMessage['type'], true>` so a shared
+union member missing from it is a COMPILE error, and CLAUDE.md's
+common-pitfalls entry documents the second registration point.
+
+**Design decisions made in-session (beyond the spec):**
+- FORCE-pin draft-skip triggers on env-var PRESENCE, not validity —
+  `FORCE_MAP=typo` degrades to rotation with the existing warning, never
+  to a surprise draft (kill-switch semantics).
+- Rematches now receive a `matchmakingStatus 'matched'` message they
+  didn't before (shared launchMatch helper); ResultsScene only reacts
+  to 'cancelled', so it's benign.
+- Draft badge attribution ("<NICK> PICKED"): a completed snapshot alone
+  can't say who picked what, so the scene caches the category of the
+  exactly-one-pick window; arriving after completion falls back to a
+  nameless "LOCKED IN" badge.
+- Lobby/Results draftState handlers tear down listeners IMMEDIATELY
+  (not just a transition guard) — draftState rebroadcasts at 20Hz and
+  the matchFound-style guard alone would restart the scene per tick.
+- e2e drives draft picks by evaluating into the live DraftScene
+  (latestDraft + gameService.sendDraftPick) — the server ignores
+  wrong-turn picks, so blindly attempting on both pages per poll is
+  safe. Canvas-coordinate clicks stay confined to the one throwaway
+  smoke that deliberately exercised the real card-click path.
+
+**Verified:** 760 unit tests green (+43: 16 server draft tests — seeded
+first-picker roll both directions, both pick orders, claimed-category/
+wrong-turn/unknown-value/outsider rejection, drafted map+mode on the
+Match, both timeout auto-picks, FORCE skips, rematch re-draft,
+disconnect teardown, queue guard; 22 client draft-logic tests —
+view derivation + rigged hop schedule; 5 NetworkManager per-match-reset
+tests). Typecheck + lint clean. Standard Playwright suite green with the
+character-select tests now walking the draft (the desktop-chromium
+mobile-controls touch test flaked once under 3-suite CPU load and
+passed twice in isolation — same known-flaky family as Session 4's
+firefox note). Throwaway two-client smoke (spec deleted after) through
+real dev servers with FORCE_MATCH_SECONDS=10: searching-state swap
+asserted on/off via ESC; draft #1 by REAL canvas card clicks (Scrapyard
+by the roll winner, Deathmatch by the other) → select screen promised
+"NEXT: DEATHMATCH - SCRAPYARD"; match 1 on defaults → 0-0 → overtime →
+true draw → results; rematch → draft #2 → player A switched
+mighty_man→bubba → **both clients rendered bubba for A** (the exact
+pre-fix failure); zero page errors on either client. Mobile-landscape
+chromium (844×390): draft renders, all 6 cards in-bounds ≥44px, draft
+completes to select.
+
+**Known issues / notes for later sessions:**
+- The balance watch-item list is still unjudged (see top of entry) —
+  collect explicit verdicts at the next group night, including SFX
+  ear-verdicts and whether the overtime finale music lands at 0:00.
+- Wire format changed AGAIN (`server:draftState`, `client:draftPick`):
+  old clients paired against the new server will sit in the lobby
+  forever (they don't know draftState and never see matchFound). Both
+  players must hard-refresh after the deploy.
+- Draft auto-pick timeouts (20s/15s) are a first guess — if the group
+  finds the draft drags between rematches, shorten SECOND_PICK_SECONDS
+  or add a "both players picked early" fast-path (already implicit:
+  picks finalize immediately).
+- The character-select screen still shows the OLD character-select
+  auto-lock timer separately from the draft timer — two consecutive
+  countdown screens. Fine for now; a merged pre-match flow (draft +
+  select on one screen) is a possible later polish.
+- The PlayerRenderer.update dead-code task (separate session) STILL
+  hasn't landed; it now needs rebasing over Session 8's setWeapon/
+  setAxeless AND this session's getCharacterId addition.
+- tsx-watch on Windows can crash its own restart with EADDRINUSE and
+  leave the OLD server process serving stale code on :3000 — if a
+  server change seems to have no effect in dev, check for an orphan
+  listener before debugging the code (cost part of the allowlist
+  debug cycle this session).
 
 ### Session 8 — 2026-07-04 — Playtest response + polish backlog
 
