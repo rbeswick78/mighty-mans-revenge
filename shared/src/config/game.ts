@@ -60,10 +60,9 @@ export const WEAPONS = Object.freeze({
     pickupAmmo: 8,
   }),
   /**
-   * Gun Game rung weapon (Session 7). Fast semi-auto, low damage — the
-   * deliberate downgrade between shotgun and grenades. Not a map pickup
-   * in v1 (pickupAmmo 0); adding a DM/KOTH pickup later only needs a
-   * PickupType + map spawns.
+   * Gun Game rung weapon (Session 7) and, since Session 8, a DM/KOTH map
+   * pickup — a sidegrade to the rifle, not a power weapon like the
+   * shotgun (spawns active, never pre-announced).
    */
   pistol: Object.freeze({
     id: 'pistol',
@@ -80,7 +79,8 @@ export const WEAPONS = Object.freeze({
     spreadAngle: 0,
     /** Semi-auto tap-fire cap (~4.5 shots/s). */
     fireCooldown: 0.22,
-    pickupAmmo: 0,
+    /** Picked up with 36 rounds total (12 in the mag + 24 reserve). */
+    pickupAmmo: 36,
   }),
   /**
    * Melee punch — the Gun Game finisher rung. Validated as an arc of
@@ -379,6 +379,7 @@ export type MutatorId = (typeof MUTATORS.POOL)[number];
  */
 export const AWARD_DEFS = Object.freeze({
   sharpshooter: Object.freeze({ displayName: 'Sharpshooter' }),
+  hill_hog: Object.freeze({ displayName: 'Hill Hog' }),
   spray_and_pray: Object.freeze({ displayName: 'Spray & Pray' }),
   demolition_man: Object.freeze({ displayName: 'Demolition Man' }),
   buckshot_barber: Object.freeze({ displayName: 'Buckshot Barber' }),
@@ -406,6 +407,17 @@ export const AWARDS = Object.freeze({
   UNTOUCHABLE_MIN_STREAK: 3,
   /** Pin Puller requires at least this many grenades thrown (and 0 grenade kills). */
   PIN_PULLER_MIN_THROWN: 3,
+  /**
+   * Hill Hog requires at least this many seconds spent alive inside the
+   * live hill (contested time counts — see StatsTracker.recordHillSeconds).
+   * Only KOTH accrues hill seconds, so other modes can never award it.
+   */
+  HILL_HOG_MIN_SECONDS: 10,
+});
+
+export const LEADERBOARD = Object.freeze({
+  /** How many all-time top players ship in server:leaderboard. */
+  SIZE: 5,
 });
 
 export const SERVER = Object.freeze({
@@ -694,6 +706,31 @@ export const CHARACTERS = Object.freeze({
       up: { w: 13, h: 25 },
       side: { w: 25, h: 19 },
       'side-left': { w: 25, h: 19 },
+    },
+    // No-axe body variant, rendered while the thrown axe is in flight or
+    // on cooldown (abilityCooldownSeconds > 0). Same 6/8/7 frame counts
+    // as the with-axe sheets; dims measured off the pack's No-Axe strips.
+    altBody: {
+      spritePrefix: 'jack-noaxe',
+      assetBaseName: 'zombie-axe-noaxe',
+      idleFrames: {
+        down: { w: 11, h: 18 },
+        up: { w: 11, h: 19 },
+        side: { w: 15, h: 18 },
+        'side-left': { w: 15, h: 18 },
+      },
+      runFrames: {
+        down: { w: 11, h: 20 },
+        up: { w: 11, h: 20 },
+        side: { w: 14, h: 19 },
+        'side-left': { w: 14, h: 19 },
+      },
+      attackFrames: {
+        down: { w: 12, h: 21 },
+        up: { w: 12, h: 21 },
+        side: { w: 18, h: 19 },
+        'side-left': { w: 18, h: 19 },
+      },
     },
   },
 }) satisfies Readonly<Record<string, CharacterDef>>;

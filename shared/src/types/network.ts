@@ -75,6 +75,7 @@ export type ServerMessage =
   | ServerWeaponIncomingMessage
   | ServerTilesDestroyedMessage
   | ServerOvertimeStartMessage
+  | ServerLeaderboardMessage
   | ServerPongMessage
   | ServerErrorMessage;
 
@@ -360,6 +361,28 @@ export interface ServerOvertimeStartMessage {
   type: 'server:overtimeStart';
   /** Overtime duration from now, in milliseconds. */
   overtimeEndsInMs: number;
+}
+
+/** One row of the all-time lobby leaderboard (lifetime persisted stats). */
+export interface LeaderboardEntry {
+  nickname: string;
+  wins: number;
+  losses: number;
+  draws: number;
+  kills: number;
+  matches: number;
+}
+
+/**
+ * All-time top players by lifetime wins (LEADERBOARD.SIZE entries, ranked
+ * wins desc → kills desc → nickname asc). Sent reliably to a connection
+ * when it opens and rebroadcast to every connection after each match's
+ * stats are recorded, so an idle lobby stays current. Empty entries =
+ * nothing persisted yet (client hides the panel).
+ */
+export interface ServerLeaderboardMessage {
+  type: 'server:leaderboard';
+  entries: LeaderboardEntry[];
 }
 
 export interface ServerPongMessage {

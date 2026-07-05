@@ -7,7 +7,12 @@ export enum TileType {
 }
 
 /** Pickup spawn kinds a map may declare. Mirrors PickupType values. */
-export type PickupSpawnType = 'gun_ammo' | 'grenade' | 'weapon_shotgun' | 'bandage';
+export type PickupSpawnType =
+  | 'gun_ammo'
+  | 'grenade'
+  | 'weapon_shotgun'
+  | 'weapon_pistol'
+  | 'bandage';
 
 export interface MapTile {
   type: TileType;

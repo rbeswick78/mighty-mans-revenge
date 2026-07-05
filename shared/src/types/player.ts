@@ -147,4 +147,11 @@ export interface PlayerStats {
    * part of prediction/reconciliation.
    */
   distanceTraveled: number;
+  /**
+   * Seconds spent alive inside the live KOTH hill this match — contested
+   * time included, which is deliberately NOT the same as score (sole-
+   * occupancy points). Drives the Hill Hog award. Only KothMode accrues
+   * it; stays 0 in every other mode. Match-scoped — never persisted.
+   */
+  hillSeconds: number;
 }

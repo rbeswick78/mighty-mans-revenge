@@ -5,6 +5,12 @@ export enum PickupType {
   GRENADE = 'grenade',
   /** Special-weapon pickup: auto-equips the shotgun on touch. */
   WEAPON_SHOTGUN = 'weapon_shotgun',
+  /**
+   * Special-weapon pickup: auto-equips the pistol on touch. A sidegrade,
+   * not a power weapon — spawns active at match start and is never
+   * pre-announced (the INCOMING banner stays shotgun-only).
+   */
+  WEAPON_PISTOL = 'weapon_pistol',
   /** Heals PICKUP.BANDAGE_HEAL, capped at the player's max health. */
   BANDAGE = 'bandage',
 }

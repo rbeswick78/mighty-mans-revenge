@@ -61,6 +61,21 @@ export interface CharacterDef {
    */
   readonly hasGun: boolean;
   /**
+   * Optional alternate body sheet set (same idle/run/attack states and the
+   * SAME frame counts as the base sheets, but its own frame dimensions —
+   * pack variants are cropped differently). Loaded by BootScene alongside
+   * the base set; the renderer swaps `spritePrefix` at runtime. Purely
+   * cosmetic — the server ignores this entirely. v1 use: Jack's no-axe
+   * body while his thrown axe is in flight / on cooldown.
+   */
+  readonly altBody?: {
+    readonly spritePrefix: string;
+    readonly assetBaseName: string;
+    readonly idleFrames: FramesByDirection;
+    readonly runFrames: FramesByDirection;
+    readonly attackFrames: FramesByDirection;
+  };
+  /**
    * Stat identity — what makes picking this character a real decision.
    * maxHealth is committed onto PlayerState when the character is locked;
    * speedMultiplier flows through the shared MovementModifiers (so client

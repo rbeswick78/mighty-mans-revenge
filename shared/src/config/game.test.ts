@@ -18,11 +18,15 @@ import {
   KOTH,
   OVERTIME,
   MATCH,
+  AWARD_DEFS,
+  AWARD_IDS,
+  AWARDS,
+  LEADERBOARD,
   type CharacterId,
   type WeaponId,
 } from './game.js';
 import { GameModeType } from '../types/game.js';
-import { DIRECTIONS } from '../types/character.js';
+import { DIRECTIONS, type CharacterDef } from '../types/character.js';
 import type { WeaponDef } from '../types/weapon.js';
 
 describe('game mode rotation', () => {
@@ -291,6 +295,56 @@ describe('WEAPONS registry', () => {
     expect(Object.isFrozen(WEAPONS)).toBe(true);
     for (const def of Object.values(WEAPONS)) {
       expect(Object.isFrozen(def)).toBe(true);
+    }
+  });
+});
+
+describe('session-8 polish backlog config', () => {
+  it('a pistol weapon pickup fills the magazine plus a positive reserve', () => {
+    const p = WEAPONS.pistol;
+    expect(p.pickupAmmo).toBeGreaterThan(p.magazineSize);
+    // 12 in the mag + 24 reserve, per the roadmap spec.
+    expect(p.pickupAmmo).toBe(36);
+  });
+
+  it('hill_hog exists and sits right after sharpshooter in priority order', () => {
+    expect(AWARD_DEFS.hill_hog.displayName).toBe('Hill Hog');
+    expect(AWARD_IDS.indexOf('hill_hog')).toBe(
+      AWARD_IDS.indexOf('sharpshooter') + 1,
+    );
+    expect(AWARDS.HILL_HOG_MIN_SECONDS).toBeGreaterThan(0);
+  });
+
+  it('leaderboard ships a sane number of entries', () => {
+    expect(LEADERBOARD.SIZE).toBeGreaterThanOrEqual(1);
+    expect(LEADERBOARD.SIZE).toBeLessThanOrEqual(10);
+    expect(Object.isFrozen(LEADERBOARD)).toBe(true);
+  });
+
+  it('Jack (and only Jack) declares a no-axe alt body with coherent frames', () => {
+    for (const id of CHARACTER_IDS) {
+      const def: CharacterDef = CHARACTERS[id];
+      if (id !== 'jack') {
+        expect(def.altBody).toBeUndefined();
+        continue;
+      }
+      const alt = def.altBody;
+      expect(alt).toBeDefined();
+      if (!alt) continue;
+      // Distinct keys so the renderer can swap prefix without colliding
+      // with the with-axe anim set.
+      expect(alt.spritePrefix).not.toBe(def.spritePrefix);
+      expect(alt.assetBaseName).not.toBe(def.assetBaseName);
+      // Frame dims are positive integers for every state and direction
+      // (sheet width = w * frameCount must divide evenly).
+      for (const frames of [alt.idleFrames, alt.runFrames, alt.attackFrames]) {
+        for (const dir of DIRECTIONS) {
+          expect(Number.isInteger(frames[dir].w)).toBe(true);
+          expect(Number.isInteger(frames[dir].h)).toBe(true);
+          expect(frames[dir].w).toBeGreaterThan(0);
+          expect(frames[dir].h).toBeGreaterThan(0);
+        }
+      }
     }
   });
 });

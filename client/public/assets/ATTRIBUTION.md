@@ -54,6 +54,18 @@ This game uses pixel art assets from third-party packs. Source archives are
 - `enemies/zombie_*_attack.png` — Enemies/Zombie_Small First-Attack Sheet4 (4 directions)
 - `enemies/zombie-big_*_attack.png` — Enemies/Zombie_Big First-Attack Sheet8 (4 directions)
 - `enemies/zombie-axe_*_attack.png` — Enemies/Zombie_Axe (with-axe) First-Attack Sheet7 (4 directions)
+- `pickups/pistol.png` — Objects/Pickable/Pistol
+- `enemies/zombie-axe-noaxe_*_idle.png` — Enemies/Zombie_Axe/No-Axe idle Sheet6 (4 directions)
+- `enemies/zombie-axe-noaxe_*_run.png` — Enemies/Zombie_Axe/No-Axe walk Sheet8 (4 directions)
+- `enemies/zombie-axe-noaxe_*_attack.png` — Enemies/Zombie_Axe/No-Axe First-Attack Sheet7 (4 directions)
+
+## Original audio
+
+The pack ships no audio. `audio/punch-whoosh.wav`, `audio/punch-impact.wav`,
+`audio/axe-whoosh.wav`, and `audio/axe-chop.wav` are original works,
+procedurally synthesized by `client/scripts/gen-sfx.mjs` (deterministic —
+rerunning the script reproduces the files byte-for-byte). No third-party
+license applies.
 
 If we ever ship this commercially (charge money, run ads, promote a paid
 product) we owe the author at least $2 — pay before release.

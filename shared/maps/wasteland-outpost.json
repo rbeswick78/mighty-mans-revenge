@@ -25,6 +25,7 @@
   ],
   "pickupSpawns": [
     { "x": 9, "y": 5, "type": "weapon_shotgun" },
+    { "x": 9, "y": 10, "type": "weapon_pistol" },
     { "x": 10, "y": 6, "type": "gun_ammo" },
     { "x": 3, "y": 5, "type": "grenade" },
     { "x": 16, "y": 6, "type": "grenade" },
