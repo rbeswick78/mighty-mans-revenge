@@ -7,11 +7,12 @@ import {
   MATCH,
   MUTATORS,
   OVERTIME,
+  DRAFT,
   listMapNames,
   GameModeType,
   GAME_MODE_ROTATION,
 } from '@shared/game';
-import type { PlayerId, ServerMessage } from '@shared/game';
+import type { PlayerId, ServerMessage, ServerDraftStateMessage } from '@shared/game';
 import { MatchmakingManager } from './matchmaking-manager.js';
 import { PersistentStatsStore } from '../persistence/persistent-stats-store.js';
 import type { GameServer } from '../network/server.js';
@@ -36,6 +37,43 @@ function makeFakeServer() {
   return { fake, sent, connected };
 }
 
+/**
+ * Deterministic rng for draft tests: returns the given values in order,
+ * then keeps returning the last one (drafts consume a variable number of
+ * rolls; padding with the final value keeps sequences short).
+ */
+function seededRng(values: number[]): () => number {
+  let i = 0;
+  return () => values[Math.min(i++, values.length - 1)];
+}
+
+function latestDraftState(sent: SentMessage[]): ServerDraftStateMessage {
+  const found = [...sent].reverse().find((s) => s.message.type === 'server:draftState');
+  if (!found || found.message.type !== 'server:draftState') {
+    throw new Error('no draftState broadcast');
+  }
+  return found.message;
+}
+
+/**
+ * Complete a live draft: tick once so the draft broadcasts a snapshot,
+ * read who picks first from it, then send both picks (map from the first
+ * picker, mode from the second). Keeps every test that just needs "a
+ * match" exercising the real draft path instead of a FORCE pin.
+ */
+function walkDraft(
+  mgr: MatchmakingManager,
+  sent: SentMessage[],
+  picks: { map?: string; mode?: GameModeType } = {},
+): void {
+  mgr.tick(0.05, 0);
+  const snap = latestDraftState(sent);
+  const first = snap.currentPickerId!;
+  const second = snap.players.find((p) => p.id !== first)!.id;
+  mgr.handleDraftPick(first, 'map', picks.map ?? snap.mapOptions[0]);
+  mgr.handleDraftPick(second, 'mode', picks.mode ?? snap.modeOptions[0]);
+}
+
 describe('MatchmakingManager rematch flow', () => {
   let mgr: MatchmakingManager;
   let sent: SentMessage[];
@@ -49,6 +87,7 @@ describe('MatchmakingManager rematch flow', () => {
   function startMatchAndForceEnd(p1: PlayerId, p2: PlayerId): void {
     mgr.handleJoinMatchmaking(p1, 'A');
     mgr.handleJoinMatchmaking(p2, 'B');
+    walkDraft(mgr, sent);
     // Find the active match and force it to ENDED so the next tick promotes
     // it into post-match state via onMatchEnded.
     const matches = mgr.getActiveMatches();
@@ -57,7 +96,7 @@ describe('MatchmakingManager rematch flow', () => {
     mgr.tick(0.05, 1);
   }
 
-  it('starts a rematch when both players request it', () => {
+  it('starts a rematch draft when both players request it', () => {
     startMatchAndForceEnd('A', 'B');
     sent.length = 0; // clear matchEnd messages
 
@@ -67,6 +106,10 @@ describe('MatchmakingManager rematch flow', () => {
     expect(aMsgs).toHaveLength(1);
 
     mgr.handleRematchRequest('B');
+
+    // Both agreed → a fresh draft opens rather than an instant match.
+    expect(mgr.getActiveMatches()).toHaveLength(0);
+    walkDraft(mgr, sent);
 
     const matchFoundMsgs = sent.filter((s) => s.message.type === 'server:matchFound');
     expect(matchFoundMsgs.map((m) => m.playerId).sort()).toEqual(['A', 'B']);
@@ -90,6 +133,7 @@ describe('MatchmakingManager rematch flow', () => {
       // post-match state must still be live so B can complete the rematch.
       vi.advanceTimersByTime(50_000);
       mgr.handleRematchRequest('B');
+      walkDraft(mgr, sent);
 
       const matchFoundMsgs = sent.filter((s) => s.message.type === 'server:matchFound');
       expect(matchFoundMsgs.map((m) => m.playerId).sort()).toEqual(['A', 'B']);
@@ -142,7 +186,7 @@ describe('MatchmakingManager rematch flow', () => {
   });
 });
 
-describe('MatchmakingManager map rotation', () => {
+describe('MatchmakingManager map rotation (FORCE-pinned, draft skipped)', () => {
   let mgr: MatchmakingManager;
   let sent: SentMessage[];
 
@@ -150,10 +194,14 @@ describe('MatchmakingManager map rotation', () => {
     const { fake, sent: bucket } = makeFakeServer();
     sent = bucket;
     mgr = new MatchmakingManager(fake);
+    // Any FORCE pin disables the draft; pinning the MODE leaves the map
+    // side on the rotation cursor under test.
+    process.env.FORCE_MODE = GameModeType.DEATHMATCH;
   });
 
   afterEach(() => {
     delete process.env.FORCE_MAP;
+    delete process.env.FORCE_MODE;
   });
 
   function matchFoundMapName(playerId: PlayerId): string {
@@ -199,7 +247,7 @@ describe('MatchmakingManager map rotation', () => {
     expect(matchFoundMapName('G')).toBe(names[0]); // wrapped
   });
 
-  it('matchEnd promises the next map and the rematch delivers it', () => {
+  it('matchEnd promises the next map and the pinned rematch delivers it', () => {
     const names = listMapNames();
     mgr.handleJoinMatchmaking('A', 'A');
     mgr.handleJoinMatchmaking('B', 'B');
@@ -241,15 +289,19 @@ describe('MatchmakingManager map rotation', () => {
     expect(matchFoundMapName('A')).toBe(names[2]);
   });
 
-  it('ignores an unknown FORCE_MAP and falls back to rotation', () => {
+  it('ignores an unknown FORCE_MAP and falls back to rotation (still no draft)', () => {
     process.env.FORCE_MAP = 'No Such Arena';
+    delete process.env.FORCE_MODE;
     mgr.handleJoinMatchmaking('A', 'A');
     mgr.handleJoinMatchmaking('B', 'B');
+    // A present-but-invalid pin still means "no draft" — it degrades to
+    // the deterministic rotation, never to a surprise draft.
     expect(matchFoundMapName('A')).toBe(listMapNames()[0]);
+    expect(sent.some((s) => s.message.type === 'server:draftState')).toBe(false);
   });
 });
 
-describe('MatchmakingManager mode rotation', () => {
+describe('MatchmakingManager mode rotation (FORCE-pinned, draft skipped)', () => {
   let mgr: MatchmakingManager;
   let sent: SentMessage[];
 
@@ -257,9 +309,13 @@ describe('MatchmakingManager mode rotation', () => {
     const { fake, sent: bucket } = makeFakeServer();
     sent = bucket;
     mgr = new MatchmakingManager(fake);
+    // Any FORCE pin disables the draft; pinning the MAP leaves the mode
+    // side on the rotation cursor under test.
+    process.env.FORCE_MAP = listMapNames()[0];
   });
 
   afterEach(() => {
+    delete process.env.FORCE_MAP;
     delete process.env.FORCE_MODE;
   });
 
@@ -308,7 +364,7 @@ describe('MatchmakingManager mode rotation', () => {
     expect(matchFoundMode('G')).toBe(GAME_MODE_ROTATION[0]); // wrapped
   });
 
-  it('matchEnd promises the next mode and the rematch delivers it', () => {
+  it('matchEnd promises the next mode and the pinned rematch delivers it', () => {
     mgr.handleJoinMatchmaking('A', 'A');
     mgr.handleJoinMatchmaking('B', 'B');
     expect(matchFoundMode('A')).toBe(GameModeType.DEATHMATCH);
@@ -352,11 +408,13 @@ describe('MatchmakingManager mode rotation', () => {
     expect(matchFoundMode('A')).toBe(GameModeType.KOTH);
   });
 
-  it('ignores an unknown FORCE_MODE and falls back to rotation', () => {
+  it('ignores an unknown FORCE_MODE and falls back to rotation (still no draft)', () => {
     process.env.FORCE_MODE = 'no_such_mode';
+    delete process.env.FORCE_MAP;
     mgr.handleJoinMatchmaking('A', 'A');
     mgr.handleJoinMatchmaking('B', 'B');
     expect(matchFoundMode('A')).toBe(GAME_MODE_ROTATION[0]);
+    expect(sent.some((s) => s.message.type === 'server:draftState')).toBe(false);
   });
 
   it('FORCE_MODE=gun_game pins fresh matches and rematches to Gun Game', () => {
@@ -436,6 +494,388 @@ describe('MatchmakingManager mode rotation', () => {
   });
 });
 
+describe('MatchmakingManager pre-match draft', () => {
+  let sent: SentMessage[];
+  let fake: GameServer;
+
+  beforeEach(() => {
+    const made = makeFakeServer();
+    fake = made.fake;
+    sent = made.sent;
+  });
+
+  afterEach(() => {
+    delete process.env.FORCE_MAP;
+    delete process.env.FORCE_MODE;
+  });
+
+  function makeManager(rngValues: number[]): MatchmakingManager {
+    return new MatchmakingManager(fake, () => 0, undefined, seededRng(rngValues));
+  }
+
+  function pairUp(mgr: MatchmakingManager): void {
+    mgr.handleJoinMatchmaking('A', 'A');
+    mgr.handleJoinMatchmaking('B', 'B');
+  }
+
+  function matchFoundMessages(bucket: SentMessage[]) {
+    return bucket
+      .filter((s) => s.message.type === 'server:matchFound')
+      .map((s) => {
+        if (s.message.type !== 'server:matchFound') throw new Error('unreachable');
+        return { playerId: s.playerId, message: s.message, reliable: s.reliable };
+      });
+  }
+
+  it('rolls who picks first with the injected rng (second entrant wins the roll)', () => {
+    const mgr = makeManager([0.9, 0]);
+    pairUp(mgr);
+
+    // Drafting, not matched: no Match, no matchFound.
+    expect(mgr.getActiveMatches()).toHaveLength(0);
+    mgr.tick(0.05, 1);
+    expect(sent.some((s) => s.message.type === 'server:matchFound')).toBe(false);
+
+    const snap = latestDraftState(sent);
+    expect(snap.firstPickerId).toBe('B');
+    expect(snap.currentPickerId).toBe('B');
+    expect(snap.players.map((p) => p.id).sort()).toEqual(['A', 'B']);
+  });
+
+  it('rolls who picks first with the injected rng (first entrant wins the roll)', () => {
+    const mgr = makeManager([0.1, 0]);
+    pairUp(mgr);
+    mgr.tick(0.05, 1);
+
+    const snap = latestDraftState(sent);
+    expect(snap.firstPickerId).toBe('A');
+    expect(snap.currentPickerId).toBe('A');
+  });
+
+  it('first pick claims map; the second picker may only pick the remaining category', () => {
+    const names = listMapNames();
+    const mgr = makeManager([0, 0]); // A first, B second
+    pairUp(mgr);
+
+    mgr.handleDraftPick('A', 'map', names[1]);
+    mgr.tick(0.05, 1);
+    let snap = latestDraftState(sent);
+    expect(snap.mapPick).toBe(names[1]);
+    expect(snap.modePick).toBeNull();
+    // The roles are distinct: the turn moved to the OTHER entrant with a
+    // fresh second-pick window.
+    expect(snap.currentPickerId).toBe('B');
+    expect(snap.pickDeadlineMs).toBeGreaterThan((DRAFT.SECOND_PICK_SECONDS - 1) * 1000);
+    expect(snap.pickDeadlineMs).toBeLessThanOrEqual(DRAFT.SECOND_PICK_SECONDS * 1000);
+
+    // B tries to re-pick the claimed category — ignored.
+    mgr.handleDraftPick('B', 'map', names[2]);
+    mgr.tick(0.05, 2);
+    snap = latestDraftState(sent);
+    expect(snap.mapPick).toBe(names[1]);
+    expect(snap.modePick).toBeNull();
+    expect(sent.some((s) => s.message.type === 'server:matchFound')).toBe(false);
+
+    // B picks the remaining category — draft finalizes.
+    mgr.handleDraftPick('B', 'mode', GameModeType.KOTH);
+    const found = matchFoundMessages(sent);
+    expect(found.map((f) => f.playerId).sort()).toEqual(['A', 'B']);
+  });
+
+  it('first pick claims mode; the second picker then picks the map (mirror order)', () => {
+    const names = listMapNames();
+    const mgr = makeManager([0.9, 0]); // B first, A second
+    pairUp(mgr);
+
+    mgr.handleDraftPick('B', 'mode', GameModeType.GUN_GAME);
+    mgr.tick(0.05, 1);
+    let snap = latestDraftState(sent);
+    expect(snap.modePick).toBe(GameModeType.GUN_GAME);
+    expect(snap.mapPick).toBeNull();
+    expect(snap.currentPickerId).toBe('A');
+
+    // A tries the claimed category — ignored.
+    mgr.handleDraftPick('A', 'mode', GameModeType.KOTH);
+    mgr.tick(0.05, 2);
+    snap = latestDraftState(sent);
+    expect(snap.modePick).toBe(GameModeType.GUN_GAME);
+    expect(sent.some((s) => s.message.type === 'server:matchFound')).toBe(false);
+
+    mgr.handleDraftPick('A', 'map', names[0]);
+    const match = mgr.getActiveMatches()[0];
+    expect(match.gameModeType).toBe(GameModeType.GUN_GAME);
+    expect(match.mapManager.getMapData().name).toBe(names[0]);
+  });
+
+  it('ignores wrong-turn picks, unknown values, and picks from players outside the draft', () => {
+    const names = listMapNames();
+    const mgr = makeManager([0, 0]); // A first
+    pairUp(mgr);
+
+    mgr.handleDraftPick('B', 'map', names[0]); // not B's turn
+    mgr.handleDraftPick('A', 'map', 'No Such Arena'); // unknown map
+    mgr.handleDraftPick('A', 'mode', 'no_such_mode'); // unknown mode
+    mgr.handleDraftPick('Z', 'map', names[0]); // not in any draft
+
+    mgr.tick(0.05, 1);
+    const snap = latestDraftState(sent);
+    expect(snap.mapPick).toBeNull();
+    expect(snap.modePick).toBeNull();
+    expect(snap.currentPickerId).toBe('A');
+    expect(sent.some((s) => s.message.type === 'server:matchFound')).toBe(false);
+    expect(mgr.getActiveMatches()).toHaveLength(0);
+  });
+
+  it('creates the match with exactly the drafted map+mode and stops broadcasting', () => {
+    const names = listMapNames();
+    const mgr = makeManager([0, 0]); // A first
+    pairUp(mgr);
+
+    // Capture the draft's matchId so the matchFound correlation holds.
+    mgr.tick(0.05, 1);
+    const draftMatchId = latestDraftState(sent).matchId;
+
+    mgr.handleDraftPick('A', 'map', names[2]);
+    mgr.handleDraftPick('B', 'mode', GameModeType.KOTH);
+
+    const found = matchFoundMessages(sent);
+    expect(found.map((f) => f.playerId).sort()).toEqual(['A', 'B']);
+    for (const f of found) {
+      expect(f.message.matchId).toBe(draftMatchId);
+      expect(f.message.mapName).toBe(names[2]);
+      expect(f.message.gameMode).toBe(GameModeType.KOTH);
+      expect(f.reliable).toBe(true);
+    }
+
+    const matched = sent.filter(
+      (s) => s.message.type === 'server:matchmakingStatus' && s.message.status === 'matched',
+    );
+    expect(matched.map((s) => s.playerId).sort()).toEqual(['A', 'B']);
+
+    // The Match itself was constructed from the drafted pair.
+    const match = mgr.getActiveMatches()[0];
+    expect(match.mapManager.getMapData().name).toBe(names[2]);
+    expect(match.gameModeType).toBe(GameModeType.KOTH);
+
+    // Draft broadcast stops once the match exists.
+    sent.length = 0;
+    mgr.tick(0.05, 2);
+    expect(sent.some((s) => s.message.type === 'server:draftState')).toBe(false);
+  });
+
+  it('auto-picks the map on first-pick timeout and hands the mode to the second picker with a fresh window', () => {
+    const names = listMapNames();
+    // Rolls: first=A, second=B; timeout: category 0.4 (<0.5 → map),
+    // option 0 → first registry map.
+    const mgr = makeManager([0, 0, 0.4, 0]);
+    pairUp(mgr);
+
+    // Burn the entire first-pick window in 1s ticks.
+    for (let i = 1; i <= DRAFT.FIRST_PICK_SECONDS; i++) mgr.tick(1, i);
+
+    const snap = latestDraftState(sent);
+    expect(snap.mapPick).toBe(names[0]);
+    expect(snap.modePick).toBeNull();
+    expect(snap.firstPickerId).toBe('A');
+    expect(snap.currentPickerId).toBe('B');
+    expect(snap.pickDeadlineMs).toBe(DRAFT.SECOND_PICK_SECONDS * 1000);
+    expect(sent.some((s) => s.message.type === 'server:matchFound')).toBe(false);
+  });
+
+  it('first-pick timeout can auto-claim the mode category instead', () => {
+    // Timeout rolls: category 0.6 (≥0.5 → mode), option 0.5 → middle mode.
+    const mgr = makeManager([0, 0, 0.6, 0.5]);
+    pairUp(mgr);
+
+    for (let i = 1; i <= DRAFT.FIRST_PICK_SECONDS; i++) mgr.tick(1, i);
+
+    const snap = latestDraftState(sent);
+    const expectedMode = GAME_MODE_ROTATION[Math.floor(0.5 * GAME_MODE_ROTATION.length)];
+    expect(snap.modePick).toBe(expectedMode);
+    expect(snap.mapPick).toBeNull();
+    expect(snap.currentPickerId).toBe('B');
+  });
+
+  it('auto-picks the remaining category on second-pick timeout and finalizes', () => {
+    const names = listMapNames();
+    // Rolls: first=A, second=B; second-pick timeout consumes ONE option
+    // roll (the category is forced to the remaining one): 0.9 → last map.
+    const mgr = makeManager([0, 0, 0.9]);
+    pairUp(mgr);
+
+    mgr.handleDraftPick('A', 'mode', GameModeType.DEATHMATCH);
+    for (let i = 1; i <= DRAFT.SECOND_PICK_SECONDS; i++) mgr.tick(1, i);
+
+    const expectedMap = names[Math.floor(0.9 * names.length)];
+    const found = matchFoundMessages(sent);
+    expect(found.map((f) => f.playerId).sort()).toEqual(['A', 'B']);
+    for (const f of found) {
+      expect(f.message.mapName).toBe(expectedMap);
+      expect(f.message.gameMode).toBe(GameModeType.DEATHMATCH);
+    }
+    const match = mgr.getActiveMatches()[0];
+    expect(match.mapManager.getMapData().name).toBe(expectedMap);
+  });
+
+  it('broadcasts a full snapshot to every entrant each tick with a counting-down deadline', () => {
+    const names = listMapNames();
+    const mgr = makeManager([0, 0]);
+    mgr.handleJoinMatchmaking('A', 'Ryan');
+    mgr.handleJoinMatchmaking('B', 'Dave');
+
+    mgr.tick(0.05, 1);
+    const perTick = sent.filter((s) => s.message.type === 'server:draftState');
+    expect(perTick.map((s) => s.playerId).sort()).toEqual(['A', 'B']);
+    // Same cadence contract as characterSelectState: unreliable, the next
+    // tick repairs a drop.
+    expect(perTick.every((s) => !s.reliable)).toBe(true);
+
+    const snap1 = latestDraftState(sent);
+    expect(snap1.players).toEqual([
+      { id: 'A', nickname: 'Ryan' },
+      { id: 'B', nickname: 'Dave' },
+    ]);
+    expect(snap1.firstPickerId).toBe('A');
+    expect(snap1.currentPickerId).toBe('A');
+    expect(snap1.mapPick).toBeNull();
+    expect(snap1.modePick).toBeNull();
+    expect(snap1.mapOptions).toEqual([...names]);
+    expect(snap1.modeOptions).toEqual([...GAME_MODE_ROTATION]);
+    expect(snap1.pickDeadlineMs).toBeGreaterThan(0);
+    expect(snap1.pickDeadlineMs).toBeLessThanOrEqual(DRAFT.FIRST_PICK_SECONDS * 1000);
+
+    sent.length = 0;
+    mgr.tick(0.05, 2);
+    const snap2 = latestDraftState(sent);
+    expect(snap2.pickDeadlineMs).toBeLessThan(snap1.pickDeadlineMs);
+
+    // Picks land in the very next snapshot.
+    mgr.handleDraftPick('A', 'map', names[1]);
+    sent.length = 0;
+    mgr.tick(0.05, 3);
+    const snap3 = latestDraftState(sent);
+    expect(snap3.mapPick).toBe(names[1]);
+    expect(snap3.currentPickerId).toBe('B');
+  });
+
+  it('FORCE_MAP skips the draft entirely (immediate matchFound, no draftState)', () => {
+    const names = listMapNames();
+    process.env.FORCE_MAP = names[1];
+    const mgr = makeManager([0, 0]);
+    pairUp(mgr);
+
+    const found = matchFoundMessages(sent);
+    expect(found.map((f) => f.playerId).sort()).toEqual(['A', 'B']);
+    expect(found[0].message.mapName).toBe(names[1]);
+
+    mgr.tick(0.05, 1);
+    expect(sent.some((s) => s.message.type === 'server:draftState')).toBe(false);
+  });
+
+  it('FORCE_MODE skips the draft entirely (immediate matchFound, no draftState)', () => {
+    process.env.FORCE_MODE = GameModeType.KOTH;
+    const mgr = makeManager([0, 0]);
+    pairUp(mgr);
+
+    const found = matchFoundMessages(sent);
+    expect(found.map((f) => f.playerId).sort()).toEqual(['A', 'B']);
+    expect(found[0].message.gameMode).toBe(GameModeType.KOTH);
+
+    mgr.tick(0.05, 1);
+    expect(sent.some((s) => s.message.type === 'server:draftState')).toBe(false);
+  });
+
+  it('a rematch opens a fresh draft with a fresh roll and plays the drafted map/mode', () => {
+    const names = listMapNames();
+    // Fresh roll: A first. Rematch roll: 0.9 → B first.
+    const mgr = makeManager([0, 0, 0.9, 0]);
+    pairUp(mgr);
+    walkDraft(mgr, sent);
+
+    const match = mgr.getActiveMatches()[0];
+    match.phase = MatchPhase.ENDED;
+    mgr.tick(0.05, 1);
+    sent.length = 0;
+
+    mgr.handleRematchRequest('A');
+    mgr.handleRematchRequest('B');
+
+    // No instant match — a new draft with a fresh who-picks-first roll.
+    expect(mgr.getActiveMatches()).toHaveLength(0);
+    expect(sent.some((s) => s.message.type === 'server:matchFound')).toBe(false);
+    mgr.tick(0.05, 2);
+    const snap = latestDraftState(sent);
+    expect(snap.firstPickerId).toBe('B');
+
+    mgr.handleDraftPick('B', 'mode', GameModeType.GUN_GAME);
+    mgr.handleDraftPick('A', 'map', names[2]);
+
+    const rematch = mgr.getActiveMatches()[0];
+    expect(rematch.gameModeType).toBe(GameModeType.GUN_GAME);
+    expect(rematch.mapManager.getMapData().name).toBe(names[2]);
+  });
+
+  it('tears the draft down when an entrant disconnects', () => {
+    const mgr = makeManager([0, 0]);
+    pairUp(mgr);
+    sent.length = 0;
+
+    mgr.handlePlayerDisconnect('A');
+
+    const disc = sent.filter((s) => s.message.type === 'server:opponentDisconnected');
+    expect(disc).toHaveLength(1);
+    expect(disc[0].playerId).toBe('B');
+    expect(disc[0].reliable).toBe(true);
+
+    // Broadcast stops and no match ever forms.
+    sent.length = 0;
+    mgr.tick(0.05, 1);
+    expect(sent.some((s) => s.message.type === 'server:draftState')).toBe(false);
+    expect(mgr.getActiveMatches()).toHaveLength(0);
+
+    // The remaining player is back in the lobby and can re-queue.
+    mgr.handleJoinMatchmaking('B', 'B');
+    expect(sent.some(
+      (s) => s.playerId === 'B'
+        && s.message.type === 'server:matchmakingStatus'
+        && s.message.status === 'queued',
+    )).toBe(true);
+  });
+
+  it('treats returnToLobby from a drafting player as a draft teardown', () => {
+    const mgr = makeManager([0, 0]);
+    pairUp(mgr);
+    sent.length = 0;
+
+    mgr.handleReturnToLobby('B');
+
+    const disc = sent.filter((s) => s.message.type === 'server:opponentDisconnected');
+    expect(disc.map((d) => d.playerId)).toEqual(['A']);
+    mgr.tick(0.05, 1);
+    expect(sent.some((s) => s.message.type === 'server:draftState')).toBe(false);
+
+    // BOTH entrants were released — re-pairing starts a brand-new draft.
+    mgr.handleJoinMatchmaking('A', 'A');
+    mgr.handleJoinMatchmaking('B', 'B');
+    sent.length = 0;
+    mgr.tick(0.05, 2);
+    expect(sent.some((s) => s.message.type === 'server:draftState')).toBe(true);
+  });
+
+  it('ignores joinMatchmaking from a player already in a draft', () => {
+    const mgr = makeManager([0, 0]);
+    pairUp(mgr);
+    sent.length = 0;
+
+    mgr.handleJoinMatchmaking('A', 'A');
+
+    expect(mgr.getQueueLength()).toBe(0);
+    expect(sent.some(
+      (s) => s.playerId === 'A' && s.message.type === 'server:matchmakingStatus',
+    )).toBe(false);
+  });
+});
+
 describe('MatchmakingManager persistent stats integration', () => {
   let dataDir: string;
   let store: PersistentStatsStore | null;
@@ -459,6 +899,7 @@ describe('MatchmakingManager persistent stats integration', () => {
 
     mgr.handleJoinMatchmaking('A', 'Ryan');
     mgr.handleJoinMatchmaking('B', 'Dave');
+    walkDraft(mgr, sent);
     const match = mgr.getActiveMatches()[0];
     // Give Ryan a decisive scoreboard so the winner is unambiguous.
     match.players.get('A')!.score = 3;
@@ -494,6 +935,7 @@ describe('MatchmakingManager persistent stats integration', () => {
 
     mgr.handleJoinMatchmaking('A', 'Ryan');
     mgr.handleJoinMatchmaking('B', 'Dave');
+    walkDraft(mgr, sent);
     const match = mgr.getActiveMatches()[0];
     match.players.get('A')!.score = 3;
     match.phase = MatchPhase.ENDED;
@@ -517,6 +959,7 @@ describe('MatchmakingManager persistent stats integration', () => {
 
     mgr.handleJoinMatchmaking('A', 'Ryan');
     mgr.handleJoinMatchmaking('B', 'Dave');
+    walkDraft(mgr, sent);
     mgr.getActiveMatches()[0].phase = MatchPhase.ENDED;
     mgr.tick(0.05, 1);
 
@@ -529,6 +972,7 @@ describe('MatchmakingManager persistent stats integration', () => {
 
     mgr.handleJoinMatchmaking('A', 'Ryan');
     mgr.handleJoinMatchmaking('B', 'Dave');
+    walkDraft(mgr, sent);
     mgr.getActiveMatches()[0].phase = MatchPhase.ENDED;
     mgr.tick(0.05, 1);
 
@@ -550,6 +994,7 @@ describe('match clock alignment (regression: 3-second event/timer offset)', () =
 
       mgr.handleJoinMatchmaking('A', 'A');
       mgr.handleJoinMatchmaking('B', 'B');
+      walkDraft(mgr, sent);
       expect(mgr.getActiveMatches()).toHaveLength(1);
 
       // Skip CHARACTER_SELECT — both players lock immediately so the
@@ -611,6 +1056,7 @@ describe('match clock alignment (regression: 3-second event/timer offset)', () =
 
     mgr.handleJoinMatchmaking('A', 'A');
     mgr.handleJoinMatchmaking('B', 'B');
+    walkDraft(mgr, sent);
 
     // Skip CHARACTER_SELECT — both players lock immediately.
     mgr.handleCharacterLock('A', 'mighty_man');

@@ -5,16 +5,28 @@ import { logger } from '../utils/logger.js';
 
 export type MessageHandler = (playerId: PlayerId, message: ClientMessage) => void;
 
-const VALID_CLIENT_MESSAGE_TYPES = new Set([
-  'client:input',
-  'client:joinMatchmaking',
-  'client:cancelMatchmaking',
-  'client:rematchRequest',
-  'client:returnToLobby',
-  'client:characterHover',
-  'client:characterLock',
-  'client:ping',
-]);
+/**
+ * Wire allowlist, one flag per ClientMessage union member. Typed as an
+ * exhaustive Record so ADDING a message type to the shared union without
+ * registering it here is a compile error — this gate silently drops
+ * unknown types, which cost a live-debug cycle when client:draftPick was
+ * routed in GameManager but never let through here (Session 9).
+ */
+const CLIENT_MESSAGE_TYPE_FLAGS: Record<ClientMessage['type'], true> = {
+  'client:input': true,
+  'client:joinMatchmaking': true,
+  'client:cancelMatchmaking': true,
+  'client:rematchRequest': true,
+  'client:returnToLobby': true,
+  'client:characterHover': true,
+  'client:characterLock': true,
+  'client:draftPick': true,
+  'client:ping': true,
+};
+
+const VALID_CLIENT_MESSAGE_TYPES = new Set<string>(
+  Object.keys(CLIENT_MESSAGE_TYPE_FLAGS),
+);
 
 export class GameServer {
   private readonly io: GeckosServer;

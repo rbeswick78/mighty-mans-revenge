@@ -2,6 +2,7 @@ import {
   MatchPhase,
   GameModeType,
   GAME_MODE_ROTATION,
+  DRAFT,
   LEADERBOARD,
   getNextGameMode,
   getMap,
@@ -14,8 +15,10 @@ import type {
   PlayerId,
   MatchResult,
   ServerGameStateMessage,
+  ServerDraftStateMessage,
   SerializedPlayerState,
   CharacterId,
+  DraftCategory,
 } from '@shared/game';
 import { Match } from '../game/match.js';
 import { GameServer } from '../network/server.js';
@@ -52,6 +55,37 @@ interface PostMatchState {
   nextGameMode: GameModeType;
 }
 
+/**
+ * A pre-match map/mode draft in progress. Lives BEFORE Match construction —
+ * Match takes mapData/gameMode in its constructor (map manager, pickups,
+ * mode instance all wire off them), so drafting inside Match would mean
+ * rebuilding managers post-hoc. Keyed by the FUTURE matchId (generated up
+ * front) so every draftState snapshot and the eventual matchFound carry the
+ * same id; entrants sit in playerMatchMap under that id for the whole draft
+ * so the queue guard and disconnect routing treat them as in-match.
+ */
+interface DraftState {
+  matchId: string;
+  playerEntries: { id: PlayerId; nickname: string }[];
+  /** Winner of the who-picks-first roll — claims a category by picking. */
+  firstPickerId: PlayerId;
+  /** The entrant who picks whatever category the first picker leaves. */
+  secondPickerId: PlayerId;
+  /**
+   * Whose pick the server is waiting on. Never null while the draft is
+   * stored: the second pick finalizes (and deletes) the draft immediately,
+   * so the wire's "complete" state is never broadcast.
+   */
+  currentPickerId: PlayerId;
+  mapPick: string | null;
+  modePick: GameModeType | null;
+  /**
+   * Seconds until the server auto-picks for the current picker. Ticked
+   * down by tick(dt) — no setTimeout, so tests drive it deterministically.
+   */
+  pickTimerSeconds: number;
+}
+
 export class MatchmakingManager {
   private readonly queue: MatchmakingQueue;
   private readonly server: GameServer;
@@ -60,6 +94,8 @@ export class MatchmakingManager {
   private readonly playerMatchMap: Map<PlayerId, string> = new Map();
   /** Post-match state for rematch handling. */
   private readonly postMatchStates: Map<string, PostMatchState> = new Map();
+  /** Pre-match drafts in progress, keyed by the future matchId. */
+  private readonly draftStates: Map<string, DraftState> = new Map();
   /** Track nicknames for players (set when they join matchmaking). */
   private readonly playerNicknames: Map<PlayerId, string> = new Map();
   /** Previous-tick phase per match, for detecting phase transitions. */
@@ -78,28 +114,32 @@ export class MatchmakingManager {
    */
   private readonly statsStore: PersistentStatsStore | undefined;
   /**
-   * Round-robin cursor over registry order for FRESH (queue-created)
-   * matches. Rematches don't consult it — they play the nextMapName
-   * pinned in their PostMatchState so consecutive matches of the same
-   * pairing never repeat a map.
+   * Randomness source for the draft: the who-picks-first roll and every
+   * timeout auto-pick. Injectable so tests can drive the draft
+   * deterministically; production uses Math.random. Contract: [0, 1).
+   */
+  private readonly rng: () => number;
+  /**
+   * Round-robin cursor over registry order, consulted ONLY when a FORCE
+   * pin skips the draft (the pinned category is forced; the other one
+   * rotates). Real matches draft their map, so the cursor survives just
+   * for the smoke-pin/kill-switch path.
    */
   private mapRotationIndex = 0;
-  /**
-   * Same contract for game modes: fresh matches walk GAME_MODE_ROTATION
-   * with this cursor; rematches play the nextGameMode pinned in their
-   * PostMatchState.
-   */
+  /** Same contract for game modes (FORCE-pinned matches only). */
   private modeRotationIndex = 0;
 
   constructor(
     server: GameServer,
     getPlayerRTT: (playerId: PlayerId) => number = () => 0,
     statsStore?: PersistentStatsStore,
+    rng: () => number = Math.random,
   ) {
     this.server = server;
     this.queue = new MatchmakingQueue();
     this.getPlayerRTT = getPlayerRTT;
     this.statsStore = statsStore;
+    this.rng = rng;
   }
 
   handleJoinMatchmaking(playerId: PlayerId, nickname: string): void {
@@ -145,6 +185,16 @@ export class MatchmakingManager {
     // Handle disconnect in active match
     const matchId = this.playerMatchMap.get(playerId);
     if (matchId) {
+      // Mid-draft disconnect: same contract as post-match teardown — the
+      // rest get opponentDisconnected and return to lobby. A drafting
+      // player can't also be in a post-match state (their map entry
+      // points at the draft's future matchId), so we're done.
+      const draft = this.draftStates.get(matchId);
+      if (draft) {
+        this.teardownDraft(draft, playerId);
+        return;
+      }
+
       const match = this.activeMatches.get(matchId);
       if (match) {
         match.onPlayerDisconnect(playerId);
@@ -242,6 +292,15 @@ export class MatchmakingManager {
     const matchId = this.playerMatchMap.get(playerId);
     if (!matchId) return;
 
+    // Defensive: the draft UI has no bail button, but a stale
+    // returnToLobby (results-screen click racing the draft start) must
+    // not orphan the draft — treat it like a disconnect.
+    const draft = this.draftStates.get(matchId);
+    if (draft) {
+      this.teardownDraft(draft, playerId);
+      return;
+    }
+
     const postMatch = this.postMatchStates.get(matchId);
     if (postMatch) {
       postMatch.returnedToLobby.add(playerId);
@@ -271,6 +330,9 @@ export class MatchmakingManager {
   tick(dt: number, serverTick: number): void {
     // Try to create matches from queued players
     this.tryCreateMatch();
+
+    // Drive pre-match draft deadlines + snapshots
+    this.tickDrafts(dt);
 
     // Update active matches
     for (const [matchId, match] of this.activeMatches) {
@@ -361,7 +423,10 @@ export class MatchmakingManager {
     return getMap(forced);
   }
 
-  /** Next fresh-match map: FORCE_MAP if set, else advance the rotation. */
+  /**
+   * FORCE-pinned path only (real matches draft their map): FORCE_MAP if
+   * valid, else advance the rotation.
+   */
   private pickRotationMap(): MapData {
     const forced = this.forcedMap();
     if (forced) return forced;
@@ -386,7 +451,10 @@ export class MatchmakingManager {
     return forced as GameModeType;
   }
 
-  /** Next fresh-match mode: FORCE_MODE if set, else advance the rotation. */
+  /**
+   * FORCE-pinned path only (real matches draft their mode): FORCE_MODE if
+   * valid, else advance the rotation.
+   */
   private pickRotationMode(): GameModeType {
     const forced = this.forcedMode();
     if (forced) return forced;
@@ -395,56 +463,81 @@ export class MatchmakingManager {
     return mode;
   }
 
+  /**
+   * Whether either FORCE pin is present in the environment. Presence —
+   * not validity — is the signal: a typo'd pin should degrade to the
+   * deterministic rotation (the forced*() helpers warn and fall through),
+   * never to a surprise draft, because the pins double as the draft's
+   * kill switch for smoke tests and e2e.
+   */
+  private forcePinsActive(): boolean {
+    return !!process.env.FORCE_MAP || !!process.env.FORCE_MODE;
+  }
+
   private tryCreateMatch(): void {
     const pair = this.queue.tryMatch();
     if (!pair) return;
 
-    const { player1, player2 } = pair;
-    const matchId = crypto.randomUUID();
-    const mapData = this.pickRotationMap();
-    const gameMode = this.pickRotationMode();
-
     const playerEntries = [
-      { id: player1.playerId, nickname: player1.nickname },
-      { id: player2.playerId, nickname: player2.nickname },
+      { id: pair.player1.playerId, nickname: pair.player1.nickname },
+      { id: pair.player2.playerId, nickname: pair.player2.nickname },
     ];
 
+    // FORCE pins skip the draft entirely: forced value + rotation cursor
+    // for the other category, exactly as before drafting existed.
+    if (this.forcePinsActive()) {
+      this.launchMatch(
+        crypto.randomUUID(),
+        this.pickRotationMap(),
+        this.pickRotationMode(),
+        playerEntries,
+      );
+      return;
+    }
+
+    this.startDraft(playerEntries);
+  }
+
+  /**
+   * Construct and register the Match and tell every entrant. Shared by
+   * the FORCE-pinned fresh path, draft finalization, and pinned rematches
+   * so the matchFound contract ("match exists; here are the FINAL
+   * map+mode") is written exactly once.
+   */
+  private launchMatch(
+    matchId: string,
+    mapData: MapData,
+    gameMode: GameModeType,
+    playerEntries: { id: PlayerId; nickname: string }[],
+  ): void {
     const match = new Match(matchId, mapData, playerEntries, gameMode);
     match.setRttResolver(this.getPlayerRTT);
     this.activeMatches.set(matchId, match);
-    this.playerMatchMap.set(player1.playerId, matchId);
-    this.playerMatchMap.set(player2.playerId, matchId);
+    for (const entry of playerEntries) {
+      this.playerMatchMap.set(entry.id, matchId);
+    }
 
     logger.info(
       {
         matchId,
-        player1: player1.playerId,
-        player2: player2.playerId,
+        players: playerEntries.map((e) => e.id),
         map: mapData.name,
         gameMode,
       },
       'Match created',
     );
 
-    // Notify both players
-    this.server.sendTo(player1.playerId, {
-      type: 'server:matchFound',
-      matchId,
-      opponents: [{ id: player2.playerId, nickname: player2.nickname }],
-      mapName: mapData.name,
-      gameMode,
-    }, { reliable: true });
-
-    this.server.sendTo(player2.playerId, {
-      type: 'server:matchFound',
-      matchId,
-      opponents: [{ id: player1.playerId, nickname: player1.nickname }],
-      mapName: mapData.name,
-      gameMode,
-    }, { reliable: true });
-
-    // Send matchmaking status update
     for (const entry of playerEntries) {
+      const opponents = playerEntries
+        .filter((e) => e.id !== entry.id)
+        .map((e) => ({ id: e.id, nickname: e.nickname }));
+      this.server.sendTo(entry.id, {
+        type: 'server:matchFound',
+        matchId,
+        opponents,
+        mapName: mapData.name,
+        gameMode,
+      }, { reliable: true });
       this.server.sendTo(entry.id, {
         type: 'server:matchmakingStatus',
         status: 'matched',
@@ -455,6 +548,212 @@ export class MatchmakingManager {
     // The match starts itself in CHARACTER_SELECT (set by Match's
     // constructor); per-tick update() drives the transition into
     // COUNTDOWN once both players lock in or the select timer expires.
+  }
+
+  // ─────────────────────── Pre-match draft ───────────────────────
+
+  /**
+   * Open the pre-match draft for a freshly paired (or rematching) set of
+   * players. The matchId is generated NOW — before the Match exists — so
+   * every draftState snapshot and the eventual matchFound share one id.
+   */
+  private startDraft(playerEntries: { id: PlayerId; nickname: string }[]): void {
+    const matchId = crypto.randomUUID();
+
+    // Roll two DISTINCT picker roles (N-player safe: any extra entrants
+    // just spectate the draft). Decided here, once — the client's
+    // who-picks-first spectacle only animates toward this outcome.
+    const firstIdx = Math.min(
+      Math.floor(this.rng() * playerEntries.length),
+      playerEntries.length - 1,
+    );
+    let secondIdx = Math.min(
+      Math.floor(this.rng() * (playerEntries.length - 1)),
+      playerEntries.length - 2,
+    );
+    if (secondIdx >= firstIdx) secondIdx++;
+
+    const draft: DraftState = {
+      matchId,
+      playerEntries,
+      firstPickerId: playerEntries[firstIdx].id,
+      secondPickerId: playerEntries[secondIdx].id,
+      currentPickerId: playerEntries[firstIdx].id,
+      mapPick: null,
+      modePick: null,
+      pickTimerSeconds: DRAFT.FIRST_PICK_SECONDS,
+    };
+    this.draftStates.set(matchId, draft);
+
+    // Register under the future matchId immediately: the queue guard
+    // ("already in a match") and disconnect routing must treat drafting
+    // players as in-match.
+    for (const entry of playerEntries) {
+      this.playerMatchMap.set(entry.id, matchId);
+    }
+
+    logger.info(
+      {
+        matchId,
+        players: playerEntries.map((e) => e.id),
+        firstPicker: draft.firstPickerId,
+      },
+      'Draft started',
+    );
+  }
+
+  /**
+   * Drive draft pick deadlines and broadcast the full draft snapshot to
+   * every entrant — every tick, unreliable, same cadence contract as
+   * broadcastCharacterSelectState (the next tick repairs a drop). Values
+   * are copied first: an expiring second pick finalizes and mutates the
+   * map mid-iteration.
+   */
+  private tickDrafts(dt: number): void {
+    for (const draft of [...this.draftStates.values()]) {
+      draft.pickTimerSeconds -= dt;
+      if (draft.pickTimerSeconds <= 0) {
+        this.autoDraftPick(draft);
+      }
+      // An auto-picked SECOND pick finalizes the draft immediately; only
+      // still-live drafts keep broadcasting.
+      if (this.draftStates.has(draft.matchId)) {
+        this.broadcastDraftState(draft);
+      }
+    }
+  }
+
+  private broadcastDraftState(draft: DraftState): void {
+    const message: ServerDraftStateMessage = {
+      type: 'server:draftState',
+      matchId: draft.matchId,
+      players: draft.playerEntries.map((e) => ({ id: e.id, nickname: e.nickname })),
+      firstPickerId: draft.firstPickerId,
+      currentPickerId: draft.currentPickerId,
+      mapPick: draft.mapPick,
+      modePick: draft.modePick,
+      mapOptions: [...listMapNames()],
+      modeOptions: [...GAME_MODE_ROTATION],
+      pickDeadlineMs: Math.max(0, draft.pickTimerSeconds * 1000),
+    };
+    for (const entry of draft.playerEntries) {
+      this.server.sendTo(entry.id, message);
+    }
+  }
+
+  /**
+   * Validate and record a pick. Silently ignores (debug log) anything
+   * off-contract: a claimed category (the second picker must take the
+   * remaining one) or a value outside the offered options. `source`
+   * distinguishes player picks from timeout auto-picks in the logs.
+   */
+  private applyDraftPick(
+    draft: DraftState,
+    category: DraftCategory,
+    value: string,
+    source: 'player' | 'timeout',
+  ): void {
+    if (category === 'map') {
+      if (draft.mapPick !== null || !listMapNames().includes(value)) {
+        logger.debug(
+          { matchId: draft.matchId, category, value },
+          'Ignoring invalid draft map pick',
+        );
+        return;
+      }
+      draft.mapPick = value;
+    } else {
+      if (
+        draft.modePick !== null ||
+        !(GAME_MODE_ROTATION as readonly string[]).includes(value)
+      ) {
+        logger.debug(
+          { matchId: draft.matchId, category, value },
+          'Ignoring invalid draft mode pick',
+        );
+        return;
+      }
+      draft.modePick = value as GameModeType;
+    }
+
+    logger.info(
+      { matchId: draft.matchId, picker: draft.currentPickerId, category, value, source },
+      'Draft pick recorded',
+    );
+
+    if (draft.mapPick !== null && draft.modePick !== null) {
+      this.finalizeDraft(draft);
+      return;
+    }
+
+    // First pick landed: hand the remaining category to the other role
+    // with a fresh window.
+    draft.currentPickerId =
+      draft.currentPickerId === draft.firstPickerId
+        ? draft.secondPickerId
+        : draft.firstPickerId;
+    draft.pickTimerSeconds = DRAFT.SECOND_PICK_SECONDS;
+  }
+
+  /**
+   * Deadline expiry: pick uniformly at random on the AFK picker's behalf
+   * (mirrors the character-select auto-lock) so a stalled player can't
+   * hold the match hostage. First pick pending → random category, then
+   * random option; second pick pending → random option of the remaining
+   * category.
+   */
+  private autoDraftPick(draft: DraftState): void {
+    const category: DraftCategory =
+      draft.mapPick === null && draft.modePick === null
+        ? (this.rng() < 0.5 ? 'map' : 'mode')
+        : draft.mapPick === null
+          ? 'map'
+          : 'mode';
+    const options: readonly string[] =
+      category === 'map' ? listMapNames() : GAME_MODE_ROTATION;
+    const value = options[
+      Math.min(Math.floor(this.rng() * options.length), options.length - 1)
+    ];
+    logger.info(
+      { matchId: draft.matchId, picker: draft.currentPickerId, category, value },
+      'Draft pick timed out — auto-picking',
+    );
+    this.applyDraftPick(draft, category, value, 'timeout');
+  }
+
+  /** Both picks are in — the draft becomes a real Match, same id. */
+  private finalizeDraft(draft: DraftState): void {
+    this.draftStates.delete(draft.matchId);
+    // Both picks were validated against the registry/rotation on entry,
+    // so these lookups can't miss.
+    this.launchMatch(
+      draft.matchId,
+      getMap(draft.mapPick!),
+      draft.modePick!,
+      draft.playerEntries,
+    );
+  }
+
+  /**
+   * Tear a draft down because an entrant left (disconnect, or a stale
+   * returnToLobby). Same contract as post-match teardown: everyone else
+   * gets opponentDisconnected and returns to lobby.
+   */
+  private teardownDraft(draft: DraftState, leavingPlayerId: PlayerId): void {
+    this.draftStates.delete(draft.matchId);
+    for (const entry of draft.playerEntries) {
+      this.playerMatchMap.delete(entry.id);
+      if (entry.id !== leavingPlayerId) {
+        this.server.sendTo(entry.id, {
+          type: 'server:opponentDisconnected',
+          playerId: leavingPlayerId,
+        }, { reliable: true });
+      }
+    }
+    logger.info(
+      { matchId: draft.matchId, leavingPlayerId },
+      'Draft torn down',
+    );
   }
 
   /**
@@ -485,6 +784,29 @@ export class MatchmakingManager {
     const match = this.activeMatches.get(matchId);
     if (!match) return;
     match.setLock(playerId, characterId);
+  }
+
+  /**
+   * A pick in the pre-match draft. Only the current picker is heard;
+   * everything else — wrong turn, no draft, claimed category, unknown
+   * value — is silently ignored (loss-tolerant clients just keep
+   * clicking against the per-tick snapshot).
+   */
+  handleDraftPick(playerId: PlayerId, category: DraftCategory, value: string): void {
+    const matchId = this.playerMatchMap.get(playerId);
+    const draft = matchId !== undefined ? this.draftStates.get(matchId) : undefined;
+    if (!draft) {
+      logger.debug({ playerId, category, value }, 'Ignoring draft pick from player not in a draft');
+      return;
+    }
+    if (draft.currentPickerId !== playerId) {
+      logger.debug(
+        { playerId, category, value, currentPickerId: draft.currentPickerId },
+        'Ignoring out-of-turn draft pick',
+      );
+      return;
+    }
+    this.applyDraftPick(draft, category, value, 'player');
   }
 
   private broadcastMatchState(match: Match, serverTick: number): void {
@@ -763,57 +1085,30 @@ export class MatchmakingManager {
 
   private startRematch(postMatch: PostMatchState): void {
     clearTimeout(postMatch.timeoutHandle);
-
-    const matchId = crypto.randomUUID();
-    // The map and mode promised on the results screen ("NEXT: X").
-    const mapData = getMap(postMatch.nextMapName);
-    const gameMode = postMatch.nextGameMode;
+    this.postMatchStates.delete(postMatch.matchId);
 
     const playerEntries = postMatch.playerIds.map((pid) => ({
       id: pid,
       nickname: this.playerNicknames.get(pid) ?? `Player_${pid.slice(0, 4)}`,
     }));
 
-    const match = new Match(matchId, mapData, playerEntries, gameMode);
-    match.setRttResolver(this.getPlayerRTT);
-    this.activeMatches.set(matchId, match);
+    logger.info({ players: postMatch.playerIds }, 'Rematch starting');
 
-    // Update player-match mapping
-    for (const pid of postMatch.playerIds) {
-      this.playerMatchMap.delete(pid);
-      this.playerMatchMap.set(pid, matchId);
-    }
-
-    // Clean up old post-match state
-    this.postMatchStates.delete(postMatch.matchId);
-
-    logger.info(
-      { matchId, players: postMatch.playerIds },
-      'Rematch started',
-    );
-
-    // Notify players
-    for (let i = 0; i < playerEntries.length; i++) {
-      const entry = playerEntries[i];
-      const opponents = playerEntries
-        .filter((e) => e.id !== entry.id)
-        .map((e) => ({ id: e.id, nickname: e.nickname }));
-
-      logger.info(
-        { playerId: entry.id, matchId },
-        'Sending rematch matchFound',
+    // FORCE pins skip the draft here too, playing the map/mode promised
+    // at match end ("NEXT: X"). Real play drafts again — rematches are
+    // the friend group's main pattern, and the draft IS the feature.
+    // Either path re-points playerMatchMap at the new id (draft or match)
+    // for every entrant, replacing the ended match's mapping.
+    if (this.forcePinsActive()) {
+      this.launchMatch(
+        crypto.randomUUID(),
+        getMap(postMatch.nextMapName),
+        postMatch.nextGameMode,
+        playerEntries,
       );
-      this.server.sendTo(entry.id, {
-        type: 'server:matchFound',
-        matchId,
-        opponents,
-        mapName: mapData.name,
-        gameMode,
-      }, { reliable: true });
+      return;
     }
 
-    // Like fresh matches, the rematch starts in CHARACTER_SELECT — no
-    // direct startCountdown call here. Players re-pick characters each
-    // rematch.
+    this.startDraft(playerEntries);
   }
 }

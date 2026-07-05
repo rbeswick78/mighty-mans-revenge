@@ -131,6 +131,10 @@ export class GameManager {
         this.matchmaking.handleCharacterLock(playerId, message.characterId);
         break;
 
+      case 'client:draftPick':
+        this.matchmaking.handleDraftPick(playerId, message.category, message.value);
+        break;
+
       case 'client:ping': {
         // Cache server-side RTT estimate so lag compensation can rewind
         // opponent positions to this player's render time on shoot. The
