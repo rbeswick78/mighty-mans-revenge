@@ -2,8 +2,10 @@ import Phaser from 'phaser';
 import { WEAPONS, ABILITY } from '@shared/config/game.js';
 import type { CharacterId, WeaponId } from '@shared/config/game.js';
 import type { KothHudState } from '@shared/types/network.js';
+import type { GunGameRung } from '@shared/utils/gun-game.js';
 import { Wasteland, cssHex, healthColor } from '@shared/config/palette.js';
 import { HUD_STRIP_HEIGHT, MAP_HEIGHT_PX, MAP_WIDTH_PX } from './layout.js';
+import { gunGameLadderLabel, rifleAmmoRowVisible } from './gun-game-hud.js';
 import { MENU_FONTS } from './menu/fonts.js';
 
 // Press Start 2P is much wider per glyph than Courier, so the final-minute
@@ -62,11 +64,25 @@ export class HUD {
   private reloadingText: Phaser.GameObjects.Text;
   private grenadeText: Phaser.GameObjects.Text;
 
-  // Special-weapon row (shotgun): label + per-shell indicator icons +
-  // reserve count. Hidden while the player is on the rifle.
+  // Special-weapon row: label + indicator icons + count text. Hidden while
+  // the player is on the rifle. Shotgun shows one icon per magazine shell
+  // plus "+reserve"; the pistol's 12-round mag would overflow the column,
+  // so it shows a single bullet icon plus "mag +reserve" as text; fists
+  // show only the label (no ammo exists).
   private specialWeaponLabel: Phaser.GameObjects.Text;
   private specialShellIcons: Phaser.GameObjects.Image[] = [];
   private specialReserveText: Phaser.GameObjects.Text;
+  /** Left edge of the icon run — reserve-text X is derived per weapon. */
+  private readonly specialIconStartX: number;
+  /** specialReserveText X while the shotgun's full shell row is visible. */
+  private readonly shotgunReserveTextX: number;
+
+  // Rifle-ammo-row suppression inputs (see syncAmmoRowVisibility): the
+  // held weapon, the Gun Game rung (null outside that mode), and whether
+  // the row's RELOADING flag was last set.
+  private currentWeaponId: WeaponId = 'rifle';
+  private gunGameRung: GunGameRung | null = null;
+  private rifleAmmoReloading = false;
 
   // Middle column: match state
   private scoreText: Phaser.GameObjects.Text;
@@ -79,6 +95,10 @@ export class HUD {
   private kothBarFg: Phaser.GameObjects.Rectangle;
   /** True while the timer renders in the sudden-death style. */
   private overtimeStyle = false;
+
+  // Gun Game ladder line (middle column). Occupies the KOTH bar's band —
+  // the two are mutually exclusive by mode, so they never collide.
+  private gunGameLadderText: Phaser.GameObjects.Text;
 
   // Right column: kill feed
   private killFeedEntries: KillFeedItem[] = [];
@@ -195,9 +215,9 @@ export class HUD {
     this.grenadeText.setScrollFactor(0);
     this.grenadeText.setDepth(1000);
 
-    // --- Special-weapon row (hidden until a shotgun is picked up) ---
+    // --- Special-weapon row (hidden until a non-rifle weapon is held) ---
     const specialY = grenadeY + 26;
-    this.specialWeaponLabel = scene.add.text(hbX, specialY + 4, 'SHOTGUN', {
+    this.specialWeaponLabel = scene.add.text(hbX, specialY + 4, '', {
       ...HEADER_STYLE,
       fontSize: '10px',
       color: cssHex(Wasteland.TEXT_RELOAD_WARNING),
@@ -206,9 +226,11 @@ export class HUD {
     this.specialWeaponLabel.setDepth(1000);
     this.specialWeaponLabel.setVisible(false);
 
-    const shellStartX = hbX + 96;
+    // Enough icon slots for the shotgun's per-shell row; the pistol reuses
+    // slot 0 as its single bullet icon.
+    this.specialIconStartX = hbX + 96;
     for (let i = 0; i < WEAPONS.shotgun.magazineSize; i++) {
-      const icon = scene.add.image(shellStartX + i * 24, specialY, 'shotgun_shell');
+      const icon = scene.add.image(this.specialIconStartX + i * 24, specialY, 'shotgun_shell');
       icon.setOrigin(0, 0);
       icon.setScale(2);
       icon.setScrollFactor(0);
@@ -217,8 +239,10 @@ export class HUD {
       this.specialShellIcons.push(icon);
     }
 
+    this.shotgunReserveTextX =
+      this.specialIconStartX + WEAPONS.shotgun.magazineSize * 24 + 8;
     this.specialReserveText = scene.add.text(
-      shellStartX + WEAPONS.shotgun.magazineSize * 24 + 8,
+      this.shotgunReserveTextX,
       specialY + 4,
       '',
       { ...FONT_STYLE },
@@ -324,6 +348,20 @@ export class HUD {
     this.kothBarFg.setDepth(1001);
     this.kothBarFg.setVisible(false);
 
+    // --- Gun Game ladder line: "PISTOL 1/2 - LVL 3/5". Sits in the KOTH
+    // bar's band (mode-exclusive) so both desktop and the scaled mobile
+    // canvas keep the middle column single-purpose. Hidden until
+    // updateGunGame receives a rung.
+    this.gunGameLadderText = scene.add.text(middleX, kothBarY - 1, '', {
+      ...HEADER_STYLE,
+      fontSize: '9px',
+      color: cssHex(Wasteland.TEXT_RELOAD_WARNING),
+    });
+    this.gunGameLadderText.setOrigin(0.5, 0);
+    this.gunGameLadderText.setScrollFactor(0);
+    this.gunGameLadderText.setDepth(1000);
+    this.gunGameLadderText.setVisible(false);
+
     // Persistent active-event label, sits right under the timer. Hidden
     // until an event activates; never moves, just toggles text + visibility.
     this.activeEventLabel = scene.add.text(middleX, stripTop + 84, '', {
@@ -385,28 +423,86 @@ export class HUD {
 
   updateAmmo(current: number, max: number, isReloading: boolean): void {
     this.ammoText.setText(`${current} / ${max}`);
-    this.reloadingText.setVisible(isReloading);
+    this.rifleAmmoReloading = isReloading;
+    this.syncAmmoRowVisibility();
   }
 
   /**
-   * Sync the special-weapon row. Hidden entirely while on the rifle;
-   * while a shotgun is held, shows one filled/empty icon per magazine
-   * shell plus the reserve count ("+6").
+   * Sync the special-weapon row.
+   *   rifle   — hidden entirely (the rifle owns the plain ammo row).
+   *   shotgun — one filled/empty icon per magazine shell + "+reserve".
+   *   pistol  — label + a single bullet icon + "mag +reserve" as text
+   *             (12 per-shell icons would overflow the left column).
+   *   punch   — label only ("FISTS"); fists have no ammo, and the rifle
+   *             ammo row hides too (syncAmmoRowVisibility).
    */
   updateSpecialWeapon(weaponId: WeaponId, magAmmo: number, reserve: number): void {
-    const visible = weaponId === 'shotgun';
-    this.specialWeaponLabel.setVisible(visible);
-    this.specialReserveText.setVisible(visible);
-    for (let i = 0; i < this.specialShellIcons.length; i++) {
-      const icon = this.specialShellIcons[i];
-      icon.setVisible(visible);
-      if (visible) {
+    this.currentWeaponId = weaponId;
+
+    const showLabel = weaponId !== 'rifle';
+    this.specialWeaponLabel.setVisible(showLabel);
+    if (showLabel) {
+      this.specialWeaponLabel.setText(WEAPONS[weaponId].displayName.toUpperCase());
+    }
+
+    if (weaponId === 'shotgun') {
+      for (let i = 0; i < this.specialShellIcons.length; i++) {
+        const icon = this.specialShellIcons[i];
+        icon.setVisible(true);
         icon.setTexture(i < magAmmo ? 'shotgun_shell' : 'shotgun_shell_empty');
       }
-    }
-    if (visible) {
+      this.specialReserveText.setX(this.shotgunReserveTextX);
       this.specialReserveText.setText(`+${reserve}`);
+      this.specialReserveText.setVisible(true);
+    } else if (weaponId === 'pistol') {
+      for (let i = 0; i < this.specialShellIcons.length; i++) {
+        const icon = this.specialShellIcons[i];
+        icon.setVisible(i === 0);
+        if (i === 0) {
+          icon.setTexture(magAmmo > 0 ? 'pistol_bullet' : 'pistol_bullet_empty');
+        }
+      }
+      // Count text hugs the single icon instead of sitting past the
+      // shotgun's shell run.
+      this.specialReserveText.setX(this.specialIconStartX + 24);
+      this.specialReserveText.setText(`${magAmmo} +${reserve}`);
+      this.specialReserveText.setVisible(true);
+    } else {
+      for (const icon of this.specialShellIcons) {
+        icon.setVisible(false);
+      }
+      this.specialReserveText.setVisible(false);
     }
+
+    this.syncAmmoRowVisibility();
+  }
+
+  /**
+   * Sync the Gun Game ladder line from the local player's rung (derived
+   * from score via the shared gunGameRungForScore). Pass null outside Gun
+   * Game — hides the line and lifts the grenade-rung ammo suppression.
+   */
+  updateGunGame(rung: GunGameRung | null): void {
+    this.gunGameRung = rung;
+    if (rung) {
+      this.gunGameLadderText.setText(gunGameLadderLabel(rung));
+      this.gunGameLadderText.setVisible(true);
+    } else {
+      this.gunGameLadderText.setVisible(false);
+    }
+    this.syncAmmoRowVisibility();
+  }
+
+  /**
+   * The rifle ammo row hides while it can only mislead: fists equipped
+   * (no ammo exists) or the Gun Game grenade rung (weaponId stays 'rifle'
+   * but gun fire is gated — the ladder line + grenade counter are the
+   * truth there).
+   */
+  private syncAmmoRowVisibility(): void {
+    const visible = rifleAmmoRowVisible(this.currentWeaponId, this.gunGameRung);
+    this.ammoText.setVisible(visible);
+    this.reloadingText.setVisible(visible && this.rifleAmmoReloading);
   }
 
   /** Show "YOU DIED" with a respawn countdown, or hide it when alive. */
@@ -932,8 +1028,18 @@ export class HUD {
     this.ammoText.destroy();
     this.reloadingText.destroy();
     this.grenadeText.destroy();
+    this.specialWeaponLabel.destroy();
+    for (const icon of this.specialShellIcons) {
+      icon.destroy();
+    }
+    this.specialShellIcons = [];
+    this.specialReserveText.destroy();
     this.scoreText.destroy();
     this.timerText.destroy();
+    this.kothLabel.destroy();
+    this.kothBarBg.destroy();
+    this.kothBarFg.destroy();
+    this.gunGameLadderText.destroy();
     this.countdownText.destroy();
     this.deathOverlay.destroy();
     this.eventBannerText.destroy();

@@ -3,8 +3,8 @@ import Phaser from 'phaser';
 import type { MapData } from '@shared/types/map.js';
 import type { PlayerId, Vec2 } from '@shared/types/common.js';
 import type { MatchResult, KillFeedEntry } from '@shared/types/game.js';
-import { MatchPhase } from '@shared/types/game.js';
-import type { BulletTrail } from '@shared/types/projectile.js';
+import { GameModeType, MatchPhase } from '@shared/types/game.js';
+import type { BulletTrail, PunchEvent } from '@shared/types/projectile.js';
 import { PickupType } from '@shared/types/pickup.js';
 import { PLAYER, SERVER, WEAPONS } from '@shared/config/game.js';
 import { Wasteland, cssHex } from '@shared/config/palette.js';
@@ -12,6 +12,7 @@ import {
   predictBulletRay,
   predictGrenadePath,
 } from '@shared/utils/trajectory-prediction.js';
+import { gunGameRungForScore } from '@shared/utils/gun-game.js';
 import type { PlayerState } from '@shared/types/player.js';
 import { MapRenderer } from '../rendering/map-renderer.js';
 import { ClientPlayerManager } from '../rendering/player-manager.js';
@@ -187,6 +188,7 @@ export class GameScene extends Phaser.Scene {
   private onGrenadeExploded: ((pos: Vec2) => void) | null = null;
   private onAxeThrown: ((pos: Vec2) => void) | null = null;
   private onAxeResolved: ((payload: { position: Vec2; angle: number }) => void) | null = null;
+  private onPunchSwung: ((punch: PunchEvent) => void) | null = null;
   private onLocalCorrection: ((correction: LocalCorrection) => void) | null = null;
   private onEventWarning: ((payload: EventWarningPayload) => void) | null = null;
   private onEventStart: ((payload: EventStartPayload) => void) | null = null;
@@ -351,8 +353,10 @@ export class GameScene extends Phaser.Scene {
       // releases the fire/throw button while their corresponding ammo pool
       // is empty. throwPressed is already gated to the throw-aim phase (not
       // detonate), so this only fires when the player intended to throw.
+      // Fists are exempt — a punch has no ammo pool, so the rifle's mag
+      // count must not produce a false out-of-ammo click.
       if (
-        (input.firePressed && localState.ammo === 0) ||
+        (input.firePressed && localState.ammo === 0 && localState.weaponId !== 'punch') ||
         (input.throwPressed && localState.grenades === 0)
       ) {
         this.cameras.main.shake(120, 0.004);
@@ -547,6 +551,15 @@ export class GameScene extends Phaser.Scene {
 
         // Update HUD — per-character HP pool, not the baseline constant.
         this.hud.updateHealth(currentLocalState.health, currentLocalState.maxHealth);
+        // Gun Game ladder line: derived purely from the local score via the
+        // shared rung helper (no extra wire state). Null outside Gun Game
+        // hides the line and lifts the grenade-rung ammo suppression. Runs
+        // before the ammo rows so visibility rules sync within the frame.
+        this.hud.updateGunGame(
+          this.matchData?.gameMode === GameModeType.GUN_GAME
+            ? gunGameRungForScore(currentLocalState.score)
+            : null,
+        );
         this.hud.updateAmmo(
           currentLocalState.ammo,
           WEAPONS.rifle.magazineSize,
@@ -709,6 +722,15 @@ export class GameScene extends Phaser.Scene {
     const piercing =
       localState.characterId === 'mighty_man' && localState.abilityActiveSeconds > 0;
 
+    // Melee draws no aim line — a 56px "ray" would read as a broken gun
+    // preview, and the punch arc is validated server-side anyway. The
+    // pistol falls through to the normal ray (predictBulletRay reads
+    // WEAPONS[weaponId] for its range).
+    if (raw.aimingGun && localState.weaponId === 'punch') {
+      this.effectsRenderer.clearAim();
+      return;
+    }
+
     if (raw.aimingGun) {
       // Build the players map (local + remotes) for ray hit-testing. Use
       // current/interpolated positions so the preview matches what the
@@ -729,12 +751,18 @@ export class GameScene extends Phaser.Scene {
         WEAPONS[localState.weaponId],
         hitboxScale,
       );
+      // The empty-mag tint tracks the HELD weapon's pool: shotgun/pistol
+      // fire from specialAmmo, not the rifle magazine.
+      const magEmpty =
+        localState.weaponId === 'shotgun' || localState.weaponId === 'pistol'
+          ? localState.specialAmmo === 0
+          : localState.ammo === 0;
       this.effectsRenderer.showBulletAim(
         localState.position.x,
         localState.position.y,
         aim.endPos.x,
         aim.endPos.y,
-        localState.ammo === 0,
+        magEmpty,
       );
     } else if (raw.aimingGrenade) {
       // turbo_grenades: preview at the boosted throw speed so the arc
@@ -934,11 +962,16 @@ export class GameScene extends Phaser.Scene {
 
       // Rifle: three trails per burst (server-authoritative, burstInterval
       // apart), so per-trail playback naturally produces three shots.
-      // Shotgun: one deeper boom per blast — the same source WAV slowed
-      // down (rate/detune variant per the roadmap; no new audio file).
+      // Shotgun: one deeper boom per blast; pistol: a lighter, snappier
+      // crack — both rate/detune variants of the same source WAV per the
+      // roadmap (no new audio files).
       const audio = AudioManager.getInstance();
       if (audio && primaryOfBlast) {
-        const sfxOptions = isShotgun ? { rate: 0.55, detune: -250 } : undefined;
+        const sfxOptions = isShotgun
+          ? { rate: 0.55, detune: -250 }
+          : trail.weaponId === 'pistol'
+            ? { rate: 1.4, detune: 200 }
+            : undefined;
         const localState = this.gameService.getNetworkManager().getLocalPlayerState();
         if (localState) {
           audio.playAtPosition(
@@ -1083,6 +1116,52 @@ export class GameScene extends Phaser.Scene {
       this.axeRenderer?.playLandingAt(payload.position.x, payload.position.y, payload.angle);
     };
 
+    // Punch swings ride the gameState message (message-granularity, like
+    // the axe events) — one per swing, local and remote punchers alike.
+    // The swing drives the puncher's body-level attack anim; melee has no
+    // bullet trail, so no muzzle flash and no tracer.
+    this.onPunchSwung = (punch: PunchEvent) => {
+      this.playerManager?.getRenderer(punch.playerId)?.playAttackAnimation();
+
+      const audio = AudioManager.getInstance();
+      if (!audio) return;
+      const localState = this.gameService.getNetworkManager().getLocalPlayerState();
+      // Whoosh: grenade-throw pitched up hard — harder than the axe-throw
+      // variant (1.5/700) so the two swings stay tellable apart by ear.
+      const whooshOptions = { rate: 1.8, detune: 1100 };
+      if (localState) {
+        audio.playAtPosition(
+          'grenadeThrow',
+          punch.position.x,
+          punch.position.y,
+          localState.position.x,
+          localState.position.y,
+          whooshOptions,
+        );
+      } else {
+        audio.play('grenadeThrow', whooshOptions);
+      }
+
+      if (punch.hit) {
+        // Impact thud: the SOUND_MAP's playerHit entry has no shipped
+        // asset, so derive a body-blow from gun-shot.wav slowed way down —
+        // well below the shotgun boom's 0.55/-250 so they don't blur.
+        const impactOptions = { rate: 0.45, detune: -600 };
+        if (localState) {
+          audio.playAtPosition(
+            'gunshot',
+            punch.position.x,
+            punch.position.y,
+            localState.position.x,
+            localState.position.y,
+            impactOptions,
+          );
+        } else {
+          audio.play('gunshot', impactOptions);
+        }
+      }
+    };
+
     this.onGrenadeExploded = (pos: Vec2) => {
       this.effectsRenderer?.showExplosion(pos.x, pos.y);
       this.lightingRenderer?.addExplosionFlash(pos.x, pos.y);
@@ -1204,6 +1283,7 @@ export class GameScene extends Phaser.Scene {
     this.gameService.on('grenadeExploded', this.onGrenadeExploded);
     this.gameService.on('axeThrown', this.onAxeThrown);
     this.gameService.on('axeResolved', this.onAxeResolved);
+    this.gameService.on('punchSwung', this.onPunchSwung);
     this.gameService.on('localCorrection', this.onLocalCorrection);
     this.gameService.on('eventWarning', this.onEventWarning);
     this.gameService.on('eventStart', this.onEventStart);
@@ -1284,6 +1364,10 @@ export class GameScene extends Phaser.Scene {
     if (this.onAxeResolved) {
       this.gameService.off('axeResolved', this.onAxeResolved);
       this.onAxeResolved = null;
+    }
+    if (this.onPunchSwung) {
+      this.gameService.off('punchSwung', this.onPunchSwung);
+      this.onPunchSwung = null;
     }
     if (this.onGrenadeExploded) {
       this.gameService.off('grenadeExploded', this.onGrenadeExploded);

@@ -1,7 +1,7 @@
 import type { PlayerId, Vec2 } from '@shared/types/common.js';
 import type { CollisionGrid } from '@shared/types/map.js';
 import type { PlayerInput, PlayerState } from '@shared/types/player.js';
-import type { AxeState, GrenadeState } from '@shared/types/projectile.js';
+import type { AxeState, GrenadeState, PunchEvent } from '@shared/types/projectile.js';
 import type { PickupState } from '@shared/types/pickup.js';
 import type {
   ServerMessage,
@@ -38,6 +38,7 @@ type EventName =
   | 'grenadeExploded'
   | 'axeThrown'
   | 'axeResolved'
+  | 'punchSwung'
   | 'localCorrection'
   | 'eventWarning'
   | 'eventStart'
@@ -454,6 +455,14 @@ export class NetworkManager {
     // Emit bullet trails so scenes can render them as effects.
     for (const trail of msg.bulletTrails) {
       this.emit('bulletTrail', trail);
+    }
+
+    // Punch swings are transient like bulletTrails — one event per entry,
+    // processed per message and never diffed (a swing resolves within a
+    // single server tick, so there is no list to mirror). Each entry
+    // drives the puncher's attack anim + whoosh/impact SFX in the scene.
+    for (const punch of msg.punches ?? []) {
+      this.emit('punchSwung', punch satisfies PunchEvent);
     }
 
     // Grenades: mirror the server list and emit explosion events for any

@@ -40,6 +40,9 @@ export class ClientPlayerManager {
       renderer.setBigHeads(this.bigHeadsActive);
       renderer.setPosition(playerState.position.x, playerState.position.y);
       renderer.setAimAngle(playerState.aimAngle);
+      // Held-weapon overlay follows the server-authoritative weapon slot
+      // (shotgun/pistol swap sheets; fists hide the overlay entirely).
+      renderer.setWeapon(playerState.weaponId);
       // Per-character HP pool (Bubba 150, Frost Wizard 85, ...) — the
       // serialized state carries the authoritative max.
       renderer.updateHealthBar(playerState.health, playerState.maxHealth);

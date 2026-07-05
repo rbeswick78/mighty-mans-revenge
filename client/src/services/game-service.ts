@@ -54,6 +54,7 @@ type GameServiceEvent =
   | 'grenadeExploded'
   | 'axeThrown'
   | 'axeResolved'
+  | 'punchSwung'
   | 'localCorrection'
   | 'eventWarning'
   | 'eventStart'
@@ -247,6 +248,10 @@ export class GameService {
 
     this.networkManager.on('axeResolved', (payload: unknown) => {
       this.emit('axeResolved', payload);
+    });
+
+    this.networkManager.on('punchSwung', (punch: unknown) => {
+      this.emit('punchSwung', punch);
     });
 
     this.networkManager.on('localCorrection', (correction: LocalCorrection) => {

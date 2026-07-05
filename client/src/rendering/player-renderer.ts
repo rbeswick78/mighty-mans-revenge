@@ -3,6 +3,11 @@ import type { PlayerState } from '@shared/types/player.js';
 import { CHARACTERS, MUTATORS, type CharacterId, type WeaponId } from '@shared/config/game.js';
 import { Wasteland, cssHex, healthColor } from '@shared/config/palette.js';
 import { bucketAimAngle, type Direction4 } from './sprite-direction.js';
+import {
+  weaponOverlayKey,
+  weaponRendersOverlay,
+  type GunOverlayState,
+} from './weapon-overlay-key.js';
 
 const SPRITE_SCALE = 3;
 
@@ -67,9 +72,15 @@ const GUN_SHOOT_DURATION_MS = 125;
  * anim this fills the weapon's 0.6 s fireCooldown (125 + 475 ms).
  */
 const SHOTGUN_RACK_DURATION_MS = 475;
+/**
+ * How long a punch swing owns the body sprite before the idle/run loop
+ * resumes. Matches ATTACK_SWING_SECONDS in boot-scene.ts — attack anims
+ * are frame-rate-normalized so every character's swing plays in this
+ * window regardless of sheet frame count.
+ */
+const ATTACK_SWING_DURATION_MS = 350;
 
 type AnimState = 'idle' | 'run';
-type GunState = 'hold' | 'shoot' | 'racking';
 
 export class PlayerRenderer {
   private container: Phaser.GameObjects.Container;
@@ -97,10 +108,17 @@ export class PlayerRenderer {
   private readonly texturePrefix: string;
   private currentDirection: Direction4 = 'down';
   private currentAnimState: AnimState = 'idle';
-  private currentGunState: GunState = 'hold';
-  /** Weapon driving the held-overlay sheets: 'gun_*' keys for the rifle, 'shotgun_*' for the shotgun. */
+  private currentGunState: GunOverlayState = 'hold';
+  /** Weapon driving the held overlay — see weaponOverlayKey for the key map. */
   private currentWeaponId: WeaponId = 'rifle';
   private gunShootTimer: Phaser.Time.TimerEvent | null = null;
+  /**
+   * True while the body sprite is playing its one-shot punch swing. While
+   * set, playCurrentAnim routes to the attack anim so idle/run flips can't
+   * clobber the swing; a direction change re-plays it in the new facing.
+   */
+  private isAttacking = false;
+  private attackTimer: Phaser.Time.TimerEvent | null = null;
   private hasLastPos = false;
   private lastX = 0;
   private lastY = 0;
@@ -344,8 +362,10 @@ export class PlayerRenderer {
 
   /**
    * Swap the held-weapon overlay when the server says the equipped weapon
-   * changed (shotgun picked up / spent). Cancels any in-flight shoot/rack
-   * chain so we never play a shotgun anim with rifle sheets or vice versa.
+   * changed (shotgun picked up / spent, Gun Game rung advance). Cancels any
+   * in-flight shoot/rack chain so we never play a shotgun anim with rifle
+   * sheets or vice versa. Fists have no overlay art — the punch is a
+   * body-level attack anim — so 'punch' hides the gun sprite entirely.
    */
   setWeapon(weaponId: WeaponId): void {
     if (weaponId === this.currentWeaponId) return;
@@ -354,19 +374,24 @@ export class PlayerRenderer {
     this.gunShootTimer?.remove(false);
     this.gunShootTimer = null;
     this.currentGunState = 'hold';
-    this.playCurrentGunAnim();
+    const rendersOverlay = weaponRendersOverlay(weaponId);
+    this.gunSprite.setVisible(rendersOverlay);
+    if (rendersOverlay) {
+      this.playCurrentGunAnim();
+    }
   }
 
   /**
    * Trigger the weapon's 3-frame shoot animation. Routed from
    * GameScene.onBulletTrail by shooterId. Each new shot restarts the
-   * shoot anim (no stacking). The rifle reverts straight to the looping
-   * hold anim; the shotgun chains its pump-racking anim first, filling
-   * the server's 0.6 s fire cooldown. No-op for characters without a
-   * rendered gun.
+   * shoot anim (no stacking). The rifle and pistol revert straight to the
+   * looping hold anim; the shotgun chains its pump-racking anim first,
+   * filling the server's 0.6 s fire cooldown. No-op for characters without
+   * a rendered gun and while fists are equipped (punches never produce
+   * bullet trails, but guard anyway).
    */
   playShootAnimation(): void {
-    if (!this.gunSprite) return;
+    if (!this.gunSprite || !weaponRendersOverlay(this.currentWeaponId)) return;
     this.currentGunState = 'shoot';
     this.playCurrentGunAnim();
     this.gunShootTimer?.remove(false);
@@ -385,6 +410,38 @@ export class PlayerRenderer {
         this.gunShootTimer = null;
       }
     });
+  }
+
+  /**
+   * Play the character's one-shot punch swing on the body sprite (unlike
+   * gun overlays, attacks are body-level states — the sheets redraw the
+   * whole character). Routed from GameScene's punchSwung handler for local
+   * AND remote players. The swing owns the body anim for
+   * ATTACK_SWING_DURATION_MS, then the idle/run loop resumes; the timer
+   * always fires, so a death mid-swing can't strand the sprite on the last
+   * attack frame (the container is hidden while dead anyway), and respawn
+   * force-ends any leftover swing via playRespawnAnimation.
+   */
+  playAttackAnimation(): void {
+    this.attackTimer?.remove(false);
+    this.isAttacking = true;
+    // ignoreIfPlaying = false: a rapid re-swing restarts the animation.
+    this.sprite.play(this.attackKey(this.currentDirection), false);
+    this.attackTimer = this.scene.time.delayedCall(ATTACK_SWING_DURATION_MS, () => {
+      this.attackTimer = null;
+      this.isAttacking = false;
+      this.playCurrentAnim();
+    });
+  }
+
+  /** Cancel an in-flight punch swing and restore the idle/run loop. */
+  private endAttackAnimation(): void {
+    this.attackTimer?.remove(false);
+    this.attackTimer = null;
+    if (this.isAttacking) {
+      this.isAttacking = false;
+      this.playCurrentAnim();
+    }
   }
 
   /** Whether this character renders a held gun (and matching muzzle flash). */
@@ -435,6 +492,8 @@ export class PlayerRenderer {
   }
 
   playRespawnAnimation(): void {
+    // A death mid-swing must not carry the attack state into the new life.
+    this.endAttackAnimation();
     this.container.setVisible(true);
     this.container.setAlpha(0);
     this.scene.tweens.add({
@@ -496,19 +555,27 @@ export class PlayerRenderer {
     }
     this.gunShootTimer?.remove(false);
     this.gunShootTimer = null;
+    this.attackTimer?.remove(false);
+    this.attackTimer = null;
     // Container.destroy disposes children, so wand/mist/crystal graphics
     // are torn down with the container — no extra cleanup needed.
     this.container.destroy();
   }
 
   private playCurrentAnim(): void {
-    const key = this.animKey(this.currentDirection, this.currentAnimState);
+    // While a punch swing plays, the body stays on the attack anim:
+    // idle↔run flips resolve to the same attack key (ignored below), and a
+    // direction change resolves to a different attack key so the swing
+    // re-plays in the new facing instead of snapping back to idle.
+    const key = this.isAttacking
+      ? this.attackKey(this.currentDirection)
+      : this.animKey(this.currentDirection, this.currentAnimState);
     // ignoreIfPlaying = true means re-calling with the same key is a no-op.
     this.sprite.play(key, true);
   }
 
   private playCurrentGunAnim(): void {
-    if (!this.gunSprite) return;
+    if (!this.gunSprite || !weaponRendersOverlay(this.currentWeaponId)) return;
     const key = this.gunKey(this.currentDirection, this.currentGunState);
     // ignoreIfPlaying = false: shooting again restarts the shoot anim.
     this.gunSprite.play(key, this.currentGunState === 'hold');
@@ -518,12 +585,11 @@ export class PlayerRenderer {
     return `${this.texturePrefix}_${direction}_${state}`;
   }
 
-  private gunKey(direction: Direction4, state: GunState): string {
-    // Only the shotgun has racking sheets; a stray 'racking' on the rifle
-    // (weapon swapped mid-chain) falls back to hold.
-    if (this.currentWeaponId === 'shotgun') {
-      return `shotgun_${direction}_${state}`;
-    }
-    return `gun_${direction}_${state === 'racking' ? 'hold' : state}`;
+  private attackKey(direction: Direction4): string {
+    return `${this.texturePrefix}_${direction}_attack`;
+  }
+
+  private gunKey(direction: Direction4, state: GunOverlayState): string {
+    return weaponOverlayKey(this.currentWeaponId, direction, state);
   }
 }

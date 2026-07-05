@@ -70,6 +70,26 @@ const SHOTGUN_RACK_FRAMES: Record<Direction4, FrameDim> = {
   'side-left': { w: 16, h: 7 },   // 32 × 7
 };
 
+/**
+ * Pistol held-overlay frame dimensions (Gun Game rung weapon; same
+ * layering trick as gun/shotgun). hold = 6-frame loop, shoot = 3-frame
+ * one-shot. No racking state — the pistol is semi-auto; its fire rate is
+ * the server's fireCooldown, with no pump animation to fill it.
+ */
+const PISTOL_HOLD_FRAMES: Record<Direction4, FrameDim> = {
+  down: { w: 5, h: 11 },          // 30 × 11
+  up: { w: 5, h: 11 },            // 30 × 11
+  side: { w: 8, h: 9 },           // 48 × 9
+  'side-left': { w: 8, h: 9 },    // 48 × 9
+};
+
+const PISTOL_SHOOT_FRAMES: Record<Direction4, FrameDim> = {
+  down: { w: 5, h: 11 },          // 15 × 11
+  up: { w: 5, h: 11 },            // 15 × 11
+  side: { w: 10, h: 8 },          // 30 × 8
+  'side-left': { w: 10, h: 8 },   // 30 × 8
+};
+
 const IDLE_FPS = 6;
 const RUN_FPS = 12;
 /** Thrown axe spins fast — 9 frames looping in ~0.5s. */
@@ -100,6 +120,14 @@ const GUN_SHOOT_FPS = 24;   // 3 frames in ~125 ms
 const FIRE_FPS = 30;        // 3 frames in ~100 ms — matches old procedural flash duration
 /** 2 racking frames spread over the shotgun's 0.6 s pump delay. */
 const SHOTGUN_RACK_FPS = 2 / 0.6;
+/**
+ * Punch swing duration in seconds. Attack sheets vary wildly in frame
+ * count across the roster (4/4/8/7), so instead of a fixed FPS each
+ * character's attack anim gets frameRate = attackFrameCount /
+ * ATTACK_SWING_SECONDS — every swing plays in ~350ms regardless of frame
+ * count. PlayerRenderer's ATTACK_SWING_DURATION_MS must match this.
+ */
+const ATTACK_SWING_SECONDS = 0.35;
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -219,6 +247,16 @@ export class BootScene extends Phaser.Scene {
           char.assetFolder,
           char.assetBaseName,
         );
+        // Melee attack sheets (the Gun Game punch rung) — body-level
+        // states, one per character, same registry-driven pipeline.
+        this.loadCharacterSheet(
+          char.spritePrefix,
+          dir,
+          'attack',
+          char.attackFrames[dir],
+          char.assetFolder,
+          char.assetBaseName,
+        );
       }
     }
 
@@ -277,6 +315,20 @@ export class BootScene extends Phaser.Scene {
         `shotgun_${dir}_racking`,
         `/assets/player/shotgun_${dir}_racking.png`,
         { frameWidth: SHOTGUN_RACK_FRAMES[dir].w, frameHeight: SHOTGUN_RACK_FRAMES[dir].h },
+      );
+    }
+
+    // Pistol held overlay — 4 directions × (hold loop / shoot). No racking.
+    for (const dir of DIRECTIONS) {
+      this.load.spritesheet(
+        `pistol_${dir}_hold`,
+        `/assets/player/pistol_${dir}_hold.png`,
+        { frameWidth: PISTOL_HOLD_FRAMES[dir].w, frameHeight: PISTOL_HOLD_FRAMES[dir].h },
+      );
+      this.load.spritesheet(
+        `pistol_${dir}_shoot`,
+        `/assets/player/pistol_${dir}_shoot.png`,
+        { frameWidth: PISTOL_SHOOT_FRAMES[dir].w, frameHeight: PISTOL_SHOOT_FRAMES[dir].h },
       );
     }
 
@@ -359,6 +411,10 @@ export class BootScene extends Phaser.Scene {
     this.load.image('shotgun_shell_empty', '/assets/ui/shotgun-bullet-indicator_empty.png');
     this.load.image('shotgun_shell_small', '/assets/ui/shotgun-bullet-indicator_small.png');
     this.load.image('shotgun_shell_small_empty', '/assets/ui/shotgun-bullet-indicator_small_empty.png');
+    // Pistol row uses a single icon + numeric count (12 per-shell icons
+    // would overflow the left column), so only the two base indicators.
+    this.load.image('pistol_bullet', '/assets/ui/pistol-bullet-indicator.png');
+    this.load.image('pistol_bullet_empty', '/assets/ui/pistol-bullet-indicator_empty.png');
 
     // Music tracks. Played via AudioManager.playMusic(<key>) on scene
     // entry; gameplay match length is tied to game-play track length.
@@ -382,7 +438,7 @@ export class BootScene extends Phaser.Scene {
   private loadCharacterSheet(
     spritePrefix: string,
     direction: Direction4,
-    state: 'idle' | 'run',
+    state: 'idle' | 'run' | 'attack',
     dim: FrameDim,
     assetFolder: string,
     assetBaseName: string,
@@ -424,6 +480,20 @@ export class BootScene extends Phaser.Scene {
             repeat: -1,
           });
         }
+
+        // Melee attack one-shot. Frame rate normalizes to the fixed
+        // ATTACK_SWING_SECONDS duration (see that constant) because the
+        // roster's attack sheets ship 4/4/8/7 frames.
+        const attackKey = `${char.spritePrefix}_${dir}_attack`;
+        this.anims.create({
+          key: attackKey,
+          frames: this.anims.generateFrameNumbers(attackKey, {
+            start: 0,
+            end: char.attackFrameCount - 1,
+          }),
+          frameRate: char.attackFrameCount / ATTACK_SWING_SECONDS,
+          repeat: 0,
+        });
       }
     }
 
@@ -494,6 +564,23 @@ export class BootScene extends Phaser.Scene {
         key: sgRackKey,
         frames: this.anims.generateFrameNumbers(sgRackKey, {}),
         frameRate: SHOTGUN_RACK_FPS,
+        repeat: 0,
+      });
+
+      // Pistol overlay: hold loop + shoot one-shot, mirroring the rifle
+      // (no racking — semi-auto, the shoot anim reverts straight to hold).
+      const pistolHoldKey = `pistol_${dir}_hold`;
+      this.anims.create({
+        key: pistolHoldKey,
+        frames: this.anims.generateFrameNumbers(pistolHoldKey, {}),
+        frameRate: GUN_HOLD_FPS,
+        repeat: -1,
+      });
+      const pistolShootKey = `pistol_${dir}_shoot`;
+      this.anims.create({
+        key: pistolShootKey,
+        frames: this.anims.generateFrameNumbers(pistolShootKey, {}),
+        frameRate: GUN_SHOOT_FPS,
         repeat: 0,
       });
     }
