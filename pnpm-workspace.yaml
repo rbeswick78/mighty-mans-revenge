@@ -3,3 +3,7 @@ packages:
   - server
   - shared
   - e2e
+
+onlyBuiltDependencies:
+  - esbuild
+  - node-datachannel
