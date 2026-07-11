@@ -158,6 +158,8 @@ Maps are visually themed: map JSON carries an optional `theme` id resolved clien
 
 Map JSON also carries `kothHills` — top-left tiles of the 2×2 King of the Hill zones, in relocation order. The validator checks bounds/walkability (≥3 entries when present); the registry requires every shipped map to declare them, because mode rotation can put KOTH on any map.
 
+Four arenas ship in registry order: Wasteland Outpost, Overgrown Suburb, Scrapyard, and Collapsed Overpass. Collapsed Overpass uses the `overpass` theme, six hill locations, heavy central supports, and open outer loops to create a riskier center-control map without introducing map-only collision rules or assets.
+
 Map choice is player-drafted per match since Session 9 (see the pre-match draft under Game Mode Abstraction). The old round-robin rotation (`shared/src/maps/registry.ts` registry order, global cursor for fresh matches, rematch pinned via `MatchResult.nextMapName`) only runs on the FORCE/no-draft path. `FORCE_MAP=<map name>` pins every match to one map for manual smoke tests and skips the draft.
 
 ## Code Conventions

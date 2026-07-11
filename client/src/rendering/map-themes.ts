@@ -326,6 +326,15 @@ export const MAP_THEMES: Record<string, MapTheme> = {
     outerWall: 'brick',
     innerWall: 'roofRed',
   },
+  overpass: {
+    floorTexture: 'tiles_bleak',
+    floorVariants: FLOOR_VARIANTS,
+    coverTexture: 'tiles_garbage',
+    coverVariants: [9, 18, 19, 26],
+    scorchFrame: SCORCH_FRAME,
+    outerWall: 'brick',
+    innerWall: 'roofDark',
+  },
 };
 
 export const DEFAULT_THEME_ID = 'wasteland';

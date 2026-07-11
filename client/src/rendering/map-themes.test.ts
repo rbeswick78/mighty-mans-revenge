@@ -17,6 +17,7 @@ describe('getTheme', () => {
   it('resolves known theme ids', () => {
     expect(getTheme('suburb')).toBe(MAP_THEMES.suburb);
     expect(getTheme('scrapyard')).toBe(MAP_THEMES.scrapyard);
+    expect(getTheme('overpass')).toBe(MAP_THEMES.overpass);
   });
 
   it('falls back to wasteland for undefined and unknown ids', () => {
@@ -34,12 +35,14 @@ describe('getTheme', () => {
     }
   });
 
-  it('the two new maps declare non-default themes', () => {
+  it('the post-launch maps declare non-default themes', () => {
     expect(getTheme('suburb')).not.toBe(getTheme(undefined));
     expect(getTheme('scrapyard')).not.toBe(getTheme(undefined));
+    expect(getTheme('overpass')).not.toBe(getTheme(undefined));
     expect(getTheme('suburb').floorTexture).not.toBe(
       getTheme('scrapyard').floorTexture,
     );
+    expect(getTheme('overpass').innerWall).toBe('roofDark');
   });
 });
 

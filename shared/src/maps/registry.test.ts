@@ -36,11 +36,12 @@ describe('MAP_REGISTRY', () => {
     }
   });
 
-  it('contains all three rotation maps in order', () => {
+  it('contains all four rotation maps in order', () => {
     expect(listMapNames()).toEqual([
       'Wasteland Outpost',
       'Overgrown Suburb',
       'Scrapyard',
+      'Collapsed Overpass',
     ]);
   });
 
@@ -71,6 +72,13 @@ describe('MAP_REGISTRY', () => {
       expect(m.kothHills!.length, `${m.name} hill count`).toBeGreaterThanOrEqual(3);
     }
   });
+
+  it('Collapsed Overpass keeps its six-hill objective identity', () => {
+    const overpass = getMap('Collapsed Overpass');
+    expect(overpass.theme).toBe('overpass');
+    expect(overpass.kothHills).toHaveLength(6);
+    expect(overpass.decorations).toHaveLength(4);
+  });
 });
 
 describe('getNextMapName', () => {
@@ -78,7 +86,8 @@ describe('getNextMapName', () => {
     const names = listMapNames();
     expect(getNextMapName(names[0])).toBe(names[1]);
     expect(getNextMapName(names[1])).toBe(names[2]);
-    expect(getNextMapName(names[2])).toBe(names[0]);
+    expect(getNextMapName(names[2])).toBe(names[3]);
+    expect(getNextMapName(names[3])).toBe(names[0]);
   });
 
   it('restarts the cycle for unknown names instead of throwing', () => {

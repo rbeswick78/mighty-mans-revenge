@@ -3,12 +3,14 @@ import { validateMap } from '../utils/map-validator.js';
 import wastelandOutpost from '../../maps/wasteland-outpost.json' with { type: 'json' };
 import overgrownSuburb from '../../maps/overgrown-suburb.json' with { type: 'json' };
 import scrapyard from '../../maps/scrapyard.json' with { type: 'json' };
+import collapsedOverpass from '../../maps/collapsed-overpass.json' with { type: 'json' };
 
 /** Registry order doubles as the rotation order (see getNextMapName). */
 const ALL: readonly MapData[] = [
   wastelandOutpost as MapData,
   overgrownSuburb as MapData,
   scrapyard as MapData,
+  collapsedOverpass as MapData,
 ];
 
 for (const m of ALL) {

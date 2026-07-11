@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–13 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts, solo Practice vs Rusty, streak + payback callouts, selectable Rusty difficulty). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–14 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts, solo Practice vs Rusty, streak + payback callouts, selectable Rusty difficulty, Collapsed Overpass). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -45,6 +45,7 @@ Each session below attacks one of these.
 | 11  | Practice vs Rusty                               | The game is playable on demand, even when no friend is online  | **DONE** (2026-07-11) |
 | 12  | Streaks, Payback + Shutdowns                    | Every kill builds a story and a reason to settle the score     | **DONE** (2026-07-11) |
 | 13  | Rusty Difficulty                               | Solo practice stays welcoming, challenging, and worth mastering | **DONE** (2026-07-11) |
+| 14  | Collapsed Overpass                             | A fourth arena adds fresh routes and riskier objective fights    | **DONE** (2026-07-11) |
 
 ---
 
@@ -1069,6 +1070,33 @@ experienced ones; three clear skill profiles let practice grow with the player.
 ---
 
 ## Session Log
+
+### Session 14 — 2026-07-11 — Collapsed Overpass
+
+**Shipped:** a fourth full-size arena joins every normal map draft and the
+fallback rotation. Collapsed Overpass is built around heavy central bridge
+supports: the shotgun and first KOTH hill tempt players into an exposed middle,
+while open top and bottom loops provide safer flanks and recovery routes. Four
+spawn points, mirrored side grenades, two bandages, pistol/ammo pickups, and
+six validated hill locations keep Deathmatch, KOTH, and Gun Game viable.
+
+The arena has its own `overpass` visual theme using existing bleak ground,
+garbage cover, brick boundaries, dark roof supports, wrecks, and containers.
+That gives the map a distinct silhouette without adding download weight or
+special-case collision. Registry tests lock the four-map order and the new
+six-hill tactical identity.
+
+**Verified:** map validation and focused registry/theme tests pass. A live
+desktop KOTH practice match rendered the complete arena, created Rusty on the
+authoritative server, and showed the bot navigating to and scoring on the
+central objective. Typecheck and lint are clean; all 781 unit tests pass; the
+production build is green; and the full 21-case Playwright matrix passed its
+12 applicable desktop/mobile browser flows with 9 intentional project skips.
+
+**Carry-over:** watch whether the center shotgun is worth its exposure and
+whether six hills feel varied rather than unpredictable during group play.
+
+---
 
 ### Session 13 — 2026-07-11 — Rusty Difficulty
 
