@@ -3,6 +3,7 @@ import {
   GameModeType,
   GAME_MODE_ROTATION,
   DRAFT,
+  RIVALRY_SET,
   LEADERBOARD,
   getNextGameMode,
   getMap,
@@ -19,12 +20,17 @@ import type {
   SerializedPlayerState,
   CharacterId,
   DraftCategory,
+  DraftFirstPickerReason,
+  RivalrySetResult,
 } from '@shared/game';
 import { Match } from '../game/match.js';
 import { GameServer } from '../network/server.js';
 import { MatchmakingQueue } from './matchmaking-queue.js';
 import { logger } from '../utils/logger.js';
-import type { PersistentStatsStore, MatchStatsEntry } from '../persistence/persistent-stats-store.js';
+import type {
+  PersistentStatsStore,
+  MatchStatsEntry,
+} from '../persistence/persistent-stats-store.js';
 
 /**
  * How long the post-match state is kept alive while waiting for both players
@@ -53,6 +59,10 @@ interface PostMatchState {
    * nextMapName.
    */
   nextGameMode: GameModeType;
+  /** Previous round's loser earns first pick in the rematch draft. */
+  revengePickerId: PlayerId | null;
+  /** A rematch after a clinch starts a clean first-to-N set. */
+  setComplete: boolean;
 }
 
 /**
@@ -69,6 +79,7 @@ interface DraftState {
   playerEntries: { id: PlayerId; nickname: string }[];
   /** Winner of the who-picks-first roll — claims a category by picking. */
   firstPickerId: PlayerId;
+  firstPickerReason: DraftFirstPickerReason;
   /** The entrant who picks whatever category the first picker leaves. */
   secondPickerId: PlayerId;
   /**
@@ -86,6 +97,13 @@ interface DraftState {
   pickTimerSeconds: number;
 }
 
+interface RivalrySetState {
+  playerIds: PlayerId[];
+  wins: Map<PlayerId, number>;
+  roundsPlayed: number;
+  championId: PlayerId | null;
+}
+
 export class MatchmakingManager {
   private readonly queue: MatchmakingQueue;
   private readonly server: GameServer;
@@ -96,6 +114,8 @@ export class MatchmakingManager {
   private readonly postMatchStates: Map<string, PostMatchState> = new Map();
   /** Pre-match drafts in progress, keyed by the future matchId. */
   private readonly draftStates: Map<string, DraftState> = new Map();
+  /** Ephemeral first-to-N scores shared by consecutive rematches. */
+  private readonly playerRivalrySets: Map<PlayerId, RivalrySetState> = new Map();
   /** Track nicknames for players (set when they join matchmaking). */
   private readonly playerNicknames: Map<PlayerId, string> = new Map();
   /** Previous-tick phase per match, for detecting phase transitions. */
@@ -152,14 +172,21 @@ export class MatchmakingManager {
     this.playerNicknames.set(playerId, nickname);
     this.queue.addPlayer(playerId, nickname);
 
-    logger.info({ playerId, nickname, queueLength: this.queue.getQueueLength() }, 'Player joined matchmaking');
+    logger.info(
+      { playerId, nickname, queueLength: this.queue.getQueueLength() },
+      'Player joined matchmaking',
+    );
 
-    this.server.sendTo(playerId, {
-      type: 'server:matchmakingStatus',
-      status: 'queued',
-      queuePosition: this.queue.getQueueLength(),
-      playersOnline: this.getOnlinePlayerCount(),
-    }, { reliable: true });
+    this.server.sendTo(
+      playerId,
+      {
+        type: 'server:matchmakingStatus',
+        status: 'queued',
+        queuePosition: this.queue.getQueueLength(),
+        playersOnline: this.getOnlinePlayerCount(),
+      },
+      { reliable: true },
+    );
 
     // Try to match immediately
     this.tryCreateMatch();
@@ -169,11 +196,15 @@ export class MatchmakingManager {
     const removed = this.queue.removePlayer(playerId);
     if (removed) {
       logger.info({ playerId }, 'Player cancelled matchmaking');
-      this.server.sendTo(playerId, {
-        type: 'server:matchmakingStatus',
-        status: 'cancelled',
-        playersOnline: this.getOnlinePlayerCount(),
-      }, { reliable: true });
+      this.server.sendTo(
+        playerId,
+        {
+          type: 'server:matchmakingStatus',
+          status: 'cancelled',
+          playersOnline: this.getOnlinePlayerCount(),
+        },
+        { reliable: true },
+      );
     }
   }
 
@@ -202,10 +233,14 @@ export class MatchmakingManager {
         // Notify other players in the match
         for (const [pid] of match.players) {
           if (pid !== playerId) {
-            this.server.sendTo(pid, {
-              type: 'server:opponentDisconnected',
-              playerId,
-            }, { reliable: true });
+            this.server.sendTo(
+              pid,
+              {
+                type: 'server:opponentDisconnected',
+                playerId,
+              },
+              { reliable: true },
+            );
           }
         }
       }
@@ -218,14 +253,19 @@ export class MatchmakingManager {
         // Notify other players
         for (const pid of state.playerIds) {
           if (pid !== playerId) {
-            this.server.sendTo(pid, {
-              type: 'server:opponentDisconnected',
-              playerId,
-            }, { reliable: true });
+            this.server.sendTo(
+              pid,
+              {
+                type: 'server:opponentDisconnected',
+                playerId,
+              },
+              { reliable: true },
+            );
           }
         }
         clearTimeout(state.timeoutHandle);
         this.postMatchStates.delete(postMatchId);
+        this.releaseRivalrySet(state.playerIds);
         // Return remaining players to lobby state
         for (const pid of state.playerIds) {
           if (pid !== playerId) {
@@ -275,10 +315,14 @@ export class MatchmakingManager {
     // Notify other players that this player wants a rematch
     for (const pid of postMatch.playerIds) {
       if (pid !== playerId) {
-        this.server.sendTo(pid, {
-          type: 'server:rematchStatus',
-          opponentWantsRematch: true,
-        }, { reliable: true });
+        this.server.sendTo(
+          pid,
+          {
+            type: 'server:rematchStatus',
+            opponentWantsRematch: true,
+          },
+          { reliable: true },
+        );
       }
     }
 
@@ -309,10 +353,14 @@ export class MatchmakingManager {
       // Notify other players
       for (const pid of postMatch.playerIds) {
         if (pid !== playerId) {
-          this.server.sendTo(pid, {
-            type: 'server:opponentDisconnected',
-            playerId,
-          }, { reliable: true });
+          this.server.sendTo(
+            pid,
+            {
+              type: 'server:opponentDisconnected',
+              playerId,
+            },
+            { reliable: true },
+          );
           // Return them to lobby too
           this.playerMatchMap.delete(pid);
         }
@@ -320,6 +368,7 @@ export class MatchmakingManager {
 
       clearTimeout(postMatch.timeoutHandle);
       this.postMatchStates.delete(matchId);
+      this.releaseRivalrySet(postMatch.playerIds);
     } else {
       // Player returning to lobby from an active match (forfeit)
       this.playerMatchMap.delete(playerId);
@@ -373,10 +422,14 @@ export class MatchmakingManager {
   private sendMatchStart(match: Match): void {
     const matchEndsInMs = match.matchTimer * 1000;
     for (const [playerId] of match.players) {
-      this.server.sendTo(playerId, {
-        type: 'server:matchStart',
-        matchEndsInMs,
-      }, { reliable: true });
+      this.server.sendTo(
+        playerId,
+        {
+          type: 'server:matchStart',
+          matchEndsInMs,
+        },
+        { reliable: true },
+      );
     }
   }
 
@@ -531,18 +584,26 @@ export class MatchmakingManager {
       const opponents = playerEntries
         .filter((e) => e.id !== entry.id)
         .map((e) => ({ id: e.id, nickname: e.nickname }));
-      this.server.sendTo(entry.id, {
-        type: 'server:matchFound',
-        matchId,
-        opponents,
-        mapName: mapData.name,
-        gameMode,
-      }, { reliable: true });
-      this.server.sendTo(entry.id, {
-        type: 'server:matchmakingStatus',
-        status: 'matched',
-        playersOnline: this.getOnlinePlayerCount(),
-      }, { reliable: true });
+      this.server.sendTo(
+        entry.id,
+        {
+          type: 'server:matchFound',
+          matchId,
+          opponents,
+          mapName: mapData.name,
+          gameMode,
+        },
+        { reliable: true },
+      );
+      this.server.sendTo(
+        entry.id,
+        {
+          type: 'server:matchmakingStatus',
+          status: 'matched',
+          playersOnline: this.getOnlinePlayerCount(),
+        },
+        { reliable: true },
+      );
     }
 
     // The match starts itself in CHARACTER_SELECT (set by Match's
@@ -557,16 +618,23 @@ export class MatchmakingManager {
    * players. The matchId is generated NOW — before the Match exists — so
    * every draftState snapshot and the eventual matchFound share one id.
    */
-  private startDraft(playerEntries: { id: PlayerId; nickname: string }[]): void {
+  private startDraft(
+    playerEntries: { id: PlayerId; nickname: string }[],
+    revengePickerId: PlayerId | null = null,
+  ): void {
     const matchId = crypto.randomUUID();
 
     // Roll two DISTINCT picker roles (N-player safe: any extra entrants
     // just spectate the draft). Decided here, once — the client's
     // who-picks-first spectacle only animates toward this outcome.
-    const firstIdx = Math.min(
-      Math.floor(this.rng() * playerEntries.length),
-      playerEntries.length - 1,
-    );
+    const revengeIdx =
+      revengePickerId === null
+        ? -1
+        : playerEntries.findIndex((entry) => entry.id === revengePickerId);
+    const firstIdx =
+      revengeIdx >= 0
+        ? revengeIdx
+        : Math.min(Math.floor(this.rng() * playerEntries.length), playerEntries.length - 1);
     let secondIdx = Math.min(
       Math.floor(this.rng() * (playerEntries.length - 1)),
       playerEntries.length - 2,
@@ -577,6 +645,7 @@ export class MatchmakingManager {
       matchId,
       playerEntries,
       firstPickerId: playerEntries[firstIdx].id,
+      firstPickerReason: revengeIdx >= 0 ? 'revenge' : 'coin_toss',
       secondPickerId: playerEntries[secondIdx].id,
       currentPickerId: playerEntries[firstIdx].id,
       mapPick: null,
@@ -597,6 +666,7 @@ export class MatchmakingManager {
         matchId,
         players: playerEntries.map((e) => e.id),
         firstPicker: draft.firstPickerId,
+        firstPickerReason: draft.firstPickerReason,
       },
       'Draft started',
     );
@@ -629,6 +699,7 @@ export class MatchmakingManager {
       matchId: draft.matchId,
       players: draft.playerEntries.map((e) => ({ id: e.id, nickname: e.nickname })),
       firstPickerId: draft.firstPickerId,
+      firstPickerReason: draft.firstPickerReason,
       currentPickerId: draft.currentPickerId,
       mapPick: draft.mapPick,
       modePick: draft.modePick,
@@ -663,10 +734,7 @@ export class MatchmakingManager {
       }
       draft.mapPick = value;
     } else {
-      if (
-        draft.modePick !== null ||
-        !(GAME_MODE_ROTATION as readonly string[]).includes(value)
-      ) {
+      if (draft.modePick !== null || !(GAME_MODE_ROTATION as readonly string[]).includes(value)) {
         logger.debug(
           { matchId: draft.matchId, category, value },
           'Ignoring invalid draft mode pick',
@@ -689,9 +757,7 @@ export class MatchmakingManager {
     // First pick landed: hand the remaining category to the other role
     // with a fresh window.
     draft.currentPickerId =
-      draft.currentPickerId === draft.firstPickerId
-        ? draft.secondPickerId
-        : draft.firstPickerId;
+      draft.currentPickerId === draft.firstPickerId ? draft.secondPickerId : draft.firstPickerId;
     draft.pickTimerSeconds = DRAFT.SECOND_PICK_SECONDS;
   }
 
@@ -705,15 +771,14 @@ export class MatchmakingManager {
   private autoDraftPick(draft: DraftState): void {
     const category: DraftCategory =
       draft.mapPick === null && draft.modePick === null
-        ? (this.rng() < 0.5 ? 'map' : 'mode')
+        ? this.rng() < 0.5
+          ? 'map'
+          : 'mode'
         : draft.mapPick === null
           ? 'map'
           : 'mode';
-    const options: readonly string[] =
-      category === 'map' ? listMapNames() : GAME_MODE_ROTATION;
-    const value = options[
-      Math.min(Math.floor(this.rng() * options.length), options.length - 1)
-    ];
+    const options: readonly string[] = category === 'map' ? listMapNames() : GAME_MODE_ROTATION;
+    const value = options[Math.min(Math.floor(this.rng() * options.length), options.length - 1)];
     logger.info(
       { matchId: draft.matchId, picker: draft.currentPickerId, category, value },
       'Draft pick timed out — auto-picking',
@@ -726,12 +791,7 @@ export class MatchmakingManager {
     this.draftStates.delete(draft.matchId);
     // Both picks were validated against the registry/rotation on entry,
     // so these lookups can't miss.
-    this.launchMatch(
-      draft.matchId,
-      getMap(draft.mapPick!),
-      draft.modePick!,
-      draft.playerEntries,
-    );
+    this.launchMatch(draft.matchId, getMap(draft.mapPick!), draft.modePick!, draft.playerEntries);
   }
 
   /**
@@ -741,19 +801,21 @@ export class MatchmakingManager {
    */
   private teardownDraft(draft: DraftState, leavingPlayerId: PlayerId): void {
     this.draftStates.delete(draft.matchId);
+    this.releaseRivalrySet(draft.playerEntries.map((entry) => entry.id));
     for (const entry of draft.playerEntries) {
       this.playerMatchMap.delete(entry.id);
       if (entry.id !== leavingPlayerId) {
-        this.server.sendTo(entry.id, {
-          type: 'server:opponentDisconnected',
-          playerId: leavingPlayerId,
-        }, { reliable: true });
+        this.server.sendTo(
+          entry.id,
+          {
+            type: 'server:opponentDisconnected',
+            playerId: leavingPlayerId,
+          },
+          { reliable: true },
+        );
       }
     }
-    logger.info(
-      { matchId: draft.matchId, leavingPlayerId },
-      'Draft torn down',
-    );
+    logger.info({ matchId: draft.matchId, leavingPlayerId }, 'Draft torn down');
   }
 
   /**
@@ -910,12 +972,16 @@ export class MatchmakingManager {
     // both slots can warn in the same tick in degenerate timings.
     for (const warning of match.consumeTickMutatorWarnings()) {
       for (const [playerId] of match.players) {
-        this.server.sendTo(playerId, {
-          type: 'server:eventWarning',
-          event: warning.event,
-          activatesInMs: warning.activatesInMs,
-          isFinalMinute: warning.isFinalMinute,
-        }, { reliable: true });
+        this.server.sendTo(
+          playerId,
+          {
+            type: 'server:eventWarning',
+            event: warning.event,
+            activatesInMs: warning.activatesInMs,
+            isFinalMinute: warning.isFinalMinute,
+          },
+          { reliable: true },
+        );
       }
     }
 
@@ -924,11 +990,15 @@ export class MatchmakingManager {
     // dramatic beat and a drop would kill the whole point.
     for (const incoming of match.consumeTickWeaponIncoming()) {
       for (const [playerId] of match.players) {
-        this.server.sendTo(playerId, {
-          type: 'server:weaponIncoming',
-          weaponId: incoming.weaponId,
-          landsInMs: incoming.landsInMs,
-        }, { reliable: true });
+        this.server.sendTo(
+          playerId,
+          {
+            type: 'server:weaponIncoming',
+            weaponId: incoming.weaponId,
+            landsInMs: incoming.landsInMs,
+          },
+          { reliable: true },
+        );
       }
     }
 
@@ -937,11 +1007,15 @@ export class MatchmakingManager {
     // so prediction matches authority.
     for (const started of match.consumeTickMutatorStarts()) {
       for (const [playerId] of match.players) {
-        this.server.sendTo(playerId, {
-          type: 'server:eventStart',
-          event: started.event,
-          isFinalMinute: started.isFinalMinute,
-        }, { reliable: true });
+        this.server.sendTo(
+          playerId,
+          {
+            type: 'server:eventStart',
+            event: started.event,
+            isFinalMinute: started.isFinalMinute,
+          },
+          { reliable: true },
+        );
       }
     }
 
@@ -951,27 +1025,30 @@ export class MatchmakingManager {
     const overtimeStart = match.consumeTickOvertimeStart();
     if (overtimeStart) {
       for (const [playerId] of match.players) {
-        this.server.sendTo(playerId, {
-          type: 'server:overtimeStart',
-          overtimeEndsInMs: overtimeStart.overtimeEndsInMs,
-        }, { reliable: true });
+        this.server.sendTo(
+          playerId,
+          {
+            type: 'server:overtimeStart',
+            overtimeEndsInMs: overtimeStart.overtimeEndsInMs,
+          },
+          { reliable: true },
+        );
       }
     }
   }
 
   private onMatchEnded(matchId: string, match: Match): void {
     const result = match.getResult();
+    result.rivalrySet = this.recordRivalrySet(match, result.winnerId);
 
     // Rotation: a rematch plays the map AND mode AFTER this one (registry/
     // rotation order). Attached to the result so the results screen's
     // "NEXT: X" promises and what the rematch actually starts can never
     // disagree.
     const nextMapName =
-      this.forcedMap()?.name ??
-      getNextMapName(match.mapManager.getMapData().name);
+      this.forcedMap()?.name ?? getNextMapName(match.mapManager.getMapData().name);
     result.nextMapName = nextMapName;
-    const nextGameMode =
-      this.forcedMode() ?? getNextGameMode(match.gameModeType);
+    const nextGameMode = this.forcedMode() ?? getNextGameMode(match.gameModeType);
     result.nextGameMode = nextGameMode;
 
     // Fold this match into the lifetime records and attach the pairing's
@@ -991,15 +1068,10 @@ export class MatchmakingManager {
         });
       }
       const winnerNickname =
-        result.winnerId !== null
-          ? (match.players.get(result.winnerId)?.nickname ?? null)
-          : null;
+        result.winnerId !== null ? (match.players.get(result.winnerId)?.nickname ?? null) : null;
       this.statsStore.recordMatch(entries, winnerNickname);
       if (entries.length === 2) {
-        result.rivalry = this.statsStore.getRivalry(
-          entries[0].nickname,
-          entries[1].nickname,
-        );
+        result.rivalry = this.statsStore.getRivalry(entries[0].nickname, entries[1].nickname);
       }
 
       // The lifetime records just changed — refresh every connected
@@ -1024,16 +1096,17 @@ export class MatchmakingManager {
     };
 
     for (const [playerId] of match.players) {
-      this.server.sendTo(playerId, {
-        type: 'server:matchEnd',
-        result: serializableResult as unknown as MatchResult,
-      }, { reliable: true });
+      this.server.sendTo(
+        playerId,
+        {
+          type: 'server:matchEnd',
+          result: serializableResult as unknown as MatchResult,
+        },
+        { reliable: true },
+      );
     }
 
-    logger.info(
-      { matchId, winnerId: result.winnerId, duration: result.duration },
-      'Match ended',
-    );
+    logger.info({ matchId, winnerId: result.winnerId, duration: result.duration }, 'Match ended');
 
     // Move to post-match state for rematch handling
     const playerIds = [...match.players.keys()];
@@ -1049,6 +1122,11 @@ export class MatchmakingManager {
       timeoutHandle,
       nextMapName,
       nextGameMode,
+      revengePickerId:
+        result.rivalrySet === null || result.winnerId === null
+          ? null
+          : (playerIds.find((id) => id !== result.winnerId) ?? null),
+      setComplete: result.rivalrySet?.championId != null,
     });
 
     // Remove from active matches
@@ -1065,22 +1143,31 @@ export class MatchmakingManager {
     // Return all players to lobby
     for (const pid of postMatch.playerIds) {
       this.playerMatchMap.delete(pid);
-      this.server.sendTo(pid, {
-        type: 'server:matchmakingStatus',
-        status: 'cancelled',
-        playersOnline: this.getOnlinePlayerCount(),
-      }, { reliable: true });
+      this.server.sendTo(
+        pid,
+        {
+          type: 'server:matchmakingStatus',
+          status: 'cancelled',
+          playersOnline: this.getOnlinePlayerCount(),
+        },
+        { reliable: true },
+      );
     }
 
     this.postMatchStates.delete(matchId);
+    this.releaseRivalrySet(postMatch.playerIds);
   }
 
   private sendRematchUnavailable(playerId: PlayerId): void {
-    this.server.sendTo(playerId, {
-      type: 'server:matchmakingStatus',
-      status: 'cancelled',
-      playersOnline: this.getOnlinePlayerCount(),
-    }, { reliable: true });
+    this.server.sendTo(
+      playerId,
+      {
+        type: 'server:matchmakingStatus',
+        status: 'cancelled',
+        playersOnline: this.getOnlinePlayerCount(),
+      },
+      { reliable: true },
+    );
   }
 
   private startRematch(postMatch: PostMatchState): void {
@@ -1091,6 +1178,10 @@ export class MatchmakingManager {
       id: pid,
       nickname: this.playerNicknames.get(pid) ?? `Player_${pid.slice(0, 4)}`,
     }));
+
+    if (postMatch.setComplete) {
+      this.releaseRivalrySet(postMatch.playerIds);
+    }
 
     logger.info({ players: postMatch.playerIds }, 'Rematch starting');
 
@@ -1109,6 +1200,66 @@ export class MatchmakingManager {
       return;
     }
 
-    this.startDraft(playerEntries);
+    this.startDraft(playerEntries, postMatch.revengePickerId);
+  }
+
+  /** Record one 1v1 result into the pairing's immediate rematch set. */
+  private recordRivalrySet(match: Match, winnerId: PlayerId | null): RivalrySetResult | null {
+    const players = [...match.players.values()];
+    if (players.length !== 2) return null;
+    const playerIds = players.map((player) => player.id);
+
+    let state = this.playerRivalrySets.get(playerIds[0]);
+    if (
+      !state ||
+      state.playerIds.length !== playerIds.length ||
+      !playerIds.every(
+        (id) => state?.playerIds.includes(id) === true && this.playerRivalrySets.get(id) === state,
+      )
+    ) {
+      this.releaseRivalrySet(playerIds);
+      state = {
+        playerIds: [...playerIds],
+        wins: new Map(playerIds.map((id) => [id, 0])),
+        roundsPlayed: 0,
+        championId: null,
+      };
+      for (const id of playerIds) this.playerRivalrySets.set(id, state);
+    }
+
+    const activeState = state;
+    activeState.roundsPlayed++;
+    if (winnerId !== null && activeState.wins.has(winnerId)) {
+      const wins = (activeState.wins.get(winnerId) ?? 0) + 1;
+      activeState.wins.set(winnerId, wins);
+      if (wins >= RIVALRY_SET.WINS_TO_CLINCH) activeState.championId = winnerId;
+    }
+
+    return {
+      winsToClinch: RIVALRY_SET.WINS_TO_CLINCH,
+      roundsPlayed: activeState.roundsPlayed,
+      players: players.map((player) => ({
+        playerId: player.id,
+        nickname: player.nickname,
+        wins: activeState.wins.get(player.id) ?? 0,
+      })),
+      championId: activeState.championId,
+    };
+  }
+
+  /** Release every shared set object touched by these players. */
+  private releaseRivalrySet(playerIds: PlayerId[]): void {
+    const states = new Set<RivalrySetState>();
+    for (const id of playerIds) {
+      const state = this.playerRivalrySets.get(id);
+      if (state) states.add(state);
+    }
+    for (const state of states) {
+      for (const id of state.playerIds) {
+        if (this.playerRivalrySets.get(id) === state) {
+          this.playerRivalrySets.delete(id);
+        }
+      }
+    }
   }
 }

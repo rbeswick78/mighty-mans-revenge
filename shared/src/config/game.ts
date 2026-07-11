@@ -237,6 +237,13 @@ export const DRAFT = Object.freeze({
    * server-rolled and already in the first draftState message.
    */
   SPECTACLE_MS: 2600,
+  /** Shorter reveal used when the previous round's loser earns first pick. */
+  REVENGE_REVEAL_MS: 1800,
+});
+
+/** Consecutive rematches form a short, self-contained rivalry set. */
+export const RIVALRY_SET = Object.freeze({
+  WINS_TO_CLINCH: 3,
 });
 
 /**
@@ -786,9 +793,7 @@ export function characterSpeedMultiplier(id: CharacterId | null): number {
  * identically across the roster (same contract as big_heads).
  */
 export function characterHitbox(id: CharacterId | null): { width: number; height: number } {
-  return id
-    ? CHARACTERS[id].hitbox
-    : { width: PLAYER.HITBOX_WIDTH, height: PLAYER.HITBOX_HEIGHT };
+  return id ? CHARACTERS[id].hitbox : { width: PLAYER.HITBOX_WIDTH, height: PLAYER.HITBOX_HEIGHT };
 }
 
 /** Convenience alias for SERVER.TICK_RATE */

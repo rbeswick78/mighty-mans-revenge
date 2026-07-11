@@ -250,6 +250,8 @@ export interface ServerMatchFoundMessage {
  * The first draftState a client receives is its cue to enter the draft
  * scene; `server:matchFound` (final map+mode) is its cue to leave.
  */
+export type DraftFirstPickerReason = 'coin_toss' | 'revenge';
+
 export interface ServerDraftStateMessage {
   type: 'server:draftState';
   matchId: MatchId;
@@ -261,6 +263,8 @@ export interface ServerDraftStateMessage {
    * before the animation starts.
    */
   firstPickerId: PlayerId;
+  /** Coin toss for a fresh pairing; previous-round loser for a rematch. */
+  firstPickerReason: DraftFirstPickerReason;
   /** Whose pick the server is waiting on; null once both picks are in. */
   currentPickerId: PlayerId | null;
   /** Chosen map name, or null while unpicked. */

@@ -77,8 +77,7 @@ export class GunGameMode implements GameMode {
 
       // The grenade rung holds the (gated) rifle; every other rung holds
       // its own weapon.
-      const expectedWeapon: WeaponId =
-        rung.weapon === 'grenade' ? 'rifle' : rung.weapon;
+      const expectedWeapon: WeaponId = rung.weapon === 'grenade' ? 'rifle' : rung.weapon;
 
       if (player.weaponId !== expectedWeapon) {
         // Fresh spawn, post-kill advance, or overtime reset — re-equip.
@@ -100,10 +99,7 @@ export class GunGameMode implements GameMode {
       // Reserve floors: topped up every tick so the shotgun/pistol
       // auto-revert-when-dry path can never fire in this mode.
       if (player.weaponId === 'shotgun' || player.weaponId === 'pistol') {
-        player.specialReserve = Math.max(
-          player.specialReserve,
-          reserveFloorFor(player.weaponId),
-        );
+        player.specialReserve = Math.max(player.specialReserve, reserveFloorFor(player.weaponId));
       }
 
       if (rung.weapon === 'grenade') {
@@ -125,12 +121,7 @@ export class GunGameMode implements GameMode {
     }
   }
 
-  onKill(
-    match: MatchContext,
-    killerId: PlayerId,
-    victimId: PlayerId,
-    weapon: KillWeapon,
-  ): void {
+  onKill(match: MatchContext, killerId: PlayerId, victimId: PlayerId, weapon: KillWeapon): void {
     // Overtime is settled by Match's generic first-kill rule; the ladder
     // score freezes so a sudden-death timeout stays a true draw.
     if (match.isOvertime) return;
@@ -176,12 +167,10 @@ export class GunGameMode implements GameMode {
       playerStats,
       duration: match.getElapsedSeconds(),
       gameMode: GameModeType.GUN_GAME,
-      awards: computeAwards(
-        playerStats,
-        (id) => match.players.get(id)?.nickname ?? 'UNKNOWN',
-      ),
+      awards: computeAwards(playerStats, (id) => match.players.get(id)?.nickname ?? 'UNKNOWN'),
       // Attached by the matchmaking manager — see DeathmatchMode.
       rivalry: null,
+      rivalrySet: null,
       nextMapName: null,
       nextGameMode: null,
       wentToOvertime: match.isOvertime,
@@ -191,7 +180,5 @@ export class GunGameMode implements GameMode {
 
 /** specialReserve floor for the rung weapons that carry a reserve. */
 function reserveFloorFor(weaponId: 'shotgun' | 'pistol'): number {
-  return weaponId === 'shotgun'
-    ? GUN_GAME.SHOTGUN_RESERVE_FLOOR
-    : GUN_GAME.PISTOL_RESERVE_FLOOR;
+  return weaponId === 'shotgun' ? GUN_GAME.SHOTGUN_RESERVE_FLOOR : GUN_GAME.PISTOL_RESERVE_FLOOR;
 }

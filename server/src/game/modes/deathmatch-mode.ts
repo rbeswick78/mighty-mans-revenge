@@ -12,12 +12,7 @@ export class DeathmatchMode implements GameMode {
     // Deathmatch has no per-tick mode-specific logic
   }
 
-  onKill(
-    match: MatchContext,
-    killerId: PlayerId,
-    _victimId: PlayerId,
-    _weapon: KillWeapon,
-  ): void {
+  onKill(match: MatchContext, killerId: PlayerId, _victimId: PlayerId, _weapon: KillWeapon): void {
     const player = match.players.get(killerId);
     if (player) {
       player.score++;
@@ -52,13 +47,11 @@ export class DeathmatchMode implements GameMode {
       playerStats,
       duration: match.getElapsedSeconds(),
       gameMode: GameModeType.DEATHMATCH,
-      awards: computeAwards(
-        playerStats,
-        (id) => match.players.get(id)?.nickname ?? 'UNKNOWN',
-      ),
+      awards: computeAwards(playerStats, (id) => match.players.get(id)?.nickname ?? 'UNKNOWN'),
       // Attached by the matchmaking manager once the persistent store has
       // folded this match in — the mode has no access to lifetime records.
       rivalry: null,
+      rivalrySet: null,
       // Also the matchmaking manager's job — modes know nothing about the
       // map/mode rotation.
       nextMapName: null,

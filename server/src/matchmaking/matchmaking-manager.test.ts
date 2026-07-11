@@ -96,13 +96,84 @@ describe('MatchmakingManager rematch flow', () => {
     mgr.tick(0.05, 1);
   }
 
+  function endRoundWithWinner(winnerId: PlayerId, tick: number) {
+    const match = mgr.getActiveMatches()[0];
+    expect(match).toBeDefined();
+    match.players.get(winnerId)!.score = 1;
+    match.phase = MatchPhase.ENDED;
+    mgr.tick(0.05, tick);
+    const end = [...sent]
+      .reverse()
+      .find((entry) => entry.playerId === 'A' && entry.message.type === 'server:matchEnd');
+    if (!end || end.message.type !== 'server:matchEnd') {
+      throw new Error('missing matchEnd');
+    }
+    return end.message.result;
+  }
+
+  function startRevengeRematch(expectedPicker: PlayerId, tick: number): void {
+    sent.length = 0;
+    mgr.handleRematchRequest('A');
+    mgr.handleRematchRequest('B');
+    mgr.tick(0.05, tick);
+    const draft = latestDraftState(sent);
+    expect(draft.firstPickerId).toBe(expectedPicker);
+    expect(draft.firstPickerReason).toBe('revenge');
+    const other = draft.players.find((player) => player.id !== expectedPicker)!.id;
+    mgr.handleDraftPick(expectedPicker, 'map', draft.mapOptions[0]);
+    mgr.handleDraftPick(other, 'mode', draft.modeOptions[0]);
+  }
+
+  it('scores a first-to-three set, gives the loser revenge picks, then resets after a clinch', () => {
+    mgr.handleJoinMatchmaking('A', 'Alpha');
+    mgr.handleJoinMatchmaking('B', 'Bravo');
+    walkDraft(mgr, sent);
+
+    const first = endRoundWithWinner('A', 1);
+    expect(first.rivalrySet).toEqual({
+      winsToClinch: 3,
+      roundsPlayed: 1,
+      players: [
+        { playerId: 'A', nickname: 'Alpha', wins: 1 },
+        { playerId: 'B', nickname: 'Bravo', wins: 0 },
+      ],
+      championId: null,
+    });
+
+    startRevengeRematch('B', 2);
+    const second = endRoundWithWinner('A', 3);
+    expect(second.rivalrySet?.players.map((player) => player.wins)).toEqual([2, 0]);
+    expect(second.rivalrySet?.roundsPlayed).toBe(2);
+
+    startRevengeRematch('B', 4);
+    const clincher = endRoundWithWinner('A', 5);
+    expect(clincher.rivalrySet?.championId).toBe('A');
+    expect(clincher.rivalrySet?.players.map((player) => player.wins)).toEqual([3, 0]);
+
+    // Both opt into a new set. The clincher's loser still gets the revenge
+    // draft, but the score itself restarts at 0-0 before this round.
+    startRevengeRematch('B', 6);
+    const newSet = endRoundWithWinner('B', 7);
+    expect(newSet.rivalrySet).toEqual({
+      winsToClinch: 3,
+      roundsPlayed: 1,
+      players: [
+        { playerId: 'A', nickname: 'Alpha', wins: 0 },
+        { playerId: 'B', nickname: 'Bravo', wins: 1 },
+      ],
+      championId: null,
+    });
+  });
+
   it('starts a rematch draft when both players request it', () => {
     startMatchAndForceEnd('A', 'B');
     sent.length = 0; // clear matchEnd messages
 
     mgr.handleRematchRequest('A');
     // After A's request, B should have been notified
-    const aMsgs = sent.filter((s) => s.playerId === 'B' && s.message.type === 'server:rematchStatus');
+    const aMsgs = sent.filter(
+      (s) => s.playerId === 'B' && s.message.type === 'server:rematchStatus',
+    );
     expect(aMsgs).toHaveLength(1);
 
     mgr.handleRematchRequest('B');
@@ -152,8 +223,7 @@ describe('MatchmakingManager rematch flow', () => {
       vi.advanceTimersByTime(60_001);
 
       const cancelMsgs = sent.filter(
-        (s) => s.message.type === 'server:matchmakingStatus'
-          && s.message.status === 'cancelled',
+        (s) => s.message.type === 'server:matchmakingStatus' && s.message.status === 'cancelled',
       );
       expect(cancelMsgs.map((m) => m.playerId).sort()).toEqual(['A', 'B']);
     } finally {
@@ -172,14 +242,16 @@ describe('MatchmakingManager rematch flow', () => {
 
       mgr.handleRematchRequest('A');
 
-      expect(sent).toContainEqual(expect.objectContaining({
-        playerId: 'A',
-        message: expect.objectContaining({
-          type: 'server:matchmakingStatus',
-          status: 'cancelled',
+      expect(sent).toContainEqual(
+        expect.objectContaining({
+          playerId: 'A',
+          message: expect.objectContaining({
+            type: 'server:matchmakingStatus',
+            status: 'cancelled',
+          }),
+          reliable: true,
         }),
-        reliable: true,
-      }));
+      );
     } finally {
       vi.useRealTimers();
     }
@@ -205,9 +277,7 @@ describe('MatchmakingManager map rotation (FORCE-pinned, draft skipped)', () => 
   });
 
   function matchFoundMapName(playerId: PlayerId): string {
-    const msg = sent.find(
-      (s) => s.playerId === playerId && s.message.type === 'server:matchFound',
-    );
+    const msg = sent.find((s) => s.playerId === playerId && s.message.type === 'server:matchFound');
     if (!msg || msg.message.type !== 'server:matchFound') {
       throw new Error(`no matchFound for ${playerId}`);
     }
@@ -320,9 +390,7 @@ describe('MatchmakingManager mode rotation (FORCE-pinned, draft skipped)', () =>
   });
 
   function matchFoundMode(playerId: PlayerId): GameModeType {
-    const msg = sent.find(
-      (s) => s.playerId === playerId && s.message.type === 'server:matchFound',
-    );
+    const msg = sent.find((s) => s.playerId === playerId && s.message.type === 'server:matchFound');
     if (!msg || msg.message.type !== 'server:matchFound') {
       throw new Error(`no matchFound for ${playerId}`);
     }
@@ -482,9 +550,7 @@ describe('MatchmakingManager mode rotation (FORCE-pinned, draft skipped)', () =>
       expect(reliable).toBe(true);
     }
 
-    const lastState = [...sent]
-      .reverse()
-      .find((s) => s.message.type === 'server:gameState');
+    const lastState = [...sent].reverse().find((s) => s.message.type === 'server:gameState');
     if (!lastState || lastState.message.type !== 'server:gameState') {
       throw new Error('missing gameState');
     }
@@ -835,11 +901,14 @@ describe('MatchmakingManager pre-match draft', () => {
 
     // The remaining player is back in the lobby and can re-queue.
     mgr.handleJoinMatchmaking('B', 'B');
-    expect(sent.some(
-      (s) => s.playerId === 'B'
-        && s.message.type === 'server:matchmakingStatus'
-        && s.message.status === 'queued',
-    )).toBe(true);
+    expect(
+      sent.some(
+        (s) =>
+          s.playerId === 'B' &&
+          s.message.type === 'server:matchmakingStatus' &&
+          s.message.status === 'queued',
+      ),
+    ).toBe(true);
   });
 
   it('treats returnToLobby from a drafting player as a draft teardown', () => {
@@ -870,9 +939,9 @@ describe('MatchmakingManager pre-match draft', () => {
     mgr.handleJoinMatchmaking('A', 'A');
 
     expect(mgr.getQueueLength()).toBe(0);
-    expect(sent.some(
-      (s) => s.playerId === 'A' && s.message.type === 'server:matchmakingStatus',
-    )).toBe(false);
+    expect(
+      sent.some((s) => s.playerId === 'A' && s.message.type === 'server:matchmakingStatus'),
+    ).toBe(false);
   });
 });
 

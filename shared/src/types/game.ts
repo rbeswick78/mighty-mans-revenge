@@ -44,14 +44,7 @@ export interface GameState {
  * compatibility); abilities and special weapons get their own entries so
  * stats/awards can distinguish them.
  */
-export type KillWeapon =
-  | 'gun'
-  | 'grenade'
-  | 'fire'
-  | 'shotgun'
-  | 'axe'
-  | 'pistol'
-  | 'punch';
+export type KillWeapon = 'gun' | 'grenade' | 'fire' | 'shotgun' | 'axe' | 'pistol' | 'punch';
 
 export interface KillFeedEntry {
   killerId: PlayerId;
@@ -87,6 +80,24 @@ export interface RivalryRecord {
   draws: number;
 }
 
+/** One player's score in the current rematch streak's first-to-N set. */
+export interface RivalrySetPlayer {
+  playerId: PlayerId;
+  nickname: string;
+  wins: number;
+}
+
+/**
+ * Short-lived set score for consecutive rematches. Unlike `RivalryRecord`,
+ * this resets when the pairing leaves results or starts again after a clinch.
+ */
+export interface RivalrySetResult {
+  winsToClinch: number;
+  roundsPlayed: number;
+  players: RivalrySetPlayer[];
+  championId: PlayerId | null;
+}
+
 export interface MatchResult {
   matchId: MatchId;
   winnerId: PlayerId | null;
@@ -101,6 +112,8 @@ export interface MatchResult {
    * null when persistence is unavailable or the match wasn't 1v1.
    */
   rivalry: RivalryRecord | null;
+  /** Immediate first-to-N score for this consecutive rematch set. */
+  rivalrySet: RivalrySetResult | null;
   /**
    * Map the rematch (if accepted) will be played on — drives the results
    * screen's "NEXT MAP: X" line. Like rivalry, attached by the matchmaking

@@ -147,12 +147,10 @@ export class KothMode implements GameMode {
       playerStats,
       duration: match.getElapsedSeconds(),
       gameMode: GameModeType.KOTH,
-      awards: computeAwards(
-        playerStats,
-        (id) => match.players.get(id)?.nickname ?? 'UNKNOWN',
-      ),
+      awards: computeAwards(playerStats, (id) => match.players.get(id)?.nickname ?? 'UNKNOWN'),
       // Attached by the matchmaking manager — see DeathmatchMode.
       rivalry: null,
+      rivalrySet: null,
       nextMapName: null,
       nextGameMode: null,
       wentToOvertime: match.isOvertime,
