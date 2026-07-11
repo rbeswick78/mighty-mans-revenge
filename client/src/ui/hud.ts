@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
-import { WEAPONS, ABILITY } from '@shared/config/game.js';
+import { WEAPONS, ABILITY, GAME_MODES } from '@shared/config/game.js';
 import type { CharacterId, WeaponId } from '@shared/config/game.js';
+import type { GameModeType } from '@shared/types/game.js';
 import type { KothHudState } from '@shared/types/network.js';
 import type { GunGameRung } from '@shared/utils/gun-game.js';
 import { Wasteland, cssHex, healthColor } from '@shared/config/palette.js';
@@ -111,6 +112,8 @@ export class HUD {
 
   // Map-centered overlays
   private countdownText: Phaser.GameObjects.Text;
+  private modeBriefingTitle: Phaser.GameObjects.Text;
+  private modeBriefingObjective: Phaser.GameObjects.Text;
   private deathOverlay: Phaser.GameObjects.Text;
   private eventBannerText: Phaser.GameObjects.Text;
   private combatCalloutText: Phaser.GameObjects.Text;
@@ -416,6 +419,28 @@ export class HUD {
     this.countdownText.setScrollFactor(0);
     this.countdownText.setDepth(2000);
     this.countdownText.setVisible(false);
+
+    this.modeBriefingTitle = scene.add.text(mapCenterX, mapCenterY + 72, '', {
+      fontFamily: MENU_FONTS.HEADER,
+      fontSize: '14px',
+      color: cssHex(Wasteland.TEXT_RELOAD_WARNING),
+      align: 'center',
+    });
+    this.modeBriefingTitle.setOrigin(0.5, 0.5);
+    this.modeBriefingTitle.setScrollFactor(0);
+    this.modeBriefingTitle.setDepth(1999);
+    this.modeBriefingTitle.setVisible(false);
+
+    this.modeBriefingObjective = scene.add.text(mapCenterX, mapCenterY + 102, '', {
+      fontFamily: MENU_FONTS.HEADER,
+      fontSize: '9px',
+      color: cssHex(Wasteland.TEXT_PRIMARY),
+      align: 'center',
+    });
+    this.modeBriefingObjective.setOrigin(0.5, 0.5);
+    this.modeBriefingObjective.setScrollFactor(0);
+    this.modeBriefingObjective.setDepth(1999);
+    this.modeBriefingObjective.setVisible(false);
 
     this.deathOverlay = scene.add.text(mapCenterX, mapCenterY, '', {
       ...LARGE_FONT_STYLE,
@@ -766,6 +791,30 @@ export class HUD {
     });
   }
 
+  showModeBriefing(mode: GameModeType): void {
+    const briefing = GAME_MODES[mode];
+    this.modeBriefingTitle.setText(briefing.displayName);
+    this.modeBriefingObjective.setText(briefing.objective);
+    for (const text of [this.modeBriefingTitle, this.modeBriefingObjective]) {
+      this.scene.tweens.killTweensOf(text);
+      text.setAlpha(1);
+      text.setVisible(true);
+    }
+  }
+
+  hideModeBriefing(duration = 700): void {
+    for (const text of [this.modeBriefingTitle, this.modeBriefingObjective]) {
+      this.scene.tweens.killTweensOf(text);
+      this.scene.tweens.add({
+        targets: text,
+        alpha: 0,
+        duration,
+        ease: 'Quad.easeIn',
+        onComplete: () => text.setVisible(false),
+      });
+    }
+  }
+
   /** Short celebratory beat for server-authored streak/payback context. */
   showCombatCallout(headline: string, detail: string, tintColor: number): void {
     this.scene.tweens.killTweensOf(this.combatCalloutText);
@@ -1114,6 +1163,8 @@ export class HUD {
     this.lastStandText.destroy();
     this.killConfirmedText.destroy();
     this.countdownText.destroy();
+    this.modeBriefingTitle.destroy();
+    this.modeBriefingObjective.destroy();
     this.deathOverlay.destroy();
     this.eventBannerText.destroy();
     this.combatCalloutText.destroy();

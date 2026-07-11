@@ -319,12 +319,29 @@ export const COMBAT_CALLOUTS = Object.freeze({
  * lie). Display names are HUD/lobby/results copy.
  */
 export const GAME_MODES = Object.freeze({
-  [GameModeType.DEATHMATCH]: Object.freeze({ displayName: 'DEATHMATCH' }),
-  [GameModeType.KOTH]: Object.freeze({ displayName: 'KING OF THE HILL' }),
-  [GameModeType.GUN_GAME]: Object.freeze({ displayName: 'GUN GAME' }),
-  [GameModeType.LAST_STAND]: Object.freeze({ displayName: 'LAST STAND' }),
-  [GameModeType.KILL_CONFIRMED]: Object.freeze({ displayName: 'KILL CONFIRMED' }),
-}) satisfies Readonly<Record<GameModeType, { displayName: string }>>;
+  [GameModeType.DEATHMATCH]: Object.freeze({
+    displayName: 'DEATHMATCH',
+    objective: 'FIRST TO 20 KILLS',
+  }),
+  [GameModeType.KOTH]: Object.freeze({
+    displayName: 'KING OF THE HILL',
+    objective: 'HOLD THE HILL · FIRST TO 60',
+  }),
+  [GameModeType.GUN_GAME]: Object.freeze({
+    displayName: 'GUN GAME',
+    objective: 'MASTER EVERY WEAPON',
+  }),
+  [GameModeType.LAST_STAND]: Object.freeze({
+    displayName: 'LAST STAND',
+    objective: '5 LIVES · LAST FIGHTER STANDING',
+  }),
+  [GameModeType.KILL_CONFIRMED]: Object.freeze({
+    displayName: 'KILL CONFIRMED',
+    objective: 'CONFIRM ENEMY TAGS · DENY YOUR OWN',
+  }),
+}) satisfies Readonly<
+  Record<GameModeType, { displayName: string; objective: string }>
+>;
 
 /** Rotation cycle for fresh matches and rematch succession. */
 export const GAME_MODE_ROTATION: readonly GameModeType[] = Object.freeze([

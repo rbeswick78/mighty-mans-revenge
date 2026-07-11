@@ -47,9 +47,10 @@ describe('game mode rotation', () => {
     expect(getNextGameMode('bogus' as GameModeType)).toBe(GAME_MODE_ROTATION[0]);
   });
 
-  it('every mode has display copy', () => {
+  it('every mode has display and countdown briefing copy', () => {
     for (const mode of GAME_MODE_ROTATION) {
       expect(GAME_MODES[mode].displayName.length).toBeGreaterThan(0);
+      expect(GAME_MODES[mode].objective.length).toBeGreaterThan(0);
       expect(gameModeDisplayName(mode)).toBe(GAME_MODES[mode].displayName);
     }
     expect(gameModeDisplayName(GameModeType.KOTH)).toBe('KING OF THE HILL');

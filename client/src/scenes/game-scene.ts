@@ -211,6 +211,7 @@ export class GameScene extends Phaser.Scene {
   private onWeaponIncoming: ((payload: WeaponIncomingPayload) => void) | null = null;
   private onTilesDestroyed: ((tiles: Array<{ col: number; row: number }>) => void) | null = null;
   private onOvertimeStart: (() => void) | null = null;
+  private modeBriefingShown = false;
   /**
    * Timestamp of the most recent shotgun blast per shooter. A blast
    * broadcasts one BulletTrail per pellet in the same tick; muzzle flash,
@@ -232,6 +233,7 @@ export class GameScene extends Phaser.Scene {
     this.endTransitionStarted = false;
     this.fadeComplete = false;
     this.pendingResult = null;
+    this.modeBriefingShown = false;
   }
 
   create(): void {
@@ -924,6 +926,10 @@ export class GameScene extends Phaser.Scene {
       if (value !== this.lastCountdownValue && this.hud) {
         this.lastCountdownValue = value;
         this.hud.showCountdown(value);
+        if (!this.modeBriefingShown && this.matchData?.gameMode) {
+          this.modeBriefingShown = true;
+          this.hud.showModeBriefing(this.matchData.gameMode);
+        }
       }
       this.matchPhase = MatchPhase.COUNTDOWN;
     };
@@ -932,6 +938,7 @@ export class GameScene extends Phaser.Scene {
       this.matchPhase = MatchPhase.ACTIVE;
       if (this.hud) {
         this.hud.showCountdown(0); // Shows "FIGHT!"
+        this.hud.hideModeBriefing();
       }
       // Match length is tuned to this track (MATCH.TIME_LIMIT === 173s).
       // loop=false because the track ends exactly when the match ends —

@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–18 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts, solo Practice vs Rusty, streak + payback callouts, selectable Rusty difficulty, Collapsed Overpass, Blackout, fresh-chaos rematches, Last Stand, Kill Confirmed). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–19 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts, solo Practice vs Rusty, streak + payback callouts, selectable Rusty difficulty, Collapsed Overpass, Blackout, fresh-chaos rematches, Last Stand, Kill Confirmed, mode briefings). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -50,6 +50,7 @@ Each session below attacks one of these.
 | 16  | Fresh-Chaos Rematches                          | Back-to-back rounds cannot repeat the same two mutators           | **DONE** (2026-07-11) |
 | 17  | Last Stand                                     | Every death spends a life, building pressure toward elimination   | **DONE** (2026-07-11) |
 | 18  | Kill Confirmed                                 | Every kill creates a risky confirm-or-deny scramble                 | **DONE** (2026-07-11) |
+| 19  | Mode Briefings                                | Every mode teaches its win condition before the fight begins        | **DONE** (2026-07-11) |
 
 ---
 
@@ -1203,7 +1204,64 @@ just landing damage, but deciding when to risk the confirmation.
 
 ---
 
+## Session 19 — Mode Briefings
+
+**Goal:** make every mode immediately understandable without adding a tutorial
+wall or asking players to remember rules from the draft screen.
+
+**Locked design decisions**
+
+- Every mode owns one concise objective line beside its display name in the
+  shared `GAME_MODES` registry; victory-rule copy must not drift between UI
+  surfaces.
+- The selected mode and objective appear beneath the existing 3/2/1 countdown,
+  then fade away with `FIGHT` so they teach without delaying control.
+- The treatment stays intentionally lightweight: one gold mode title, one
+  high-contrast objective line, no modal, input gate, or extra network message.
+- Countdown snapshot repair remains the timing authority, so a dropped first
+  countdown packet still produces the briefing on a later countdown snapshot.
+
+**Acceptance criteria**
+
+- [x] All five modes define non-empty shared objective copy with unit coverage.
+- [x] The countdown presents the selected mode and objective exactly once per
+      scene lifecycle and clears them when the match starts.
+- [x] Kill Confirmed's longest objective fits and remains readable in desktop
+      and mobile-landscape layouts.
+- [x] Live Practice inspection shows the briefing during countdown and a clean
+      browser console.
+- [x] Typecheck, lint, all unit tests, production build, and Playwright pass.
+
+---
+
 ## Session Log
+
+### Session 19 — 2026-07-11 — Mode Briefings
+
+**Shipped:** every match now teaches its objective during the familiar 3/2/1
+beat. The selected mode name appears in gold with a short win-condition line
+directly beneath it, then both fade with `FIGHT`. The shared mode registry owns
+the copy, keeping Deathmatch, KOTH, Gun Game, Last Stand, and Kill Confirmed
+consistent without a second client-only rules table.
+
+The presentation reuses the authoritative countdown stream and its snapshot
+repair path. It adds no protocol surface, match delay, or blocking tutorial,
+and it is recreated cleanly for rematches and scene restarts.
+
+**Verified:** focused shared-config and client logic coverage is green. A forced
+Kill Confirmed Practice match displayed `KILL CONFIRMED` and `CONFIRM ENEMY
+TAGS · DENY YOUR OWN` during countdown on both the default desktop viewport and
+an 844×390 mobile-landscape viewport; both layouts remained clear and the
+browser console had no warnings or errors. The complete automated gate is
+green: typecheck and lint pass; all 816 unit tests pass; the production build
+succeeds; and the 21-case Playwright matrix reports 12 passes, 9 intentional
+skips, 0 unexpected results, and 0 flaky results.
+
+**Carry-over:** objective copy is deliberately terse. Group play should reveal
+whether any line needs plainer wording, but the presentation timing and layout
+should remain stable unless players consistently miss the countdown.
+
+---
 
 ### Session 18 — 2026-07-11 — Kill Confirmed
 
