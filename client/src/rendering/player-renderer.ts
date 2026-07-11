@@ -3,7 +3,12 @@ import type { PlayerState } from '@shared/types/player.js';
 import { CHARACTERS, MUTATORS, type CharacterId, type WeaponId } from '@shared/config/game.js';
 import type { CharacterDef } from '@shared/types/character.js';
 import { Wasteland, cssHex, healthColor } from '@shared/config/palette.js';
-import { bucketAimAngle, type Direction4 } from './sprite-direction.js';
+import {
+  bucketAimAngle,
+  deathDirectionForAim,
+  type DeathDirection,
+  type Direction4,
+} from './sprite-direction.js';
 import {
   weaponOverlayKey,
   weaponRendersOverlay,
@@ -119,6 +124,8 @@ export class PlayerRenderer {
    */
   private isAxeless = false;
   private currentDirection: Direction4 = 'down';
+  private deathDirection: DeathDirection = 'side';
+  private isDead = false;
   private currentAnimState: AnimState = 'idle';
   private currentGunState: GunOverlayState = 'hold';
   /** Weapon driving the held overlay — see weaponOverlayKey for the key map. */
@@ -262,7 +269,7 @@ export class PlayerRenderer {
     this.setWeapon(state.weaponId);
     this.updateHealthBar(state.health, state.maxHealth);
     this.nicknameText.setText(state.nickname);
-    this.container.setVisible(!state.isDead);
+    this.updateLifeState(state.isDead);
 
     if (state.invulnerableTimer > 0) {
       this.setInvulnerable(true);
@@ -366,12 +373,15 @@ export class PlayerRenderer {
    * No free rotation — this asset pack is 4-direction.
    */
   setAimAngle(angle: number): void {
+    this.deathDirection = deathDirectionForAim(angle);
     const direction = bucketAimAngle(angle);
     if (direction !== this.currentDirection) {
       this.currentDirection = direction;
-      this.playCurrentAnim();
-      if (this.gunSprite) this.playCurrentGunAnim();
-      if (this.wandGraphics) this.applyWandTransform(direction);
+      if (!this.isDead) {
+        this.playCurrentAnim();
+        if (this.gunSprite) this.playCurrentGunAnim();
+        if (this.wandGraphics) this.applyWandTransform(direction);
+      }
     }
   }
 
@@ -389,6 +399,10 @@ export class PlayerRenderer {
     this.gunShootTimer?.remove(false);
     this.gunShootTimer = null;
     this.currentGunState = 'hold';
+    if (this.isDead) {
+      this.gunSprite.setVisible(false);
+      return;
+    }
     const rendersOverlay = weaponRendersOverlay(weaponId);
     this.gunSprite.setVisible(rendersOverlay);
     if (rendersOverlay) {
@@ -406,7 +420,7 @@ export class PlayerRenderer {
    * bullet trails, but guard anyway).
    */
   playShootAnimation(): void {
-    if (!this.gunSprite || !weaponRendersOverlay(this.currentWeaponId)) return;
+    if (this.isDead || !this.gunSprite || !weaponRendersOverlay(this.currentWeaponId)) return;
     this.currentGunState = 'shoot';
     this.playCurrentGunAnim();
     this.gunShootTimer?.remove(false);
@@ -438,6 +452,7 @@ export class PlayerRenderer {
    * force-ends any leftover swing via playRespawnAnimation.
    */
   playAttackAnimation(): void {
+    if (this.isDead) return;
     this.attackTimer?.remove(false);
     this.isAttacking = true;
     // ignoreIfPlaying = false: a rapid re-swing restarts the animation.
@@ -470,6 +485,7 @@ export class PlayerRenderer {
   setAxeless(axeless: boolean): void {
     if (!this.altBodyPrefix || axeless === this.isAxeless) return;
     this.isAxeless = axeless;
+    if (this.isDead) return;
     // Re-resolve the current body anim under the new prefix (the key
     // changes, so play() actually restarts even with ignoreIfPlaying).
     this.playCurrentAnim();
@@ -513,36 +529,58 @@ export class PlayerRenderer {
     this.healthBarFg.setFillStyle(healthColor(ratio));
   }
 
-  playDeathAnimation(): void {
-    this.scene.tweens.add({
-      targets: this.sprite,
-      tint: { from: 0xffffff, to: Wasteland.DEATH_TINT },
-      duration: 200,
-      yoyo: true,
-      onComplete: () => {
-        this.scene.tweens.add({
-          targets: this.container,
-          alpha: 0,
-          duration: 300,
-          onComplete: () => {
-            this.container.setVisible(false);
-          },
-        });
-      },
-    });
+  /**
+   * Apply an authoritative alive/dead edge exactly once. Deaths play their
+   * character sheet and hold the final corpse frame for the respawn window;
+   * repeated snapshots cannot restart or hide the animation.
+   */
+  updateLifeState(dead: boolean): void {
+    if (dead === this.isDead) return;
+    this.isDead = dead;
+    if (dead) {
+      this.playDeathAnimation();
+    } else {
+      this.playRespawnAnimation();
+    }
   }
 
-  playRespawnAnimation(): void {
+  private playDeathAnimation(): void {
+    this.endAttackAnimation();
+    this.gunShootTimer?.remove(false);
+    this.gunShootTimer = null;
+    this.currentGunState = 'hold';
+    this.setInvulnerable(false);
+    this.setSprintEffect(false);
+    this.container.setVisible(true);
+    this.container.setAlpha(1);
+    this.setAliveVisualsVisible(false);
+    this.sprite.play(this.deathKey(), false);
+  }
+
+  private playRespawnAnimation(): void {
     // A death mid-swing must not carry the attack state into the new life.
     this.endAttackAnimation();
     this.container.setVisible(true);
-    this.container.setAlpha(0);
-    this.scene.tweens.add({
-      targets: this.container,
-      alpha: 1,
-      duration: 500,
-      ease: 'Sine.easeInOut',
-    });
+    this.container.setAlpha(1);
+    this.setAliveVisualsVisible(true);
+    if (this.characterId === 'frost_wizard') {
+      this.applyFrostWizardTint();
+    } else {
+      this.sprite.clearTint();
+    }
+    this.applyWandTransform(this.currentDirection);
+    this.playCurrentAnim();
+    this.playCurrentGunAnim();
+  }
+
+  private setAliveVisualsVisible(alive: boolean): void {
+    this.gunSprite?.setVisible(alive && weaponRendersOverlay(this.currentWeaponId));
+    this.wandGraphics?.setVisible(alive);
+    this.frostMistGraphics?.setVisible(alive);
+    if (!alive) this.frozenCrystalGraphics?.setVisible(false);
+    this.healthBarBg.setVisible(alive);
+    this.healthBarFg.setVisible(alive);
+    this.nicknameText.setVisible(alive);
   }
 
   setInvulnerable(active: boolean): void {
@@ -604,6 +642,7 @@ export class PlayerRenderer {
   }
 
   private playCurrentAnim(): void {
+    if (this.isDead) return;
     // While a punch swing plays, the body stays on the attack anim:
     // idle↔run flips resolve to the same attack key (ignored below), and a
     // direction change resolves to a different attack key so the swing
@@ -616,7 +655,7 @@ export class PlayerRenderer {
   }
 
   private playCurrentGunAnim(): void {
-    if (!this.gunSprite || !weaponRendersOverlay(this.currentWeaponId)) return;
+    if (this.isDead || !this.gunSprite || !weaponRendersOverlay(this.currentWeaponId)) return;
     const key = this.gunKey(this.currentDirection, this.currentGunState);
     // ignoreIfPlaying = false: shooting again restarts the shoot anim.
     this.gunSprite.play(key, this.currentGunState === 'hold');
@@ -635,6 +674,10 @@ export class PlayerRenderer {
 
   private attackKey(direction: Direction4): string {
     return `${this.bodyPrefix()}_${direction}_attack`;
+  }
+
+  private deathKey(): string {
+    return `${this.bodyPrefix()}_${this.deathDirection}_death`;
   }
 
   private gunKey(direction: Direction4, state: GunOverlayState): string {

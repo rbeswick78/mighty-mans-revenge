@@ -5,9 +5,17 @@
  */
 export type Direction4 = 'up' | 'down' | 'side' | 'side-left';
 
+/** Death sheets in the asset pack only ship horizontal facings. */
+export type DeathDirection = Extract<Direction4, 'side' | 'side-left'>;
+
 export const DIRECTIONS: readonly Direction4[] = [
   'down',
   'up',
+  'side',
+  'side-left',
+];
+
+export const DEATH_DIRECTIONS: readonly DeathDirection[] = [
   'side',
   'side-left',
 ];
@@ -46,12 +54,16 @@ export interface CharacterDef {
    * a fixed FPS.
    */
   readonly attackFrames: FramesByDirection;
+  /** Horizontal first-death sheets, held on their final frame until respawn. */
+  readonly deathFrames: Record<DeathDirection, FrameDim>;
   /** Horizontal frames per idle sheet (pack `-SheetN` suffix). */
   readonly idleFrameCount: number;
   /** Horizontal frames per run/walk sheet (pack `-SheetN` suffix). */
   readonly runFrameCount: number;
   /** Horizontal frames per attack sheet (pack `-SheetN` suffix). */
   readonly attackFrameCount: number;
+  /** Horizontal frames per death sheet. */
+  readonly deathFrameCount: number;
   /**
    * Whether to render the held-gun overlay and matching muzzle flash for
    * this character. Gameplay (bullets, damage) is identical regardless —
@@ -74,6 +86,8 @@ export interface CharacterDef {
     readonly idleFrames: FramesByDirection;
     readonly runFrames: FramesByDirection;
     readonly attackFrames: FramesByDirection;
+    readonly deathFrames: Record<DeathDirection, FrameDim>;
+    readonly deathFrameCount: number;
   };
   /**
    * Stat identity — what makes picking this character a real decision.

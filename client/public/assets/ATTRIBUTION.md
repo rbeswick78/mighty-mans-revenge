@@ -59,6 +59,12 @@ This game uses pixel art assets from third-party packs. Source archives are
 - `enemies/zombie-axe-noaxe_*_run.png` — Enemies/Zombie_Axe/No-Axe walk Sheet8 (4 directions)
 - `enemies/zombie-axe-noaxe_*_attack.png` — Enemies/Zombie_Axe/No-Axe First-Attack Sheet7 (4 directions)
 
+- `player/character_{side,side-left}_death.png` — Character/Main/Death death1 NoHands Sheet6
+- `enemies/zombie_{side,side-left}_death.png` — Enemies/Zombie_Small First-Death Sheet6
+- `enemies/zombie-big_{side,side-left}_death.png` — Enemies/Zombie_Big First-Death Sheet7
+- `enemies/zombie-axe_{side,side-left}_death.png` — Enemies/Zombie_Axe First-Death Sheet6
+- `enemies/zombie-axe-noaxe_{side,side-left}_death.png` — Enemies/Zombie_Axe/No-Axe First-Death Sheet6
+
 ## Original audio
 
 The pack ships no audio. `audio/punch-whoosh.wav`, `audio/punch-impact.wav`,

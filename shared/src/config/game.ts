@@ -685,6 +685,7 @@ export const CHARACTERS = Object.freeze({
     idleFrameCount: 6,
     runFrameCount: 6,
     attackFrameCount: 4,
+    deathFrameCount: 6,
     idleFrames: {
       down: { w: 11, h: 16 },
       up: { w: 11, h: 16 },
@@ -703,6 +704,10 @@ export const CHARACTERS = Object.freeze({
       side: { w: 20, h: 18 },
       'side-left': { w: 20, h: 18 },
     },
+    deathFrames: {
+      side: { w: 21, h: 16 },
+      'side-left': { w: 21, h: 16 },
+    },
   },
   bruce: {
     id: 'bruce',
@@ -717,6 +722,7 @@ export const CHARACTERS = Object.freeze({
     idleFrameCount: 6,
     runFrameCount: 6,
     attackFrameCount: 4,
+    deathFrameCount: 6,
     idleFrames: {
       down: { w: 13, h: 16 },
       up: { w: 13, h: 15 },
@@ -734,6 +740,10 @@ export const CHARACTERS = Object.freeze({
       up: { w: 14, h: 15 },
       side: { w: 11, h: 14 },
       'side-left': { w: 11, h: 14 },
+    },
+    deathFrames: {
+      side: { w: 16, h: 14 },
+      'side-left': { w: 16, h: 14 },
     },
   },
   // Frost Wizard intentionally shares Mighty Man's spritePrefix, asset
@@ -756,6 +766,7 @@ export const CHARACTERS = Object.freeze({
     idleFrameCount: 6,
     runFrameCount: 6,
     attackFrameCount: 4,
+    deathFrameCount: 6,
     idleFrames: {
       down: { w: 11, h: 16 },
       up: { w: 11, h: 16 },
@@ -774,6 +785,10 @@ export const CHARACTERS = Object.freeze({
       side: { w: 20, h: 18 },
       'side-left': { w: 20, h: 18 },
     },
+    deathFrames: {
+      side: { w: 21, h: 16 },
+      'side-left': { w: 21, h: 16 },
+    },
   },
   // Bubba — the tank. Pack's Zombie_Big: huge HP pool, slow, and a bigger
   // hit-validation box (he's simply easier to hit). Ability: Iron Hide
@@ -791,6 +806,7 @@ export const CHARACTERS = Object.freeze({
     idleFrameCount: 6,
     runFrameCount: 8,
     attackFrameCount: 8,
+    deathFrameCount: 7,
     idleFrames: {
       down: { w: 16, h: 23 },
       up: { w: 16, h: 22 },
@@ -808,6 +824,10 @@ export const CHARACTERS = Object.freeze({
       up: { w: 18, h: 24 },
       side: { w: 23, h: 23 },
       'side-left': { w: 23, h: 23 },
+    },
+    deathFrames: {
+      side: { w: 29, h: 23 },
+      'side-left': { w: 29, h: 23 },
     },
   },
   // Jack — the skirmisher. Pack's Zombie_Axe (with-axe body variant).
@@ -827,6 +847,7 @@ export const CHARACTERS = Object.freeze({
     idleFrameCount: 6,
     runFrameCount: 8,
     attackFrameCount: 7,
+    deathFrameCount: 6,
     idleFrames: {
       down: { w: 13, h: 18 },
       up: { w: 12, h: 23 },
@@ -844,6 +865,10 @@ export const CHARACTERS = Object.freeze({
       up: { w: 13, h: 25 },
       side: { w: 25, h: 19 },
       'side-left': { w: 25, h: 19 },
+    },
+    deathFrames: {
+      side: { w: 27, h: 18 },
+      'side-left': { w: 27, h: 18 },
     },
     // No-axe body variant, rendered while the thrown axe is in flight or
     // on cooldown (abilityCooldownSeconds > 0). Same 6/8/7 frame counts
@@ -869,6 +894,11 @@ export const CHARACTERS = Object.freeze({
         side: { w: 18, h: 19 },
         'side-left': { w: 18, h: 19 },
       },
+      deathFrames: {
+        side: { w: 22, h: 18 },
+        'side-left': { w: 22, h: 18 },
+      },
+      deathFrameCount: 6,
     },
   },
 }) satisfies Readonly<Record<string, CharacterDef>>;

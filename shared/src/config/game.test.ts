@@ -26,7 +26,11 @@ import {
   type WeaponId,
 } from './game.js';
 import { GameModeType } from '../types/game.js';
-import { DIRECTIONS, type CharacterDef } from '../types/character.js';
+import {
+  DEATH_DIRECTIONS,
+  DIRECTIONS,
+  type CharacterDef,
+} from '../types/character.js';
 import type { WeaponDef } from '../types/weapon.js';
 
 describe('game mode rotation', () => {
@@ -153,6 +157,12 @@ describe('CHARACTERS registry', () => {
     for (const def of Object.values(CHARACTERS)) {
       expect(def.idleFrameCount).toBeGreaterThan(0);
       expect(def.runFrameCount).toBeGreaterThan(0);
+      expect(def.attackFrameCount).toBeGreaterThan(0);
+      expect(def.deathFrameCount).toBeGreaterThan(0);
+      for (const dir of DEATH_DIRECTIONS) {
+        expect(def.deathFrames[dir].w).toBeGreaterThan(0);
+        expect(def.deathFrames[dir].h).toBeGreaterThan(0);
+      }
     }
     // The pack's Zombie_Big / Zombie_Axe walk sheets are 8-frame; their
     // idles (and the whole original roster) are 6-frame.
@@ -349,6 +359,11 @@ describe('session-8 polish backlog config', () => {
           expect(frames[dir].w).toBeGreaterThan(0);
           expect(frames[dir].h).toBeGreaterThan(0);
         }
+      }
+      expect(alt.deathFrameCount).toBeGreaterThan(0);
+      for (const dir of DEATH_DIRECTIONS) {
+        expect(alt.deathFrames[dir].w).toBeGreaterThan(0);
+        expect(alt.deathFrames[dir].h).toBeGreaterThan(0);
       }
     }
   });

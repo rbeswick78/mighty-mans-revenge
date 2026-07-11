@@ -65,8 +65,10 @@ export class ClientPlayerManager {
         localRenderer = renderer;
       }
 
-      // Handle visibility based on death state
-      renderer.getContainer().setVisible(!playerState.isDead);
+      // Death presentation is edge-driven inside the renderer. Repeated
+      // dead snapshots must hold the corpse's final frame, not hide or
+      // restart the one-shot animation.
+      renderer.updateLifeState(playerState.isDead);
 
       if (playerState.invulnerableTimer > 0) {
         renderer.setInvulnerable(true);

@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { Wasteland, cssHex } from '@shared/config/palette.js';
 import { CHARACTERS } from '@shared/config/game.js';
 import {
+  DEATH_DIRECTIONS,
   DIRECTIONS,
   type CharacterDef,
   type Direction4,
@@ -133,6 +134,8 @@ const SHOTGUN_RACK_FPS = 2 / 0.6;
  * count. PlayerRenderer's ATTACK_SWING_DURATION_MS must match this.
  */
 const ATTACK_SWING_SECONDS = 0.35;
+/** Death sheets play once, then hold their final corpse frame until respawn. */
+const DEATH_ANIMATION_SECONDS = 0.65;
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -222,7 +225,8 @@ export class BootScene extends Phaser.Scene {
   }
 
   private loadRealAssets(): void {
-    // Character sprite sheets — each character × 4 directions × 2 states.
+    // Character sprite sheets — four-direction living states plus the
+    // asset pack's two horizontal death facings.
     // Driven by the CHARACTERS registry in /shared so adding a new
     // character only requires registering it there + dropping assets in
     // the right folder.
@@ -266,6 +270,16 @@ export class BootScene extends Phaser.Scene {
           char.assetBaseName,
         );
       }
+      for (const dir of DEATH_DIRECTIONS) {
+        this.loadCharacterSheet(
+          char.spritePrefix,
+          dir,
+          'death',
+          char.deathFrames[dir],
+          char.assetFolder,
+          char.assetBaseName,
+        );
+      }
 
       // Alt-body sheets (Jack's no-axe body while his thrown axe is in
       // flight / on cooldown). By CharacterDef.altBody contract the alt
@@ -285,6 +299,12 @@ export class BootScene extends Phaser.Scene {
           );
           this.loadCharacterSheet(
             alt.spritePrefix, dir, 'attack', alt.attackFrames[dir],
+            char.assetFolder, alt.assetBaseName,
+          );
+        }
+        for (const dir of DEATH_DIRECTIONS) {
+          this.loadCharacterSheet(
+            alt.spritePrefix, dir, 'death', alt.deathFrames[dir],
             char.assetFolder, alt.assetBaseName,
           );
         }
@@ -477,7 +497,7 @@ export class BootScene extends Phaser.Scene {
   private loadCharacterSheet(
     spritePrefix: string,
     direction: Direction4,
-    state: 'idle' | 'run' | 'attack',
+    state: 'idle' | 'run' | 'attack' | 'death',
     dim: FrameDim,
     assetFolder: string,
     assetBaseName: string,
@@ -501,7 +521,7 @@ export class BootScene extends Phaser.Scene {
     for (const char of roster) {
       if (animatedPrefixes.has(char.spritePrefix)) continue;
       animatedPrefixes.add(char.spritePrefix);
-      this.createBodyAnimationSet(char.spritePrefix, char);
+      this.createBodyAnimationSet(char.spritePrefix, char, char.deathFrameCount);
 
       // Alt-body anim set (Jack's no-axe body) — same frame counts and
       // pacing as the base set by CharacterDef.altBody contract, so it
@@ -509,7 +529,7 @@ export class BootScene extends Phaser.Scene {
       const alt = char.altBody;
       if (alt && !animatedPrefixes.has(alt.spritePrefix)) {
         animatedPrefixes.add(alt.spritePrefix);
-        this.createBodyAnimationSet(alt.spritePrefix, char);
+        this.createBodyAnimationSet(alt.spritePrefix, char, alt.deathFrameCount);
       }
     }
 
@@ -608,7 +628,11 @@ export class BootScene extends Phaser.Scene {
    * for both the base sheets and any altBody variant (which shares frame
    * counts with the base by contract).
    */
-  private createBodyAnimationSet(prefix: string, char: CharacterDef): void {
+  private createBodyAnimationSet(
+    prefix: string,
+    char: CharacterDef,
+    deathFrameCount: number,
+  ): void {
     for (const dir of DIRECTIONS) {
       for (const state of ['idle', 'run'] as const) {
         const key = `${prefix}_${dir}_${state}`;
@@ -641,6 +665,19 @@ export class BootScene extends Phaser.Scene {
           end: char.attackFrameCount - 1,
         }),
         frameRate: char.attackFrameCount / ATTACK_SWING_SECONDS,
+        repeat: 0,
+      });
+    }
+
+    for (const dir of DEATH_DIRECTIONS) {
+      const deathKey = `${prefix}_${dir}_death`;
+      this.anims.create({
+        key: deathKey,
+        frames: this.anims.generateFrameNumbers(deathKey, {
+          start: 0,
+          end: deathFrameCount - 1,
+        }),
+        frameRate: deathFrameCount / DEATH_ANIMATION_SECONDS,
         repeat: 0,
       });
     }

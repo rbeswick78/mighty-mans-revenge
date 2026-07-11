@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–19 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts, solo Practice vs Rusty, streak + payback callouts, selectable Rusty difficulty, Collapsed Overpass, Blackout, fresh-chaos rematches, Last Stand, Kill Confirmed, mode briefings). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–20 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts, solo Practice vs Rusty, streak + payback callouts, selectable Rusty difficulty, Collapsed Overpass, Blackout, fresh-chaos rematches, Last Stand, Kill Confirmed, mode briefings, character death animations). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -51,6 +51,7 @@ Each session below attacks one of these.
 | 17  | Last Stand                                     | Every death spends a life, building pressure toward elimination   | **DONE** (2026-07-11) |
 | 18  | Kill Confirmed                                 | Every kill creates a risky confirm-or-deny scramble                 | **DONE** (2026-07-11) |
 | 19  | Mode Briefings                                | Every mode teaches its win condition before the fight begins        | **DONE** (2026-07-11) |
+| 20  | Character Death Animations                    | Every elimination lands with a readable, satisfying corpse pose     | **DONE** (2026-07-11) |
 
 ---
 
@@ -1234,7 +1235,73 @@ wall or asking players to remember rules from the draft screen.
 
 ---
 
+## Session 20 — Character Death Animations
+
+**Goal:** make every kill visually land instead of having the defeated fighter
+vanish on the first dead snapshot.
+
+**Locked design decisions**
+
+- Every roster entry owns measured horizontal death-sheet dimensions and a
+  frame count in `CHARACTERS`; BootScene loads and creates these animations
+  through the same registry-driven path as idle/run/attack.
+- The asset pack supplies side and side-left deaths only. Continuous aim is
+  projected onto that horizontal pair so vertical-facing fighters fall toward
+  their actual horizontal lean rather than snapping to one universal pose.
+- An authoritative alive-to-dead edge plays the 650ms first-death sheet once,
+  hides weapon/wand/name/health UI, and holds the final corpse frame for the
+  complete respawn window. Repeated dead snapshots never restart or hide it.
+- Respawn restores the current authoritative body variant, weapon, cosmetics,
+  and normal invulnerability presentation. Jack uses matching no-axe death art
+  while his axe is out; Frost Wizard retains its shared-body tint.
+- This is presentation only: no combat, collision, respawn, network, or balance
+  rules change.
+
+**Acceptance criteria**
+
+- [x] All five fighters have measured death metadata and curated attributed
+      sheets; Jack's with-axe and no-axe bodies both resolve valid frames.
+- [x] Local and remote renderers transition only on authoritative life edges,
+      hold corpses until respawn, and cannot have death animation overwritten
+      by movement, aim, weapon, attack, or body-variant snapshot updates.
+- [x] Horizontal death direction is deterministic and unit-covered.
+- [x] A live forced Last Stand Practice match shows death, corpse hold, respawn,
+      and clean desktop/mobile-landscape presentation with no console warnings.
+- [x] Typecheck, lint, all unit tests, production build, and Playwright pass.
+
+---
+
 ## Session Log
+
+### Session 20 — 2026-07-11 — Character Death Animations
+
+**Shipped:** eliminations now use the asset pack's real character-specific
+death sheets instead of instantly hiding the defeated renderer. Mighty Man and
+Frost Wizard share the no-hands human fall, Bruce uses Zombie Small, Bubba uses
+Zombie Big, and Jack has distinct with-axe and no-axe falls. Each animation
+plays once and leaves a readable corpse until the server revives that player.
+
+The renderer now owns a small authoritative life-state edge machine. Living
+overlays and labels disappear during death, normal snapshot updates cannot
+clobber the corpse pose, and respawn restores the latest body/weapon state.
+This also makes the previously unused `playDeathAnimation` path real rather
+than letting `ClientPlayerManager` hide every dead snapshot immediately.
+
+**Verified:** the character registry and horizontal aim projection have focused
+coverage. A forced 45-second Last Stand match against Warlord showed Bruce's
+fall, the corpse held through `RESPAWN IN 3/2/1`, and a clean return at the
+authoritative spawn; a mobile 844×390 pass kept the arena and HUD readable.
+All curated sheets loaded with zero browser warnings after correcting Jack's
+no-axe crop to its measured 22×18 frame. Typecheck and lint are clean; all 818
+unit tests pass; the production build succeeds; and Playwright completes all 21
+cases with 12 passes, 9 intentional skips, and zero unexpected or flaky cases.
+
+**Carry-over:** this pass intentionally uses each character's first death
+variant. The pack includes alternate human/zombie falls that can become
+cosmetic randomization later, but deterministic first-death presentation is
+the stronger baseline.
+
+---
 
 ### Session 19 — 2026-07-11 — Mode Briefings
 
