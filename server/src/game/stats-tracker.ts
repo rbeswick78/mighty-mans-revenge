@@ -92,6 +92,12 @@ export class StatsTracker {
     return new Map(this.stats);
   }
 
+  /** Current life streak, distinct from the all-match longest streak. */
+  getCurrentStreak(playerId: PlayerId): number {
+    this.getStatsOrThrow(playerId);
+    return this.currentStreaks.get(playerId) ?? 0;
+  }
+
   private getStatsOrThrow(playerId: PlayerId): PlayerStats {
     const s = this.stats.get(playerId);
     if (!s) {

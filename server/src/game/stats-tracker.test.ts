@@ -74,6 +74,7 @@ describe('StatsTracker', () => {
       tracker.recordKill('p1', 'p2', 'gun');
 
       expect(tracker.getStats('p1').longestKillStreak).toBe(3);
+      expect(tracker.getCurrentStreak('p1')).toBe(3);
     });
 
     it('resets kill streak on death', () => {
@@ -84,6 +85,7 @@ describe('StatsTracker', () => {
 
       // Current streak is 1 after the death, but longest is still 2
       expect(tracker.getStats('p1').longestKillStreak).toBe(2);
+      expect(tracker.getCurrentStreak('p1')).toBe(1);
     });
 
     it('preserves longest kill streak after death', () => {

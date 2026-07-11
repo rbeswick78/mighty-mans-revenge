@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–11 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts, solo Practice vs Rusty). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–12 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts, solo Practice vs Rusty, streak + payback callouts). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -43,6 +43,7 @@ Each session below attacks one of these.
 | 9   | Playtest response #1: two bugs + map/mode draft | The game respects your pick — and lets you pick the arena      | **DONE** (2026-07-05) |
 | 10  | Rivalry Sets + Revenge Drafts                   | Every rematch becomes a round with stakes and comeback control | **DONE** (2026-07-11) |
 | 11  | Practice vs Rusty                               | The game is playable on demand, even when no friend is online  | **DONE** (2026-07-11) |
+| 12  | Streaks, Payback + Shutdowns                    | Every kill builds a story and a reason to settle the score     | **DONE** (2026-07-11) |
 
 ---
 
@@ -1001,7 +1002,75 @@ than becoming a parallel tutorial implementation.
 
 ---
 
+## Session 12 — Streaks, Payback + Shutdowns
+
+**Goal:** make the middle of a match tell a memorable story. The game already
+has good kill impact and end-of-match awards, but consecutive kills and revenge
+were invisible until results; live callouts turn those events into goals worth
+chasing and moments worth talking about.
+
+**Locked design decisions**
+
+- Streak, ended-streak, and payback context are authored by `Match` and ride
+  the existing reliable `server:playerKilled` event. The client never infers
+  combat history from snapshots or timing.
+- Payback means killing the opponent who most recently killed you. A shutdown
+  means ending a 3+ kill life streak and takes presentation priority over a
+  simultaneous payback or streak milestone.
+- Local celebrations escalate at 2 (`ON A ROLL`), 3 (`RAMPAGE`), and 5
+  (`UNSTOPPABLE`) kills. Thresholds live in shared `COMBAT_CALLOUTS` config.
+- Callouts use a dedicated upper-map text lane. They cannot overwrite the
+  shared event/ability banner used for mutators, overtime, and abilities.
+- Only the killer gets a large celebration. The existing kill feed remains the
+  compact source of truth for everyone else and suicides never celebrate.
+
+**Acceptance criteria**
+
+- [x] Every kill event carries the killer's post-kill streak, the victim's
+      pre-death streak, and authoritative payback status.
+- [x] Death resets the live streak while preserving longest-streak awards.
+- [x] Pure client formatting covers streak escalation, payback, shutdown
+      priority, remote kills, and suicides.
+- [x] HUD callouts have an independent animation lane and clean themselves up.
+- [x] Typecheck, lint, all unit tests, production build, and Playwright pass.
+
+---
+
 ## Session Log
+
+### Session 12 — 2026-07-11 — Streaks, Payback + Shutdowns
+
+**Shipped:** each authoritative kill now includes three pieces of live combat
+context: the killer's current life streak, the streak just ended, and whether
+the kill answered the opponent who last killed them. Local kills turn that
+context into escalating `ON A ROLL`, `RAMPAGE`, and `UNSTOPPABLE` celebrations,
+plus `PAYBACK` and high-value `SHUTDOWN` moments. Shutdown wins presentation
+priority when one kill qualifies for several stories at once.
+
+The HUD owns a dedicated callout object above the action, separate from the
+existing event/ability banner, so rapid kills cannot erase a final-minute
+mutator, overtime announcement, or ability activation. Existing kill audio,
+heal flash, hit-stop, and kill feed stay intact underneath the new beat.
+
+**Design decisions made in-session:**
+
+- Streaks are per life and per match; they are not another persistence system.
+  The existing `longestKillStreak` stat still powers end-of-match awards.
+- Payback follows the most recent killer, not an arbitrary time window. This is
+  deterministic for N-player matches and naturally produces back-and-forth in
+  the current duel format.
+- Large callouts are local-killer celebrations only. Showing every remote
+  streak milestone full-screen would punish the player already losing.
+
+**Verified:** focused Match/StatsTracker/client formatting coverage passes (180
+tests); typecheck and lint clean; production build green; all 779 unit tests
+green. The complete Playwright matrix passed with 12 tests and 9 expected
+cross-project skips, including solo practice through live GameScene, two-client
+draft/lock-and-go, Firefox smoke, and mobile-landscape canvas/touch coverage.
+
+**Carry-over:** callout thresholds and wording are first-pass tuning. Watch
+whether `ON A ROLL` at 2 feels too frequent in Gun Game and whether shutdown
+should get a distinct sound after real group play. No combat balance changed.
 
 ### Session 11 — 2026-07-11 — Practice vs Rusty
 

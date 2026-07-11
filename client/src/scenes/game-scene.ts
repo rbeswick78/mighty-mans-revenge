@@ -58,6 +58,7 @@ import {
   BLOOM_STRENGTH,
 } from '../rendering/post-fx/bloom-config.js';
 import { Crosshair } from '../rendering/crosshair.js';
+import { combatCalloutFor } from '../ui/combat-callout.js';
 import { HUD } from '../ui/hud.js';
 import { InputManager } from '../input/input-manager.js';
 import { isTouchDevice } from '../input/is-touch-device.js';
@@ -1039,6 +1040,14 @@ export class GameScene extends Phaser.Scene {
       // (killer === victim, e.g. own grenade) plays only the death sound.
       const localId = this.gameService.getNetworkManager().getPlayerId();
       if (!localId) return;
+      const callout = combatCalloutFor(entry, localId);
+      if (callout) {
+        this.hud?.showCombatCallout(
+          callout.headline,
+          callout.detail,
+          callout.tint,
+        );
+      }
       const audio = AudioManager.getInstance();
       if (!audio) return;
       if (entry.killerId === localId && entry.killerId !== entry.victimId) {

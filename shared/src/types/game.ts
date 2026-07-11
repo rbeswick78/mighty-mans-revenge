@@ -51,6 +51,12 @@ export interface KillFeedEntry {
   victimId: PlayerId;
   weapon: KillWeapon;
   timestamp: number;
+  /** Consecutive kills held by the killer after this event. */
+  killerStreak?: number;
+  /** Consecutive kills the victim held immediately before this death. */
+  victimStreakEnded?: number;
+  /** True when the killer just answered the opponent who last killed them. */
+  isRevenge?: boolean;
 }
 
 /**

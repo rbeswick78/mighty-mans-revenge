@@ -391,6 +391,31 @@ describe('Match', () => {
       expect(killFeed[0].killerId).toBe('player-0');
       expect(killFeed[0].victimId).toBe('player-1');
       expect(killFeed[0].weapon).toBe('gun');
+      expect(killFeed[0].killerStreak).toBe(1);
+      expect(killFeed[0].victimStreakEnded).toBe(0);
+      expect(killFeed[0].isRevenge).toBe(false);
+    });
+
+    it('ships streak shutdown and payback context with each kill', () => {
+      match.startCountdown();
+      match.update(MATCH.COUNTDOWN_DURATION + 0.1);
+
+      match.onKill('player-0', 'player-1', 'gun');
+      match.players.get('player-1')!.isDead = false;
+      match.onKill('player-0', 'player-1', 'gun');
+      match.players.get('player-1')!.isDead = false;
+      match.onKill('player-0', 'player-1', 'gun');
+      match.players.get('player-1')!.isDead = false;
+      match.onKill('player-1', 'player-0', 'pistol');
+
+      const feed = match.getKillFeed();
+      expect(feed.map((entry) => entry.killerStreak)).toEqual([1, 2, 3, 1]);
+      expect(feed[3]).toMatchObject({
+        killerId: 'player-1',
+        victimId: 'player-0',
+        victimStreakEnded: 3,
+        isRevenge: true,
+      });
     });
   });
 

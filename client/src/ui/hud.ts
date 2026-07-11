@@ -108,6 +108,7 @@ export class HUD {
   private countdownText: Phaser.GameObjects.Text;
   private deathOverlay: Phaser.GameObjects.Text;
   private eventBannerText: Phaser.GameObjects.Text;
+  private combatCalloutText: Phaser.GameObjects.Text;
 
   // Persistent active-event label, shown next to the timer.
   private activeEventLabel: Phaser.GameObjects.Text;
@@ -411,6 +412,19 @@ export class HUD {
     this.eventBannerText.setScrollFactor(0);
     this.eventBannerText.setDepth(2000);
     this.eventBannerText.setVisible(false);
+
+    // Kill streak/payback callouts own a separate upper-map lane so a kill
+    // cannot erase a mutator, overtime, or ability announcement.
+    this.combatCalloutText = scene.add.text(mapCenterX, mapCenterY - 170, '', {
+      fontFamily: MENU_FONTS.HEADER,
+      fontSize: '20px',
+      color: cssHex(Wasteland.TEXT_RELOAD_WARNING),
+      align: 'center',
+    });
+    this.combatCalloutText.setOrigin(0.5, 0.5);
+    this.combatCalloutText.setScrollFactor(0);
+    this.combatCalloutText.setDepth(2001);
+    this.combatCalloutText.setVisible(false);
   }
 
   updateHealth(current: number, max: number): void {
@@ -712,6 +726,26 @@ export class HUD {
       onComplete: () => {
         this.eventBannerText.setVisible(false);
       },
+    });
+  }
+
+  /** Short celebratory beat for server-authored streak/payback context. */
+  showCombatCallout(headline: string, detail: string, tintColor: number): void {
+    this.scene.tweens.killTweensOf(this.combatCalloutText);
+    this.combatCalloutText.setText(`${headline}\n${detail}`);
+    this.combatCalloutText.setColor(cssHex(tintColor));
+    this.combatCalloutText.setLineSpacing(8);
+    this.combatCalloutText.setVisible(true);
+    this.combatCalloutText.setScale(1.35);
+    this.combatCalloutText.setAlpha(1);
+    this.scene.tweens.add({
+      targets: this.combatCalloutText,
+      scaleX: 1,
+      scaleY: 1,
+      alpha: 0,
+      duration: 1400,
+      ease: 'Quad.easeIn',
+      onComplete: () => this.combatCalloutText.setVisible(false),
     });
   }
 
@@ -1043,6 +1077,7 @@ export class HUD {
     this.countdownText.destroy();
     this.deathOverlay.destroy();
     this.eventBannerText.destroy();
+    this.combatCalloutText.destroy();
     this.activeEventLabel.destroy();
     this.abilityBg.destroy();
     this.abilityIconGfx.destroy();

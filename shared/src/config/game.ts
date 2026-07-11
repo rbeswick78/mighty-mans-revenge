@@ -263,6 +263,14 @@ export const BOT = Object.freeze({
   ABILITY_OPENING_DELAY_SECONDS: 4,
 });
 
+/** Thresholds for authoritative kill-streak and payback callouts. */
+export const COMBAT_CALLOUTS = Object.freeze({
+  STREAK_START: 2,
+  RAMPAGE_START: 3,
+  UNSTOPPABLE_START: 5,
+  SHUTDOWN_MIN_VICTIM_STREAK: 3,
+});
+
 /**
  * Game mode metadata + rotation. Rotation order doubles as the cycle fresh
  * matches walk through (mirrors the map registry's rotation contract):

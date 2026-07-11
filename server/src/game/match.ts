@@ -79,6 +79,8 @@ export class Match implements MatchContext {
   readonly gameModeType: GameModeType;
   private readonly gameMode: GameMode;
   private readonly killFeed: KillFeedEntry[] = [];
+  /** Most recent opponent to kill each player, for authoritative payback. */
+  private readonly lastKillerByVictim: Map<PlayerId, PlayerId> = new Map();
   readonly combatManager: CombatManager = new CombatManager();
   /**
    * Server-side rewind path for "favor the shooter" hit detection. Owns a
@@ -446,8 +448,14 @@ export class Match implements MatchContext {
 
   /** Record a kill event. */
   onKill(killerId: PlayerId, victimId: PlayerId, weapon: KillWeapon): void {
+    const victimStreakEnded = this.stats.getCurrentStreak(victimId);
+    const isRevenge =
+      killerId !== victimId && this.lastKillerByVictim.get(killerId) === victimId;
     this.stats.recordKill(killerId, victimId, weapon);
+    const killerStreak =
+      killerId === victimId ? 0 : this.stats.getCurrentStreak(killerId);
     this.stats.recordDeath(victimId);
+    if (killerId !== victimId) this.lastKillerByVictim.set(victimId, killerId);
 
     this.gameMode.onKill(this, killerId, victimId, weapon);
 
@@ -490,6 +498,9 @@ export class Match implements MatchContext {
       victimId,
       weapon,
       timestamp: Date.now(),
+      killerStreak,
+      victimStreakEnded,
+      isRevenge,
     };
     this.killFeed.push(entry);
     this.tickKillFeedEntries.push(entry);
