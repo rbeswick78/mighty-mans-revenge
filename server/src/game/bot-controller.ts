@@ -116,7 +116,8 @@ export class BotController {
     const bot = match.players.get(this.playerId);
     if (!bot || bot.isDead) return;
     const target = this.pickTarget(bot, match.players);
-    if (!target) return;
+    const objectiveTag = this.pickNearestTag(bot, match.getKillConfirmedTags());
+    if (!target && !objectiveTag) return;
 
     this.elapsedSeconds += dt;
     this.pathRecalcSeconds -= dt;
@@ -129,8 +130,9 @@ export class BotController {
       this.strafeSign *= -1;
     }
 
-    const dx = target.position.x - bot.position.x;
-    const dy = target.position.y - bot.position.y;
+    const combatPosition = target?.position ?? objectiveTag!.position;
+    const dx = combatPosition.x - bot.position.x;
+    const dy = combatPosition.y - bot.position.y;
     const distance = Math.hypot(dx, dy);
     const directAngle = Math.atan2(dy, dx);
     const grid = match.mapManager.getCollisionGrid();
@@ -142,7 +144,7 @@ export class BotController {
       distance,
     );
     const hasLineOfSight = !ray.hitTile || ray.distance >= distance - 8;
-    const movementGoal = this.chooseMovementGoal(bot, target, match, grid);
+    const movementGoal = this.chooseMovementGoal(bot, target, objectiveTag, match, grid);
     const movementDx = movementGoal.position.x - bot.position.x;
     const movementDy = movementGoal.position.y - bot.position.y;
     const movementDistance = Math.hypot(movementDx, movementDy);
@@ -185,6 +187,7 @@ export class BotController {
         gunGameRungForScore(bot.score).weapon === 'grenade';
       if (
         this.grenadeSeconds <= 0 &&
+        target !== null &&
         bot.grenades > 0 &&
         distance >= 80 &&
         distance <= 440
@@ -204,12 +207,14 @@ export class BotController {
     const reload = this.shouldReload(bot);
     const firePressed =
       !reload &&
+      target !== null &&
       hasLineOfSight &&
       distance <= usefulRange &&
       this.fireSeconds <= 0;
     if (firePressed) this.fireSeconds = this.profile.fireIntervalSeconds;
 
     const abilityPressed =
+      target !== null &&
       hasLineOfSight &&
       distance <= BOT.FIRE_RANGE &&
       this.abilitySeconds <= 0 &&
@@ -222,7 +227,7 @@ export class BotController {
       moveX: movement.x,
       moveY: movement.y,
       aimAngle,
-      aimingGun: hasLineOfSight,
+      aimingGun: target !== null && hasLineOfSight,
       firePressed,
       aimingGrenade: false,
       throwPressed,
@@ -243,16 +248,25 @@ export class BotController {
    */
   private chooseMovementGoal(
     bot: PlayerState,
-    target: PlayerState,
+    target: PlayerState | null,
+    objectiveTag: { position: Vec2 } | null,
     match: Match,
     grid: CollisionGrid,
   ): { position: Vec2; holdPosition: boolean; isCombatTarget: boolean } {
+    if (objectiveTag) {
+      return {
+        position: objectiveTag.position,
+        holdPosition: false,
+        isCombatTarget: false,
+      };
+    }
+
     const koth = match.getKothHudState();
     if (!koth) {
       return {
-        position: target.position,
-        holdPosition: false,
-        isCombatTarget: true,
+        position: target?.position ?? bot.position,
+        holdPosition: target === null,
+        isCombatTarget: target !== null,
       };
     }
 
@@ -288,6 +302,25 @@ export class BotController {
       );
       if (distance < nearestDistance) {
         nearest = player;
+        nearestDistance = distance;
+      }
+    }
+    return nearest;
+  }
+
+  private pickNearestTag(
+    bot: PlayerState,
+    tags: readonly { position: Vec2 }[],
+  ): { position: Vec2 } | null {
+    let nearest: { position: Vec2 } | null = null;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    for (const tag of tags) {
+      const distance = Math.hypot(
+        tag.position.x - bot.position.x,
+        tag.position.y - bot.position.y,
+      );
+      if (distance < nearestDistance) {
+        nearest = tag;
         nearestDistance = distance;
       }
     }

@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–17 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts, solo Practice vs Rusty, streak + payback callouts, selectable Rusty difficulty, Collapsed Overpass, Blackout, fresh-chaos rematches, Last Stand). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–18 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts, solo Practice vs Rusty, streak + payback callouts, selectable Rusty difficulty, Collapsed Overpass, Blackout, fresh-chaos rematches, Last Stand, Kill Confirmed). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -49,6 +49,7 @@ Each session below attacks one of these.
 | 15  | Blackout                                       | Darkness turns familiar fights into close-range cat-and-mouse    | **DONE** (2026-07-11) |
 | 16  | Fresh-Chaos Rematches                          | Back-to-back rounds cannot repeat the same two mutators           | **DONE** (2026-07-11) |
 | 17  | Last Stand                                     | Every death spends a life, building pressure toward elimination   | **DONE** (2026-07-11) |
+| 18  | Kill Confirmed                                 | Every kill creates a risky confirm-or-deny scramble                 | **DONE** (2026-07-11) |
 
 ---
 
@@ -1167,7 +1168,71 @@ can turn into a tense final-life comeback.
 
 ---
 
+## Session 18 — Kill Confirmed
+
+**Goal:** turn kills into contested map objectives so the winning move is not
+just landing damage, but deciding when to risk the confirmation.
+
+**Locked design decisions**
+
+- Every regulation death drops one dog tag at the victim's authoritative
+  position. Raw kills do not score.
+- Any living opponent can collect a tag for one point; its owner can recover
+  it to deny the point. This remains meaningful and deterministic for N players.
+- Tags expire after 20 seconds and collect within a 30px radius. The first
+  fighter to eight confirmations wins; highest confirmations wins on time.
+- A tied clock uses the normal first-kill sudden death. Tags are retired in
+  overtime so a previous-life objective cannot decide the duel.
+- Rusty routes toward the nearest live tag even while the opponent is dead,
+  using the same collision grid and ordinary movement inputs as human players.
+- Gold `CONFIRM` and green `DENY` tokens communicate ownership. Authoritative
+  one-tick events drive explicit callouts and pitched pickup feedback.
+
+**Acceptance criteria**
+
+- [x] Kill Confirmed is typed and available in drafts, fallback rotation,
+      rematches, results, and `FORCE_MODE=kill_confirmed` smoke tooling.
+- [x] Spawn, confirm, deny, expiry, N-player collection, target wins, timed
+      ties, and overtime retirement are authoritative and deterministic.
+- [x] Rusty actively pursues tags without bypassing normal input or movement.
+- [x] The client renders local-relative tag intent, objective HUD copy, and
+      authoritative confirm/deny feedback.
+- [x] A forced Warlord Practice match verifies preview, HUD, scoring, Rusty
+      collection, feedback callout/SFX path, and a clean browser console.
+- [x] Typecheck, lint, all unit tests, production build, and Playwright pass.
+
+---
+
 ## Session Log
+
+### Session 18 — 2026-07-11 — Kill Confirmed
+
+**Shipped:** Kill Confirmed joins the draft and fallback rotation as the fifth
+mode. A death now starts a second contest: the killer can push into danger to
+bank the gold tag, while the victim can return and recover the green tag to
+erase the opportunity. First to eight confirmations wins, and abandoned tags
+expire after 20 seconds so the arena never accumulates stale objectives.
+
+The mode owns tag state behind narrow objective hooks while continuing to use
+the normal score, result, respawn, combat, map, mutator, and rivalry paths.
+Snapshots carry the durable tag list; transient authoritative collection
+events produce explicit CONFIRMED/DENIED callouts and audio without asking the
+client to reverse-engineer score changes. Rusty chooses the nearest tag as a
+movement goal and can finish a confirmation while its opponent is respawning.
+
+**Verified:** focused mode, match, N-player, bot, rotation, draft, network, and
+presentation coverage is green. A forced Warlord Practice match showed the
+correct preview, objective label, Rusty confirmation scoring, ENEMY CONFIRMED
+feedback, and no browser-console warnings. Typecheck and lint are clean; all
+816 unit tests pass; the production build succeeds; and the 21-case Playwright
+matrix passes all 12 applicable desktop/mobile flows with 9 intentional skips.
+
+**Carry-over:** eight confirmations, the 20-second lifetime, and 30px pickup
+radius are first-pass pacing choices. Group play should decide whether tags
+linger too long or whether the target produces matches shorter than the other
+modes; do not tune from solo Warlord performance alone.
+
+---
 
 ### Session 17 — 2026-07-11 — Last Stand
 

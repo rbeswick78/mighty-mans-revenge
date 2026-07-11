@@ -152,6 +152,37 @@ describe('BotController', () => {
     expect(bot.position).toEqual(held);
   });
 
+  it('pursues a Kill Confirmed tag even while its opponent is dead', () => {
+    const match = new Match(
+      'practice-confirmed',
+      OPEN_MAP,
+      [
+        { id: 'human', nickname: 'Human' },
+        { id: 'bot:test', nickname: 'Rusty' },
+      ],
+      GameModeType.KILL_CONFIRMED,
+      () => 0,
+    );
+    match.setLock('human', 'mighty_man');
+    match.setLock('bot:test', 'bruce');
+    match.update(0);
+    match.update(10);
+
+    const human = match.players.get('human')!;
+    const bot = match.players.get('bot:test')!;
+    human.position = { x: 5.5 * 48, y: 2.5 * 48 };
+    bot.position = { x: 2.5 * 48, y: 2.5 * 48 };
+    match.onKill(bot.id, human.id, 'gun');
+    const start = { ...bot.position };
+
+    const controller = new BotController(bot.id);
+    controller.update(0.05, match, 1);
+    match.update(0.05);
+
+    expect(bot.lastProcessedInput).toBe(1);
+    expect(bot.position.x).toBeGreaterThan(start.x);
+  });
+
   it('fires more aggressively on warlord than rookie without changing damage rules', () => {
     const shotsFor = (difficulty: 'rookie' | 'warlord'): number => {
       const practice = new Match(

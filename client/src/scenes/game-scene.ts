@@ -2,7 +2,11 @@ import Phaser from 'phaser';
 
 import type { MapData } from '@shared/types/map.js';
 import type { PlayerId, Vec2 } from '@shared/types/common.js';
-import type { MatchResult, KillFeedEntry } from '@shared/types/game.js';
+import type {
+  MatchResult,
+  KillFeedEntry,
+  KillConfirmedCollection,
+} from '@shared/types/game.js';
 import { GameModeType, MatchPhase } from '@shared/types/game.js';
 import type { BulletTrail, PunchEvent } from '@shared/types/projectile.js';
 import { PickupType } from '@shared/types/pickup.js';
@@ -18,6 +22,7 @@ import { MapRenderer } from '../rendering/map-renderer.js';
 import { ClientPlayerManager } from '../rendering/player-manager.js';
 import { EffectsRenderer } from '../rendering/effects-renderer.js';
 import { PickupRenderer } from '../rendering/pickup-renderer.js';
+import { ConfirmedTagRenderer } from '../rendering/confirmed-tag-renderer.js';
 import { GrenadeRenderer } from '../rendering/grenade-renderer.js';
 import { AxeRenderer } from '../rendering/axe-renderer.js';
 import { LightingRenderer } from '../rendering/lighting-renderer.js';
@@ -59,6 +64,7 @@ import {
 } from '../rendering/post-fx/bloom-config.js';
 import { Crosshair } from '../rendering/crosshair.js';
 import { combatCalloutFor } from '../ui/combat-callout.js';
+import { confirmedTagCallout } from '../ui/confirmed-tag.js';
 import { HUD } from '../ui/hud.js';
 import { InputManager } from '../input/input-manager.js';
 import { isTouchDevice } from '../input/is-touch-device.js';
@@ -107,6 +113,7 @@ export class GameScene extends Phaser.Scene {
   private playerManager: ClientPlayerManager | null = null;
   private effectsRenderer: EffectsRenderer | null = null;
   private pickupRenderer: PickupRenderer | null = null;
+  private confirmedTagRenderer: ConfirmedTagRenderer | null = null;
   private grenadeRenderer: GrenadeRenderer | null = null;
   private axeRenderer: AxeRenderer | null = null;
   private lightingRenderer: LightingRenderer | null = null;
@@ -192,6 +199,7 @@ export class GameScene extends Phaser.Scene {
   private onBulletTrail: ((trail: BulletTrail) => void) | null = null;
   private onPlayerKilled: ((entry: KillFeedEntry) => void) | null = null;
   private onPickupCollected: ((pickupId: string, playerId: PlayerId) => void) | null = null;
+  private onConfirmedTagCollected: ((event: KillConfirmedCollection) => void) | null = null;
   private onGrenadeThrown: ((pos: Vec2) => void) | null = null;
   private onGrenadeExploded: ((pos: Vec2) => void) | null = null;
   private onAxeThrown: ((pos: Vec2) => void) | null = null;
@@ -271,6 +279,7 @@ export class GameScene extends Phaser.Scene {
     this.playerManager = new ClientPlayerManager(this);
     this.effectsRenderer = new EffectsRenderer(this);
     this.pickupRenderer = new PickupRenderer(this);
+    this.confirmedTagRenderer = new ConfirmedTagRenderer(this);
     this.grenadeRenderer = new GrenadeRenderer(this);
     this.axeRenderer = new AxeRenderer(this);
     this.lightingRenderer = new LightingRenderer(this);
@@ -580,6 +589,9 @@ export class GameScene extends Phaser.Scene {
         const isLastStand =
           this.matchData?.gameMode === GameModeType.LAST_STAND;
         this.hud.updateLastStand(isLastStand);
+        this.hud.updateKillConfirmed(
+          this.matchData?.gameMode === GameModeType.KILL_CONFIRMED,
+        );
         this.hud.updateAmmo(
           currentLocalState.ammo,
           WEAPONS.rifle.magazineSize,
@@ -693,6 +705,10 @@ export class GameScene extends Phaser.Scene {
     if (this.pickupRenderer) {
       this.pickupRenderer.updatePickups(pickups);
     }
+    this.confirmedTagRenderer?.update(
+      networkManager.getConfirmedTags(),
+      networkManager.getPlayerId(),
+    );
 
     // Aim line preview (white) — re-drawn each render frame so it tracks the
     // mouse smoothly, not just on server-tick boundaries.
@@ -1122,6 +1138,20 @@ export class GameScene extends Phaser.Scene {
       }
     };
 
+    this.onConfirmedTagCollected = (event: KillConfirmedCollection) => {
+      const localId = this.gameService.getNetworkManager().getPlayerId();
+      if (!localId) return;
+      const callout = confirmedTagCallout(event, localId);
+      this.hud?.showCombatCallout(
+        callout.headline,
+        callout.detail,
+        callout.color,
+      );
+      AudioManager.getInstance()?.play('pickupCollect', {
+        rate: event.confirmed ? 1.15 : 0.8,
+      });
+    };
+
     this.onGrenadeThrown = (pos: Vec2) => {
       const audio = AudioManager.getInstance();
       if (!audio) return;
@@ -1348,6 +1378,7 @@ export class GameScene extends Phaser.Scene {
     this.gameService.on('bulletTrail', this.onBulletTrail);
     this.gameService.on('playerKilled', this.onPlayerKilled);
     this.gameService.on('pickupCollected', this.onPickupCollected);
+    this.gameService.on('confirmedTagCollected', this.onConfirmedTagCollected);
     this.gameService.on('grenadeThrown', this.onGrenadeThrown);
     this.gameService.on('grenadeExploded', this.onGrenadeExploded);
     this.gameService.on('axeThrown', this.onAxeThrown);
@@ -1520,6 +1551,14 @@ export class GameScene extends Phaser.Scene {
     if (this.pickupRenderer) {
       this.pickupRenderer.destroy();
       this.pickupRenderer = null;
+    }
+    if (this.onConfirmedTagCollected) {
+      this.gameService.off('confirmedTagCollected', this.onConfirmedTagCollected);
+      this.onConfirmedTagCollected = null;
+    }
+    if (this.confirmedTagRenderer) {
+      this.confirmedTagRenderer.destroy();
+      this.confirmedTagRenderer = null;
     }
     if (this.axeRenderer) {
       this.axeRenderer.destroy();

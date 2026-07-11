@@ -102,6 +102,8 @@ export class HUD {
   private gunGameLadderText: Phaser.GameObjects.Text;
   /** Last Stand label in the same mode-exclusive middle band. */
   private lastStandText: Phaser.GameObjects.Text;
+  /** Kill Confirmed objective label in the mode-exclusive middle band. */
+  private killConfirmedText: Phaser.GameObjects.Text;
 
   // Right column: kill feed
   private killFeedEntries: KillFeedItem[] = [];
@@ -376,6 +378,16 @@ export class HUD {
     this.lastStandText.setDepth(1000);
     this.lastStandText.setVisible(false);
 
+    this.killConfirmedText = scene.add.text(middleX, kothBarY - 1, 'COLLECT ENEMY TAGS', {
+      ...HEADER_STYLE,
+      fontSize: '9px',
+      color: cssHex(Wasteland.TEXT_RELOAD_WARNING),
+    });
+    this.killConfirmedText.setOrigin(0.5, 0);
+    this.killConfirmedText.setScrollFactor(0);
+    this.killConfirmedText.setDepth(1000);
+    this.killConfirmedText.setVisible(false);
+
     // Persistent active-event label, sits right under the timer. Hidden
     // until an event activates; never moves, just toggles text + visibility.
     this.activeEventLabel = scene.add.text(middleX, stripTop + 84, '', {
@@ -522,6 +534,10 @@ export class HUD {
 
   updateLastStand(active: boolean): void {
     this.lastStandText.setVisible(active);
+  }
+
+  updateKillConfirmed(active: boolean): void {
+    this.killConfirmedText.setVisible(active);
   }
 
   /**
@@ -1096,6 +1112,7 @@ export class HUD {
     this.kothBarFg.destroy();
     this.gunGameLadderText.destroy();
     this.lastStandText.destroy();
+    this.killConfirmedText.destroy();
     this.countdownText.destroy();
     this.deathOverlay.destroy();
     this.eventBannerText.destroy();

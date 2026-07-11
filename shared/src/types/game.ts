@@ -23,6 +23,23 @@ export enum GameModeType {
   KOTH = 'koth',
   GUN_GAME = 'gun_game',
   LAST_STAND = 'last_stand',
+  KILL_CONFIRMED = 'kill_confirmed',
+}
+
+/** A contested token dropped by a death in Kill Confirmed. */
+export interface KillConfirmedTagState {
+  id: string;
+  ownerId: PlayerId;
+  position: { x: number; y: number };
+  expiresInSeconds: number;
+}
+
+/** One authoritative confirm/deny interaction, transient for one snapshot. */
+export interface KillConfirmedCollection {
+  tagId: string;
+  collectorId: PlayerId;
+  ownerId: PlayerId;
+  confirmed: boolean;
 }
 
 export interface GameState {

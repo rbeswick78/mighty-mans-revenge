@@ -150,7 +150,7 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
     expect(manager.getLocalPlayerState()?.characterId).toBe('jack');
   });
 
-  it('clears grenades, axes, pickups, mutators, and remote buffers on matchFound', () => {
+  it('clears projectiles, pickups, tags, mutators, and remote buffers on matchFound', () => {
     deliver(
       makeGameState(
         [makeSerialized(), makeSerialized({ id: REMOTE_ID, nickname: 'Rival' })],
@@ -166,12 +166,21 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
             },
           ],
           activeMutators: ['big_heads'],
+          confirmedTags: [
+            {
+              id: 'tag-1',
+              ownerId: REMOTE_ID,
+              position: { x: 20, y: 30 },
+              expiresInSeconds: 15,
+            },
+          ],
         },
       ),
     );
     expect(manager.getActiveGrenades()).toHaveLength(1);
     expect(manager.getRemotePlayerIds()).toEqual([REMOTE_ID]);
     expect(manager.getActiveMutators()).toEqual(['big_heads']);
+    expect(manager.getConfirmedTags()).toHaveLength(1);
 
     deliver({
       type: 'server:matchFound',
@@ -184,6 +193,7 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
     expect(manager.getActiveGrenades()).toHaveLength(0);
     expect(manager.getActiveAxes()).toHaveLength(0);
     expect(manager.getPickups()).toHaveLength(0);
+    expect(manager.getConfirmedTags()).toHaveLength(0);
     expect(manager.getRemotePlayerIds()).toHaveLength(0);
     expect(manager.getActiveMutators()).toHaveLength(0);
     expect(manager.getInterpolatedPlayers().size).toBe(0);
@@ -201,6 +211,23 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
       gameMode: GameModeType.GUN_GAME,
     });
     expect(seen).toHaveLength(1);
+  });
+
+  it('emits authoritative Kill Confirmed collection feedback', () => {
+    const seen: unknown[] = [];
+    manager.on('confirmedTagCollected', (event) => seen.push(event));
+    const collection = {
+      tagId: 'tag-1',
+      collectorId: LOCAL_ID,
+      ownerId: REMOTE_ID,
+      confirmed: true,
+    };
+    deliver(
+      makeGameState([makeSerialized()], {
+        confirmedTagCollections: [collection],
+      }),
+    );
+    expect(seen).toEqual([collection]);
   });
 
   it('sends an explicit authoritative practice request', () => {

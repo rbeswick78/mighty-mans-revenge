@@ -17,6 +17,7 @@ import {
   KOTH,
   GUN_GAME,
   LAST_STAND,
+  KILL_CONFIRMED,
   GameModeType,
 } from '@shared/game';
 import type { CharacterId, MapData, PlayerInput, MutatorId } from '@shared/game';
@@ -3209,6 +3210,57 @@ describe('Match', () => {
       expect(m.phase).toBe(MatchPhase.ENDED);
       expect(m.isOvertime).toBe(false);
       expect(m.getResult().winnerId).toBeNull();
+    });
+  });
+
+  describe('Kill Confirmed mode integration', () => {
+    function startActiveKillConfirmed(): Match {
+      const m = new Match(
+        'confirmed-1',
+        makeMapData(),
+        [
+          { id: 'player-0', nickname: 'P0' },
+          { id: 'player-1', nickname: 'P1' },
+        ],
+        GameModeType.KILL_CONFIRMED,
+      );
+      m.startCountdown();
+      m.update(MATCH.COUNTDOWN_DURATION + 0.05);
+      return m;
+    }
+
+    it('publishes a death tag and scores only when an opponent collects it', () => {
+      const m = startActiveKillConfirmed();
+      const collector = m.players.get('player-0')!;
+      const victim = m.players.get('player-1')!;
+      collector.position = { x: 80, y: 80 };
+      victim.position = { x: 300, y: 240 };
+      m.onKill(collector.id, victim.id, 'gun');
+
+      expect(collector.score).toBe(0);
+      expect(m.getKillConfirmedTags()).toMatchObject([
+        { ownerId: victim.id, position: { x: 300, y: 240 } },
+      ]);
+
+      collector.position = { x: 300, y: 240 };
+      m.update(0.05);
+      expect(collector.score).toBe(1);
+      expect(m.getKillConfirmedTags()).toEqual([]);
+    });
+
+    it('ends immediately when a collected tag reaches the score target', () => {
+      const m = startActiveKillConfirmed();
+      const collector = m.players.get('player-0')!;
+      const victim = m.players.get('player-1')!;
+      collector.score = KILL_CONFIRMED.SCORE_TARGET - 1;
+      collector.position = { x: 80, y: 80 };
+      victim.position = { x: 300, y: 240 };
+      m.onKill(collector.id, victim.id, 'gun');
+      collector.position = { x: 300, y: 240 };
+      m.update(0.05);
+
+      expect(m.phase).toBe(MatchPhase.ENDED);
+      expect(m.getResult().winnerId).toBe(collector.id);
     });
   });
 

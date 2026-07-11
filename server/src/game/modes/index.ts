@@ -4,18 +4,21 @@ import { DeathmatchMode } from './deathmatch-mode.js';
 import { KothMode } from './koth-mode.js';
 import { GunGameMode } from './gun-game-mode.js';
 import { LastStandMode } from './last-stand-mode.js';
+import { KillConfirmedMode } from './kill-confirmed-mode.js';
 
 export type { GameMode, MatchContext } from './game-mode.js';
 export { DeathmatchMode } from './deathmatch-mode.js';
 export { KothMode } from './koth-mode.js';
 export { GunGameMode } from './gun-game-mode.js';
 export { LastStandMode } from './last-stand-mode.js';
+export { KillConfirmedMode } from './kill-confirmed-mode.js';
 
 const GAME_MODE_REGISTRY: Record<GameModeType, () => GameMode> = {
   [GameModeType.DEATHMATCH]: () => new DeathmatchMode(),
   [GameModeType.KOTH]: () => new KothMode(),
   [GameModeType.GUN_GAME]: () => new GunGameMode(),
   [GameModeType.LAST_STAND]: () => new LastStandMode(),
+  [GameModeType.KILL_CONFIRMED]: () => new KillConfirmedMode(),
 };
 
 /** Create a GameMode instance for the given type. */

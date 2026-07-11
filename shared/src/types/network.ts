@@ -2,7 +2,14 @@ import { PlayerId, MatchId, Tick, Vec2 } from './common.js';
 import { PlayerInput } from './player.js';
 import { AxeState, GrenadeState, BulletTrail, PunchEvent } from './projectile.js';
 import { PickupState } from './pickup.js';
-import { MatchPhase, KillFeedEntry, MatchResult, GameModeType } from './game.js';
+import {
+  MatchPhase,
+  KillFeedEntry,
+  MatchResult,
+  GameModeType,
+  KillConfirmedTagState,
+  KillConfirmedCollection,
+} from './game.js';
 import type {
   BotDifficulty,
   CharacterId,
@@ -164,6 +171,10 @@ export interface ServerGameStateMessage {
    * ride in each player's `score` field like DM kills do.
    */
   koth?: KothHudState;
+  /** Active dog tags in Kill Confirmed; omitted in every other mode. */
+  confirmedTags?: KillConfirmedTagState[];
+  /** Confirm/deny interactions resolved during this server tick. */
+  confirmedTagCollections?: KillConfirmedCollection[];
 }
 
 /** Per-snapshot King of the Hill HUD state. Tile coords, not pixels. */

@@ -3,6 +3,7 @@ import type { CollisionGrid } from '@shared/types/map.js';
 import type { PlayerInput, PlayerState } from '@shared/types/player.js';
 import type { AxeState, GrenadeState, PunchEvent } from '@shared/types/projectile.js';
 import type { PickupState } from '@shared/types/pickup.js';
+import type { KillConfirmedTagState } from '@shared/types/game.js';
 import type {
   DraftCategory,
   ServerMessage,
@@ -36,6 +37,7 @@ type EventName =
   | 'playerKilled'
   | 'playerRespawned'
   | 'pickupCollected'
+  | 'confirmedTagCollected'
   | 'matchmakingStatus'
   | 'rematchStatus'
   | 'opponentDisconnected'
@@ -98,6 +100,7 @@ export class NetworkManager {
 
   /** Most recent pickups from server gameState. Scene polls for rendering. */
   private latestPickups: PickupState[] = [];
+  private latestConfirmedTags: KillConfirmedTagState[] = [];
 
   /**
    * Local-clock timestamp (performance.now() ms) at which the current
@@ -184,6 +187,7 @@ export class NetworkManager {
     this.latestAxes = [];
     this.lastAxeStates.clear();
     this.latestPickups = [];
+    this.latestConfirmedTags = [];
     this.matchEndsAtLocalMs = null;
     this._activeMutators = [];
     this._kothState = null;
@@ -335,6 +339,10 @@ export class NetworkManager {
   /** Most recent pickups from the server, for rendering. */
   getPickups(): PickupState[] {
     return this.latestPickups;
+  }
+
+  getConfirmedTags(): readonly KillConfirmedTagState[] {
+    return this.latestConfirmedTags;
   }
 
   /**
@@ -576,6 +584,10 @@ export class NetworkManager {
     }
     this.latestAxes = msg.axes ?? [];
     this.latestPickups = msg.pickups;
+    this.latestConfirmedTags = msg.confirmedTags ?? [];
+    for (const collection of msg.confirmedTagCollections ?? []) {
+      this.emit('confirmedTagCollected', collection);
+    }
     // Server is authoritative for the active mutators. Mirror every
     // snapshot so reconnects pick up the modifiers without an extra
     // round-trip.

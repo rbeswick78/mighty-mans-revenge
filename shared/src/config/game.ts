@@ -323,6 +323,7 @@ export const GAME_MODES = Object.freeze({
   [GameModeType.KOTH]: Object.freeze({ displayName: 'KING OF THE HILL' }),
   [GameModeType.GUN_GAME]: Object.freeze({ displayName: 'GUN GAME' }),
   [GameModeType.LAST_STAND]: Object.freeze({ displayName: 'LAST STAND' }),
+  [GameModeType.KILL_CONFIRMED]: Object.freeze({ displayName: 'KILL CONFIRMED' }),
 }) satisfies Readonly<Record<GameModeType, { displayName: string }>>;
 
 /** Rotation cycle for fresh matches and rematch succession. */
@@ -331,6 +332,7 @@ export const GAME_MODE_ROTATION: readonly GameModeType[] = Object.freeze([
   GameModeType.KOTH,
   GameModeType.GUN_GAME,
   GameModeType.LAST_STAND,
+  GameModeType.KILL_CONFIRMED,
 ]);
 
 /**
@@ -414,6 +416,13 @@ export const GUN_GAME = Object.freeze({
  */
 export const LAST_STAND = Object.freeze({
   STARTING_LIVES: 5,
+});
+
+/** Kill Confirmed: bank enemy tags, or recover your own to deny the point. */
+export const KILL_CONFIRMED = Object.freeze({
+  SCORE_TARGET: 8,
+  TAG_COLLECT_RADIUS: 30,
+  TAG_LIFETIME_SECONDS: 20,
 });
 
 /** A Gun Game ladder rung's weapon: a real WeaponId or the grenade rung. */

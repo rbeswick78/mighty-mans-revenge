@@ -5,6 +5,8 @@ import type {
   MapData,
   KothHudState,
   KillWeapon,
+  KillConfirmedTagState,
+  KillConfirmedCollection,
   MutatorId,
   PickupType,
 } from '@shared/game';
@@ -62,6 +64,10 @@ export interface GameMode {
    * Only modes with a hill implement it.
    */
   getKothState?(match: MatchContext): KothHudState;
+  /** Active objective tokens for Kill Confirmed snapshots and bot routing. */
+  getKillConfirmedTags?(match: MatchContext): readonly KillConfirmedTagState[];
+  /** One-tick confirm/deny events used for client feedback. */
+  getKillConfirmedCollections?(match: MatchContext): readonly KillConfirmedCollection[];
   /**
    * Mutators this mode removes from BOTH random rolls (mid-match and
    * final-minute). The FORCE_EVENT / FORCE_MIDMATCH_MUTATOR env pins

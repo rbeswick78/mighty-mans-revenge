@@ -1026,6 +1026,14 @@ export class MatchmakingManager {
       activeMutators: [...match.activeMutators],
       isOvertime: match.isOvertime,
       koth: match.getKothHudState() ?? undefined,
+      confirmedTags:
+        match.gameModeType === GameModeType.KILL_CONFIRMED
+          ? [...match.getKillConfirmedTags()]
+          : undefined,
+      confirmedTagCollections:
+        match.gameModeType === GameModeType.KILL_CONFIRMED
+          ? [...match.getKillConfirmedCollections()]
+          : undefined,
     };
 
     // Send only to players in this match

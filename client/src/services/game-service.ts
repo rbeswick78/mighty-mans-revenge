@@ -1,6 +1,10 @@
 import type { PlayerId } from '@shared/types/common.js';
 import type { PlayerInput } from '@shared/types/player.js';
-import type { MatchResult, GameModeType } from '@shared/types/game.js';
+import type {
+  MatchResult,
+  GameModeType,
+  KillConfirmedCollection,
+} from '@shared/types/game.js';
 import type {
   DraftCategory,
   LeaderboardEntry,
@@ -54,6 +58,7 @@ type GameServiceEvent =
   | 'characterSelectState'
   | 'playerKilled'
   | 'pickupCollected'
+  | 'confirmedTagCollected'
   | 'bulletTrail'
   | 'grenadeThrown'
   | 'grenadeExploded'
@@ -281,6 +286,13 @@ export class GameService {
     this.networkManager.on('pickupCollected', (pickupId: string, pid: PlayerId) => {
       this.emit('pickupCollected', pickupId, pid);
     });
+
+    this.networkManager.on(
+      'confirmedTagCollected',
+      (collection: KillConfirmedCollection) => {
+        this.emit('confirmedTagCollected', collection);
+      },
+    );
 
     this.networkManager.on('bulletTrail', (trail: unknown) => {
       this.emit('bulletTrail', trail);

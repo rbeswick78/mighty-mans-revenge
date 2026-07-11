@@ -38,6 +38,8 @@ import type {
   CharacterId,
   WeaponId,
   KothHudState,
+  KillConfirmedTagState,
+  KillConfirmedCollection,
   ServerCharacterSelectStateMessage,
 } from '@shared/game';
 import { logger } from '../utils/logger.js';
@@ -644,6 +646,16 @@ export class Match implements MatchContext {
   getKothHudState(): KothHudState | null {
     if (this.isOvertime || this.phase !== MatchPhase.ACTIVE) return null;
     return this.gameMode.getKothState?.(this) ?? null;
+  }
+
+  /** Active Kill Confirmed tags for snapshots and bot objective routing. */
+  getKillConfirmedTags(): readonly KillConfirmedTagState[] {
+    if (this.isOvertime || this.phase !== MatchPhase.ACTIVE) return [];
+    return this.gameMode.getKillConfirmedTags?.(this) ?? [];
+  }
+
+  getKillConfirmedCollections(): readonly KillConfirmedCollection[] {
+    return this.gameMode.getKillConfirmedCollections?.(this) ?? [];
   }
 
   /**

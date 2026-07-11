@@ -453,6 +453,7 @@ describe('MatchmakingManager mode rotation (FORCE-pinned, draft skipped)', () =>
       ['E', 'F'],
       ['G', 'H'],
       ['I', 'J'],
+      ['K', 'L'],
     ];
     pairs.forEach(([p1, p2], i) => {
       sent.length = 0;
@@ -462,7 +463,7 @@ describe('MatchmakingManager mode rotation (FORCE-pinned, draft skipped)', () =>
       expect(matchFoundMode(p1)).toBe(expected);
       expect(matchFoundMode(p2)).toBe(expected);
     });
-    expect(matchFoundMode('I')).toBe(GAME_MODE_ROTATION[0]); // wrapped
+    expect(matchFoundMode('K')).toBe(GAME_MODE_ROTATION[0]); // wrapped
   });
 
   it('matchEnd promises the next mode and the pinned rematch delivers it', () => {
@@ -492,6 +493,14 @@ describe('MatchmakingManager mode rotation (FORCE-pinned, draft skipped)', () =>
     mgr.handleRematchRequest('A');
     mgr.handleRematchRequest('B');
     expect(matchFoundMode('A')).toBe(GameModeType.LAST_STAND);
+
+    // ...then Kill Confirmed...
+    endActiveMatch();
+    expect(lastMatchEndNextMode()).toBe(GameModeType.KILL_CONFIRMED);
+    sent.length = 0;
+    mgr.handleRematchRequest('A');
+    mgr.handleRematchRequest('B');
+    expect(matchFoundMode('A')).toBe(GameModeType.KILL_CONFIRMED);
 
     // ...then wraps back to DM.
     endActiveMatch();
