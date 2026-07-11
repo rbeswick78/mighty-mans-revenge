@@ -6,6 +6,7 @@ import type { GunGameRung } from '@shared/utils/gun-game.js';
 import { Wasteland, cssHex, healthColor } from '@shared/config/palette.js';
 import { HUD_STRIP_HEIGHT, MAP_HEIGHT_PX, MAP_WIDTH_PX } from './layout.js';
 import { gunGameLadderLabel, rifleAmmoRowVisible } from './gun-game-hud.js';
+import { deathOverlayLabel } from './death-overlay.js';
 import { MENU_FONTS } from './menu/fonts.js';
 
 // Press Start 2P is much wider per glyph than Courier, so the final-minute
@@ -99,6 +100,8 @@ export class HUD {
   // Gun Game ladder line (middle column). Occupies the KOTH bar's band —
   // the two are mutually exclusive by mode, so they never collide.
   private gunGameLadderText: Phaser.GameObjects.Text;
+  /** Last Stand label in the same mode-exclusive middle band. */
+  private lastStandText: Phaser.GameObjects.Text;
 
   // Right column: kill feed
   private killFeedEntries: KillFeedItem[] = [];
@@ -363,6 +366,16 @@ export class HUD {
     this.gunGameLadderText.setDepth(1000);
     this.gunGameLadderText.setVisible(false);
 
+    this.lastStandText = scene.add.text(middleX, kothBarY - 1, 'LIVES REMAINING', {
+      ...HEADER_STYLE,
+      fontSize: '9px',
+      color: cssHex(Wasteland.TEXT_RELOAD_WARNING),
+    });
+    this.lastStandText.setOrigin(0.5, 0);
+    this.lastStandText.setScrollFactor(0);
+    this.lastStandText.setDepth(1000);
+    this.lastStandText.setVisible(false);
+
     // Persistent active-event label, sits right under the timer. Hidden
     // until an event activates; never moves, just toggles text + visibility.
     this.activeEventLabel = scene.add.text(middleX, stripTop + 84, '', {
@@ -507,6 +520,10 @@ export class HUD {
     this.syncAmmoRowVisibility();
   }
 
+  updateLastStand(active: boolean): void {
+    this.lastStandText.setVisible(active);
+  }
+
   /**
    * The rifle ammo row hides while it can only mislead: fists equipped
    * (no ammo exists) or the Gun Game grenade rung (weaponId stays 'rifle'
@@ -519,14 +536,18 @@ export class HUD {
     this.reloadingText.setVisible(visible && this.rifleAmmoReloading);
   }
 
-  /** Show "YOU DIED" with a respawn countdown, or hide it when alive. */
-  updateDeathState(isDead: boolean, respawnSecondsRemaining: number): void {
-    if (!isDead) {
+  /** Show a respawn countdown or permanent stock-elimination state. */
+  updateDeathState(
+    isDead: boolean,
+    respawnSecondsRemaining: number,
+    eliminated = false,
+  ): void {
+    const label = deathOverlayLabel(isDead, respawnSecondsRemaining, eliminated);
+    if (label === null) {
       this.deathOverlay.setVisible(false);
       return;
     }
-    const seconds = Math.max(0, Math.ceil(respawnSecondsRemaining));
-    this.deathOverlay.setText(`YOU DIED\nRESPAWN IN ${seconds}`);
+    this.deathOverlay.setText(label);
     this.deathOverlay.setVisible(true);
   }
 
@@ -1074,6 +1095,7 @@ export class HUD {
     this.kothBarBg.destroy();
     this.kothBarFg.destroy();
     this.gunGameLadderText.destroy();
+    this.lastStandText.destroy();
     this.countdownText.destroy();
     this.deathOverlay.destroy();
     this.eventBannerText.destroy();

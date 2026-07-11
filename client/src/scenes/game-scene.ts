@@ -577,6 +577,9 @@ export class GameScene extends Phaser.Scene {
             ? gunGameRungForScore(currentLocalState.score)
             : null,
         );
+        const isLastStand =
+          this.matchData?.gameMode === GameModeType.LAST_STAND;
+        this.hud.updateLastStand(isLastStand);
         this.hud.updateAmmo(
           currentLocalState.ammo,
           WEAPONS.rifle.magazineSize,
@@ -592,7 +595,11 @@ export class GameScene extends Phaser.Scene {
           currentLocalState.grenades,
         );
         this.hud.updateStamina(currentLocalState.stamina, PLAYER.SPRINT_DURATION);
-        this.hud.updateDeathState(currentLocalState.isDead, currentLocalState.respawnTimer);
+        this.hud.updateDeathState(
+          currentLocalState.isDead,
+          currentLocalState.respawnTimer,
+          isLastStand && currentLocalState.score <= 0,
+        );
         this.hud.updateAbility(
           currentLocalState.characterId,
           currentLocalState.abilityActiveSeconds,

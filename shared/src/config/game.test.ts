@@ -35,10 +35,11 @@ describe('game mode rotation', () => {
     expect([...GAME_MODE_ROTATION].sort()).toEqual(allModes);
   });
 
-  it('getNextGameMode cycles DM → KOTH → GUN GAME → DM', () => {
+  it('getNextGameMode cycles DM → KOTH → GUN GAME → LAST STAND → DM', () => {
     expect(getNextGameMode(GameModeType.DEATHMATCH)).toBe(GameModeType.KOTH);
     expect(getNextGameMode(GameModeType.KOTH)).toBe(GameModeType.GUN_GAME);
-    expect(getNextGameMode(GameModeType.GUN_GAME)).toBe(GameModeType.DEATHMATCH);
+    expect(getNextGameMode(GameModeType.GUN_GAME)).toBe(GameModeType.LAST_STAND);
+    expect(getNextGameMode(GameModeType.LAST_STAND)).toBe(GameModeType.DEATHMATCH);
   });
 
   it('restarts the cycle for unknown values instead of throwing', () => {
@@ -51,6 +52,7 @@ describe('game mode rotation', () => {
       expect(gameModeDisplayName(mode)).toBe(GAME_MODES[mode].displayName);
     }
     expect(gameModeDisplayName(GameModeType.KOTH)).toBe('KING OF THE HILL');
+    expect(gameModeDisplayName(GameModeType.LAST_STAND)).toBe('LAST STAND');
   });
 });
 

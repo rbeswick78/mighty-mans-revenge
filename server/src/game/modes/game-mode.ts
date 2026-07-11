@@ -81,4 +81,10 @@ export interface GameMode {
    * weapon fire; grenade throws stay live.
    */
   areGunsDisabled?(match: MatchContext, player: PlayerState): boolean;
+  /**
+   * Whether a dead player may return. Omitted = normal respawns. Last Stand
+   * uses this to keep zero-life fighters eliminated in N-player matches and
+   * out of sudden-death overtime.
+   */
+  canRespawn?(match: MatchContext, player: PlayerState): boolean;
 }

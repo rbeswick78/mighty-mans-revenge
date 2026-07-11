@@ -322,6 +322,7 @@ export const GAME_MODES = Object.freeze({
   [GameModeType.DEATHMATCH]: Object.freeze({ displayName: 'DEATHMATCH' }),
   [GameModeType.KOTH]: Object.freeze({ displayName: 'KING OF THE HILL' }),
   [GameModeType.GUN_GAME]: Object.freeze({ displayName: 'GUN GAME' }),
+  [GameModeType.LAST_STAND]: Object.freeze({ displayName: 'LAST STAND' }),
 }) satisfies Readonly<Record<GameModeType, { displayName: string }>>;
 
 /** Rotation cycle for fresh matches and rematch succession. */
@@ -329,6 +330,7 @@ export const GAME_MODE_ROTATION: readonly GameModeType[] = Object.freeze([
   GameModeType.DEATHMATCH,
   GameModeType.KOTH,
   GameModeType.GUN_GAME,
+  GameModeType.LAST_STAND,
 ]);
 
 /**
@@ -403,6 +405,15 @@ export const GUN_GAME = Object.freeze({
   SHOTGUN_RESERVE_FLOOR: 6,
   /** specialReserve floor while on the pistol rung. */
   PISTOL_RESERVE_FLOOR: 24,
+});
+
+/**
+ * Last Stand: every fighter begins with a visible stock of lives. Deaths
+ * remove one life; the last fighter with lives remaining wins. A tied clock
+ * uses the normal sudden-death overtime path.
+ */
+export const LAST_STAND = Object.freeze({
+  STARTING_LIVES: 5,
 });
 
 /** A Gun Game ladder rung's weapon: a real WeaponId or the grenade rung. */

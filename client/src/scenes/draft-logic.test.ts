@@ -24,7 +24,12 @@ function snap(overrides: Partial<ServerDraftStateMessage> = {}): ServerDraftStat
     mapPick: null,
     modePick: null,
     mapOptions: ['Wasteland Outpost', 'Overgrown Suburb', 'Scrapyard'],
-    modeOptions: [GameModeType.DEATHMATCH, GameModeType.KOTH, GameModeType.GUN_GAME],
+    modeOptions: [
+      GameModeType.DEATHMATCH,
+      GameModeType.KOTH,
+      GameModeType.GUN_GAME,
+      GameModeType.LAST_STAND,
+    ],
     pickDeadlineMs: 20000,
     ...overrides,
   };

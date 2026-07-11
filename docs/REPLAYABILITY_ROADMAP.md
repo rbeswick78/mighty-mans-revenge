@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–16 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts, solo Practice vs Rusty, streak + payback callouts, selectable Rusty difficulty, Collapsed Overpass, Blackout, fresh-chaos rematches). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–17 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts, solo Practice vs Rusty, streak + payback callouts, selectable Rusty difficulty, Collapsed Overpass, Blackout, fresh-chaos rematches, Last Stand). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -48,6 +48,7 @@ Each session below attacks one of these.
 | 14  | Collapsed Overpass                             | A fourth arena adds fresh routes and riskier objective fights    | **DONE** (2026-07-11) |
 | 15  | Blackout                                       | Darkness turns familiar fights into close-range cat-and-mouse    | **DONE** (2026-07-11) |
 | 16  | Fresh-Chaos Rematches                          | Back-to-back rounds cannot repeat the same two mutators           | **DONE** (2026-07-11) |
+| 17  | Last Stand                                     | Every death spends a life, building pressure toward elimination   | **DONE** (2026-07-11) |
 
 ---
 
@@ -1131,7 +1132,76 @@ instead of allowing the same mid-match or final-minute twist twice in a row.
 
 ---
 
+## Session 17 — Last Stand
+
+**Goal:** add a compact stock-lives mode where every death matters and a lead
+can turn into a tense final-life comeback.
+
+**Locked design decisions**
+
+- Every fighter begins with five lives. Every death removes one, including a
+  suicide; the authoritative remaining-life count rides in `PlayerState.score`.
+- Positive-life fighters use the normal respawn loop. A fighter at zero stays
+  dead as an eliminated spectator while any N-player match continues.
+- The last fighter with lives wins immediately. If regulation expires first,
+  highest lives wins; a top-score tie uses the existing sudden-death overtime.
+- Already-eliminated fighters do not return for overtime. Overtime itself
+  remains first-kill-wins and does not spend stock. If a simultaneous final
+  exchange eliminates everybody, the match ends as a draw instead of opening
+  an empty overtime.
+- Maps, characters, weapons, mutators, Rusty, drafts, rivalry sets, and
+  persistent results all reuse their existing authoritative paths.
+- The HUD explicitly labels the score as `LIVES REMAINING`; a zero-life local
+  player sees `ELIMINATED` instead of a misleading respawn timer.
+
+**Acceptance criteria**
+
+- [x] Last Stand is a typed mode available in drafts, rotation, rematches, and
+      `FORCE_MODE=last_stand` smoke tooling.
+- [x] Deaths, suicides, respawns, immediate wins, timed wins, ties, overtime,
+      and N-player elimination have deterministic server coverage.
+- [x] Rusty can play through the normal input path without mode-specific
+      combat shortcuts.
+- [x] The four-card mode draft and in-match five-life HUD fit the desktop UI.
+- [x] Typecheck, lint, all unit tests, production build, and Playwright pass.
+
+---
+
 ## Session Log
+
+### Session 17 — 2026-07-11 — Last Stand
+
+**Shipped:** Last Stand joins the draft and fallback rotation as the fourth
+mode. Each fighter starts with five lives, and every death spends one until
+only one contender remains. Positive-life fighters keep the familiar combat
+and respawn rhythm; zero-life fighters stay eliminated, including in N-player
+matches where the surviving contenders continue fighting.
+
+The implementation keeps remaining lives in the existing score field and adds
+one narrow `GameMode.canRespawn` lifecycle hook. That preserves the established
+snapshot, results, bot, mutator, map, and rivalry paths instead of creating a
+parallel rules engine. Regulation ties still flow into sudden death, but a
+fighter already eliminated from stock cannot re-enter the duel.
+
+The HUD now labels the score as lives and shows a permanent `ELIMINATED` state
+at zero. A forced Practice smoke verified the character-select preview, the
+Collapsed Overpass load, a 5–5 opening score, the lives label, and a clean
+browser console.
+
+**Verified:** focused shared/server/client coverage passes 266 tests, including
+stock accounting, suicides, respawns, double-knockout draws, N-player
+elimination, overtime, mode
+rotation, rematches, draft projection, and death-overlay labels. Typecheck and
+lint are clean; all 801 unit tests pass; the production build succeeds; and the
+21-case Playwright matrix passes all 12 applicable desktop/mobile flows with 9
+intentional project skips. A live forced Practice match also verified the
+fourth mode's preview and opening HUD with no browser-console warnings.
+
+**Carry-over:** five lives is a deliberately legible starting point, not a
+balance verdict. Group play should determine whether match length calls for
+four or six; do not tune stock count from solo Rusty behavior alone.
+
+---
 
 ### Session 16 — 2026-07-11 — Fresh-Chaos Rematches
 

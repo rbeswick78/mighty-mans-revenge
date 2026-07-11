@@ -22,6 +22,7 @@ export enum GameModeType {
   DEATHMATCH = 'deathmatch',
   KOTH = 'koth',
   GUN_GAME = 'gun_game',
+  LAST_STAND = 'last_stand',
 }
 
 export interface GameState {

@@ -531,7 +531,10 @@ export class Match implements MatchContext {
       if (
         !this.isOvertime &&
         this.players.size > 1 &&
-        this.gameMode.determineWinner(this) === null
+        this.gameMode.determineWinner(this) === null &&
+        [...this.players.values()].filter(
+          (player) => this.gameMode.canRespawn?.(this, player) ?? true,
+        ).length > 1
       ) {
         this.enterOvertime();
       } else {
@@ -566,7 +569,12 @@ export class Match implements MatchContext {
     this.regulationElapsedAtOvertime = this.timeLimitSeconds - this.matchTimer;
     this.matchTimer = OVERTIME.DURATION;
     for (const player of this.players.values()) {
-      this.respawnPlayer(player);
+      if (this.gameMode.canRespawn?.(this, player) ?? true) {
+        this.respawnPlayer(player);
+      } else {
+        player.isDead = true;
+        player.respawnTimer = 0;
+      }
     }
     // Nothing from regulation may decide the duel: no in-flight bursts,
     // fire cooldowns, live grenades, or thrown axes carry over.
@@ -1060,10 +1068,16 @@ export class Match implements MatchContext {
     // single-life: the timer freezes and nobody comes back (in practice
     // the first overtime death ends the match this same tick anyway).
     for (const player of this.players.values()) {
-      if (player.isDead && player.respawnTimer > 0 && !this.isOvertime) {
-        player.respawnTimer -= dt;
-        if (player.respawnTimer <= 0) {
-          this.respawnPlayer(player);
+      if (player.isDead && !this.isOvertime) {
+        if (!(this.gameMode.canRespawn?.(this, player) ?? true)) {
+          // Eliminated stock-lives players remain spectators. Zero the timer
+          // so snapshots never imply that a respawn is still pending.
+          player.respawnTimer = 0;
+        } else if (player.respawnTimer > 0) {
+          player.respawnTimer -= dt;
+          if (player.respawnTimer <= 0) {
+            this.respawnPlayer(player);
+          }
         }
       }
       // Tick invulnerability timer

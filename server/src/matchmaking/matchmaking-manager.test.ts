@@ -446,12 +446,13 @@ describe('MatchmakingManager mode rotation (FORCE-pinned, draft skipped)', () =>
     return last.message.result.nextGameMode;
   }
 
-  it('fresh matches cycle DM → KOTH → GUN GAME and wrap', () => {
+  it('fresh matches cycle every mode and wrap', () => {
     const pairs: Array<[PlayerId, PlayerId]> = [
       ['A', 'B'],
       ['C', 'D'],
       ['E', 'F'],
       ['G', 'H'],
+      ['I', 'J'],
     ];
     pairs.forEach(([p1, p2], i) => {
       sent.length = 0;
@@ -461,9 +462,7 @@ describe('MatchmakingManager mode rotation (FORCE-pinned, draft skipped)', () =>
       expect(matchFoundMode(p1)).toBe(expected);
       expect(matchFoundMode(p2)).toBe(expected);
     });
-    // The loop asserted E/F got GUN_GAME (rotation index 2); the fourth
-    // pair wraps back to the head of the rotation.
-    expect(matchFoundMode('G')).toBe(GAME_MODE_ROTATION[0]); // wrapped
+    expect(matchFoundMode('I')).toBe(GAME_MODE_ROTATION[0]); // wrapped
   });
 
   it('matchEnd promises the next mode and the pinned rematch delivers it', () => {
@@ -485,6 +484,14 @@ describe('MatchmakingManager mode rotation (FORCE-pinned, draft skipped)', () =>
     mgr.handleRematchRequest('A');
     mgr.handleRematchRequest('B');
     expect(matchFoundMode('A')).toBe(GameModeType.GUN_GAME);
+
+    // ...then continues into Last Stand...
+    endActiveMatch();
+    expect(lastMatchEndNextMode()).toBe(GameModeType.LAST_STAND);
+    sent.length = 0;
+    mgr.handleRematchRequest('A');
+    mgr.handleRematchRequest('B');
+    expect(matchFoundMode('A')).toBe(GameModeType.LAST_STAND);
 
     // ...then wraps back to DM.
     endActiveMatch();

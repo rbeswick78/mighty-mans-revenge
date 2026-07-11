@@ -16,6 +16,7 @@ import {
   OVERTIME,
   KOTH,
   GUN_GAME,
+  LAST_STAND,
   GameModeType,
 } from '@shared/game';
 import type { CharacterId, MapData, PlayerInput, MutatorId } from '@shared/game';
@@ -3117,6 +3118,97 @@ describe('Match', () => {
           delete process.env.FORCE_EVENT;
         }
       });
+    });
+  });
+
+  describe('Last Stand mode integration', () => {
+    function startActiveLastStand(playerCount = 2): Match {
+      const m = new Match(
+        'last-stand-1',
+        makeMapData(),
+        Array.from({ length: playerCount }, (_, i) => ({
+          id: `player-${i}`,
+          nickname: `P${i}`,
+        })),
+        GameModeType.LAST_STAND,
+      );
+      m.startCountdown();
+      m.update(MATCH.COUNTDOWN_DURATION + 0.05);
+      return m;
+    }
+
+    it('publishes lives through score and respawns while stock remains', () => {
+      const m = startActiveLastStand();
+      const victim = m.players.get('player-1')!;
+      expect(victim.score).toBe(LAST_STAND.STARTING_LIVES);
+
+      m.onKill('player-0', 'player-1', 'gun');
+      expect(victim.score).toBe(4);
+      expect(victim.isDead).toBe(true);
+      m.update(RESPAWN.DELAY + 0.1);
+      expect(victim.isDead).toBe(false);
+      expect(victim.score).toBe(4);
+      expect(m.phase).toBe(MatchPhase.ACTIVE);
+    });
+
+    it('ends a duel immediately when the final stock is lost', () => {
+      const m = startActiveLastStand();
+      const victim = m.players.get('player-1')!;
+      victim.score = 1;
+      m.onKill('player-0', 'player-1', 'gun');
+      m.update(0.05);
+
+      expect(victim.score).toBe(0);
+      expect(m.phase).toBe(MatchPhase.ENDED);
+      expect(m.getResult().gameMode).toBe(GameModeType.LAST_STAND);
+      expect(m.getResult().winnerId).toBe('player-0');
+    });
+
+    it('keeps a zero-stock fighter eliminated while an N-player round continues', () => {
+      const m = startActiveLastStand(3);
+      const eliminated = m.players.get('player-2')!;
+      eliminated.score = 1;
+      m.onKill('player-0', 'player-2', 'gun');
+      m.update(RESPAWN.DELAY + 0.1);
+
+      expect(m.phase).toBe(MatchPhase.ACTIVE);
+      expect(eliminated.isDead).toBe(true);
+      expect(eliminated.respawnTimer).toBe(0);
+    });
+
+    it('excludes zero-stock fighters from a tied-clock overtime reset', () => {
+      const m = startActiveLastStand(3);
+      const p0 = m.players.get('player-0')!;
+      const p1 = m.players.get('player-1')!;
+      const eliminated = m.players.get('player-2')!;
+      p0.score = 2;
+      p1.score = 2;
+      eliminated.score = 0;
+      eliminated.isDead = true;
+      eliminated.respawnTimer = 0;
+      m.matchTimer = 0.01;
+      m.update(0.05);
+
+      expect(m.isOvertime).toBe(true);
+      expect(p0.isDead).toBe(false);
+      expect(p1.isDead).toBe(false);
+      expect(eliminated.isDead).toBe(true);
+      expect(eliminated.respawnTimer).toBe(0);
+    });
+
+    it('ends an all-eliminated double knockout as a draw without empty overtime', () => {
+      const m = startActiveLastStand();
+      const p0 = m.players.get('player-0')!;
+      const p1 = m.players.get('player-1')!;
+      p0.score = 1;
+      p1.score = 1;
+      m.onKill('player-1', 'player-0', 'grenade');
+      m.onKill('player-0', 'player-1', 'grenade');
+      m.update(0.05);
+
+      expect(m.phase).toBe(MatchPhase.ENDED);
+      expect(m.isOvertime).toBe(false);
+      expect(m.getResult().winnerId).toBeNull();
     });
   });
 
