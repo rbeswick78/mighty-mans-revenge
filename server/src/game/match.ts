@@ -1698,6 +1698,7 @@ export class Match implements MatchContext {
       case 'big_heads':
       case 'vampire':
       case 'second_wind':
+      case 'blackout':
         // Per-tick behavior only; nothing to mutate at activation.
         return;
       case 'turbo_grenades':

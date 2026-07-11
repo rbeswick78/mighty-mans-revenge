@@ -698,7 +698,16 @@ export class GameScene extends Phaser.Scene {
           activePickupPositions.push({ x: p.position.x, y: p.position.y });
         }
       }
-      this.lightingRenderer.update(activePickupPositions, delta);
+      const blackoutActive = networkManager.getActiveMutators().includes('blackout');
+      const localLightPosition = !currentLocalState || currentLocalState.isDead
+        ? null
+        : (this.lastRenderedLocalPos ?? currentLocalState.position);
+      this.lightingRenderer.update(
+        activePickupPositions,
+        delta,
+        localLightPosition,
+        blackoutActive,
+      );
     }
 
     this.impactFx?.update(delta);
@@ -1266,6 +1275,7 @@ export class GameScene extends Phaser.Scene {
       vampire: 0x9b30d9,
       turbo_grenades: 0x7cff4f,
       second_wind: 0x4fe3c1,
+      blackout: 0x4b527e,
     };
 
     this.onEventWarning = (payload: EventWarningPayload) => {

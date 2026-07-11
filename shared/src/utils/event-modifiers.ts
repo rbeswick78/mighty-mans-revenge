@@ -91,5 +91,7 @@ export function eventDisplayName(event: MutatorId): string {
       return 'TURBO GRENADES';
     case 'second_wind':
       return 'SECOND WIND';
+    case 'blackout':
+      return 'BLACKOUT';
   }
 }

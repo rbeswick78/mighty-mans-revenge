@@ -15,6 +15,7 @@ const EVENT_COLORS: Record<MutatorId, number> = {
   vampire: 0x9b30d9,         // blood-magic violet
   turbo_grenades: 0x7cff4f,  // radioactive green
   second_wind: 0x4fe3c1,     // revival teal
+  blackout: 0x4b527e,        // midnight indigo
 };
 
 /**

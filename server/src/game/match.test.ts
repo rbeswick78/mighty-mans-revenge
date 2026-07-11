@@ -1021,6 +1021,10 @@ describe('Match', () => {
         p0.position = { x: 100, y: 100 };
         p1.position = { x: 250, y: 115 };
         p0.aimAngle = 0;
+        // Commit the teleported positions to the rewind buffer before the
+        // shot. Otherwise hit validation can sample the prior spawn history,
+        // making this geometry assertion depend on suite timing.
+        m.update(0.05);
       }
 
       it('a shot that misses a normal hitbox hits a scaled one', () => {
@@ -1056,6 +1060,7 @@ describe('Match', () => {
         p0.position = { x: 100, y: 100 };
         p1.position = { x: 250, y: 100 };
         p0.health = 40;
+        m.update(0.05); // seed the rewind buffer with the arranged duel
 
         m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
         m.update(0.05);
@@ -1075,6 +1080,7 @@ describe('Match', () => {
         p0.position = { x: 100, y: 100 };
         p1.position = { x: 250, y: 100 };
         p0.health = PLAYER.MAX_HEALTH;
+        m.update(0.05); // seed the rewind buffer with the arranged duel
 
         m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
         m.update(0.05);

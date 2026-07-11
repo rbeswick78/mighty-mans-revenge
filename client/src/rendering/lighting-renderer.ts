@@ -3,8 +3,7 @@ import Phaser from 'phaser';
 import type { Vec2 } from '@shared/types/common.js';
 import { Wasteland } from '@shared/config/palette.js';
 import { MAP_WIDTH_PX, MAP_HEIGHT_PX } from '../ui/layout.js';
-
-const AMBIENT_DARKNESS_ALPHA = 0.20;
+import { lightingProfile } from './lighting-profile.js';
 
 // Above gameplay sprites (0–50) and below the death/countdown overlays at
 // 2000. The HUD strip sits below the playfield rect, so its 500–2000 depth
@@ -53,7 +52,7 @@ export class LightingRenderer {
     this.rt = scene.add.renderTexture(0, 0, MAP_WIDTH_PX, MAP_HEIGHT_PX);
     this.rt.setOrigin(0, 0);
     this.rt.setDepth(LIGHTING_DEPTH);
-    this.rt.setAlpha(AMBIENT_DARKNESS_ALPHA);
+    this.rt.setAlpha(lightingProfile(false).ambientAlpha);
 
     bakeLightTexture(scene, LIGHT_TEXTURE_KEY, LIGHT_TEXTURE_RADIUS, LIGHT_GRADIENT_STEPS);
     // Off-display image used only as the erase source. Re-positioned and
@@ -84,11 +83,31 @@ export class LightingRenderer {
     });
   }
 
-  update(activePickupPositions: Vec2[], deltaMs: number): void {
+  update(
+    activePickupPositions: Vec2[],
+    deltaMs: number,
+    localPlayerPosition: Vec2 | null,
+    blackoutActive: boolean,
+  ): void {
     this.elapsedMs += deltaMs;
+
+    const profile = lightingProfile(blackoutActive);
+    this.rt.setAlpha(profile.ambientAlpha);
 
     this.rt.clear();
     this.rt.fill(Wasteland.CANVAS_BG, 1);
+
+    // Blackout is close-range cat-and-mouse, not a blindfold. Each client
+    // gets a soft personal pool of light around their living local player;
+    // remote players do not emit one, so crossing the darkness still matters.
+    if (localPlayerPosition && profile.playerLightRadius > 0) {
+      this.eraseLight(
+        localPlayerPosition.x,
+        localPlayerPosition.y,
+        profile.playerLightRadius,
+        1,
+      );
+    }
 
     // Decay & emit timed lights; drop expired ones via in-place compaction.
     let writeIdx = 0;

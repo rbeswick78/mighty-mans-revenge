@@ -433,6 +433,7 @@ export const MUTATORS = Object.freeze({
     'vampire',
     'turbo_grenades',
     'second_wind',
+    'blackout',
   ] as const,
   /** Final-minute slot: warning/activation thresholds in seconds REMAINING. */
   WARNING_AT_REMAINING: 65,

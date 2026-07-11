@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–14 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts, solo Practice vs Rusty, streak + payback callouts, selectable Rusty difficulty, Collapsed Overpass). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–15 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts, solo Practice vs Rusty, streak + payback callouts, selectable Rusty difficulty, Collapsed Overpass, Blackout). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -46,6 +46,7 @@ Each session below attacks one of these.
 | 12  | Streaks, Payback + Shutdowns                    | Every kill builds a story and a reason to settle the score     | **DONE** (2026-07-11) |
 | 13  | Rusty Difficulty                               | Solo practice stays welcoming, challenging, and worth mastering | **DONE** (2026-07-11) |
 | 14  | Collapsed Overpass                             | A fourth arena adds fresh routes and riskier objective fights    | **DONE** (2026-07-11) |
+| 15  | Blackout                                       | Darkness turns familiar fights into close-range cat-and-mouse    | **DONE** (2026-07-11) |
 
 ---
 
@@ -1069,7 +1070,65 @@ experienced ones; three clear skill profiles let practice grow with the player.
 
 ---
 
+## Session 15 — Blackout
+
+**Goal:** add a high-contrast fight state that changes how players read and
+approach the arena without guessing at weapon, character, or physics balance.
+
+**Locked design decisions**
+
+- Blackout is a normal shared mutator id and can occupy either activation
+  slot; the server remains the authority for when it starts.
+- Visibility is client-rendered only. Blackout changes no damage, movement,
+  collision, input, aim, pickups, or serialized player state.
+- Ambient darkness rises from 0.20 to 0.78. Each living local player receives
+  one 140px soft light pool; remote players never emit a tracking light.
+- Existing pickup glows, muzzle flashes, and explosion flashes still cut
+  through the overlay, turning combat actions into temporary reveals.
+- Dead players lose the personal light and regain it on authoritative respawn;
+  the HUD stays readable above the playfield overlay throughout.
+
+**Acceptance criteria**
+
+- [x] `blackout` participates in typed mutator selection, labels, banners,
+      flashes, no-repeat scheduling, and FORCE smoke tooling.
+- [x] Normal lighting is byte-for-byte behaviorally unchanged when inactive.
+- [x] Blackout has a tested, immutable client profile with a playable local
+      light and no authoritative gameplay branch.
+- [x] A live forced match verifies activation, distance concealment, pickup
+      beacons, death darkness, and respawn light restoration.
+- [x] Typecheck, lint, all unit tests, production build, and Playwright pass.
+
+---
+
 ## Session Log
+
+### Session 15 — 2026-07-11 — Blackout
+
+**Shipped:** Blackout joins the mutator pool as a close-range cat-and-mouse
+state. When it activates, the arena drops into deep indigo darkness while the
+living local player keeps a small soft pool of visibility. The opponent is no
+longer readable across the map, but glowing pickups still provide landmarks
+and gunfire or explosions briefly expose the space around them.
+
+The server owns selection, timing, stacking, and reliable activation through
+the existing typed mutator pipeline. The actual visibility curve stays in a
+small immutable client profile because it changes presentation only—no combat,
+physics, movement, input, or wire state branches were introduced.
+
+**Verified:** 167 focused mutator, scheduler, match, and lighting-profile tests
+pass. A forced 70-second Deathmatch on Collapsed Overpass confirmed the normal
+pre-event grade, `BLACKOUT` HUD state, 140px local light, distant concealment,
+pickup beacons, no light while dead, and light restoration after respawn. Full
+release gates are green: typecheck and lint clean, all 784 unit tests pass,
+production build succeeds, and the 21-case Playwright matrix passes all 12
+applicable desktop/mobile flows with 9 intentional project skips.
+
+**Carry-over:** the 0.78 darkness and 140px radius are first-pass atmosphere
+tuning. Group play should answer whether opponents get enough warning from
+gunfire and whether the radius is comfortable on smaller mobile displays.
+
+---
 
 ### Session 14 — 2026-07-11 — Collapsed Overpass
 

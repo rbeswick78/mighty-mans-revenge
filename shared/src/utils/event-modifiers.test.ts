@@ -23,6 +23,7 @@ describe('mutatorsToMovementModifiers', () => {
       'big_heads',
       'vampire',
       'turbo_grenades',
+      'blackout',
     ];
     for (const mutator of passthrough) {
       expect(mutatorsToMovementModifiers([mutator])).toEqual({});
