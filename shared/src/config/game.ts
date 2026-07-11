@@ -263,6 +263,46 @@ export const BOT = Object.freeze({
   ABILITY_OPENING_DELAY_SECONDS: 4,
 });
 
+export const BOT_DIFFICULTIES = ['rookie', 'scrapper', 'warlord'] as const;
+export type BotDifficulty = (typeof BOT_DIFFICULTIES)[number];
+export const DEFAULT_BOT_DIFFICULTY: BotDifficulty = 'scrapper';
+
+/** Skill profiles change decision cadence, never physics or damage rules. */
+export const BOT_PROFILES: Readonly<
+  Record<
+    BotDifficulty,
+    {
+      aimWobbleRadians: number;
+      fireIntervalSeconds: number;
+      grenadeIntervalSeconds: number;
+      abilityIntervalSeconds: number;
+      pathRecalcSeconds: number;
+    }
+  >
+> = Object.freeze({
+  rookie: Object.freeze({
+    aimWobbleRadians: 0.12,
+    fireIntervalSeconds: 0.9,
+    grenadeIntervalSeconds: 12,
+    abilityIntervalSeconds: 8,
+    pathRecalcSeconds: 0.4,
+  }),
+  scrapper: Object.freeze({
+    aimWobbleRadians: BOT.AIM_WOBBLE_RADIANS,
+    fireIntervalSeconds: BOT.FIRE_INTERVAL_SECONDS,
+    grenadeIntervalSeconds: BOT.GRENADE_INTERVAL_SECONDS,
+    abilityIntervalSeconds: BOT.ABILITY_OPENING_DELAY_SECONDS,
+    pathRecalcSeconds: BOT.PATH_RECALC_SECONDS,
+  }),
+  warlord: Object.freeze({
+    aimWobbleRadians: 0.018,
+    fireIntervalSeconds: 0.3,
+    grenadeIntervalSeconds: 4.5,
+    abilityIntervalSeconds: 2.5,
+    pathRecalcSeconds: 0.15,
+  }),
+});
+
 /** Thresholds for authoritative kill-streak and payback callouts. */
 export const COMBAT_CALLOUTS = Object.freeze({
   STREAK_START: 2,

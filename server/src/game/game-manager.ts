@@ -112,7 +112,11 @@ export class GameManager {
         break;
 
       case 'client:startPractice':
-        this.matchmaking.handleStartPractice(playerId, message.nickname);
+        this.matchmaking.handleStartPractice(
+          playerId,
+          message.nickname,
+          message.difficulty,
+        );
         break;
 
       case 'client:cancelMatchmaking':

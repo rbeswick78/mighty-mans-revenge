@@ -10,17 +10,44 @@ test.describe('Mobile controls', () => {
   }) => {
     const canvas = gamePage.locator('canvas');
     await expect(canvas).toBeVisible();
+    // Canvas visibility can occur while BootScene is still active. Wait for
+    // the stable interactive scene before attaching the probe, otherwise a
+    // fast boot transition strands the listener on the destroyed scene.
+    await expect
+      .poll(() =>
+        gamePage.evaluate(() => {
+          const w = window as unknown as {
+            game?: {
+              scene: {
+                scenes: Array<{
+                  scene: { key: string };
+                  sys: { settings: { active: boolean } };
+                }>;
+              };
+            };
+          };
+          return (
+            w.game?.scene.scenes.some(
+              (scene) =>
+                scene.scene.key === 'LobbyScene' && scene.sys.settings.active,
+            ) ?? false
+          );
+        }),
+      )
+      .toBe(true);
 
     // Instrument the active scene: capture any pointerdown the scene
     // receives so we can verify Phaser dispatches it under touch emulation.
     const installed = await gamePage.evaluate(() => {
       const w = window as unknown as {
-        game?: { scene: { scenes: Array<{ sys: { settings: { active: boolean } }; input: { on: (evt: string, cb: (p: unknown) => void) => void } }> } };
+        game?: { scene: { scenes: Array<{ scene: { key: string }; sys: { settings: { active: boolean } }; input: { on: (evt: string, cb: (p: unknown) => void) => void } }> } };
         __lastPointerDown?: { x: number; y: number; wasTouch: boolean } | null;
       };
       w.__lastPointerDown = null;
       const scenes = w.game?.scene.scenes ?? [];
-      const active = scenes.find((s) => s.sys.settings.active);
+      const active = scenes.find(
+        (s) => s.scene.key === 'LobbyScene' && s.sys.settings.active,
+      );
       if (!active) return false;
       active.input.on('pointerdown', (pointer: unknown) => {
         const p = pointer as { x: number; y: number; wasTouch: boolean };

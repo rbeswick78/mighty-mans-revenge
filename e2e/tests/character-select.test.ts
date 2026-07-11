@@ -172,11 +172,15 @@ test('solo practice launches against locked Rusty and reaches live play', async 
   await expect(input).toHaveCount(1);
   await input.fill('Solo');
 
-  // Desktop canvas is 960x720 at this project viewport. Click the center of
-  // the secondary lobby CTA in canvas-local coordinates.
+  // Desktop canvas is 960x720 at this project viewport. Cycle the persisted
+  // Rusty level once, then click the practice CTA in canvas-local coordinates.
   const canvas = page.locator('canvas');
   await expect(canvas).toHaveCount(1);
-  await canvas.click({ position: { x: 480, y: 630 } });
+  await canvas.click({ position: { x: 480, y: 660 } });
+  await expect
+    .poll(() => page.evaluate(() => localStorage.getItem('mmr_bot_difficulty')))
+    .toBe('warlord');
+  await canvas.click({ position: { x: 480, y: 614 } });
   await waitForActiveScene(page, 'CharacterSelectScene', 10000);
 
   await expect

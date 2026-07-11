@@ -204,10 +204,11 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
   });
 
   it('sends an explicit authoritative practice request', () => {
-    manager.startPractice('Alpha');
+    manager.startPractice('Alpha', 'warlord');
     expect(hoisted.sentMessages).toContainEqual({
       type: 'client:startPractice',
       nickname: 'Alpha',
+      difficulty: 'warlord',
     });
   });
 });

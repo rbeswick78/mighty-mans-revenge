@@ -3,7 +3,12 @@ import { PlayerInput } from './player.js';
 import { AxeState, GrenadeState, BulletTrail, PunchEvent } from './projectile.js';
 import { PickupState } from './pickup.js';
 import { MatchPhase, KillFeedEntry, MatchResult, GameModeType } from './game.js';
-import type { CharacterId, WeaponId, MutatorId } from '../config/game.js';
+import type {
+  BotDifficulty,
+  CharacterId,
+  WeaponId,
+  MutatorId,
+} from '../config/game.js';
 
 // === Client -> Server Messages ===
 
@@ -32,6 +37,7 @@ export interface ClientJoinMatchmakingMessage {
 export interface ClientStartPracticeMessage {
   type: 'client:startPractice';
   nickname: string;
+  difficulty: BotDifficulty;
 }
 
 export interface ClientCancelMatchmakingMessage {

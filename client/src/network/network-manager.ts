@@ -10,7 +10,12 @@ import type {
   KothHudState,
 } from '@shared/types/network.js';
 import { MatchPhase } from '@shared/types/game.js';
-import { SERVER, type CharacterId, type MutatorId } from '@shared/config/game.js';
+import {
+  SERVER,
+  type BotDifficulty,
+  type CharacterId,
+  type MutatorId,
+} from '@shared/config/game.js';
 import { playerMovementModifiers } from '@shared/utils/event-modifiers.js';
 import { NetworkConnection } from './connection.js';
 import { ClientPrediction } from './prediction.js';
@@ -238,8 +243,8 @@ export class NetworkManager {
   }
 
   /** Start an immediate authoritative solo match. */
-  startPractice(nickname: string): void {
-    this.connection.send({ type: 'client:startPractice', nickname });
+  startPractice(nickname: string, difficulty: BotDifficulty): void {
+    this.connection.send({ type: 'client:startPractice', nickname, difficulty });
   }
 
   /** Cancel matchmaking. */

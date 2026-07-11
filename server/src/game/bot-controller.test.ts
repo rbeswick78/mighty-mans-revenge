@@ -151,4 +151,37 @@ describe('BotController', () => {
     match.update(0.05);
     expect(bot.position).toEqual(held);
   });
+
+  it('fires more aggressively on warlord than rookie without changing damage rules', () => {
+    const shotsFor = (difficulty: 'rookie' | 'warlord'): number => {
+      const practice = new Match(
+        `practice-${difficulty}`,
+        OPEN_MAP,
+        [
+          { id: 'human', nickname: 'Human' },
+          { id: 'bot:test', nickname: 'Rusty' },
+        ],
+        GameModeType.DEATHMATCH,
+        () => 0,
+      );
+      const human = practice.players.get('human')!;
+      const bot = practice.players.get('bot:test')!;
+      human.characterId = 'bubba';
+      bot.characterId = 'mighty_man';
+      human.health = 10_000;
+      human.maxHealth = 10_000;
+      human.position = { x: 5.5 * 48, y: 2.5 * 48 };
+      bot.position = { x: 2.5 * 48, y: 2.5 * 48 };
+      practice.phase = MatchPhase.ACTIVE;
+      practice.matchTimer = 100;
+      const controller = new BotController('bot:test', difficulty);
+      for (let tick = 1; tick <= 60; tick++) {
+        controller.update(0.05, practice, tick);
+        practice.update(0.05);
+      }
+      return practice.stats.getStats('bot:test').shotsFired;
+    };
+
+    expect(shotsFor('warlord')).toBeGreaterThan(shotsFor('rookie'));
+  });
 });

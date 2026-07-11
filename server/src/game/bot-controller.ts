@@ -1,5 +1,7 @@
 import {
   BOT,
+  BOT_PROFILES,
+  DEFAULT_BOT_DIFFICULTY,
   KOTH,
   MatchPhase,
   GameModeType,
@@ -14,6 +16,7 @@ import type {
   PlayerState,
   Vec2,
 } from '@shared/game';
+import type { BotDifficulty } from '@shared/game';
 import type { Match } from './match.js';
 
 export interface GridPoint {
@@ -97,9 +100,16 @@ export class BotController {
   private fireSeconds = 0;
   private grenadeSeconds = 2.5;
   private activeGrenadeSeconds = 0;
-  private abilitySeconds = BOT.ABILITY_OPENING_DELAY_SECONDS;
+  private abilitySeconds: number = BOT.ABILITY_OPENING_DELAY_SECONDS;
 
-  constructor(readonly playerId: PlayerId) {}
+  private readonly profile;
+
+  constructor(
+    readonly playerId: PlayerId,
+    readonly difficulty: BotDifficulty = DEFAULT_BOT_DIFFICULTY,
+  ) {
+    this.profile = BOT_PROFILES[difficulty];
+  }
 
   update(dt: number, match: Match, tick: number): void {
     if (match.phase !== MatchPhase.ACTIVE) return;
@@ -157,7 +167,7 @@ export class BotController {
           movementGoal.isCombatTarget,
         );
     const aimAngle =
-      directAngle + Math.sin(this.elapsedSeconds * 1.7) * BOT.AIM_WOBBLE_RADIANS;
+      directAngle + Math.sin(this.elapsedSeconds * 1.7) * this.profile.aimWobbleRadians;
 
     const activeGrenade = match.combatManager.getActiveGrenadeFor(this.playerId);
     let throwPressed = false;
@@ -182,7 +192,7 @@ export class BotController {
         throwPressed = true;
         this.grenadeSeconds = grenadeRung
           ? BOT.GRENADE_RUNG_INTERVAL_SECONDS
-          : BOT.GRENADE_INTERVAL_SECONDS;
+          : this.profile.grenadeIntervalSeconds;
       }
     }
 
@@ -197,7 +207,7 @@ export class BotController {
       hasLineOfSight &&
       distance <= usefulRange &&
       this.fireSeconds <= 0;
-    if (firePressed) this.fireSeconds = BOT.FIRE_INTERVAL_SECONDS;
+    if (firePressed) this.fireSeconds = this.profile.fireIntervalSeconds;
 
     const abilityPressed =
       hasLineOfSight &&
@@ -205,7 +215,7 @@ export class BotController {
       this.abilitySeconds <= 0 &&
       bot.abilityActiveSeconds <= 0 &&
       bot.abilityCooldownSeconds <= 0;
-    if (abilityPressed) this.abilitySeconds = BOT.ABILITY_OPENING_DELAY_SECONDS;
+    if (abilityPressed) this.abilitySeconds = this.profile.abilityIntervalSeconds;
 
     const input: PlayerInput = {
       sequenceNumber: ++this.sequence,
@@ -307,7 +317,7 @@ export class BotController {
     }
 
     if (this.pathRecalcSeconds <= 0 || this.waypoint === null) {
-      this.pathRecalcSeconds = BOT.PATH_RECALC_SECONDS;
+      this.pathRecalcSeconds = this.profile.pathRecalcSeconds;
       const ts = grid.tileSize;
       const path = findGridPath(
         grid,

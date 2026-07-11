@@ -5,6 +5,8 @@ import {
   DRAFT,
   RIVALRY_SET,
   BOT,
+  BOT_DIFFICULTIES,
+  DEFAULT_BOT_DIFFICULTY,
   CHARACTER_IDS,
   LEADERBOARD,
   getNextGameMode,
@@ -24,6 +26,7 @@ import type {
   DraftCategory,
   DraftFirstPickerReason,
   RivalrySetResult,
+  BotDifficulty,
 } from '@shared/game';
 import { Match } from '../game/match.js';
 import { BotController } from '../game/bot-controller.js';
@@ -68,6 +71,7 @@ interface PostMatchState {
   setComplete: boolean;
   /** Practice rematches auto-accept for the synthetic opponent. */
   isPractice: boolean;
+  practiceDifficulty: BotDifficulty | null;
 }
 
 /**
@@ -124,7 +128,7 @@ export class MatchmakingManager {
   /** One live authoritative controller per practice match. */
   private readonly botControllers: Map<string, BotController> = new Map();
   /** Match ids whose lifetime stats must stay out of friend leaderboards. */
-  private readonly practiceMatchIds: Set<string> = new Set();
+  private readonly practiceDifficulties: Map<string, BotDifficulty> = new Map();
   /** Synthetic ids survive across direct practice rematches. */
   private readonly botPlayerIds: Set<PlayerId> = new Set();
   /** Track nicknames for players (set when they join matchmaking). */
@@ -204,8 +208,15 @@ export class MatchmakingManager {
   }
 
   /** Start a real authoritative match immediately with a synthetic opponent. */
-  handleStartPractice(playerId: PlayerId, nickname: string): void {
+  handleStartPractice(
+    playerId: PlayerId,
+    nickname: string,
+    difficulty: BotDifficulty = DEFAULT_BOT_DIFFICULTY,
+  ): void {
     if (this.playerMatchMap.has(playerId)) return;
+    const safeDifficulty = BOT_DIFFICULTIES.includes(difficulty)
+      ? difficulty
+      : DEFAULT_BOT_DIFFICULTY;
     this.queue.removePlayer(playerId);
     this.playerNicknames.set(playerId, nickname);
 
@@ -230,7 +241,7 @@ export class MatchmakingManager {
         { id: playerId, nickname },
         { id: botId, nickname: BOT.NICKNAME },
       ],
-      true,
+      safeDifficulty,
     );
   }
 
@@ -612,7 +623,7 @@ export class MatchmakingManager {
     mapData: MapData,
     gameMode: GameModeType,
     playerEntries: { id: PlayerId; nickname: string }[],
-    isPractice: boolean = false,
+    practiceDifficulty: BotDifficulty | null = null,
   ): void {
     const match = new Match(matchId, mapData, playerEntries, gameMode);
     match.setRttResolver(this.getPlayerRTT);
@@ -620,11 +631,14 @@ export class MatchmakingManager {
     for (const entry of playerEntries) {
       this.playerMatchMap.set(entry.id, matchId);
     }
-    if (isPractice) {
-      this.practiceMatchIds.add(matchId);
+    if (practiceDifficulty !== null) {
+      this.practiceDifficulties.set(matchId, practiceDifficulty);
       const botEntry = playerEntries.find((entry) => this.botPlayerIds.has(entry.id));
       if (botEntry) {
-        this.botControllers.set(matchId, new BotController(botEntry.id));
+        this.botControllers.set(
+          matchId,
+          new BotController(botEntry.id, practiceDifficulty),
+        );
         const character = CHARACTER_IDS[
           Math.min(
             Math.floor(this.rng() * CHARACTER_IDS.length),
@@ -1104,7 +1118,8 @@ export class MatchmakingManager {
 
   private onMatchEnded(matchId: string, match: Match): void {
     const result = match.getResult();
-    const isPractice = this.practiceMatchIds.has(matchId);
+    const practiceDifficulty = this.practiceDifficulties.get(matchId) ?? null;
+    const isPractice = practiceDifficulty !== null;
     result.isPractice = isPractice;
     result.rivalrySet = this.recordRivalrySet(match, result.winnerId);
 
@@ -1195,13 +1210,14 @@ export class MatchmakingManager {
           : (playerIds.find((id) => id !== result.winnerId) ?? null),
       setComplete: result.rivalrySet?.championId != null,
       isPractice,
+      practiceDifficulty,
     });
 
     // Remove from active matches
     this.activeMatches.delete(matchId);
     this.previousPhases.delete(matchId);
     this.botControllers.delete(matchId);
-    this.practiceMatchIds.delete(matchId);
+    this.practiceDifficulties.delete(matchId);
   }
 
   private onRematchTimeout(matchId: string): void {
@@ -1262,7 +1278,7 @@ export class MatchmakingManager {
         getMap(postMatch.nextMapName),
         postMatch.nextGameMode,
         playerEntries,
-        true,
+        postMatch.practiceDifficulty,
       );
       return;
     }

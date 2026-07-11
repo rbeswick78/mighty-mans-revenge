@@ -10,6 +10,7 @@ import type {
   ServerPlayerKilledMessage,
   ServerCharacterSelectStateMessage,
 } from '@shared/types/network.js';
+import type { BotDifficulty } from '@shared/config/game.js';
 import type { CharacterId, WeaponId, MutatorId } from '@shared/config/game.js';
 import { NetworkManager, type LocalCorrection } from '../network/network-manager.js';
 
@@ -160,9 +161,9 @@ export class GameService {
     this.networkManager.joinMatchmaking(nickname);
   }
 
-  startPractice(nickname: string): void {
+  startPractice(nickname: string, difficulty: BotDifficulty): void {
     this.localNickname = nickname;
-    this.networkManager.startPractice(nickname);
+    this.networkManager.startPractice(nickname, difficulty);
   }
 
   cancelMatchmaking(): void {

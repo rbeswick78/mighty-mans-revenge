@@ -12,8 +12,14 @@ import { PixelButton } from '../ui/menu/pixel-button.js';
 import { TitleLogo } from '../ui/menu/title-logo.js';
 import { MENU_FONTS } from '../ui/menu/fonts.js';
 import { formatLeaderboardRow } from '../ui/leaderboard-format.js';
+import {
+  BOT_DIFFICULTIES,
+  DEFAULT_BOT_DIFFICULTY,
+  type BotDifficulty,
+} from '@shared/config/game.js';
 
 const STORAGE_KEY_NICKNAME = 'mmr_nickname';
+const STORAGE_KEY_BOT_DIFFICULTY = 'mmr_bot_difficulty';
 
 // Scene-local color decisions. Everything beyond the parallax backdrop is
 // pinned here so a future palette pass can re-tune the lobby in one place.
@@ -51,8 +57,10 @@ export class LobbyScene extends Phaser.Scene {
   private leaderboardRowsText!: Phaser.GameObjects.Text;
   private quickMatchButton!: PixelButton;
   private practiceButton!: PixelButton;
+  private difficultyButton!: PixelButton;
   private mightyManSprite!: Phaser.GameObjects.Sprite;
   private nickname: string;
+  private practiceDifficulty: BotDifficulty;
   private isSearching = false;
   private searchStartTime = 0;
   private cursorVisible = true;
@@ -70,11 +78,18 @@ export class LobbyScene extends Phaser.Scene {
   constructor() {
     super({ key: 'LobbyScene' });
     this.nickname = '';
+    this.practiceDifficulty = DEFAULT_BOT_DIFFICULTY;
   }
 
   create(): void {
     this.cameras.main.fadeIn(300, 0, 0, 0);
     this.nickname = localStorage.getItem(STORAGE_KEY_NICKNAME) ?? '';
+    const savedDifficulty = localStorage.getItem(STORAGE_KEY_BOT_DIFFICULTY);
+    this.practiceDifficulty = BOT_DIFFICULTIES.includes(
+      savedDifficulty as BotDifficulty,
+    )
+      ? (savedDifficulty as BotDifficulty)
+      : DEFAULT_BOT_DIFFICULTY;
     this.isSearching = false;
 
     this.gameService = GameService.getInstance();
@@ -123,9 +138,9 @@ export class LobbyScene extends Phaser.Scene {
     // searching-state UI shares this panel, swapping visibility.
     // ────────────────────────────────────────────────────────────────────
     const panelW = 380;
-    const panelH = 238;
+    const panelH = 256;
     const panelX = centerX - panelW / 2;
-    const panelY = camHeight - 270;
+    const panelY = camHeight - 286;
     const panel = new MenuPanel(this, panelX, panelY, panelW, panelH);
     panel.setDepth(WastelandStreet.DEPTH.UI);
 
@@ -218,6 +233,21 @@ export class LobbyScene extends Phaser.Scene {
       },
     );
     panel.add(this.practiceButton);
+
+    this.difficultyButton = new PixelButton(
+      this,
+      panel.centerX - qmW / 2,
+      212,
+      qmW,
+      28,
+      this.difficultyLabel(),
+      {
+        variant: 'secondary',
+        fontSize: 9,
+        onClick: () => this.cyclePracticeDifficulty(),
+      },
+    );
+    panel.add(this.difficultyButton);
 
     // ────────────────────────────────────────────────────────────────────
     // Searching state — sits in the same panel real estate, hidden by
@@ -567,6 +597,7 @@ export class LobbyScene extends Phaser.Scene {
     this.cancelButton.setVisible(true);
     this.quickMatchButton.setVisible(false);
     this.practiceButton.setVisible(false);
+    this.difficultyButton.setVisible(false);
 
     this.searchingTween = this.tweens.add({
       targets: this.searchingText,
@@ -599,7 +630,19 @@ export class LobbyScene extends Phaser.Scene {
     if (this.isSearching || !this.validateNickname()) return;
     this.nicknameInput?.blur();
     this.tryStartFullscreen();
-    this.gameService.startPractice(this.nickname);
+    this.gameService.startPractice(this.nickname, this.practiceDifficulty);
+  }
+
+  private cyclePracticeDifficulty(): void {
+    const current = BOT_DIFFICULTIES.indexOf(this.practiceDifficulty);
+    this.practiceDifficulty =
+      BOT_DIFFICULTIES[(current + 1) % BOT_DIFFICULTIES.length];
+    localStorage.setItem(STORAGE_KEY_BOT_DIFFICULTY, this.practiceDifficulty);
+    this.difficultyButton.setLabel(this.difficultyLabel());
+  }
+
+  private difficultyLabel(): string {
+    return `RUSTY LEVEL: ${this.practiceDifficulty.toUpperCase()}`;
   }
 
   /** Fullscreen improves play, but browser policy must never block a match. */
@@ -646,6 +689,7 @@ export class LobbyScene extends Phaser.Scene {
     this.cancelButton.setVisible(false);
     this.quickMatchButton.setVisible(true);
     this.practiceButton.setVisible(true);
+    this.difficultyButton.setVisible(true);
     this.setNameEntryVisible(true);
 
     if (this.searchingTween) {

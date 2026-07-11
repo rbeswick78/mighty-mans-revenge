@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–12 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts, solo Practice vs Rusty, streak + payback callouts). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–13 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts, solo Practice vs Rusty, streak + payback callouts, selectable Rusty difficulty). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -44,6 +44,7 @@ Each session below attacks one of these.
 | 10  | Rivalry Sets + Revenge Drafts                   | Every rematch becomes a round with stakes and comeback control | **DONE** (2026-07-11) |
 | 11  | Practice vs Rusty                               | The game is playable on demand, even when no friend is online  | **DONE** (2026-07-11) |
 | 12  | Streaks, Payback + Shutdowns                    | Every kill builds a story and a reason to settle the score     | **DONE** (2026-07-11) |
+| 13  | Rusty Difficulty                               | Solo practice stays welcoming, challenging, and worth mastering | **DONE** (2026-07-11) |
 
 ---
 
@@ -1036,7 +1037,65 @@ chasing and moments worth talking about.
 
 ---
 
+## Session 13 — Rusty Difficulty
+
+**Goal:** keep the new solo loop useful after the first few rounds. A single
+fixed opponent inevitably becomes either a wall for new players or solved by
+experienced ones; three clear skill profiles let practice grow with the player.
+
+**Locked design decisions**
+
+- Rookie, Scrapper, and Warlord change only decision cadence and aim wobble.
+  They never alter damage, health, speed, ammo, cooldown rules, or physics.
+- Scrapper is the original Session 11 behavior and remains the default.
+- The lobby exposes one compact cycling control below Practice, persists the
+  choice locally, and sends it explicitly in `client:startPractice`.
+- The server validates untrusted difficulty values and falls back to Scrapper.
+  Practice rematches retain the selected profile for the entire Rivalry Set.
+- `BOT_PROFILES` and `BotDifficulty` live in shared config; the controller
+  consumes a profile without branching combat rules by difficulty.
+
+**Acceptance criteria**
+
+- [x] Lobby cycles Rookie → Scrapper → Warlord, persists the selection, and
+      remains usable at desktop and mobile-landscape canvas sizes.
+- [x] Difficulty travels on the discriminated network message and is validated
+      server-side with a backward-compatible Scrapper default.
+- [x] Rematches reconstruct Rusty with the same selected profile.
+- [x] Warlord demonstrably fires more aggressively than Rookie in a real Match
+      while both still use identical authoritative damage/physics paths.
+- [x] Typecheck, lint, all unit tests, production build, and Playwright pass.
+
+---
+
 ## Session Log
+
+### Session 13 — 2026-07-11 — Rusty Difficulty
+
+**Shipped:** solo practice now has three persisted skill levels. Rookie uses
+wider aim wobble and slower fire, grenade, ability, and path decisions;
+Scrapper preserves the original balanced controller; Warlord tightens aim and
+reacts more aggressively. The lobby's compact `RUSTY LEVEL` control cycles the
+profiles without adding another scene, and the existing Practice CTA launches
+the selected opponent immediately.
+
+The selection crosses the normal client message boundary, is validated by
+`MatchmakingManager`, stays attached to direct practice rematches, and is fed
+into `BotController`. Profiles never touch shared player movement, weapon
+damage, health, ammo, or cooldowns, so changing difficulty cannot create a
+second combat ruleset.
+
+**Verified:** typecheck and lint clean; production build green; all 780 unit
+tests green. Focused controller/matchmaking/network coverage (52 tests) includes
+a real Match comparison proving Warlord fires more shots than Rookie. Chromium
+E2E cycles the persisted selector, launches Warlord, verifies Rusty arrives
+locked, and reaches GameScene. The 21-case matrix passed every product flow; it
+also exposed a pre-existing boot-race in the touch probe (listener attached to
+BootScene), which now waits for LobbyScene and passes its focused retry.
+
+**Carry-over:** profile numbers are first-pass accessibility tuning. Ask new
+players whether Rookie gives enough breathing room and strong players whether
+Warlord feels challenging without becoming laser-accurate.
 
 ### Session 12 — 2026-07-11 — Streaks, Payback + Shutdowns
 
