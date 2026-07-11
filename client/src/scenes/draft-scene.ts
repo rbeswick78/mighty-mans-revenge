@@ -19,9 +19,9 @@ import {
 
 // Scene-local color decisions — same palette anchors as the lobby /
 // character-select so the menu flow reads as one continuous place.
-const SUBTITLE_COLOR = Wasteland.COVER_FILL;            // weathered tan
+const SUBTITLE_COLOR = Wasteland.COVER_FILL; // weathered tan
 const COLUMN_HEADER_COLOR = Wasteland.COVER_FILL;
-const STATUS_ACTIVE_COLOR = Wasteland.HEALTH_GOOD;      // mint — "you act now"
+const STATUS_ACTIVE_COLOR = Wasteland.HEALTH_GOOD; // mint — "you act now"
 const STATUS_WAIT_COLOR = Wasteland.COVER_FILL;
 const BADGE_COLOR = Wasteland.HEALTH_GOOD;
 const PICKED_BORDER_COLOR = Wasteland.HEALTH_GOOD;
@@ -267,9 +267,68 @@ export class DraftScene extends Phaser.Scene {
     // real pick window.
     if (shouldSkipSpectacle(draft) || draft.players.length < 2) {
       this.buildPickUi();
+    } else if (draft.firstPickerReason === 'revenge') {
+      this.startRevengeReveal(draft);
     } else {
       this.startSpectacle(draft);
     }
+  }
+
+  /**
+   * Rematches replace the random ping-pong with a shorter, explicit
+   * comeback beat: the previous round's loser has earned first pick.
+   */
+  private startRevengeReveal(draft: ServerDraftStateMessage): void {
+    this.phase = 'spectacle';
+    const centerX = this.cameras.main.width / 2;
+    const picker = draft.players.find((player) => player.id === draft.firstPickerId);
+
+    const headline = new TitleLogo(this, centerX, 180, ['REVENGE DRAFT'], {
+      fontSize: 24,
+      fillColor: Wasteland.LOADING_BAR_FILL,
+      strokeThickness: 3,
+    }).setDepth(WastelandStreet.DEPTH.UI);
+    const kicker = this.add
+      .text(centerX, 270, "LAST ROUND'S LOSER STRIKES BACK", {
+        fontFamily: MENU_FONTS.BODY,
+        fontSize: '16px',
+        color: cssHex(SUBTITLE_COLOR),
+      })
+      .setOrigin(0.5)
+      .setDepth(WastelandStreet.DEPTH.UI);
+    const pickerText = this.add
+      .text(centerX, 350, (picker?.nickname ?? 'CHALLENGER').toUpperCase(), {
+        fontFamily: MENU_FONTS.HEADER,
+        fontSize: '22px',
+        color: cssHex(SPECTACLE_ACTIVE_COLOR),
+      })
+      .setOrigin(0.5)
+      .setScale(0.8)
+      .setDepth(WastelandStreet.DEPTH.UI);
+    const landingText = this.add
+      .text(centerX, 410, 'PICKS FIRST', {
+        fontFamily: MENU_FONTS.HEADER,
+        fontSize: '14px',
+        color: cssHex(WINNER_COLOR),
+      })
+      .setOrigin(0.5)
+      .setDepth(WastelandStreet.DEPTH.UI);
+
+    this.spectacleNickTexts = [pickerText];
+    this.spectacleObjects = [headline, kicker, pickerText, landingText];
+    AudioManager.getInstance()?.play('matchStartHorn');
+    this.tweens.add({
+      targets: pickerText,
+      scale: 1.2,
+      duration: 450,
+      ease: 'Back.easeOut',
+    });
+
+    this.time.delayedCall(DRAFT.REVENGE_REVEAL_MS, () => {
+      if (this.transitioned || this.phase !== 'spectacle') return;
+      this.destroySpectacle();
+      this.buildPickUi();
+    });
   }
 
   private startSpectacle(draft: ServerDraftStateMessage): void {
@@ -277,8 +336,7 @@ export class DraftScene extends Phaser.Scene {
     const centerX = this.cameras.main.width / 2;
 
     const contenders = draft.players.slice(0, 2);
-    const winnerIndex =
-      draft.players.findIndex((p) => p.id === draft.firstPickerId) === 1 ? 1 : 0;
+    const winnerIndex = draft.players.findIndex((p) => p.id === draft.firstPickerId) === 1 ? 1 : 0;
 
     const headline = new TitleLogo(this, centerX, 180, ['WHO PICKS FIRST?'], {
       fontSize: 22,
@@ -334,9 +392,7 @@ export class DraftScene extends Phaser.Scene {
 
     this.time.delayedCall(schedule.landMs + LAND_TEXT_DELAY_MS, () => {
       if (this.transitioned || this.phase !== 'spectacle') return;
-      const winnerNick = (
-        contenders[winnerIndex]?.nickname ?? 'FIRST PICKER'
-      ).toUpperCase();
+      const winnerNick = (contenders[winnerIndex]?.nickname ?? 'FIRST PICKER').toUpperCase();
       landingText.setText(`${winnerNick} PICKS FIRST`).setVisible(true);
       AudioManager.getInstance()?.play('matchStartHorn');
       this.tweens.add({
@@ -384,8 +440,12 @@ export class DraftScene extends Phaser.Scene {
       strokeThickness: 3,
     }).setDepth(WastelandStreet.DEPTH.UI);
 
+    const subtitle =
+      draft.firstPickerReason === 'revenge'
+        ? 'REVENGE PICK CLAIMS A COLUMN'
+        : 'FIRST PICK CLAIMS A COLUMN';
     this.add
-      .text(centerX, 108, 'FIRST PICK CLAIMS A COLUMN', {
+      .text(centerX, 108, subtitle, {
         fontFamily: MENU_FONTS.BODY,
         fontSize: '14px',
         color: cssHex(SUBTITLE_COLOR),
@@ -439,9 +499,7 @@ export class DraftScene extends Phaser.Scene {
       );
     });
 
-    this.pickHighlight = this.add
-      .graphics()
-      .setDepth(WastelandStreet.DEPTH.UI + 1);
+    this.pickHighlight = this.add.graphics().setDepth(WastelandStreet.DEPTH.UI + 1);
 
     this.statusText = this.add
       .text(centerX, STATUS_Y, '', {
@@ -525,9 +583,7 @@ export class DraftScene extends Phaser.Scene {
     this.gameService.sendDraftPick(category, value);
     // Optimistic feedback only — the server is authoritative and the next
     // snapshot (≤1 tick) echoes the accepted pick and restyles everything.
-    const card = this.cards.find(
-      (c) => c.category === category && c.value === value,
-    );
+    const card = this.cards.find((c) => c.category === category && c.value === value);
     card?.button.setAlpha(0.7);
   }
 
@@ -540,9 +596,7 @@ export class DraftScene extends Phaser.Scene {
 
     this.statusText
       ?.setText(view.statusLine)
-      .setColor(
-        cssHex(view.yourTurn || view.complete ? STATUS_ACTIVE_COLOR : STATUS_WAIT_COLOR),
-      );
+      .setColor(cssHex(view.yourTurn || view.complete ? STATUS_ACTIVE_COLOR : STATUS_WAIT_COLOR));
     this.mapBadgeText?.setText(view.mapBadge ?? '');
     this.modeBadgeText?.setText(view.modeBadge ?? '');
 
@@ -559,9 +613,7 @@ export class DraftScene extends Phaser.Scene {
       if (isPicked) this.drawCardHighlight(card);
     }
 
-    this.deadlineAtLocalMs = view.complete
-      ? null
-      : performance.now() + draft.pickDeadlineMs;
+    this.deadlineAtLocalMs = view.complete ? null : performance.now() + draft.pickDeadlineMs;
     this.timerText?.setVisible(!view.complete);
     this.updateCountdownLabel();
   }
@@ -581,8 +633,7 @@ export class DraftScene extends Phaser.Scene {
 
     this.pickHighlight?.clear();
     for (const card of this.cards) {
-      const finalValue =
-        card.category === 'map' ? matchData.mapName : matchData.gameMode;
+      const finalValue = card.category === 'map' ? matchData.mapName : matchData.gameMode;
       const isFinal = card.value === finalValue;
       card.button.setDisabled(true);
       card.button.setAlpha(isFinal ? 1 : 0.35);
@@ -606,9 +657,6 @@ export class DraftScene extends Phaser.Scene {
   }
 
   private isLikelyMobile(): boolean {
-    return (
-      'ontouchstart' in window &&
-      Math.min(window.innerWidth, window.innerHeight) < 600
-    );
+    return 'ontouchstart' in window && Math.min(window.innerWidth, window.innerHeight) < 600;
   }
 }

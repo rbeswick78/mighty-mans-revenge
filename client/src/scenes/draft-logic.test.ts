@@ -10,9 +10,7 @@ import {
   shouldSkipSpectacle,
 } from './draft-logic.js';
 
-function snap(
-  overrides: Partial<ServerDraftStateMessage> = {},
-): ServerDraftStateMessage {
+function snap(overrides: Partial<ServerDraftStateMessage> = {}): ServerDraftStateMessage {
   return {
     type: 'server:draftState',
     matchId: 'match-1',
@@ -21,15 +19,12 @@ function snap(
       { id: 'p2', nickname: 'dave' },
     ],
     firstPickerId: 'p1',
+    firstPickerReason: 'coin_toss',
     currentPickerId: 'p1',
     mapPick: null,
     modePick: null,
     mapOptions: ['Wasteland Outpost', 'Overgrown Suburb', 'Scrapyard'],
-    modeOptions: [
-      GameModeType.DEATHMATCH,
-      GameModeType.KOTH,
-      GameModeType.GUN_GAME,
-    ],
+    modeOptions: [GameModeType.DEATHMATCH, GameModeType.KOTH, GameModeType.GUN_GAME],
     pickDeadlineMs: 20000,
     ...overrides,
   };
@@ -129,9 +124,7 @@ describe('firstPickedCategory', () => {
 
   it('is null again once both picks are in (ambiguous)', () => {
     expect(
-      firstPickedCategory(
-        snap({ mapPick: 'Scrapyard', modePick: GameModeType.KOTH }),
-      ),
+      firstPickedCategory(snap({ mapPick: 'Scrapyard', modePick: GameModeType.KOTH })),
     ).toBeNull();
   });
 });

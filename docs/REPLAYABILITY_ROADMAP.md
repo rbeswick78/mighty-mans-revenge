@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–9 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–10 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -30,17 +30,18 @@ Each session below attacks one of these.
 
 ## Session overview
 
-| # | Title | Fun payoff | Status |
-|---|-------|-----------|--------|
-| 1 | Weapon system + Shotgun + health pickups | Fights stop being identical; map control begins | **DONE** (2026-07-04) |
-| 2 | Match awards + persistent rivalry stats | Bragging rights: the friend-group replay engine | **DONE** (2026-07-04) |
-| 3 | Mutator expansion | Matches stop repeating; chaos moments | **DONE** (2026-07-04) |
-| 4 | Two new maps + rotation | New spaces to master | **DONE** (2026-07-04) |
-| 5 | King of the Hill + overtime | A second way to play; no more anticlimactic ties | **DONE** (2026-07-04) |
-| 6 | New characters + stat identities | Counterpicks and mains | **DONE** (2026-07-04) |
-| 7 | (Stretch) Gun Game + Pistol + melee | The party mode | **DONE** (2026-07-04) |
-| 8 | Playtest response + polish backlog | The accumulated small stuff, cleared before group night | **DONE** (2026-07-04) |
-| 9 | Playtest response #1: two bugs + map/mode draft | The game respects your pick — and lets you pick the arena | **DONE** (2026-07-05) |
+| #   | Title                                           | Fun payoff                                                     | Status                |
+| --- | ----------------------------------------------- | -------------------------------------------------------------- | --------------------- |
+| 1   | Weapon system + Shotgun + health pickups        | Fights stop being identical; map control begins                | **DONE** (2026-07-04) |
+| 2   | Match awards + persistent rivalry stats         | Bragging rights: the friend-group replay engine                | **DONE** (2026-07-04) |
+| 3   | Mutator expansion                               | Matches stop repeating; chaos moments                          | **DONE** (2026-07-04) |
+| 4   | Two new maps + rotation                         | New spaces to master                                           | **DONE** (2026-07-04) |
+| 5   | King of the Hill + overtime                     | A second way to play; no more anticlimactic ties               | **DONE** (2026-07-04) |
+| 6   | New characters + stat identities                | Counterpicks and mains                                         | **DONE** (2026-07-04) |
+| 7   | (Stretch) Gun Game + Pistol + melee             | The party mode                                                 | **DONE** (2026-07-04) |
+| 8   | Playtest response + polish backlog              | The accumulated small stuff, cleared before group night        | **DONE** (2026-07-04) |
+| 9   | Playtest response #1: two bugs + map/mode draft | The game respects your pick — and lets you pick the arena      | **DONE** (2026-07-05) |
+| 10  | Rivalry Sets + Revenge Drafts                   | Every rematch becomes a round with stakes and comeback control | **DONE** (2026-07-11) |
 
 ---
 
@@ -244,14 +245,14 @@ screen and lifetime head-to-head records that survive restarts.
   and shipped in `MatchResult` (extend the shared type). Display the top 3
   applicable by priority order. Starting set (names final, thresholds
   tunable):
-  - *Sharpshooter* — best accuracy (min 10 shots fired)
-  - *Spray & Pray* — most shots fired with accuracy < 25%
-  - *Demolition Man* — most grenade kills (≥1)
-  - *Buckshot Barber* — most shotgun kills (≥1; from Session 1's attribution)
-  - *Untouchable* — longest kill streak (≥3)
-  - *Pincushion* — most damage taken
-  - *Pin Puller, No Payoff* — ≥3 grenades thrown, 0 grenade kills
-  - *Tourist* — most distance traveled if cheap to track, else drop
+  - _Sharpshooter_ — best accuracy (min 10 shots fired)
+  - _Spray & Pray_ — most shots fired with accuracy < 25%
+  - _Demolition Man_ — most grenade kills (≥1)
+  - _Buckshot Barber_ — most shotgun kills (≥1; from Session 1's attribution)
+  - _Untouchable_ — longest kill streak (≥3)
+  - _Pincushion_ — most damage taken
+  - _Pin Puller, No Payoff_ — ≥3 grenades thrown, 0 grenade kills
+  - _Tourist_ — most distance traveled if cheap to track, else drop
 - **Persistence:** a JSON file on the server (`server/data/persistent-stats.json`,
   path via env `DATA_DIR`, default `server/data/`; gitignored). Keyed by
   **lowercased nickname** (fine for <10 friends). Schema: per-player lifetime
@@ -553,17 +554,17 @@ ladder needs: a Pistol and a Punch melee.
   punch → melee path. `WeaponId` grows `'pistol' | 'punch'`;
   `KillWeapon` + `KILL_WEAPONS` grow `'pistol' | 'punch'` (persistence
   must default missing `killsByWeapon` keys to 0 when loading an older
-  `persistent-stats.json`). New award: *Bare Knuckles* — most punch
+  `persistent-stats.json`). New award: _Bare Knuckles_ — most punch
   kills (≥1).
 - **Punch animations are body-level states** (unlike gun overlays):
   `CharacterDef` gains `attackFrames`/`attackFrameCount`; every roster
   character has pack attack sheets (Main Punch Sheet4 — with-hands
-  variant; Zombie_Small First-Attack Sheet4; Zombie_Big Sheet8;
+  variant; Zombie*Small First-Attack Sheet4; Zombie_Big Sheet8;
   Zombie_Axe Sheet7; Frost Wizard reuses Main). Anims normalize to a
   ~350ms play regardless of frame count. While `weaponId === 'punch'`
   the gun overlay hides. Pistol gets held overlays
-  (`pistol_{dir}_{hold,shoot}`, Mighty Man only — the only
-  `hasGun` character; skip the Sheet11 reloads, fixed timer like the
+  (`pistol*{dir}\_{hold,shoot}`, Mighty Man only — the only
+`hasGun` character; skip the Sheet11 reloads, fixed timer like the
   shotgun).
 - **Mobile untouched:** right-stick release already fires; the server
   decides what firing means from the rung. Grenade rung uses the
@@ -578,12 +579,13 @@ ladder needs: a Pistol and a Punch melee.
 
 **Type/plumbing checklist:** `WEAPONS.pistol`/`WEAPONS.punch` +
 `WeaponDef.maxRange?`; `GUN_GAME` config block; `GameModeType.GUN_GAME`
-+ rotation + registry entries; `GameMode.onKill(…, weapon)` signature
-change; three optional mode hooks (mutator exclusion, pickup filter,
-gun gate); punch one-shot event on the gameState message
-(`shared/src/types/network.ts`); `KillWeapon`/`KILL_WEAPONS` growth;
-`CharacterDef.attackFrames`/`attackFrameCount`; shared
-`gun-game.ts` + `evenFanAngles` utils (100% coverage, deterministic).
+
+- rotation + registry entries; `GameMode.onKill(…, weapon)` signature
+  change; three optional mode hooks (mutator exclusion, pickup filter,
+  gun gate); punch one-shot event on the gameState message
+  (`shared/src/types/network.ts`); `KillWeapon`/`KILL_WEAPONS` growth;
+  `CharacterDef.attackFrames`/`attackFrameCount`; shared
+  `gun-game.ts` + `evenFanAngles` utils (100% coverage, deterministic).
 
 **Assets to extract:** pistol hold/shoot overlays (4 dirs × 2 states),
 `UI/Bullet Indicators/Pistol-Bullet{,_Empty}.png` (+ Small variants if
@@ -690,7 +692,7 @@ the next session tunes off real group-night data.
 - **Overtime music** (Session 5 leftover): on `server:overtimeStart`,
   after the existing deep-horn sting, play the **final 30s of the
   gameplay track** (`music-gameplay` with `seek = duration − OVERTIME
-  length`) — overtime is 30s, so the track's already-tuned finale lands
+length`) — overtime is 30s, so the track's already-tuned finale lands
   exactly at 0:00 again. No new audio file; a kill just stops it early
   like any match end.
 - **Real melee/axe SFX** (Session 7 leftover): the pack ships no audio
@@ -826,7 +828,7 @@ for those verdicts explicitly next time.
 - **Map & mode draft (feature):** every real match — fresh AND rematch —
   opens with a pre-match draft replacing the blind rotation:
   - Server rolls **who picks first** (injectable RNG for tests). The
-    first picker claims a category *implicitly by picking*: they click
+    first picker claims a category _implicitly by picking_: they click
     EITHER a map card OR a mode card — no separate "choose your
     category" step (one action instead of two; the choice of category is
     the choice). The other player then picks from the remaining
@@ -887,7 +889,7 @@ MatchmakingManager `DraftState` machinery + `handleDraftPick` +
 tick-driven deadlines + seeded-RNG constructor injection; GameService
 `draftState` event + `sendDraftPick`; new
 `client/src/scenes/draft-scene.ts`; ResultsScene teaser text; e2e
-fixtures walk the draft (or pin FORCE_*).
+fixtures walk the draft (or pin FORCE\_\*).
 
 **Acceptance criteria**
 
@@ -908,8 +910,8 @@ fixtures walk the draft (or pin FORCE_*).
       wrong-turn/wrong-category clicks do nothing; opponent's pick
       renders live; mobile landscape legible.
 - [x] Full regression: typecheck/lint/unit/Playwright green; no
-      shared-physics changes (the bug-2 fix touches prediction *state
-      plumbing*, not movement math).
+      shared-physics changes (the bug-2 fix touches prediction _state
+      plumbing_, not movement math).
 
 **Parallelizable workstreams:** (a) shared config/types (single writer
 to game.ts/network.ts — lands first); (b) the two client bug fixes
@@ -920,7 +922,85 @@ teaser. (c) and (d) are independent once (a)+(b) land.
 
 ---
 
+## Session 10 — Rivalry Sets + Revenge Drafts
+
+**Goal:** turn the strong individual-match experience into a compelling
+"one more round" loop. Consecutive rematches become a first-to-3 set, and
+the previous round's loser earns first pick in the next map/mode draft.
+
+**Locked design decisions**
+
+- Sets are session-scoped, not lifetime progression: leaving results,
+  disconnecting during the next draft, or timing out dissolves the set.
+- First to 3 wins clinches. Draws count as rounds played but award no set
+  point. Accepting another rematch after a clinch starts a clean set.
+- Fresh pairings and post-draw drafts keep the coin toss. After a decisive
+  round, the loser gets first pick; this is explicit comeback agency, not
+  a hidden weighting.
+- Set state lives in `MatchmakingManager`, outside `Match` and every game
+  mode. `MatchResult.rivalrySet` is a complete snapshot, so the client is a
+  pure projector and all modes behave identically.
+- Results combine the immediate set and lifetime rivalry on one compact
+  line, name the next revenge picker, and relabel REMATCH as NEXT ROUND or
+  NEW SET. Revenge drafts use a short dedicated reveal instead of the
+  random ping-pong spectacle.
+
+**Acceptance criteria**
+
+- [x] Consecutive 1v1 rematches accumulate a deterministic first-to-3 set
+      across every mode; draws do not grant a point.
+- [x] A decisive round gives its loser first pick in the next real draft;
+      fresh/post-draw drafts still use seeded randomness.
+- [x] A clinch ships a champion, the results action becomes NEW SET, and
+      accepting it resets the next round to a clean 0-0 set.
+- [x] Leaving the rematch flow releases ephemeral set state; lifetime
+      persistence remains unchanged.
+- [x] Results and draft treatments fit desktop and mobile landscape, with
+      Phaser-free formatting tests and server flow coverage.
+- [x] Typecheck, lint, all unit tests, production build, and Playwright pass.
+
+---
+
 ## Session Log
+
+### Session 10 — 2026-07-11 — Rivalry Sets + Revenge Drafts
+
+**Shipped:** consecutive rematches now form a first-to-3 Rivalry Set. The
+authoritative matchmaking layer owns an ephemeral pairing score, attaches a
+full set snapshot to every `MatchResult`, records draws as rounds without a
+point, declares a champion at 3 wins, and starts a clean set when both players
+accept another round after a clinch. A decisive round also gives its loser the
+next draft's first pick (`firstPickerReason: 'revenge'`); fresh pairings and
+draws keep the original seeded coin toss.
+
+The client turns that state into a tighter social loop: results show the live
+set score beside the all-time rivalry, name who gets the revenge pick, and use
+NEXT ROUND / NEW SET actions. The next draft opens with a short REVENGE DRAFT
+reveal for the previous loser instead of replaying fake-random theater.
+
+**Design decisions made in-session:**
+
+- First-to-3 is intentionally short enough for one hangout but long enough
+  for a comeback. The value is centralized in `RIVALRY_SET`.
+- Set state is deliberately not written to `persistent-stats.json`; the
+  existing all-time line already owns durable history, while a set should
+  feel immediate and disposable.
+- FORCE_MAP/FORCE_MODE still bypass draft presentation for smoke tests, but
+  results continue to score the set.
+- A real forfeit counts as a round win (matching lifetime win semantics), so
+  rage-quitting cannot erase the opponent's set point.
+
+**Verified:** typecheck and lint clean; production build green; 765 unit tests
+green (including a full server-driven 3-0 clinch, loser-first drafts each
+round, and post-clinch reset); full Playwright suite green (11 passed, 7
+expected project skips). Real two-client browser smoke through the dev server:
+fresh coin-toss draft -> Gun Game match -> authoritative disconnect forfeit ->
+results showed `SET R1: ALPHA 1-0 BRAVO (FIRST TO 3)`, the named BRAVO revenge
+pick, lifetime record, and NEXT ROUND. Desktop 1280x720 and mobile landscape
+844x390 screenshots were checked; the combined line and both buttons fit.
+
+**Carry-over:** the Session 9 balance watch list remains unjudged. This
+session changes no weapon, character, mutator, map, or mode tuning.
 
 Append one entry per session. Include: date, what shipped (commits), design
 deviations from this doc, known issues, tuning notes from play-testing.
@@ -936,6 +1016,7 @@ distinctness, the 4 generated SFX, overtime music at 0:00) carries
 forward verbatim — ask for explicit verdicts at the next group night.
 
 **Shipped:**
+
 - **Lobby searching-overlap fix**: "SEARCHING FOR OPPONENT" was drawn
   at panel y=70 — inside the callsign input box (y 46–82) — with the
   name-entry UI left visible. The panel now swaps wholesale: label,
@@ -995,6 +1076,7 @@ union member missing from it is a COMPILE error, and CLAUDE.md's
 common-pitfalls entry documents the second registration point.
 
 **Design decisions made in-session (beyond the spec):**
+
 - FORCE-pin draft-skip triggers on env-var PRESENCE, not validity —
   `FORCE_MAP=typo` degrades to rotation with the existing warning, never
   to a surprise draft (kill-switch semantics).
@@ -1036,6 +1118,7 @@ chromium (844×390): draft renders, all 6 cards in-bounds ≥44px, draft
 completes to select.
 
 **Known issues / notes for later sessions:**
+
 - The balance watch-item list is still unjudged (see top of entry) —
   collect explicit verdicts at the next group night, including SFX
   ear-verdicts and whether the overtime finale music lands at 0:00.
@@ -1069,6 +1152,7 @@ NOT touched** — no playtest has happened, so pistol/punch/RUNG_KILLS
 and the Session 6 character stats keep their spec values.
 
 **Shipped:**
+
 - **Pistol as a DM/KOTH map pickup** (`PickupType.WEAPON_PISTOL`,
   `WEAPONS.pistol.pickupAmmo` 0→36): a sidegrade, not a power weapon —
   spawns ACTIVE at match start, silent 30s respawn, never announced
@@ -1094,7 +1178,7 @@ and the Session 6 character stats keep their spec values.
   open (GameManager, right behind server:welcome) and rebroadcast to
   every connection after each match's stats are recorded. Client:
   "ALL-TIME TOP 5" panel bottom-left in the lobby (rows like
-  "1. RYAN  14W 9L", names clipped to 10 chars via the pure
+  "1. RYAN 14W 9L", names clipped to 10 chars via the pure
   `formatLeaderboardRow`), hidden on an empty store, updates in place;
   GameService caches entries so a lobby created after the message
   renders immediately.
@@ -1117,7 +1201,7 @@ and the Session 6 character stats keep their spec values.
   dims differ and are measured into the new optional
   `CharacterDef.altBody`). BootScene loads a parallel `jack-noaxe` anim
   set via a `createBodyAnimationSet` refactor; `PlayerRenderer.
-  setAxeless` swaps the body prefix while `abilityCooldownSeconds > 0`
+setAxeless` swaps the body prefix while `abilityCooldownSeconds > 0`
   (driven per-frame next to setWeapon — works for local AND remote).
   The pack's Taking-Axe recovery flourish is skipped (v1).
 - **Dry-fire fix**: the out-of-ammo beep now reads the HELD weapon's
@@ -1125,6 +1209,7 @@ and the Session 6 character stats keep their spec values.
   Session 7's aim-line tint fix.
 
 **Design decisions / deviations:**
+
 - Session scoped as "clear the polish backlog, defer all balance" —
   the roadmap's session title says "playtest response", but Session 7
   only reached production at the START of this session, so there was
@@ -1139,7 +1224,7 @@ and the Session 6 character stats keep their spec values.
   — that helper is unreliable geckos io.emit.
 
 **Verified:** 717 unit tests green (+32 this session: config invariants
-incl. altBody frame-dim integrity and hill_hog priority slot, KOTH
+incl. altBody frame-dim integrity and hill*hog priority slot, KOTH
 hill-seconds accrual matrix incl. contested-both-accrue-score-frozen,
 Hill Hog threshold/tie/DM-never, pistol equip/replace/refresh/
 starts-active/never-announced/gun-game-veto, getTopPlayers ordering +
@@ -1153,11 +1238,11 @@ persisted players (desktop AND an 844×390 chromium mobile-landscape
 viewport), pair-up with Jack locked via 3×ArrowRight, pistol pickup
 present at match start, a BFS waypoint-walker drove a client onto
 (9,10) → weaponId flipped to pistol with exactly 12 mag + 24 reserve,
-Jack's axe throw flipped BOTH clients' body anims to `jack-noaxe_*`
-for the cooldown window and back to `jack_*` at expiry, zero uncaught
+Jack's axe throw flipped BOTH clients' body anims to `jack-noaxe*_`for the cooldown window and back to`jack\__` at expiry, zero uncaught
 page errors on either client.
 
 **Known issues / notes for later sessions:**
+
 - **The four generated SFX have not been heard by a human.** They were
   judged by synthesis parameters (envelopes/RMS/spectra), not ears.
   If any lands wrong at group night, retune the constants in
@@ -1214,13 +1299,14 @@ impact SFX); the client plays per-character body-level attack anims
 sheets extracted, playback normalized to ~350ms across 4/4/8/7-frame
 sheets). HUD: ladder line ("PISTOL 1/2 - LVL 3/5") in the mode-exclusive
 middle slot, pistol row (icon + "12 +24"), FISTS label, rifle-ammo row
-hidden on grenade/punch rungs. New award *Bare Knuckles* (most punch
+hidden on grenade/punch rungs. New award _Bare Knuckles_ (most punch
 kills). `KillWeapon` grew 'pistol'/'punch'; persistence back-fills
 missing killsByWeapon keys from older stats files.
 
 **Design decisions made in-session (beyond the locked spec):**
+
 - `GameMode` grew `onKill(…, weapon)` + optional `excludedMutators`
-  (Gun Game: grenades_only, infinite_ammo — FORCE_* pins still bypass),
+  (Gun Game: grenades*only, infinite_ammo — FORCE*\* pins still bypass),
   `isPickupTypeEnabled` (Gun Game: bandages only; vetoed spawns never
   exist so they never announce), `areGunsDisabled` (the grenade rung
   holds a gated rifle for rendering), and
@@ -1239,13 +1325,14 @@ missing killsByWeapon keys from older stats files.
   is NOT excluded (only its regen overlaps; fastest interval wins).
 - `rackingTimers` → `fireCooldownTimers` (now shotgun racking + pistol
   0.22s pacing + punch 0.5s swing cooldown).
-- **FORCE_MATCH_SECONDS** env pin added (FORCE_* family): overrides
+- **FORCE_MATCH_SECONDS** env pin added (FORCE\_\* family): overrides
   regulation length server-side for manual smokes — the client clock
   re-anchors from snapshots so no client change is needed. Used to
   live-verify the full 9-kill ladder without the 173s ceiling. Music
   sync is knowingly off while pinned.
 
 **Fixed in passing:**
+
 - `PlayerRenderer.setWeapon`/`update()` had ZERO call sites — the
   shotgun held-overlay swap has been silently dead since Session 1.
   setWeapon is now driven per-frame by ClientPlayerManager (this
@@ -1284,6 +1371,7 @@ the timeout-victory results path (with a Buckshot Barber award) and a
 0-0 Gun Game timeout entering sudden-death overtime.
 
 **Known issues / notes for later sessions (the polish backlog):**
+
 - Balance is UNTESTED with humans: pistol/punch numbers and
   RUNG_KILLS [2,2,2,2,1] are the spec's starting values — get a group
   night in before tuning. Watch: punch-rung standoffs in 1v1 (both
@@ -1309,7 +1397,7 @@ the timeout-victory results path (with a Buckshot Barber award) and a
   a settle wait before reading it back); dead remotes VANISH from the
   renderer map (interpolation drops them); a chased victim heals on
   trampled bandages; an 85HP victim survives any grenade landing
-  >29px off-centre, so lob at stationary targets.
+  > 29px off-centre, so lob at stationary targets.
 - **Session 7 deploys NOT run:** the auto-mode permission classifier
   allowed the start-of-session Session 6 carry-over deploys but blocked
   the NEW Session 7 production deploys (its stated reasoning: a fresh
@@ -1345,6 +1433,7 @@ flight/landing renderer, Iron Hide steel aura + shield HUD icon +
 banner, Jack axe HUD icon + pitched-up throw SFX.
 
 **Design decisions made in-session (roadmap was silent or amended):**
+
 - Display names: **Bubba** and **Jack** (Bruce/Bubba/Jack — horror-icon
   first names; "Big Zombie"/"Axe Zombie" were placeholders).
 - Per-character hitbox affects HIT VALIDATION ONLY. Movement collision
@@ -1389,8 +1478,9 @@ banner, Jack axe HUD icon + pitched-up throw SFX.
 - Fire breath now computes per-victim hitbox sums (Bubba eats more cone).
 
 **Fixed in passing:**
+
 - `rewind-buffer.ts` line 37 stored `state.maxHealth !== undefined ? 24
-  : 24` — a hardcoded hitbox pretending to be conditional, never read.
+: 24` — a hardcoded hitbox pretending to be conditional, never read.
 - HUD health bar (`game-scene.ts`) and world-space health bars
   (`player-manager.ts`) passed `PLAYER.MAX_HEALTH` instead of the
   player's own `maxHealth` — wrong for the whole roster now, previously
@@ -1413,6 +1503,7 @@ via a display-list probe + a wire tap counting axe-carrying snapshots;
 zero page errors on both clients across both viewports.
 
 **Known issues / notes for later sessions:**
+
 - Point-blank wall throws show only the landing animation at the
   thrower's feet (the axe lives one snapshot). Acceptable — it was
   fully invisible before the armed-tick + event fixes.
@@ -1473,6 +1564,7 @@ bounds/2×2-walkability; the registry requires hills on every shipped
 map).
 
 **Design decisions made in-session (roadmap was silent or amended):**
+
 - "3-minute timer" is interpreted as the existing MATCH.TIME_LIMIT
   (173s, music-synced) — no per-mode time limit.
 - KOTH ties break on hill points ONLY (no deaths tie-break — hill time
@@ -1490,8 +1582,8 @@ map).
   racking, live grenades) are cleared.
 - `MatchResult` gained `nextGameMode` and `wentToOvertime`;
   `server:matchFound` gained `gameMode`; gameState gained `isOvertime`
-  + optional `koth` (KothHudState); new one-shot `server:overtimeStart`
-  re-anchors the client clock exactly like matchStart.
+  - optional `koth` (KothHudState); new one-shot `server:overtimeStart`
+    re-anchors the client clock exactly like matchStart.
 - The client's local 0:00 fade-out now waits a 600ms grace window
   (END_FADE_GRACE_MS) before firing — a tied match re-anchors the clock
   to overtime within ~1 tick + RTT, and the old instant trigger would
@@ -1506,6 +1598,7 @@ map).
   contested center (shotgun room on Scrapyard).
 
 **Fixed in passing:**
+
 - gameState broadcasts run from COUNTDOWN onward, but KothMode's hills
   are only initialized by onStart at the COUNTDOWN→ACTIVE transition —
   the countdown snapshots carried `koth.hill: undefined` (JSON drops
@@ -1522,6 +1615,7 @@ regression test for the countdown hill-state bug). Typecheck + lint
 clean; full standard Playwright suite green. Throwaway two-client
 Playwright smokes with FORCE_MODE=koth (spec deleted after), driven
 through the real dev servers + netcode:
+
 - Desktop KOTH: character-select "NEXT: KING OF THE HILL - WASTELAND
   OUTPOST" line, hill zone overlay at (9,5), BFS-walked a client onto
   the hill → occupantId flipped, capture bar filled mint, +2 score in
@@ -1538,6 +1632,7 @@ through the real dev servers + netcode:
   overtime ended as a true draw on both results screens.
 
 **Known issues / notes for later sessions:**
+
 - The smoke surfaced and fixed a real bug in review: countdown-phase
   gameState carried koth.hill undefined (onStart hadn't run) → client
   TypeError per frame. Fixed server-side + defensive client guards +
@@ -1588,6 +1683,7 @@ keys are skipped; cells under a decoration render plain floor.
 Validator gained a decoration bounds/size check.
 
 **Design decisions made in-session (roadmap was silent or amended):**
+
 - The Background_Green/Dark-Green sheets are exact layout twins of the
   bleak-yellow sheet, so floor theming is a texture swap reusing the
   same variant/scorch frame indices.
@@ -1624,6 +1720,7 @@ FORCE_MAP on both new maps — desktop + mobile-landscape screenshots
 eyeballed, WASD wandering, zero page errors.
 
 **Known issues / notes for later sessions:**
+
 - Suburb vs Scrapyard floor greens are closer in tone than the sheet
   names suggest once the CRT/lighting wash is applied; identity comes
   mostly from wall color + clutter. If the group can't tell them apart
@@ -1664,6 +1761,7 @@ shared `mutatorsToMovementModifiers`). All constants in
 `shared/src/config/game.ts` under `MUTATORS`.
 
 **Design decisions made in-session (roadmap was silent):**
+
 - **Mutators stack.** The 70% window edge (51.9s remaining at
   TIME_LIMIT 173) lies inside the final minute, so both slots can be
   live at once — active state is an ordered list (`activeMutators` in
@@ -1710,6 +1808,7 @@ no snap/rubber-banding while moving, screenshots eyeballed. Spec deleted
 after the run.
 
 **Known issues / notes for later sessions:**
+
 - Mutator activation VFX is the existing flash + banner + horn; no
   per-mutator world VFX (e.g. no heal number popups for vampire). Cheap
   polish later — HealFlash exists and could fire on vampire heals.
@@ -1735,6 +1834,7 @@ the amber "ALL-TIME: RYAN 14 - 9 DAVE" rivalry line, verified on desktop +
 mobile-landscape viewports via a throwaway Playwright drive-through.
 
 **Design decisions made in-session (roadmap was silent):**
+
 - `PlayerStats.grenadeKills`/`shotgunKills` were replaced by a
   `killsByWeapon: Record<KillWeapon, number>` (runtime key list
   `KILL_WEAPONS` in shared config) so lifetime per-weapon kills and
@@ -1759,12 +1859,14 @@ mobile-landscape viewports via a throwaway Playwright drive-through.
 - Head-to-head pairs are only recorded for exactly-2-player matches.
 
 **Fixed in passing:**
+
 - Session 1's last commit left `pnpm lint` red: the Playwright
   `_fixtures` fix introduced empty destructuring patterns
   (`no-empty-pattern`) in `e2e/tests/character-select.test.ts` — now
   suppressed with targeted disables (Playwright forces that shape).
 
 **Known issues / notes for later sessions:**
+
 - Lobby leaderboard (stretch goal) skipped — the store already has the
   data (`getLifetime`); a `/stats` HTTP endpoint or lobby panel is a
   cheap follow-up.
@@ -1790,6 +1892,7 @@ deterministic pellet spread (`shared/src/utils/pellet-spread.ts`,
 mulberry32 seeded by the firing input's sequence number).
 
 **Design decisions made in-session (roadmap was silent):**
+
 - `WeaponDef` gained a `fireCooldown` field — the 0.6 s pump-racking is a
   between-trigger-pulls delay, which none of the spec'd fields could
   express. Rifle: 0.
@@ -1812,6 +1915,7 @@ mulberry32 seeded by the firing input's sequence number).
   `shotgunKills` now so Session 2's Buckshot Barber can consume it.
 
 **Fixed in passing:**
+
 - Pre-existing double-count: every kill incremented `PlayerState.deaths`
   in BOTH `CombatManager.applyDamage` and `Match.onKill` (surfaced by the
   multi-pellet kill test). `onKill` now owns the counter.
@@ -1823,6 +1927,7 @@ mulberry32 seeded by the firing input's sequence number).
   failing before any test ran.
 
 **Known issues / notes for later sessions:**
+
 - Bruce and Frost Wizard have `hasGun: false`, so they show no held
   shotgun overlay (same as the rifle today). Pellets/SFX still fire.
 - Shotgun pellet trails reuse the rifle tracer visuals; the extracted
@@ -1836,6 +1941,7 @@ mulberry32 seeded by the firing input's sequence number).
   / 20 s). Playtest with the group before tweaking.
 
 ### Session 0 — 2026-07-03 — Planning
+
 - Reviewed game for repetitiveness causes; wrote this roadmap.
 - Inventoried the asset pack: PNGs live only inside the zip
   (`PostApocalypse_AssetPack_v1.1.2.zip`); extracted folder is GIF previews.

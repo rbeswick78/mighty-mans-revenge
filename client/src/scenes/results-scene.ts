@@ -7,14 +7,12 @@ import { AWARD_DEFS, createEmptyKillsByWeapon, gameModeDisplayName } from '@shar
 import { Wasteland, cssHex } from '@shared/config/palette.js';
 import { AudioManager } from '../audio/audio-manager.js';
 import { GameService, type MatchData } from '../services/game-service.js';
-import {
-  WastelandStreet,
-  type Outcome,
-} from '../ui/menu/wasteland-street.js';
+import { WastelandStreet, type Outcome } from '../ui/menu/wasteland-street.js';
 import { MenuPanel } from '../ui/menu/menu-panel.js';
 import { PixelButton } from '../ui/menu/pixel-button.js';
 import { TitleLogo } from '../ui/menu/title-logo.js';
 import { MENU_FONTS } from '../ui/menu/fonts.js';
+import { formatRivalrySummary, nextDraftTeaser, rematchButtonLabel } from '../ui/rivalry-set.js';
 
 interface ResultsSceneData {
   result?: MatchResult;
@@ -23,22 +21,22 @@ interface ResultsSceneData {
 }
 
 // Outcome → primary banner color (matches WastelandStreet's wash family).
-const VICTORY_COLOR = Wasteland.HEALTH_GOOD;          // dusty mint
-const DEFEAT_COLOR = Wasteland.HIT_FLASH;             // dried blood
-const DRAW_COLOR = Wasteland.HEALTH_WARNING;          // amber warning
-const DIVIDER_COLOR = Wasteland.LOADING_BAR_FILL;     // hot orange accent
-const LABEL_COLOR = Wasteland.COVER_FILL;             // weathered tan
-const VALUE_COLOR = Wasteland.TEXT_PRIMARY;           // bone-white
-const WINNER_NICK_COLOR = Wasteland.HEALTH_GOOD;      // mint
-const LOSER_NICK_COLOR = Wasteland.HIT_FLASH;         // blood
+const VICTORY_COLOR = Wasteland.HEALTH_GOOD; // dusty mint
+const DEFEAT_COLOR = Wasteland.HIT_FLASH; // dried blood
+const DRAW_COLOR = Wasteland.HEALTH_WARNING; // amber warning
+const DIVIDER_COLOR = Wasteland.LOADING_BAR_FILL; // hot orange accent
+const LABEL_COLOR = Wasteland.COVER_FILL; // weathered tan
+const VALUE_COLOR = Wasteland.TEXT_PRIMARY; // bone-white
+const WINNER_NICK_COLOR = Wasteland.HEALTH_GOOD; // mint
+const LOSER_NICK_COLOR = Wasteland.HIT_FLASH; // blood
 const REMATCH_STATUS_COLOR = Wasteland.HEALTH_WARNING;
 const OPPONENT_LEFT_COLOR = Wasteland.HIT_FLASH;
 const FOOTER_COLOR = Wasteland.WALL_LINE;
 const NO_DATA_COLOR = Wasteland.COVER_FILL;
 const LOSER_TINT = 0x55454f;
-const AWARD_NAME_COLOR = Wasteland.LOADING_BAR_FILL;  // hot orange accent
-const RIVALRY_COLOR = Wasteland.HEALTH_WARNING;       // amber
-const NEXT_DRAFT_COLOR = Wasteland.LOADING_BAR_FILL;  // hot orange accent
+const AWARD_NAME_COLOR = Wasteland.LOADING_BAR_FILL; // hot orange accent
+const RIVALRY_COLOR = Wasteland.HEALTH_WARNING; // amber
+const NEXT_DRAFT_COLOR = Wasteland.LOADING_BAR_FILL; // hot orange accent
 
 // Awards + rivalry strip sits between the stats panel (ends at y=460) and
 // the rematch status line (camHeight - 130 = 590 on the 960x720 canvas).
@@ -134,11 +132,16 @@ export class ResultsScene extends Phaser.Scene {
     // MatchResult.nextMapName/nextGameMode stay populated for wire compat
     // but only the FORCE/no-draft path honors them.
     const nextTeaser = this.add
-      .text(centerX, 112, 'NEXT: COIN TOSS PICKS WHO DRAFTS MAP + MODE', {
-        fontFamily: MENU_FONTS.HEADER,
-        fontSize: '10px',
-        color: cssHex(NEXT_DRAFT_COLOR),
-      })
+      .text(
+        centerX,
+        112,
+        this.result ? nextDraftTeaser(this.result) : 'NEXT: COIN TOSS PICKS WHO DRAFTS MAP + MODE',
+        {
+          fontFamily: MENU_FONTS.HEADER,
+          fontSize: '10px',
+          color: cssHex(NEXT_DRAFT_COLOR),
+        },
+      )
       .setOrigin(0.5)
       .setAlpha(0)
       .setDepth(WastelandStreet.DEPTH.UI);
@@ -203,7 +206,7 @@ export class ResultsScene extends Phaser.Scene {
       btnY,
       btnW,
       btnH,
-      'REMATCH',
+      rematchButtonLabel(this.result),
       {
         variant: 'primary',
         fontSize: 13,
@@ -213,47 +216,32 @@ export class ResultsScene extends Phaser.Scene {
             return;
           }
           this.gameService.requestRematch();
-          this.rematchStatusText
-            ?.setText('Waiting for opponent...')
-            .setVisible(true);
+          this.rematchStatusText?.setText('Waiting for opponent...').setVisible(true);
         },
       },
     );
     this.rematchButton.setDepth(WastelandStreet.DEPTH.UI);
 
-    new PixelButton(
-      this,
-      centerX + 14,
-      btnY,
-      btnW,
-      btnH,
-      'BACK TO LOBBY',
-      {
-        variant: 'secondary',
-        fontSize: 13,
-        onClick: () => {
-          this.gameService.returnToLobby();
-          this.cameras.main.fadeOut(300, 0, 0, 0);
-          this.cameras.main.once('camerafadeoutcomplete', () => {
-            this.cleanupEvents();
-            this.scene.start('LobbyScene');
-          });
-        },
+    new PixelButton(this, centerX + 14, btnY, btnW, btnH, 'BACK TO LOBBY', {
+      variant: 'secondary',
+      fontSize: 13,
+      onClick: () => {
+        this.gameService.returnToLobby();
+        this.cameras.main.fadeOut(300, 0, 0, 0);
+        this.cameras.main.once('camerafadeoutcomplete', () => {
+          this.cleanupEvents();
+          this.scene.start('LobbyScene');
+        });
       },
-    ).setDepth(WastelandStreet.DEPTH.UI);
+    }).setDepth(WastelandStreet.DEPTH.UI);
 
     // Footer
     this.add
-      .text(
-        centerX,
-        camHeight - 24,
-        "MIGHTY MAN'S REVENGE  //  POST-APOCALYPTIC SHOWDOWN",
-        {
-          fontFamily: MENU_FONTS.BODY,
-          fontSize: '12px',
-          color: cssHex(FOOTER_COLOR),
-        },
-      )
+      .text(centerX, camHeight - 24, "MIGHTY MAN'S REVENGE  //  POST-APOCALYPTIC SHOWDOWN", {
+        fontFamily: MENU_FONTS.BODY,
+        fontSize: '12px',
+        color: cssHex(FOOTER_COLOR),
+      })
       .setOrigin(0.5)
       .setDepth(WastelandStreet.DEPTH.UI);
 
@@ -264,11 +252,7 @@ export class ResultsScene extends Phaser.Scene {
     this.cleanupEvents();
   }
 
-  private renderTableau(
-    isWinner: boolean,
-    isDraw: boolean,
-    camHeight: number,
-  ): void {
+  private renderTableau(isWinner: boolean, isDraw: boolean, camHeight: number): void {
     // Local player is assumed to be mighty_man; opponent is assumed to be
     // bruce. (CharacterId isn't currently threaded through MatchData.)
     const groundY = camHeight - 130;
@@ -338,9 +322,7 @@ export class ResultsScene extends Phaser.Scene {
       statsMap = this.result.playerStats;
     } else {
       statsMap = new Map(
-        Object.entries(
-          this.result.playerStats as unknown as Record<string, PlayerStats>,
-        ),
+        Object.entries(this.result.playerStats as unknown as Record<string, PlayerStats>),
       );
     }
 
@@ -358,9 +340,7 @@ export class ResultsScene extends Phaser.Scene {
     }
 
     const localNick = this.nickname.toUpperCase();
-    const opponentNick = (
-      this.matchData?.opponents[0]?.nickname ?? 'OPPONENT'
-    ).toUpperCase();
+    const opponentNick = (this.matchData?.opponents[0]?.nickname ?? 'OPPONENT').toUpperCase();
     const leftNick = leftId === localPlayerId ? localNick : opponentNick;
     const rightNick = rightId === localPlayerId ? localNick : opponentNick;
 
@@ -469,16 +449,12 @@ export class ResultsScene extends Phaser.Scene {
   private renderAwardsAndRivalry(centerX: number): void {
     if (!this.result) return;
 
-    const rivalry = this.result.rivalry;
-    if (rivalry) {
-      const drawsSuffix = rivalry.draws > 0 ? `  (${rivalry.draws} DRAWS)` : '';
-      const line =
-        `ALL-TIME: ${rivalry.nicknameA.toUpperCase()} ${rivalry.winsA}` +
-        ` - ${rivalry.winsB} ${rivalry.nicknameB.toUpperCase()}${drawsSuffix}`;
+    const line = formatRivalrySummary(this.result);
+    if (line) {
       const rivalryText = this.add
         .text(centerX, RIVALRY_Y, line, {
           fontFamily: MENU_FONTS.HEADER,
-          fontSize: '11px',
+          fontSize: '9px',
           color: cssHex(RIVALRY_COLOR),
         })
         .setOrigin(0.5)
@@ -538,10 +514,22 @@ export class ResultsScene extends Phaser.Scene {
       { label: 'DEATHS', left: `${s1.deaths}`, right: `${s2.deaths}` },
       { label: 'K/D', left: kd1, right: kd2 },
       { label: 'ACCURACY', left: `${accuracy1}%`, right: `${accuracy2}%` },
-      { label: 'DMG DEALT', left: `${Math.round(s1.damageDealt)}`, right: `${Math.round(s2.damageDealt)}` },
-      { label: 'DMG TAKEN', left: `${Math.round(s1.damageTaken)}`, right: `${Math.round(s2.damageTaken)}` },
+      {
+        label: 'DMG DEALT',
+        left: `${Math.round(s1.damageDealt)}`,
+        right: `${Math.round(s2.damageDealt)}`,
+      },
+      {
+        label: 'DMG TAKEN',
+        left: `${Math.round(s1.damageTaken)}`,
+        right: `${Math.round(s2.damageTaken)}`,
+      },
       { label: 'GRENADES', left: `${s1.grenadesThrown}`, right: `${s2.grenadesThrown}` },
-      { label: 'GREN KILLS', left: `${s1.killsByWeapon.grenade}`, right: `${s2.killsByWeapon.grenade}` },
+      {
+        label: 'GREN KILLS',
+        left: `${s1.killsByWeapon.grenade}`,
+        right: `${s2.killsByWeapon.grenade}`,
+      },
       { label: 'BEST STREAK', left: `${s1.longestKillStreak}`, right: `${s2.longestKillStreak}` },
     ];
   }
@@ -565,9 +553,7 @@ export class ResultsScene extends Phaser.Scene {
   private wireGameServiceEvents(): void {
     this.onRematchStatus = (opponentWantsRematch: boolean) => {
       if (opponentWantsRematch && this.rematchStatusText) {
-        this.rematchStatusText
-          .setText('Opponent wants a rematch!')
-          .setVisible(true);
+        this.rematchStatusText.setText('Opponent wants a rematch!').setVisible(true);
       }
     };
 
@@ -612,9 +598,7 @@ export class ResultsScene extends Phaser.Scene {
       this.rematchUnavailable = true;
       this.rematchButton?.setDisabled(true);
       if (this.rematchStatusText) {
-        this.rematchStatusText
-          .setText('Opponent has left.')
-          .setVisible(true);
+        this.rematchStatusText.setText('Opponent has left.').setVisible(true);
         this.rematchStatusText.setColor(cssHex(OPPONENT_LEFT_COLOR));
       }
     };
@@ -661,16 +645,11 @@ export class ResultsScene extends Phaser.Scene {
   private showRematchUnavailable(): void {
     if (!this.rematchStatusText) return;
     this.rematchButton?.setDisabled(true);
-    this.rematchStatusText
-      .setText('Rematch unavailable - return to lobby.')
-      .setVisible(true);
+    this.rematchStatusText.setText('Rematch unavailable - return to lobby.').setVisible(true);
     this.rematchStatusText.setColor(cssHex(OPPONENT_LEFT_COLOR));
   }
 
   private isLikelyMobile(): boolean {
-    return (
-      'ontouchstart' in window &&
-      Math.min(window.innerWidth, window.innerHeight) < 600
-    );
+    return 'ontouchstart' in window && Math.min(window.innerWidth, window.innerHeight) < 600;
   }
 }
