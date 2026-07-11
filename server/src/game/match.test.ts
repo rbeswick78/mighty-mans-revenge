@@ -1007,6 +1007,57 @@ describe('Match', () => {
           delete process.env.FORCE_MIDMATCH_MUTATOR;
         }
       });
+
+      it('random rematch rolls exclude both mutators from the previous round', () => {
+        const previous: MutatorId[] = ['super_speed', 'blackout'];
+        const m = new Match(
+          'rematch-1',
+          makeMapData(),
+          [
+            { id: 'player-0', nickname: 'Player 0' },
+            { id: 'player-1', nickname: 'Player 1' },
+          ],
+          GameModeType.DEATHMATCH,
+          () => 0,
+          previous,
+        );
+        m.startCountdown();
+        m.update(MATCH.COUNTDOWN_DURATION + 0.05);
+        const internals = m as unknown as MatchInternals;
+        internals.midMatchSlot.activateAtElapsed = 80;
+        internals.matchTimer = MATCH.TIME_LIMIT - 80.1;
+
+        m.update(0.05);
+
+        expect(m.activeMutators).toHaveLength(1);
+        expect(previous).not.toContain(m.activeMutators[0]);
+      });
+
+      it('FORCE_MIDMATCH_MUTATOR overrides rematch recency for smoke tooling', () => {
+        process.env.FORCE_MIDMATCH_MUTATOR = 'blackout';
+        try {
+          const m = new Match(
+            'forced-rematch-1',
+            makeMapData(),
+            [
+              { id: 'player-0', nickname: 'Player 0' },
+              { id: 'player-1', nickname: 'Player 1' },
+            ],
+            GameModeType.DEATHMATCH,
+            () => 0,
+            ['blackout'],
+          );
+          m.startCountdown();
+          m.update(MATCH.COUNTDOWN_DURATION + 0.05);
+          const internals = m as unknown as MatchInternals;
+          internals.midMatchSlot.activateAtElapsed = 80;
+          internals.matchTimer = MATCH.TIME_LIMIT - 80.1;
+          m.update(0.05);
+          expect(m.activeMutators).toEqual(['blackout']);
+        } finally {
+          delete process.env.FORCE_MIDMATCH_MUTATOR;
+        }
+      });
     });
 
     describe('big_heads', () => {

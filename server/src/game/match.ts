@@ -199,6 +199,8 @@ export class Match implements MatchContext {
   private _tickMutatorStarts: Array<{ event: MutatorId; isFinalMinute: boolean }> = [];
   /** Injected RNG for mutator timing/selection — defaults to Math.random, override in tests. */
   private readonly rng: () => number;
+  /** Mutators from the immediately previous round, excluded from random rolls. */
+  private readonly rematchMutatorExclusions: ReadonlySet<MutatorId>;
   /**
    * Regulation length in seconds — MATCH.TIME_LIMIT unless the
    * FORCE_MATCH_SECONDS env smoke pin overrides it (same family as
@@ -216,9 +218,11 @@ export class Match implements MatchContext {
     playerEntries: Array<{ id: PlayerId; nickname: string }>,
     gameModeType: GameModeType = GameModeType.DEATHMATCH,
     rng: () => number = Math.random,
+    rematchMutatorExclusions: readonly MutatorId[] = [],
   ) {
     this.matchId = matchId;
     this.rng = rng;
+    this.rematchMutatorExclusions = new Set(rematchMutatorExclusions);
     this.timeLimitSeconds = resolveTimeLimitSeconds();
     this.stats = new StatsTracker();
     this.pickupManager = new PickupManager();
@@ -1642,6 +1646,9 @@ export class Match implements MatchContext {
     // Mode-level exclusions (Gun Game bans grenades_only/infinite_ammo).
     for (const modeExcluded of this.gameMode.excludedMutators ?? []) {
       excluded.add(modeExcluded);
+    }
+    for (const recent of this.rematchMutatorExclusions) {
+      excluded.add(recent);
     }
     const other = isFinalMinute
       ? this.midMatchSlot.mutator

@@ -27,6 +27,7 @@ import type {
   DraftFirstPickerReason,
   RivalrySetResult,
   BotDifficulty,
+  MutatorId,
 } from '@shared/game';
 import { Match } from '../game/match.js';
 import { BotController } from '../game/bot-controller.js';
@@ -72,6 +73,8 @@ interface PostMatchState {
   /** Practice rematches auto-accept for the synthetic opponent. */
   isPractice: boolean;
   practiceDifficulty: BotDifficulty | null;
+  /** Both mutators from the completed round; random rematch rolls skip them. */
+  previousMutators: MutatorId[];
 }
 
 /**
@@ -104,6 +107,8 @@ interface DraftState {
    * down by tick(dt) — no setTimeout, so tests drive it deterministically.
    */
   pickTimerSeconds: number;
+  /** Previous round's mutators, carried through the draft into Match construction. */
+  rematchMutatorExclusions: MutatorId[];
 }
 
 interface RivalrySetState {
@@ -624,8 +629,16 @@ export class MatchmakingManager {
     gameMode: GameModeType,
     playerEntries: { id: PlayerId; nickname: string }[],
     practiceDifficulty: BotDifficulty | null = null,
+    rematchMutatorExclusions: readonly MutatorId[] = [],
   ): void {
-    const match = new Match(matchId, mapData, playerEntries, gameMode);
+    const match = new Match(
+      matchId,
+      mapData,
+      playerEntries,
+      gameMode,
+      Math.random,
+      rematchMutatorExclusions,
+    );
     match.setRttResolver(this.getPlayerRTT);
     this.activeMatches.set(matchId, match);
     for (const entry of playerEntries) {
@@ -700,6 +713,7 @@ export class MatchmakingManager {
   private startDraft(
     playerEntries: { id: PlayerId; nickname: string }[],
     revengePickerId: PlayerId | null = null,
+    rematchMutatorExclusions: readonly MutatorId[] = [],
   ): void {
     const matchId = crypto.randomUUID();
 
@@ -730,6 +744,7 @@ export class MatchmakingManager {
       mapPick: null,
       modePick: null,
       pickTimerSeconds: DRAFT.FIRST_PICK_SECONDS,
+      rematchMutatorExclusions: [...rematchMutatorExclusions],
     };
     this.draftStates.set(matchId, draft);
 
@@ -870,7 +885,14 @@ export class MatchmakingManager {
     this.draftStates.delete(draft.matchId);
     // Both picks were validated against the registry/rotation on entry,
     // so these lookups can't miss.
-    this.launchMatch(draft.matchId, getMap(draft.mapPick!), draft.modePick!, draft.playerEntries);
+    this.launchMatch(
+      draft.matchId,
+      getMap(draft.mapPick!),
+      draft.modePick!,
+      draft.playerEntries,
+      null,
+      draft.rematchMutatorExclusions,
+    );
   }
 
   /**
@@ -1211,6 +1233,7 @@ export class MatchmakingManager {
       setComplete: result.rivalrySet?.championId != null,
       isPractice,
       practiceDifficulty,
+      previousMutators: [...match.activeMutators],
     });
 
     // Remove from active matches
@@ -1279,6 +1302,7 @@ export class MatchmakingManager {
         postMatch.nextGameMode,
         playerEntries,
         postMatch.practiceDifficulty,
+        postMatch.previousMutators,
       );
       return;
     }
@@ -1294,11 +1318,17 @@ export class MatchmakingManager {
         getMap(postMatch.nextMapName),
         postMatch.nextGameMode,
         playerEntries,
+        null,
+        postMatch.previousMutators,
       );
       return;
     }
 
-    this.startDraft(playerEntries, postMatch.revengePickerId);
+    this.startDraft(
+      playerEntries,
+      postMatch.revengePickerId,
+      postMatch.previousMutators,
+    );
   }
 
   /** Record one 1v1 result into the pairing's immediate rematch set. */

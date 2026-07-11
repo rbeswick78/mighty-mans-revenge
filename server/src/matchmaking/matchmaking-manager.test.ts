@@ -12,7 +12,12 @@ import {
   GameModeType,
   GAME_MODE_ROTATION,
 } from '@shared/game';
-import type { PlayerId, ServerMessage, ServerDraftStateMessage } from '@shared/game';
+import type {
+  MutatorId,
+  PlayerId,
+  ServerMessage,
+  ServerDraftStateMessage,
+} from '@shared/game';
 import { MatchmakingManager } from './matchmaking-manager.js';
 import { PersistentStatsStore } from '../persistence/persistent-stats-store.js';
 import type { GameServer } from '../network/server.js';
@@ -187,6 +192,27 @@ describe('MatchmakingManager rematch flow', () => {
 
     // A new match should be active
     expect(mgr.getActiveMatches()).toHaveLength(1);
+  });
+
+  it('carries the previous round mutators through the rematch draft', () => {
+    mgr.handleJoinMatchmaking('A', 'Alpha');
+    mgr.handleJoinMatchmaking('B', 'Bravo');
+    walkDraft(mgr, sent);
+    const first = mgr.getActiveMatches()[0];
+    const previous: MutatorId[] = ['vampire', 'blackout'];
+    (first.activeMutators as MutatorId[]).push(...previous);
+    first.phase = MatchPhase.ENDED;
+    mgr.tick(0.05, 1);
+
+    sent.length = 0;
+    mgr.handleRematchRequest('A');
+    mgr.handleRematchRequest('B');
+    walkDraft(mgr, sent);
+
+    const rematch = mgr.getActiveMatches()[0] as unknown as {
+      rematchMutatorExclusions: ReadonlySet<MutatorId>;
+    };
+    expect([...rematch.rematchMutatorExclusions]).toEqual(previous);
   });
 
   it('resets the post-match timeout when a player requests rematch', () => {
@@ -1096,6 +1122,8 @@ describe('MatchmakingManager solo practice flow', () => {
     }
     expect(found.message.opponents).toEqual([{ id: bot.id, nickname: 'RUSTY' }]);
 
+    const previousMutators: MutatorId[] = ['second_wind', 'blackout'];
+    (first.activeMutators as MutatorId[]).push(...previousMutators);
     first.players.get('A')!.score = 3;
     first.phase = MatchPhase.ENDED;
     mgr.tick(0.05, 1);
@@ -1121,6 +1149,10 @@ describe('MatchmakingManager solo practice flow', () => {
     expect(rematch.players.has(bot.id)).toBe(true);
     expect(rematch.selectionState.get(bot.id)?.locked).not.toBeNull();
     expect(sent.some((entry) => entry.message.type === 'server:draftState')).toBe(false);
+    const rematchInternals = rematch as unknown as {
+      rematchMutatorExclusions: ReadonlySet<MutatorId>;
+    };
+    expect([...rematchInternals.rematchMutatorExclusions]).toEqual(previousMutators);
   });
 
   it('removes a queued player before opening practice', () => {

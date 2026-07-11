@@ -115,10 +115,23 @@ async function draftPickIfMyTurn(page: Page): Promise<boolean> {
  * on both. Tolerates the ~900ms locked-in beat and either pick order.
  */
 async function completeDraft(pageA: Page, pageB: Page): Promise<void> {
-  await Promise.all([
-    waitForActiveScene(pageA, 'DraftScene'),
-    waitForActiveScene(pageB, 'DraftScene'),
-  ]);
+  // A slow worker can let the server's draft deadlines auto-pick both
+  // categories before this helper begins polling. CharacterSelectScene is
+  // then the correct advanced state, so accept either the draft itself or
+  // its successful destination instead of waiting for a scene that ended.
+  await Promise.all(
+    [pageA, pageB].map((page) =>
+      expect
+        .poll(async () => {
+          const active = (await getSceneInfo(page)).activeKeys;
+          return (
+            active.includes('DraftScene') ||
+            active.includes('CharacterSelectScene')
+          );
+        }, { timeout: 15000, message: 'expected draft or character select' })
+        .toBe(true),
+    ),
+  );
   await expect
     .poll(
       async () => {

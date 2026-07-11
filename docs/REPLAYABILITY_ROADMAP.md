@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–15 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts, solo Practice vs Rusty, streak + payback callouts, selectable Rusty difficulty, Collapsed Overpass, Blackout). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–16 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts, solo Practice vs Rusty, streak + payback callouts, selectable Rusty difficulty, Collapsed Overpass, Blackout, fresh-chaos rematches). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -47,6 +47,7 @@ Each session below attacks one of these.
 | 13  | Rusty Difficulty                               | Solo practice stays welcoming, challenging, and worth mastering | **DONE** (2026-07-11) |
 | 14  | Collapsed Overpass                             | A fourth arena adds fresh routes and riskier objective fights    | **DONE** (2026-07-11) |
 | 15  | Blackout                                       | Darkness turns familiar fights into close-range cat-and-mouse    | **DONE** (2026-07-11) |
+| 16  | Fresh-Chaos Rematches                          | Back-to-back rounds cannot repeat the same two mutators           | **DONE** (2026-07-11) |
 
 ---
 
@@ -1101,7 +1102,64 @@ approach the arena without guessing at weapon, character, or physics balance.
 
 ---
 
+## Session 16 — Fresh-Chaos Rematches
+
+**Goal:** make the REMATCH button deliver a meaningfully different chaos mix
+instead of allowing the same mid-match or final-minute twist twice in a row.
+
+**Locked design decisions**
+
+- A completed round contributes only its two active mutators; the next direct
+  rematch excludes both from random selection.
+- The exclusion crosses human revenge drafts, direct Practice rematches, and
+  FORCE map/mode rematches. Returning to the lobby starts clean.
+- Memory is server-only and ephemeral. It adds no persistent schema, player
+  state, network message, client branch, or pairing database.
+- Existing mode exclusions and within-match no-repeat rules still compose.
+  The nine-item pool always leaves ample candidates for both rematch slots.
+- `FORCE_EVENT` and `FORCE_MIDMATCH_MUTATOR` remain absolute smoke tools and
+  intentionally override the recent-mutator exclusion.
+
+**Acceptance criteria**
+
+- [x] Both prior mutators are carried through human and Practice rematches.
+- [x] Both random slots exclude the prior pair while still excluding each
+      other and respecting mode-level bans.
+- [x] Explicit FORCE pins can reproduce a recent mutator for diagnostics.
+- [x] Fresh matches have no inherited exclusion state.
+- [x] Typecheck, lint, all unit tests, production build, and Playwright pass.
+
+---
+
 ## Session Log
+
+### Session 16 — 2026-07-11 — Fresh-Chaos Rematches
+
+**Shipped:** consecutive rounds now remember the completed match's active
+mutators and remove both from the next random draw. A Blackout/Vampire round,
+for example, guarantees that the immediate rematch will build its two-event
+arc from the other seven choices. This compounds the existing map/mode revenge
+draft and character re-pick, making rematches feel structurally fresh as well
+as competitively connected.
+
+`PostMatchState` owns the tiny handoff. Human rematches carry it through the
+pre-match draft; Practice and FORCE paths pass it directly. `Match` folds the
+pair into its normal candidate-exclusion set alongside Gun Game bans and the
+other slot's pick. Explicit smoke pins still bypass every random filter.
+
+**Verified:** focused Match and MatchmakingManager coverage passes 196 tests,
+including random exclusion, FORCE override, human draft handoff, and direct
+Practice handoff. Typecheck and lint are clean; all 787 unit tests pass; the
+production build succeeds; and the 21-case Playwright matrix passes all 12
+applicable desktop/mobile flows with 9 intentional project skips. The run also
+made the draft helper accept an already-reached CharacterSelectScene after
+server timeout auto-picks, eliminating a slow-worker false failure.
+
+**Carry-over:** this intentionally prevents only immediate repeats. A deeper
+shuffle bag would reduce variety once the pool is nearly exhausted and is not
+warranted with nine choices and two activations per match.
+
+---
 
 ### Session 15 — 2026-07-11 — Blackout
 
@@ -2107,10 +2165,9 @@ after the run.
 - Mutator activation VFX is the existing flash + banner + horn; no
   per-mutator world VFX (e.g. no heal number popups for vampire). Cheap
   polish later — HealFlash exists and could fire on vampire heals.
-- The mid-match roll is uniform per match; across a rematch session the
-  same mutator can recur match-over-match (only within-match repeats are
-  prevented). If the group notices, add a per-pairing recent-mutator
-  memory in a later session.
+- ~~The same mutator can recur immediately across rematches.~~ **DONE in
+  Session 16:** both active mutators are excluded from the next direct
+  rematch's random rolls; FORCE pins still bypass the memory.
 - A stray Vite dev server on 5173 hijacked e2e AGAIN this session —
   killed PID before the suite. The gotcha note in Session 2's log
   stands.
