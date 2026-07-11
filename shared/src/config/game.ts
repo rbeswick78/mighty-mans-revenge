@@ -246,6 +246,23 @@ export const RIVALRY_SET = Object.freeze({
   WINS_TO_CLINCH: 3,
 });
 
+/** Server-authoritative solo practice opponent. All behavior tuning lives here. */
+export const BOT = Object.freeze({
+  PLAYER_ID_PREFIX: 'bot:',
+  NICKNAME: 'RUSTY',
+  PATH_RECALC_SECONDS: 0.25,
+  PREFERRED_DISTANCE: 220,
+  RETREAT_DISTANCE: 120,
+  FIRE_RANGE: 520,
+  AIM_WOBBLE_RADIANS: 0.045,
+  FIRE_INTERVAL_SECONDS: 0.55,
+  STRAFE_SWITCH_SECONDS: 1.6,
+  GRENADE_INTERVAL_SECONDS: 7,
+  GRENADE_RUNG_INTERVAL_SECONDS: 1.5,
+  GRENADE_DETONATE_SECONDS: 0.85,
+  ABILITY_OPENING_DELAY_SECONDS: 4,
+});
+
 /**
  * Game mode metadata + rotation. Rotation order doubles as the cycle fresh
  * matches walk through (mirrors the map registry's rotation contract):
