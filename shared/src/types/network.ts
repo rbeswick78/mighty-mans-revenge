@@ -10,6 +10,7 @@ import type { CharacterId, WeaponId, MutatorId } from '../config/game.js';
 export type ClientMessage =
   | ClientInputMessage
   | ClientJoinMatchmakingMessage
+  | ClientStartPracticeMessage
   | ClientCancelMatchmakingMessage
   | ClientRematchRequestMessage
   | ClientReturnToLobbyMessage
@@ -25,6 +26,11 @@ export interface ClientInputMessage {
 
 export interface ClientJoinMatchmakingMessage {
   type: 'client:joinMatchmaking';
+  nickname: string;
+}
+
+export interface ClientStartPracticeMessage {
+  type: 'client:startPractice';
   nickname: string;
 }
 

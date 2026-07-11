@@ -114,6 +114,8 @@ export interface MatchResult {
   rivalry: RivalryRecord | null;
   /** Immediate first-to-N score for this consecutive rematch set. */
   rivalrySet: RivalrySetResult | null;
+  /** True for a solo authoritative match against a server-controlled bot. */
+  isPractice: boolean;
   /**
    * Map the rematch (if accepted) will be played on — drives the results
    * screen's "NEXT MAP: X" line. Like rivalry, attached by the matchmaking

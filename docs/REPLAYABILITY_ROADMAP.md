@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–10 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–11 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts, solo Practice vs Rusty). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -42,6 +42,7 @@ Each session below attacks one of these.
 | 8   | Playtest response + polish backlog              | The accumulated small stuff, cleared before group night        | **DONE** (2026-07-04) |
 | 9   | Playtest response #1: two bugs + map/mode draft | The game respects your pick — and lets you pick the arena      | **DONE** (2026-07-05) |
 | 10  | Rivalry Sets + Revenge Drafts                   | Every rematch becomes a round with stakes and comeback control | **DONE** (2026-07-11) |
+| 11  | Practice vs Rusty                               | The game is playable on demand, even when no friend is online  | **DONE** (2026-07-11) |
 
 ---
 
@@ -961,7 +962,86 @@ the previous round's loser earns first pick in the next map/mode draft.
 
 ---
 
+## Session 11 — Practice vs Rusty
+
+**Goal:** remove the game's largest replayability dead end: needing a second
+human online before any of its combat, characters, maps, or modes can be
+played. A one-click solo practice match should exercise the real game rather
+than becoming a parallel tutorial implementation.
+
+**Locked design decisions**
+
+- Rusty is server-authoritative and submits ordinary sequenced `PlayerInput`
+  through `Match`, so movement, collision, combat, abilities, mutators, and
+  mode rules remain identical to human play.
+- Practice starts immediately from the lobby and skips the social map/mode
+  draft. Rematches rotate directly through the promised next map and mode,
+  while retaining the same ephemeral first-to-3 set stakes.
+- Practice never writes lifetime stats, rivalries, or leaderboards. Beating a
+  training opponent must not become the optimal way to farm social records.
+- The bot uses deterministic collision-grid pathfinding, line-of-sight combat,
+  range management, grenades, reloads, character abilities, Gun Game rung
+  rules, and explicit KOTH objective play. Its tuning lives in the frozen
+  shared `BOT` config.
+- Synthetic bot identities use the `bot:` prefix and have no transport
+  channel; outbound match broadcasts are intentionally discarded for them.
+
+**Acceptance criteria**
+
+- [x] A valid callsign can launch directly into character select against a
+      named, already-locked Rusty without entering the human queue or draft.
+- [x] Rusty moves around walls, aims, fires, reloads, throws/detonates
+      grenades, uses abilities, plays every Gun Game rung, and captures KOTH.
+- [x] One human rematch click starts the next practice round directly and
+      preserves first-to-3 set scoring; leaving/timeout releases bot state.
+- [x] Practice results are explicitly identified and never update persistent
+      stats, rivalry records, or the public leaderboard.
+- [x] Lobby and match flow pass browser smoke; typecheck, lint, all unit tests,
+      production build, and Playwright pass.
+
+---
+
 ## Session Log
+
+### Session 11 — 2026-07-11 — Practice vs Rusty
+
+**Shipped:** the lobby now offers `PRACTICE VS RUSTY`, which creates an
+immediate authoritative match against a synthetic player. Rusty locks a random
+available fighter and drives the same input queue humans use: collision-grid
+BFS when sightlines are blocked, distance/strafe behavior in open fights,
+weapon range and reload handling, grenades with remote detonation, abilities,
+and Gun Game's weapon-specific rungs. In KOTH, Rusty prioritizes entering the
+live hill and holds it while fighting rather than chasing kills off-objective.
+
+Practice results carry an explicit `isPractice` flag. They keep the immediate
+first-to-3 Rivalry Set loop, but bypass all persistent-stat and leaderboard
+writes. Rusty auto-accepts rematches, so one human click launches the map/mode
+rotation promised on results without a fake two-player draft. Disconnect,
+lobby-return, and timeout paths release the synthetic identity and set state.
+
+**Design decisions made in-session:**
+
+- The bot is intentionally moderate rather than clairvoyant: visible aim
+  wobble and fire cadence leave counterplay, while shared pathfinding and real
+  inputs prevent rules drift.
+- Practice is a full match, not a reduced tutorial. That makes every existing
+  map, mode, mutator, pickup, character, and future shared mechanic useful to
+  solo players automatically.
+- Fullscreen remains a best-effort lobby enhancement. Browser-policy rejection
+  is caught so it can never prevent either quick match or practice entry.
+
+**Verified:** typecheck and lint clean; production build green; all 774 unit
+tests green. The full Playwright matrix passed (11 passed, 7 expected project
+skips), followed by a dedicated Chromium practice regression (1 passed) that
+clicks the new lobby CTA, proves Rusty arrives locked, and reaches GameScene. A
+real browser smoke launched into Scrapyard Deathmatch, showed
+`RUSTY: LOCKED - JACK`, entered live play, and observed Rusty navigate, fire,
+and score a kill through the normal death/respawn loop with a clean
+post-polish console.
+
+**Carry-over:** Rusty's initial tuning is deliberately conservative and needs
+human playtest feedback before difficulty levels or aim/fire changes. The
+Session 9 weapon/character/map watch list remains otherwise unchanged.
 
 ### Session 10 — 2026-07-11 — Rivalry Sets + Revenge Drafts
 

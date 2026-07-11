@@ -1053,6 +1053,79 @@ describe('MatchmakingManager persistent stats integration', () => {
   });
 });
 
+describe('MatchmakingManager solo practice flow', () => {
+  let dataDir: string;
+  let store: PersistentStatsStore;
+
+  beforeEach(() => {
+    dataDir = mkdtempSync(path.join(os.tmpdir(), 'mmr-practice-stats-'));
+    store = new PersistentStatsStore(dataDir);
+  });
+
+  afterEach(async () => {
+    await store.flush();
+    rmSync(dataDir, { recursive: true, force: true });
+  });
+
+  it('starts immediately, locks Rusty, keeps stats clean, and auto-accepts a direct rematch', () => {
+    const { fake, sent, connected } = makeFakeServer();
+    connected.push('A');
+    const mgr = new MatchmakingManager(fake, () => 0, store, seededRng([0, 0, 0]));
+
+    mgr.handleStartPractice('A', 'Alpha');
+    expect(mgr.getQueueLength()).toBe(0);
+    expect(mgr.getActiveMatches()).toHaveLength(1);
+    const first = mgr.getActiveMatches()[0];
+    const bot = [...first.players.values()].find((player) => player.id.startsWith('bot:'))!;
+    expect(bot.nickname).toBe('RUSTY');
+    expect(first.selectionState.get(bot.id)?.locked).not.toBeNull();
+
+    const found = sent.find(
+      (entry) => entry.playerId === 'A' && entry.message.type === 'server:matchFound',
+    );
+    if (!found || found.message.type !== 'server:matchFound') {
+      throw new Error('missing practice matchFound');
+    }
+    expect(found.message.opponents).toEqual([{ id: bot.id, nickname: 'RUSTY' }]);
+
+    first.players.get('A')!.score = 3;
+    first.phase = MatchPhase.ENDED;
+    mgr.tick(0.05, 1);
+    const ended = [...sent].reverse().find(
+      (entry) => entry.playerId === 'A' && entry.message.type === 'server:matchEnd',
+    );
+    if (!ended || ended.message.type !== 'server:matchEnd') {
+      throw new Error('missing practice matchEnd');
+    }
+    expect(ended.message.result.isPractice).toBe(true);
+    expect(ended.message.result.rivalry).toBeNull();
+    expect(ended.message.result.rivalrySet?.players[0].wins).toBe(1);
+    expect(store.getLifetime('Alpha')).toBeNull();
+    expect(store.getLifetime('Rusty')).toBeNull();
+    expect(sent.some((entry) => entry.message.type === 'server:leaderboard')).toBe(false);
+
+    sent.length = 0;
+    mgr.handleRematchRequest('A');
+    expect(mgr.getActiveMatches()).toHaveLength(1);
+    const rematch = mgr.getActiveMatches()[0];
+    expect(rematch.mapManager.getMapData().name).toBe('Overgrown Suburb');
+    expect(rematch.gameModeType).toBe(GameModeType.KOTH);
+    expect(rematch.players.has(bot.id)).toBe(true);
+    expect(rematch.selectionState.get(bot.id)?.locked).not.toBeNull();
+    expect(sent.some((entry) => entry.message.type === 'server:draftState')).toBe(false);
+  });
+
+  it('removes a queued player before opening practice', () => {
+    const { fake } = makeFakeServer();
+    const mgr = new MatchmakingManager(fake, () => 0, store, seededRng([0, 0, 0]));
+    mgr.handleJoinMatchmaking('A', 'Alpha');
+    expect(mgr.getQueueLength()).toBe(1);
+    mgr.handleStartPractice('A', 'Alpha');
+    expect(mgr.getQueueLength()).toBe(0);
+    expect(mgr.getActiveMatches()).toHaveLength(1);
+  });
+});
+
 describe('match clock alignment (regression: 3-second event/timer offset)', () => {
   it('matchEndsInMs equals the wall-clock time between matchStart broadcast and eventStart broadcast', () => {
     process.env.FORCE_EVENT = 'infinite_ammo';

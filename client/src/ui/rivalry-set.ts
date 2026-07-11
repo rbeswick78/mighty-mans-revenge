@@ -1,4 +1,5 @@
 import type { MatchResult } from '@shared/types/game.js';
+import { gameModeDisplayName } from '@shared/config/game.js';
 
 /** Compact set + lifetime line sized for the results screen's single strip. */
 export function formatRivalrySummary(result: MatchResult): string | null {
@@ -33,6 +34,12 @@ export function formatRivalrySummary(result: MatchResult): string | null {
 
 /** Results-screen promise for how the next draft's first picker is chosen. */
 export function nextDraftTeaser(result: MatchResult): string {
+  if (result.isPractice && result.nextMapName && result.nextGameMode) {
+    return (
+      `NEXT: ${gameModeDisplayName(result.nextGameMode)} - ` +
+      result.nextMapName.toUpperCase()
+    );
+  }
   if (result.winnerId === null || !result.rivalrySet) {
     return 'NEXT: COIN TOSS PICKS WHO DRAFTS MAP + MODE';
   }

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PLAYER, WEAPONS } from '@shared/config/game.js';
 import { MatchPhase, GameModeType } from '@shared/types/game.js';
 import type {
+  ClientMessage,
   SerializedPlayerState,
   ServerGameStateMessage,
   ServerMessage,
@@ -14,6 +15,7 @@ import type {
 // imports, so the shared handle must be hoisted too.
 const hoisted = vi.hoisted(() => ({
   messageCb: null as ((msg: unknown) => void) | null,
+  sentMessages: [] as ClientMessage[],
 }));
 
 vi.mock('./connection.js', () => ({
@@ -22,7 +24,9 @@ vi.mock('./connection.js', () => ({
       hoisted.messageCb = cb;
     }
     onStateChange(): void {}
-    send(): void {}
+    send(message: ClientMessage): void {
+      hoisted.sentMessages.push(message);
+    }
     connect(): Promise<void> {
       return Promise.resolve();
     }
@@ -104,6 +108,7 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
 
   beforeEach(() => {
     hoisted.messageCb = null;
+    hoisted.sentMessages = [];
     manager = new NetworkManager('http://localhost:0');
     const cb = hoisted.messageCb as ((msg: ServerMessage) => void) | null;
     if (!cb) throw new Error('NetworkManager never registered onMessage');
@@ -196,5 +201,13 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
       gameMode: GameModeType.GUN_GAME,
     });
     expect(seen).toHaveLength(1);
+  });
+
+  it('sends an explicit authoritative practice request', () => {
+    manager.startPractice('Alpha');
+    expect(hoisted.sentMessages).toContainEqual({
+      type: 'client:startPractice',
+      nickname: 'Alpha',
+    });
   });
 });

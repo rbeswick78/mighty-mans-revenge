@@ -159,6 +159,56 @@ async function startQuickMatch(page: Page, nickname: string): Promise<void> {
 // Desktop projects: full pair-up + lock-and-go.
 // ─────────────────────────────────────────────────────────────────────
 
+test('solo practice launches against locked Rusty and reaches live play', async ({ page }, testInfo) => {
+  test.skip(
+    testInfo.project.name !== 'desktop-chromium',
+    'One authoritative browser flow is sufficient; mobile rendering has separate coverage',
+  );
+  test.setTimeout(30000);
+
+  await page.goto('/');
+  await waitForLobby(page);
+  const input = page.locator('input[type="text"]');
+  await expect(input).toHaveCount(1);
+  await input.fill('Solo');
+
+  // Desktop canvas is 960x720 at this project viewport. Click the center of
+  // the secondary lobby CTA in canvas-local coordinates.
+  const canvas = page.locator('canvas');
+  await expect(canvas).toHaveCount(1);
+  await canvas.click({ position: { x: 480, y: 630 } });
+  await waitForActiveScene(page, 'CharacterSelectScene', 10000);
+
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const w = window as unknown as {
+            game?: { scene: { getScene: (key: string) => unknown } };
+          };
+          const scene = w.game?.scene.getScene('CharacterSelectScene') as {
+            latestSelections?: Array<{
+              nickname: string;
+              lockedCharacterId: string | null;
+            }>;
+          } | null;
+          return (
+            scene?.latestSelections?.some(
+              (selection) =>
+                selection.nickname === 'RUSTY' &&
+                selection.lockedCharacterId !== null,
+            ) ?? false
+          );
+        }),
+      { timeout: 10000, message: 'expected Rusty to arrive already locked' },
+    )
+    .toBe(true);
+
+  await canvas.click({ position: { x: 480, y: 400 } });
+  await page.keyboard.press('Enter');
+  await waitForActiveScene(page, 'GameScene', 10000);
+});
+
 test.describe('Character select (desktop)', () => {
   let ctxA: BrowserContext;
   let ctxB: BrowserContext;

@@ -160,6 +160,11 @@ export class GameService {
     this.networkManager.joinMatchmaking(nickname);
   }
 
+  startPractice(nickname: string): void {
+    this.localNickname = nickname;
+    this.networkManager.startPractice(nickname);
+  }
+
   cancelMatchmaking(): void {
     this.networkManager.cancelMatchmaking();
   }

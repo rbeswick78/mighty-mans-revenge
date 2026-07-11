@@ -237,6 +237,11 @@ export class NetworkManager {
     this.connection.send({ type: 'client:joinMatchmaking', nickname });
   }
 
+  /** Start an immediate authoritative solo match. */
+  startPractice(nickname: string): void {
+    this.connection.send({ type: 'client:startPractice', nickname });
+  }
+
   /** Cancel matchmaking. */
   cancelMatchmaking(): void {
     this.connection.send({ type: 'client:cancelMatchmaking' });

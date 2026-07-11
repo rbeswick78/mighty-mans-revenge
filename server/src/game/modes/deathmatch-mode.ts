@@ -52,6 +52,7 @@ export class DeathmatchMode implements GameMode {
       // folded this match in — the mode has no access to lifetime records.
       rivalry: null,
       rivalrySet: null,
+      isPractice: false,
       // Also the matchmaking manager's job — modes know nothing about the
       // map/mode rotation.
       nextMapName: null,

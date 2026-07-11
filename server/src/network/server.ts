@@ -1,5 +1,5 @@
 import geckos, { type GeckosServer, type ServerChannel, type Data } from '@geckos.io/server';
-import { SERVER } from '@shared/game';
+import { BOT, SERVER } from '@shared/game';
 import type { ClientMessage, PlayerId, ServerMessage } from '@shared/game';
 import { logger } from '../utils/logger.js';
 
@@ -15,6 +15,7 @@ export type MessageHandler = (playerId: PlayerId, message: ClientMessage) => voi
 const CLIENT_MESSAGE_TYPE_FLAGS: Record<ClientMessage['type'], true> = {
   'client:input': true,
   'client:joinMatchmaking': true,
+  'client:startPractice': true,
   'client:cancelMatchmaking': true,
   'client:rematchRequest': true,
   'client:returnToLobby': true,
@@ -145,6 +146,10 @@ export class GameServer {
   sendTo(playerId: PlayerId, message: ServerMessage, opts?: { reliable?: boolean }): void {
     const channel = this.channels.get(playerId);
     if (!channel) {
+      // Server-controlled practice players intentionally have no data
+      // channel. Matchmaking broadcasts through the same N-player loops;
+      // quietly discard their outbound copies instead of warning at 20 Hz.
+      if (playerId.startsWith(BOT.PLAYER_ID_PREFIX)) return;
       logger.warn(
         { playerId, type: message.type },
         'Cannot send to unknown player',

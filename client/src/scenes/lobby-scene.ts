@@ -50,6 +50,7 @@ export class LobbyScene extends Phaser.Scene {
   private leaderboardTitleText!: Phaser.GameObjects.Text;
   private leaderboardRowsText!: Phaser.GameObjects.Text;
   private quickMatchButton!: PixelButton;
+  private practiceButton!: PixelButton;
   private mightyManSprite!: Phaser.GameObjects.Sprite;
   private nickname: string;
   private isSearching = false;
@@ -122,7 +123,7 @@ export class LobbyScene extends Phaser.Scene {
     // searching-state UI shares this panel, swapping visibility.
     // ────────────────────────────────────────────────────────────────────
     const panelW = 380;
-    const panelH = 180;
+    const panelH = 238;
     const panelX = centerX - panelW / 2;
     const panelY = camHeight - 270;
     const panel = new MenuPanel(this, panelX, panelY, panelW, panelH);
@@ -187,11 +188,11 @@ export class LobbyScene extends Phaser.Scene {
 
     // Quick Match button (primary CTA, centered in lower half of panel)
     const qmW = 260;
-    const qmH = 48;
+    const qmH = 44;
     this.quickMatchButton = new PixelButton(
       this,
       panel.centerX - qmW / 2,
-      panelH - qmH - 16,
+      104,
       qmW,
       qmH,
       'QUICK MATCH',
@@ -202,6 +203,21 @@ export class LobbyScene extends Phaser.Scene {
       },
     );
     panel.add(this.quickMatchButton);
+
+    this.practiceButton = new PixelButton(
+      this,
+      panel.centerX - qmW / 2,
+      158,
+      qmW,
+      qmH,
+      'PRACTICE VS RUSTY',
+      {
+        variant: 'secondary',
+        fontSize: 12,
+        onClick: () => this.onPractice(),
+      },
+    );
+    panel.add(this.practiceButton);
 
     // ────────────────────────────────────────────────────────────────────
     // Searching state — sits in the same panel real estate, hidden by
@@ -530,25 +546,7 @@ export class LobbyScene extends Phaser.Scene {
 
   private onQuickMatch(): void {
     if (this.isSearching) return;
-
-    if (this.nickname.length < 2) {
-      const centerX = this.cameras.main.width / 2;
-      const flash = this.add
-        .text(
-          centerX,
-          this.cameras.main.height - 70,
-          'CALLSIGN MUST BE AT LEAST 2 CHARACTERS',
-          {
-            fontFamily: MENU_FONTS.BODY,
-            fontSize: '14px',
-            color: cssHex(ERROR_COLOR),
-          },
-        )
-        .setOrigin(0.5)
-        .setDepth(WastelandStreet.DEPTH.UI + 2);
-      this.time.delayedCall(2000, () => flash.destroy());
-      return;
-    }
+    if (!this.validateNickname()) return;
 
     this.isSearching = true;
     this.searchStartTime = Date.now();
@@ -558,9 +556,7 @@ export class LobbyScene extends Phaser.Scene {
 
     // Request fullscreen on this user gesture. Best-effort — many iOS
     // Safari versions report fullscreenEnabled=false and we skip.
-    if (document.fullscreenEnabled && !this.scale.isFullscreen) {
-      this.scale.startFullscreen();
-    }
+    this.tryStartFullscreen();
 
     // Swap panel content into searching state. The name-entry group must
     // hide too — the searching text sits in the input box's band, and the
@@ -570,6 +566,7 @@ export class LobbyScene extends Phaser.Scene {
     this.searchTimerText.setVisible(true);
     this.cancelButton.setVisible(true);
     this.quickMatchButton.setVisible(false);
+    this.practiceButton.setVisible(false);
 
     this.searchingTween = this.tweens.add({
       targets: this.searchingText,
@@ -598,6 +595,44 @@ export class LobbyScene extends Phaser.Scene {
     this.gameService.joinMatchmaking(this.nickname);
   }
 
+  private onPractice(): void {
+    if (this.isSearching || !this.validateNickname()) return;
+    this.nicknameInput?.blur();
+    this.tryStartFullscreen();
+    this.gameService.startPractice(this.nickname);
+  }
+
+  /** Fullscreen improves play, but browser policy must never block a match. */
+  private tryStartFullscreen(): void {
+    if (!document.fullscreenEnabled || document.fullscreenElement) return;
+    const target = document.getElementById('game-container');
+    if (!target?.requestFullscreen) return;
+    void target.requestFullscreen().catch(() => {
+      // Embedded browsers and automation can deny fullscreen despite a
+      // click gesture. The game remains playable in its fitted canvas.
+    });
+  }
+
+  private validateNickname(): boolean {
+    if (this.nickname.length >= 2) return true;
+    const centerX = this.cameras.main.width / 2;
+    const flash = this.add
+      .text(
+        centerX,
+        this.cameras.main.height - 70,
+        'CALLSIGN MUST BE AT LEAST 2 CHARACTERS',
+        {
+          fontFamily: MENU_FONTS.BODY,
+          fontSize: '14px',
+          color: cssHex(ERROR_COLOR),
+        },
+      )
+      .setOrigin(0.5)
+      .setDepth(WastelandStreet.DEPTH.UI + 2);
+    this.time.delayedCall(2000, () => flash.destroy());
+    return false;
+  }
+
   private onCancelSearch(): void {
     this.gameService.cancelMatchmaking();
     this.stopSearching();
@@ -610,6 +645,7 @@ export class LobbyScene extends Phaser.Scene {
     this.searchTimerText.setVisible(false);
     this.cancelButton.setVisible(false);
     this.quickMatchButton.setVisible(true);
+    this.practiceButton.setVisible(true);
     this.setNameEntryVisible(true);
 
     if (this.searchingTween) {

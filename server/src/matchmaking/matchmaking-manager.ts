@@ -4,6 +4,8 @@ import {
   GAME_MODE_ROTATION,
   DRAFT,
   RIVALRY_SET,
+  BOT,
+  CHARACTER_IDS,
   LEADERBOARD,
   getNextGameMode,
   getMap,
@@ -24,6 +26,7 @@ import type {
   RivalrySetResult,
 } from '@shared/game';
 import { Match } from '../game/match.js';
+import { BotController } from '../game/bot-controller.js';
 import { GameServer } from '../network/server.js';
 import { MatchmakingQueue } from './matchmaking-queue.js';
 import { logger } from '../utils/logger.js';
@@ -63,6 +66,8 @@ interface PostMatchState {
   revengePickerId: PlayerId | null;
   /** A rematch after a clinch starts a clean first-to-N set. */
   setComplete: boolean;
+  /** Practice rematches auto-accept for the synthetic opponent. */
+  isPractice: boolean;
 }
 
 /**
@@ -116,6 +121,12 @@ export class MatchmakingManager {
   private readonly draftStates: Map<string, DraftState> = new Map();
   /** Ephemeral first-to-N scores shared by consecutive rematches. */
   private readonly playerRivalrySets: Map<PlayerId, RivalrySetState> = new Map();
+  /** One live authoritative controller per practice match. */
+  private readonly botControllers: Map<string, BotController> = new Map();
+  /** Match ids whose lifetime stats must stay out of friend leaderboards. */
+  private readonly practiceMatchIds: Set<string> = new Set();
+  /** Synthetic ids survive across direct practice rematches. */
+  private readonly botPlayerIds: Set<PlayerId> = new Set();
   /** Track nicknames for players (set when they join matchmaking). */
   private readonly playerNicknames: Map<PlayerId, string> = new Map();
   /** Previous-tick phase per match, for detecting phase transitions. */
@@ -192,6 +203,37 @@ export class MatchmakingManager {
     this.tryCreateMatch();
   }
 
+  /** Start a real authoritative match immediately with a synthetic opponent. */
+  handleStartPractice(playerId: PlayerId, nickname: string): void {
+    if (this.playerMatchMap.has(playerId)) return;
+    this.queue.removePlayer(playerId);
+    this.playerNicknames.set(playerId, nickname);
+
+    const botId = `${BOT.PLAYER_ID_PREFIX}${crypto.randomUUID()}` as PlayerId;
+    this.botPlayerIds.add(botId);
+    this.playerNicknames.set(botId, BOT.NICKNAME);
+    const names = listMapNames();
+    const mapName = names[
+      Math.min(Math.floor(this.rng() * names.length), names.length - 1)
+    ];
+    const gameMode = GAME_MODE_ROTATION[
+      Math.min(
+        Math.floor(this.rng() * GAME_MODE_ROTATION.length),
+        GAME_MODE_ROTATION.length - 1,
+      )
+    ];
+    this.launchMatch(
+      crypto.randomUUID(),
+      this.forcedMap() ?? getMap(mapName),
+      this.forcedMode() ?? gameMode,
+      [
+        { id: playerId, nickname },
+        { id: botId, nickname: BOT.NICKNAME },
+      ],
+      true,
+    );
+  }
+
   handleCancelMatchmaking(playerId: PlayerId): void {
     const removed = this.queue.removePlayer(playerId);
     if (removed) {
@@ -266,6 +308,7 @@ export class MatchmakingManager {
         clearTimeout(state.timeoutHandle);
         this.postMatchStates.delete(postMatchId);
         this.releaseRivalrySet(state.playerIds);
+        this.releasePracticePlayers(state.playerIds);
         // Return remaining players to lobby state
         for (const pid of state.playerIds) {
           if (pid !== playerId) {
@@ -293,6 +336,11 @@ export class MatchmakingManager {
     }
 
     postMatch.rematchRequests.add(playerId);
+    if (postMatch.isPractice) {
+      for (const pid of postMatch.playerIds) {
+        if (this.botPlayerIds.has(pid)) postMatch.rematchRequests.add(pid);
+      }
+    }
 
     logger.info(
       {
@@ -369,6 +417,7 @@ export class MatchmakingManager {
       clearTimeout(postMatch.timeoutHandle);
       this.postMatchStates.delete(matchId);
       this.releaseRivalrySet(postMatch.playerIds);
+      this.releasePracticePlayers(postMatch.playerIds);
     } else {
       // Player returning to lobby from an active match (forfeit)
       this.playerMatchMap.delete(playerId);
@@ -386,6 +435,7 @@ export class MatchmakingManager {
     // Update active matches
     for (const [matchId, match] of this.activeMatches) {
       const prevPhase = this.previousPhases.get(matchId);
+      this.botControllers.get(matchId)?.update(dt, match, serverTick);
       match.update(dt);
       const newPhase = match.phase;
 
@@ -562,12 +612,27 @@ export class MatchmakingManager {
     mapData: MapData,
     gameMode: GameModeType,
     playerEntries: { id: PlayerId; nickname: string }[],
+    isPractice: boolean = false,
   ): void {
     const match = new Match(matchId, mapData, playerEntries, gameMode);
     match.setRttResolver(this.getPlayerRTT);
     this.activeMatches.set(matchId, match);
     for (const entry of playerEntries) {
       this.playerMatchMap.set(entry.id, matchId);
+    }
+    if (isPractice) {
+      this.practiceMatchIds.add(matchId);
+      const botEntry = playerEntries.find((entry) => this.botPlayerIds.has(entry.id));
+      if (botEntry) {
+        this.botControllers.set(matchId, new BotController(botEntry.id));
+        const character = CHARACTER_IDS[
+          Math.min(
+            Math.floor(this.rng() * CHARACTER_IDS.length),
+            CHARACTER_IDS.length - 1,
+          )
+        ];
+        match.setLock(botEntry.id, character);
+      }
     }
 
     logger.info(
@@ -1039,6 +1104,8 @@ export class MatchmakingManager {
 
   private onMatchEnded(matchId: string, match: Match): void {
     const result = match.getResult();
+    const isPractice = this.practiceMatchIds.has(matchId);
+    result.isPractice = isPractice;
     result.rivalrySet = this.recordRivalrySet(match, result.winnerId);
 
     // Rotation: a rematch plays the map AND mode AFTER this one (registry/
@@ -1055,7 +1122,7 @@ export class MatchmakingManager {
     // all-time rivalry line before shipping the result. The in-memory
     // update is synchronous and O(players); the file write is queued onto
     // fs.promises — nothing here blocks the tick.
-    if (this.statsStore) {
+    if (this.statsStore && !isPractice) {
       const entries: MatchStatsEntry[] = [];
       for (const [playerId, player] of match.players) {
         const stats = result.playerStats.get(playerId);
@@ -1123,15 +1190,18 @@ export class MatchmakingManager {
       nextMapName,
       nextGameMode,
       revengePickerId:
-        result.rivalrySet === null || result.winnerId === null
+        isPractice || result.rivalrySet === null || result.winnerId === null
           ? null
           : (playerIds.find((id) => id !== result.winnerId) ?? null),
       setComplete: result.rivalrySet?.championId != null,
+      isPractice,
     });
 
     // Remove from active matches
     this.activeMatches.delete(matchId);
     this.previousPhases.delete(matchId);
+    this.botControllers.delete(matchId);
+    this.practiceMatchIds.delete(matchId);
   }
 
   private onRematchTimeout(matchId: string): void {
@@ -1156,6 +1226,7 @@ export class MatchmakingManager {
 
     this.postMatchStates.delete(matchId);
     this.releaseRivalrySet(postMatch.playerIds);
+    this.releasePracticePlayers(postMatch.playerIds);
   }
 
   private sendRematchUnavailable(playerId: PlayerId): void {
@@ -1184,6 +1255,17 @@ export class MatchmakingManager {
     }
 
     logger.info({ players: postMatch.playerIds }, 'Rematch starting');
+
+    if (postMatch.isPractice) {
+      this.launchMatch(
+        crypto.randomUUID(),
+        getMap(postMatch.nextMapName),
+        postMatch.nextGameMode,
+        playerEntries,
+        true,
+      );
+      return;
+    }
 
     // FORCE pins skip the draft here too, playing the map/mode promised
     // at match end ("NEXT: X"). Real play drafts again — rematches are
@@ -1260,6 +1342,14 @@ export class MatchmakingManager {
           this.playerRivalrySets.delete(id);
         }
       }
+    }
+  }
+
+  private releasePracticePlayers(playerIds: PlayerId[]): void {
+    for (const id of playerIds) {
+      if (!this.botPlayerIds.delete(id)) continue;
+      this.playerNicknames.delete(id);
+      this.playerMatchMap.delete(id);
     }
   }
 }

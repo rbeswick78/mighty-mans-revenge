@@ -20,6 +20,7 @@ function result(overrides: Partial<MatchResult> = {}): MatchResult {
       ],
       championId: null,
     },
+    isPractice: false,
     nextMapName: null,
     nextGameMode: null,
     wentToOvertime: false,
@@ -72,5 +73,17 @@ describe('rivalry-set results copy', () => {
     expect(nextDraftTeaser(result({ winnerId: null }))).toContain('COIN TOSS');
     expect(nextDraftTeaser(result({ rivalrySet: null }))).toContain('COIN TOSS');
     expect(formatRivalrySummary(result({ rivalrySet: null }))).toBeNull();
+  });
+
+  it('promises the direct map and mode rotation for practice rounds', () => {
+    expect(
+      nextDraftTeaser(
+        result({
+          isPractice: true,
+          nextMapName: 'Scrapyard',
+          nextGameMode: 'gun_game' as MatchResult['gameMode'],
+        }),
+      ),
+    ).toBe('NEXT: GUN GAME - SCRAPYARD');
   });
 });

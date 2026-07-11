@@ -151,6 +151,7 @@ export class KothMode implements GameMode {
       // Attached by the matchmaking manager — see DeathmatchMode.
       rivalry: null,
       rivalrySet: null,
+      isPractice: false,
       nextMapName: null,
       nextGameMode: null,
       wentToOvertime: match.isOvertime,
