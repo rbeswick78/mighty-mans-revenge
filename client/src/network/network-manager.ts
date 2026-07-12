@@ -532,6 +532,12 @@ export class NetworkManager {
       this.emit('bulletTrail', trail);
     }
 
+    // Environmental blasts reuse the grenade presentation path, but are
+    // explicit transient cues because no in-flight grenade exists to diff.
+    for (const position of msg.barrelExplosions ?? []) {
+      this.emit('grenadeExploded', position);
+    }
+
     // Punch swings are transient like bulletTrails — one event per entry,
     // processed per message and never diffed (a swing resolves within a
     // single server tick, so there is no list to mirror). Each entry

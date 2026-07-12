@@ -131,6 +131,7 @@ export const KILL_WEAPONS = Object.freeze([
   'axe',
   'pistol',
   'punch',
+  'barrel',
 ] as const) satisfies readonly KillWeapon[];
 
 /** Fresh all-zero per-weapon kill record (PlayerStats.killsByWeapon). */

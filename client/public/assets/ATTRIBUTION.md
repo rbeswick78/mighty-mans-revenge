@@ -67,6 +67,8 @@ This game uses pixel art assets from third-party packs. Source archives are
 - `effects/player-hit-1.png` — Enemies/Shot/shot_1 Sheet3
 - `effects/player-hit-2.png` — Enemies/Shot/shot_2 Sheet3
 
+- `decor/barrel-red.png` - Objects/Barrel_red_1
+
 ## Original audio
 
 The pack ships no audio. `audio/punch-whoosh.wav`, `audio/punch-impact.wav`,

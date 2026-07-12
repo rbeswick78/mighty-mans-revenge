@@ -1021,6 +1021,7 @@ export class MatchmakingManager {
       grenades: match.getActiveGrenades(),
       axes: match.getActiveAxes(),
       bulletTrails: match.getTickBulletTrails(),
+      barrelExplosions: match.getTickBarrelExplosions(),
       punches: match.getTickPunchEvents(),
       pickups: match.pickupManager.getPickups(),
       activeMutators: [...match.activeMutators],

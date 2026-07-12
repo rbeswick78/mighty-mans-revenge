@@ -133,6 +133,7 @@ describe('CombatManager', () => {
       const result = combat.processShot('shooter', 0, players, grid);
 
       expect(result.hit).toBe(false);
+      expect(result.hitTile).toEqual({ col: 4, row: 2 });
     });
 
     it('does not hit dead players', () => {

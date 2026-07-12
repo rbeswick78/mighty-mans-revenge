@@ -39,6 +39,8 @@ export interface ShotResult {
   victimId?: PlayerId;
   damage?: number;
   trail: BulletTrail;
+  /** First solid cell struck by a non-piercing miss, if any. */
+  hitTile?: { col: number; row: number };
 }
 
 /** One thrown axe connecting with a player this tick. */
@@ -359,6 +361,10 @@ export class CombatManager {
 
     return {
       hit: false,
+      hitTile:
+        wallHit.hitTileX !== null && wallHit.hitTileY !== null
+          ? { col: wallHit.hitTileX, row: wallHit.hitTileY }
+          : undefined,
       trail: {
         startPos,
         endPos,
@@ -443,6 +449,27 @@ export class CombatManager {
     }
 
     return { explosions };
+  }
+
+  /** Resolve an environmental blast with grenade tuning and normal LOS. */
+  explodeAt(
+    position: Vec2,
+    instigatorId: PlayerId,
+    players: Map<PlayerId, PlayerState>,
+    grid: CollisionGrid,
+  ): ExplosionResult {
+    return this.applyExplosion(
+      {
+        id: `barrel_${Date.now()}_${nextGrenadeId++}`,
+        position: { ...position },
+        velocity: { x: 0, y: 0 },
+        safetyFuseTimer: 0,
+        throwerId: instigatorId,
+        piercing: false,
+      },
+      players,
+      grid,
+    );
   }
 
   applyDamage(

@@ -228,7 +228,7 @@ export class PersistentStatsStore {
         throw new Error('unrecognized shape');
       }
       const data = parsed as PersistentStatsData;
-      // Files written before newer KillWeapons existed ('pistol'/'punch',
+      // Files written before newer KillWeapons existed ('pistol'/'punch'/'barrel',
       // and 'axe' before them) lack those weaponKills keys. Default them
       // to 0 so the Record<KillWeapon, number> contract holds for every
       // consumer without per-read null checks.

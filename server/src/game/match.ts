@@ -117,6 +117,10 @@ export class Match implements MatchContext {
   private tickPickupCollections: Array<{ pickupId: string; playerId: PlayerId }> = [];
   /** Solid tiles destroyed this tick by fire breath or grenade blasts. */
   private tickDestroyedTiles: Array<{ col: number; row: number }> = [];
+  /** Environmental blasts resolved this tick, for client explosion VFX. */
+  private tickBarrelExplosions: Array<{ x: number; y: number }> = [];
+  /** Unspent explosive barrels in this round, keyed as `col,row`. */
+  private readonly activeBarrels = new Set<string>();
   /** Ordered input queue per player. Inputs are acked only after consumption. */
   private inputQueues: Map<PlayerId, InputQueue> = new Map();
   /** Active 3-shot bursts in flight, keyed by player. */
@@ -234,6 +238,11 @@ export class Match implements MatchContext {
     this.gameMode = getGameMode(gameModeType);
 
     this.mapManager.loadMap(mapData);
+    for (const decoration of mapData.decorations ?? []) {
+      if (decoration.hazard === 'explosive_barrel') {
+        this.activeBarrels.add(this.barrelKey(decoration.x, decoration.y));
+      }
+    }
     // Modes can veto whole pickup categories (Gun Game: everything but
     // bandages) — filtered spawns never exist, so they never announce.
     this.pickupManager.initFromMap(
@@ -694,6 +703,11 @@ export class Match implements MatchContext {
     return this.tickDestroyedTiles;
   }
 
+  /** Barrel blasts created in the most recent tick, for transient VFX. */
+  getTickBarrelExplosions(): Array<{ x: number; y: number }> {
+    return this.tickBarrelExplosions;
+  }
+
   /** Active grenades in flight, for broadcasting. */
   getActiveGrenades(): GrenadeState[] {
     return this.combatManager.getGrenades();
@@ -780,6 +794,7 @@ export class Match implements MatchContext {
     this.tickKillFeedEntries = [];
     this.tickPickupCollections = [];
     this.tickDestroyedTiles = [];
+    this.tickBarrelExplosions = [];
 
     // Snapshot positions BEFORE this tick's inputs move anyone. A shot
     // that arrives this tick will rewind opponents to the snapshot taken
@@ -1304,6 +1319,8 @@ export class Match implements MatchContext {
           this.onKill(playerId, shot.victimId, weaponId === 'rifle' ? 'gun' : weaponId);
         }
       }
+    } else if (shot.hitTile) {
+      this.detonateBarrelAt(shot.hitTile.col, shot.hitTile.row, playerId);
     }
   }
 
@@ -1422,9 +1439,13 @@ export class Match implements MatchContext {
 
     this.stats.recordShot(player.id);
     let anyPelletHit = false;
+    const struckBarrels = new Set<string>();
 
     for (const shot of shots) {
       this.tickBulletTrails.push(shot.trail);
+      if (!shot.hit && shot.hitTile) {
+        struckBarrels.add(this.barrelKey(shot.hitTile.col, shot.hitTile.row));
+      }
       if (!shot.hit || !shot.victimId || shot.damage === undefined) continue;
       const victim = this.players.get(shot.victimId);
       // A victim killed by an earlier pellet of this same blast absorbs no
@@ -1445,6 +1466,13 @@ export class Match implements MatchContext {
 
     if (anyPelletHit) {
       this.stats.recordHit(player.id);
+    }
+
+    // Resolve hazards after every pellet's already-authoritative player hit.
+    // Several pellets hitting one barrel still produce one explosion.
+    for (const key of struckBarrels) {
+      const [col, row] = key.split(',').map(Number);
+      this.detonateBarrelAt(col, row, player.id);
     }
 
     if (!infiniteAmmo) {
@@ -1484,8 +1512,11 @@ export class Match implements MatchContext {
     }
   }
 
-  /** Apply world destruction, stats, and kill credit for an explosion. */
-  private recordExplosion(explosion: ExplosionResult): void {
+  /** Apply world destruction, chain reactions, stats, and kill credit. */
+  private recordExplosion(
+    explosion: ExplosionResult,
+    killWeapon: KillWeapon = 'grenade',
+  ): void {
     // Damage was already resolved by CombatManager against the untouched grid,
     // so cover protects players from the same blast that tears it down.
     const blastable = findBlastableCoverTiles(
@@ -1493,6 +1524,11 @@ export class Match implements MatchContext {
       this.mapManager.getCollisionGrid(),
       explosion.position,
     );
+    const chainedBarrels: Array<{ col: number; row: number }> = [];
+    for (const tile of blastable) {
+      const key = this.barrelKey(tile.col, tile.row);
+      if (this.activeBarrels.delete(key)) chainedBarrels.push(tile);
+    }
     for (const tile of blastable) {
       if (this.mapManager.destroyTile(tile.col, tile.row)) {
         this.tickDestroyedTiles.push(tile);
@@ -1505,7 +1541,7 @@ export class Match implements MatchContext {
       this.stats.recordDamage(explosion.throwerId, dmg.damage);
       this.applyVampireHeal(explosion.throwerId, dmg.playerId, dmg.damage);
       if (dmg.killed && dmg.playerId !== explosion.throwerId) {
-        this.onKill(explosion.throwerId, dmg.playerId, 'grenade');
+        this.onKill(explosion.throwerId, dmg.playerId, killWeapon);
       } else if (dmg.killed) {
         // Suicide via own grenade. In a duel, credit the kill to the only
         // other connected player so their score still ticks. In FFA with
@@ -1516,7 +1552,7 @@ export class Match implements MatchContext {
           if (id !== dmg.playerId) opponents.push(id);
         }
         if (opponents.length === 1) {
-          this.onKill(opponents[0], dmg.playerId, 'grenade');
+          this.onKill(opponents[0], dmg.playerId, killWeapon);
         } else {
           const victim = this.players.get(dmg.playerId);
           if (victim) {
@@ -1529,6 +1565,40 @@ export class Match implements MatchContext {
         }
       }
     }
+
+    for (const barrel of chainedBarrels) {
+      this.resolveBarrelExplosion(barrel.col, barrel.row, explosion.throwerId);
+    }
+  }
+
+  private barrelKey(col: number, row: number): string {
+    return `${col},${row}`;
+  }
+
+  /** Consume a bullet-struck barrel and open its collision before it blasts. */
+  private detonateBarrelAt(col: number, row: number, instigatorId: PlayerId): void {
+    if (!this.activeBarrels.delete(this.barrelKey(col, row))) return;
+    if (this.mapManager.destroyTile(col, row)) {
+      this.tickDestroyedTiles.push({ col, row });
+    }
+    this.resolveBarrelExplosion(col, row, instigatorId);
+  }
+
+  /** Resolve one already-consumed barrel, recursively triggering exposed props. */
+  private resolveBarrelExplosion(col: number, row: number, instigatorId: PlayerId): void {
+    const tileSize = this.mapManager.getMapData().tileSize;
+    const position = {
+      x: col * tileSize + tileSize / 2,
+      y: row * tileSize + tileSize / 2,
+    };
+    this.tickBarrelExplosions.push(position);
+    const explosion = this.combatManager.explodeAt(
+      position,
+      instigatorId,
+      this.players,
+      this.mapManager.getCollisionGrid(),
+    );
+    this.recordExplosion(explosion, 'barrel');
   }
 
   private respawnPlayer(player: PlayerState): void {

@@ -213,6 +213,54 @@ describe('validateMap', () => {
     );
   });
 
+  it('requires explosive barrels to be one-cell decorations on low cover', () => {
+    const valid = makeValidMap();
+    valid.tiles[2][1] = 2;
+    valid.decorations = [
+      {
+        x: 1,
+        y: 2,
+        w: 1,
+        h: 1,
+        texture: 'deco_barrel_red',
+        hazard: 'explosive_barrel',
+      },
+    ];
+    expect(validateMap(valid).valid).toBe(true);
+
+    const oversized = makeValidMap({
+      decorations: [
+        {
+          x: 1,
+          y: 2,
+          w: 2,
+          h: 1,
+          texture: 'deco_barrel_red',
+          hazard: 'explosive_barrel',
+        },
+      ],
+    });
+    expect(validateMap(oversized).errors).toContainEqual(
+      expect.stringContaining('must be exactly 1x1'),
+    );
+
+    const onFloor = makeValidMap({
+      decorations: [
+        {
+          x: 1,
+          y: 2,
+          w: 1,
+          h: 1,
+          texture: 'deco_barrel_red',
+          hazard: 'explosive_barrel',
+        },
+      ],
+    });
+    expect(validateMap(onFloor).errors).toContainEqual(
+      expect.stringContaining('must stand on COVER_LOW'),
+    );
+  });
+
   describe('kothHills', () => {
     /** 8x6 open interior — room for several distinct 2x2 hills. */
     function makeHillMap(kothHills?: { x: number; y: number }[]): MapData {

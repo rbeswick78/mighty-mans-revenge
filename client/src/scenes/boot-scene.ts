@@ -451,6 +451,7 @@ export class BootScene extends Phaser.Scene {
     this.load.image('deco_car_scrap_red', '/assets/decor/car-scrap_red.png');
     this.load.image('deco_container_gray', '/assets/decor/container-overgrown_gray.png');
     this.load.image('deco_container_red', '/assets/decor/container-overgrown_red.png');
+    this.load.image('deco_barrel_red', '/assets/decor/barrel-red.png');
 
     // Pickups — single static images, scaled at render time.
     // Ammo uses the asset-pack crate; grenade is generated procedurally

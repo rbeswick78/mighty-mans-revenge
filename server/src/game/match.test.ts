@@ -671,6 +671,50 @@ describe('Match', () => {
       return m;
     }
 
+    function startBarrelMatch(
+      secondBarrelCol: number | null = null,
+      shieldingWall = false,
+    ): Match {
+      const barrelCols = [3, ...(secondBarrelCol === null ? [] : [secondBarrelCol])];
+      const middleRow = [1, 0, 0, 2, shieldingWall ? 1 : 0, 0, 0, 0, 1];
+      if (secondBarrelCol !== null) middleRow[secondBarrelCol] = 2;
+      const map: MapData = {
+        name: 'Barrel Lab',
+        width: 9,
+        height: 5,
+        tileSize: 48,
+        tiles: [
+          [1, 1, 1, 1, 1, 1, 1, 1, 1],
+          [1, 0, 0, 0, 0, 0, 0, 0, 1],
+          middleRow,
+          [1, 3, 0, 0, 0, 0, 0, 3, 1],
+          [1, 1, 1, 1, 1, 1, 1, 1, 1],
+        ],
+        spawnPoints: [
+          { x: 1, y: 3 },
+          { x: 7, y: 3 },
+        ],
+        pickupSpawns: [],
+        decorations: barrelCols.map((x) => ({
+          x,
+          y: 2,
+          w: 1,
+          h: 1,
+          texture: 'deco_barrel_red',
+          hazard: 'explosive_barrel' as const,
+        })),
+      };
+      const m = new Match('barrel-lab', map, [
+        { id: 'player-0', nickname: 'P0' },
+        { id: 'player-1', nickname: 'P1' },
+      ]);
+      m.startCountdown();
+      m.update(MATCH.COUNTDOWN_DURATION + 0.05);
+      m.players.get('player-0')!.position = { x: 72, y: 120 };
+      m.players.get('player-1')!.position = { x: 216, y: 120 };
+      return m;
+    }
+
     function plantGrenade(m: Match): GrenadeState {
       m.queueInput('player-0', makeInput(1, { throwPressed: true, aimAngle: 0 }));
       m.update(0.05);
@@ -748,6 +792,69 @@ describe('Match', () => {
       ]);
       expect(m.mapManager.getCollisionGrid().solid[2][3]).toBe(false);
       expect(m.mapManager.getCollisionGrid().solid[2][4]).toBe(false);
+    });
+
+    it('a rifle impact detonates one barrel, removes collision, and credits barrel kills', () => {
+      const m = startBarrelMatch();
+      m.players.get('player-1')!.health = 50;
+
+      m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+      m.update(0.05);
+
+      expect(m.getTickBarrelExplosions()).toEqual([{ x: 168, y: 120 }]);
+      expect(m.getTickDestroyedTiles()).toEqual([{ col: 3, row: 2 }]);
+      expect(m.mapManager.getCollisionGrid().solid[2][3]).toBe(false);
+      expect(m.players.get('player-1')!.isDead).toBe(true);
+      expect(m.getTickKillFeedEntries()[0]?.weapon).toBe('barrel');
+      expect(m.stats.getStats('player-0').killsByWeapon.barrel).toBe(1);
+    });
+
+    it('a grenade-triggered barrel recursively chains into another exposed barrel once', () => {
+      const m = startBarrelMatch(5);
+      plantGrenade(m);
+
+      m.queueInput('player-0', makeInput(2, { detonatePressed: true }));
+      m.update(0.05);
+
+      expect(m.getTickBarrelExplosions()).toEqual([
+        { x: 168, y: 120 },
+        { x: 264, y: 120 },
+      ]);
+      expect(m.getTickDestroyedTiles()).toEqual([
+        { col: 3, row: 2 },
+        { col: 5, row: 2 },
+      ]);
+      expect(m.mapManager.getCollisionGrid().solid[2][3]).toBe(false);
+      expect(m.mapManager.getCollisionGrid().solid[2][5]).toBe(false);
+
+      m.update(0.05);
+      expect(m.getTickBarrelExplosions()).toEqual([]);
+      expect(m.getTickDestroyedTiles()).toEqual([]);
+    });
+
+    it('an ordinary wall shields a second barrel from the chain', () => {
+      const m = startBarrelMatch(5, true);
+
+      m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+      m.update(0.05);
+
+      expect(m.getTickBarrelExplosions()).toEqual([{ x: 168, y: 120 }]);
+      expect(m.mapManager.getCollisionGrid().solid[2][3]).toBe(false);
+      expect(m.mapManager.getCollisionGrid().solid[2][4]).toBe(true);
+      expect(m.mapManager.getCollisionGrid().solid[2][5]).toBe(true);
+    });
+
+    it('a fresh match rebuilds barrels consumed in the previous round', () => {
+      const first = startBarrelMatch();
+      first.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+      first.update(0.05);
+      expect(first.mapManager.getCollisionGrid().solid[2][3]).toBe(false);
+
+      const rematch = startBarrelMatch();
+      expect(rematch.mapManager.getCollisionGrid().solid[2][3]).toBe(true);
+      rematch.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+      rematch.update(0.05);
+      expect(rematch.getTickBarrelExplosions()).toEqual([{ x: 168, y: 120 }]);
     });
 
     it('safety fuse auto-detonates if no detonate input arrives', () => {

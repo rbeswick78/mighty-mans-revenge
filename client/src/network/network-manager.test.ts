@@ -94,6 +94,7 @@ function makeGameState(
     grenades: [],
     axes: [],
     bulletTrails: [],
+    barrelExplosions: [],
     punches: [],
     pickups: [],
     activeMutators: [],
@@ -244,6 +245,23 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
     };
     deliver(makeGameState([makeSerialized()], { bulletTrails: [trail] }));
     expect(seen).toEqual([trail]);
+  });
+
+  it('forwards transient barrel blasts through the grenade explosion presentation', () => {
+    const seen: unknown[] = [];
+    manager.on('grenadeExploded', (position) => seen.push(position));
+    deliver(
+      makeGameState([makeSerialized()], {
+        barrelExplosions: [
+          { x: 168, y: 120 },
+          { x: 264, y: 120 },
+        ],
+      }),
+    );
+    expect(seen).toEqual([
+      { x: 168, y: 120 },
+      { x: 264, y: 120 },
+    ]);
   });
 
   it('sends an explicit authoritative practice request', () => {

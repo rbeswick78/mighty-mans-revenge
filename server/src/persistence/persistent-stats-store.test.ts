@@ -82,6 +82,7 @@ describe('PersistentStatsStore', () => {
       axe: 0,
       pistol: 0,
       punch: 0,
+      barrel: 0,
     });
     expect(ryan.nickname).toBe('Ryan');
   });
@@ -206,6 +207,7 @@ describe('PersistentStatsStore', () => {
       axe: 0,
       pistol: 0,
       punch: 0,
+      barrel: 0,
     });
 
     // Accumulating a new-era match on top of the migrated record works.

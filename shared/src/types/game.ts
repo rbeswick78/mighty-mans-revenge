@@ -1,4 +1,4 @@
-import { PlayerId, MatchId, Tick } from './common.js';
+import { PlayerId, MatchId, Tick, Vec2 } from './common.js';
 import { PlayerState, PlayerStats } from './player.js';
 import { AxeState, GrenadeState, BulletTrail, PunchEvent } from './projectile.js';
 import { PickupState } from './pickup.js';
@@ -52,6 +52,7 @@ export interface GameState {
   grenades: GrenadeState[];
   axes: AxeState[];
   bulletTrails: BulletTrail[];
+  barrelExplosions: Vec2[];
   punches: PunchEvent[];
   pickups: PickupState[];
   killFeed: KillFeedEntry[];
@@ -62,7 +63,15 @@ export interface GameState {
  * compatibility); abilities and special weapons get their own entries so
  * stats/awards can distinguish them.
  */
-export type KillWeapon = 'gun' | 'grenade' | 'fire' | 'shotgun' | 'axe' | 'pistol' | 'punch';
+export type KillWeapon =
+  | 'gun'
+  | 'grenade'
+  | 'fire'
+  | 'shotgun'
+  | 'axe'
+  | 'pistol'
+  | 'punch'
+  | 'barrel';
 
 export interface KillFeedEntry {
   killerId: PlayerId;

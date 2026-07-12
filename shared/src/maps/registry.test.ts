@@ -73,11 +73,24 @@ describe('MAP_REGISTRY', () => {
     }
   });
 
+  it('every arena places exactly two one-cell explosive barrels on low cover', () => {
+    for (const m of MAP_REGISTRY.values()) {
+      const barrels = (m.decorations ?? []).filter(
+        (decoration) => decoration.hazard === 'explosive_barrel',
+      );
+      expect(barrels, `${m.name} barrels`).toHaveLength(2);
+      for (const barrel of barrels) {
+        expect([barrel.w, barrel.h]).toEqual([1, 1]);
+        expect(m.tiles[barrel.y][barrel.x]).toBe(2);
+      }
+    }
+  });
+
   it('Collapsed Overpass keeps its six-hill objective identity', () => {
     const overpass = getMap('Collapsed Overpass');
     expect(overpass.theme).toBe('overpass');
     expect(overpass.kothHills).toHaveLength(6);
-    expect(overpass.decorations).toHaveLength(4);
+    expect(overpass.decorations).toHaveLength(6);
   });
 });
 

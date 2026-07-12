@@ -36,6 +36,8 @@ export interface MapDecoration {
   texture: string;
   /** Mirror the sprite horizontally for cheap variety. */
   flipX?: boolean;
+  /** Optional server-authored gameplay carried by this decorated solid. */
+  hazard?: 'explosive_barrel';
 }
 
 export interface MapData {

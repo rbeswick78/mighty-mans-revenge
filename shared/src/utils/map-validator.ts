@@ -99,6 +99,17 @@ export function validateMap(mapData: MapData): ValidationResult {
         `Decoration "${deco.texture}" rect (${deco.x}, ${deco.y}, ${deco.w}x${deco.h}) extends out of map bounds`,
       );
     }
+    if (deco.hazard === 'explosive_barrel') {
+      if (deco.w !== 1 || deco.h !== 1) {
+        errors.push(
+          `Explosive barrel at (${deco.x}, ${deco.y}) must be exactly 1x1`,
+        );
+      } else if (mapData.tiles[deco.y]?.[deco.x] !== TileType.COVER_LOW) {
+        errors.push(
+          `Explosive barrel at (${deco.x}, ${deco.y}) must stand on COVER_LOW`,
+        );
+      }
+    }
   }
 
   // Check KOTH hills when declared: at least 3 (round-robin relocation

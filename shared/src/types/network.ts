@@ -144,6 +144,8 @@ export interface ServerGameStateMessage {
   /** Jack's thrown axes in flight (usually empty — one per Jack per 12s). */
   axes: AxeState[];
   bulletTrails: BulletTrail[];
+  /** Barrel detonations resolved during this snapshot (transient VFX cues). */
+  barrelExplosions: Vec2[];
   /**
    * Punch swings resolved during this snapshot's ticks (usually empty).
    * Transient like bulletTrails — processed per message, never diffed.

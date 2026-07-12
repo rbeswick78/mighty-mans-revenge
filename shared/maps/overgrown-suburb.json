@@ -35,7 +35,9 @@
   ],
   "decorations": [
     { "x": 11, "y": 3, "w": 1, "h": 2, "texture": "deco_car_overgrown_red" },
-    { "x": 8, "y": 7, "w": 1, "h": 2, "texture": "deco_car_overgrown_blue", "flipX": true }
+    { "x": 8, "y": 7, "w": 1, "h": 2, "texture": "deco_car_overgrown_blue", "flipX": true },
+    { "x": 3, "y": 5, "w": 1, "h": 1, "texture": "deco_barrel_red", "hazard": "explosive_barrel" },
+    { "x": 17, "y": 8, "w": 1, "h": 1, "texture": "deco_barrel_red", "hazard": "explosive_barrel" }
   ],
   "kothHills": [
     { "x": 9, "y": 5 },

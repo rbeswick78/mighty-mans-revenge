@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–22 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts, solo Practice vs Rusty, streak + payback callouts, selectable Rusty difficulty, Collapsed Overpass, Blackout, fresh-chaos rematches, Last Stand, Kill Confirmed, mode briefings, character death animations, authoritative hit confirmation, blastable cover). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–23 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts, solo Practice vs Rusty, streak + payback callouts, selectable Rusty difficulty, Collapsed Overpass, Blackout, fresh-chaos rematches, Last Stand, Kill Confirmed, mode briefings, character death animations, authoritative hit confirmation, blastable cover, chain-reaction barrels). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -54,6 +54,7 @@ Each session below attacks one of these.
 | 20  | Character Death Animations                    | Every elimination lands with a readable, satisfying corpse pose     | **DONE** (2026-07-11) |
 | 21  | Authoritative Hit Confirmation                | Every accurate shot feels crisp, legible, and unquestionably earned  | **DONE** (2026-07-12) |
 | 22  | Blastable Cover                               | Grenades permanently carve new routes through each round's arena     | **DONE** (2026-07-12) |
+| 23  | Chain-Reaction Barrels                        | Every arena gains tactical traps, ambushes, and explosive reversals  | **DONE** (2026-07-12) |
 
 ---
 
@@ -1348,7 +1349,81 @@ low cover without weakening the arena boundary or changing combat numbers.
 
 ---
 
+## Session 23 — Chain-Reaction Barrels
+
+**Goal:** turn cover into an authored tactical opportunity that rewards map
+awareness, accurate shots, and risky chain-reaction plays without changing any
+weapon, character, or grenade tuning.
+
+**Locked design decisions**
+
+- Every shipped arena has exactly two red barrels, declared as one-cell
+  `MapDecoration` entries with `hazard: "explosive_barrel"` and backed by
+  `COVER_LOW`. The map validator rejects oversized or non-cover barrels.
+- A non-piercing rifle, pistol, or shotgun ray that terminates on a barrel
+  detonates it. Grenade and barrel blasts trigger any exposed barrel inside
+  the existing grenade radius. Punches, axes, fire breath, and X-ray shots do
+  not trigger barrels because they do not terminate on that solid cell.
+- Barrels reuse grenade damage, falloff, radius, Iron Hide handling, and LOS.
+  The consumed barrel's collision disappears before its own blast; ordinary
+  walls and nearer solids still shield later barrels. Each barrel is removed
+  from the round's active set before recursion, so it can explode only once.
+- The server owns barrel state, damage, chains, and tile destruction. A
+  transient `barrelExplosions` snapshot list reuses the existing grenade VFX,
+  audio, scorch, and shockwave path; reliable `server:tilesDestroyed` remains
+  the collision/art synchronization path. New matches rebuild the map cleanly.
+- Barrel kills use a distinct `KillWeapon` entry. They score in normal modes
+  and persist in lifetime weapon totals, but cannot accidentally satisfy a Gun
+  Game weapon rung or inflate grenade-specific awards.
+
+**Acceptance criteria**
+
+- [x] Rifle, pistol, and shotgun impacts can consume a barrel exactly once;
+      multiple pellets in one blast still produce one detonation.
+- [x] Grenades and barrels recursively chain only into exposed barrels, while
+      ordinary walls shield hazards behind them.
+- [x] Damage, kill credit, persistent stats, collision removal, VFX, and fresh
+      rematch state are server-authoritative and covered by regressions.
+- [x] All four maps place two readable, validator-approved barrels outside
+      spawn, pickup, and objective cells.
+- [x] Typecheck, lint, all unit tests, production build, and Playwright pass.
+
+---
+
 ## Session Log
+
+### Session 23 — 2026-07-12 — Chain-Reaction Barrels
+
+**Shipped:** every arena now contains two bright red explosive barrels. A
+well-placed rifle or pistol round, any shotgun pellet, a grenade, or another
+barrel can set one off. The blast uses the game's established grenade damage
+and visibility rules, tears open the barrel's cover cell, can cascade through
+other exposed hazards, and awards any resulting elimination to the player who
+started the reaction under the distinct `barrel` attribution.
+
+The implementation stays authoritative end to end. Hitscan reports the exact
+solid cell it struck; Match consumes each hazard before resolving recursion;
+clients receive reliable tile removal plus a transient environmental-blast cue
+that deliberately reuses the mature grenade effects path. The map validator
+enforces the one-cell low-cover contract, persistent stats back-fill the new
+weapon key for old files, and constructing a rematch restores every barrel.
+
+**Verified:** focused tests cover solid-cell hit reporting, direct rifle
+detonation, barrel kill attribution, grenade-driven two-barrel recursion,
+ordinary-wall shielding, transient cue forwarding, one-tick cleanup, fresh
+match restoration, persistence compatibility, and the two-per-map contract.
+A live Collapsed Overpass practice match confirmed both curated barrel sprites
+render clearly among the existing wrecks and containers. Typecheck and lint are
+clean; all 837 unit tests pass; the production build succeeds; and Playwright
+completes all 21 cases with 12 passes, 9 intentional skips, and zero failures
+across Chromium, Firefox, and mobile landscape.
+
+**Carry-over:** barrel blasts intentionally reuse grenade tuning, and two per
+map is an authored starting point rather than a balance verdict. Watch whether
+Grenades Only or Turbo Grenades makes chains too easy during the next real
+group session; do not alter counts, radius, or damage without playtest evidence.
+
+---
 
 ### Session 22 — 2026-07-12 — Blastable Cover
 
