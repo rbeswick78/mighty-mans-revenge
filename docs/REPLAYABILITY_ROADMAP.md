@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–20 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts, solo Practice vs Rusty, streak + payback callouts, selectable Rusty difficulty, Collapsed Overpass, Blackout, fresh-chaos rematches, Last Stand, Kill Confirmed, mode briefings, character death animations). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–21 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts, solo Practice vs Rusty, streak + payback callouts, selectable Rusty difficulty, Collapsed Overpass, Blackout, fresh-chaos rematches, Last Stand, Kill Confirmed, mode briefings, character death animations, authoritative hit confirmation). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -52,6 +52,7 @@ Each session below attacks one of these.
 | 18  | Kill Confirmed                                 | Every kill creates a risky confirm-or-deny scramble                 | **DONE** (2026-07-11) |
 | 19  | Mode Briefings                                | Every mode teaches its win condition before the fight begins        | **DONE** (2026-07-11) |
 | 20  | Character Death Animations                    | Every elimination lands with a readable, satisfying corpse pose     | **DONE** (2026-07-11) |
+| 21  | Authoritative Hit Confirmation                | Every accurate shot feels crisp, legible, and unquestionably earned  | **DONE** (2026-07-12) |
 
 ---
 
@@ -1271,7 +1272,72 @@ vanish on the first dead snapshot.
 
 ---
 
+## Session 21 — Authoritative Hit Confirmation
+
+**Goal:** make accurate gunfire feel unmistakably satisfying without letting
+the client guess whether a ray actually damaged a fighter.
+
+**Locked design decisions**
+
+- `BulletTrail` carries explicit `hitPlayerId` and `damageApplied` fields.
+  CombatManager initializes every trail as unconfirmed; Match stamps the fields
+  only after `applyDamage()` succeeds, using the post-mitigation amount.
+- A ray endpoint alone is never proof of a player hit. Confirmed trails use the
+  pack's two three-frame `Enemies/Shot` splashes; misses and scenery contacts
+  keep the existing spark, dust, and wall-decal presentation.
+- Bullet arrival owns impact timing. The 200ms trail tween invokes its arrival
+  callback after the bullet head reaches the endpoint, eliminating the old
+  effect-before-projectile causality mismatch.
+- Only the shooter hears the short, original hit-confirm tick. Rifle and pistol
+  rounds confirm individually; a shotgun blast may show several pellet splashes
+  but collapses to one sound on the first confirmed pellet.
+- This adds no client damage prediction and changes no weapon, hitbox, health,
+  mitigation, lag-compensation, or scoring rules.
+
+**Acceptance criteria**
+
+- [x] Rifle, pistol, and every applied shotgun pellet broadcast the victim and
+      post-mitigation damage; misses and discarded pellets remain null/zero.
+- [x] The network client forwards the new fields unchanged and old/undefined
+      fields safely fall through to ordinary impact feedback.
+- [x] Confirmed-hit art, arrival timing, local-only audio, and shotgun sound
+      grouping work in live desktop and mobile-landscape play.
+- [x] Curated art and original synthesized audio are fully attributed and
+      reproducible.
+- [x] Typecheck, lint, all unit tests, production build, and Playwright pass.
+
+---
+
 ## Session Log
+
+### Session 21 — 2026-07-12 — Authoritative Hit Confirmation
+
+**Shipped:** every rifle, pistol, and applied shotgun-pellet trail can now carry
+the server-authoritative victim and post-mitigation damage that actually
+landed. Confirmed shots play one of two curated three-frame impact splashes at
+bullet arrival, while misses keep the existing sparks, dust, and wall decals.
+The local shooter also hears a short original hit-confirm tick; shotgun pellets
+share one tick per blast without hiding their individual impact splashes.
+
+The confirmation is deliberately downstream of `applyDamage()`, so Iron Hide,
+lethal pellet ordering, discarded pellets, and every existing combat rule stay
+truthful. Old or incomplete payloads safely use ordinary impact feedback, and
+the client never predicts damage from geometry alone.
+
+**Verified:** a live Warlord Practice match produced real confirmed kills and
+ordinary wall impacts with no browser warnings or errors. The desktop canvas,
+mobile-landscape canvas, and touch path all pass the Playwright matrix. Focused
+coverage checks rifle, pistol, shotgun, lethal-pellet, mitigation, network
+forwarding, compatibility, and sound-grouping behavior. Typecheck and lint are
+clean; all 822 unit tests pass; the production build succeeds; and Playwright
+completes all 21 cases with 12 passes, 9 intentional skips, and zero unexpected
+or flaky cases.
+
+**Carry-over:** the hit tick is intentionally local-only and understated. A
+group playtest should decide whether its mix needs adjustment; no weapon or
+character balance values changed in this session.
+
+---
 
 ### Session 20 — 2026-07-11 — Character Death Animations
 

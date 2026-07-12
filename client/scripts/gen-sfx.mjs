@@ -123,9 +123,29 @@ function axeChop() {
   return out;
 }
 
+// --- hit-confirm: two bright square-wave ticks + a tiny noise transient, 65ms ---
+// Kept intentionally dry and short so it reads through rifle bursts without
+// masking weapon audio. This is local-shooter feedback, not a world sound.
+function hitConfirm() {
+  const rng = mulberry32(0x417c0de);
+  const n = Math.floor(SR * 0.065);
+  const out = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    const seconds = i / SR;
+    const t = i / n;
+    const toneA = Math.sign(Math.sin(2 * Math.PI * 1320 * seconds));
+    const toneB = Math.sign(Math.sin(2 * Math.PI * 1760 * seconds));
+    const envelope = Math.exp(-t * 8.5);
+    const click = i < SR * 0.004 ? (rng() * 2 - 1) * (1 - i / (SR * 0.004)) : 0;
+    out[i] = Math.tanh((toneA * 0.42 + toneB * 0.22 + click * 0.35) * envelope);
+  }
+  return out;
+}
+
 const outDir = process.argv[2] ?? '.';
 mkdirSync(outDir, { recursive: true });
 writeWav(join(outDir, 'punch-whoosh.wav'), punchWhoosh());
 writeWav(join(outDir, 'punch-impact.wav'), punchImpact());
 writeWav(join(outDir, 'axe-whoosh.wav'), axeWhoosh());
 writeWav(join(outDir, 'axe-chop.wav'), axeChop());
+writeWav(join(outDir, 'hit-confirm.wav'), hitConfirm());

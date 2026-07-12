@@ -21,6 +21,10 @@ import type { PlayerState } from '@shared/types/player.js';
 import { MapRenderer } from '../rendering/map-renderer.js';
 import { ClientPlayerManager } from '../rendering/player-manager.js';
 import { EffectsRenderer } from '../rendering/effects-renderer.js';
+import {
+  hasConfirmedPlayerHit,
+  isSameShotgunBlast,
+} from '../rendering/hit-feedback.js';
 import { PickupRenderer } from '../rendering/pickup-renderer.js';
 import { ConfirmedTagRenderer } from '../rendering/confirmed-tag-renderer.js';
 import { GrenadeRenderer } from '../rendering/grenade-renderer.js';
@@ -219,6 +223,8 @@ export class GameScene extends Phaser.Scene {
    * once per pellet.
    */
   private lastShotgunBlastAt: Map<PlayerId, number> = new Map();
+  /** First confirmed pellet owns the local hit tick for each shotgun blast. */
+  private lastShotgunConfirmedHitAt: Map<PlayerId, number> = new Map();
   /** Cached so we can detect changes (incl. mid-match-join) and resync the label. */
   /** Joined display names of the synced active mutators, or null when none. */
   private lastSyncedMutatorLabel: string | null = null;
@@ -979,13 +985,6 @@ export class GameScene extends Phaser.Scene {
     };
 
     this.onBulletTrail = (trail: BulletTrail) => {
-      this.effectsRenderer?.showBulletTrail(
-        trail.startPos.x,
-        trail.startPos.y,
-        trail.endPos.x,
-        trail.endPos.y,
-      );
-
       const bulletAngle = Math.atan2(
         trail.endPos.y - trail.startPos.y,
         trail.endPos.x - trail.startPos.x,
@@ -996,10 +995,11 @@ export class GameScene extends Phaser.Scene {
       // one-per-blast effects (muzzle flash, boom SFX, shoot anim, camera
       // kick) only for the first pellet of the blast.
       const isShotgun = trail.weaponId === 'shotgun';
+      const localPlayerId = this.gameService.getNetworkManager().getPlayerId();
       let primaryOfBlast = true;
       if (isShotgun) {
-        const last = this.lastShotgunBlastAt.get(trail.shooterId) ?? -Infinity;
-        if (trail.timestamp - last < 100) {
+        const last = this.lastShotgunBlastAt.get(trail.shooterId);
+        if (isSameShotgunBlast(last, trail.timestamp)) {
           primaryOfBlast = false;
         } else {
           this.lastShotgunBlastAt.set(trail.shooterId, trail.timestamp);
@@ -1051,25 +1051,55 @@ export class GameScene extends Phaser.Scene {
       }
 
       const grid = this.mapRenderer?.getCollisionGrid() ?? null;
-      this.impactFx?.spawnBulletImpact(
+      const confirmedPlayerHit = hasConfirmedPlayerHit(trail);
+      this.effectsRenderer?.showBulletTrail(
+        trail.startPos.x,
+        trail.startPos.y,
         trail.endPos.x,
         trail.endPos.y,
-        bulletAngle,
-        grid,
-      );
-      this.decalRenderer?.addBulletHoleIfWall(
-        trail.endPos.x,
-        trail.endPos.y,
-        bulletAngle,
-        grid,
+        () => {
+          if (confirmedPlayerHit) {
+            this.effectsRenderer?.showPlayerHit(
+              trail.endPos.x,
+              trail.endPos.y,
+              bulletAngle,
+              trail.timestamp,
+            );
+
+            // This dry UI tick is private shooter feedback. Shotgun pellets
+            // share one blast, so only its first confirmed pellet owns it.
+            if (audio && trail.shooterId === localPlayerId) {
+              let playHitConfirm = true;
+              if (isShotgun) {
+                const last = this.lastShotgunConfirmedHitAt.get(trail.shooterId);
+                if (isSameShotgunBlast(last, trail.timestamp)) {
+                  playHitConfirm = false;
+                } else {
+                  this.lastShotgunConfirmedHitAt.set(trail.shooterId, trail.timestamp);
+                }
+              }
+              if (playHitConfirm) audio.play('hitConfirm');
+            }
+          } else {
+            this.impactFx?.spawnBulletImpact(
+              trail.endPos.x,
+              trail.endPos.y,
+              bulletAngle,
+              grid,
+            );
+            this.decalRenderer?.addBulletHoleIfWall(
+              trail.endPos.x,
+              trail.endPos.y,
+              bulletAngle,
+              grid,
+            );
+          }
+        },
       );
 
       // Recoil kick — only the local player's shot moves the local camera.
       // Watching a remote player fire must not jitter your view.
-      if (
-        primaryOfBlast &&
-        trail.shooterId === this.gameService.getNetworkManager().getPlayerId()
-      ) {
+      if (primaryOfBlast && trail.shooterId === localPlayerId) {
         this.cameraKick?.trigger(bulletAngle + Math.PI);
       }
     };

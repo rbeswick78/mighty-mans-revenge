@@ -268,6 +268,8 @@ export class CombatManager {
           shooterId,
           timestamp: Date.now(),
           weaponId,
+          hitPlayerId: null,
+          damageApplied: 0,
         },
       };
     }
@@ -344,6 +346,8 @@ export class CombatManager {
           shooterId,
           timestamp: Date.now(),
           weaponId,
+          hitPlayerId: null,
+          damageApplied: 0,
         },
       };
     }
@@ -361,6 +365,8 @@ export class CombatManager {
         shooterId,
         timestamp: Date.now(),
         weaponId,
+        hitPlayerId: null,
+        damageApplied: 0,
       },
     };
   }

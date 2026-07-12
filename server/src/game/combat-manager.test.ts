@@ -94,6 +94,10 @@ describe('CombatManager', () => {
       expect(result.damage).toBeGreaterThan(0);
       expect(result.trail.startPos.x).toBe(100);
       expect(result.trail.startPos.y).toBe(100);
+      // Geometric hit detection alone is not a client confirmation. Match
+      // stamps these only after damage survives lifecycle/mitigation checks.
+      expect(result.trail.hitPlayerId).toBeNull();
+      expect(result.trail.damageApplied).toBe(0);
     });
 
     it('misses when no player is in the line of fire', () => {
@@ -110,6 +114,8 @@ describe('CombatManager', () => {
 
       expect(result.hit).toBe(false);
       expect(result.victimId).toBeUndefined();
+      expect(result.trail.hitPlayerId).toBeNull();
+      expect(result.trail.damageApplied).toBe(0);
     });
 
     it('stops at walls — cannot hit through walls', () => {

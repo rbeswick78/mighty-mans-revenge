@@ -230,6 +230,22 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
     expect(seen).toEqual([collection]);
   });
 
+  it('emits authoritative post-mitigation bullet-hit confirmation intact', () => {
+    const seen: unknown[] = [];
+    manager.on('bulletTrail', (trail) => seen.push(trail));
+    const trail = {
+      startPos: { x: 100, y: 100 },
+      endPos: { x: 180, y: 100 },
+      shooterId: LOCAL_ID,
+      timestamp: 1234,
+      weaponId: 'rifle' as const,
+      hitPlayerId: REMOTE_ID,
+      damageApplied: 17,
+    };
+    deliver(makeGameState([makeSerialized()], { bulletTrails: [trail] }));
+    expect(seen).toEqual([trail]);
+  });
+
   it('sends an explicit authoritative practice request', () => {
     manager.startPractice('Alpha', 'warlord');
     expect(hoisted.sentMessages).toContainEqual({

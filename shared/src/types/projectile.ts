@@ -12,6 +12,17 @@ export interface BulletTrail {
    * flash/SFX once per blast (grouped by shooter + timestamp).
    */
   weaponId: WeaponId;
+  /**
+   * Player who actually absorbed this bullet's damage, or null when the
+   * authoritative shot missed, hit scenery, or was discarded before damage
+   * application. This is stamped only after CombatManager.applyDamage runs.
+   */
+  hitPlayerId: PlayerId | null;
+  /**
+   * Post-mitigation damage actually applied to hitPlayerId. Zero when there
+   * is no confirmed player hit; Iron Hide and future mitigation are reflected.
+   */
+  damageApplied: number;
 }
 
 /**

@@ -64,14 +64,16 @@ This game uses pixel art assets from third-party packs. Source archives are
 - `enemies/zombie-big_{side,side-left}_death.png` — Enemies/Zombie_Big First-Death Sheet7
 - `enemies/zombie-axe_{side,side-left}_death.png` — Enemies/Zombie_Axe First-Death Sheet6
 - `enemies/zombie-axe-noaxe_{side,side-left}_death.png` — Enemies/Zombie_Axe/No-Axe First-Death Sheet6
+- `effects/player-hit-1.png` — Enemies/Shot/shot_1 Sheet3
+- `effects/player-hit-2.png` — Enemies/Shot/shot_2 Sheet3
 
 ## Original audio
 
 The pack ships no audio. `audio/punch-whoosh.wav`, `audio/punch-impact.wav`,
-`audio/axe-whoosh.wav`, and `audio/axe-chop.wav` are original works,
-procedurally synthesized by `client/scripts/gen-sfx.mjs` (deterministic —
-rerunning the script reproduces the files byte-for-byte). No third-party
-license applies.
+`audio/axe-whoosh.wav`, `audio/axe-chop.wav`, and `audio/hit-confirm.wav` are
+original works, procedurally synthesized by `client/scripts/gen-sfx.mjs`
+(deterministic — rerunning the script reproduces the files byte-for-byte). No
+third-party license applies.
 
 If we ever ship this commercially (charge money, run ads, promote a paid
 product) we owe the author at least $2 — pay before release.

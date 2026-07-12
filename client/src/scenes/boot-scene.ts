@@ -50,6 +50,14 @@ const FIRE_FRAMES: Record<Direction4, FrameDim> = {
   'side-left': { w: 10, h: 7 },   // 30 × 7
 };
 
+/** Two three-frame player-hit splashes from Enemies/Shot. */
+const HIT_SPLASH_SHEETS = [
+  { key: 'hit_splash_1', file: 'player-hit-1.png', frameWidth: 7 },
+  { key: 'hit_splash_2', file: 'player-hit-2.png', frameWidth: 6 },
+] as const;
+const HIT_SPLASH_FRAME_HEIGHT = 6;
+const HIT_SPLASH_FPS = 30;
+
 /**
  * Shotgun held-overlay frame dimensions (same layering trick as the gun:
  * overlay both sprites at the same origin and the weapon sits in the held
@@ -457,6 +465,13 @@ export class BootScene extends Phaser.Scene {
     this.load.image('bullet', '/assets/player/bullet.png');
     // Shotgun pellet head — 3×1 px, one per pellet trail.
     this.load.image('shotgun-bullet', '/assets/player/shotgun-bullet.png');
+    for (const splash of HIT_SPLASH_SHEETS) {
+      this.load.spritesheet(
+        splash.key,
+        `/assets/effects/${splash.file}`,
+        { frameWidth: splash.frameWidth, frameHeight: HIT_SPLASH_FRAME_HEIGHT },
+      );
+    }
 
     // HUD shell indicators for the special-weapon ammo panel.
     this.load.image('shotgun_shell', '/assets/ui/shotgun-bullet-indicator.png');
@@ -485,6 +500,7 @@ export class BootScene extends Phaser.Scene {
     this.load.audio('sfx-death', '/assets/audio/death.wav');
     this.load.audio('sfx-pickup', '/assets/audio/pickup.wav');
     this.load.audio('sfx-out-of-ammo', '/assets/audio/out-of-ammo.wav');
+    this.load.audio('sfx-hit-confirm', '/assets/audio/hit-confirm.wav');
     // Melee/axe SFX — procedurally generated WAVs (client/scripts/gen-sfx.mjs),
     // replacing the Session 7 rate/detune stand-ins derived from
     // grenade-throw/gun-shot.
@@ -617,6 +633,15 @@ export class BootScene extends Phaser.Scene {
         key: pistolShootKey,
         frames: this.anims.generateFrameNumbers(pistolShootKey, {}),
         frameRate: GUN_SHOOT_FPS,
+        repeat: 0,
+      });
+    }
+
+    for (const splash of HIT_SPLASH_SHEETS) {
+      this.anims.create({
+        key: splash.key,
+        frames: this.anims.generateFrameNumbers(splash.key, {}),
+        frameRate: HIT_SPLASH_FPS,
         repeat: 0,
       });
     }

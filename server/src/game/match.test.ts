@@ -1905,6 +1905,13 @@ describe('Match', () => {
         const damage = startHp - victim.health;
         // All pellets land at ~50px: total well above a single pellet's max.
         expect(damage).toBeGreaterThan(WEAPONS.shotgun.damageMax);
+        const confirmedTrails = m.getTickBulletTrails().filter(
+          (trail) => trail.hitPlayerId === 'player-1',
+        );
+        expect(confirmedTrails.length).toBeGreaterThan(1);
+        expect(
+          confirmedTrails.reduce((sum, trail) => sum + trail.damageApplied, 0),
+        ).toBeCloseTo(damage, 5);
         const stats = m.stats.getStats('player-0');
         expect(stats.shotsFired).toBe(1);
         expect(stats.shotsHit).toBe(1);
@@ -1927,6 +1934,11 @@ describe('Match', () => {
         expect(victim.isDead).toBe(true);
         // The victim died exactly once even though multiple pellets connected.
         expect(victim.deaths).toBe(1);
+        const trails = m.getTickBulletTrails();
+        expect(trails.some((trail) => trail.hitPlayerId === 'player-1')).toBe(true);
+        expect(
+          trails.some((trail) => trail.hitPlayerId === null && trail.damageApplied === 0),
+        ).toBe(true);
         const stats = m.stats.getStats('player-0');
         expect(stats.killsByWeapon.shotgun).toBe(1);
         expect(stats.kills).toBe(1);
@@ -2357,6 +2369,9 @@ describe('Match', () => {
         m.update(0.001);
         const damagedWhileActive = bubba.maxHealth - bubba.health;
         expect(damagedWhileActive).toBeGreaterThan(0);
+        const confirmedTrail = m.getTickBulletTrails()[0];
+        expect(confirmedTrail.hitPlayerId).toBe('player-0');
+        expect(confirmedTrail.damageApplied).toBeCloseTo(damagedWhileActive, 10);
 
         // Let the window (and the burst) fully expire, then shoot again
         // from the same spot: same distance → same raw damage, now unhalved.
@@ -2799,6 +2814,10 @@ describe('Match', () => {
       const trails = m.getTickBulletTrails();
       expect(trails).toHaveLength(1);
       expect(trails[0].weaponId).toBe('pistol');
+      expect(trails[0]).toMatchObject({
+        hitPlayerId: 'player-1',
+        damageApplied: WEAPONS.pistol.damageMax,
+      });
       expect(shooter.specialAmmo).toBe(WEAPONS.pistol.magazineSize - 1);
       // Rifle magazine untouched — the pistol has its own pool.
       expect(shooter.ammo).toBe(WEAPONS.rifle.magazineSize);

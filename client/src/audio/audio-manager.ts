@@ -12,9 +12,7 @@
  *   - gunshot          → when local player fires (InputManager shoot action)
  *   - grenadeThrow     → when local player throws grenade
  *   - explosion        → when grenade/explosion effect spawns (EffectsRenderer)
- *   - bulletImpact     → when bullet hits wall/cover (EffectsRenderer)
- *   - playerHit        → when any player takes damage (server state update)
- *   - playerDeath      → when any player dies (server state update)
+ *   - hitConfirm       → when a local shot deals authoritative player damage
  *   - reload           → when player starts reloading
  *
  * Movement sounds (trigger in GameScene update loop):
@@ -56,9 +54,7 @@ const SOUND_MAP = {
   gunshot: { key: 'sfx-gunshot', volume: 0.7, category: 'sfx' },
   grenadeThrow: { key: 'sfx-grenade-throw', volume: 0.6, category: 'sfx' },
   explosion: { key: 'sfx-explosion', volume: 0.8, category: 'sfx' },
-  bulletImpact: { key: 'sfx-bullet-impact', volume: 0.5, category: 'sfx' },
-  playerHit: { key: 'sfx-player-hit', volume: 0.6, category: 'sfx' },
-  playerDeath: { key: 'sfx-player-death', volume: 0.7, category: 'sfx' },
+  hitConfirm: { key: 'sfx-hit-confirm', volume: 0.45, category: 'sfx' },
   // Melee/axe — generated WAVs (client/scripts/gen-sfx.mjs), replacing the
   // Session 7 rate/detune stand-ins derived from grenade-throw/gun-shot.
   punchWhoosh: { key: 'sfx-punch-whoosh', volume: 0.6, category: 'sfx' },

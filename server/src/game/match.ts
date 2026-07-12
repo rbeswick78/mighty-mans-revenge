@@ -1293,6 +1293,8 @@ export class Match implements MatchContext {
       const victim = this.players.get(shot.victimId);
       if (victim) {
         const result = this.combatManager.applyDamage(victim, shot.damage, playerId);
+        shot.trail.hitPlayerId = shot.victimId;
+        shot.trail.damageApplied = result.damageApplied;
         this.stats.recordHit(playerId);
         // damageApplied, not shot.damage — Iron Hide may have halved it.
         this.stats.recordDamage(playerId, result.damageApplied);
@@ -1429,6 +1431,8 @@ export class Match implements MatchContext {
       // re-trigger the death path and inflate the death counter.
       if (!victim || victim.isDead) continue;
       const result = this.combatManager.applyDamage(victim, shot.damage, player.id);
+      shot.trail.hitPlayerId = shot.victimId;
+      shot.trail.damageApplied = result.damageApplied;
       anyPelletHit = true;
       // damageApplied, not shot.damage — Iron Hide may have halved it.
       this.stats.recordDamage(player.id, result.damageApplied);

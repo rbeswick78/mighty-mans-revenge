@@ -7,12 +7,14 @@ const AIM_LINE_ALPHA = 0.6;
 const AIM_LINE_THICKNESS = 2;
 /** Match PlayerRenderer's SPRITE_SCALE so the muzzle flash size lines up with the gun. */
 const MUZZLE_FLASH_SCALE = 3;
+const PLAYER_HIT_SPLASH_SCALE = 3;
+const PLAYER_HIT_SPLASH_DEPTH = 31;
+const PLAYER_HIT_SPLASH_KEYS = ['hit_splash_1', 'hit_splash_2'] as const;
 
 /** Bullet head sprite scale (matches PlayerRenderer's SPRITE_SCALE for visual coherence). */
 const BULLET_SCALE = 3;
-/** Constant travel time per shot — fast enough that the hit-flash on the
- *  target lands close enough to bullet-arrival to read as coincident.
- *  Bumping past ~250 ms starts to feel like backwards causality. */
+/** Constant travel time per shot. The arrival callback synchronizes world
+ *  impact feedback with the bullet head; past ~250ms starts to feel laggy. */
 const BULLET_TRAVEL_MS = 200;
 /** Comet-tail particle config. */
 const BULLET_TAIL_LIFESPAN_MS = 140;
@@ -81,7 +83,13 @@ export class EffectsRenderer {
     return this.aimGraphic;
   }
 
-  showBulletTrail(startX: number, startY: number, endX: number, endY: number): void {
+  showBulletTrail(
+    startX: number,
+    startY: number,
+    endX: number,
+    endY: number,
+    onArrive?: () => void,
+  ): void {
     const angle = Math.atan2(endY - startY, endX - startX);
 
     // Bullet head — tiny 2×1 sprite, rotated to direction of travel.
@@ -122,6 +130,7 @@ export class EffectsRenderer {
             tail?.destroy();
           });
         }
+        onArrive?.();
       },
     });
   }
@@ -173,20 +182,30 @@ export class EffectsRenderer {
     this.scene.cameras.main.shake(200, 0.01);
   }
 
-  showHitEffect(x: number, y: number): void {
-    const flash = this.scene.add.circle(x, y, 5, Wasteland.HIT_FLASH, 0.9);
-    this.scene.tweens.add({
-      targets: flash,
-      alpha: 0,
-      scaleX: 2,
-      scaleY: 2,
-      duration: 150,
-      onComplete: () => {
-        flash.destroy();
-      },
+  /**
+   * Play an authoritative fighter-hit splash. `variantSeed` comes from the
+   * server timestamp, so every client chooses the same cosmetic variation.
+   */
+  showPlayerHit(
+    x: number,
+    y: number,
+    bulletAngle: number,
+    variantSeed: number,
+  ): void {
+    const index = Math.abs(Math.trunc(variantSeed)) % PLAYER_HIT_SPLASH_KEYS.length;
+    const key = PLAYER_HIT_SPLASH_KEYS[index];
+    const splash = this.scene.add.sprite(x, y, key, 0);
+    splash.setOrigin(0.5, 0.5);
+    splash.setScale(PLAYER_HIT_SPLASH_SCALE);
+    splash.setRotation(bulletAngle);
+    splash.setDepth(PLAYER_HIT_SPLASH_DEPTH);
+    splash.play(key);
+    splash.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
+      splash.destroy();
     });
 
-    // Small particle burst
+    // A tiny debris burst gives the six-pixel sheet enough presence at the
+    // game's 3x sprite scale without obscuring the target.
     if (this.scene.textures.exists('particle')) {
       const emitter = this.scene.add.particles(x, y, 'particle', {
         speed: { min: 20, max: 80 },
@@ -197,6 +216,7 @@ export class EffectsRenderer {
         quantity: 5,
         emitting: false,
       });
+      emitter.setDepth(PLAYER_HIT_SPLASH_DEPTH);
       emitter.explode(5);
       this.scene.time.delayedCall(300, () => {
         emitter.destroy();
