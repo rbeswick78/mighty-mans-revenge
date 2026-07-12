@@ -20,10 +20,11 @@ export interface MapTile {
 }
 
 /**
- * A purely cosmetic sprite the client draws centered on a tile rect
- * (e.g. a wrecked car spanning 1×2 COVER_LOW tiles). Collision comes
- * exclusively from the tile types underneath — decorations never affect
- * physics, so the server ignores them entirely.
+ * A client sprite drawn centered on a tile rect (e.g. a wrecked car spanning
+ * 1×2 solid tiles). Collision comes
+ * exclusively from the tile types underneath. A decoration spanning multiple
+ * solid cells groups them as one atomic prop for grenade destruction; its
+ * texture and flip remain client-only presentation.
  */
 export interface MapDecoration {
   /** Tile rect the sprite is centered on (tile coords, w/h in tiles). */

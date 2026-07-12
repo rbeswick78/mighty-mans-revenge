@@ -13,6 +13,9 @@ export interface RaycastResult {
   hitY: number;
   distance: number;
   hitTile: boolean;
+  /** Grid coordinate of the first solid tile, or null when the ray misses. */
+  hitTileX: number | null;
+  hitTileY: number | null;
 }
 
 export function pointInRect(
@@ -97,6 +100,8 @@ export function raycastAgainstGrid(
       hitY: startY + dirY * maxDistance,
       distance: maxDistance,
       hitTile: false,
+      hitTileX: null,
+      hitTileY: null,
     };
   }
 
@@ -152,6 +157,8 @@ export function raycastAgainstGrid(
         hitY: startY + dirY * distance,
         distance,
         hitTile: true,
+        hitTileX: tileX,
+        hitTileY: tileY,
       };
     }
   }
@@ -161,6 +168,8 @@ export function raycastAgainstGrid(
     hitY: startY + dirY * maxDistance,
     distance: maxDistance,
     hitTile: false,
+    hitTileX: null,
+    hitTileY: null,
   };
 }
 

@@ -48,6 +48,10 @@ export class MapRenderer {
   private mapWidth = 0;
   private mapHeight = 0;
   private mapTileSize = 0;
+  /** Cells visually owned by a decoration rather than only a tile overlay. */
+  private decoratedCells = new Set<number>();
+  /** Every cell in an atomic prop rect points at the same decoration sprite. */
+  private decorationSpritesByCell = new Map<number, Phaser.GameObjects.Sprite>();
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -75,7 +79,7 @@ export class MapRenderer {
 
     // Cells hidden by a decoration sprite render as plain floor — a
     // rubble/garbage tile peeking out from under a car reads as noise.
-    const decoCovered = new Set<number>();
+    const decoCovered = this.decoratedCells;
     for (const deco of mapData.decorations ?? []) {
       for (let r = deco.y; r < deco.y + deco.h; r++) {
         for (let c = deco.x; c < deco.x + deco.w; c++) {
@@ -135,6 +139,11 @@ export class MapRenderer {
       sprite.setScale(scale);
       sprite.setFlipX(deco.flipX ?? false);
       this.container.add(sprite);
+      for (let row = deco.y; row < deco.y + deco.h; row++) {
+        for (let col = deco.x; col < deco.x + deco.w; col++) {
+          this.decorationSpritesByCell.set(row * mapData.width + col, sprite);
+        }
+      }
     }
 
     // Spawn point indicators
@@ -231,11 +240,9 @@ export class MapRenderer {
   }
 
   /**
-   * Mirror a server `server:tilesDestroyed` event: hide the wall sprite
-   * (the floor underlay is already painted for inner walls — see the
-   * isInnerWall branch in renderMap), flip the tile to FLOOR in the
-   * local type grid, and mark the collision cell passable so the
-   * client's prediction grid stops blocking movement.
+   * Mirror a server `server:tilesDestroyed` event: remove a wall/cover
+   * overlay (or its atomic decoration prop), reveal its existing floor
+   * underlay, flip the tile to FLOOR, and clear prediction collision.
    *
    * No-op if the tile is out of range or already a non-solid type.
    */
@@ -243,12 +250,35 @@ export class MapRenderer {
     if (row < 0 || row >= this.mapHeight || col < 0 || col >= this.mapWidth) {
       return;
     }
-    if (this.tileTypes[row][col] !== TileType.WALL) return;
+    const tileType = this.tileTypes[row][col];
+    if (tileType !== TileType.WALL && tileType !== TileType.COVER_LOW) return;
 
-    const sprite = this.tileSprites[row][col];
-    if (sprite) {
-      sprite.destroy();
-      this.tileSprites[row][col] = null;
+    const key = row * this.mapWidth + col;
+    if (this.decoratedCells.has(key)) {
+      const prop = this.decorationSpritesByCell.get(key);
+      if (prop) {
+        prop.destroy();
+        for (const [cell, sprite] of this.decorationSpritesByCell) {
+          if (sprite === prop) this.decorationSpritesByCell.delete(cell);
+        }
+      }
+      if (tileType === TileType.WALL) {
+        // Decoration-backed WALL still rendered its auto-tiled wall beneath
+        // the prop; remove that layer to reveal the inner-wall floor underlay.
+        const wall = this.tileSprites[row][col];
+        if (wall) {
+          wall.destroy();
+          this.tileSprites[row][col] = null;
+        }
+      }
+      // Decorated COVER_LOW rendered a floor sprite in this cell from the
+      // start; keep that floor visible when the prop/collision disappear.
+    } else {
+      const sprite = this.tileSprites[row][col];
+      if (sprite) {
+        sprite.destroy();
+        this.tileSprites[row][col] = null;
+      }
     }
     this.tileTypes[row][col] = TileType.FLOOR;
     if (this.collisionGrid) {
@@ -266,6 +296,8 @@ export class MapRenderer {
     this.tileSprites = [];
     this.tileTypes = [];
     this.scorchedCells.clear();
+    this.decoratedCells.clear();
+    this.decorationSpritesByCell.clear();
     this.mapWidth = 0;
     this.mapHeight = 0;
     this.mapTileSize = 0;

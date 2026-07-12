@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–21 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts, solo Practice vs Rusty, streak + payback callouts, selectable Rusty difficulty, Collapsed Overpass, Blackout, fresh-chaos rematches, Last Stand, Kill Confirmed, mode briefings, character death animations, authoritative hit confirmation). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–22 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts, solo Practice vs Rusty, streak + payback callouts, selectable Rusty difficulty, Collapsed Overpass, Blackout, fresh-chaos rematches, Last Stand, Kill Confirmed, mode briefings, character death animations, authoritative hit confirmation, blastable cover). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -53,6 +53,7 @@ Each session below attacks one of these.
 | 19  | Mode Briefings                                | Every mode teaches its win condition before the fight begins        | **DONE** (2026-07-11) |
 | 20  | Character Death Animations                    | Every elimination lands with a readable, satisfying corpse pose     | **DONE** (2026-07-11) |
 | 21  | Authoritative Hit Confirmation                | Every accurate shot feels crisp, legible, and unquestionably earned  | **DONE** (2026-07-12) |
+| 22  | Blastable Cover                               | Grenades permanently carve new routes through each round's arena     | **DONE** (2026-07-12) |
 
 ---
 
@@ -1308,7 +1309,87 @@ the client guess whether a ray actually damaged a fighter.
 
 ---
 
+## Session 22 — Blastable Cover
+
+**Goal:** let grenades reshape a round's routes and sightlines by destroying
+low cover without weakening the arena boundary or changing combat numbers.
+
+**Locked design decisions**
+
+- A grenade destroys `COVER_LOW` or a decoration-backed interior solid whose
+  tile centre is inside the configured blast radius and is the first solid
+  tile on that ray from the detonation. Ordinary walls can shield cover/props;
+  a target behind another solid cannot be destroyed by the same blast.
+- Damage resolves against the pre-explosion collision grid. The cover protects
+  fighters from the blast that breaks it, then becomes passable for subsequent
+  movement, shots, grenades, and bot line-of-sight.
+- Decorations backed by multiple solid cells are atomic props: exposing any
+  one cell destroys the whole wreck/container and every solid under it. Plain
+  low cover remains independently destructible; perimeter walls stay immune.
+- The server mutates only the match's live collision grid and reuses the
+  existing transient `server:tilesDestroyed` event. Registry JSON is immutable,
+  direct rematches start fresh, and no new protocol message is introduced.
+- Clients reveal the already-rendered floor underlay, remove an atomic prop
+  once, and clear prediction collision for every authoritative tile. Outer and
+  interior `WALL` rules, Bruce's fire breath, weapon values, and character
+  values are unchanged.
+
+**Acceptance criteria**
+
+- [x] Manual and fuse grenade detonations destroy only exposed cover inside
+      `GRENADE.BLAST_RADIUS`; walls and nearer solids shield later cover.
+- [x] Multi-cell decoration props disappear atomically and all backing solids
+      become passable; undecorated cover breaks one cell at a time.
+- [x] The destroying blast still uses the pre-destruction LOS result, while
+      later movement/rays use the newly open collision grid.
+- [x] Destruction renders cleanly and prediction stays synchronized in live
+      desktop and mobile-landscape play, including direct rematches.
+- [x] Typecheck, lint, all unit tests, production build, and Playwright pass.
+
+---
+
 ## Session Log
+
+### Session 22 — 2026-07-12 — Blastable Cover
+
+**Shipped:** grenades now permanently reshape the current round. An exposed
+`COVER_LOW` tile inside the configured blast radius breaks independently;
+wrecks and containers break as atomic multi-cell props. Their authoritative
+collision disappears with the art, opening new movement routes, bullet lanes,
+bot sightlines, and future grenade paths. Ordinary and perimeter walls remain
+immune, and every new match rebuilds the pristine map from registry data.
+
+Explosion damage intentionally resolves first against the intact collision
+grid. Cover can therefore save a fighter from the same blast that destroys it,
+without the client guessing or retroactively changing damage. The existing
+reliable `server:tilesDestroyed` event now carries both fire-breath walls and
+grenade-broken cover, while the raycaster exposes the exact first solid tile so
+walls and nearer props shield anything behind them.
+
+**Verified:** focused visibility tests cover exposed low cover, ordinary-wall
+shielding, nearer-cover shielding, atomic decoration-backed interior walls,
+unrelated props, and perimeter immunity. Match integration covers manual and
+safety-fuse detonation, pre-destruction LOS protection, transient broadcasts,
+immutable map JSON, and live collision clearing. A two-client Collapsed
+Overpass pass exercised grenade/rematch behavior; a removed dev-only visual pin
+confirmed that the real two-cell gray wreck and both backing wall sprites
+disappear together, revealing the floor, and a new round restores the prop.
+There were no browser warnings/errors after reconnect. Typecheck and lint are
+clean; all 830 unit tests pass; the production build succeeds; and Playwright
+completes all 21 cases with 12 passes, 9 intentional skips, and zero unexpected
+or flaky cases across Chromium, Firefox, and mobile landscape.
+
+**Deviation:** shipped decoration props are backed by interior `WALL` cells,
+not `COVER_LOW` as the old map-type comment implied. The implementation treats
+only decoration-backed interior walls as blastable and explicitly preserves
+the arena perimeter; no map JSON or combat constants changed.
+
+**Carry-over:** the destruction radius is the existing grenade damage radius,
+not a new tuning value. Group play should reveal whether three starting
+grenades open arenas too quickly, especially under Grenades Only/Turbo
+Grenades; do not adjust that economy without a real playtest verdict.
+
+---
 
 ### Session 21 — 2026-07-12 — Authoritative Hit Confirmation
 

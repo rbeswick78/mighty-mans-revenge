@@ -30,8 +30,8 @@ export class MapManager {
   }
 
   /**
-   * Mark a tile as passable in the live collision grid. Used when Bruce's
-   * fire-breath burns through an interior wall. Returns true if the tile
+   * Mark a tile as passable in the live collision grid. Used when an ability
+   * burns through a wall or a grenade breaks low cover. Returns true if the tile
    * was solid before this call (i.e. a destruction actually happened) so
    * the caller can decide whether to broadcast.
    *

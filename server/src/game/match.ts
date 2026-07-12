@@ -46,7 +46,8 @@ import { logger } from '../utils/logger.js';
 import { PickupManager } from './pickup-manager.js';
 import { StatsTracker } from './stats-tracker.js';
 import { MapManager } from './map-manager.js';
-import { CombatManager } from './combat-manager.js';
+import { CombatManager, type ExplosionResult } from './combat-manager.js';
+import { findBlastableCoverTiles } from './destructible-cover.js';
 import { LagCompensator } from './lag-compensator.js';
 import { getGameMode } from './modes/index.js';
 import type { GameMode, MatchContext } from './modes/game-mode.js';
@@ -114,7 +115,7 @@ export class Match implements MatchContext {
   private tickKillFeedEntries: KillFeedEntry[] = [];
   /** Pickups collected this tick, cleared after broadcast. */
   private tickPickupCollections: Array<{ pickupId: string; playerId: PlayerId }> = [];
-  /** Wall tiles destroyed this tick (currently only by fire-breath), cleared after broadcast. */
+  /** Solid tiles destroyed this tick by fire breath or grenade blasts. */
   private tickDestroyedTiles: Array<{ col: number; row: number }> = [];
   /** Ordered input queue per player. Inputs are acked only after consumption. */
   private inputQueues: Map<PlayerId, InputQueue> = new Map();
@@ -1483,8 +1484,21 @@ export class Match implements MatchContext {
     }
   }
 
-  /** Apply stats and kill credit for an explosion that just happened. */
-  private recordExplosion(explosion: { throwerId: PlayerId; damages: { playerId: PlayerId; damage: number; killed: boolean }[] }): void {
+  /** Apply world destruction, stats, and kill credit for an explosion. */
+  private recordExplosion(explosion: ExplosionResult): void {
+    // Damage was already resolved by CombatManager against the untouched grid,
+    // so cover protects players from the same blast that tears it down.
+    const blastable = findBlastableCoverTiles(
+      this.mapManager.getMapData(),
+      this.mapManager.getCollisionGrid(),
+      explosion.position,
+    );
+    for (const tile of blastable) {
+      if (this.mapManager.destroyTile(tile.col, tile.row)) {
+        this.tickDestroyedTiles.push(tile);
+      }
+    }
+
     for (const dmg of explosion.damages) {
       // Credit damage to the thrower. Self-damage from your own grenade
       // is real and intentional, but don't award yourself a kill.

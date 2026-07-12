@@ -19,8 +19,15 @@ import {
   LAST_STAND,
   KILL_CONFIRMED,
   GameModeType,
+  TileType,
 } from '@shared/game';
-import type { CharacterId, MapData, PlayerInput, MutatorId } from '@shared/game';
+import type {
+  CharacterId,
+  GrenadeState,
+  MapData,
+  PlayerInput,
+  MutatorId,
+} from '@shared/game';
 
 function makeInput(seq: number, overrides: Partial<PlayerInput> = {}): PlayerInput {
   return {
@@ -633,6 +640,46 @@ describe('Match', () => {
       return m;
     }
 
+    function startBlastableCoverMatch(decorated = false): Match {
+      const map: MapData = {
+        name: 'Blastable Cover Lab',
+        width: 7,
+        height: 5,
+        tileSize: 48,
+        tiles: [
+          [1, 1, 1, 1, 1, 1, 1],
+          [1, 0, 0, 0, 0, 0, 1],
+          [1, 0, 0, decorated ? 1 : 2, decorated ? 1 : 0, 0, 1],
+          [1, 3, 0, 0, 0, 3, 1],
+          [1, 1, 1, 1, 1, 1, 1],
+        ],
+        spawnPoints: [
+          { x: 1, y: 3 },
+          { x: 5, y: 3 },
+        ],
+        pickupSpawns: [],
+        decorations: decorated
+          ? [{ x: 3, y: 2, w: 2, h: 1, texture: 'deco_container' }]
+          : undefined,
+      };
+      const m = new Match('blastable-cover', map, [
+        { id: 'player-0', nickname: 'P0' },
+        { id: 'player-1', nickname: 'P1' },
+      ]);
+      m.startCountdown();
+      m.update(MATCH.COUNTDOWN_DURATION + 0.05);
+      return m;
+    }
+
+    function plantGrenade(m: Match): GrenadeState {
+      m.queueInput('player-0', makeInput(1, { throwPressed: true, aimAngle: 0 }));
+      m.update(0.05);
+      const grenade = m.getActiveGrenades()[0];
+      grenade.position = { x: 120, y: 120 };
+      grenade.velocity = { x: 0, y: 0 };
+      return grenade;
+    }
+
     it('throw on throwPressed spawns a grenade', () => {
       const m = startActiveMatch();
       expect(m.getActiveGrenades().length).toBe(0);
@@ -666,6 +713,41 @@ describe('Match', () => {
       m.queueInput('player-0', makeInput(2, { detonatePressed: true }));
       m.update(0.05);
       expect(m.getActiveGrenades().length).toBe(0);
+    });
+
+    it('manual detonation breaks exposed cover after that cover shields the blast', () => {
+      const m = startBlastableCoverMatch();
+      const victim = m.players.get('player-1')!;
+      victim.position = { x: 216, y: 120 }; // directly behind cover (3,2)
+      const healthBefore = victim.health;
+      plantGrenade(m);
+
+      m.queueInput('player-0', makeInput(2, { detonatePressed: true }));
+      m.update(0.05);
+
+      expect(victim.health).toBe(healthBefore);
+      expect(m.getTickDestroyedTiles()).toEqual([{ col: 3, row: 2 }]);
+      expect(m.mapManager.getCollisionGrid().solid[2][3]).toBe(false);
+      expect(m.getMapData().tiles[2][3]).toBe(TileType.COVER_LOW);
+
+      m.update(0.05);
+      expect(m.getTickDestroyedTiles()).toEqual([]);
+    });
+
+    it('safety-fuse detonation removes an entire decorated cover prop', () => {
+      const m = startBlastableCoverMatch(true);
+      const grenade = plantGrenade(m);
+      grenade.safetyFuseTimer = 0.01;
+
+      m.update(0.05);
+
+      expect(m.getActiveGrenades()).toHaveLength(0);
+      expect(m.getTickDestroyedTiles()).toEqual([
+        { col: 3, row: 2 },
+        { col: 4, row: 2 },
+      ]);
+      expect(m.mapManager.getCollisionGrid().solid[2][3]).toBe(false);
+      expect(m.mapManager.getCollisionGrid().solid[2][4]).toBe(false);
     });
 
     it('safety fuse auto-detonates if no detonate input arrives', () => {

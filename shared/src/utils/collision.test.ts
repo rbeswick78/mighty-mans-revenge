@@ -222,6 +222,8 @@ describe('raycastAgainstGrid', () => {
     // Should hit the wall at column 4 (x=192)
     expect(result.distance).toBeLessThan(500);
     expect(result.hitX).toBeCloseTo(192, 0);
+    expect(result.hitTileX).toBe(4);
+    expect(result.hitTileY).toBe(2);
   });
 
   it('returns max distance when ray misses all walls', () => {
@@ -237,6 +239,8 @@ describe('raycastAgainstGrid', () => {
     const result = raycastAgainstGrid(openGrid, 72, 72, 0, 10);
     expect(result.hitTile).toBe(false);
     expect(result.distance).toBeCloseTo(10, 5);
+    expect(result.hitTileX).toBeNull();
+    expect(result.hitTileY).toBeNull();
   });
 
   it('hits wall on diagonal ray', () => {
@@ -297,6 +301,8 @@ describe('raycastAgainstGrid', () => {
       expect(result.hitTile).toBe(false);
       expect(result.distance).toBeCloseTo(500, 5);
       expect(result.hitX).toBeCloseTo(120 + 500, 5);
+      expect(result.hitTileX).toBeNull();
+      expect(result.hitTileY).toBeNull();
     });
 
     it('default (ignoreSolids omitted) preserves the wall-blocked behavior', () => {

@@ -423,10 +423,9 @@ export interface ServerWeaponIncomingMessage {
 }
 
 /**
- * One-shot notification that one or more wall tiles have been destroyed
- * (currently only by Bruce's fire-breath ability). Broadcast reliably
- * because a drop would leave the client rendering a wall the server
- * already treats as passable.
+ * One-shot notification that one or more solid tiles have been destroyed by
+ * Bruce's fire breath or a grenade blast. Broadcast reliably because a drop
+ * would leave the client rendering collision the server treats as passable.
  */
 export interface ServerTilesDestroyedMessage {
   type: 'server:tilesDestroyed';
