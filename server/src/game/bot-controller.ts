@@ -2,10 +2,15 @@ import {
   BOT,
   BOT_PROFILES,
   DEFAULT_BOT_DIFFICULTY,
+  GRENADE,
   KOTH,
+  MAP,
   MatchPhase,
   GameModeType,
+  PLAYER,
+  PickupType,
   WEAPONS,
+  characterSpeedMultiplier,
   gunGameRungForScore,
   raycastAgainstGrid,
   isOutsideRadiationStorm,
@@ -15,6 +20,7 @@ import type {
   PlayerId,
   PlayerInput,
   PlayerState,
+  PickupState,
   Vec2,
 } from '@shared/game';
 import type { BotDifficulty } from '@shared/game';
@@ -86,6 +92,110 @@ function normalized(dx: number, dy: number): Vec2 {
   return length > 0 ? { x: dx / length, y: dy / length } : { x: 0, y: 0 };
 }
 
+function heldSpecialAmmo(player: PlayerState): number {
+  return player.specialAmmo + player.specialReserve;
+}
+
+/**
+ * Return the tactical value of an ordinary pickup for Rusty's current state.
+ * Null means collecting it would be wasteful or would replace a better live
+ * weapon. Higher values deliberately form broad tiers; distance only breaks
+ * ties inside a tier.
+ */
+export function botResourcePriority(
+  player: PlayerState,
+  type: PickupType,
+): number | null {
+  const heldAmmo = heldSpecialAmmo(player);
+  const hasLivePowerWeapon =
+    (player.weaponId === 'bat' || player.weaponId === 'shotgun') && heldAmmo > 0;
+
+  switch (type) {
+    case PickupType.BANDAGE: {
+      if (player.isDead || player.health >= player.maxHealth) return null;
+      const healthRatio = player.health / player.maxHealth;
+      if (healthRatio <= BOT.RESOURCE_CRITICAL_HEALTH_RATIO) {
+        return BOT.RESOURCE_PRIORITY.CRITICAL_BANDAGE;
+      }
+      return healthRatio <= BOT.RESOURCE_BANDAGE_HEALTH_RATIO
+        ? BOT.RESOURCE_PRIORITY.BANDAGE
+        : null;
+    }
+    case PickupType.WEAPON_BAT:
+      if (hasLivePowerWeapon && player.weaponId !== 'bat') return null;
+      return player.weaponId !== 'bat' || heldAmmo <= 1
+        ? BOT.RESOURCE_PRIORITY.BAT
+        : null;
+    case PickupType.WEAPON_SHOTGUN:
+      if (hasLivePowerWeapon && player.weaponId !== 'shotgun') return null;
+      return player.weaponId !== 'shotgun' || heldAmmo <= WEAPONS.shotgun.magazineSize
+        ? BOT.RESOURCE_PRIORITY.SHOTGUN
+        : null;
+    case PickupType.WEAPON_PISTOL:
+      if (hasLivePowerWeapon) return null;
+      return player.weaponId !== 'pistol' || heldAmmo <= WEAPONS.pistol.magazineSize
+        ? BOT.RESOURCE_PRIORITY.PISTOL
+        : null;
+    case PickupType.GRENADE:
+      return player.grenades < GRENADE.MAX_COUNT
+        ? BOT.RESOURCE_PRIORITY.GRENADE
+        : null;
+    case PickupType.GUN_AMMO: {
+      const maxAmmo = WEAPONS.rifle.magazineSize * 2;
+      return player.ammo <= maxAmmo * BOT.RESOURCE_RIFLE_AMMO_RATIO
+        ? BOT.RESOURCE_PRIORITY.GUN_AMMO
+        : null;
+    }
+    default:
+      return null;
+  }
+}
+
+/** Deterministically select the highest-value reachable ordinary resource. */
+export function pickBotResource(
+  player: PlayerState,
+  pickups: readonly PickupState[],
+  tileSize: number = MAP.TILE_SIZE,
+): PickupState | null {
+  const maxDistance = BOT.RESOURCE_MAX_DETOUR_TILES * tileSize;
+  const travelSpeed =
+    PLAYER.BASE_SPEED * characterSpeedMultiplier(player.characterId);
+  let best: PickupState | null = null;
+  let bestPriority = Number.NEGATIVE_INFINITY;
+  let bestDistance = Number.POSITIVE_INFINITY;
+
+  for (const pickup of pickups) {
+    if (!pickup.isActive || pickup.isScavengerRushDrop) continue;
+    const priority = botResourcePriority(player, pickup.type);
+    if (priority === null) continue;
+    const distance = Math.hypot(
+      pickup.position.x - player.position.x,
+      pickup.position.y - player.position.y,
+    );
+    if (distance > maxDistance) continue;
+    if (
+      pickup.expiresInSeconds !== undefined &&
+      pickup.expiresInSeconds <=
+        distance / travelSpeed + BOT.RESOURCE_EXPIRY_BUFFER_SECONDS
+    ) {
+      continue;
+    }
+    if (
+      priority > bestPriority ||
+      (priority === bestPriority && distance < bestDistance) ||
+      (priority === bestPriority &&
+        distance === bestDistance &&
+        best !== null &&
+        pickup.id.localeCompare(best.id) < 0)
+    ) {
+      best = pickup;
+      bestPriority = priority;
+      bestDistance = distance;
+    }
+  }
+  return best;
+}
+
 /**
  * A moderate server-authoritative opponent. It submits ordinary sequenced
  * PlayerInput, so every action goes through the real shared physics and
@@ -132,7 +242,12 @@ export class BotController {
       bot,
       match.pickupManager.getPickups(),
     );
-    if (!target && !objectiveTag && !looseCore && !supplyDrop) return;
+    const resource = pickBotResource(
+      bot,
+      match.pickupManager.getPickups(),
+      match.mapManager.getCollisionGrid().tileSize,
+    );
+    if (!target && !objectiveTag && !looseCore && !supplyDrop && !resource) return;
 
     this.elapsedSeconds += dt;
     this.pathRecalcSeconds -= dt;
@@ -149,7 +264,8 @@ export class BotController {
       target?.position ??
       objectiveTag?.position ??
       looseCore?.position ??
-      supplyDrop!.position;
+      supplyDrop?.position ??
+      resource!.position;
     const dx = combatPosition.x - bot.position.x;
     const dy = combatPosition.y - bot.position.y;
     const distance = Math.hypot(dx, dy);
@@ -169,6 +285,8 @@ export class BotController {
       objectiveTag,
       looseCore,
       supplyDrop,
+      resource,
+      bountyTarget,
       match,
       grid,
     );
@@ -274,8 +392,8 @@ export class BotController {
   }
 
   /**
-   * KOTH is won by owning space, not by chasing kills. Move into the live
-   * hill first, then plant and fight from it; other modes pursue the target.
+   * Deterministic movement hierarchy: immediate safety and live objectives,
+   * then expiring/ordinary supplies, then ordinary combat pursuit.
    */
   private chooseMovementGoal(
     bot: PlayerState,
@@ -283,6 +401,8 @@ export class BotController {
     objectiveTag: { position: Vec2 } | null,
     looseCore: { position: Vec2 } | null,
     supplyDrop: { position: Vec2 } | null,
+    resource: { position: Vec2 } | null,
+    bountyTarget: PlayerState | null,
     match: Match,
     grid: CollisionGrid,
   ): { position: Vec2; holdPosition: boolean; isCombatTarget: boolean } {
@@ -313,9 +433,17 @@ export class BotController {
 
     const koth = match.getKothHudState();
     if (!koth) {
-      if (supplyDrop) {
+      if (bountyTarget) {
         return {
-          position: supplyDrop.position,
+          position: bountyTarget.position,
+          holdPosition: false,
+          isCombatTarget: true,
+        };
+      }
+      const detour = supplyDrop ?? resource;
+      if (detour) {
+        return {
+          position: detour.position,
           holdPosition: false,
           isCombatTarget: false,
         };

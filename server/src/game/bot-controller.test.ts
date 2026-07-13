@@ -1,13 +1,26 @@
 import { describe, expect, it } from 'vitest';
 import {
+  BOT,
   GameModeType,
+  GRENADE,
   MatchPhase,
   MUTATORS,
   PickupType,
   TileType,
+  WEAPONS,
 } from '@shared/game';
-import type { CollisionGrid, MapData } from '@shared/game';
-import { BotController, findGridPath } from './bot-controller.js';
+import type {
+  CollisionGrid,
+  MapData,
+  PickupState,
+  PlayerState,
+} from '@shared/game';
+import {
+  BotController,
+  botResourcePriority,
+  findGridPath,
+  pickBotResource,
+} from './bot-controller.js';
 import { Match } from './match.js';
 
 function grid(solid: boolean[][]): CollisionGrid {
@@ -42,6 +55,57 @@ const KOTH_MAP: MapData = {
   kothHills: [{ x: 4, y: 2 }],
 };
 
+function makeBotState(overrides: Partial<PlayerState> = {}): PlayerState {
+  return {
+    id: 'bot:test',
+    nickname: 'Rusty',
+    characterId: 'bruce',
+    position: { x: 0, y: 0 },
+    velocity: { x: 0, y: 0 },
+    aimAngle: 0,
+    health: 100,
+    maxHealth: 100,
+    ammo: WEAPONS.rifle.magazineSize * 2,
+    isReloading: false,
+    reloadTimer: 0,
+    weaponId: 'rifle',
+    specialAmmo: 0,
+    specialReserve: 0,
+    grenades: GRENADE.MAX_COUNT,
+    grenadeRegenSeconds: 0,
+    isSprinting: false,
+    stamina: 1,
+    isDead: false,
+    respawnTimer: 0,
+    invulnerableTimer: 0,
+    lastProcessedInput: 0,
+    score: 0,
+    deaths: 0,
+    abilityActiveSeconds: 0,
+    abilityCooldownSeconds: 0,
+    abilityLockedAim: 0,
+    frozenTimer: 0,
+    secondWindTimer: 0,
+    ...overrides,
+  };
+}
+
+function resource(
+  id: string,
+  type: PickupType,
+  x: number,
+  overrides: Partial<PickupState> = {},
+): PickupState {
+  return {
+    id,
+    type,
+    position: { x, y: 0 },
+    isActive: true,
+    respawnTimer: 0,
+    ...overrides,
+  };
+}
+
 describe('findGridPath', () => {
   it('routes through the only opening without stepping on solid tiles', () => {
     const collision = grid([
@@ -66,6 +130,114 @@ describe('findGridPath', () => {
     ]);
     expect(findGridPath(collision, { x: 1, y: 1 }, { x: 0, y: 0 })).toEqual([]);
     expect(findGridPath(collision, { x: -1, y: 1 }, { x: 1, y: 1 })).toEqual([]);
+  });
+});
+
+describe('Rusty resource evaluation', () => {
+  it('ignores full refills and only seeks bandages below the wounded threshold', () => {
+    const full = makeBotState();
+    expect(botResourcePriority(full, PickupType.BANDAGE)).toBeNull();
+    expect(botResourcePriority(full, PickupType.GUN_AMMO)).toBeNull();
+    expect(botResourcePriority(full, PickupType.GRENADE)).toBeNull();
+
+    expect(
+      botResourcePriority(
+        makeBotState({ health: 76 }),
+        PickupType.BANDAGE,
+      ),
+    ).toBeNull();
+    expect(
+      botResourcePriority(
+        makeBotState({ health: 75 }),
+        PickupType.BANDAGE,
+      ),
+    ).not.toBeNull();
+    expect(
+      botResourcePriority(
+        makeBotState({ ammo: WEAPONS.rifle.magazineSize + 1 }),
+        PickupType.GUN_AMMO,
+      ),
+    ).toBeNull();
+    expect(
+      botResourcePriority(
+        makeBotState({ ammo: WEAPONS.rifle.magazineSize }),
+        PickupType.GUN_AMMO,
+      ),
+    ).not.toBeNull();
+    expect(
+      botResourcePriority(
+        makeBotState({ grenades: GRENADE.MAX_COUNT - 1 }),
+        PickupType.GRENADE,
+      ),
+    ).not.toBeNull();
+  });
+
+  it('lets a critical bandage beat weapons, then uses distance inside a tier', () => {
+    const bot = makeBotState({ health: 40 });
+    const selected = pickBotResource(bot, [
+      resource('bat', PickupType.WEAPON_BAT, 48),
+      resource('far-bandage', PickupType.BANDAGE, 144),
+      resource('near-bandage', PickupType.BANDAGE, 96),
+    ]);
+    expect(selected?.id).toBe('near-bandage');
+  });
+
+  it('preserves live power weapons and refreshes only a nearly dry matching one', () => {
+    const loadedShotgun = makeBotState({
+      weaponId: 'shotgun',
+      specialAmmo: WEAPONS.shotgun.magazineSize,
+      specialReserve: 2,
+    });
+    expect(
+      botResourcePriority(loadedShotgun, PickupType.WEAPON_PISTOL),
+    ).toBeNull();
+    expect(botResourcePriority(loadedShotgun, PickupType.WEAPON_BAT)).toBeNull();
+    expect(
+      botResourcePriority(loadedShotgun, PickupType.WEAPON_SHOTGUN),
+    ).toBeNull();
+
+    const dryShotgun = makeBotState({
+      weaponId: 'shotgun',
+      specialAmmo: 1,
+      specialReserve: 1,
+    });
+    expect(
+      botResourcePriority(dryShotgun, PickupType.WEAPON_SHOTGUN),
+    ).not.toBeNull();
+    expect(botResourcePriority(dryShotgun, PickupType.WEAPON_PISTOL)).toBeNull();
+  });
+
+  it('bounds detours, rejects doomed expiring routes, and skips Rush supplies', () => {
+    const bot = makeBotState({ ammo: 0 });
+    const maxDistance = BOT.RESOURCE_MAX_DETOUR_TILES * 48;
+    expect(
+      pickBotResource(bot, [
+        resource('too-far', PickupType.GUN_AMMO, maxDistance + 1),
+      ]),
+    ).toBeNull();
+    expect(
+      pickBotResource(bot, [
+        resource('doomed', PickupType.GUN_AMMO, 200, {
+          expiresInSeconds: 0.6,
+        }),
+      ]),
+    ).toBeNull();
+    expect(
+      pickBotResource(bot, [
+        resource('rush', PickupType.GUN_AMMO, 48, {
+          isScavengerRushDrop: true,
+        }),
+      ]),
+    ).toBeNull();
+  });
+
+  it('uses stable pickup ids to break exact priority and distance ties', () => {
+    const bot = makeBotState({ grenades: 0 });
+    const selected = pickBotResource(bot, [
+      resource('pickup-z', PickupType.GRENADE, 48),
+      resource('pickup-a', PickupType.GRENADE, -48),
+    ]);
+    expect(selected?.id).toBe('pickup-a');
   });
 });
 
@@ -132,6 +304,11 @@ describe('BotController', () => {
     internals.radiationStormInitialRadius = 300;
     internals.radiationStormElapsed = MUTATORS.RADIATION_STORM_SHRINK_SECONDS;
     internals.radiationStormPulseTimer = 999;
+    bot.health = 40;
+    match.pickupManager.spawnOneShot(PickupType.BANDAGE, {
+      x: 0.5 * 48,
+      y: 2.5 * 48,
+    });
 
     const controller = new BotController(bot.id);
     const outsideStart = bot.position.x;
@@ -140,6 +317,7 @@ describe('BotController', () => {
     expect(bot.position.x).toBeGreaterThan(outsideStart);
 
     bot.position = { ...internals.radiationStormCenter };
+    bot.health = bot.maxHealth;
     human.position = { x: 1.5 * 48, y: 2.5 * 48 };
     const insideStart = bot.position.x;
     controller.update(0.05, match, 2);
@@ -189,6 +367,11 @@ describe('BotController', () => {
     const bot = match.players.get('bot:test')!;
     human.position = { x: 1.5 * 48, y: 2.5 * 48 };
     bot.position = { x: 3.5 * 48, y: 2.5 * 48 };
+    bot.health = 40;
+    match.pickupManager.spawnOneShot(PickupType.BANDAGE, {
+      x: 2.5 * 48,
+      y: 2.5 * 48,
+    });
     const controller = new BotController('bot:test');
 
     controller.update(0.05, match, 1);
@@ -223,6 +406,11 @@ describe('BotController', () => {
     human.position = { x: 5.5 * 48, y: 2.5 * 48 };
     bot.position = { x: 2.5 * 48, y: 2.5 * 48 };
     match.onKill(bot.id, human.id, 'gun');
+    bot.health = 40;
+    match.pickupManager.spawnOneShot(PickupType.BANDAGE, {
+      x: 1.5 * 48,
+      y: 2.5 * 48,
+    });
     const start = { ...bot.position };
 
     const controller = new BotController(bot.id);
@@ -253,6 +441,11 @@ describe('BotController', () => {
     const bot = match.players.get('bot:test')!;
     human.isDead = true;
     bot.position = { x: 2.5 * 48, y: 2.5 * 48 };
+    bot.health = 40;
+    match.pickupManager.spawnOneShot(PickupType.BANDAGE, {
+      x: 1.5 * 48,
+      y: 2.5 * 48,
+    });
     const start = { ...bot.position };
 
     const controller = new BotController(bot.id);
@@ -297,6 +490,51 @@ describe('BotController', () => {
     expect(Math.abs(bot.aimAngle)).toBeLessThan(0.5);
   });
 
+  it('detours for and authoritatively collects a useful ordinary resource while fighting', () => {
+    const map: MapData = {
+      ...OPEN_MAP,
+      name: 'Bot Resource Range',
+      pickupSpawns: [{ x: 2, y: 2, type: 'bandage' }],
+    };
+    const match = new Match(
+      'practice-resource',
+      map,
+      [
+        { id: 'human', nickname: 'Human' },
+        { id: 'bot:test', nickname: 'Rusty' },
+      ],
+      GameModeType.DEATHMATCH,
+      () => 0,
+    );
+    const human = match.players.get('human')!;
+    const bot = match.players.get('bot:test')!;
+    human.characterId = 'mighty_man';
+    bot.characterId = 'bruce';
+    human.position = { x: 6.5 * 48, y: 2.5 * 48 };
+    bot.position = { x: 3.5 * 48, y: 2.5 * 48 };
+    bot.health = 40;
+    match.phase = MatchPhase.ACTIVE;
+    match.matchTimer = 100;
+
+    const controller = new BotController(bot.id);
+    const startX = bot.position.x;
+    controller.update(0.05, match, 1);
+    match.update(0.05);
+    expect(bot.position.x).toBeLessThan(startX);
+    expect(Math.abs(bot.aimAngle)).toBeLessThan(0.5);
+
+    for (let tick = 2; tick <= 20 && bot.health === 40; tick++) {
+      controller.update(0.05, match, tick);
+      match.update(0.05);
+    }
+    expect(bot.health).toBe(70);
+    expect(
+      match.pickupManager
+        .getPickups()
+        .find((pickup) => pickup.type === PickupType.BANDAGE)?.isActive,
+    ).toBe(false);
+  });
+
   it('prioritizes the marked Bounty Hunt target over a nearer hunter', () => {
     let match: Match | null = null;
     for (const id of ['practice-bounty-a', 'practice-bounty-b', 'practice-bounty-c']) {
@@ -332,6 +570,11 @@ describe('BotController', () => {
     bot.position = { x: 3.5 * 48, y: 2.5 * 48 };
     decoy.position = { x: 2.5 * 48, y: 2.5 * 48 };
     target.position = { x: 6.5 * 48, y: 2.5 * 48 };
+    bot.health = 40;
+    match!.pickupManager.spawnOneShot(PickupType.BANDAGE, {
+      x: 2.5 * 48,
+      y: 2.5 * 48,
+    });
     const controller = new BotController(bot.id);
     controller.update(0.05, match!, 1);
     match!.update(0.05);

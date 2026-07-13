@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–43 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty, four arenas, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–44 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty with Scavenger Instincts, four arenas, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -75,6 +75,7 @@ Each session below attacks one of these.
 | 41  | Scavenger Rush                                | Rotating short-lived supplies repeatedly pull fighters into fresh contests   | **DONE** (2026-07-13) |
 | 42  | Wasteland Bat                                 | Four brutal swings create a scarce close-range map-control prize              | **DONE** (2026-07-13) |
 | 43  | Radiation Storm                               | A shrinking safe zone turns passive corners into urgent closing fights         | **DONE** (2026-07-13) |
+| 44  | Rusty's Scavenger Instincts                   | Practice opponents contest the arena's weapons and supplies like real rivals   | **DONE** (2026-07-13) |
 
 ---
 
@@ -2200,7 +2201,85 @@ that creates closing fights without awarding arbitrary environmental kills.
 
 ---
 
+## Session 44 — Rusty's Scavenger Instincts
+
+**Goal:** make Practice exercise the arena's full tactical economy instead of
+letting every authored weapon, heal, grenade, and ammo route belong to the
+human by default.
+
+**Locked design decisions**
+
+- Rusty evaluates active ordinary pickups using server-visible state only.
+  Health, carried weapon/ammo, grenades, pickup type, lifetime, and distance
+  determine whether a resource is useful; no hidden knowledge or combat-rule
+  shortcut is introduced.
+- Radiation safety and live mode objectives remain absolute movement
+  priorities. Kill Confirmed tags, a loose Core Run core, the KOTH hill, and a
+  marked Bounty Hunt target cannot be abandoned for ordinary loot.
+- Expiring Scavenger Rush supplies keep their existing priority outside those
+  objective obligations. Ordinary resources are considered next, then normal
+  combat pursuit, and Rusty keeps aiming and fighting while taking a detour.
+- Detours are range-limited and deterministic. Critical bandages outrank
+  weapons, weapons outrank refill supplies, and distance breaks equal-value
+  ties. Rusty never replaces a live bat or shotgun with the pistol sidegrade,
+  never chases a full health/ammo/grenade refill, and may refresh a nearly dry
+  held special weapon.
+- Pickup collection remains completely generic: Rusty walks through the same
+  authoritative overlap and `PickupManager.applyPickup` path as a player.
+  Game-mode and mutator pickup vetoes therefore remain the economy authority.
+
+**Acceptance criteria**
+
+- [x] Pure tests cover pickup usefulness, power-weapon preservation, refill
+      thresholds, bounded detours, deterministic priority, and tie-breaking.
+- [x] Bot integration tests cover resource detours while fighting plus storm,
+      KOTH, Kill Confirmed, Core Run, and Bounty Hunt objective precedence.
+- [x] A live Practice smoke verifies Rusty visibly collects an authored arena
+      resource through the normal networked match path.
+- [x] Typecheck, lint, all unit tests, production build, and Playwright pass.
+
+---
+
 ## Session Log
+
+### Session 44 — 2026-07-13 — Rusty's Scavenger Instincts
+
+**Shipped:** Practice Rusty now contests the arena economy instead of ceding
+every authored pickup to the human. A pure deterministic selector scores only
+active, useful resources inside a six-tile detour: critical bandages first,
+then scarce weapons, ordinary healing, pistol sidegrades, grenades, and rifle
+ammo. Distance and stable pickup id settle ties, while an expiry-time travel
+check rejects rewards that will vanish before Rusty can plausibly arrive.
+
+Weapon judgment preserves a live bat or shotgun, permits a nearly dry matching
+weapon refresh, and never trades power for the pistol sidegrade. Full health,
+grenade, and ammo refills are ignored. Movement priority remains storm safety,
+live Kill Confirmed/Core Run/KOTH objectives, and an enemy Bounty target before
+loot; Scavenger Rush keeps its short-lived priority next. Rusty still aims,
+fires, throws, and uses abilities while detouring, then collects through the
+same authoritative overlap and pickup-application path as every human.
+
+**Verification:** 1,050 unit tests pass across 67 files, including 21 focused
+bot-controller tests for valuation thresholds, deterministic range/lifetime
+selection, exact tie-breaking, live collection, fighting while detouring, and
+storm/KOTH/Kill Confirmed/Core Run/Bounty precedence. TypeScript, ESLint, and
+the production build are clean; Vite retains its existing chunk-size advisory.
+The standard Playwright matrix passes 13 tests with 11 intentional scoped skips
+across desktop Chromium, desktop Firefox, and mobile landscape. A separate
+in-app-browser Practice smoke pinned Deathmatch on Scrapyard: Rusty routed from
+its bottom-right spawn to the authored pistol at tile `(14,10)`, collected it
+through the live networked match, and continued combat with zero browser
+warnings or errors.
+
+**Tuning watch:** six tiles keeps a detour tactical rather than map-wide; 50%
+critical health, 75% ordinary bandage interest, and 50% rifle-ammo interest are
+readable first defaults. Watch whether Rusty steals enough contested weapons
+to feel opportunistic without becoming distractible, and whether Warlord would
+benefit from a slightly wider range after human playtesting.
+
+**Deployment:** not run; deployment still requires explicit authorization.
+
+---
 
 ### Session 43 — 2026-07-13 — Radiation Storm
 

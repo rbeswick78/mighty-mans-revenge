@@ -470,6 +470,26 @@ export const BOT = Object.freeze({
   GRENADE_RUNG_INTERVAL_SECONDS: 1.5,
   GRENADE_DETONATE_SECONDS: 0.85,
   ABILITY_OPENING_DELAY_SECONDS: 4,
+  /** Furthest ordinary arena pickup worth leaving a fight to contest. */
+  RESOURCE_MAX_DETOUR_TILES: 6,
+  /** Health ratio at or below which a bandage outranks every weapon. */
+  RESOURCE_CRITICAL_HEALTH_RATIO: 0.5,
+  /** Health ratio at or below which Rusty considers an ordinary bandage. */
+  RESOURCE_BANDAGE_HEALTH_RATIO: 0.75,
+  /** Rifle reserve ratio at or below which an ammo box is worth a detour. */
+  RESOURCE_RIFLE_AMMO_RATIO: 0.5,
+  /** Do not start a route that expires before Rusty can plausibly arrive. */
+  RESOURCE_EXPIRY_BUFFER_SECONDS: 0.5,
+  /** Broad tactical tiers; distance only breaks ties inside one tier. */
+  RESOURCE_PRIORITY: Object.freeze({
+    CRITICAL_BANDAGE: 600,
+    BAT: 500,
+    SHOTGUN: 480,
+    BANDAGE: 420,
+    PISTOL: 340,
+    GRENADE: 240,
+    GUN_AMMO: 220,
+  }),
 });
 
 export const BOT_DIFFICULTIES = ['rookie', 'scrapper', 'warlord'] as const;
