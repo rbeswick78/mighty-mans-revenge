@@ -30,6 +30,7 @@ import {
   MUTATORS,
   ONE_IN_THE_CHAMBER,
   CORE_RUN,
+  BOUNTY_HUNT,
   characterMasteryProgressForWins,
   createEmptyCharacterWins,
   selectMatchContract,
@@ -65,6 +66,9 @@ describe('game mode rotation', () => {
       GameModeType.CORE_RUN,
     );
     expect(getNextGameMode(GameModeType.CORE_RUN)).toBe(
+      GameModeType.BOUNTY_HUNT,
+    );
+    expect(getNextGameMode(GameModeType.BOUNTY_HUNT)).toBe(
       GameModeType.DEATHMATCH,
     );
   });
@@ -86,6 +90,7 @@ describe('game mode rotation', () => {
       'ONE IN THE CHAMBER',
     );
     expect(gameModeDisplayName(GameModeType.CORE_RUN)).toBe('CORE RUN');
+    expect(gameModeDisplayName(GameModeType.BOUNTY_HUNT)).toBe('BOUNTY HUNT');
   });
 });
 
@@ -103,6 +108,16 @@ describe('core run mode', () => {
     expect(CORE_RUN.SCORE_TARGET).toBeGreaterThan(0);
     expect(CORE_RUN.COLLECT_RADIUS).toBeGreaterThan(0);
     expect(CORE_RUN.RETURN_SECONDS).toBeGreaterThan(0);
+  });
+});
+
+describe('bounty hunt mode', () => {
+  it('defines a frozen 1/2/3 score economy and positive target', () => {
+    expect(Object.isFrozen(BOUNTY_HUNT)).toBe(true);
+    expect(BOUNTY_HUNT.SCORE_TARGET).toBeGreaterThan(0);
+    expect(BOUNTY_HUNT.ORDINARY_KILL_POINTS).toBe(1);
+    expect(BOUNTY_HUNT.TARGET_RETALIATION_POINTS).toBe(2);
+    expect(BOUNTY_HUNT.BOUNTY_KILL_POINTS).toBe(3);
   });
 });
 

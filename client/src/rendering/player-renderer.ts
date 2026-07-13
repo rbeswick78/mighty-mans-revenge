@@ -21,6 +21,8 @@ const HEALTH_BAR_WIDTH = 36;
 const HEALTH_BAR_HEIGHT = 4;
 const HEALTH_BAR_OFFSET_Y = -32;
 const NICKNAME_OFFSET_Y = -42;
+const BOUNTY_MARKER_OFFSET_Y = -56;
+const BOUNTY_MARKER_COLOR = '#ffd166';
 
 /**
  * Frost Wizard tint — vertical gradient via Phaser's per-corner setTint.
@@ -105,6 +107,8 @@ export class PlayerRenderer {
   private healthBarBg: Phaser.GameObjects.Rectangle;
   private healthBarFg: Phaser.GameObjects.Rectangle;
   private nicknameText: Phaser.GameObjects.Text;
+  private bountyMarkerText: Phaser.GameObjects.Text;
+  private bountyMarked = false;
   private scene: Phaser.Scene;
   private invulnerableTween: Phaser.Tweens.Tween | null = null;
   private sprintParticles: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
@@ -265,6 +269,17 @@ export class PlayerRenderer {
     });
     this.nicknameText.setOrigin(0.5, 0.5);
 
+    this.bountyMarkerText = scene.add.text(0, BOUNTY_MARKER_OFFSET_Y, '[ BOUNTY ]', {
+      fontFamily: 'Courier, monospace',
+      fontSize: '9px',
+      color: BOUNTY_MARKER_COLOR,
+      stroke: '#2b1b0e',
+      strokeThickness: 3,
+      align: 'center',
+    });
+    this.bountyMarkerText.setOrigin(0.5, 0.5);
+    this.bountyMarkerText.setVisible(false);
+
     const children: Phaser.GameObjects.GameObject[] = [];
     // Mist sits under the body so the sprite paints over the puddle's center.
     if (this.frostMistGraphics) children.push(this.frostMistGraphics);
@@ -273,7 +288,12 @@ export class PlayerRenderer {
     if (this.bodyOverlaySprite) children.push(this.bodyOverlaySprite);
     if (this.wandGraphics) children.push(this.wandGraphics);
     if (this.frozenCrystalGraphics) children.push(this.frozenCrystalGraphics);
-    children.push(this.healthBarBg, this.healthBarFg, this.nicknameText);
+    children.push(
+      this.healthBarBg,
+      this.healthBarFg,
+      this.nicknameText,
+      this.bountyMarkerText,
+    );
     this.container = scene.add.container(0, 0, children);
     // Position the wand for the initial 'down' direction.
     if (this.wandGraphics) this.applyWandTransform('down');
@@ -610,6 +630,20 @@ export class PlayerRenderer {
     this.healthBarBg.setVisible(alive);
     this.healthBarFg.setVisible(alive);
     this.nicknameText.setVisible(alive);
+    this.bountyMarkerText.setVisible(alive && this.bountyMarked);
+  }
+
+  /** Gold, pulsing world marker driven by the authoritative Bounty Hunt id. */
+  setBountyMarked(active: boolean): void {
+    this.bountyMarked = active;
+    this.bountyMarkerText.setVisible(active && !this.isDead);
+    if (active) {
+      const pulse = 1 + Math.sin(this.scene.time.now * 0.008) * 0.08;
+      this.bountyMarkerText.setScale(pulse);
+      this.bountyMarkerText.setAlpha(0.82 + Math.sin(this.scene.time.now * 0.012) * 0.18);
+    } else {
+      this.bountyMarkerText.setScale(1).setAlpha(1);
+    }
   }
 
   setInvulnerable(active: boolean): void {

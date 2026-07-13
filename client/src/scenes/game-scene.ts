@@ -238,6 +238,7 @@ export class GameScene extends Phaser.Scene {
   private awaitingRouletteOpeningWeapon = false;
   /** Undefined before the first Core Run snapshot; null means loose. */
   private lastCoreCarrierId: PlayerId | null | undefined = undefined;
+  private lastBountyTargetId: PlayerId | null | undefined = undefined;
   /** Undefined before the first warp snapshot; later edges trigger feedback. */
   private lastWastelandWarpSequence: number | undefined = undefined;
 
@@ -255,6 +256,7 @@ export class GameScene extends Phaser.Scene {
     this.prevAbilityActive = false;
     this.prevAbilityCoolingDown = false;
     this.lastCoreCarrierId = undefined;
+    this.lastBountyTargetId = undefined;
     this.lastWastelandWarpSequence = undefined;
   }
 
@@ -566,7 +568,12 @@ export class GameScene extends Phaser.Scene {
         this.playerManager.setBigHeads(
           networkManager.getActiveMutators().includes('big_heads'),
         );
-        this.playerManager.updatePlayers(allPlayers, playerId);
+        const bountyHuntState = networkManager.getBountyHuntState();
+        this.playerManager.updatePlayers(
+          allPlayers,
+          playerId,
+          bountyHuntState?.targetId ?? null,
+        );
 
         // Ability VFX. Fire cone for any active Bruce; screen-edge border +
         // tint for the local player while their ability is active; x-ray
@@ -643,6 +650,33 @@ export class GameScene extends Phaser.Scene {
           networkManager.getCoreRunState(),
           playerId,
         );
+        const bountyTarget = bountyHuntState?.targetId
+          ? allPlayers.find((player) => player.id === bountyHuntState.targetId)
+          : null;
+        this.hud.updateBountyHunt(
+          bountyHuntState,
+          playerId,
+          bountyTarget?.nickname ?? null,
+        );
+        if (
+          bountyHuntState &&
+          bountyHuntState.targetId !== null &&
+          bountyHuntState.targetId !== this.lastBountyTargetId
+        ) {
+          if (bountyHuntState.targetId === playerId) {
+            this.hud.showCombatCallout('YOU ARE THE BOUNTY', 'FIGHT BACK · KILLS ×2', 0xffd166);
+            AudioManager.getInstance()?.play('menuSelect', { rate: 0.68 });
+          } else {
+            this.hud.showCombatCallout(
+              'NEW BOUNTY',
+              `HUNT ${(bountyTarget?.nickname ?? 'THE MARK').toUpperCase()} · WORTH 3`,
+              0xffd166,
+            );
+            AudioManager.getInstance()?.play('menuSelect', { rate: 1.12 });
+          }
+          this.zoomPulse?.trigger();
+        }
+        this.lastBountyTargetId = bountyHuntState?.targetId;
         this.hud.updateAmmo(
           currentLocalState.ammo,
           WEAPONS.rifle.magazineSize,
@@ -833,6 +867,14 @@ export class GameScene extends Phaser.Scene {
       }
       if (coreRunState) {
         activePickupPositions.push({ ...coreRunState.position });
+      }
+      const bountyTargetId = networkManager.getBountyHuntState()?.targetId ?? null;
+      if (bountyTargetId !== null) {
+        const bountyPosition =
+          bountyTargetId === networkManager.getPlayerId()
+            ? currentLocalState?.position
+            : networkManager.getInterpolatedPlayers().get(bountyTargetId)?.position;
+        if (bountyPosition) activePickupPositions.push({ ...bountyPosition });
       }
       for (const grenade of networkManager.getActiveGrenades()) {
         if (grenade.isDeathBomb) activePickupPositions.push({ ...grenade.position });

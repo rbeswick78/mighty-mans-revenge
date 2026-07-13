@@ -20,6 +20,7 @@ import {
   KILL_CONFIRMED,
   ONE_IN_THE_CHAMBER,
   CORE_RUN,
+  BOUNTY_HUNT,
   GameModeType,
   TileType,
   PickupType,
@@ -4404,6 +4405,73 @@ describe('Match', () => {
       expect(m.getResult()).toMatchObject({
         winnerId: winner.id,
         gameMode: GameModeType.CORE_RUN,
+      });
+    });
+  });
+
+  describe('Bounty Hunt mode integration', () => {
+    function startActiveBountyHunt(): Match {
+      const m = new Match(
+        'bounty-integration',
+        makeMapData(),
+        [
+          { id: 'player-0', nickname: 'P0' },
+          { id: 'player-1', nickname: 'P1' },
+          { id: 'player-2', nickname: 'P2' },
+        ],
+        GameModeType.BOUNTY_HUNT,
+        () => 0,
+      );
+      m.startCountdown();
+      m.update(MATCH.COUNTDOWN_DURATION + 0.05);
+      return m;
+    }
+
+    it('publishes one living target and transfers it for a three-point kill', () => {
+      const m = startActiveBountyHunt();
+      const targetId = m.getBountyHuntState()?.targetId;
+      expect(targetId).toBeTruthy();
+      const hunter = [...m.players.values()].find((player) => player.id !== targetId)!;
+
+      m.onKill(hunter.id, targetId!, 'gun');
+
+      expect(hunter.score).toBe(BOUNTY_HUNT.BOUNTY_KILL_POINTS);
+      expect(m.getBountyHuntState()).toEqual({ targetId: hunter.id });
+    });
+
+    it('awards the marked fighter two points for fighting back', () => {
+      const m = startActiveBountyHunt();
+      const targetId = m.getBountyHuntState()!.targetId!;
+      const victim = [...m.players.values()].find((player) => player.id !== targetId)!;
+
+      m.onKill(targetId, victim.id, 'shotgun');
+
+      expect(m.players.get(targetId)!.score).toBe(
+        BOUNTY_HUNT.TARGET_RETALIATION_POINTS,
+      );
+      expect(m.getBountyHuntState()).toEqual({ targetId });
+    });
+
+    it('retires the target in tied overtime and ends at the score target', () => {
+      const tied = startActiveBountyHunt();
+      for (const player of tied.players.values()) player.score = 4;
+      tied.matchTimer = 0.01;
+      tied.update(0.05);
+      expect(tied.isOvertime).toBe(true);
+      expect(tied.getBountyHuntState()).toBeNull();
+
+      const decisive = startActiveBountyHunt();
+      const targetId = decisive.getBountyHuntState()!.targetId!;
+      const hunter = [...decisive.players.values()].find(
+        (player) => player.id !== targetId,
+      )!;
+      hunter.score = BOUNTY_HUNT.SCORE_TARGET - BOUNTY_HUNT.BOUNTY_KILL_POINTS;
+      decisive.onKill(hunter.id, targetId, 'gun');
+      decisive.update(0.05);
+      expect(decisive.phase).toBe(MatchPhase.ENDED);
+      expect(decisive.getResult()).toMatchObject({
+        winnerId: hunter.id,
+        gameMode: GameModeType.BOUNTY_HUNT,
       });
     });
   });

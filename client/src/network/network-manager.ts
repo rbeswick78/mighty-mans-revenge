@@ -7,6 +7,7 @@ import type {
   KillConfirmedTagState,
   MatchContractHudState,
   CoreRunState,
+  BountyHuntState,
   WastelandWarpState,
 } from '@shared/types/game.js';
 import type {
@@ -109,6 +110,7 @@ export class NetworkManager {
   private latestPickups: PickupState[] = [];
   private latestConfirmedTags: KillConfirmedTagState[] = [];
   private _coreRunState: CoreRunState | null = null;
+  private _bountyHuntState: BountyHuntState | null = null;
   private _wastelandWarpState: WastelandWarpState | null = null;
 
   /**
@@ -200,6 +202,7 @@ export class NetworkManager {
     this.latestPickups = [];
     this.latestConfirmedTags = [];
     this._coreRunState = null;
+    this._bountyHuntState = null;
     this._wastelandWarpState = null;
     this.matchEndsAtLocalMs = null;
     this._activeMutators = [];
@@ -375,6 +378,10 @@ export class NetworkManager {
 
   getCoreRunState(): CoreRunState | null {
     return this._coreRunState;
+  }
+
+  getBountyHuntState(): BountyHuntState | null {
+    return this._bountyHuntState;
   }
 
   /**
@@ -624,6 +631,7 @@ export class NetworkManager {
     this.latestPickups = msg.pickups;
     this.latestConfirmedTags = msg.confirmedTags ?? [];
     this._coreRunState = msg.coreRun ?? null;
+    this._bountyHuntState = msg.bountyHunt ?? null;
     this._wastelandWarpState = msg.wastelandWarp ?? null;
     for (const collection of msg.confirmedTagCollections ?? []) {
       this.emit('confirmedTagCollected', collection);

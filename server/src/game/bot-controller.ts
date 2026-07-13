@@ -115,7 +115,15 @@ export class BotController {
     if (match.phase !== MatchPhase.ACTIVE) return;
     const bot = match.players.get(this.playerId);
     if (!bot || bot.isDead) return;
-    const target = this.pickTarget(bot, match.players);
+    const bountyTargetId = match.getBountyHuntState()?.targetId ?? null;
+    const bountyTarget =
+      bountyTargetId !== null && bountyTargetId !== bot.id
+        ? (match.players.get(bountyTargetId) ?? null)
+        : null;
+    const target =
+      bountyTarget && !bountyTarget.isDead
+        ? bountyTarget
+        : this.pickTarget(bot, match.players);
     const objectiveTag = this.pickNearestTag(bot, match.getKillConfirmedTags());
     const coreState = match.getCoreRunState();
     const looseCore = coreState?.carrierId === null ? coreState : null;

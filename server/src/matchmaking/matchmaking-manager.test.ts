@@ -476,6 +476,7 @@ describe('MatchmakingManager mode rotation (FORCE-pinned, draft skipped)', () =>
       ['K', 'L'],
       ['M', 'N'],
       ['O', 'P'],
+      ['Q', 'R'],
     ];
     pairs.forEach(([p1, p2], i) => {
       sent.length = 0;
@@ -485,7 +486,7 @@ describe('MatchmakingManager mode rotation (FORCE-pinned, draft skipped)', () =>
       expect(matchFoundMode(p1)).toBe(expected);
       expect(matchFoundMode(p2)).toBe(expected);
     });
-    expect(matchFoundMode('O')).toBe(GAME_MODE_ROTATION[0]); // wrapped
+    expect(matchFoundMode('Q')).toBe(GAME_MODE_ROTATION[0]); // wrapped
   });
 
   it('matchEnd promises the next mode and the pinned rematch delivers it', () => {
@@ -539,6 +540,14 @@ describe('MatchmakingManager mode rotation (FORCE-pinned, draft skipped)', () =>
     mgr.handleRematchRequest('A');
     mgr.handleRematchRequest('B');
     expect(matchFoundMode('A')).toBe(GameModeType.CORE_RUN);
+
+    // ...then Bounty Hunt...
+    endActiveMatch();
+    expect(lastMatchEndNextMode()).toBe(GameModeType.BOUNTY_HUNT);
+    sent.length = 0;
+    mgr.handleRematchRequest('A');
+    mgr.handleRematchRequest('B');
+    expect(matchFoundMode('A')).toBe(GameModeType.BOUNTY_HUNT);
 
     // ...then wraps back to DM.
     endActiveMatch();
@@ -641,6 +650,30 @@ describe('MatchmakingManager mode rotation (FORCE-pinned, draft skipped)', () =>
         carryFraction: expect.any(Number),
       });
       expect(message.confirmedTags).toBeUndefined();
+      expect(message.koth).toBeUndefined();
+    }
+  });
+
+  it('Bounty Hunt snapshots carry one authoritative marked fighter', () => {
+    process.env.FORCE_MODE = GameModeType.BOUNTY_HUNT;
+    const dt = 0.05;
+
+    mgr.handleJoinMatchmaking('A', 'A');
+    mgr.handleJoinMatchmaking('B', 'B');
+    mgr.handleCharacterLock('A', 'mighty_man');
+    mgr.handleCharacterLock('B', 'bruce');
+
+    const totalTicks = Math.ceil(MATCH.COUNTDOWN_DURATION / dt) + 10;
+    for (let i = 1; i <= totalTicks; i++) mgr.tick(dt, i);
+
+    const active = sent.filter(
+      (s) => s.message.type === 'server:gameState' && s.message.phase === MatchPhase.ACTIVE,
+    );
+    expect(active.length).toBeGreaterThan(0);
+    for (const { message } of active) {
+      if (message.type !== 'server:gameState') throw new Error('unreachable');
+      expect(['A', 'B']).toContain(message.bountyHunt?.targetId);
+      expect(message.coreRun).toBeUndefined();
       expect(message.koth).toBeUndefined();
     }
   });

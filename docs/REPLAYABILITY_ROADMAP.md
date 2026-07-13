@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–37 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty, four arenas, seven modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–38 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty, four arenas, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -69,6 +69,7 @@ Each session below attacks one of these.
 | 35  | Core Run                                      | A moving objective turns every second of possession into a chase          | **DONE** (2026-07-13) |
 | 36  | Wasteland Warp                                | Synchronized position swaps turn settled fights into instant reversals    | **DONE** (2026-07-13) |
 | 37  | Last Laugh                                    | Every death leaves one final explosive threat and chain-reaction story     | **DONE** (2026-07-13) |
+| 38  | Bounty Hunt                                   | A rotating marked fighter makes every chase and reversal worth more         | **DONE** (2026-07-13) |
 
 ---
 
@@ -1968,7 +1969,74 @@ memorable chain reactions without adding a separate damage system.
 
 ---
 
+## Session 38 — Bounty Hunt
+
+**Goal:** add a moving human objective that continuously redirects fights,
+rewards both pursuit and a marked player's counterattack, and creates clear
+three-point reversals without replacing the game's ordinary combat sandbox.
+
+**Locked design decisions**
+
+- One living fighter is marked throughout regulation. Ordinary kills score 1,
+  the mark's kills score 2, and killing the mark scores 3 and transfers the
+  bounty to a living killer. The first fighter to 25 points wins.
+- The opening target is a stable hash of match id over sorted player ids, so no
+  lobby slot receives a permanent advantage. Dead, self-killed, or missing
+  targets rotate through the stable N-player order.
+- Posthumous killers receive the full bounty payout but cannot retain the mark;
+  the next living target is selected on the following authority tick.
+- Every snapshot carries `BountyHuntState`. The client projects it into a gold
+  pulsing world label, local/rival HUD copy, transfer callouts, zoom/audio beats,
+  and a Blackout beacon without predicting target ownership.
+- Rusty prioritizes a rival bounty over nearer hunters. Sudden-death overtime
+  freezes mode scoring and retires the mark before its first-kill resolution.
+
+**Acceptance criteria**
+
+- [x] Isolated mode tests cover stable opening selection, 1/2/3 scoring,
+      transfer, dead-target rotation, score target, ties, and overtime.
+- [x] Match, matchmaking, and network tests cover live target state, payout,
+      results, snapshot delivery, mirroring, reset, and the eight-mode cycle.
+- [x] Client HUD tests cover local/rival/retired copy; Rusty and the live scene
+      follow the authoritative mark, including Blackout readability.
+- [x] A real Chromium draft reaches Bounty Hunt and observes its target, gold
+      world marker, and mode HUD before the full Playwright matrix completes.
+- [x] Typecheck, lint, all unit tests, production build, and Playwright pass.
+
+---
+
 ## Session Log
+
+### Session 38 — 2026-07-13 — Bounty Hunt
+
+**Shipped:** Bounty Hunt joins the draft and rotation as the eighth game mode.
+One living fighter is always marked during regulation: an ordinary kill scores
+1, fighting back as the mark scores 2, and taking down the bounty scores 3 and
+transfers the mark. First to 25 wins. The opening target is derived from the
+match id rather than a player slot, and N-player fallback rotation handles dead,
+self-killed, missing, and posthumous target transitions deterministically.
+
+Every authoritative snapshot carries the target. The client renders a pulsing
+gold world label, names the target and point value in the HUD, fires transfer
+callouts with audio/zoom feedback, and keeps the mark lit during Blackout. Rusty
+prioritizes a rival bounty instead of blindly choosing the nearest fighter.
+Tied regulation retires both scoring and the target for normal first-kill
+overtime.
+
+**Verification:** 993 unit tests pass across 63 files (311 suites), including
+214 Match, 46 matchmaking, 12 bot, 12 client-network, six isolated mode, and
+three HUD-copy tests. TypeScript, ESLint, and the production build are clean;
+Vite reports only its existing chunk-size advisory. The real desktop Chromium
+flow drafts Bounty Hunt, enters live play, and observes its authoritative
+target, visible gold marker, and HUD. The full Playwright matrix passes 13 tests
+with 11 intentional scoped skips across desktop Chromium, desktop Firefox, and
+mobile landscape.
+
+**Tuning watch:** the 1/2/3 payout and 25-point target are deliberate first
+defaults, not group-tested verdicts. Watch whether marked fighters feel
+empowered enough to fight without snowballing, whether bounty transfers happen
+often enough in larger free-for-alls, and whether 25 produces the right round
+length alongside explosive mutators.
 
 ### Session 37 — 2026-07-13 — Last Laugh
 

@@ -46,6 +46,7 @@ import type {
   KillConfirmedTagState,
   KillConfirmedCollection,
   CoreRunState,
+  BountyHuntState,
   WastelandWarpState,
   ServerCharacterSelectStateMessage,
   MatchContractDefinition,
@@ -796,6 +797,12 @@ export class Match implements MatchContext {
   getCoreRunState(): CoreRunState | null {
     if (this.isOvertime || this.phase !== MatchPhase.ACTIVE) return null;
     return this.gameMode.getCoreRunState?.(this) ?? null;
+  }
+
+  /** Active Bounty Hunt target for snapshots and Practice bot routing. */
+  getBountyHuntState(): BountyHuntState | null {
+    if (this.isOvertime || this.phase !== MatchPhase.ACTIVE) return null;
+    return this.gameMode.getBountyHuntState?.(this) ?? null;
   }
 
   getWastelandWarpState(): WastelandWarpState | null {

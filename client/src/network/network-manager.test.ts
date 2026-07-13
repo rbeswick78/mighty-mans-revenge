@@ -197,6 +197,7 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
             returnInSeconds: null,
             carryFraction: 0.4,
           },
+          bountyHunt: { targetId: REMOTE_ID },
           wastelandWarp: { secondsUntilSwap: 5.5, sequence: 2 },
         },
       ),
@@ -206,6 +207,7 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
     expect(manager.getActiveMutators()).toEqual(['big_heads']);
     expect(manager.getConfirmedTags()).toHaveLength(1);
     expect(manager.getCoreRunState()?.carrierId).toBe(LOCAL_ID);
+    expect(manager.getBountyHuntState()).toEqual({ targetId: REMOTE_ID });
     expect(manager.getWastelandWarpState()).toEqual({ secondsUntilSwap: 5.5, sequence: 2 });
     expect(manager.getContractState()).toMatchObject({ id: 'hot_shot' });
 
@@ -222,6 +224,7 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
     expect(manager.getPickups()).toHaveLength(0);
     expect(manager.getConfirmedTags()).toHaveLength(0);
     expect(manager.getCoreRunState()).toBeNull();
+    expect(manager.getBountyHuntState()).toBeNull();
     expect(manager.getWastelandWarpState()).toBeNull();
     expect(manager.getRemotePlayerIds()).toHaveLength(0);
     expect(manager.getActiveMutators()).toHaveLength(0);
@@ -242,6 +245,14 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
 
     deliver(makeGameState([makeSerialized()], { tick: 2 }));
     expect(manager.getCoreRunState()).toBeNull();
+  });
+
+  it('mirrors and clears the authoritative Bounty Hunt target', () => {
+    deliver(makeGameState([makeSerialized()], { bountyHunt: { targetId: REMOTE_ID } }));
+    expect(manager.getBountyHuntState()).toEqual({ targetId: REMOTE_ID });
+
+    deliver(makeGameState([makeSerialized()], { tick: 2 }));
+    expect(manager.getBountyHuntState()).toBeNull();
   });
 
   it('mirrors and clears the persistent Wasteland Warp countdown', () => {

@@ -8,6 +8,7 @@ import type {
   KillConfirmedTagState,
   KillConfirmedCollection,
   CoreRunState,
+  BountyHuntState,
   MutatorId,
   PickupType,
   WeaponId,
@@ -72,6 +73,8 @@ export interface GameMode {
   getKillConfirmedCollections?(match: MatchContext): readonly KillConfirmedCollection[];
   /** Persistent moving-objective state for Core Run snapshots and bots. */
   getCoreRunState?(match: MatchContext): CoreRunState;
+  /** Current marked fighter for Bounty Hunt snapshots and Practice routing. */
+  getBountyHuntState?(match: MatchContext): BountyHuntState;
   /**
    * Mutators this mode removes from BOTH random rolls (mid-match and
    * final-minute). The FORCE_EVENT / FORCE_MIDMATCH_MUTATOR env pins

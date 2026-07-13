@@ -536,6 +536,10 @@ export const GAME_MODES = Object.freeze({
     displayName: 'CORE RUN',
     objective: 'CARRY THE CORE · FIRST TO 45',
   }),
+  [GameModeType.BOUNTY_HUNT]: Object.freeze({
+    displayName: 'BOUNTY HUNT',
+    objective: 'MARK KILLS ×2 · BOUNTY KILLS ×3 · FIRST TO 25',
+  }),
 }) satisfies Readonly<
   Record<GameModeType, { displayName: string; objective: string }>
 >;
@@ -549,6 +553,7 @@ export const GAME_MODE_ROTATION: readonly GameModeType[] = Object.freeze([
   GameModeType.KILL_CONFIRMED,
   GameModeType.ONE_IN_THE_CHAMBER,
   GameModeType.CORE_RUN,
+  GameModeType.BOUNTY_HUNT,
 ]);
 
 /**
@@ -656,6 +661,14 @@ export const CORE_RUN = Object.freeze({
   SCORE_TARGET: 45,
   COLLECT_RADIUS: 30,
   RETURN_SECONDS: 12,
+});
+
+/** Bounty Hunt score economy. The visible target is dangerous and valuable. */
+export const BOUNTY_HUNT = Object.freeze({
+  SCORE_TARGET: 25,
+  ORDINARY_KILL_POINTS: 1,
+  TARGET_RETALIATION_POINTS: 2,
+  BOUNTY_KILL_POINTS: 3,
 });
 
 /** A Gun Game ladder rung's weapon: a real WeaponId or the grenade rung. */

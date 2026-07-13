@@ -11,6 +11,7 @@ import {
   KillConfirmedCollection,
   MatchContractHudState,
   CoreRunState,
+  BountyHuntState,
   WastelandWarpState,
 } from './game.js';
 import type {
@@ -184,6 +185,8 @@ export interface ServerGameStateMessage {
   confirmedTagCollections?: KillConfirmedCollection[];
   /** Moving carry objective; present only in active Core Run regulation. */
   coreRun?: CoreRunState;
+  /** Living marked fighter; present only in active Bounty Hunt regulation. */
+  bountyHunt?: BountyHuntState;
   /** Reconnect-safe countdown and edge for the Wasteland Warp mutator. */
   wastelandWarp?: WastelandWarpState;
 }

@@ -26,6 +26,13 @@ export enum GameModeType {
   KILL_CONFIRMED = 'kill_confirmed',
   ONE_IN_THE_CHAMBER = 'one_in_the_chamber',
   CORE_RUN = 'core_run',
+  BOUNTY_HUNT = 'bounty_hunt',
+}
+
+/** Persistent moving target for Bounty Hunt snapshots and bot routing. */
+export interface BountyHuntState {
+  /** Living fighter currently worth the bounty bonus; null during overtime. */
+  targetId: PlayerId | null;
 }
 
 /** Persistent moving-objective state for Core Run snapshots. */

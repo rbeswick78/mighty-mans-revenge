@@ -1057,6 +1057,10 @@ export class MatchmakingManager {
         match.gameModeType === GameModeType.CORE_RUN
           ? (match.getCoreRunState() ?? undefined)
           : undefined,
+      bountyHunt:
+        match.gameModeType === GameModeType.BOUNTY_HUNT
+          ? (match.getBountyHuntState() ?? undefined)
+          : undefined,
       wastelandWarp: match.getWastelandWarpState() ?? undefined,
     };
 

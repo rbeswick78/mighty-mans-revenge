@@ -213,6 +213,49 @@ describe('BotController', () => {
     expect(bot.position.x).toBeGreaterThan(start.x);
   });
 
+  it('prioritizes the marked Bounty Hunt target over a nearer hunter', () => {
+    let match: Match | null = null;
+    for (const id of ['practice-bounty-a', 'practice-bounty-b', 'practice-bounty-c']) {
+      const candidate = new Match(
+        id,
+        OPEN_MAP,
+        [
+          { id: 'human-a', nickname: 'Human A' },
+          { id: 'human-b', nickname: 'Human B' },
+          { id: 'bot:test', nickname: 'Rusty' },
+        ],
+        GameModeType.BOUNTY_HUNT,
+        () => 0,
+      );
+      candidate.players.get('human-a')!.characterId = 'mighty_man';
+      candidate.players.get('human-b')!.characterId = 'bubba';
+      candidate.players.get('bot:test')!.characterId = 'bruce';
+      candidate.startCountdown();
+      candidate.update(10);
+      if (candidate.getBountyHuntState()?.targetId !== 'bot:test') {
+        match = candidate;
+        break;
+      }
+    }
+    expect(match).not.toBeNull();
+
+    const bot = match!.players.get('bot:test')!;
+    const targetId = match!.getBountyHuntState()!.targetId!;
+    const decoy = [...match!.players.values()].find(
+      (player) => player.id !== bot.id && player.id !== targetId,
+    )!;
+    const target = match!.players.get(targetId)!;
+    bot.position = { x: 3.5 * 48, y: 2.5 * 48 };
+    decoy.position = { x: 2.5 * 48, y: 2.5 * 48 };
+    target.position = { x: 6.5 * 48, y: 2.5 * 48 };
+    const controller = new BotController(bot.id);
+    controller.update(0.05, match!, 1);
+    match!.update(0.05);
+
+    // The bounty is due east (angle 0); the nearer decoy is due west (±π).
+    expect(Math.abs(bot.aimAngle)).toBeLessThan(0.5);
+  });
+
   it('fires more aggressively on warlord than rookie without changing damage rules', () => {
     const shotsFor = (difficulty: 'rookie' | 'warlord'): number => {
       const practice = new Match(

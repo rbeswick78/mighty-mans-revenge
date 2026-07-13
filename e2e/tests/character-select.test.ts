@@ -103,12 +103,12 @@ async function draftPickIfMyTurn(page: Page): Promise<boolean> {
       return true;
     }
     if (draft.modePick === null) {
-      // Exercise the newest moving-objective mode through the real draft and
+      // Exercise the newest marked-target mode through the real draft and
       // live scene; fall back only for an older server during mixed-version
       // local development.
       service.sendDraftPick(
         'mode',
-        draft.modeOptions.includes('core_run') ? 'core_run' : draft.modeOptions[0],
+        draft.modeOptions.includes('bounty_hunt') ? 'bounty_hunt' : draft.modeOptions[0],
       );
       return true;
     }
@@ -348,34 +348,42 @@ test.describe('Character select (desktop)', () => {
             };
             const scene = w.game?.scene.getScene('GameScene') as {
               matchData?: { gameMode?: string } | null;
-              coreRunRenderer?: {
-                container?: { visible?: boolean };
+              playerManager?: {
+                getRenderer: (id: string) => {
+                  bountyMarkerText?: { visible?: boolean };
+                } | undefined;
               } | null;
+              hud?: { bountyHuntText?: { visible?: boolean } } | null;
               gameService?: {
                 getNetworkManager: () => {
-                  getCoreRunState: () => {
-                    carrierId: string | null;
-                    position: { x: number; y: number };
-                  } | null;
+                  getBountyHuntState: () => { targetId: string | null } | null;
                 };
               };
             } | null;
             const state = scene?.gameService
               ?.getNetworkManager()
-              .getCoreRunState();
+              .getBountyHuntState();
+            const targetRenderer = state?.targetId
+              ? scene?.playerManager?.getRenderer(state.targetId)
+              : undefined;
             return {
               mode: scene?.matchData?.gameMode ?? null,
-              hasState: state !== null && state !== undefined,
-              markerVisible:
-                scene?.coreRunRenderer?.container?.visible ?? false,
+              hasTarget: state?.targetId !== null && state?.targetId !== undefined,
+              markerVisible: targetRenderer?.bountyMarkerText?.visible ?? false,
+              hudVisible: scene?.hud?.bountyHuntText?.visible ?? false,
             };
           }),
         {
           timeout: 10000,
-          message: 'expected drafted Core Run state and live world marker',
+          message: 'expected drafted Bounty Hunt state, world marker, and HUD',
         },
       )
-      .toEqual({ mode: 'core_run', hasState: true, markerVisible: true });
+      .toEqual({
+        mode: 'bounty_hunt',
+        hasTarget: true,
+        markerVisible: true,
+        hudVisible: true,
+      });
 
     if (process.env.FORCE_EVENT === 'wasteland_warp') {
       await expect

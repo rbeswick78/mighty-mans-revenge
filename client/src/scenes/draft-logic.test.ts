@@ -32,6 +32,7 @@ function snap(overrides: Partial<ServerDraftStateMessage> = {}): ServerDraftStat
       GameModeType.KILL_CONFIRMED,
       GameModeType.ONE_IN_THE_CHAMBER,
       GameModeType.CORE_RUN,
+      GameModeType.BOUNTY_HUNT,
     ],
     pickDeadlineMs: 20000,
     ...overrides,
