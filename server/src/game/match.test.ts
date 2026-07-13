@@ -1824,6 +1824,96 @@ describe('Match', () => {
       });
     });
 
+    describe('Scavenger Rush', () => {
+      function startRush(mode = GameModeType.DEATHMATCH): Match {
+        const map = {
+          ...makeMapData(),
+          kothHills: [
+            { x: 2, y: 2 },
+            { x: 6, y: 6 },
+            { x: 2, y: 6 },
+          ],
+        };
+        const m = new Match(
+          `scavenger-rush-${mode}`,
+          map,
+          [
+            { id: 'player-0', nickname: 'Player 0' },
+            { id: 'player-1', nickname: 'Player 1' },
+          ],
+          mode,
+          () => 0,
+        );
+        m.startCountdown();
+        m.update(MATCH.COUNTDOWN_DURATION + 0.05);
+        (m as unknown as {
+          startMutator: (mutator: MutatorId, isFinalMinute: boolean) => void;
+        }).startMutator('scavenger_rush', false);
+        m.update(0.05);
+        return m;
+      }
+
+      it('cycles one expiring supply through deterministic authored anchors', () => {
+        const m = startRush();
+        const first = m.pickupManager
+          .getPickups()
+          .find((pickup) => pickup.isScavengerRushDrop)!;
+
+        expect(first.expiresInSeconds).toBe(
+          MUTATORS.SCAVENGER_RUSH_DROP_LIFETIME_SECONDS,
+        );
+        expect([
+          { x: 3 * 48, y: 3 * 48 },
+          { x: 7 * 48, y: 7 * 48 },
+          { x: 3 * 48, y: 7 * 48 },
+        ]).toContainEqual(first.position);
+
+        m.update(MUTATORS.SCAVENGER_RUSH_DROP_LIFETIME_SECONDS + 0.1);
+        expect(m.pickupManager.getPickups()).not.toContainEqual(
+          expect.objectContaining({ isScavengerRushDrop: true }),
+        );
+
+        m.update(
+          MUTATORS.SCAVENGER_RUSH_DROP_INTERVAL_SECONDS -
+            MUTATORS.SCAVENGER_RUSH_DROP_LIFETIME_SECONDS,
+        );
+        const second = m.pickupManager
+          .getPickups()
+          .find((pickup) => pickup.isScavengerRushDrop)!;
+        expect(second).toBeDefined();
+        expect(second.position).not.toEqual(first.position);
+        expect(second.expiresInSeconds).toBe(
+          MUTATORS.SCAVENGER_RUSH_DROP_LIFETIME_SECONDS,
+        );
+      });
+
+      it('obeys mode pickup ownership even when a FORCE pin bypasses exclusion', () => {
+        const m = startRush(GameModeType.GUN_GAME);
+        const supply = m.pickupManager
+          .getPickups()
+          .find((pickup) => pickup.isScavengerRushDrop);
+
+        expect(supply).toMatchObject({ type: PickupType.BANDAGE });
+      });
+
+      it('retires live supplies at the sudden-death boundary', () => {
+        const m = startRush();
+        expect(m.pickupManager.getPickups()).toContainEqual(
+          expect.objectContaining({ isScavengerRushDrop: true }),
+        );
+
+        (m as unknown as { enterOvertime: () => void }).enterOvertime();
+
+        expect(m.pickupManager.getPickups()).not.toContainEqual(
+          expect.objectContaining({ isScavengerRushDrop: true }),
+        );
+        m.update(MUTATORS.SCAVENGER_RUSH_DROP_INTERVAL_SECONDS * 2);
+        expect(m.pickupManager.getPickups()).not.toContainEqual(
+          expect.objectContaining({ isScavengerRushDrop: true }),
+        );
+      });
+    });
+
     describe('Last Laugh', () => {
       it('drops a stationary corpse bomb that can earn a posthumous chain kill', () => {
         const m = startActiveMatchWithMidMutator('last_laugh');

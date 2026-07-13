@@ -23,6 +23,8 @@ export interface PickupState {
   respawnTimer: number;
   /** Short-lived corpse weapon; omitted for authored and cache pickups. */
   isDroppedWeapon?: true;
-  /** Authoritative seconds before a dropped weapon disappears unclaimed. */
+  /** Short-lived supply created by the Scavenger Rush mutator. */
+  isScavengerRushDrop?: true;
+  /** Authoritative seconds before a temporary dynamic pickup disappears. */
   expiresInSeconds?: number;
 }

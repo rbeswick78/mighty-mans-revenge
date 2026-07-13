@@ -101,6 +101,8 @@ export function eventDisplayName(event: MutatorId): string {
       return 'WASTELAND WARP';
     case 'last_laugh':
       return 'LAST LAUGH';
+    case 'scavenger_rush':
+      return 'SCAVENGER RUSH';
   }
 }
 

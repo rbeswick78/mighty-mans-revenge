@@ -127,7 +127,11 @@ export class BotController {
     const objectiveTag = this.pickNearestTag(bot, match.getKillConfirmedTags());
     const coreState = match.getCoreRunState();
     const looseCore = coreState?.carrierId === null ? coreState : null;
-    if (!target && !objectiveTag && !looseCore) return;
+    const supplyDrop = this.pickNearestSupply(
+      bot,
+      match.pickupManager.getPickups(),
+    );
+    if (!target && !objectiveTag && !looseCore && !supplyDrop) return;
 
     this.elapsedSeconds += dt;
     this.pathRecalcSeconds -= dt;
@@ -140,7 +144,11 @@ export class BotController {
       this.strafeSign *= -1;
     }
 
-    const combatPosition = target?.position ?? objectiveTag?.position ?? looseCore!.position;
+    const combatPosition =
+      target?.position ??
+      objectiveTag?.position ??
+      looseCore?.position ??
+      supplyDrop!.position;
     const dx = combatPosition.x - bot.position.x;
     const dy = combatPosition.y - bot.position.y;
     const distance = Math.hypot(dx, dy);
@@ -159,6 +167,7 @@ export class BotController {
       target,
       objectiveTag,
       looseCore,
+      supplyDrop,
       match,
       grid,
     );
@@ -272,6 +281,7 @@ export class BotController {
     target: PlayerState | null,
     objectiveTag: { position: Vec2 } | null,
     looseCore: { position: Vec2 } | null,
+    supplyDrop: { position: Vec2 } | null,
     match: Match,
     grid: CollisionGrid,
   ): { position: Vec2; holdPosition: boolean; isCombatTarget: boolean } {
@@ -293,6 +303,13 @@ export class BotController {
 
     const koth = match.getKothHudState();
     if (!koth) {
+      if (supplyDrop) {
+        return {
+          position: supplyDrop.position,
+          holdPosition: false,
+          isCombatTarget: false,
+        };
+      }
       return {
         position: target?.position ?? bot.position,
         holdPosition: target === null,
@@ -351,6 +368,30 @@ export class BotController {
       );
       if (distance < nearestDistance) {
         nearest = tag;
+        nearestDistance = distance;
+      }
+    }
+    return nearest;
+  }
+
+  private pickNearestSupply(
+    bot: PlayerState,
+    pickups: readonly {
+      position: Vec2;
+      isActive: boolean;
+      isScavengerRushDrop?: true;
+    }[],
+  ): { position: Vec2 } | null {
+    let nearest: { position: Vec2 } | null = null;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    for (const pickup of pickups) {
+      if (!pickup.isActive || !pickup.isScavengerRushDrop) continue;
+      const distance = Math.hypot(
+        pickup.position.x - bot.position.x,
+        pickup.position.y - bot.position.y,
+      );
+      if (distance < nearestDistance) {
+        nearest = pickup;
         nearestDistance = distance;
       }
     }

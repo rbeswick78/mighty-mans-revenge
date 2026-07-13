@@ -38,7 +38,9 @@ export class GunGameMode implements GameMode {
    * grenades_only would gate the very guns the ladder is about, and
    * infinite_ammo fights the reserve-floor economy, while fists_only and
    * weapon_roulette would bypass the ladder entirely, while free corpse-bomb
-   * grenade kills could advance the wrong rung. All five stay out of random
+   * grenade kills could advance the wrong rung. Scavenger Rush can only roll
+   * bandages after the mode veto, so it adds noise instead of a real contest.
+   * All six stay out of random
    * rolls (FORCE_* env pins still bypass — smoke tools).
    */
   readonly excludedMutators: readonly MutatorId[] = [
@@ -47,6 +49,7 @@ export class GunGameMode implements GameMode {
     'fists_only',
     'weapon_roulette',
     'last_laugh',
+    'scavenger_rush',
   ];
 
   /**

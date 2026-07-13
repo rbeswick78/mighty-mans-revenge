@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { GameModeType, MatchPhase, MUTATORS, TileType } from '@shared/game';
+import {
+  GameModeType,
+  MatchPhase,
+  MUTATORS,
+  PickupType,
+  TileType,
+} from '@shared/game';
 import type { CollisionGrid, MapData } from '@shared/game';
 import { BotController, findGridPath } from './bot-controller.js';
 import { Match } from './match.js';
@@ -211,6 +217,40 @@ describe('BotController', () => {
 
     expect(bot.lastProcessedInput).toBe(1);
     expect(bot.position.x).toBeGreaterThan(start.x);
+  });
+
+  it('detours toward a live Scavenger Rush supply outside objective modes', () => {
+    const match = new Match(
+      'practice-scavenger-rush',
+      OPEN_MAP,
+      [
+        { id: 'human', nickname: 'Human' },
+        { id: 'bot:test', nickname: 'Rusty' },
+      ],
+      GameModeType.DEATHMATCH,
+      () => 0,
+    );
+    const human = match.players.get('human')!;
+    const bot = match.players.get('bot:test')!;
+    human.characterId = 'mighty_man';
+    bot.characterId = 'bruce';
+    bot.position = { x: 3.5 * 48, y: 2.5 * 48 };
+    human.position = { x: 6.5 * 48, y: 2.5 * 48 };
+    match.phase = MatchPhase.ACTIVE;
+    match.matchTimer = 100;
+    match.pickupManager.spawnOneShot(
+      PickupType.GRENADE,
+      { x: 1.5 * 48, y: 2.5 * 48 },
+      { isScavengerRushDrop: true },
+    );
+    const startX = bot.position.x;
+
+    const controller = new BotController(bot.id);
+    controller.update(0.05, match, 1);
+    match.update(0.05);
+
+    expect(bot.position.x).toBeLessThan(startX);
+    expect(Math.abs(bot.aimAngle)).toBeLessThan(0.5);
   });
 
   it('prioritizes the marked Bounty Hunt target over a nearer hunter', () => {

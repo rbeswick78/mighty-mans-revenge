@@ -1505,6 +1505,7 @@ export class GameScene extends Phaser.Scene {
       weapon_roulette: 0x5ce1e6,
       wasteland_warp: 0xb56cff,
       last_laugh: 0xff3b30,
+      scavenger_rush: 0x5ce1e6,
     };
 
     this.onEventWarning = (payload: EventWarningPayload) => {

@@ -20,6 +20,7 @@ const EVENT_COLORS: Record<MutatorId, number> = {
   weapon_roulette: 0x5ce1e6, // arcade cyan
   wasteland_warp: 0xb56cff,   // dimensional violet
   last_laugh: 0xff3b30,       // armed corpse red
+  scavenger_rush: 0x5ce1e6,  // supply-drop cyan
 };
 
 /**

@@ -10,6 +10,7 @@ import {
   SERVER,
   MUTATORS,
   COMBAT_MEDALS,
+  KOTH,
   ABILITY,
   CHARACTER_IDS,
   MAP,
@@ -246,6 +247,9 @@ export class Match implements MatchContext {
   /** Persistent countdown/edge for deterministic living-player warps. */
   private wastelandWarpTimer = 0;
   private wastelandWarpSequence = 0;
+  /** Rotating one-shot supply cadence for the Scavenger Rush mutator. */
+  private scavengerRushTimer = 0;
+  private scavengerRushSequence = 0;
   /**
    * Regulation length in seconds — MATCH.TIME_LIMIT unless the
    * FORCE_MATCH_SECONDS env smoke pin overrides it (same family as
@@ -682,6 +686,7 @@ export class Match implements MatchContext {
     this.fireCooldownTimers.clear();
     this.combatManager.clearGrenades();
     this.combatManager.clearAxes();
+    this.pickupManager.removeScavengerRushDrops();
     this._tickOvertimeStart = { overtimeEndsInMs: OVERTIME.DURATION * 1000 };
     logger.info({ matchId: this.matchId }, 'Match tied — entering sudden-death overtime');
   }
@@ -1296,6 +1301,9 @@ export class Match implements MatchContext {
         landsInMs: announcement.landsInMs,
       });
     }
+    // Spawn after ticking existing pickup lifetimes so a new supply keeps
+    // its full authoritative window even if a test or stalled tick is large.
+    this.updateScavengerRush(dt);
 
     // Pickup collection
     for (const player of this.players.values()) {
@@ -1839,7 +1847,17 @@ export class Match implements MatchContext {
    * rolls into sustain so a late-opened cache is always worth contesting.
    */
   private spawnScavengerCacheReward(col: number, row: number): void {
-    let type = this.scavengerCacheReward;
+    const type = this.resolveDynamicPickupReward(this.scavengerCacheReward);
+    const tileSize = this.mapManager.getMapData().tileSize;
+    this.pickupManager.spawnOneShot(type, {
+      x: col * tileSize + tileSize / 2,
+      y: row * tileSize + tileSize / 2,
+    });
+  }
+
+  /** Keep cache and Rush loot useful under live loadout and mode ownership. */
+  private resolveDynamicPickupReward(rolled: PickupType): PickupType {
+    let type = rolled;
     if (
       this.mutatorActive('fists_only') ||
       this.mutatorActive('weapon_roulette') ||
@@ -1860,14 +1878,14 @@ export class Match implements MatchContext {
     // Mutator substitutions still obey the mode's final economy contract.
     // Gun Game, for example, permits Low Health but owns its grenade rung.
     if (this.gameMode.isPickupTypeEnabled?.(type) === false) {
-      type = PickupType.BANDAGE;
+      const fallback = [
+        PickupType.BANDAGE,
+        PickupType.GRENADE,
+        PickupType.GUN_AMMO,
+      ].find((candidate) => this.gameMode.isPickupTypeEnabled?.(candidate) ?? true);
+      type = fallback ?? PickupType.BANDAGE;
     }
-
-    const tileSize = this.mapManager.getMapData().tileSize;
-    this.pickupManager.spawnOneShot(type, {
-      x: col * tileSize + tileSize / 2,
-      y: row * tileSize + tileSize / 2,
-    });
+    return type;
   }
 
   /** Resolve one already-consumed barrel, recursively triggering exposed props. */
@@ -2112,6 +2130,10 @@ export class Match implements MatchContext {
       case 'last_laugh':
         // Per-tick behavior only; nothing to mutate at activation.
         return;
+      case 'scavenger_rush':
+        this.scavengerRushTimer = 0;
+        this.scavengerRushSequence = 0;
+        return;
       case 'wasteland_warp':
         this.wastelandWarpTimer = MUTATORS.WASTELAND_WARP_FIRST_DELAY_SECONDS;
         this.wastelandWarpSequence = 0;
@@ -2198,6 +2220,73 @@ export class Match implements MatchContext {
       living[i].velocity = { x: 0, y: 0 };
     }
     this.wastelandWarpSequence += 1;
+  }
+
+  /** Keep one short-lived supply moving through deterministic arena anchors. */
+  private updateScavengerRush(dt: number): void {
+    if (!this.mutatorActive('scavenger_rush') || this.isOvertime) return;
+    this.scavengerRushTimer -= dt;
+    if (this.scavengerRushTimer > 0) return;
+
+    let dueCount = 0;
+    while (this.scavengerRushTimer <= 0) {
+      this.scavengerRushTimer += MUTATORS.SCAVENGER_RUSH_DROP_INTERVAL_SECONDS;
+      dueCount++;
+    }
+    // Fixed 20 Hz play produces dueCount=1. Advancing skipped sequences on
+    // an unusually large tick keeps the chosen anchor time-deterministic.
+    this.scavengerRushSequence += dueCount - 1;
+    this.spawnScavengerRushDrop();
+  }
+
+  private spawnScavengerRushDrop(): void {
+    const map = this.mapManager.getMapData();
+    let anchors: Array<{ x: number; y: number }>;
+    if (map.kothHills?.length) {
+      anchors = map.kothHills.map((hill) => ({
+        x: (hill.x + KOTH.HILL_SIZE_TILES / 2) * map.tileSize,
+        y: (hill.y + KOTH.HILL_SIZE_TILES / 2) * map.tileSize,
+      }));
+    } else if (map.pickupSpawns.length) {
+      anchors = map.pickupSpawns.map((spawn) => ({
+        x: (spawn.x + 0.5) * map.tileSize,
+        y: (spawn.y + 0.5) * map.tileSize,
+      }));
+    } else {
+      anchors = map.spawnPoints.map((spawn) => ({
+        x: (spawn.x + 0.5) * map.tileSize,
+        y: (spawn.y + 0.5) * map.tileSize,
+      }));
+    }
+    if (anchors.length === 0) return;
+
+    const sequence = this.scavengerRushSequence++;
+    const offset = this.stableIndex(`${this.matchId}:scavenger-rush`, anchors.length);
+    const position = anchors[(offset + sequence) % anchors.length];
+    const rolled = selectScavengerCacheReward(
+      `${this.matchId}:scavenger-rush:${sequence}`,
+      (type) => this.gameMode.isPickupTypeEnabled?.(type) ?? true,
+    );
+
+    this.pickupManager.removeScavengerRushDrops();
+    this.pickupManager.spawnOneShot(
+      this.resolveDynamicPickupReward(rolled),
+      position,
+      {
+        expiresInSeconds: MUTATORS.SCAVENGER_RUSH_DROP_LIFETIME_SECONDS,
+        isScavengerRushDrop: true,
+      },
+    );
+  }
+
+  /** Small stable FNV-1a index; consumes none of the match's gameplay RNG. */
+  private stableIndex(key: string, length: number): number {
+    let hash = 0x811c9dc5;
+    for (let i = 0; i < key.length; i++) {
+      hash ^= key.charCodeAt(i);
+      hash = Math.imul(hash, 0x01000193);
+    }
+    return (hash >>> 0) % length;
   }
 
   /** Equip fists, retire grenades, and cancel only stale prior-weapon state. */

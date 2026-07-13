@@ -419,6 +419,64 @@ test.describe('Character select (desktop)', () => {
         )
         .toEqual({ sequence: 1, presentedSequence: 1 });
     }
+
+    if (process.env.FORCE_EVENT === 'scavenger_rush') {
+      await expect
+        .poll(
+          () =>
+            pageA.evaluate(() => {
+              const w = window as unknown as {
+                game?: { scene: { getScene: (key: string) => unknown } };
+              };
+              const scene = w.game?.scene.getScene('GameScene') as {
+                pickupRenderer?: {
+                  pickups?: Map<
+                    string,
+                    {
+                      container?: { visible?: boolean };
+                      supplyHalo?: { visible?: boolean } | null;
+                      supplyLabel?: { text?: string; visible?: boolean } | null;
+                    }
+                  >;
+                } | null;
+                gameService?: {
+                  getNetworkManager: () => {
+                    getPickups: () => Array<{
+                      id: string;
+                      isActive: boolean;
+                      isScavengerRushDrop?: true;
+                    }>;
+                  };
+                };
+              } | null;
+              const supply = scene?.gameService
+                ?.getNetworkManager()
+                .getPickups()
+                .find((pickup) => pickup.isScavengerRushDrop);
+              const rendered = supply
+                ? scene?.pickupRenderer?.pickups?.get(supply.id)
+                : undefined;
+              return {
+                stateActive: supply?.isActive ?? false,
+                containerVisible: rendered?.container?.visible ?? false,
+                haloVisible: rendered?.supplyHalo?.visible ?? false,
+                label: rendered?.supplyLabel?.text ?? null,
+                labelVisible: rendered?.supplyLabel?.visible ?? false,
+              };
+            }),
+          {
+            timeout: 10000,
+            message: 'expected a live authoritative Scavenger Rush supply',
+          },
+        )
+        .toEqual({
+          stateActive: true,
+          containerVisible: true,
+          haloVisible: true,
+          label: 'SUPPLY',
+          labelVisible: true,
+        });
+    }
   });
 
   // eslint-disable-next-line no-empty-pattern

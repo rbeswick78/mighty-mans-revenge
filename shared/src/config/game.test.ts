@@ -249,6 +249,17 @@ describe('combat medals', () => {
   });
 });
 
+describe('Scavenger Rush', () => {
+  it('defines a frozen mutator with a non-overlapping supply cadence', () => {
+    expect(Object.isFrozen(MUTATORS)).toBe(true);
+    expect(MUTATORS.POOL).toContain('scavenger_rush');
+    expect(MUTATORS.SCAVENGER_RUSH_DROP_LIFETIME_SECONDS).toBeGreaterThan(0);
+    expect(MUTATORS.SCAVENGER_RUSH_DROP_INTERVAL_SECONDS).toBeGreaterThan(
+      MUTATORS.SCAVENGER_RUSH_DROP_LIFETIME_SECONDS,
+    );
+  });
+});
+
 describe('wasteland reputation', () => {
   it('defines a frozen, ordered ladder with unique three-letter badges', () => {
     expect(Object.isFrozen(CAREER_RANKS)).toBe(true);

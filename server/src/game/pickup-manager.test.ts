@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { PickupManager } from './pickup-manager.js';
-import { PickupType, PICKUP, WEAPONS, GRENADE } from '@shared/game';
+import { PickupType, PICKUP, WEAPONS, GRENADE, MUTATORS } from '@shared/game';
 import type { MapData, PlayerState, Vec2, PickupSpawnType } from '@shared/game';
 
 function makeMapData(
@@ -208,6 +208,44 @@ describe('PickupManager', () => {
 
       expect(manager.getPickups()).toEqual([reward]);
       expect(reward.expiresInSeconds).toBeUndefined();
+    });
+  });
+
+  describe('Scavenger Rush supplies', () => {
+    it('carries its reconnect-safe flag and authoritative lifetime', () => {
+      manager.initFromMap(makeMapData());
+      const supply = manager.spawnOneShot(
+        PickupType.GRENADE,
+        { x: 120, y: 168 },
+        {
+          expiresInSeconds: MUTATORS.SCAVENGER_RUSH_DROP_LIFETIME_SECONDS,
+          isScavengerRushDrop: true,
+        },
+      );
+
+      expect(supply).toMatchObject({
+        isScavengerRushDrop: true,
+        expiresInSeconds: MUTATORS.SCAVENGER_RUSH_DROP_LIFETIME_SECONDS,
+      });
+      manager.update(MUTATORS.SCAVENGER_RUSH_DROP_LIFETIME_SECONDS + 0.1);
+      expect(manager.getPickups()).toEqual([]);
+    });
+
+    it('retires only Rush supplies when regulation ends', () => {
+      manager.initFromMap(makeMapData());
+      const cacheReward = manager.spawnOneShot(PickupType.BANDAGE, {
+        x: 120,
+        y: 168,
+      });
+      manager.spawnOneShot(
+        PickupType.GRENADE,
+        { x: 168, y: 168 },
+        { isScavengerRushDrop: true },
+      );
+
+      manager.removeScavengerRushDrops();
+
+      expect(manager.getPickups()).toEqual([cacheReward]);
     });
   });
 

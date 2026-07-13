@@ -212,6 +212,7 @@ describe('OneInTheChamberMode', () => {
       'vampire',
       'turbo_grenades',
       'last_laugh',
+      'scavenger_rush',
     ]);
   });
 

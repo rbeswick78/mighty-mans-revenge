@@ -33,6 +33,7 @@ export interface OneShotPickupOptions {
   /** Optional active lifetime; cache rewards intentionally never expire. */
   expiresInSeconds?: number;
   isDroppedWeapon?: true;
+  isScavengerRushDrop?: true;
 }
 
 function respawnTimeFor(type: PickupType): number {
@@ -178,6 +179,9 @@ export class PickupManager {
       isActive: true,
       respawnTimer: 0,
       ...(options.isDroppedWeapon ? { isDroppedWeapon: true as const } : {}),
+      ...(options.isScavengerRushDrop
+        ? { isScavengerRushDrop: true as const }
+        : {}),
       ...(options.expiresInSeconds !== undefined
         ? { expiresInSeconds: options.expiresInSeconds }
         : {}),
@@ -239,6 +243,13 @@ export class PickupManager {
       this.oneShotIds.delete(id);
       this.pendingOneShotRemoval.delete(id);
       this.oneShotWeaponAmmo.delete(id);
+    }
+  }
+
+  /** Retire regulation-only Scavenger Rush supplies at the overtime edge. */
+  removeScavengerRushDrops(): void {
+    for (const [id, pickup] of this.pickups) {
+      if (pickup.isScavengerRushDrop) this.removeOneShot(id);
     }
   }
 

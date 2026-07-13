@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–40 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty, four arenas, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–41 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty, four arenas, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -72,6 +72,7 @@ Each session below attacks one of these.
 | 38  | Bounty Hunt                                   | A rotating marked fighter makes every chase and reversal worth more         | **DONE** (2026-07-13) |
 | 39  | Power Weapon Drops                             | Every armed death creates a brief, ammo-honest scramble at the corpse        | **DONE** (2026-07-13) |
 | 40  | Clutch Kills                                  | Critical-health victories land as memorable, exact-HP highlight moments      | **DONE** (2026-07-13) |
+| 41  | Scavenger Rush                                | Rotating short-lived supplies repeatedly pull fighters into fresh contests   | **DONE** (2026-07-13) |
 
 ---
 
@@ -2074,7 +2075,75 @@ exact-HP feedback so narrow victories become stories players want to repeat.
 
 ---
 
+## Session 41 — Scavenger Rush
+
+**Goal:** turn familiar arena routes into recurring risk/reward decisions by
+moving a valuable, short-lived supply contest around the whole map.
+
+**Locked design decisions**
+
+- Activation launches the first supply immediately; later supplies arrive
+  every 12 seconds. Each lasts 8 seconds, so the map gets a readable four-
+  second breath and never carries overlapping Rush loot.
+- Supplies rotate through authored KOTH anchors. A stable match-id offset and
+  sequence choose positions without consuming respawn, combat, or mutator RNG;
+  legacy/test maps fall back to pickup anchors and then spawn anchors.
+- Rewards reuse the weighted Scavenger Cache table: common ammo/healing/
+  grenades with rare pistol or shotgun hits. Live mode and loadout ownership
+  substitutes unusable rolls before the pickup enters the snapshot.
+- Gun Game and One in the Chamber exclude the random mutator because their
+  complete economies reduce every reward to a low-value bandage. Explicit
+  FORCE pins remain safe and obey the final mode veto.
+- `isScavengerRushDrop` and authoritative expiry make late joins/reconnects
+  honest. The client adds a cyan halo, `SUPPLY` label, and accelerating pulse;
+  authored pickups, permanent cache rewards, and corpse weapons keep their
+  existing presentation.
+- Rusty pursues a live supply in ordinary combat modes, while tags, the loose
+  core, and the KOTH hill retain movement priority. Overtime removes the live
+  supply and suppresses every later spawn.
+
+**Acceptance criteria**
+
+- [x] Authority tests cover immediate spawn, authored-anchor rotation, expiry,
+      no overlap, stable cadence, mode ownership, and overtime retirement.
+- [x] Pickup, bot, config, and client tests cover snapshot flags, selective
+      cleanup, Rusty pursuit, constants, neutral compatibility, and urgency.
+- [x] Every exhaustive mutator display/flash surface recognizes the new id.
+- [x] Typecheck, lint, all unit tests, production build, and Playwright pass.
+
+---
+
 ## Session Log
+
+### Session 41 — 2026-07-13 — Scavenger Rush
+
+**Shipped:** Scavenger Rush joins the mutator pool as a rotating contest over
+short-lived supplies. Activation launches one weighted Scavenger Cache reward
+at an authored arena anchor, then moves the opportunity every 12 seconds. Each
+drop lives for 8 seconds, giving players a clear four-second reset between
+contests and ensuring that only one Rush supply exists at a time.
+
+The server owns placement, reward substitutions, expiry, overtime cleanup, and
+reconnect snapshots. The client gives the opportunity a cyan accelerating
+pulse, halo, and `SUPPLY` label. Rusty can detour for the loot without
+forgetting its combat target, while Kill Confirmed tags, a loose Core Run core,
+and the KOTH hill keep movement priority. Gun Game and One in the Chamber omit
+the mutator from random schedules because their tightly owned economies would
+reduce its reward value.
+
+**Verification:** 1,015 unit tests pass across 64 files (318 suites), including
+223 Match tests, 33 PickupManager tests, 13 BotController tests, and 3 pure
+pickup-presentation tests. TypeScript, ESLint, and the production build are
+clean; Vite retains its existing chunk-size advisory. The full Playwright
+matrix passes 13 tests with 11 intentional scoped skips across desktop
+Chromium, desktop Firefox, and mobile landscape. A separate forced-event
+two-client Chromium smoke also passes and verifies the live authoritative
+supply plus its rendered cyan halo and `SUPPLY` label.
+
+**Tuning watch:** the 8-second lifetime and 12-second cadence are deliberately
+readable first defaults. Watch whether the four-second downtime preserves
+route variety, whether rare weapon rolls feel exciting without snowballing,
+and whether Rusty's detours create lively fights without looking distracted.
 
 ### Session 40 — 2026-07-13 — Clutch Kills
 

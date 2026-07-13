@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import type { PickupState } from '@shared/types/pickup.js';
 import { PickupType } from '@shared/types/pickup.js';
-import { PICKUP } from '@shared/config/game.js';
+import { pickupPresentation } from './pickup-presentation.js';
 
 const PICKUP_SCALE = 3;
 
@@ -18,6 +18,8 @@ interface PickupSprite {
   sprite: Phaser.GameObjects.Sprite;
   wasActive: boolean;
   bobTween: Phaser.Tweens.Tween | null;
+  supplyHalo: Phaser.GameObjects.Arc | null;
+  supplyLabel: Phaser.GameObjects.Text | null;
 }
 
 export class PickupRenderer {
@@ -41,20 +43,15 @@ export class PickupRenderer {
       }
 
       pickup.container.setPosition(state.position.x, state.position.y);
-      if (state.isDroppedWeapon) {
-        const remainingFraction = Math.min(
-          1,
-          Math.max(0, state.expiresInSeconds ?? 0) /
-            PICKUP.DROPPED_WEAPON_LIFETIME_SECONDS,
-        );
-        const urgency = 1 - remainingFraction;
-        const pulse =
-          1 + Math.sin(this.scene.time.now * (0.01 + urgency * 0.018)) * 0.1;
-        pickup.container.setScale(pulse);
-        pickup.sprite.setTint(0xffd166).setAlpha(0.78 + urgency * 0.22);
+      const presentation = pickupPresentation(state, this.scene.time.now);
+      pickup.container.setScale(presentation.scale);
+      pickup.sprite.setAlpha(presentation.alpha);
+      pickup.supplyHalo?.setAlpha(presentation.alpha * 0.55);
+      pickup.supplyLabel?.setAlpha(presentation.alpha);
+      if (presentation.tint !== null) {
+        pickup.sprite.setTint(presentation.tint);
       } else {
-        pickup.container.setScale(1);
-        pickup.sprite.clearTint().setAlpha(1);
+        pickup.sprite.clearTint();
       }
 
       if (state.isActive && !pickup.wasActive) {
@@ -100,9 +97,32 @@ export class PickupRenderer {
     sprite.setOrigin(0.5, 0.5);
     sprite.setScale(PICKUP_SCALE);
 
-    const container = this.scene.add.container(state.position.x, state.position.y, [
-      sprite,
-    ]);
+    let supplyHalo: Phaser.GameObjects.Arc | null = null;
+    let supplyLabel: Phaser.GameObjects.Text | null = null;
+    const children: Phaser.GameObjects.GameObject[] = [];
+    if (state.isScavengerRushDrop) {
+      supplyHalo = this.scene.add.circle(0, 0, 18, 0x5ce1e6, 0.16);
+      supplyHalo.setStrokeStyle(2, 0x5ce1e6, 0.9);
+      children.push(supplyHalo);
+    }
+    children.push(sprite);
+    if (state.isScavengerRushDrop) {
+      supplyLabel = this.scene.add.text(0, -24, 'SUPPLY', {
+        fontFamily: 'Courier, monospace',
+        fontSize: '8px',
+        color: '#5ce1e6',
+        stroke: '#1a1a1a',
+        strokeThickness: 2,
+      });
+      supplyLabel.setOrigin(0.5, 0.5);
+      children.push(supplyLabel);
+    }
+
+    const container = this.scene.add.container(
+      state.position.x,
+      state.position.y,
+      children,
+    );
 
     container.setVisible(state.isActive);
 
@@ -113,6 +133,8 @@ export class PickupRenderer {
       sprite,
       wasActive: state.isActive,
       bobTween,
+      supplyHalo,
+      supplyLabel,
     };
   }
 

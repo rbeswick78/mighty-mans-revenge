@@ -708,6 +708,7 @@ export const MUTATORS = Object.freeze({
     'weapon_roulette',
     'wasteland_warp',
     'last_laugh',
+    'scavenger_rush',
   ] as const,
   /** Final-minute slot: warning/activation thresholds in seconds REMAINING. */
   WARNING_AT_REMAINING: 65,
@@ -752,6 +753,10 @@ export const MUTATORS = Object.freeze({
   WASTELAND_WARP_INTERVAL_SECONDS: 12,
   /** Corpse bomb fuse; resolves before the normal three-second respawn. */
   LAST_LAUGH_FUSE_SECONDS: 1.4,
+  /** Seconds a Scavenger Rush supply remains contestable before vanishing. */
+  SCAVENGER_RUSH_DROP_LIFETIME_SECONDS: 8,
+  /** Seconds between rotating Scavenger Rush supplies. */
+  SCAVENGER_RUSH_DROP_INTERVAL_SECONDS: 12,
 });
 
 /**

@@ -358,6 +358,7 @@ describe('GunGameMode', () => {
         'fists_only',
         'weapon_roulette',
         'last_laugh',
+        'scavenger_rush',
       ]);
     });
 
