@@ -29,6 +29,7 @@ import {
   CHARACTER_MASTERY_TIERS,
   MUTATORS,
   ONE_IN_THE_CHAMBER,
+  CORE_RUN,
   characterMasteryProgressForWins,
   createEmptyCharacterWins,
   selectMatchContract,
@@ -61,6 +62,9 @@ describe('game mode rotation', () => {
       GameModeType.ONE_IN_THE_CHAMBER,
     );
     expect(getNextGameMode(GameModeType.ONE_IN_THE_CHAMBER)).toBe(
+      GameModeType.CORE_RUN,
+    );
+    expect(getNextGameMode(GameModeType.CORE_RUN)).toBe(
       GameModeType.DEATHMATCH,
     );
   });
@@ -81,6 +85,7 @@ describe('game mode rotation', () => {
     expect(gameModeDisplayName(GameModeType.ONE_IN_THE_CHAMBER)).toBe(
       'ONE IN THE CHAMBER',
     );
+    expect(gameModeDisplayName(GameModeType.CORE_RUN)).toBe('CORE RUN');
   });
 });
 
@@ -89,6 +94,15 @@ describe('one in the chamber mode', () => {
     expect(ONE_IN_THE_CHAMBER.CHAMBERED_ROUNDS).toBe(1);
     expect(ONE_IN_THE_CHAMBER.SCORE_TARGET).toBeGreaterThan(0);
     expect(Object.isFrozen(ONE_IN_THE_CHAMBER)).toBe(true);
+  });
+});
+
+describe('core run mode', () => {
+  it('defines a frozen positive target, pickup radius, and return timer', () => {
+    expect(Object.isFrozen(CORE_RUN)).toBe(true);
+    expect(CORE_RUN.SCORE_TARGET).toBeGreaterThan(0);
+    expect(CORE_RUN.COLLECT_RADIUS).toBeGreaterThan(0);
+    expect(CORE_RUN.RETURN_SECONDS).toBeGreaterThan(0);
   });
 });
 
@@ -185,6 +199,11 @@ describe('wasteland match contracts', () => {
         selectMatchContract(`confirmed-${i}`, GameModeType.KILL_CONFIRMED).id,
       ),
     );
+    const coreIds = new Set(
+      Array.from({ length: 100 }, (_, i) =>
+        selectMatchContract(`core-${i}`, GameModeType.CORE_RUN).id,
+      ),
+    );
     const dmIds = new Set(
       Array.from({ length: 100 }, (_, i) =>
         selectMatchContract(`dm-${i}`, GameModeType.DEATHMATCH).id,
@@ -192,8 +211,10 @@ describe('wasteland match contracts', () => {
     );
     expect(kothIds).toContain('hill_dweller');
     expect(confirmedIds).toContain('tag_hunter');
+    expect(coreIds).toContain('core_runner');
     expect(dmIds).not.toContain('hill_dweller');
     expect(dmIds).not.toContain('tag_hunter');
+    expect(dmIds).not.toContain('core_runner');
   });
 });
 

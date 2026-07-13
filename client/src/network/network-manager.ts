@@ -6,6 +6,7 @@ import type { PickupState } from '@shared/types/pickup.js';
 import type {
   KillConfirmedTagState,
   MatchContractHudState,
+  CoreRunState,
 } from '@shared/types/game.js';
 import type {
   DraftCategory,
@@ -106,6 +107,7 @@ export class NetworkManager {
   /** Most recent pickups from server gameState. Scene polls for rendering. */
   private latestPickups: PickupState[] = [];
   private latestConfirmedTags: KillConfirmedTagState[] = [];
+  private _coreRunState: CoreRunState | null = null;
 
   /**
    * Local-clock timestamp (performance.now() ms) at which the current
@@ -195,6 +197,7 @@ export class NetworkManager {
     this.lastAxeStates.clear();
     this.latestPickups = [];
     this.latestConfirmedTags = [];
+    this._coreRunState = null;
     this.matchEndsAtLocalMs = null;
     this._activeMutators = [];
     this._kothState = null;
@@ -361,6 +364,10 @@ export class NetworkManager {
 
   getConfirmedTags(): readonly KillConfirmedTagState[] {
     return this.latestConfirmedTags;
+  }
+
+  getCoreRunState(): CoreRunState | null {
+    return this._coreRunState;
   }
 
   /**
@@ -609,6 +616,7 @@ export class NetworkManager {
     this.latestAxes = msg.axes ?? [];
     this.latestPickups = msg.pickups;
     this.latestConfirmedTags = msg.confirmedTags ?? [];
+    this._coreRunState = msg.coreRun ?? null;
     for (const collection of msg.confirmedTagCollections ?? []) {
       this.emit('confirmedTagCollected', collection);
     }

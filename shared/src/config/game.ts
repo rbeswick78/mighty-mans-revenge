@@ -70,6 +70,13 @@ export const MATCH_CONTRACTS = Object.freeze({
     metric: 'confirmed_tags',
     target: 3,
   }),
+  core_runner: Object.freeze({
+    id: 'core_runner',
+    title: 'CORE RUNNER',
+    objective: 'CARRY THE CORE FOR 15S',
+    metric: 'core_seconds',
+    target: 15,
+  }),
 } as const) satisfies Readonly<Record<MatchContractId, MatchContractDefinition>>;
 
 const BASE_CONTRACT_POOL: readonly MatchContractId[] = Object.freeze([
@@ -130,6 +137,7 @@ export function selectMatchContract(
   const pool = [...BASE_CONTRACT_POOL];
   if (mode === GameModeType.KOTH) pool.push('hill_dweller');
   if (mode === GameModeType.KILL_CONFIRMED) pool.push('tag_hunter');
+  if (mode === GameModeType.CORE_RUN) pool.push('core_runner');
   const eligible = excluded ? pool.filter((id) => id !== excluded) : pool;
   return MATCH_CONTRACTS[
     eligible[contractHash(`${matchId}:${mode}`) % eligible.length]
@@ -524,6 +532,10 @@ export const GAME_MODES = Object.freeze({
     displayName: 'ONE IN THE CHAMBER',
     objective: 'ONE BULLET · KILLS RELOAD · FIRST TO 8',
   }),
+  [GameModeType.CORE_RUN]: Object.freeze({
+    displayName: 'CORE RUN',
+    objective: 'CARRY THE CORE · FIRST TO 45',
+  }),
 }) satisfies Readonly<
   Record<GameModeType, { displayName: string; objective: string }>
 >;
@@ -536,6 +548,7 @@ export const GAME_MODE_ROTATION: readonly GameModeType[] = Object.freeze([
   GameModeType.LAST_STAND,
   GameModeType.KILL_CONFIRMED,
   GameModeType.ONE_IN_THE_CHAMBER,
+  GameModeType.CORE_RUN,
 ]);
 
 /**
@@ -636,6 +649,13 @@ export const KILL_CONFIRMED = Object.freeze({
   SCORE_TARGET: 8,
   TAG_COLLECT_RADIUS: 30,
   TAG_LIFETIME_SECONDS: 20,
+});
+
+/** Core Run: hold the neutral moving objective to bank one point per second. */
+export const CORE_RUN = Object.freeze({
+  SCORE_TARGET: 45,
+  COLLECT_RADIUS: 30,
+  RETURN_SECONDS: 12,
 });
 
 /** A Gun Game ladder rung's weapon: a real WeaponId or the grenade rung. */

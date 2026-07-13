@@ -103,7 +103,13 @@ async function draftPickIfMyTurn(page: Page): Promise<boolean> {
       return true;
     }
     if (draft.modePick === null) {
-      service.sendDraftPick('mode', draft.modeOptions[0]);
+      // Exercise the newest moving-objective mode through the real draft and
+      // live scene; fall back only for an older server during mixed-version
+      // local development.
+      service.sendDraftPick(
+        'mode',
+        draft.modeOptions.includes('core_run') ? 'core_run' : draft.modeOptions[0],
+      );
       return true;
     }
     return false;
@@ -332,6 +338,44 @@ test.describe('Character select (desktop)', () => {
       waitForActiveScene(pageA, 'GameScene', 10000),
       waitForActiveScene(pageB, 'GameScene', 10000),
     ]);
+
+    await expect
+      .poll(
+        () =>
+          pageA.evaluate(() => {
+            const w = window as unknown as {
+              game?: { scene: { getScene: (key: string) => unknown } };
+            };
+            const scene = w.game?.scene.getScene('GameScene') as {
+              matchData?: { gameMode?: string } | null;
+              coreRunRenderer?: {
+                container?: { visible?: boolean };
+              } | null;
+              gameService?: {
+                getNetworkManager: () => {
+                  getCoreRunState: () => {
+                    carrierId: string | null;
+                    position: { x: number; y: number };
+                  } | null;
+                };
+              };
+            } | null;
+            const state = scene?.gameService
+              ?.getNetworkManager()
+              .getCoreRunState();
+            return {
+              mode: scene?.matchData?.gameMode ?? null,
+              hasState: state !== null && state !== undefined,
+              markerVisible:
+                scene?.coreRunRenderer?.container?.visible ?? false,
+            };
+          }),
+        {
+          timeout: 10000,
+          message: 'expected drafted Core Run state and live world marker',
+        },
+      )
+      .toEqual({ mode: 'core_run', hasState: true, markerVisible: true });
   });
 
   // eslint-disable-next-line no-empty-pattern

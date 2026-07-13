@@ -1053,6 +1053,10 @@ export class MatchmakingManager {
         match.gameModeType === GameModeType.KILL_CONFIRMED
           ? [...match.getKillConfirmedCollections()]
           : undefined,
+      coreRun:
+        match.gameModeType === GameModeType.CORE_RUN
+          ? (match.getCoreRunState() ?? undefined)
+          : undefined,
     };
 
     // Send only to players in this match

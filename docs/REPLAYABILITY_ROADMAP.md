@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–34 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty, four arenas, six modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–35 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty, four arenas, seven modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -66,6 +66,7 @@ Each session below attacks one of these.
 | 32  | Shootable Arena Gates                         | Every firefight can permanently reveal a shortcut or surprise sightline | **DONE** (2026-07-12) |
 | 33  | Rook + Breach Dash                            | A sixth main turns every fight into a positioning puzzle             | **DONE** (2026-07-13) |
 | 34  | Scavenger Caches                              | Shooting cover open creates fair loot races and round-to-round surprise | **DONE** (2026-07-13) |
+| 35  | Core Run                                      | A moving objective turns every second of possession into a chase          | **DONE** (2026-07-13) |
 
 ---
 
@@ -1853,7 +1854,86 @@ whether to claim it immediately or bait the opponent into the new sightline.
 
 ---
 
+## Session 35 — Core Run
+
+**Goal:** add a mobile objective mode where taking control is only the start;
+the scoring player must survive and move while every opponent has a clear,
+urgent reason to hunt them.
+
+**Locked design decisions**
+
+- A neutral glowing core begins at each arena's geometric centre. Any living
+  fighter inside 30px may claim it; simultaneous claims resolve by distance,
+  then stable player id, so authority is deterministic and N-player safe.
+- The carrier earns one score point per full second. First to 45 wins; ties at
+  regulation retire the objective and use the shared first-kill overtime.
+- Carrier death drops the core at that exact position. If nobody reclaims it
+  within 12 seconds it returns home, preventing an abandoned objective from
+  hiding indefinitely in a remote corner.
+- Ordinary weapons, grenades, abilities, mutators, ammo, healing, and grenade
+  pickups stay live. Pistol and shotgun pickups are disabled so the central
+  objective does not also grant a special-weapon advantage; cache filtering
+  follows the same mode contract automatically.
+- The persistent `CoreRunState` snapshot is the sole presentation contract.
+  It drives the world marker, possession HUD, transition callouts, Blackout
+  light beacon, and reconnect-safe state without a fragile transient event.
+- Rusty prioritizes a loose core even when no opponent is alive, then resumes
+  normal combat pursuit once somebody carries it. The mode adds the Core
+  Runner contract for 15 authoritative seconds of possession.
+
+**Acceptance criteria**
+
+- [x] Core collection, second-based scoring, deterministic contested claims,
+      death drops, timed returns, target wins, and overtime retirement are
+      authoritative and covered by isolated plus Match integration tests.
+- [x] Mode draft, FORCE/no-draft rotation, rematches, results, contracts,
+      pickup filtering, and snapshots all accept Core Run.
+- [x] The live client renders loose/local/rival states, possession HUD and
+      callouts, plus Blackout visibility, without inferring objective state.
+- [x] Rusty pursues a loose core using the normal movement/input pipeline.
+- [x] Typecheck, lint, all unit tests, production build, and Playwright pass.
+
+---
+
 ## Session Log
+
+### Session 35 — 2026-07-13 — Core Run
+
+**Shipped:** Core Run joins the draft and rotation as the seventh game mode.
+A neutral glowing core starts at the geometric centre of every arena; carrying
+it earns one point per full second, and the first fighter to 45 wins. The
+carrier becomes a moving objective without losing access to ordinary combat,
+abilities, grenades, mutators, or sustain pickups. Death drops the core at the
+elimination point, while a 12-second return prevents abandoned drops from
+stalling the round. Deterministic distance/player-id collection keeps contested
+claims fair and N-player safe.
+
+The persistent authoritative objective snapshot drives a gold/green/red world
+marker, possession HUD, secure/stolen/dropped callouts, reconnect-safe state,
+and a Blackout beacon. Rusty pursues the loose core through its normal pathing
+and input pipeline, including while the opponent is respawning. Pistol and
+shotgun pickups are retired in this mode so the centre objective does not also
+grant a power weapon; existing cache filtering composes with that rule. The
+mode-specific Core Runner contract rewards 15 scored seconds of possession.
+
+**Verification:** 967 unit tests pass across 60 files (301 suites), including
+206 Match tests plus dedicated Core Run authority, bot, networking, HUD, draft,
+and matchmaking coverage. TypeScript, ESLint, and the production build are
+clean; Vite reports only its existing chunk-size advisory. A focused real
+two-player Chromium flow drafts Core Run, enters the live scene, receives the
+objective snapshot, and renders its marker. The full Playwright matrix passes
+13 tests with 11 intentional scoped skips across desktop Chromium, desktop
+Firefox, and mobile landscape.
+
+**Tuning watch:** 45 carry seconds, the 30px claim radius, and 12-second return
+are strong first-play defaults rather than group-tested balance verdicts.
+Watch whether carriers can kite too safely on open routes, whether a death
+creates enough time for a satisfying steal, and whether disabling map power
+weapons focuses the chase or removes too much variance. No fighter, weapon,
+ability, mutator, or existing-mode balance values changed.
+
+**Deployment:** not run; production deployment remains an explicit separate
+operation under `CLAUDE.md`.
 
 ### Session 34 — 2026-07-13 — Scavenger Caches
 

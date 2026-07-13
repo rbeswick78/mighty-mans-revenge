@@ -25,6 +25,19 @@ export enum GameModeType {
   LAST_STAND = 'last_stand',
   KILL_CONFIRMED = 'kill_confirmed',
   ONE_IN_THE_CHAMBER = 'one_in_the_chamber',
+  CORE_RUN = 'core_run',
+}
+
+/** Persistent moving-objective state for Core Run snapshots. */
+export interface CoreRunState {
+  /** Current authoritative world position; follows the carrier while held. */
+  position: Vec2;
+  /** Living fighter holding the core, or null while it is loose. */
+  carrierId: PlayerId | null;
+  /** Seconds until an abandoned dropped core returns home; null at home/held. */
+  returnInSeconds: number | null;
+  /** Fractional progress toward the carrier's next whole score point. */
+  carryFraction: number;
 }
 
 /** A contested token dropped by a death in Kill Confirmed. */
@@ -148,7 +161,8 @@ export type MatchContractId =
   | 'road_warrior'
   | 'powder_keg'
   | 'hill_dweller'
-  | 'tag_hunter';
+  | 'tag_hunter'
+  | 'core_runner';
 
 export type MatchContractMetric =
   | 'hits'
@@ -157,7 +171,8 @@ export type MatchContractMetric =
   | 'distance_tiles'
   | 'barrels'
   | 'hill_seconds'
-  | 'confirmed_tags';
+  | 'confirmed_tags'
+  | 'core_seconds';
 
 export interface MatchContractDefinition {
   id: MatchContractId;

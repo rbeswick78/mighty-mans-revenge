@@ -158,7 +158,7 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
     expect(manager.getLocalPlayerState()?.characterId).toBe('jack');
   });
 
-  it('clears projectiles, pickups, tags, mutators, and remote buffers on matchFound', () => {
+  it('clears projectiles, pickups, objectives, mutators, and remote buffers on matchFound', () => {
     deliver(
       makeGameState(
         [makeSerialized(), makeSerialized({ id: REMOTE_ID, nickname: 'Rival' })],
@@ -191,6 +191,12 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
               expiresInSeconds: 15,
             },
           ],
+          coreRun: {
+            position: { x: 480, y: 288 },
+            carrierId: LOCAL_ID,
+            returnInSeconds: null,
+            carryFraction: 0.4,
+          },
         },
       ),
     );
@@ -198,6 +204,7 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
     expect(manager.getRemotePlayerIds()).toEqual([REMOTE_ID]);
     expect(manager.getActiveMutators()).toEqual(['big_heads']);
     expect(manager.getConfirmedTags()).toHaveLength(1);
+    expect(manager.getCoreRunState()?.carrierId).toBe(LOCAL_ID);
     expect(manager.getContractState()).toMatchObject({ id: 'hot_shot' });
 
     deliver({
@@ -212,11 +219,26 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
     expect(manager.getActiveAxes()).toHaveLength(0);
     expect(manager.getPickups()).toHaveLength(0);
     expect(manager.getConfirmedTags()).toHaveLength(0);
+    expect(manager.getCoreRunState()).toBeNull();
     expect(manager.getRemotePlayerIds()).toHaveLength(0);
     expect(manager.getActiveMutators()).toHaveLength(0);
     expect(manager.getContractState()).toBeNull();
     expect(manager.getInterpolatedPlayers().size).toBe(0);
     expect(manager.getMatchTimer()).toBe(0);
+  });
+
+  it('mirrors persistent Core Run state from each authoritative snapshot', () => {
+    const coreRun = {
+      position: { x: 240, y: 144 },
+      carrierId: REMOTE_ID,
+      returnInSeconds: null,
+      carryFraction: 0.65,
+    };
+    deliver(makeGameState([makeSerialized()], { coreRun }));
+    expect(manager.getCoreRunState()).toEqual(coreRun);
+
+    deliver(makeGameState([makeSerialized()], { tick: 2 }));
+    expect(manager.getCoreRunState()).toBeNull();
   });
 
   it('still emits matchFound to listeners after the reset', () => {

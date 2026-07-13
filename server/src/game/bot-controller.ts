@@ -117,7 +117,9 @@ export class BotController {
     if (!bot || bot.isDead) return;
     const target = this.pickTarget(bot, match.players);
     const objectiveTag = this.pickNearestTag(bot, match.getKillConfirmedTags());
-    if (!target && !objectiveTag) return;
+    const coreState = match.getCoreRunState();
+    const looseCore = coreState?.carrierId === null ? coreState : null;
+    if (!target && !objectiveTag && !looseCore) return;
 
     this.elapsedSeconds += dt;
     this.pathRecalcSeconds -= dt;
@@ -130,7 +132,7 @@ export class BotController {
       this.strafeSign *= -1;
     }
 
-    const combatPosition = target?.position ?? objectiveTag!.position;
+    const combatPosition = target?.position ?? objectiveTag?.position ?? looseCore!.position;
     const dx = combatPosition.x - bot.position.x;
     const dy = combatPosition.y - bot.position.y;
     const distance = Math.hypot(dx, dy);
@@ -144,7 +146,14 @@ export class BotController {
       distance,
     );
     const hasLineOfSight = !ray.hitTile || ray.distance >= distance - 8;
-    const movementGoal = this.chooseMovementGoal(bot, target, objectiveTag, match, grid);
+    const movementGoal = this.chooseMovementGoal(
+      bot,
+      target,
+      objectiveTag,
+      looseCore,
+      match,
+      grid,
+    );
     const movementDx = movementGoal.position.x - bot.position.x;
     const movementDy = movementGoal.position.y - bot.position.y;
     const movementDistance = Math.hypot(movementDx, movementDy);
@@ -254,12 +263,21 @@ export class BotController {
     bot: PlayerState,
     target: PlayerState | null,
     objectiveTag: { position: Vec2 } | null,
+    looseCore: { position: Vec2 } | null,
     match: Match,
     grid: CollisionGrid,
   ): { position: Vec2; holdPosition: boolean; isCombatTarget: boolean } {
     if (objectiveTag) {
       return {
         position: objectiveTag.position,
+        holdPosition: false,
+        isCombatTarget: false,
+      };
+    }
+
+    if (looseCore) {
+      return {
+        position: looseCore.position,
         holdPosition: false,
         isCombatTarget: false,
       };

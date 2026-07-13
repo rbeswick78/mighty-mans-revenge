@@ -19,6 +19,7 @@ import {
   LAST_STAND,
   KILL_CONFIRMED,
   ONE_IN_THE_CHAMBER,
+  CORE_RUN,
   GameModeType,
   TileType,
   PickupType,
@@ -4189,6 +4190,108 @@ describe('Match', () => {
         expect(player.weaponId).toBe('pistol');
         expect(player.specialAmmo).toBe(1);
       }
+    });
+  });
+
+  describe('Core Run mode integration', () => {
+    function startActiveCoreRun(): Match {
+      const map: MapData = {
+        ...makeMapData(),
+        pickupSpawns: [
+          { x: 2, y: 2, type: 'weapon_shotgun' as const },
+          { x: 3, y: 3, type: 'weapon_pistol' as const },
+          { x: 4, y: 4, type: 'gun_ammo' as const },
+          { x: 6, y: 6, type: 'grenade' as const },
+          { x: 7, y: 7, type: 'bandage' as const },
+        ],
+      };
+      const m = new Match(
+        'core-1',
+        map,
+        [
+          { id: 'player-0', nickname: 'P0' },
+          { id: 'player-1', nickname: 'P1' },
+        ],
+        GameModeType.CORE_RUN,
+        () => 0,
+        [],
+        'core_runner',
+      );
+      m.startCountdown();
+      m.update(MATCH.COUNTDOWN_DURATION + 0.05);
+      return m;
+    }
+
+    it('spawns the objective at center and removes bundled power weapons', () => {
+      const m = startActiveCoreRun();
+
+      expect(m.getCoreRunState()).toEqual({
+        position: { x: 240, y: 240 },
+        carrierId: null,
+        returnInSeconds: null,
+        carryFraction: 0,
+      });
+      expect(m.pickupManager.getPickups().map((pickup) => pickup.type)).toEqual([
+        PickupType.GUN_AMMO,
+        PickupType.GRENADE,
+        PickupType.BANDAGE,
+      ]);
+    });
+
+    it('collects and scores through Match while feeding the mode contract', () => {
+      const m = startActiveCoreRun();
+      const carrier = m.players.get('player-0')!;
+      carrier.position = { x: 240, y: 240 };
+
+      m.update(0.05);
+      expect(m.getCoreRunState()?.carrierId).toBe(carrier.id);
+      m.update(1.05);
+
+      expect(carrier.score).toBe(1);
+      expect(m.getContractHudState().players).toContainEqual({
+        playerId: carrier.id,
+        progress: 1,
+        completed: false,
+      });
+    });
+
+    it('drops at the carrier death position and retires for overtime', () => {
+      const m = startActiveCoreRun();
+      const carrier = m.players.get('player-0')!;
+      const rival = m.players.get('player-1')!;
+      carrier.position = { x: 240, y: 240 };
+      rival.position = { x: 400, y: 400 };
+      m.update(0.05);
+      carrier.position = { x: 310, y: 190 };
+
+      m.onKill(rival.id, carrier.id, 'gun');
+      expect(m.getCoreRunState()).toMatchObject({
+        position: { x: 310, y: 190 },
+        carrierId: null,
+        returnInSeconds: CORE_RUN.RETURN_SECONDS,
+      });
+
+      carrier.score = 4;
+      rival.score = 4;
+      m.matchTimer = 0.01;
+      m.update(0.05);
+      expect(m.isOvertime).toBe(true);
+      expect(m.getCoreRunState()).toBeNull();
+    });
+
+    it('ends immediately when carrying reaches the score target', () => {
+      const m = startActiveCoreRun();
+      const winner = m.players.get('player-0')!;
+      winner.position = { x: 240, y: 240 };
+      winner.score = CORE_RUN.SCORE_TARGET - 1;
+      m.update(0.05);
+      m.update(1.05);
+
+      expect(m.phase).toBe(MatchPhase.ENDED);
+      expect(m.getResult()).toMatchObject({
+        winnerId: winner.id,
+        gameMode: GameModeType.CORE_RUN,
+      });
     });
   });
 

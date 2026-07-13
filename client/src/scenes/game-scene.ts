@@ -27,6 +27,7 @@ import {
 } from '../rendering/hit-feedback.js';
 import { PickupRenderer } from '../rendering/pickup-renderer.js';
 import { ConfirmedTagRenderer } from '../rendering/confirmed-tag-renderer.js';
+import { CoreRunRenderer } from '../rendering/core-run-renderer.js';
 import { GrenadeRenderer } from '../rendering/grenade-renderer.js';
 import { AxeRenderer } from '../rendering/axe-renderer.js';
 import { LightingRenderer } from '../rendering/lighting-renderer.js';
@@ -119,6 +120,7 @@ export class GameScene extends Phaser.Scene {
   private effectsRenderer: EffectsRenderer | null = null;
   private pickupRenderer: PickupRenderer | null = null;
   private confirmedTagRenderer: ConfirmedTagRenderer | null = null;
+  private coreRunRenderer: CoreRunRenderer | null = null;
   private grenadeRenderer: GrenadeRenderer | null = null;
   private axeRenderer: AxeRenderer | null = null;
   private lightingRenderer: LightingRenderer | null = null;
@@ -233,6 +235,8 @@ export class GameScene extends Phaser.Scene {
   private lastRouletteWeapon: WeaponId | null = null;
   /** Ignore the pre-activation weapon if eventStart beats its first snapshot. */
   private awaitingRouletteOpeningWeapon = false;
+  /** Undefined before the first Core Run snapshot; null means loose. */
+  private lastCoreCarrierId: PlayerId | null | undefined = undefined;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -247,6 +251,7 @@ export class GameScene extends Phaser.Scene {
     this.modeBriefingShown = false;
     this.prevAbilityActive = false;
     this.prevAbilityCoolingDown = false;
+    this.lastCoreCarrierId = undefined;
   }
 
   create(): void {
@@ -298,6 +303,7 @@ export class GameScene extends Phaser.Scene {
     this.effectsRenderer = new EffectsRenderer(this);
     this.pickupRenderer = new PickupRenderer(this);
     this.confirmedTagRenderer = new ConfirmedTagRenderer(this);
+    this.coreRunRenderer = new CoreRunRenderer(this);
     this.grenadeRenderer = new GrenadeRenderer(this);
     this.axeRenderer = new AxeRenderer(this);
     this.lightingRenderer = new LightingRenderer(this);
@@ -629,6 +635,10 @@ export class GameScene extends Phaser.Scene {
           currentLocalState.isDead,
           this.matchPhase === MatchPhase.ACTIVE,
         );
+        this.hud.updateCoreRun(
+          networkManager.getCoreRunState(),
+          playerId,
+        );
         this.hud.updateAmmo(
           currentLocalState.ammo,
           WEAPONS.rifle.magazineSize,
@@ -773,6 +783,28 @@ export class GameScene extends Phaser.Scene {
       networkManager.getConfirmedTags(),
       networkManager.getPlayerId(),
     );
+    const coreRunState = networkManager.getCoreRunState();
+    this.coreRunRenderer?.update(coreRunState, networkManager.getPlayerId());
+    if (coreRunState) {
+      const carrierId = coreRunState.carrierId;
+      if (
+        this.lastCoreCarrierId !== undefined &&
+        carrierId !== this.lastCoreCarrierId
+      ) {
+        if (carrierId === networkManager.getPlayerId()) {
+          this.hud?.showCombatCallout('CORE SECURED', 'KEEP MOVING', 0x7dffb2);
+          AudioManager.getInstance()?.play('pickupCollect', { rate: 1.2 });
+        } else if (carrierId !== null) {
+          this.hud?.showCombatCallout('CORE STOLEN', 'HUNT THE CARRIER', 0xff6b5c);
+          AudioManager.getInstance()?.play('menuSelect', { rate: 0.75 });
+        } else if (this.lastCoreCarrierId !== null) {
+          this.hud?.showCombatCallout('CORE DROPPED', 'CLAIM IT', 0xffc857);
+        }
+      }
+      this.lastCoreCarrierId = carrierId;
+    } else {
+      this.lastCoreCarrierId = undefined;
+    }
 
     // Aim line preview (white) — re-drawn each render frame so it tracks the
     // mouse smoothly, not just on server-tick boundaries.
@@ -784,6 +816,9 @@ export class GameScene extends Phaser.Scene {
         if (p.isActive) {
           activePickupPositions.push({ x: p.position.x, y: p.position.y });
         }
+      }
+      if (coreRunState) {
+        activePickupPositions.push({ ...coreRunState.position });
       }
       const blackoutActive = networkManager.getActiveMutators().includes('blackout');
       const localLightPosition = !currentLocalState || currentLocalState.isDead
@@ -1659,6 +1694,10 @@ export class GameScene extends Phaser.Scene {
     if (this.confirmedTagRenderer) {
       this.confirmedTagRenderer.destroy();
       this.confirmedTagRenderer = null;
+    }
+    if (this.coreRunRenderer) {
+      this.coreRunRenderer.destroy();
+      this.coreRunRenderer = null;
     }
     if (this.axeRenderer) {
       this.axeRenderer.destroy();

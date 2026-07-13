@@ -7,6 +7,7 @@ import type {
   KillWeapon,
   KillConfirmedTagState,
   KillConfirmedCollection,
+  CoreRunState,
   MutatorId,
   PickupType,
   WeaponId,
@@ -69,6 +70,8 @@ export interface GameMode {
   getKillConfirmedTags?(match: MatchContext): readonly KillConfirmedTagState[];
   /** One-tick confirm/deny events used for client feedback. */
   getKillConfirmedCollections?(match: MatchContext): readonly KillConfirmedCollection[];
+  /** Persistent moving-objective state for Core Run snapshots and bots. */
+  getCoreRunState?(match: MatchContext): CoreRunState;
   /**
    * Mutators this mode removes from BOTH random rolls (mid-match and
    * final-minute). The FORCE_EVENT / FORCE_MIDMATCH_MUTATOR env pins

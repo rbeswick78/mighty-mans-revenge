@@ -1,7 +1,12 @@
 import Phaser from 'phaser';
 import { WEAPONS, ABILITY, GAME_MODES } from '@shared/config/game.js';
 import type { CharacterId, WeaponId } from '@shared/config/game.js';
-import type { GameModeType, MatchContractHudState } from '@shared/types/game.js';
+import type {
+  CoreRunState,
+  GameModeType,
+  MatchContractHudState,
+} from '@shared/types/game.js';
+import type { PlayerId } from '@shared/types/common.js';
 import type { KothHudState } from '@shared/types/network.js';
 import type { GunGameRung } from '@shared/utils/gun-game.js';
 import { Wasteland, cssHex, healthColor } from '@shared/config/palette.js';
@@ -10,6 +15,7 @@ import { gunGameLadderLabel, rifleAmmoRowVisible } from './gun-game-hud.js';
 import { deathOverlayLabel } from './death-overlay.js';
 import { MENU_FONTS } from './menu/fonts.js';
 import { oneInTheChamberStatus } from './one-in-the-chamber-hud.js';
+import { coreRunStatus } from './core-run-hud.js';
 
 // Press Start 2P is much wider per glyph than Courier, so the final-minute
 // banner size drops to compensate (Courier 40px ≈ PS2P 22-24px in width).
@@ -109,6 +115,8 @@ export class HUD {
   /** One in the Chamber's loaded/fists state in the same exclusive band. */
   private oneInTheChamberText: Phaser.GameObjects.Text;
   private oneInTheChamberActive = false;
+  /** Core Run carrier/drop state in the shared mode-exclusive middle band. */
+  private coreRunText: Phaser.GameObjects.Text;
 
   // Right column: kill feed
   private killFeedEntries: KillFeedItem[] = [];
@@ -413,6 +421,16 @@ export class HUD {
     this.oneInTheChamberText.setDepth(1000);
     this.oneInTheChamberText.setVisible(false);
 
+    this.coreRunText = scene.add.text(middleX, kothBarY - 1, '', {
+      ...HEADER_STYLE,
+      fontSize: '8px',
+      color: cssHex(Wasteland.TEXT_RELOAD_WARNING),
+    });
+    this.coreRunText.setOrigin(0.5, 0);
+    this.coreRunText.setScrollFactor(0);
+    this.coreRunText.setDepth(1000);
+    this.coreRunText.setVisible(false);
+
     // Persistent active-event label, sits right under the timer. Hidden
     // until an event activates; never moves, just toggles text + visibility.
     this.activeEventLabel = scene.add.text(middleX, stripTop + 84, '', {
@@ -649,6 +667,15 @@ export class HUD {
         ),
       );
     }
+  }
+
+  updateCoreRun(
+    state: CoreRunState | null,
+    localPlayerId: PlayerId | null,
+  ): void {
+    const status = coreRunStatus(state, localPlayerId);
+    this.coreRunText.setText(status);
+    this.coreRunText.setVisible(status.length > 0);
   }
 
   /**
@@ -1313,6 +1340,8 @@ export class HUD {
     this.gunGameLadderText.destroy();
     this.lastStandText.destroy();
     this.killConfirmedText.destroy();
+    this.oneInTheChamberText.destroy();
+    this.coreRunText.destroy();
     this.countdownText.destroy();
     this.modeBriefingTitle.destroy();
     this.modeBriefingObjective.destroy();

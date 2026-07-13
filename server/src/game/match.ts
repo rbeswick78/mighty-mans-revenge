@@ -45,6 +45,7 @@ import type {
   KothHudState,
   KillConfirmedTagState,
   KillConfirmedCollection,
+  CoreRunState,
   ServerCharacterSelectStateMessage,
   MatchContractDefinition,
   MatchContractHudState,
@@ -721,6 +722,10 @@ export class Match implements MatchContext {
         return this.gameModeType === GameModeType.KILL_CONFIRMED
           ? (this.players.get(playerId)?.score ?? 0)
           : 0;
+      case 'core_seconds':
+        return this.gameModeType === GameModeType.CORE_RUN
+          ? (this.players.get(playerId)?.score ?? 0)
+          : 0;
     }
   }
 
@@ -780,6 +785,12 @@ export class Match implements MatchContext {
 
   getKillConfirmedCollections(): readonly KillConfirmedCollection[] {
     return this.gameMode.getKillConfirmedCollections?.(this) ?? [];
+  }
+
+  /** Active Core Run objective for snapshots and Practice bot routing. */
+  getCoreRunState(): CoreRunState | null {
+    if (this.isOvertime || this.phase !== MatchPhase.ACTIVE) return null;
+    return this.gameMode.getCoreRunState?.(this) ?? null;
   }
 
   /**

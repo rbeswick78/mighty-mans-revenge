@@ -10,6 +10,7 @@ import {
   KillConfirmedTagState,
   KillConfirmedCollection,
   MatchContractHudState,
+  CoreRunState,
 } from './game.js';
 import type {
   BotDifficulty,
@@ -180,6 +181,8 @@ export interface ServerGameStateMessage {
   confirmedTags?: KillConfirmedTagState[];
   /** Confirm/deny interactions resolved during this server tick. */
   confirmedTagCollections?: KillConfirmedCollection[];
+  /** Moving carry objective; present only in active Core Run regulation. */
+  coreRun?: CoreRunState;
 }
 
 /** Per-snapshot King of the Hill HUD state. Tile coords, not pixels. */
