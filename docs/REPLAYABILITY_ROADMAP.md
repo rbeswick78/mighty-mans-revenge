@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–58 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty with Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, style bonuses, and live style callouts, four arenas, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–59 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty with Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, style bonuses, and live style callouts, four arenas, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -90,6 +90,7 @@ Each session below attacks one of these.
 | 56  | Demolition Wave                                | Familiar lanes erupt into exposed, permanently rewritten battlefields        | **DONE** (2026-07-13) |
 | 57  | Gauntlet Style Bonuses                         | Combat highlights become capped score-chase rewards worth mastering           | **DONE** (2026-07-13) |
 | 58  | Live Gauntlet Style Callouts                   | Every highlight immediately teaches the score chase it can bank                | **DONE** (2026-07-13) |
+| 59  | Blood Rush                                     | Every kill can ignite a fast, aggressive chase for the next                     | **DONE** (2026-07-13) |
 
 ---
 
@@ -2670,7 +2671,7 @@ that make the best-clear chase ask for courage as well as clean execution.
 
 **Locked design decisions**
 
-- `GAUNTLET_CHAOS_BOUNTIES` exhaustively assigns all 17 mutators to a frozen
+- `GAUNTLET_CHAOS_BOUNTIES` exhaustively assigns all 18 mutators to a frozen
   100, 200, or 300 point tier. Mostly beneficial spectacle pays 100, disruptive
   rules pay 200, and lethal health, loadout replacement, or persistent arena
   pressure pays 300. Offer generation and mode compatibility stay unchanged.
@@ -2821,7 +2822,81 @@ so players can deliberately chase it instead of discovering its value later.
 
 ---
 
+## Session 59 — Blood Rush
+
+**Goal:** turn a kill into immediate forward momentum, encouraging pursuit,
+multikill attempts, and aggressive reversals instead of a reset to neutral.
+
+**Locked design decisions**
+
+- `blood_rush` is a shared mutator valid in every mode. A living player who
+  earns an opponent kill receives a four-second 1.35x movement boost.
+- Suicides and posthumous kills do not trigger the boost. Another qualifying
+  kill refreshes the four-second duration instead of stacking time or speed,
+  preventing an unbounded momentum bank.
+- The authoritative Match writes the existing per-player temporary boost
+  timer. Shared movement modifiers consume it on both server and client, so
+  prediction, reconciliation, and Rusty's movement stay exact.
+- Blood Rush and Second Wind conflict in ordinary scheduling because they
+  share that timer. Super Speed remains compatible and multiplies normally;
+  explicit FORCE pins retain their established override semantics.
+- Activation uses a crimson flash and explicitly teaches `KILLS GRANT 4s
+  SPEED`. Boosted fighters reuse the snapshot-driven sprint dust. No new wire
+  field, damage rule, score rule, or client-authored movement state is added.
+- Its Gauntlet danger bounty is 200: the rule can create a meaningful snowball,
+  but every player has equal access and the boost must be earned.
+
+**Acceptance criteria**
+
+- [x] Shared tests prove the exact timer-gated movement multiplier, activation
+      copy, uppercase label, and symmetric Second Wind conflict.
+- [x] Match integration proves a surviving opponent killer gets exact boosted
+      movement, the timer expires, and suicides/posthumous kills pay nothing.
+- [x] Exhaustive client color maps, shared labels, and the Gauntlet bounty map
+      recognize Blood Rush at compile time.
+- [x] A forced real-client Chromium Practice smoke verifies authoritative
+      activation and the persistent `BLOOD RUSH` HUD label.
+- [x] Typecheck, lint, all 1,121 unit tests, production build, and the full
+      Playwright desktop/mobile matrix pass.
+
+---
+
 ## Session Log
+
+### Session 59 — 2026-07-13 — Blood Rush
+
+**Shipped:** the new `blood_rush` mutator turns every living opponent kill into
+a four-second 1.35x speed burst. Instead of pausing after an elimination, the
+killer can immediately close on another target, steal an objective, contest a
+drop, or escape retaliation. The rule gives rapid-kill medals a physical
+gameplay rhythm and creates momentum swings without changing weapon damage.
+
+The server alone grants the boost. Suicides and delayed posthumous kills are
+rejected, while another valid kill refreshes rather than stacks the duration.
+The existing snapshot boost timer feeds shared movement math on server
+authority, local prediction, reconciliation, and Rusty, preserving exact
+physics with no new wire state. Blood Rush conflicts with Second Wind in
+ordinary scheduling, composes with Super Speed, works in all eight modes, and
+joins Gauntlet forecasts at a 200-point danger bounty. Crimson activation copy
+teaches the trigger, and boosted fighters emit the existing movement dust.
+
+**Verification:** 1,121 tests pass across 73 files, including exact shared and
+authoritative movement, expiry, invalid-kill rejection, conflict symmetry,
+activation copy, and exhaustive bounty/label coverage. TypeScript, ESLint, all
+package builds, and the Vite production bundle are clean; Vite retains its
+existing chunk-size advisory. A forced live Chromium Practice smoke verified
+authoritative activation and the persistent HUD label. The full Playwright
+matrix passes 16 tests with 11 intentional scoped skips across Chromium,
+Firefox, and mobile landscape, and teardown leaves no game ports open.
+
+**Tuning watch:** 1.35x for four seconds should be enough to convert a kill into
+a chase without making the leader untouchable. Watch Gun Game and crowded
+free-for-alls for runaway chaining before changing duration, multiplier,
+Second Wind conflict, or the 200-point Gauntlet bounty.
+
+**Deployment:** not run; deployment still requires explicit authorization.
+
+---
 
 ### Session 58 — 2026-07-13 — Live Gauntlet Style Callouts
 
@@ -2930,7 +3005,7 @@ preference picker. The payout appears on the route card, follows the selected
 fight into its character-select briefing, and is itemized in the winning score
 breakdown before rolling into the run and `BEST CLEAR` total.
 
-The frozen table covers all 17 mutators at compile time. Shared boons and light
+The frozen table covers all 18 current mutators at compile time. Shared boons and light
 spectacle pay 100; disruptive rules pay 200; one-shot health, forced loadouts,
 and sustained arena threats pay 300. Only a server-authored forecast can create
 a bounty, and only an authoritative human win banks it. The payout does not wait

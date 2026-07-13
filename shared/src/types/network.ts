@@ -277,9 +277,9 @@ export interface SerializedPlayerState {
    */
   frozenTimer: number;
   /**
-   * second_wind respawn boost — seconds remaining; 0 when not boosted.
-   * Broadcast so the local player's prediction applies the same speed
-   * multiplier the server does. See PlayerState.secondWindTimer.
+   * Temporary mutator speed boost — seconds remaining; 0 when inactive.
+   * Broadcast so local prediction applies the same Second Wind or Blood Rush
+   * multiplier as the server. See PlayerState.secondWindTimer.
    */
   secondWindTimer: number;
 }

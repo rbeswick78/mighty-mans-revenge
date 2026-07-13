@@ -2693,6 +2693,47 @@ describe('Match', () => {
         expect(p1.secondWindTimer).toBe(0);
       });
     });
+
+    describe('blood_rush', () => {
+      it('grants a surviving opponent killer an authoritative speed burst', () => {
+        const m = startActiveMatchWithMidMutator('blood_rush');
+        const p0 = m.players.get('player-0')!;
+
+        m.onKill('player-0', 'player-1', 'gun');
+        expect(p0.secondWindTimer).toBe(MUTATORS.BLOOD_RUSH_DURATION_SECONDS);
+
+        const startX = p0.position.x;
+        m.queueInput('player-0', makeInput(1, { moveX: 1 }));
+        m.update(0.05);
+        expect(p0.position.x - startX).toBeCloseTo(
+          PLAYER.BASE_SPEED * MUTATORS.BLOOD_RUSH_SPEED_MULTIPLIER * 0.05,
+          5,
+        );
+      });
+
+      it('does not reward a suicide or posthumous kill', () => {
+        const suicide = startActiveMatchWithMidMutator('blood_rush');
+        const suicidalPlayer = suicide.players.get('player-0')!;
+        suicide.onKill('player-0', 'player-0', 'grenade');
+        expect(suicidalPlayer.secondWindTimer).toBe(0);
+
+        const posthumous = startActiveMatchWithMidMutator('blood_rush');
+        const deadKiller = posthumous.players.get('player-0')!;
+        deadKiller.isDead = true;
+        posthumous.onKill('player-0', 'player-1', 'grenade');
+        expect(deadKiller.secondWindTimer).toBe(0);
+      });
+
+      it('returns movement to normal after the refreshed burst expires', () => {
+        const m = startActiveMatchWithMidMutator('blood_rush');
+        const p0 = m.players.get('player-0')!;
+        m.onKill('player-0', 'player-1', 'gun');
+
+        const boostTicks = Math.ceil(MUTATORS.BLOOD_RUSH_DURATION_SECONDS / 0.05) + 1;
+        for (let i = 0; i < boostTicks; i++) m.update(0.05);
+        expect(p0.secondWindTimer).toBe(0);
+      });
+    });
   });
 
   describe('lag compensation wiring', () => {

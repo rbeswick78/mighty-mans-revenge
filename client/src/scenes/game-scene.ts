@@ -35,7 +35,7 @@ import { LightingRenderer } from '../rendering/lighting-renderer.js';
 import { KillJuice } from '../rendering/kill-juice.js';
 import { HealFlash } from '../rendering/heal-flash.js';
 import { EventFlash } from '../rendering/event-flash.js';
-import { eventDisplayName } from '@shared/utils/event-modifiers.js';
+import { eventDisplayName, eventStartDetail } from '@shared/utils/event-modifiers.js';
 import type { SerializedPlayerState } from '@shared/types/network.js';
 import { MUTATORS, type MutatorId, type WeaponId } from '@shared/config/game.js';
 import { weaponRouletteCallout } from '../ui/weapon-roulette.js';
@@ -1587,6 +1587,7 @@ export class GameScene extends Phaser.Scene {
       vampire: 0x9b30d9,
       turbo_grenades: 0x7cff4f,
       second_wind: 0x4fe3c1,
+      blood_rush: 0xff4055,
       blackout: 0x4b527e,
       fists_only: 0xffb347,
       weapon_roulette: 0x5ce1e6,
@@ -1617,7 +1618,11 @@ export class GameScene extends Phaser.Scene {
         this.cameras.main.shake(450, 0.012);
         this.zoomPulse?.trigger();
       }
-      this.hud?.showEventBanner(`${name}!`, undefined, EVENT_BANNER_COLORS[payload.event]);
+      this.hud?.showEventBanner(
+        `${name}!`,
+        eventStartDetail(payload.event),
+        EVENT_BANNER_COLORS[payload.event],
+      );
       this.hud?.setActiveEventLabel(name);
       this.eventFlash?.trigger(payload.event);
       AudioManager.getInstance()?.play('matchStartHorn');

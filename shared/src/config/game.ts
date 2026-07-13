@@ -794,6 +794,7 @@ export const MUTATORS = Object.freeze({
     'vampire',
     'turbo_grenades',
     'second_wind',
+    'blood_rush',
     'blackout',
     'fists_only',
     'weapon_roulette',
@@ -832,6 +833,10 @@ export const MUTATORS = Object.freeze({
   SECOND_WIND_SPEED_MULTIPLIER: 1.3,
   /** ...for this many seconds (PlayerState.secondWindTimer). */
   SECOND_WIND_DURATION_SECONDS: 3,
+  /** blood_rush: speed multiplier granted to a surviving opponent killer. */
+  BLOOD_RUSH_SPEED_MULTIPLIER: 1.35,
+  /** Seconds each qualifying kill keeps the Blood Rush boost active. */
+  BLOOD_RUSH_DURATION_SECONDS: 4,
   /** Fair shared loadout sequence used by weapon_roulette; scarce bat excluded. */
   WEAPON_ROULETTE_ORDER: Object.freeze(['shotgun', 'pistol', 'punch', 'rifle'] as const),
   /** Seconds each shared roulette loadout stays active. */
@@ -887,6 +892,7 @@ export const GAUNTLET_CHAOS_BOUNTIES: Readonly<Record<MutatorId, number>> = Obje
   vampire: 100,
   turbo_grenades: 200,
   second_wind: 100,
+  blood_rush: 200,
   blackout: 200,
   fists_only: 300,
   weapon_roulette: 200,

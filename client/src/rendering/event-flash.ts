@@ -15,6 +15,7 @@ const EVENT_COLORS: Record<MutatorId, number> = {
   vampire: 0x9b30d9,         // blood-magic violet
   turbo_grenades: 0x7cff4f,  // radioactive green
   second_wind: 0x4fe3c1,     // revival teal
+  blood_rush: 0xff4055,      // momentum crimson
   blackout: 0x4b527e,        // midnight indigo
   fists_only: 0xffb347,      // bare-knuckle amber
   weapon_roulette: 0x5ce1e6, // arcade cyan

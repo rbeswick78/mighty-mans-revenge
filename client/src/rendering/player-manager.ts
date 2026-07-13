@@ -78,7 +78,9 @@ export class ClientPlayerManager {
         renderer.setInvulnerable(false);
       }
 
-      renderer.setSprintEffect(playerState.isSprinting);
+      // Temporary boosts use the existing dust streak so Blood Rush and
+      // Second Wind stay visible without any client-only state.
+      renderer.setSprintEffect(playerState.isSprinting || playerState.secondWindTimer > 0);
     }
 
     // Remove renderers for players that are no longer in the state

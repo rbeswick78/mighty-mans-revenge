@@ -265,7 +265,7 @@ export class NetworkManager {
 
     // Predict locally using shared physics, applying the active mutators'
     // movement modifiers so prediction matches server authority during
-    // e.g. super_speed or a second_wind respawn boost. The boost timer
+    // e.g. super_speed, Second Wind, or Blood Rush. The boost timer
     // comes from the last snapshot — the server consumes the same value
     // when it processes this input, so the two stay aligned.
     const predicted = this.prediction.predictInput(
@@ -804,8 +804,8 @@ export class NetworkManager {
       // player's prediction next tick respects the lockout via the shared
       // calculateMovement frozen modifier.
       frozenTimer: serverState.frozenTimer,
-      // second_wind boost timer — forwarded so the next predictInput
-      // applies the same speed multiplier the server will.
+      // Temporary mutator boost timer — forwarded so the next predictInput
+      // applies the same Second Wind / Blood Rush multiplier as the server.
       secondWindTimer: serverState.secondWindTimer,
     };
 

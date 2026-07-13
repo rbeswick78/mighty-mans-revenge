@@ -678,6 +678,45 @@ test('solo practice launches against locked Rusty and reaches live play', async 
         closedGates: 0,
       });
   }
+
+  if (
+    process.env.FORCE_MIDMATCH_MUTATOR === 'blood_rush' ||
+    process.env.FORCE_EVENT === 'blood_rush'
+  ) {
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() => {
+            const w = window as unknown as {
+              game?: { scene: { getScene: (key: string) => unknown } };
+            };
+            const scene = w.game?.scene.getScene('GameScene') as {
+              gameService?: {
+                getNetworkManager: () => {
+                  getActiveMutators: () => readonly string[];
+                };
+              };
+              hud?: { activeEventLabel?: { text?: string; visible?: boolean } };
+            } | null;
+            const active =
+              scene?.gameService
+                ?.getNetworkManager()
+                .getActiveMutators()
+                .includes('blood_rush') ?? false;
+            return {
+              active,
+              label: scene?.hud?.activeEventLabel?.text ?? '',
+              labelVisible: scene?.hud?.activeEventLabel?.visible ?? false,
+            };
+          }),
+        { timeout: 15000, message: 'expected synchronized Blood Rush activation' },
+      )
+      .toEqual({
+        active: true,
+        label: 'BLOOD RUSH',
+        labelVisible: true,
+      });
+  }
 });
 
 test.describe('Character select (desktop)', () => {

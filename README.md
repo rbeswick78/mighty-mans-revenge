@@ -68,7 +68,8 @@ Every round gains two announced match-wide mutators that can stack. The pool
 includes loadout swaps, storms, teleports, supply races, and Demolition Wave:
 one arena-wide blast that permanently opens ordinary low cover and wire gates.
 Barrels and scavenger caches survive the wave, leaving their traps and rewards
-available inside the newly exposed sightlines.
+available inside the newly exposed sightlines. Blood Rush turns each living
+opponent kill into a four-second speed burst, rewarding immediate pursuit.
 
 ## Where to read next
 

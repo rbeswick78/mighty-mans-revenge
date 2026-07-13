@@ -85,11 +85,10 @@ export interface PlayerState {
    */
   frozenTimer: number;
   /**
-   * Seconds remaining on the second_wind respawn speed boost; 0 when not
-   * boosted. Set by the server on respawn while the second_wind mutator is
-   * active, decremented per tick, and consumed by the shared
-   * mutatorsToMovementModifiers so client prediction and server authority
-   * apply the identical speed multiplier.
+   * Seconds remaining on a temporary mutator speed boost; 0 when inactive.
+   * Second Wind sets it on respawn and Blood Rush sets it when a surviving
+   * player earns an opponent kill. Shared movement rules consume it so
+   * prediction and server authority apply the identical multiplier.
    */
   secondWindTimer: number;
 }

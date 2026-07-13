@@ -160,6 +160,14 @@ describe('scrapstorm mutator', () => {
   });
 });
 
+describe('blood rush mutator', () => {
+  it('defines a meaningful positive kill-triggered speed window', () => {
+    expect(MUTATORS.POOL).toContain('blood_rush');
+    expect(MUTATORS.BLOOD_RUSH_SPEED_MULTIPLIER).toBeGreaterThan(1);
+    expect(MUTATORS.BLOOD_RUSH_DURATION_SECONDS).toBeGreaterThan(0);
+  });
+});
+
 describe('overcharge pickup', () => {
   it('defines a meaningful spent-cooldown gate and contested respawn', () => {
     expect(PICKUP.OVERCHARGE_MIN_COOLDOWN_SECONDS).toBeGreaterThan(0);

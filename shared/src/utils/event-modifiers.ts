@@ -7,8 +7,8 @@ import {
 import { MovementModifiers } from './physics.js';
 
 /**
- * Fold the active mutators (plus the local player's second_wind boost
- * timer) into a single MovementModifiers. Pure and shared so the client
+ * Fold the active mutators (plus the local player's temporary boost timer)
+ * into a single MovementModifiers. Pure and shared so the client
  * (prediction + reconciliation) and server (authority) derive identical
  * movement behavior from the same inputs.
  *
@@ -18,8 +18,8 @@ import { MovementModifiers } from './physics.js';
  *     says so (today only super_speed does either).
  *
  * `secondWindTimer` is the per-player boost countdown from PlayerState —
- * passed in rather than read from a player object so this stays a pure
- * function of primitives.
+ * Second Wind sets this legacy-named timer on respawn; Blood Rush sets it
+ * on a qualifying kill. Passing it in keeps this a pure function.
  */
 export function mutatorsToMovementModifiers(
   active: readonly MutatorId[],
@@ -38,6 +38,10 @@ export function mutatorsToMovementModifiers(
   }
   if (active.includes('second_wind') && secondWindTimer > 0) {
     speedMultiplier *= MUTATORS.SECOND_WIND_SPEED_MULTIPLIER;
+    any = true;
+  }
+  if (active.includes('blood_rush') && secondWindTimer > 0) {
+    speedMultiplier *= MUTATORS.BLOOD_RUSH_SPEED_MULTIPLIER;
     any = true;
   }
 
@@ -91,6 +95,8 @@ export function eventDisplayName(event: MutatorId): string {
       return 'TURBO GRENADES';
     case 'second_wind':
       return 'SECOND WIND';
+    case 'blood_rush':
+      return 'BLOOD RUSH';
     case 'blackout':
       return 'BLACKOUT';
     case 'fists_only':
@@ -112,6 +118,14 @@ export function eventDisplayName(event: MutatorId): string {
   }
 }
 
+/** Optional activation-rule copy shown beneath the mutator name. */
+export function eventStartDetail(event: MutatorId): string | undefined {
+  if (event === 'blood_rush') {
+    return `KILLS GRANT ${MUTATORS.BLOOD_RUSH_DURATION_SECONDS}s SPEED`;
+  }
+  return undefined;
+}
+
 /** Mutator pairs whose combined rules would be redundant or contradictory. */
 export function mutatorsConflict(a: MutatorId, b: MutatorId): boolean {
   const aOwnsLoadout =
@@ -124,9 +138,13 @@ export function mutatorsConflict(a: MutatorId, b: MutatorId): boolean {
   const scrapstormPressurePair =
     (a === 'scrapstorm' && (b === 'low_health' || b === 'radiation_storm')) ||
     (b === 'scrapstorm' && (a === 'low_health' || a === 'radiation_storm'));
+  const speedBoostTimerPair =
+    (a === 'second_wind' && b === 'blood_rush') ||
+    (a === 'blood_rush' && b === 'second_wind');
   return a !== b && (
     (aOwnsLoadout && bOwnsLoadout) ||
     lowHealthStormPair ||
-    scrapstormPressurePair
+    scrapstormPressurePair ||
+    speedBoostTimerPair
   );
 }

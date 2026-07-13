@@ -587,6 +587,13 @@ export class Match implements MatchContext {
 
     this.gameMode.onKill(this, killerId, victimId, weapon);
 
+    // Blood Rush rewards living aggression, not suicides or delayed
+    // posthumous explosives. Refreshing instead of stacking the duration
+    // keeps rapid chains readable and prevents an unbounded speed bank.
+    if (isOpponentKill && !isPosthumous && this.mutatorActive('blood_rush') && killerAtKill) {
+      killerAtKill.secondWindTimer = MUTATORS.BLOOD_RUSH_DURATION_SECONDS;
+    }
+
     // Sudden death: the first kill decides the match. checkMatchEnd ends
     // it later this same tick, so the victim never sits dead-unrespawnable
     // for more than one tick.
@@ -1066,8 +1073,8 @@ export class Match implements MatchContext {
       const inputs = queue.drain(SERVER.MAX_INPUTS_PER_PLAYER_PER_TICK);
       if (inputs.length === 0) continue;
 
-      // Per-player because second_wind's boost rides on the player's own
-      // respawn timer and the character speed multiplier is a per-player
+      // Per-player because temporary mutator boosts ride on the player's own
+      // countdown and the character speed multiplier is a per-player
       // stat identity. Constant across this tick's queued inputs — the
       // timer decrements later in the tick, matching the client, which
       // predicts each input with the timer value from the last snapshot.
@@ -1345,7 +1352,7 @@ export class Match implements MatchContext {
           player.invulnerableTimer = 0;
         }
       }
-      // Tick the second_wind respawn boost. Runs AFTER this tick's
+      // Tick the Second Wind / Blood Rush speed boost. Runs AFTER this tick's
       // movement consumed the pre-decrement value — mirroring the client,
       // which predicts each input with the timer from the last snapshot.
       if (player.secondWindTimer > 0) {
@@ -2237,6 +2244,7 @@ export class Match implements MatchContext {
       case 'big_heads':
       case 'vampire':
       case 'second_wind':
+      case 'blood_rush':
       case 'blackout':
       case 'last_laugh':
         // Per-tick behavior only; nothing to mutate at activation.

@@ -3,6 +3,7 @@ import {
   mutatorsToMovementModifiers,
   playerMovementModifiers,
   eventDisplayName,
+  eventStartDetail,
   mutatorsConflict,
 } from './event-modifiers.js';
 import { CHARACTERS, MUTATORS, type MutatorId } from '../config/game.js';
@@ -54,6 +55,15 @@ describe('mutatorsToMovementModifiers', () => {
 
   it('second_wind timer alone does nothing without the mutator active', () => {
     expect(mutatorsToMovementModifiers([], 3)).toEqual({});
+  });
+
+  it('blood_rush boosts speed only while its kill timer is running', () => {
+    expect(mutatorsToMovementModifiers(['blood_rush'], 2.5)).toEqual({
+      speedMultiplier: MUTATORS.BLOOD_RUSH_SPEED_MULTIPLIER,
+      sprintEnabled: true,
+      staminaFrozen: false,
+    });
+    expect(mutatorsToMovementModifiers(['blood_rush'], 0)).toEqual({});
   });
 
   it('stacked super_speed + second_wind multiply their speed multipliers', () => {
@@ -119,6 +129,13 @@ describe('eventDisplayName', () => {
     }
   });
 
+  it('teaches the Blood Rush trigger in its activation detail', () => {
+    expect(eventStartDetail('blood_rush')).toBe(
+      `KILLS GRANT ${MUTATORS.BLOOD_RUSH_DURATION_SECONDS}s SPEED`,
+    );
+    expect(eventStartDetail('blackout')).toBeUndefined();
+  });
+
   it('identifies symmetric ownership conflicts between forced loadouts', () => {
     expect(mutatorsConflict('fists_only', 'grenades_only')).toBe(true);
     expect(mutatorsConflict('grenades_only', 'fists_only')).toBe(true);
@@ -137,5 +154,8 @@ describe('eventDisplayName', () => {
     expect(mutatorsConflict('scrapstorm', 'radiation_storm')).toBe(true);
     expect(mutatorsConflict('radiation_storm', 'scrapstorm')).toBe(true);
     expect(mutatorsConflict('scrapstorm', 'blackout')).toBe(false);
+    expect(mutatorsConflict('second_wind', 'blood_rush')).toBe(true);
+    expect(mutatorsConflict('blood_rush', 'second_wind')).toBe(true);
+    expect(mutatorsConflict('blood_rush', 'super_speed')).toBe(false);
   });
 });
