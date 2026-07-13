@@ -70,6 +70,9 @@ one arena-wide blast that permanently opens ordinary low cover and wire gates.
 Barrels and scavenger caches survive the wave, leaving their traps and rewards
 available inside the newly exposed sightlines. Blood Rush turns each living
 opponent kill into a four-second speed burst, rewarding immediate pursuit.
+Every activation banner pairs the mutator name with a compact rule callout, so
+new surprises teach players how to react before the fight changes underneath
+them.
 
 ## Where to read next
 

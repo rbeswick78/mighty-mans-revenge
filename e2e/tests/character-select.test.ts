@@ -654,7 +654,10 @@ test('solo practice launches against locked Rusty and reaches live play', async 
                   getActiveMutators: () => readonly string[];
                 };
               };
-              hud?: { activeEventLabel?: { text?: string; visible?: boolean } };
+              hud?: {
+                activeEventLabel?: { text?: string; visible?: boolean };
+                eventBannerText?: { text?: string };
+              };
               mapRenderer?: { gateSpritesByCell?: Map<number, unknown> };
             } | null;
             const active =
@@ -707,6 +710,7 @@ test('solo practice launches against locked Rusty and reaches live play', async 
               active,
               label: scene?.hud?.activeEventLabel?.text ?? '',
               labelVisible: scene?.hud?.activeEventLabel?.visible ?? false,
+              banner: scene?.hud?.eventBannerText?.text ?? '',
             };
           }),
         { timeout: 15000, message: 'expected synchronized Blood Rush activation' },
@@ -715,6 +719,7 @@ test('solo practice launches against locked Rusty and reaches live play', async 
         active: true,
         label: 'BLOOD RUSH',
         labelVisible: true,
+        banner: 'BLOOD RUSH!\nKILLS GRANT 4 SEC SPEED',
       });
   }
 });

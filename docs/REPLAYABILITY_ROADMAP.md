@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–59 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty with Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, style bonuses, and live style callouts, four arenas, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–60 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty with Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, style bonuses, and live style callouts, four arenas, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -91,6 +91,7 @@ Each session below attacks one of these.
 | 57  | Gauntlet Style Bonuses                         | Combat highlights become capped score-chase rewards worth mastering           | **DONE** (2026-07-13) |
 | 58  | Live Gauntlet Style Callouts                   | Every highlight immediately teaches the score chase it can bank                | **DONE** (2026-07-13) |
 | 59  | Blood Rush                                     | Every kill can ignite a fast, aggressive chase for the next                     | **DONE** (2026-07-13) |
+| 60  | Mutator Rule Callouts                          | Every surprise teaches its rule before players must react                       | **DONE** (2026-07-13) |
 
 ---
 
@@ -2840,7 +2841,7 @@ multikill attempts, and aggressive reversals instead of a reset to neutral.
 - Blood Rush and Second Wind conflict in ordinary scheduling because they
   share that timer. Super Speed remains compatible and multiplies normally;
   explicit FORCE pins retain their established override semantics.
-- Activation uses a crimson flash and explicitly teaches `KILLS GRANT 4s
+- Activation uses a crimson flash and explicitly teaches `KILLS GRANT 4 SEC
   SPEED`. Boosted fighters reuse the snapshot-driven sprint dust. No new wire
   field, damage rule, score rule, or client-authored movement state is added.
 - Its Gauntlet danger bounty is 200: the rule can create a meaningful snowball,
@@ -2861,7 +2862,71 @@ multikill attempts, and aggressive reversals instead of a reset to neutral.
 
 ---
 
+## Session 60 — Mutator Rule Callouts
+
+**Goal:** make match chaos immediately understandable, so first-time players
+can react to a surprise instead of learning its hidden rule by losing to it.
+
+**Locked design decisions**
+
+- Every one of the 18 mutators gets a compact activation detail beneath its
+  display name. The copy explains the rule or the required response rather
+  than adding flavor text.
+- All details live in one exhaustive shared `Record<MutatorId, string>`.
+  Adding a future mutator without activation copy therefore fails TypeScript
+  instead of silently producing an incomplete banner.
+- Details are uppercase and capped at 30 characters to fit the existing
+  two-line 22px activation banner. Persistent HUD labels and advance warnings
+  remain name-only so they do not become visual noise.
+- The client only projects shared copy. No mutator timing, authority, physics,
+  scoring, schedule, or compatibility rule changes in this session.
+
+**Acceptance criteria**
+
+- [x] Every mutator has non-empty uppercase activation copy no longer than 30
+      characters, enforced by an exhaustive shared test.
+- [x] Blood Rush and Blackout have exact regression assertions covering a
+      timer rule and a response-oriented spatial rule.
+- [x] A forced real-client Chromium Practice smoke verifies the exact
+      `BLOOD RUSH! / KILLS GRANT 4 SEC SPEED` two-line activation banner.
+- [x] Typecheck, lint, all 1,121 unit tests, production build, and the full
+      Playwright desktop/mobile matrix pass.
+
+---
+
 ## Session Log
+
+### Session 60 — 2026-07-13 — Mutator Rule Callouts
+
+**Shipped:** all 18 match-chaos events now teach their rule in the activation
+banner. Players see actionable explanations such as `STAY CLOSE OR LOSE
+SIGHT`, `GRENADES REFILL EVERY 3 SEC`, and `COVER + GATES COLLAPSE` at the
+moment each surprise begins, closing the knowledge gap between experienced
+players and someone encountering a mutator for the first time.
+
+The details are an exhaustive shared map keyed by `MutatorId`, so future
+events cannot compile without teaching copy. Uppercase and 30-character
+limits protect the existing compact banner, while persistent HUD labels and
+advance warnings stay uncluttered. The client simply renders the shared rule;
+authoritative behavior, scheduling, compatibility, scoring, and physics are
+unchanged.
+
+**Verification:** 1,121 tests pass across 73 files, including exhaustive
+coverage for every current mutator and exact Blood Rush/Blackout copy.
+TypeScript, ESLint, all package builds, and the Vite production bundle are
+clean; Vite retains its existing chunk-size advisory. A forced live Chromium
+Practice smoke verified the exact two-line Blood Rush activation banner. The
+full Playwright matrix passes 16 tests with 11 intentional scoped skips across
+Chromium, Firefox, and mobile landscape, and teardown leaves no game ports
+open.
+
+**Tuning watch:** observe whether the 30-character copy remains legible during
+high-pressure fights, especially on mobile landscape. Shorten individual
+phrases before enlarging or lengthening the banner.
+
+**Deployment:** not run; deployment still requires explicit authorization.
+
+---
 
 ### Session 59 — 2026-07-13 — Blood Rush
 

@@ -129,11 +129,17 @@ describe('eventDisplayName', () => {
     }
   });
 
-  it('teaches the Blood Rush trigger in its activation detail', () => {
+  it('teaches every mutator with compact uppercase activation copy', () => {
+    for (const mutator of MUTATORS.POOL) {
+      const detail = eventStartDetail(mutator);
+      expect(detail).toBeTruthy();
+      expect(detail).toBe(detail.toUpperCase());
+      expect(detail.length).toBeLessThanOrEqual(30);
+    }
     expect(eventStartDetail('blood_rush')).toBe(
-      `KILLS GRANT ${MUTATORS.BLOOD_RUSH_DURATION_SECONDS}s SPEED`,
+      `KILLS GRANT ${MUTATORS.BLOOD_RUSH_DURATION_SECONDS} SEC SPEED`,
     );
-    expect(eventStartDetail('blackout')).toBeUndefined();
+    expect(eventStartDetail('blackout')).toBe('STAY CLOSE OR LOSE SIGHT');
   });
 
   it('identifies symmetric ownership conflicts between forced loadouts', () => {

@@ -118,12 +118,30 @@ export function eventDisplayName(event: MutatorId): string {
   }
 }
 
-/** Optional activation-rule copy shown beneath the mutator name. */
-export function eventStartDetail(event: MutatorId): string | undefined {
-  if (event === 'blood_rush') {
-    return `KILLS GRANT ${MUTATORS.BLOOD_RUSH_DURATION_SECONDS}s SPEED`;
-  }
-  return undefined;
+/** Compact activation-rule copy shown beneath each mutator name. */
+const EVENT_START_DETAILS: Readonly<Record<MutatorId, string>> = Object.freeze({
+  super_speed: '1.6X SPEED - SPRINT LOCKED',
+  grenades_only: 'GRENADES REFILL EVERY 3 SEC',
+  infinite_ammo: 'NO RELOADS',
+  low_health: 'EVERYONE HAS 1 HP',
+  big_heads: 'BIGGER TARGETS',
+  vampire: 'DAMAGE HEALS THE ATTACKER',
+  turbo_grenades: 'FASTER THROWS + RECHARGE',
+  second_wind: 'RESPAWN WITH 3 SEC SPEED',
+  blood_rush: `KILLS GRANT ${MUTATORS.BLOOD_RUSH_DURATION_SECONDS} SEC SPEED`,
+  blackout: 'STAY CLOSE OR LOSE SIGHT',
+  fists_only: 'GUNS OFF - THROW HANDS',
+  weapon_roulette: 'LOADOUT SWAPS EVERY 10 SEC',
+  wasteland_warp: 'POSITIONS SWAP EVERY 12 SEC',
+  demolition_wave: 'COVER + GATES COLLAPSE',
+  last_laugh: 'DEATHS DROP LIVE BOMBS',
+  scavenger_rush: 'SUPPLIES ROTATE EVERY 12 SEC',
+  radiation_storm: 'SAFE ZONE IS SHRINKING',
+  scrapstorm: 'DODGE THE PAINTED BLASTS',
+});
+
+export function eventStartDetail(event: MutatorId): string {
+  return EVENT_START_DETAILS[event];
 }
 
 /** Mutator pairs whose combined rules would be redundant or contradictory. */
