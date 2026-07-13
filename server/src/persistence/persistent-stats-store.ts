@@ -2,8 +2,17 @@ import { readFileSync } from 'node:fs';
 import { mkdir, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { KILL_WEAPONS, createEmptyKillsByWeapon } from '@shared/game';
-import type { KillWeapon, LeaderboardEntry, RivalryRecord } from '@shared/game';
+import {
+  KILL_WEAPONS,
+  createEmptyCharacterWins,
+  createEmptyKillsByWeapon,
+} from '@shared/game';
+import type {
+  CharacterId,
+  KillWeapon,
+  LeaderboardEntry,
+  RivalryRecord,
+} from '@shared/game';
 import { logger } from '../utils/logger.js';
 
 /** Lifetime totals for one player, keyed in the file by lowercased nickname. */
@@ -19,6 +28,7 @@ export interface LifetimePlayerStats {
   contractsCompleted: number;
   currentWinStreak: number;
   bestWinStreak: number;
+  characterWins: Record<CharacterId, number>;
   weaponKills: Record<KillWeapon, number>;
 }
 
@@ -45,6 +55,7 @@ export interface MatchStatsEntry {
   deaths: number;
   killsByWeapon: Record<KillWeapon, number>;
   contractCompleted: boolean;
+  characterId: CharacterId | null;
 }
 
 const FILE_NAME = 'persistent-stats.json';
@@ -76,6 +87,7 @@ function emptyLifetime(nickname: string): LifetimePlayerStats {
     contractsCompleted: 0,
     currentWinStreak: 0,
     bestWinStreak: 0,
+    characterWins: createEmptyCharacterWins(),
     weaponKills: createEmptyKillsByWeapon(),
   };
 }
@@ -132,6 +144,10 @@ export class PersistentStatsStore {
           lifetime.bestWinStreak,
           lifetime.currentWinStreak,
         );
+        if (entry.characterId !== null) {
+          lifetime.characterWins[entry.characterId] =
+            (lifetime.characterWins[entry.characterId] ?? 0) + 1;
+        }
       } else {
         lifetime.losses += 1;
         lifetime.currentWinStreak = 0;
@@ -251,6 +267,10 @@ export class PersistentStatsStore {
         lifetime.contractsCompleted ??= 0;
         lifetime.currentWinStreak ??= 0;
         lifetime.bestWinStreak ??= lifetime.currentWinStreak;
+        lifetime.characterWins = {
+          ...createEmptyCharacterWins(),
+          ...lifetime.characterWins,
+        };
         lifetime.weaponKills = {
           ...createEmptyKillsByWeapon(),
           ...lifetime.weaponKills,

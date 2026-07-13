@@ -267,6 +267,8 @@ export interface ServerMatchFoundMessage {
   mapName: string;
   /** Mode this match will be played in — drives the lobby's "NEXT: X" line. */
   gameMode: GameModeType;
+  /** Local player's persisted real-match wins per fighter; absent on old servers. */
+  characterWins?: Record<CharacterId, number>;
 }
 
 /**

@@ -14,6 +14,7 @@ import type {
   ServerPlayerKilledMessage,
   ServerCharacterSelectStateMessage,
 } from '@shared/types/network.js';
+import { createEmptyCharacterWins } from '@shared/config/game.js';
 import type { BotDifficulty } from '@shared/config/game.js';
 import type { CharacterId, WeaponId, MutatorId } from '@shared/config/game.js';
 import { NetworkManager, type LocalCorrection } from '../network/network-manager.js';
@@ -42,6 +43,8 @@ export interface MatchData {
   mapName: string;
   /** Mode this match will be played in — drives the pre-match mode label. */
   gameMode: GameModeType;
+  /** Persisted real-match wins for every selectable fighter. */
+  characterWins: Record<CharacterId, number>;
 }
 
 type GameServiceEvent =
@@ -235,6 +238,10 @@ export class GameService {
         opponents: msg.opponents,
         mapName: msg.mapName,
         gameMode: msg.gameMode,
+        characterWins: {
+          ...createEmptyCharacterWins(),
+          ...msg.characterWins,
+        },
       };
       // matchFound ends any draft (both picks in, or the FORCE/no-draft
       // path) — drop the cache so a later scene can't render a stale one.

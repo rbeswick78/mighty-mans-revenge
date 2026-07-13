@@ -8,6 +8,7 @@ import {
   BOT_DIFFICULTIES,
   DEFAULT_BOT_DIFFICULTY,
   CHARACTER_IDS,
+  createEmptyCharacterWins,
   LEADERBOARD,
   getNextGameMode,
   getMap,
@@ -684,6 +685,10 @@ export class MatchmakingManager {
       const opponents = playerEntries
         .filter((e) => e.id !== entry.id)
         .map((e) => ({ id: e.id, nickname: e.nickname }));
+      const characterWins = {
+        ...createEmptyCharacterWins(),
+        ...this.statsStore?.getLifetime(entry.nickname)?.characterWins,
+      };
       this.server.sendTo(
         entry.id,
         {
@@ -692,6 +697,7 @@ export class MatchmakingManager {
           opponents,
           mapName: mapData.name,
           gameMode,
+          characterWins,
         },
         { reliable: true },
       );
@@ -1199,6 +1205,7 @@ export class MatchmakingManager {
           kills: stats.kills,
           deaths: stats.deaths,
           killsByWeapon: stats.killsByWeapon,
+          characterId: player.characterId,
           contractCompleted:
             result.contract?.players.find((progress) => progress.playerId === playerId)
               ?.completed ?? false,

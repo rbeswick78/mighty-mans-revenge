@@ -15,6 +15,7 @@ import { PixelButton } from '../ui/menu/pixel-button.js';
 import { TitleLogo } from '../ui/menu/title-logo.js';
 import { MENU_FONTS } from '../ui/menu/fonts.js';
 import { drawBeveledChrome } from '../ui/menu/menu-panel.js';
+import { characterMasteryLabel } from '../ui/character-mastery.js';
 
 // Scene-local color decisions. HEALTH_GOOD (mint) doubles as the "you"
 // highlight — same color the HUD uses for the local player's health bar,
@@ -31,6 +32,7 @@ const OPP_HOVER_COLOR = 0xff58d8;
 const LOCKED_BADGE_COLOR = Wasteland.HEALTH_GOOD;
 const TIMER_COLOR = Wasteland.HEALTH_WARNING;
 const TIMER_URGENT_COLOR = Wasteland.HIT_FLASH;
+const MASTERY_COLOR = Wasteland.HEALTH_WARNING;
 const FOOTER_COLOR = Wasteland.COVER_FILL; // weathered tan — readable against the near-ground band
 
 // Card sizing scales with roster count: the original 3-card layout used
@@ -290,6 +292,14 @@ export class CharacterSelectScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
+    const masteryText = this.add
+      .text(0, 17, characterMasteryLabel(this.matchData?.characterWins[id]), {
+        fontFamily: MENU_FONTS.HEADER,
+        fontSize: COMPACT ? '7px' : '9px',
+        color: cssHex(MASTERY_COLOR),
+      })
+      .setOrigin(0.5);
+
     // Stat identity rows — HP and SPD bars normalized across the roster
     // so the counterpick differences are legible at a glance.
     const statWidgets = [
@@ -332,6 +342,7 @@ export class CharacterSelectScene extends Phaser.Scene {
       border,
       sprite,
       nameText,
+      masteryText,
       ...statWidgets,
       abilityText,
       lockedBadge,

@@ -3,7 +3,8 @@ import { mkdtempSync, rmSync, readFileSync, writeFileSync, existsSync, mkdirSync
 import os from 'node:os';
 import path from 'node:path';
 import { createEmptyKillsByWeapon } from '@shared/game';
-import type { KillWeapon } from '@shared/game';
+import { createEmptyCharacterWins } from '@shared/game';
+import type { CharacterId, KillWeapon } from '@shared/game';
 import { PersistentStatsStore } from './persistent-stats-store.js';
 import type { MatchStatsEntry } from './persistent-stats-store.js';
 
@@ -13,6 +14,7 @@ function entry(
   deaths = 0,
   weaponKills: Partial<Record<KillWeapon, number>> = {},
   contractCompleted = false,
+  characterId: CharacterId | null = null,
 ): MatchStatsEntry {
   return {
     nickname,
@@ -20,6 +22,7 @@ function entry(
     deaths,
     killsByWeapon: { ...createEmptyKillsByWeapon(), ...weaponKills },
     contractCompleted,
+    characterId,
   };
 }
 
@@ -169,6 +172,40 @@ describe('PersistentStatsStore', () => {
     });
   });
 
+  it('banks mastery only for the winning fighter', () => {
+    const store = makeStore();
+    store.recordMatch(
+      [
+        entry('Ryan', 3, 1, {}, false, 'jack'),
+        entry('Dave', 1, 3, {}, false, 'bubba'),
+      ],
+      'Ryan',
+    );
+    store.recordMatch(
+      [
+        entry('Ryan', 2, 2, {}, false, 'mighty_man'),
+        entry('Dave', 2, 2, {}, false, 'bubba'),
+      ],
+      null,
+    );
+    store.recordMatch(
+      [
+        entry('Ryan', 1, 3, {}, false, 'frost_wizard'),
+        entry('Dave', 3, 1, {}, false, 'bubba'),
+      ],
+      'Dave',
+    );
+
+    expect(store.getLifetime('Ryan')!.characterWins).toEqual({
+      ...createEmptyCharacterWins(),
+      jack: 1,
+    });
+    expect(store.getLifetime('Dave')!.characterWins).toEqual({
+      ...createEmptyCharacterWins(),
+      bubba: 1,
+    });
+  });
+
   it('skips head-to-head for non-1v1 matches but still counts lifetime totals', () => {
     const store = makeStore();
     store.recordMatch([entry('Ryan', 3), entry('Dave', 2), entry('Pat', 1)], 'Ryan');
@@ -257,6 +294,7 @@ describe('PersistentStatsStore', () => {
     expect(ryan.contractsCompleted).toBe(0);
     expect(ryan.currentWinStreak).toBe(0);
     expect(ryan.bestWinStreak).toBe(0);
+    expect(ryan.characterWins).toEqual(createEmptyCharacterWins());
 
     // Accumulating a new-era match on top of the migrated record works.
     store.recordMatch(

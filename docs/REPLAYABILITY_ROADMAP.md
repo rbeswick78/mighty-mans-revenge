@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–27 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts, solo Practice vs Rusty, streak + payback callouts, selectable Rusty difficulty, Collapsed Overpass, Blackout, fresh-chaos rematches, Last Stand, Kill Confirmed, mode briefings, character death animations, authoritative hit confirmation, blastable cover, chain-reaction barrels, Wasteland Contracts, Combat Medals, Wasteland Reputation, Hot Streaks). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–28 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts, solo Practice vs Rusty, streak + payback callouts, selectable Rusty difficulty, Collapsed Overpass, Blackout, fresh-chaos rematches, Last Stand, Kill Confirmed, mode briefings, character death animations, authoritative hit confirmation, blastable cover, chain-reaction barrels, Wasteland Contracts, Combat Medals, Wasteland Reputation, Hot Streaks, Fighter Mastery). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -59,6 +59,7 @@ Each session below attacks one of these.
 | 25  | Combat Medals                                 | First Blood, rapid chains, and posthumous kills become stories worth chasing | **DONE** (2026-07-12) |
 | 26  | Wasteland Reputation                          | Contract clears build a visible career ladder and recurring promotion chase | **DONE** (2026-07-12) |
 | 27  | Hot Streaks                                   | Consecutive wins survive restarts, giving every rematch another stake | **DONE** (2026-07-12) |
+| 28  | Fighter Mastery                               | Every roster pick gains its own persistent goal and identity | **DONE** (2026-07-12) |
 
 ---
 
@@ -1553,7 +1554,78 @@ preserving active and personal-best win streaks across rematches and restarts.
 
 ---
 
+## Session 28 — Fighter Mastery
+
+**Goal:** give every fighter a persistent, visible mastery chase so players have
+a reason to build a main, revisit neglected characters, and make the next lock-in
+feel like career progress rather than a disposable menu choice.
+
+**Locked design decisions**
+
+- Only real-match wins count, credited to the winner's server-authoritative
+  locked fighter. Losses and draws do not move any character total.
+- Five frozen cosmetic tiers use deliberately early milestones: Untested (0),
+  Blooded (1), Proven (3), Veteran (7), and Master (15). Master continues to
+  show open-ended wins.
+- Per-character wins extend the existing version-1 lifetime record and backfill
+  every roster key to zero. No separate mastery file or client persistence exists.
+- Each reliable `matchFound` privately carries the receiving nickname's complete
+  roster totals. Rematches therefore show the just-earned win immediately, and an
+  old server safely produces an all-zero roster on the new client.
+- Every character-select card shows tier plus progress to the next threshold in
+  the existing name/stat gap. The line is informational and never changes which
+  characters may be hovered, locked, or auto-selected.
+- Practice may show the player's existing roster history to help choose a fighter,
+  but its result never advances mastery. Mastery changes no combat or matchmaking.
+
+**Acceptance criteria**
+
+- [x] Tier thresholds, exact boundaries, invalid input, full-roster zero creation,
+      and compact card copy are covered by deterministic pure tests.
+- [x] Persistence credits only a winning locked fighter, survives restarts, and
+      backfills all five characters in older files.
+- [x] Initial and rematch `matchFound` messages carry local-only normalized totals;
+      the rematch reflects the win recorded moments earlier.
+- [x] All five tier/progress variants fit simultaneously on the live five-card
+      roster without touching names, stats, ability copy, locks, or hit zones.
+- [x] Typecheck, lint, all unit tests, production build, and Playwright pass.
+
+---
+
 ## Session Log
+
+### Session 28 — 2026-07-12 — Fighter Mastery
+
+**Shipped:** each of the five fighters now owns a persistent mastery journey.
+The character-select roster shows Untested, Blooded, Proven, Veteran, or Master
+plus exact progress toward the next tier, turning every choice into a visible
+long-term goal and making underplayed fighters inviting rather than anonymous.
+
+The server records one mastery win only for the authoritative fighter used by a
+real-match winner. It folds that value into the existing asynchronous lifetime
+store, fills missing roster keys when old files load, and privately sends the
+local totals with every `matchFound`. A direct rematch therefore exposes the
+fresh win before either player locks again. No client claim, draw, loss, or
+Practice result can manufacture progress.
+
+**Verified:** shared tests cover the frozen ladder, every exact boundary, invalid
+totals, and full-roster initialization; persistence tests prove winner-only
+credit and old-file backfill; matchmaking integration proves zeroed first-match
+delivery and refreshed rematch delivery; pure client tests cover all compact copy
+states. A live seeded two-client character select rendered all five tiers at once
+(`0/1`, `1/3`, `3/7`, `9/15`, and open-ended 18 wins) with clean card geometry
+and zero browser warnings/errors. The fixed 960×720 scene geometry is uniformly
+scaled on smaller displays, and the mobile-landscape canvas/control regression
+passes in the standard browser matrix. All 881 unit tests pass, typecheck and lint
+are clean, the production build succeeds, and Playwright completes all 21 cases
+with 12 passes, 9 intentional skips, and zero failures across Chromium, Firefox,
+and mobile landscape.
+
+**Carry-over:** the tier names and 1/3/7/15 pacing are first-pass motivation
+tuning. Watch whether friends naturally rotate fighters or tunnel harder into one
+main; either behavior is valid, but the cards should make both choices feel owned.
+
+---
 
 ### Session 27 — 2026-07-12 — Hot Streaks
 

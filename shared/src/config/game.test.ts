@@ -26,6 +26,9 @@ import {
   COMBAT_MEDALS,
   CAREER_RANKS,
   careerRankProgressForContracts,
+  CHARACTER_MASTERY_TIERS,
+  characterMasteryProgressForWins,
+  createEmptyCharacterWins,
   selectMatchContract,
   type CharacterId,
   type WeaponId,
@@ -188,6 +191,44 @@ describe('wasteland reputation', () => {
     expect(careerRankProgressForContracts(-4).completed).toBe(0);
     expect(careerRankProgressForContracts(Number.NaN).completed).toBe(0);
     expect(careerRankProgressForContracts(Number.POSITIVE_INFINITY).completed).toBe(0);
+  });
+});
+
+describe('fighter mastery', () => {
+  it('defines a frozen ordered tier ladder beginning at zero wins', () => {
+    expect(Object.isFrozen(CHARACTER_MASTERY_TIERS)).toBe(true);
+    expect(CHARACTER_MASTERY_TIERS[0].minWins).toBe(0);
+    for (let i = 0; i < CHARACTER_MASTERY_TIERS.length; i++) {
+      expect(Object.isFrozen(CHARACTER_MASTERY_TIERS[i])).toBe(true);
+      if (i > 0) {
+        expect(CHARACTER_MASTERY_TIERS[i].minWins).toBeGreaterThan(
+          CHARACTER_MASTERY_TIERS[i - 1].minWins,
+        );
+      }
+    }
+  });
+
+  it('changes tier exactly at every threshold and reports the next target', () => {
+    for (let i = 0; i < CHARACTER_MASTERY_TIERS.length; i++) {
+      const tier = CHARACTER_MASTERY_TIERS[i];
+      const progress = characterMasteryProgressForWins(tier.minWins);
+      expect(progress.current).toBe(tier);
+      expect(progress.next).toBe(CHARACTER_MASTERY_TIERS[i + 1] ?? null);
+      if (tier.minWins > 0) {
+        expect(characterMasteryProgressForWins(tier.minWins - 1).current).toBe(
+          CHARACTER_MASTERY_TIERS[i - 1],
+        );
+      }
+    }
+  });
+
+  it('normalizes invalid wins and creates a complete zeroed roster record', () => {
+    expect(characterMasteryProgressForWins(7.9).wins).toBe(7);
+    expect(characterMasteryProgressForWins(-2).wins).toBe(0);
+    expect(characterMasteryProgressForWins(Number.NaN).wins).toBe(0);
+    expect(createEmptyCharacterWins()).toEqual(
+      Object.fromEntries(CHARACTER_IDS.map((id) => [id, 0])),
+    );
   });
 });
 

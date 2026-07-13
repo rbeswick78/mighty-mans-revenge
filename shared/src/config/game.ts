@@ -1058,6 +1058,61 @@ export const CHARACTERS = Object.freeze({
 export type CharacterId = keyof typeof CHARACTERS;
 export const CHARACTER_IDS = Object.keys(CHARACTERS) as CharacterId[];
 
+export type CharacterMasteryTierId =
+  | 'untested'
+  | 'blooded'
+  | 'proven'
+  | 'veteran'
+  | 'master';
+
+export interface CharacterMasteryTier {
+  id: CharacterMasteryTierId;
+  title: string;
+  minWins: number;
+}
+
+export interface CharacterMasteryProgress {
+  wins: number;
+  current: CharacterMasteryTier;
+  next: CharacterMasteryTier | null;
+  remaining: number;
+}
+
+/** Cosmetic per-fighter ladder; wins are never spent or used for balance. */
+export const CHARACTER_MASTERY_TIERS: readonly CharacterMasteryTier[] = Object.freeze([
+  Object.freeze({ id: 'untested', title: 'UNTESTED', minWins: 0 }),
+  Object.freeze({ id: 'blooded', title: 'BLOODED', minWins: 1 }),
+  Object.freeze({ id: 'proven', title: 'PROVEN', minWins: 3 }),
+  Object.freeze({ id: 'veteran', title: 'VETERAN', minWins: 7 }),
+  Object.freeze({ id: 'master', title: 'MASTER', minWins: 15 }),
+]);
+
+export function characterMasteryProgressForWins(value: number): CharacterMasteryProgress {
+  const wins = Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
+  let current = CHARACTER_MASTERY_TIERS[0];
+  let next: CharacterMasteryTier | null = null;
+  for (const tier of CHARACTER_MASTERY_TIERS) {
+    if (wins >= tier.minWins) current = tier;
+    else {
+      next = tier;
+      break;
+    }
+  }
+  return {
+    wins,
+    current,
+    next,
+    remaining: next ? next.minWins - wins : 0,
+  };
+}
+
+export function createEmptyCharacterWins(): Record<CharacterId, number> {
+  return Object.fromEntries(CHARACTER_IDS.map((id) => [id, 0])) as Record<
+    CharacterId,
+    number
+  >;
+}
+
 /**
  * Stat-identity accessors. All take `CharacterId | null` because
  * PlayerState.characterId is null until the select screen locks —

@@ -11,6 +11,7 @@ import {
   listMapNames,
   GameModeType,
   GAME_MODE_ROTATION,
+  createEmptyCharacterWins,
 } from '@shared/game';
 import type {
   MutatorId,
@@ -1045,7 +1046,16 @@ describe('MatchmakingManager persistent stats integration', () => {
     mgr.handleJoinMatchmaking('B', 'Dave');
     walkDraft(mgr, sent);
     const match = mgr.getActiveMatches()[0];
+    const initialFound = sent.find(
+      (entry) => entry.playerId === 'A' && entry.message.type === 'server:matchFound',
+    );
+    if (!initialFound || initialFound.message.type !== 'server:matchFound') {
+      throw new Error('missing initial matchFound');
+    }
+    expect(initialFound.message.characterWins).toEqual(createEmptyCharacterWins());
     // Give Ryan a decisive scoreboard so the winner is unambiguous.
+    match.players.get('A')!.characterId = 'jack';
+    match.players.get('B')!.characterId = 'bubba';
     match.players.get('A')!.score = 3;
     match.phase = MatchPhase.ENDED;
     mgr.tick(0.05, 1);
@@ -1053,6 +1063,8 @@ describe('MatchmakingManager persistent stats integration', () => {
     // Lifetime store took the match...
     expect(store.getLifetime('Ryan')!.wins).toBe(1);
     expect(store.getLifetime('Dave')!.losses).toBe(1);
+    expect(store.getLifetime('Ryan')!.characterWins.jack).toBe(1);
+    expect(store.getLifetime('Dave')!.characterWins.bubba).toBe(0);
 
     // ...and both matchEnd messages carry the updated rivalry.
     const matchEndMsgs = sent.filter((s) => s.message.type === 'server:matchEnd');
@@ -1071,6 +1083,17 @@ describe('MatchmakingManager persistent stats integration', () => {
         B: { previous: 0, current: 0, previousBest: 0, best: 0 },
       });
     }
+
+    mgr.handleRematchRequest('A');
+    mgr.handleRematchRequest('B');
+    walkDraft(mgr, sent);
+    const rematchFound = [...sent].reverse().find(
+      (entry) => entry.playerId === 'A' && entry.message.type === 'server:matchFound',
+    );
+    if (!rematchFound || rematchFound.message.type !== 'server:matchFound') {
+      throw new Error('missing rematch matchFound');
+    }
+    expect(rematchFound.message.characterWins?.jack).toBe(1);
   });
 
   it('rebroadcasts the refreshed leaderboard to every connection after stats are recorded', () => {
