@@ -1099,7 +1099,7 @@ describe('Match', () => {
     /**
      * Build a match with a deterministic constant RNG that makes the given
      * mutator the pick. The picker indexes into the candidate list (the
-     * full 8-entry POOL when nothing else has been chosen), so the rng
+     * full mutator POOL when nothing else has been chosen), so the rng
      * value is the pool index normalized to [0, 1).
      */
     function createMatchWithPick(mutator: MutatorId): Match {
@@ -1194,6 +1194,64 @@ describe('Match', () => {
         m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
         m.update(0.05);
         expect(player.ammo).toBe(startingAmmo);
+      });
+
+      it('fists_only equips everyone, retires grenades, and routes fire to punches', () => {
+        const m = startActiveMatchAt(
+          MUTATORS.ACTIVATION_AT_REMAINING + 0.01,
+          'fists_only',
+        );
+        const p0 = m.players.get('player-0')!;
+        const p1 = m.players.get('player-1')!;
+        p0.weaponId = 'shotgun';
+        p0.specialAmmo = 2;
+        p0.specialReserve = 6;
+        p0.grenades = 2;
+        p0.position = { x: 100, y: 100 };
+        p1.position = { x: 140, y: 100 };
+
+        m.update(0.05); // activation tick
+
+        expect(m.activeMutators).toContain('fists_only');
+        for (const player of m.players.values()) {
+          expect(player.weaponId).toBe('punch');
+          expect(player.grenades).toBe(0);
+          expect(player.specialAmmo).toBe(0);
+          expect(player.specialReserve).toBe(0);
+        }
+        expect(m.getActiveGrenades()).toHaveLength(0);
+
+        m.queueInput(
+          p0.id,
+          makeInput(1, { firePressed: true, throwPressed: true, aimAngle: 0 }),
+        );
+        m.update(0.05);
+
+        expect(m.getTickPunchEvents()).toHaveLength(1);
+        expect(p1.health).toBeLessThan(p1.maxHealth);
+        expect(m.getActiveGrenades()).toHaveLength(0);
+      });
+
+      it('fists_only reasserts the brawl after pickups and respawns', () => {
+        const m = startActiveMatchAt(
+          MUTATORS.ACTIVATION_AT_REMAINING + 0.01,
+          'fists_only',
+        );
+        m.update(0.05);
+        const p1 = m.players.get('player-1')!;
+
+        p1.weaponId = 'pistol';
+        p1.specialAmmo = WEAPONS.pistol.magazineSize;
+        m.update(0.05);
+        expect(p1.weaponId).toBe('punch');
+
+        m.onKill('player-0', p1.id, 'punch');
+        const respawnTicks = Math.ceil(RESPAWN.DELAY / 0.05) + 1;
+        for (let i = 0; i < respawnTicks; i++) m.update(0.05);
+
+        expect(p1.isDead).toBe(false);
+        expect(p1.weaponId).toBe('punch');
+        expect(p1.grenades).toBe(0);
       });
 
       it('infinite_ammo keeps the magazine full when firing', () => {
@@ -1310,6 +1368,20 @@ describe('Match', () => {
         expect(m.activeMutators[1]).not.toBe(m.activeMutators[0]);
       });
 
+      it('never pairs fists_only with grenades_only in random slots', () => {
+        for (const first of ['fists_only', 'grenades_only'] as const) {
+          const m = startActiveMatchWithMidMutator(first);
+          const internals = m as unknown as MatchInternals;
+          internals.matchTimer = MUTATORS.ACTIVATION_AT_REMAINING - 0.01;
+          m.update(0.05);
+
+          expect(m.activeMutators).toHaveLength(2);
+          expect(m.activeMutators).not.toEqual(
+            expect.arrayContaining(['fists_only', 'grenades_only']),
+          );
+        }
+      });
+
       it('FORCE_EVENT pins the final-minute pick and the mid-match draw avoids it', () => {
         process.env.FORCE_EVENT = 'super_speed';
         try {
@@ -1334,6 +1406,22 @@ describe('Match', () => {
           expect(m.activeMutators).toEqual(['vampire']);
         } finally {
           delete process.env.FORCE_MIDMATCH_MUTATOR;
+        }
+      });
+
+      it('a forced final-minute mutator also excludes its conflict from the random mid slot', () => {
+        process.env.FORCE_EVENT = 'grenades_only';
+        try {
+          const m = startActiveMatchWithMidMutator('fists_only');
+          expect(m.activeMutators[0]).not.toBe('fists_only');
+          expect(m.activeMutators[0]).not.toBe('grenades_only');
+
+          const internals = m as unknown as MatchInternals;
+          internals.matchTimer = MUTATORS.ACTIVATION_AT_REMAINING - 0.01;
+          m.update(0.05);
+          expect(m.activeMutators[1]).toBe('grenades_only');
+        } finally {
+          delete process.env.FORCE_EVENT;
         }
       });
 
@@ -3430,7 +3518,7 @@ describe('Match', () => {
         midMatchSlot: { activateAtElapsed: number };
       };
 
-      it('neither roll can pick grenades_only or infinite_ammo, for any rng value', () => {
+      it('neither roll can pick a loadout-breaking mutator, for any rng value', () => {
         // Sweep constant rng values across [0, 1): every candidate index
         // for both slots gets exercised.
         for (let k = 0; k < 16; k++) {
@@ -3449,6 +3537,7 @@ describe('Match', () => {
           expect(m.activeMutators).toHaveLength(2);
           expect(m.activeMutators).not.toContain('grenades_only');
           expect(m.activeMutators).not.toContain('infinite_ammo');
+          expect(m.activeMutators).not.toContain('fists_only');
         }
       });
 

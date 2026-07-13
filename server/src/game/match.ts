@@ -19,6 +19,7 @@ import {
   computePelletAngles,
   evenFanAngles,
   playerMovementModifiers,
+  mutatorsConflict,
   rayIntersectsAABB,
   TileType,
   PickupType,
@@ -944,6 +945,7 @@ export class Match implements MatchContext {
       );
       const grenadesOnly = this.mutatorActive('grenades_only');
       const infiniteAmmo = this.mutatorActive('infinite_ammo');
+      const fistsOnly = this.mutatorActive('fists_only');
 
       for (const input of inputs) {
         // Frost Wizard freeze: full action lockout while frozenTimer > 0.
@@ -1043,6 +1045,7 @@ export class Match implements MatchContext {
         // Throw grenade (release edge), only if no live grenade for this
         // player and they have at least one grenade in their pouch.
         if (
+          !fistsOnly &&
           input.throwPressed &&
           player.grenades > 0 &&
           !this.combatManager.getActiveGrenadeFor(playerId)
@@ -1253,6 +1256,13 @@ export class Match implements MatchContext {
 
     // Game mode tick
     this.gameMode.onTick(this, dt);
+
+    // Fists Only is the final loadout authority for compatible modes.
+    // Reapply after respawns, pickups, and mode hooks so no one can escape
+    // the brawl between snapshots.
+    if (this.mutatorActive('fists_only')) {
+      this.enforceFistsOnlyLoadouts();
+    }
 
     // Check win conditions
     this.checkMatchEnd();
@@ -1867,11 +1877,20 @@ export class Match implements MatchContext {
     const other = isFinalMinute
       ? this.midMatchSlot.mutator
       : this.finalMinuteSlot.mutator;
-    if (other) excluded.add(other);
+    if (other) {
+      excluded.add(other);
+      for (const candidate of MUTATORS.POOL) {
+        if (mutatorsConflict(candidate, other)) excluded.add(candidate);
+      }
+    }
     if (!isFinalMinute) {
       const forcedFinal = process.env.FORCE_EVENT;
       if (forcedFinal && pool.includes(forcedFinal)) {
-        excluded.add(forcedFinal as MutatorId);
+        const forcedFinalId = forcedFinal as MutatorId;
+        excluded.add(forcedFinalId);
+        for (const candidate of MUTATORS.POOL) {
+          if (mutatorsConflict(candidate, forcedFinalId)) excluded.add(candidate);
+        }
       }
     }
 
@@ -1922,6 +1941,10 @@ export class Match implements MatchContext {
       case 'blackout':
         // Per-tick behavior only; nothing to mutate at activation.
         return;
+      case 'fists_only':
+        this.combatManager.clearGrenades();
+        this.enforceFistsOnlyLoadouts();
+        return;
       case 'turbo_grenades':
         // Restart the shared regen accumulator so the first turbo refill
         // lands a full interval after activation.
@@ -1957,6 +1980,21 @@ export class Match implements MatchContext {
           }
         }
         return;
+    }
+  }
+
+  /** Equip fists, retire grenades, and cancel only stale prior-weapon state. */
+  private enforceFistsOnlyLoadouts(): void {
+    for (const player of this.players.values()) {
+      const weaponChanged = player.weaponId !== 'punch';
+      player.weaponId = 'punch';
+      player.specialAmmo = 0;
+      player.specialReserve = 0;
+      player.grenades = 0;
+      player.grenadeRegenSeconds = 0;
+      player.isReloading = false;
+      player.reloadTimer = 0;
+      if (weaponChanged) this.clearWeaponTransients(player.id);
     }
   }
 

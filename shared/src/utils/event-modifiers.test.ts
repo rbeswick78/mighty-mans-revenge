@@ -3,6 +3,7 @@ import {
   mutatorsToMovementModifiers,
   playerMovementModifiers,
   eventDisplayName,
+  mutatorsConflict,
 } from './event-modifiers.js';
 import { CHARACTERS, MUTATORS, type MutatorId } from '../config/game.js';
 
@@ -24,6 +25,7 @@ describe('mutatorsToMovementModifiers', () => {
       'vampire',
       'turbo_grenades',
       'blackout',
+      'fists_only',
     ];
     for (const mutator of passthrough) {
       expect(mutatorsToMovementModifiers([mutator])).toEqual({});
@@ -108,5 +110,12 @@ describe('eventDisplayName', () => {
       expect(label).toBeTruthy();
       expect(label).toBe(label.toUpperCase());
     }
+  });
+
+  it('identifies only the symmetric fists/grenades conflict', () => {
+    expect(mutatorsConflict('fists_only', 'grenades_only')).toBe(true);
+    expect(mutatorsConflict('grenades_only', 'fists_only')).toBe(true);
+    expect(mutatorsConflict('fists_only', 'super_speed')).toBe(false);
+    expect(mutatorsConflict('grenades_only', 'turbo_grenades')).toBe(false);
   });
 });

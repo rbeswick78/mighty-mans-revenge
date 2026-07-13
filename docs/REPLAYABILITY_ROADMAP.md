@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–28 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts, solo Practice vs Rusty, streak + payback callouts, selectable Rusty difficulty, Collapsed Overpass, Blackout, fresh-chaos rematches, Last Stand, Kill Confirmed, mode briefings, character death animations, authoritative hit confirmation, blastable cover, chain-reaction barrels, Wasteland Contracts, Combat Medals, Wasteland Reputation, Hot Streaks, Fighter Mastery). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–29 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts, solo Practice vs Rusty, streak + payback callouts, selectable Rusty difficulty, Collapsed Overpass, Blackout, fresh-chaos rematches, Last Stand, Kill Confirmed, mode briefings, character death animations, authoritative hit confirmation, blastable cover, chain-reaction barrels, Wasteland Contracts, Combat Medals, Wasteland Reputation, Hot Streaks, Fighter Mastery, Fists Only). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -60,6 +60,7 @@ Each session below attacks one of these.
 | 26  | Wasteland Reputation                          | Contract clears build a visible career ladder and recurring promotion chase | **DONE** (2026-07-12) |
 | 27  | Hot Streaks                                   | Consecutive wins survive restarts, giving every rematch another stake | **DONE** (2026-07-12) |
 | 28  | Fighter Mastery                               | Every roster pick gains its own persistent goal and identity | **DONE** (2026-07-12) |
+| 29  | Fists Only                                    | Mid-round gunfights collapse into frantic close-range brawls | **DONE** (2026-07-12) |
 
 ---
 
@@ -1592,7 +1593,77 @@ feel like career progress rather than a disposable menu choice.
 
 ---
 
+## Session 29 — Fists Only
+
+**Goal:** add a dramatic mid-match rule change that forces everyone into the
+same readable, frantic close-range fight and makes familiar arenas play
+differently without introducing another weapon or changing baseline balance.
+
+**Locked design decisions**
+
+- Activation equips every living or respawning fighter with punch, removes all
+  grenades and special ammo, cancels reload state, and keeps enforcing that
+  loadout after pickups and mode hooks until the match ends.
+- Character abilities stay active. Fists Only changes the shared weapon layer,
+  not the identity or signature move of the selected fighter.
+- Random scheduling never combines Fists Only with Grenades Only, in either
+  slot order. Gun Game also excludes it because the party mode's weapon ladder
+  and the mutator's forced loadout cannot both own progression.
+- Explicit FORCE pins continue to bypass random-roll exclusions and conflicts
+  for focused development smoke tests, consistent with every existing mutator.
+- Rusty recognizes punch range and closes into melee instead of circling at its
+  normal rifle distance. No ranged bot behavior or shared physics changes.
+
+**Acceptance criteria**
+
+- [x] Activation strips guns and grenades, routes ordinary fire through the
+      existing authoritative punch attack, and blocks grenade throws.
+- [x] Respawns, pickups, and per-mode loadout hooks cannot escape the forced
+      punch loadout while the mutator is active.
+- [x] Random mid/final selection rejects the Fists Only + Grenades Only pair in
+      both orders, including when the other slot is explicitly forced.
+- [x] Gun Game excludes Fists Only from random rolls and Rusty can close, swing,
+      and deal damage with punch through normal player input processing.
+- [x] Two live clients synchronize the combined mutator label, FISTS loadout,
+      zero grenades, and gun-free presentation with clean browser consoles.
+- [x] Typecheck, lint, all unit tests, production build, and Playwright pass.
+
+---
+
 ## Session Log
+
+### Session 29 — 2026-07-12 — Fists Only
+
+**Shipped:** Fists Only can now take over the middle or finale of a match,
+instantly stripping every fighter down to the existing lag-compensated punch
+and turning open gunfights into a close-range scramble. Grenades and special
+ammo disappear, reloads are cancelled, and the server reasserts the brawl
+loadout after respawns, pickups, and mode hooks. Signature abilities remain
+available, preserving character choice inside the shared chaos rule.
+
+The random scheduler treats Fists Only and Grenades Only as an impossible pair
+in either order, including when a forced final event constrains a random middle
+slot. Gun Game vetoes the mutator's random selection so its weapon ladder stays
+coherent. Rusty now derives melee pursuit spacing from punch range and closes
+far enough to swing through the same authoritative input and damage paths as a
+human player.
+
+**Verified:** focused shared and server tests prove activation, punch damage,
+grenade lockout, loadout reassertion, random conflict handling, Gun Game
+exclusion, and Rusty's ability to close and land a punch. A live two-client
+forced match showed synchronized `SUPER SPEED + FISTS ONLY`, `FISTS`, zero
+grenades, and no gun overlays, with no warnings or errors in either browser
+console. All 887 unit tests pass, typecheck and lint are clean, the production
+build succeeds, and Playwright completes all 21 cases with 12 passes, 9
+intentional skips, and zero failures across Chromium, Firefox, and mobile
+landscape.
+
+**Carry-over:** abilities intentionally remain live, so one-hit low-health
+rounds and character-specific attacks can make especially volatile brawls.
+Watch whether the chaos feels like a highlight or needs a lower random weight;
+do not tune punch damage or range without the next group playtest's evidence.
+
+---
 
 ### Session 28 — 2026-07-12 — Fighter Mastery
 

@@ -341,8 +341,14 @@ export class BotController {
     if (hasDirectPath) {
       this.waypoint = null;
       if (!isCombatTarget) return toward;
-      if (distance > BOT.PREFERRED_DISTANCE) return toward;
-      if (distance < BOT.RETREAT_DISTANCE) return { x: -toward.x, y: -toward.y };
+      const isMelee = bot.weaponId === 'punch';
+      const preferredDistance = isMelee
+        ? WEAPONS.punch.maxRange * 0.65
+        : BOT.PREFERRED_DISTANCE;
+      if (distance > preferredDistance) return toward;
+      if (!isMelee && distance < BOT.RETREAT_DISTANCE) {
+        return { x: -toward.x, y: -toward.y };
+      }
       return {
         x: -toward.y * this.strafeSign,
         y: toward.x * this.strafeSign,

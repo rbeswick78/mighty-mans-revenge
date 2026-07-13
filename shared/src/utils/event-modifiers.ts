@@ -93,5 +93,15 @@ export function eventDisplayName(event: MutatorId): string {
       return 'SECOND WIND';
     case 'blackout':
       return 'BLACKOUT';
+    case 'fists_only':
+      return 'FISTS ONLY';
   }
+}
+
+/** Mutator pairs that would leave players with no usable core attack. */
+export function mutatorsConflict(a: MutatorId, b: MutatorId): boolean {
+  return (
+    (a === 'fists_only' && b === 'grenades_only') ||
+    (a === 'grenades_only' && b === 'fists_only')
+  );
 }

@@ -1352,6 +1352,7 @@ export class GameScene extends Phaser.Scene {
       turbo_grenades: 0x7cff4f,
       second_wind: 0x4fe3c1,
       blackout: 0x4b527e,
+      fists_only: 0xffb347,
     };
 
     this.onEventWarning = (payload: EventWarningPayload) => {

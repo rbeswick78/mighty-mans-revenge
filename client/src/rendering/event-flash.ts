@@ -16,6 +16,7 @@ const EVENT_COLORS: Record<MutatorId, number> = {
   turbo_grenades: 0x7cff4f,  // radioactive green
   second_wind: 0x4fe3c1,     // revival teal
   blackout: 0x4b527e,        // midnight indigo
+  fists_only: 0xffb347,      // bare-knuckle amber
 };
 
 /**

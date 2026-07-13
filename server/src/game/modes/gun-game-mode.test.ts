@@ -351,8 +351,12 @@ describe('GunGameMode', () => {
   });
 
   describe('mode hooks', () => {
-    it('excludes grenades_only and infinite_ammo from mutator rolls', () => {
-      expect(mode.excludedMutators).toEqual(['grenades_only', 'infinite_ammo']);
+    it('excludes loadout-breaking mutators from random rolls', () => {
+      expect(mode.excludedMutators).toEqual([
+        'grenades_only',
+        'infinite_ammo',
+        'fists_only',
+      ]);
     });
 
     it('enables only bandage pickups', () => {

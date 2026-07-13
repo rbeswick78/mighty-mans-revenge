@@ -215,4 +215,36 @@ describe('BotController', () => {
 
     expect(shotsFor('warlord')).toBeGreaterThan(shotsFor('rookie'));
   });
+
+  it('closes into punch range instead of strafing at rifle distance', () => {
+    const match = new Match(
+      'practice-melee',
+      OPEN_MAP,
+      [
+        { id: 'human', nickname: 'Human' },
+        { id: 'bot:test', nickname: 'Rusty' },
+      ],
+      GameModeType.DEATHMATCH,
+      () => 0,
+    );
+    const human = match.players.get('human')!;
+    const bot = match.players.get('bot:test')!;
+    human.characterId = 'bubba';
+    bot.characterId = 'mighty_man';
+    human.position = { x: 5.5 * 48, y: 2.5 * 48 };
+    bot.position = { x: 2.5 * 48, y: 2.5 * 48 };
+    bot.weaponId = 'punch';
+    bot.grenades = 0;
+    match.phase = MatchPhase.ACTIVE;
+    match.matchTimer = 100;
+
+    const controller = new BotController(bot.id);
+    for (let tick = 1; tick <= 60; tick++) {
+      controller.update(0.05, match, tick);
+      match.update(0.05);
+    }
+
+    expect(match.stats.getStats(bot.id).shotsFired).toBeGreaterThan(0);
+    expect(human.health).toBeLessThan(human.maxHealth);
+  });
 });
