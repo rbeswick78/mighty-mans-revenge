@@ -864,6 +864,31 @@ export const MUTATORS = Object.freeze({
 export type MutatorId = (typeof MUTATORS.POOL)[number];
 
 /**
+ * Score paid for clearing a forecast Gauntlet stage. Lower tiers are mostly
+ * shared boons or readable spectacle; higher tiers can erase loadouts, force
+ * lethal health, or add persistent arena pressure. Stage one has no forecast
+ * and therefore no bounty.
+ */
+export const GAUNTLET_CHAOS_BOUNTIES: Readonly<Record<MutatorId, number>> = Object.freeze({
+  super_speed: 200,
+  grenades_only: 300,
+  infinite_ammo: 100,
+  low_health: 300,
+  big_heads: 100,
+  vampire: 100,
+  turbo_grenades: 200,
+  second_wind: 100,
+  blackout: 200,
+  fists_only: 300,
+  weapon_roulette: 200,
+  wasteland_warp: 200,
+  last_laugh: 200,
+  scavenger_rush: 100,
+  radiation_storm: 300,
+  scrapstorm: 300,
+});
+
+/**
  * End-of-match awards. Declaration order IS the priority order: the server
  * walks AWARD_IDS top to bottom and ships the first AWARDS.DISPLAY_COUNT
  * awards that have an outright winner (ties earn nobody the award).

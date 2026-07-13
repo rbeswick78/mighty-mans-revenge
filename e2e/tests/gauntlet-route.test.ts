@@ -133,13 +133,13 @@ test.describe('Gauntlet route draft', () => {
           (child) =>
             child.text?.includes('ROUTE A') &&
             child.text.includes('VS BRUCE') &&
-            child.text.includes('CHAOS: BLACKOUT'),
+            child.text.includes('CHAOS: BLACKOUT +200'),
         ),
         routeB: scene.alternateRouteButton.list.some(
           (child) =>
             child.text?.includes('ROUTE B') &&
             child.text.includes('VS FROST WIZARD') &&
-            child.text.includes('CHAOS: WEAPON ROULETTE'),
+            child.text.includes('CHAOS: WEAPON ROULETTE +200'),
         ),
         teaser: scene.children.list.some((child) => child.text === 'CHOOSE: STAGE 2/3 - SCRAPPER'),
       };

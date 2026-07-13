@@ -1,4 +1,9 @@
-import { PRACTICE_GAUNTLET, type CharacterId, type MutatorId } from '../config/game.js';
+import {
+  GAUNTLET_CHAOS_BOUNTIES,
+  PRACTICE_GAUNTLET,
+  type CharacterId,
+  type MutatorId,
+} from '../config/game.js';
 import type {
   PracticeGauntletMatch,
   PracticeGauntletResult,
@@ -26,6 +31,11 @@ export interface PracticeGauntletPerformance {
   wentToOvertime?: boolean;
   deaths?: number;
   regulationSecondsRemaining?: number;
+}
+
+/** Frozen danger payout for a server-authored route forecast. */
+export function practiceGauntletChaosBounty(mutatorId: MutatorId): number {
+  return GAUNTLET_CHAOS_BOUNTIES[mutatorId];
 }
 
 /**
@@ -139,12 +149,15 @@ export function resolvePracticeGauntlet(
           secondsRemaining * PRACTICE_GAUNTLET.PACE_POINTS_PER_SECOND,
         )
       : 0;
+  const chaosBountyBonus =
+    won && match.forecastMutatorId ? practiceGauntletChaosBounty(match.forecastMutatorId) : 0;
   const stageScore = won
     ? PRACTICE_GAUNTLET.STAGE_CLEAR_POINTS +
       contractBonus +
       regulationBonus +
       flawlessBonus +
-      paceBonus
+      paceBonus +
+      chaosBountyBonus
     : 0;
   return {
     ...match,
@@ -155,6 +168,7 @@ export function resolvePracticeGauntlet(
     regulationBonus,
     flawlessBonus,
     paceBonus,
+    chaosBountyBonus,
     nextStage: next.stage,
     nextDifficulty: next.difficulty,
   };

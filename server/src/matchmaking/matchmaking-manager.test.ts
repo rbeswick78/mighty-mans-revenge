@@ -12,6 +12,7 @@ import {
   GameModeType,
   GAME_MODE_ROTATION,
   createEmptyCharacterWins,
+  practiceGauntletChaosBounty,
 } from '@shared/game';
 import type { MutatorId, PlayerId, ServerMessage, ServerDraftStateMessage } from '@shared/game';
 import { MatchmakingManager } from './matchmaking-manager.js';
@@ -1503,6 +1504,7 @@ describe('MatchmakingManager solo practice flow', () => {
       outcome: 'advanced',
       stageScore: 1800,
       runScore: 1800,
+      chaosBountyBonus: 0,
       flawlessBonus: 400,
       paceBonus: 200,
       nextStage: 2,
@@ -1527,6 +1529,7 @@ describe('MatchmakingManager solo practice flow', () => {
     expect(firstRoutes.every((route) => route.forecastMutatorId !== undefined)).toBe(true);
     expect(new Set(firstRoutes.map((route) => route.forecastMutatorId)).size).toBe(2);
     const secondForecast = firstRoutes[1].forecastMutatorId!;
+    const secondBounty = practiceGauntletChaosBounty(secondForecast);
     expect(firstEnd.message.result.rivalrySet).toBeNull();
     expect(store.getLifetime('Alpha')).toBeNull();
 
@@ -1571,8 +1574,9 @@ describe('MatchmakingManager solo practice flow', () => {
       opponentCharacterId: 'frost_wizard',
       forecastMutatorId: secondForecast,
       outcome: 'advanced',
-      stageScore: 1294,
-      runScore: 3094,
+      stageScore: 1294 + secondBounty,
+      runScore: 3094 + secondBounty,
+      chaosBountyBonus: secondBounty,
       flawlessBonus: 0,
       paceBonus: 94,
       nextStage: 3,
@@ -1598,6 +1602,7 @@ describe('MatchmakingManager solo practice flow', () => {
     expect(new Set(secondRoutes.map((route) => route.forecastMutatorId)).size).toBe(2);
     expect(secondRoutes.map((route) => route.forecastMutatorId)).not.toContain(secondForecast);
     const thirdForecast = secondRoutes[0].forecastMutatorId!;
+    const thirdBounty = practiceGauntletChaosBounty(thirdForecast);
 
     sent.length = 0;
     mgr.handleRematchRequest(
@@ -1614,7 +1619,7 @@ describe('MatchmakingManager solo practice flow', () => {
       stage: 3,
       totalStages: 3,
       difficulty: 'warlord',
-      runScore: 3094,
+      runScore: 3094 + secondBounty,
       opponentCharacterId: 'bubba',
       forecastMutatorId: thirdForecast,
     });
@@ -1643,8 +1648,9 @@ describe('MatchmakingManager solo practice flow', () => {
       opponentCharacterId: 'bubba',
       forecastMutatorId: thirdForecast,
       outcome: 'cleared',
-      stageScore: 1600,
-      runScore: 4694,
+      stageScore: 1600 + thirdBounty,
+      runScore: 4694 + secondBounty + thirdBounty,
+      chaosBountyBonus: thirdBounty,
       flawlessBonus: 400,
       paceBonus: 0,
       nextStage: 1,
@@ -1686,6 +1692,7 @@ describe('MatchmakingManager solo practice flow', () => {
       outcome: 'failed',
       stageScore: 0,
       runScore: 0,
+      chaosBountyBonus: 0,
       nextStage: 1,
       nextDifficulty: 'rookie',
     });

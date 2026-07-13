@@ -6,6 +6,7 @@ import type {
 } from '@shared/types/game.js';
 import { CHARACTERS, gameModeDisplayName } from '@shared/config/game.js';
 import { eventDisplayName } from '@shared/utils/event-modifiers.js';
+import { practiceGauntletChaosBounty } from '@shared/utils/practice-gauntlet.js';
 
 export const GAUNTLET_BEST_CLEAR_STORAGE_KEY = 'mmr_gauntlet_best_clear';
 
@@ -57,7 +58,8 @@ export function gauntletMatchLabel(
     ? `  //  RUSTY: ${CHARACTERS[gauntlet.opponentCharacterId].displayName.toUpperCase()}`
     : '';
   const forecast = gauntlet.forecastMutatorId
-    ? `\nMID-MATCH: ${eventDisplayName(gauntlet.forecastMutatorId)}`
+    ? `\nMID-MATCH: ${eventDisplayName(gauntlet.forecastMutatorId)}` +
+      `  //  BOUNTY +${formatScore(practiceGauntletChaosBounty(gauntlet.forecastMutatorId))}`
     : '';
   return `${summary}\n${destination}${rival}${forecast}`;
 }
@@ -85,17 +87,19 @@ export function gauntletStageScoreSummary(result: MatchResult): string | null {
   const regulationBonus = safeScore(run.regulationBonus);
   const flawlessBonus = safeScore(run.flawlessBonus);
   const paceBonus = safeScore(run.paceBonus);
+  const chaosBountyBonus = safeScore(run.chaosBountyBonus);
   if (stageScore <= 0) return 'NO POINTS BANKED - WIN THE STAGE TO SCORE';
 
   const clearPoints = Math.max(
     0,
-    stageScore - contractBonus - regulationBonus - flawlessBonus - paceBonus,
+    stageScore - contractBonus - regulationBonus - flawlessBonus - paceBonus - chaosBountyBonus,
   );
   const bonuses = [
     contractBonus > 0 ? `CONTRACT ${formatScore(contractBonus)}` : null,
     regulationBonus > 0 ? `REG ${formatScore(regulationBonus)}` : null,
     flawlessBonus > 0 ? `FLAWLESS ${formatScore(flawlessBonus)}` : null,
     paceBonus > 0 ? `PACE ${formatScore(paceBonus)}` : null,
+    chaosBountyBonus > 0 ? `CHAOS ${formatScore(chaosBountyBonus)}` : null,
   ].filter((bonus): bonus is string => bonus !== null);
   return (
     `STAGE +${formatScore(stageScore)} = CLEAR ${formatScore(clearPoints)}` +
@@ -133,7 +137,8 @@ export function gauntletRouteButtonLabel(route: PracticeGauntletRoute): string {
     ? `\nVS ${CHARACTERS[route.opponentCharacterId].displayName.toUpperCase()}`
     : '';
   const forecast = route.forecastMutatorId
-    ? `\nCHAOS: ${eventDisplayName(route.forecastMutatorId)}`
+    ? `\nCHAOS: ${eventDisplayName(route.forecastMutatorId)} ` +
+      `+${formatScore(practiceGauntletChaosBounty(route.forecastMutatorId))}`
     : '';
   return (
     `ROUTE ${letter} · ${gameModeDisplayName(route.gameMode)}\n` +

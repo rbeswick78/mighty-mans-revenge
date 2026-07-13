@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { CharacterId } from '../config/game.js';
+import { MUTATORS, type CharacterId } from '../config/game.js';
 import { GameModeType } from '../types/game.js';
 import {
   practiceGauntletMatch,
+  practiceGauntletChaosBounty,
   practiceGauntletMutatorChoice,
   practiceGauntletOpponentChoices,
   practiceGauntletRoutes,
@@ -81,6 +82,14 @@ describe('practice gauntlet', () => {
     expect(next).not.toBe(first);
     expect(pool).toContain(next);
     expect(practiceGauntletMutatorChoice(pool, [...pool], 'anything')).toBeUndefined();
+  });
+
+  it('assigns every chaos event to a frozen 100, 200, or 300 point bounty tier', () => {
+    const payouts = MUTATORS.POOL.map(practiceGauntletChaosBounty);
+    expect(new Set(payouts)).toEqual(new Set([100, 200, 300]));
+    expect(practiceGauntletChaosBounty('infinite_ammo')).toBe(100);
+    expect(practiceGauntletChaosBounty('blackout')).toBe(200);
+    expect(practiceGauntletChaosBounty('scrapstorm')).toBe(300);
   });
 
   it('offers deterministic non-repeating rivals after the current matchup', () => {
@@ -189,6 +198,28 @@ describe('practice gauntlet', () => {
       regulationBonus: 0,
       flawlessBonus: 0,
       paceBonus: 0,
+    });
+  });
+
+  it('banks a forecast bounty only when that Gauntlet stage is won', () => {
+    const forecastMatch = {
+      ...practiceGauntletMatch(2, 1500),
+      forecastMutatorId: 'scrapstorm' as const,
+    };
+    expect(
+      resolvePracticeGauntlet(forecastMatch, 'human', 'human', {
+        wentToOvertime: true,
+        deaths: 1,
+      }),
+    ).toMatchObject({
+      stageScore: 1300,
+      runScore: 2800,
+      chaosBountyBonus: 300,
+    });
+    expect(resolvePracticeGauntlet(forecastMatch, 'human', 'bot')).toMatchObject({
+      stageScore: 0,
+      runScore: 1500,
+      chaosBountyBonus: 0,
     });
   });
 

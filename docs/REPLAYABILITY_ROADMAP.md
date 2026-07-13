@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–54 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty with Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, and chaos forecasts, four arenas, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–55 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty with Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, and danger bounties, four arenas, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -86,6 +86,7 @@ Each session below attacks one of these.
 | 52  | Gauntlet Route Draft                            | Every cleared stage offers a meaningful next-fight choice                    | **DONE** (2026-07-13) |
 | 53  | Gauntlet Rival Drafts                           | Route previews turn each branch into a readable matchup decision             | **DONE** (2026-07-13) |
 | 54  | Gauntlet Chaos Forecasts                        | Every branch reveals a different mid-fight twist worth planning around       | **DONE** (2026-07-13) |
+| 55  | Gauntlet Chaos Bounties                         | Dangerous route choices become explicit high-score gambles                   | **DONE** (2026-07-13) |
 
 ---
 
@@ -2659,7 +2660,91 @@ by revealing the mid-match twist waiting inside the next fight.
 
 ---
 
+## Session 55 — Gauntlet Chaos Bounties
+
+**Goal:** turn readable Gauntlet forecasts into explicit risk/reward decisions
+that make the best-clear chase ask for courage as well as clean execution.
+
+**Locked design decisions**
+
+- `GAUNTLET_CHAOS_BOUNTIES` exhaustively assigns all 16 mutators to a frozen
+  100, 200, or 300 point tier. Mostly beneficial spectacle pays 100, disruptive
+  rules pay 200, and lethal health, loadout replacement, or persistent arena
+  pressure pays 300. Offer generation and mode compatibility stay unchanged.
+- Stage one has no forecast and no bounty. A stage-two or stage-three win banks
+  the selected forecast's bounty into `stageScore`, `runScore`, and therefore
+  the browser-local `BEST CLEAR`. A loss or draw pays zero.
+- A forecast stage pays on victory even if the match ended before activation.
+  The route itself is the wager; requiring activation would reward waiting out
+  the clock and fight against the existing pace bonus.
+- The authoritative Gauntlet match metadata determines the payout. The client
+  derives only display copy from the same frozen table and cannot submit a
+  bounty value. `chaosBountyBonus` exists solely as an optional result breakdown
+  field, so old payloads continue to render with a zero bounty.
+- Route cards append the payout to the existing chaos line, the next character
+  select repeats it as `BOUNTY +N`, and winning results itemize `CHAOS N` without
+  changing button positions or adding another line.
+- Chaos Bounties never affect PvP, ordinary Spar, contracts, lifetime stats,
+  mode score, Match rules, mutator timing, or persistence format.
+
+**Acceptance criteria**
+
+- [x] Shared tests prove all mutators have one valid tier, representative events
+      retain their intended 100/200/300 payouts, a win banks the bounty, and a
+      loss pays zero.
+- [x] The three-stage matchmaking integration proves selected stage-two and
+      stage-three payouts accumulate into later match metadata and the final
+      run score while stage one remains bounty-free.
+- [x] Presentation tests prove old results still derive a correct clear subtotal
+      and new results itemize the bounty; briefing and route labels show the
+      exact frozen payout.
+- [x] The live route regression verifies bounty copy and Route B selection in
+      Chromium, Firefox, and mobile touch. Desktop and mobile-landscape captures
+      keep the longest `WEAPON ROULETTE +200` label inside the existing card.
+- [x] Typecheck, lint, all 1,109 unit tests, production build, and the full
+      Playwright desktop/mobile matrix pass.
+
+---
+
 ## Session Log
+
+### Session 55 — 2026-07-13 — Gauntlet Chaos Bounties
+
+**Shipped:** every advanced Gauntlet forecast now carries an explicit danger
+bounty. Players can take a lower-paying wildcard or chase a 300-point brutal
+event, turning the route screen into a high-score wager instead of only a
+preference picker. The payout appears on the route card, follows the selected
+fight into its character-select briefing, and is itemized in the winning score
+breakdown before rolling into the run and `BEST CLEAR` total.
+
+The frozen table covers all 16 mutators at compile time. Shared boons and light
+spectacle pay 100; disruptive rules pay 200; one-shot health, forced loadouts,
+and sustained arena threats pay 300. Only a server-authored forecast can create
+a bounty, and only an authoritative human win banks it. The payout does not wait
+for activation, preserving the pace bonus's incentive to finish quickly rather
+than stall until chaos begins. Stage one, losses, draws, ordinary Spar, and PvP
+all remain unchanged.
+
+Route cards retain their four-line 8 px layout and established pointer/touch
+targets. The longest label was reviewed in desktop and mobile-landscape captures
+without clipping; the temporary captures were removed after inspection.
+
+**Verification:** 1,109 tests pass across 73 files, including exhaustive tier
+coverage, victory-only scoring, old-result fallback, multi-stage accumulation,
+briefing copy, score breakdown, and route labels. TypeScript, ESLint, formatting,
+all package builds, and the Vite production bundle are clean; Vite retains its
+existing chunk-size advisory. The full Playwright matrix passes 16 tests with
+11 intentional scoped skips, including the bounty route in Chromium, Firefox,
+and mobile touch. Playwright teardown left ports 3000, 3001, and 5173 clear.
+
+**Tuning watch:** the first 100/200/300 assignments describe disruption, not a
+claim that every event is equally hard in every mode or matchup. Watch whether
+players always choose the highest visible number; adjust the frozen table from
+real route-choice and clear-rate evidence rather than speculative balance.
+
+**Deployment:** not run; deployment still requires explicit authorization.
+
+---
 
 ### Session 54 — 2026-07-13 — Gauntlet Chaos Forecasts
 

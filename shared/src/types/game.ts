@@ -308,6 +308,8 @@ export interface PracticeGauntletResult extends PracticeGauntletMatch {
   flawlessBonus: number;
   /** Regulation time-remaining portion of stageScore. */
   paceBonus: number;
+  /** Forecast danger payout; absent on results from older servers. */
+  chaosBountyBonus?: number;
   /** Stage launched by the results-screen action (advance or retry). */
   nextStage: number;
   nextDifficulty: BotDifficulty;

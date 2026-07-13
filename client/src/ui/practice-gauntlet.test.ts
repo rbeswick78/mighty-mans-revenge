@@ -105,7 +105,7 @@ describe('practice gauntlet presentation', () => {
     ).toBe(
       'GAUNTLET 2/3 - SCRAPPER  //  RUN 1,500\n' +
         'KING OF THE HILL - SCRAPYARD  //  RUSTY: FROST WIZARD\n' +
-        'MID-MATCH: WEAPON ROULETTE',
+        'MID-MATCH: WEAPON ROULETTE  //  BOUNTY +200',
     );
   });
 
@@ -118,13 +118,19 @@ describe('practice gauntlet presentation', () => {
     expect(gauntletStageScoreSummary(value)).toBe(
       'STAGE +2,200 = CLEAR 1,000 + CONTRACT 300 + REG 200 + FLAWLESS 400 + PACE 300',
     );
+    value.gauntlet!.stageScore = 2400;
+    value.gauntlet!.runScore = 2400;
+    value.gauntlet!.chaosBountyBonus = 200;
+    expect(gauntletStageScoreSummary(value)).toBe(
+      'STAGE +2,400 = CLEAR 1,000 + CONTRACT 300 + REG 200 + FLAWLESS 400 + PACE 300 + CHAOS 200',
+    );
     expect(gauntletNextTeaser(value)).toBe('CHOOSE: STAGE 2/3 - SCRAPPER');
     expect(gauntletRouteChoices(value)).toHaveLength(2);
     expect(gauntletRouteButtonLabel(gauntletRouteChoices(value)[0])).toBe(
-      'ROUTE A · GUN GAME\nSCRAPYARD\nVS BRUCE\nCHAOS: BLACKOUT',
+      'ROUTE A · GUN GAME\nSCRAPYARD\nVS BRUCE\nCHAOS: BLACKOUT +200',
     );
     expect(gauntletRouteButtonLabel(gauntletRouteChoices(value)[1])).toBe(
-      'ROUTE B · LAST STAND\nCOLLAPSED OVERPASS\nVS FROST WIZARD\nCHAOS: WEAPON ROULETTE',
+      'ROUTE B · LAST STAND\nCOLLAPSED OVERPASS\nVS FROST WIZARD\nCHAOS: WEAPON ROULETTE +200',
     );
   });
 
