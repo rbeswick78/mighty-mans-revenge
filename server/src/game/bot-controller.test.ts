@@ -5,6 +5,7 @@ import {
   GRENADE,
   MatchPhase,
   MUTATORS,
+  PICKUP,
   PickupType,
   TileType,
   WEAPONS,
@@ -65,6 +66,7 @@ function makeBotState(overrides: Partial<PlayerState> = {}): PlayerState {
     aimAngle: 0,
     health: 100,
     maxHealth: 100,
+    armor: 0,
     ammo: WEAPONS.rifle.magazineSize * 2,
     isReloading: false,
     reloadTimer: 0,
@@ -139,6 +141,15 @@ describe('Rusty resource evaluation', () => {
     expect(botResourcePriority(full, PickupType.BANDAGE)).toBeNull();
     expect(botResourcePriority(full, PickupType.GUN_AMMO)).toBeNull();
     expect(botResourcePriority(full, PickupType.GRENADE)).toBeNull();
+    expect(botResourcePriority(full, PickupType.ARMOR)).toBe(
+      BOT.RESOURCE_PRIORITY.ARMOR,
+    );
+    expect(
+      botResourcePriority(
+        makeBotState({ armor: PICKUP.ARMOR_MAX }),
+        PickupType.ARMOR,
+      ),
+    ).toBeNull();
 
     expect(
       botResourcePriority(
@@ -180,6 +191,23 @@ describe('Rusty resource evaluation', () => {
       resource('near-bandage', PickupType.BANDAGE, 96),
     ]);
     expect(selected?.id).toBe('near-bandage');
+  });
+
+  it('values armor between power weapons and reactive bandaging', () => {
+    const bot = makeBotState({ health: 70 });
+    expect(
+      pickBotResource(bot, [
+        resource('bandage', PickupType.BANDAGE, 48),
+        resource('armor', PickupType.ARMOR, 96),
+        resource('shotgun', PickupType.WEAPON_SHOTGUN, 144),
+      ])?.id,
+    ).toBe('shotgun');
+    expect(
+      pickBotResource(bot, [
+        resource('bandage', PickupType.BANDAGE, 48),
+        resource('armor', PickupType.ARMOR, 96),
+      ])?.id,
+    ).toBe('armor');
   });
 
   it('preserves live power weapons and refreshes only a nearly dry matching one', () => {

@@ -501,7 +501,12 @@ export class CombatManager {
     if (victim.characterId === 'bubba' && victim.abilityActiveSeconds > 0) {
       damage *= 1 - ABILITY.BUBBA_IRON_HIDE.DAMAGE_REDUCTION;
     }
-    victim.health = Math.max(0, victim.health - damage);
+    // Scrap Armor absorbs the post-reduction hit before HP. Keep
+    // damageApplied as the whole landed hit (including shield absorption),
+    // preserving damage stats, Vampire healing, and hit feedback semantics.
+    const absorbed = Math.min(victim.armor, damage);
+    victim.armor -= absorbed;
+    victim.health = Math.max(0, victim.health - (damage - absorbed));
 
     if (victim.health <= 0) {
       victim.isDead = true;

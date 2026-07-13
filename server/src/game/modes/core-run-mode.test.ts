@@ -22,6 +22,7 @@ function player(id: PlayerId, x: number, y: number): PlayerState {
     aimAngle: 0,
     health: 100,
     maxHealth: 100,
+    armor: 0,
     ammo: 30,
     isReloading: false,
     reloadTimer: 0,
@@ -210,6 +211,7 @@ describe('CoreRunMode', () => {
     expect(mode.isPickupTypeEnabled(PickupType.WEAPON_BAT)).toBe(false);
     expect(mode.isPickupTypeEnabled(PickupType.GUN_AMMO)).toBe(true);
     expect(mode.isPickupTypeEnabled(PickupType.BANDAGE)).toBe(true);
+    expect(mode.isPickupTypeEnabled(PickupType.ARMOR)).toBe(true);
     expect(mode.isPickupTypeEnabled(PickupType.GRENADE)).toBe(true);
   });
 });

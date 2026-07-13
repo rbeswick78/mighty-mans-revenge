@@ -49,6 +49,7 @@ function makePlayer(id: PlayerId, score = 0): PlayerState {
     aimAngle: 0,
     health: 100,
     maxHealth: 100,
+    armor: 0,
     ammo: 30,
     isReloading: false,
     reloadTimer: 0,

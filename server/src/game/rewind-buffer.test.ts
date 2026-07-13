@@ -16,6 +16,7 @@ function createPlayer(overrides: Partial<PlayerState> & { id: PlayerId }): Playe
     aimAngle: 0,
     health: PLAYER.MAX_HEALTH,
     maxHealth: PLAYER.MAX_HEALTH,
+    armor: 0,
     ammo: WEAPONS.rifle.magazineSize,
     isReloading: false,
     reloadTimer: 0,

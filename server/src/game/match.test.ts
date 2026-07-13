@@ -472,6 +472,19 @@ describe('Match', () => {
       expect(killer.health).toBeGreaterThan(match.getKillFeed()[0].clutchHealth!);
     });
 
+    it('does not award Clutch while critical-health killer still has armor', () => {
+      match.startCountdown();
+      match.update(MATCH.COUNTDOWN_DURATION + 0.1);
+      const killer = match.players.get('player-0')!;
+      const victim = match.players.get('player-1')!;
+      killer.health = killer.maxHealth * COMBAT_MEDALS.CLUTCH_HEALTH_FRACTION;
+      killer.armor = 1;
+
+      match.onKill(killer.id, victim.id, 'pistol');
+
+      expect(match.getKillFeed()[0].clutchHealth).toBeUndefined();
+    });
+
     it('does not stamp healthy, suicide, or posthumous kills as clutch', () => {
       match.startCountdown();
       match.update(MATCH.COUNTDOWN_DURATION + 0.1);
@@ -1793,6 +1806,8 @@ describe('Match', () => {
         const p1 = m.players.get('player-1')!;
         p0.health = 100;
         p1.health = 50;
+        p0.armor = PICKUP.ARMOR_MAX;
+        m.pickupManager.spawnOneShot(PickupType.ARMOR, { x: 120, y: 120 });
 
         m.update(0.05); // activation tick
 
@@ -1800,6 +1815,10 @@ describe('Match', () => {
         expect(p1.maxHealth).toBe(MUTATORS.LOW_HEALTH_HP);
         expect(p0.health).toBe(MUTATORS.LOW_HEALTH_HP);
         expect(p1.health).toBe(MUTATORS.LOW_HEALTH_HP);
+        expect(p0.armor).toBe(0);
+        expect(
+          m.pickupManager.getPickups().some((pickup) => pickup.type === PickupType.ARMOR),
+        ).toBe(false);
       });
 
       it('super_speed has no on-trigger state mutation but is reported active', () => {
@@ -1884,11 +1903,13 @@ describe('Match', () => {
         exposed.position = { ...outside };
         protectedPlayer.position = { ...outside };
         exposed.health = 31;
+        exposed.armor = PICKUP.ARMOR_MAX;
         protectedPlayer.health = 31;
         protectedPlayer.invulnerableTimer = 10;
 
         m.update(MUTATORS.RADIATION_STORM_PULSE_SECONDS);
         expect(exposed.health).toBe(21);
+        expect(exposed.armor).toBe(PICKUP.ARMOR_MAX);
         expect(protectedPlayer.health).toBe(31);
 
         m.update(MUTATORS.RADIATION_STORM_PULSE_SECONDS * 3);
@@ -3234,6 +3255,7 @@ describe('Match', () => {
         expect(p.isDead).toBe(false);
         expect(p.health).toBe(p.maxHealth);
         expect(p.weaponId).toBe('rifle');
+        expect(p.armor).toBe(0);
       }
     });
 

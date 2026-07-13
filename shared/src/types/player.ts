@@ -15,6 +15,8 @@ export interface PlayerState {
   aimAngle: number;
   health: number;
   maxHealth: number;
+  /** Temporary Scrap Armor that absorbs ordinary combat damage before HP. */
+  armor: number;
   /**
    * Rounds in the RIFLE's magazine. Always tracks the rifle even while a
    * special weapon is equipped, so reverting is lossless.

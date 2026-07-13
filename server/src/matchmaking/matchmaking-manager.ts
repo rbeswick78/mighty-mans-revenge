@@ -1006,6 +1006,7 @@ export class MatchmakingManager {
         aimAngle: player.aimAngle,
         health: player.health,
         maxHealth: player.maxHealth,
+        armor: player.armor,
         ammo: player.ammo,
         weaponId: player.weaponId,
         specialAmmo: player.specialAmmo,

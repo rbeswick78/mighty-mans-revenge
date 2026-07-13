@@ -50,6 +50,7 @@ function makePlayer(id: PlayerId, score = 0): PlayerState {
     aimAngle: 0,
     health: 100,
     maxHealth: 100,
+    armor: 0,
     ammo: 30,
     isReloading: false,
     reloadTimer: 0,
@@ -369,6 +370,7 @@ describe('GunGameMode', () => {
       expect(mode.isPickupTypeEnabled(PickupType.WEAPON_BAT)).toBe(false);
       expect(mode.isPickupTypeEnabled(PickupType.GUN_AMMO)).toBe(false);
       expect(mode.isPickupTypeEnabled(PickupType.GRENADE)).toBe(false);
+      expect(mode.isPickupTypeEnabled(PickupType.ARMOR)).toBe(false);
     });
   });
 });

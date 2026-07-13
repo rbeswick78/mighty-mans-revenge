@@ -19,6 +19,7 @@ const SPAWN_TYPE_TO_PICKUP_TYPE: Record<PickupSpawnType, PickupType> = {
   weapon_pistol: PickupType.WEAPON_PISTOL,
   weapon_bat: PickupType.WEAPON_BAT,
   bandage: PickupType.BANDAGE,
+  armor: PickupType.ARMOR,
 };
 
 /** A weapon pickup that will become active in `landsInMs`. */
@@ -45,6 +46,8 @@ function respawnTimeFor(type: PickupType): number {
       return PICKUP.WEAPON_RESPAWN_TIME;
     case PickupType.BANDAGE:
       return PICKUP.BANDAGE_RESPAWN_TIME;
+    case PickupType.ARMOR:
+      return PICKUP.ARMOR_RESPAWN_TIME;
     default:
       return PICKUP.RESPAWN_TIME;
   }
@@ -314,6 +317,14 @@ export class PickupManager {
         player.health = Math.min(
           player.maxHealth,
           player.health + PICKUP.BANDAGE_HEAL,
+        );
+        return true;
+      }
+      case PickupType.ARMOR: {
+        if (player.isDead || player.armor >= PICKUP.ARMOR_MAX) return false;
+        player.armor = Math.min(
+          PICKUP.ARMOR_MAX,
+          player.armor + PICKUP.ARMOR_AMOUNT,
         );
         return true;
       }

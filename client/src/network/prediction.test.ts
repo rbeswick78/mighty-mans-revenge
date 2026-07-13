@@ -41,6 +41,7 @@ function rook(overrides: Partial<PlayerState> = {}): PlayerState {
     aimAngle: 0,
     health: 95,
     maxHealth: 95,
+    armor: 0,
     ammo: WEAPONS.rifle.magazineSize,
     isReloading: false,
     reloadTimer: 0,

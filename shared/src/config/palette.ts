@@ -46,6 +46,7 @@ export const Wasteland = Object.freeze({
   // --- Pickups ---
   PICKUP_AMMO: 0xfdcbb0,        // bone — paper cartridge box
   PICKUP_GRENADE: 0xcd683d,     // rust — corroded crate
+  PICKUP_ARMOR: 0x4d9be6,
   PICKUP_FLASH: 0xfdcbb0,
   PICKUP_SPARKLE_A: 0xfdcbb0,
   PICKUP_SPARKLE_B: 0xfbff86,
@@ -76,6 +77,7 @@ export const Wasteland = Object.freeze({
   HEALTH_GOOD: 0x91db69,
   HEALTH_WARNING: 0xf9c22b,
   HEALTH_DANGER: 0xb33831,
+  ARMOR_FILL: 0x8fd3ff,
   STAMINA_BAR_BG: 0x3e3546,
   STAMINA_FILL: 0x4d9be6,
 

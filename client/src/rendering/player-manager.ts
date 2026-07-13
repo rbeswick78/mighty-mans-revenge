@@ -60,7 +60,7 @@ export class ClientPlayerManager {
       renderer.setAxeless(playerState.abilityCooldownSeconds > 0);
       // Per-character HP pool (Bubba 150, Frost Wizard 85, ...) — the
       // serialized state carries the authoritative max.
-      renderer.updateHealthBar(playerState.health, playerState.maxHealth);
+      renderer.updateHealthBar(playerState.health, playerState.maxHealth, playerState.armor);
 
       if (playerState.id === localPlayerId) {
         localRenderer = renderer;

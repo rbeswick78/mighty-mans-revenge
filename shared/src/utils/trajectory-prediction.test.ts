@@ -30,6 +30,7 @@ function makePlayer(overrides: Partial<PlayerState> = {}): PlayerState {
     aimAngle: 0,
     health: 100,
     maxHealth: 100,
+    armor: 0,
     ammo: 30,
     isReloading: false,
     reloadTimer: 0,

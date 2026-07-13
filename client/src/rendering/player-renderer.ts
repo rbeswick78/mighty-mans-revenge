@@ -15,12 +15,15 @@ import {
   type GunOverlayState,
 } from './weapon-overlay-key.js';
 import { batHeldRotation, batSwingRotations } from './bat-presentation.js';
+import { armorPresentation } from '../ui/armor-presentation.js';
 
 const SPRITE_SCALE = 3;
 
 const HEALTH_BAR_WIDTH = 36;
 const HEALTH_BAR_HEIGHT = 4;
 const HEALTH_BAR_OFFSET_Y = -32;
+const ARMOR_BAR_HEIGHT = 2;
+const ARMOR_BAR_OFFSET_Y = -37;
 const NICKNAME_OFFSET_Y = -42;
 const BOUNTY_MARKER_OFFSET_Y = -56;
 const BOUNTY_MARKER_COLOR = '#ffd166';
@@ -112,6 +115,9 @@ export class PlayerRenderer {
   private readonly hasGun: boolean;
   private healthBarBg: Phaser.GameObjects.Rectangle;
   private healthBarFg: Phaser.GameObjects.Rectangle;
+  private armorBarBg: Phaser.GameObjects.Rectangle;
+  private armorBarFg: Phaser.GameObjects.Rectangle;
+  private hasArmor = false;
   private nicknameText: Phaser.GameObjects.Text;
   private bountyMarkerText: Phaser.GameObjects.Text;
   private bountyMarked = false;
@@ -273,6 +279,24 @@ export class PlayerRenderer {
     );
     this.healthBarFg.setOrigin(0.5, 0.5);
 
+    this.armorBarBg = scene.add.rectangle(
+      0,
+      ARMOR_BAR_OFFSET_Y,
+      HEALTH_BAR_WIDTH,
+      ARMOR_BAR_HEIGHT,
+      Wasteland.HEALTH_BAR_BG,
+    );
+    this.armorBarBg.setOrigin(0.5, 0.5).setVisible(false);
+
+    this.armorBarFg = scene.add.rectangle(
+      0,
+      ARMOR_BAR_OFFSET_Y,
+      HEALTH_BAR_WIDTH,
+      ARMOR_BAR_HEIGHT,
+      Wasteland.ARMOR_FILL,
+    );
+    this.armorBarFg.setOrigin(0.5, 0.5).setVisible(false);
+
     this.nicknameText = scene.add.text(0, NICKNAME_OFFSET_Y, '', {
       fontFamily: 'Courier, monospace',
       fontSize: '10px',
@@ -304,6 +328,8 @@ export class PlayerRenderer {
     children.push(
       this.healthBarBg,
       this.healthBarFg,
+      this.armorBarBg,
+      this.armorBarFg,
       this.nicknameText,
       this.bountyMarkerText,
     );
@@ -316,7 +342,7 @@ export class PlayerRenderer {
     this.setPosition(state.position.x, state.position.y);
     this.setAimAngle(state.aimAngle);
     this.setWeapon(state.weaponId);
-    this.updateHealthBar(state.health, state.maxHealth);
+    this.updateHealthBar(state.health, state.maxHealth, state.armor);
     this.nicknameText.setText(state.nickname);
     this.updateLifeState(state.isDead);
 
@@ -604,12 +630,20 @@ export class PlayerRenderer {
     this.applyCurrentBodyOverlayTransform();
   }
 
-  updateHealthBar(health: number, maxHealth: number): void {
+  updateHealthBar(health: number, maxHealth: number, armor: number = 0): void {
     const ratio = Math.max(0, Math.min(1, health / maxHealth));
     const width = HEALTH_BAR_WIDTH * ratio;
     this.healthBarFg.setSize(width, HEALTH_BAR_HEIGHT);
     this.healthBarFg.setX(-(HEALTH_BAR_WIDTH - width) / 2);
     this.healthBarFg.setFillStyle(healthColor(ratio));
+    const shield = armorPresentation(health, armor);
+    const armorWidth = HEALTH_BAR_WIDTH * shield.ratio;
+    this.hasArmor = shield.visible;
+    this.armorBarBg.setVisible(shield.visible && !this.isDead);
+    this.armorBarFg
+      .setVisible(shield.visible && !this.isDead)
+      .setSize(armorWidth, ARMOR_BAR_HEIGHT)
+      .setX(-(HEALTH_BAR_WIDTH - armorWidth) / 2);
   }
 
   /**
@@ -669,6 +703,8 @@ export class PlayerRenderer {
     if (!alive) this.frozenCrystalGraphics?.setVisible(false);
     this.healthBarBg.setVisible(alive);
     this.healthBarFg.setVisible(alive);
+    this.armorBarBg.setVisible(alive && this.hasArmor);
+    this.armorBarFg.setVisible(alive && this.hasArmor);
     this.nicknameText.setVisible(alive);
     this.bountyMarkerText.setVisible(alive && this.bountyMarked);
   }

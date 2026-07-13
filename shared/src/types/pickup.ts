@@ -15,6 +15,8 @@ export enum PickupType {
   WEAPON_BAT = 'weapon_bat',
   /** Heals PICKUP.BANDAGE_HEAL, capped at the player's max health. */
   BANDAGE = 'bandage',
+  /** Grants a temporary combat shield, capped at PICKUP.ARMOR_MAX. */
+  ARMOR = 'armor',
 }
 
 export interface PickupState {

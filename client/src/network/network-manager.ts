@@ -757,6 +757,7 @@ export class NetworkManager {
       // Always trust server for these values
       health: serverState.health,
       maxHealth: serverState.maxHealth,
+      armor: serverState.armor,
       ammo: serverState.ammo,
       // Weapon slot is server-authoritative (auto-equip on pickup,
       // auto-revert on empty) — the client never predicts it.
@@ -814,6 +815,7 @@ export class NetworkManager {
       aimAngle: s.aimAngle,
       health: s.health,
       maxHealth: s.maxHealth,
+      armor: s.armor,
       ammo: s.ammo,
       isReloading: s.isReloading,
       reloadTimer: 0,

@@ -33,6 +33,7 @@ export class PlayerManager {
       aimAngle: 0,
       health: PLAYER.MAX_HEALTH,
       maxHealth: PLAYER.MAX_HEALTH,
+      armor: 0,
       ammo: WEAPONS.rifle.magazineSize,
       isReloading: false,
       reloadTimer: 0,
@@ -164,6 +165,7 @@ export class PlayerManager {
     player.position = { x: spawnPos.x, y: spawnPos.y };
     player.velocity = { x: 0, y: 0 };
     player.health = player.maxHealth;
+    player.armor = 0;
     player.ammo = WEAPONS.rifle.magazineSize;
     player.isReloading = false;
     player.reloadTimer = 0;

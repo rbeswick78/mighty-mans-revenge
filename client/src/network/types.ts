@@ -24,6 +24,7 @@ export interface InterpolatedState {
   aimAngle: number;
   health: number;
   maxHealth: number;
+  armor: number;
   ammo: number;
   weaponId: WeaponId;
   specialAmmo: number;

@@ -110,6 +110,7 @@ export const SCAVENGER_CACHE = Object.freeze({
     PickupType.BANDAGE,
     PickupType.GRENADE,
     PickupType.GRENADE,
+    PickupType.ARMOR,
     PickupType.WEAPON_PISTOL,
     PickupType.WEAPON_SHOTGUN,
     PickupType.WEAPON_BAT,
@@ -385,6 +386,10 @@ export const PICKUP = Object.freeze({
   /** HP restored by a bandage, capped at the player's max health. */
   BANDAGE_HEAL: 30,
   BANDAGE_RESPAWN_TIME: 20,
+  /** Proactive shield granted by one Scrap Armor plate. */
+  ARMOR_AMOUNT: 35,
+  ARMOR_MAX: 35,
+  ARMOR_RESPAWN_TIME: 25,
   /**
    * Respawn cycle for special-weapon pickups (shotgun). Weapon pickups
    * also start the match on this timer rather than pre-placed, so every
@@ -485,6 +490,7 @@ export const BOT = Object.freeze({
     CRITICAL_BANDAGE: 600,
     BAT: 500,
     SHOTGUN: 480,
+    ARMOR: 450,
     BANDAGE: 420,
     PISTOL: 340,
     GRENADE: 240,

@@ -19,6 +19,7 @@ import { oneInTheChamberStatus } from './one-in-the-chamber-hud.js';
 import { coreRunStatus } from './core-run-hud.js';
 import { bountyHuntStatus } from './bounty-hunt-hud.js';
 import { batDurabilityLabel } from '../rendering/bat-presentation.js';
+import { armorPresentation } from './armor-presentation.js';
 
 // Press Start 2P is much wider per glyph than Courier, so the final-minute
 // banner size drops to compensate (Courier 40px ≈ PS2P 22-24px in width).
@@ -69,6 +70,8 @@ export class HUD {
   // Left column: player stats
   private healthBarBg: Phaser.GameObjects.Rectangle;
   private healthBarFg: Phaser.GameObjects.Rectangle;
+  private armorBarBg: Phaser.GameObjects.Rectangle;
+  private armorBarFg: Phaser.GameObjects.Rectangle;
   private healthText: Phaser.GameObjects.Text;
   private staminaBarBg: Phaser.GameObjects.Rectangle;
   private staminaBarFg: Phaser.GameObjects.Rectangle;
@@ -198,6 +201,11 @@ export class HUD {
     this.healthBarFg.setOrigin(0, 0);
     this.healthBarFg.setScrollFactor(0);
     this.healthBarFg.setDepth(1001);
+
+    this.armorBarBg = scene.add.rectangle(hbX, hbY - 6, hbW, 4, Wasteland.HEALTH_BAR_BG);
+    this.armorBarBg.setOrigin(0, 0).setScrollFactor(0).setDepth(1000).setVisible(false);
+    this.armorBarFg = scene.add.rectangle(hbX, hbY - 6, hbW, 4, Wasteland.ARMOR_FILL);
+    this.armorBarFg.setOrigin(0, 0).setScrollFactor(0).setDepth(1001).setVisible(false);
 
     this.healthText = scene.add.text(hbX + hbW / 2, hbY + hbH / 2, '100', {
       ...FONT_STYLE,
@@ -575,12 +583,15 @@ export class HUD {
     this.contractCalloutText.setVisible(false);
   }
 
-  updateHealth(current: number, max: number): void {
+  updateHealth(current: number, max: number, armor: number): void {
     const ratio = Math.max(0, Math.min(1, current / max));
+    const shield = armorPresentation(current, armor);
     const fullWidth = 200;
     this.healthBarFg.setSize(fullWidth * ratio, 20);
     this.healthBarFg.setFillStyle(healthColor(ratio));
-    this.healthText.setText(`${Math.ceil(current)}`);
+    this.armorBarBg.setVisible(shield.visible);
+    this.armorBarFg.setVisible(shield.visible).setSize(fullWidth * shield.ratio, 4);
+    this.healthText.setText(shield.healthLabel);
   }
 
   updateAmmo(current: number, max: number, isReloading: boolean): void {
@@ -1355,6 +1366,8 @@ export class HUD {
     this.stripBevel.destroy();
     this.healthBarBg.destroy();
     this.healthBarFg.destroy();
+    this.armorBarBg.destroy();
+    this.armorBarFg.destroy();
     this.healthText.destroy();
     this.staminaBarBg.destroy();
     this.staminaBarFg.destroy();

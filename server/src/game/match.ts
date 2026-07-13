@@ -546,6 +546,7 @@ export class Match implements MatchContext {
       !isPosthumous &&
       killerAtKill &&
       killerAtKill.health > 0 &&
+      killerAtKill.armor <= 0 &&
       killerAtKill.health <= killerAtKill.maxHealth * COMBAT_MEDALS.CLUTCH_HEALTH_FRACTION
         ? killerAtKill.health
         : undefined;
@@ -1983,6 +1984,7 @@ export class Match implements MatchContext {
     // resetting to the default — otherwise the event would only bite on first
     // hit after respawn.
     player.health = player.maxHealth;
+    player.armor = 0;
     player.isDead = false;
     player.respawnTimer = 0;
     player.invulnerableTimer = RESPAWN.INVULNERABILITY_DURATION;
@@ -2026,6 +2028,7 @@ export class Match implements MatchContext {
       aimAngle: 0,
       health: PLAYER.MAX_HEALTH,
       maxHealth: PLAYER.MAX_HEALTH,
+      armor: 0,
       ammo: WEAPONS.rifle.magazineSize,
       isReloading: false,
       reloadTimer: 0,
@@ -2264,7 +2267,9 @@ export class Match implements MatchContext {
         }
         return;
       case 'low_health':
+        this.pickupManager.removeTypes([PickupType.ARMOR]);
         for (const player of this.players.values()) {
+          player.armor = 0;
           player.maxHealth = MUTATORS.LOW_HEALTH_HP;
           if (!player.isDead) {
             player.health = Math.min(player.health, MUTATORS.LOW_HEALTH_HP);

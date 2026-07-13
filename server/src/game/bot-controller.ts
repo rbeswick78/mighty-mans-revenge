@@ -8,6 +8,7 @@ import {
   MatchPhase,
   GameModeType,
   PLAYER,
+  PICKUP,
   PickupType,
   WEAPONS,
   characterSpeedMultiplier,
@@ -135,6 +136,10 @@ export function botResourcePriority(
       if (hasLivePowerWeapon) return null;
       return player.weaponId !== 'pistol' || heldAmmo <= WEAPONS.pistol.magazineSize
         ? BOT.RESOURCE_PRIORITY.PISTOL
+        : null;
+    case PickupType.ARMOR:
+      return player.armor < PICKUP.ARMOR_MAX
+        ? BOT.RESOURCE_PRIORITY.ARMOR
         : null;
     case PickupType.GRENADE:
       return player.grenades < GRENADE.MAX_COUNT

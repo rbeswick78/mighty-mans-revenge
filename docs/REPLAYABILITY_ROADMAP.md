@@ -2240,7 +2240,80 @@ human by default.
 
 ---
 
+## Session 45 — Scrap Armor
+
+**Goal:** add a proactive defensive arena resource that creates contested
+routes before a fighter is already wounded.
+
+**Locked design decisions**
+
+- Every arena places one immediately active Scrap Armor plate in its contested
+  center lane. It grants a 35-point shield, caps at 35, and respawns after 25
+  seconds; Scavenger Caches and Scavenger Rush may also roll it as a rare reward.
+- Ordinary authoritative combat damage applies Iron Hide first, then drains
+  armor before health. The entire post-reduction hit still counts as landed
+  damage for stats, contracts, Vampire, and feedback. Radiation bypasses armor
+  and remains nonlethal environmental pressure.
+- Armor clears on every respawn and overtime reset. Low Health clears all live
+  shields and retires armor pickups; Gun Game and One in the Chamber keep their
+  existing bandage-only economies. Core Run permits armor because it does not
+  replace the mode-owned weapon loadout.
+- Clutch requires both critical health and an empty shield. Rusty seeks an
+  unclaimed plate below power weapons but above ordinary healing, while full
+  armor is never worth a detour.
+- The shield is explicit in authoritative player snapshots. Local and overhead
+  cyan bars expose it to every fighter; the procedural riveted-plate pickup and
+  weighted collection sound make the center objective readable without a new
+  attributed asset.
+
+**Acceptance criteria**
+
+- [x] Pickup, combat, match, bot, mode, map, network, and pure presentation
+      tests cover the complete shield lifecycle and cross-feature contracts.
+- [x] Typecheck, lint, all unit tests, production build, and Playwright pass.
+- [x] A live Practice smoke verifies the authored center plate, normal match
+      flow, and clean browser logs; deterministic tests cover collection,
+      local/remote shield projection, and combat absorption.
+
+---
+
 ## Session Log
+
+### Session 45 — 2026-07-13 — Scrap Armor
+
+**Shipped:** every arena now contests one center-lane Scrap Armor plate. It
+grants 35 temporary shield points, respawns in 25 seconds, and joins the cache
+and Scavenger Rush reward table as a rare roll. The authoritative damage choke
+point applies Iron Hide before armor, drains health only after the shield, and
+preserves the full landed post-reduction damage for stats, contracts, Vampire,
+and combat feedback. Death, respawn, and overtime cannot carry armor forward;
+Low Health removes it entirely, while radiation intentionally passes through.
+
+Armor is carried through snapshots, interpolation, reconciliation, prediction
+state, and render assembly. A slim cyan bar appears over shielded fighters and
+above the local health bar, whose label shows health plus armor separately. A
+procedural riveted steel plate supplies distinct world art. Clutch medals now
+require an empty shield, and Rusty values armor between power weapons and
+ordinary healing without chasing a full plate.
+
+**Verification:** 1,059 unit tests pass across 68 files, including focused
+pickup, combat, match, bot, mode, map, network reconciliation, and presentation
+coverage. TypeScript, ESLint, and the production build are clean; Vite retains
+its existing chunk-size advisory. The clean Playwright matrix passes 13 tests
+with 11 intentional scoped skips across desktop Chromium, desktop Firefox, and
+mobile landscape. A separate in-app-browser Practice smoke pinned Deathmatch on
+Wasteland Outpost, visibly confirmed the new blue plate at the authored center
+spawn through a normal networked match, and produced zero browser warnings or
+errors. The local smoke services were stopped afterward.
+
+**Tuning watch:** 35 armor absorbs roughly one strong rifle hit plus spillover
+without rewriting weapon lethality. Watch whether the 25-second center respawn
+creates healthy repeat contests or needs a slightly longer cooldown in crowded
+matches.
+
+**Deployment:** not run; deployment still requires explicit authorization.
+
+---
 
 ### Session 44 — 2026-07-13 — Rusty's Scavenger Instincts
 

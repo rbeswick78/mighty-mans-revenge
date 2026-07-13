@@ -20,6 +20,7 @@ function createPlayer(overrides: Partial<PlayerState> & { id: PlayerId }): Playe
     aimAngle: 0,
     health: PLAYER.MAX_HEALTH,
     maxHealth: PLAYER.MAX_HEALTH,
+    armor: 0,
     ammo: WEAPONS.rifle.magazineSize,
     isReloading: false,
     reloadTimer: 0,
@@ -426,6 +427,18 @@ describe('CombatManager', () => {
       expect(result.entry).toBeUndefined();
       expect(victim.isDead).toBe(false);
     });
+
+    it('drains Scrap Armor before health and keeps full landed damage credit', () => {
+      const victim = createPlayer({ id: 'victim', health: 100, armor: 35 });
+
+      const first = combat.applyDamage(victim, 20, 'attacker');
+      expect(first).toMatchObject({ killed: false, damageApplied: 20 });
+      expect(victim).toMatchObject({ health: 100, armor: 15, isDead: false });
+
+      const second = combat.applyDamage(victim, 30, 'attacker');
+      expect(second.damageApplied).toBe(30);
+      expect(victim).toMatchObject({ health: 85, armor: 0, isDead: false });
+    });
   });
 
   describe('applyDamage — Iron Hide (Bubba)', () => {
@@ -441,6 +454,22 @@ describe('CombatManager', () => {
 
       expect(result.damageApplied).toBeCloseTo(20, 10);
       expect(bubba.health).toBeCloseTo(130, 10);
+    });
+
+    it('applies Iron Hide before Scrap Armor absorption', () => {
+      const bubba = createPlayer({
+        id: 'bubba',
+        characterId: 'bubba',
+        health: 150,
+        maxHealth: 150,
+        armor: 15,
+        abilityActiveSeconds: ABILITY.BUBBA_IRON_HIDE.DURATION,
+      });
+
+      const result = combat.applyDamage(bubba, 40, 'attacker');
+      expect(result.damageApplied).toBeCloseTo(20, 10);
+      expect(bubba.armor).toBe(0);
+      expect(bubba.health).toBeCloseTo(145, 10);
     });
 
     it('takes full damage once the window has expired', () => {

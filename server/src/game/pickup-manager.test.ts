@@ -27,6 +27,7 @@ function makePlayer(overrides: Partial<PlayerState> = {}): PlayerState {
     aimAngle: 0,
     health: 100,
     maxHealth: 100,
+    armor: 0,
     ammo: 10,
     isReloading: false,
     reloadTimer: 0,
@@ -575,6 +576,24 @@ describe('PickupManager', () => {
       expect(manager.applyPickup(pickup, dead)).toBe(false);
       expect(dead.health).toBe(40);
     });
+
+    it('ARMOR grants one capped proactive shield and refuses full or dead players', () => {
+      const pickup = {
+        id: 'plate',
+        type: PickupType.ARMOR,
+        position: { x: 0, y: 0 },
+        isActive: true,
+        respawnTimer: 0,
+      };
+      const unshielded = makePlayer();
+      expect(manager.applyPickup(pickup, unshielded)).toBe(true);
+      expect(unshielded.armor).toBe(PICKUP.ARMOR_MAX);
+
+      expect(manager.applyPickup(pickup, unshielded)).toBe(false);
+      const dead = makePlayer({ armor: 0, isDead: true });
+      expect(manager.applyPickup(pickup, dead)).toBe(false);
+      expect(dead.armor).toBe(0);
+    });
   });
 
   describe('weapon pickups', () => {
@@ -707,6 +726,14 @@ describe('PickupManager', () => {
       expect(pickup.isActive).toBe(true);
       manager.collectPickup(pickup.id);
       expect(pickup.respawnTimer).toBe(PICKUP.BANDAGE_RESPAWN_TIME);
+    });
+
+    it('Scrap Armor starts active and uses its own contested respawn time', () => {
+      manager.initFromMap(makeMapData([{ x: 5, y: 5, type: 'armor' }]));
+      const [pickup] = manager.getPickups();
+      expect(pickup).toMatchObject({ type: PickupType.ARMOR, isActive: true });
+      manager.collectPickup(pickup.id);
+      expect(pickup.respawnTimer).toBe(PICKUP.ARMOR_RESPAWN_TIME);
     });
   });
 });

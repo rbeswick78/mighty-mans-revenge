@@ -855,6 +855,21 @@ export class BootScene extends Phaser.Scene {
     pickupGrenadeGfx.generateTexture('pickup_grenade', 16, 16);
     pickupGrenadeGfx.destroy();
 
+    // Scrap Armor — compact riveted plate, authored procedurally so its
+    // hard-blue silhouette remains readable at the pickup renderer's 3x scale.
+    const armorGfx = gfx();
+    armorGfx.fillStyle(0x2e222f, 1);
+    armorGfx.fillRect(2, 3, 12, 10);
+    armorGfx.fillStyle(Wasteland.PICKUP_ARMOR, 1);
+    armorGfx.fillRect(3, 4, 10, 8);
+    armorGfx.fillStyle(Wasteland.ARMOR_FILL, 1);
+    armorGfx.fillRect(4, 5, 8, 2);
+    armorGfx.fillStyle(0xc7dcd0, 1);
+    armorGfx.fillRect(4, 9, 2, 2);
+    armorGfx.fillRect(10, 9, 2, 2);
+    armorGfx.generateTexture('pickup_armor', 16, 16);
+    armorGfx.destroy();
+
     // Explosion — 32×32 layered hot circles
     const explosionGfx = gfx();
     explosionGfx.fillStyle(Wasteland.EXPLOSION_PARTICLE_B, 1);

@@ -482,6 +482,7 @@ export class GameScene extends Phaser.Scene {
           aimAngle: currentLocalState.aimAngle,
           health: currentLocalState.health,
           maxHealth: currentLocalState.maxHealth,
+          armor: currentLocalState.armor,
           ammo: currentLocalState.ammo,
           weaponId: currentLocalState.weaponId,
           specialAmmo: currentLocalState.specialAmmo,
@@ -514,6 +515,7 @@ export class GameScene extends Phaser.Scene {
             aimAngle: interpState.aimAngle,
             health: interpState.health,
             maxHealth: interpState.maxHealth,
+            armor: interpState.armor,
             ammo: interpState.ammo,
             weaponId: interpState.weaponId,
             specialAmmo: interpState.specialAmmo,
@@ -628,7 +630,11 @@ export class GameScene extends Phaser.Scene {
         this.prevAbilityCoolingDown = localCoolingDown;
 
         // Update HUD — per-character HP pool, not the baseline constant.
-        this.hud.updateHealth(currentLocalState.health, currentLocalState.maxHealth);
+        this.hud.updateHealth(
+          currentLocalState.health,
+          currentLocalState.maxHealth,
+          currentLocalState.armor,
+        );
         // Gun Game ladder line: derived purely from the local score via the
         // shared rung helper (no extra wire state). Null outside Gun Game
         // hides the line and lifts the grenade-rung ammo suppression. Runs
@@ -1030,6 +1036,7 @@ export class GameScene extends Phaser.Scene {
         aimAngle: interp.aimAngle,
         health: interp.health,
         maxHealth: interp.maxHealth,
+        armor: interp.armor,
         ammo: interp.ammo,
         isReloading: interp.isReloading,
         reloadTimer: 0,
@@ -1326,6 +1333,8 @@ export class GameScene extends Phaser.Scene {
         sfxOptions = { rate: 0.7 };
       } else if (pickupType === PickupType.BANDAGE) {
         sfxOptions = { rate: 1.35 };
+      } else if (pickupType === PickupType.ARMOR) {
+        sfxOptions = { rate: 0.72 };
       }
 
       if (collectorPos && localState) {

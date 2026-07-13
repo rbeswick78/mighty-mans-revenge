@@ -232,6 +232,8 @@ export interface SerializedPlayerState {
    * health bar shows current/max correctly.
    */
   maxHealth: number;
+  /** Temporary Scrap Armor remaining; 0 when unshielded. */
+  armor: number;
   ammo: number;
   /** Equipped weapon; drives the held-overlay sprite and HUD ammo panel. */
   weaponId: WeaponId;

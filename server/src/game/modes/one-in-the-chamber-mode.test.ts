@@ -23,6 +23,7 @@ function makePlayer(id: PlayerId): PlayerState {
     aimAngle: 0,
     health: 100,
     maxHealth: 100,
+    armor: 0,
     ammo: 30,
     isReloading: false,
     reloadTimer: 0,
@@ -202,6 +203,7 @@ describe('OneInTheChamberMode', () => {
     expect(mode.areAbilitiesDisabled(ctx, player)).toBe(true);
     expect(mode.areGrenadesDisabled(ctx, player)).toBe(true);
     expect(mode.isPickupTypeEnabled(PickupType.BANDAGE)).toBe(true);
+    expect(mode.isPickupTypeEnabled(PickupType.ARMOR)).toBe(false);
     expect(mode.isPickupTypeEnabled(PickupType.WEAPON_PISTOL)).toBe(false);
     expect(mode.isPickupTypeEnabled(PickupType.WEAPON_BAT)).toBe(false);
     expect(mode.excludedMutators).toEqual([

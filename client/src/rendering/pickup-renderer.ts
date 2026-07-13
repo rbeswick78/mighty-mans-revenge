@@ -12,6 +12,7 @@ const PICKUP_TEXTURES: Record<PickupType, string> = {
   [PickupType.WEAPON_PISTOL]: 'pickup_pistol',
   [PickupType.WEAPON_BAT]: 'pickup_bat',
   [PickupType.BANDAGE]: 'pickup_bandage',
+  [PickupType.ARMOR]: 'pickup_armor',
 };
 
 interface PickupSprite {

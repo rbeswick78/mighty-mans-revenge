@@ -57,6 +57,7 @@ function makeSerialized(
     aimAngle: 0,
     health: PLAYER.MAX_HEALTH,
     maxHealth: PLAYER.MAX_HEALTH,
+    armor: 0,
     ammo: WEAPONS.rifle.magazineSize,
     weaponId: 'rifle',
     specialAmmo: 0,
@@ -138,6 +139,15 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
       makeGameState([makeSerialized({ characterId: 'frost_wizard' })], { tick: 2 }),
     );
     expect(manager.getLocalPlayerState()?.characterId).toBe('frost_wizard');
+  });
+
+  it('forwards authoritative armor changes through reconciliation', () => {
+    deliver(makeGameState([makeSerialized({ armor: 0 })]));
+    deliver(makeGameState([makeSerialized({ armor: 35 })], { tick: 2 }));
+    expect(manager.getLocalPlayerState()?.armor).toBe(35);
+
+    deliver(makeGameState([makeSerialized({ armor: 9 })], { tick: 3 }));
+    expect(manager.getLocalPlayerState()?.armor).toBe(9);
   });
 
   it('resets localPlayerState on matchFound so a rematch re-seeds fresh', () => {
