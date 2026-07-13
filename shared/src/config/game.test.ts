@@ -24,6 +24,8 @@ import {
   LEADERBOARD,
   MATCH_CONTRACTS,
   COMBAT_MEDALS,
+  CAREER_RANKS,
+  careerRankProgressForContracts,
   selectMatchContract,
   type CharacterId,
   type WeaponId,
@@ -144,6 +146,48 @@ describe('combat medals', () => {
     expect(COMBAT_MEDALS.MAYHEM_COUNT).toBeGreaterThan(
       COMBAT_MEDALS.TRIPLE_KILL_COUNT,
     );
+  });
+});
+
+describe('wasteland reputation', () => {
+  it('defines a frozen, ordered ladder with unique three-letter badges', () => {
+    expect(Object.isFrozen(CAREER_RANKS)).toBe(true);
+    expect(CAREER_RANKS[0].minContracts).toBe(0);
+    expect(new Set(CAREER_RANKS.map((rank) => rank.id)).size).toBe(CAREER_RANKS.length);
+    expect(new Set(CAREER_RANKS.map((rank) => rank.badge)).size).toBe(CAREER_RANKS.length);
+    for (let i = 0; i < CAREER_RANKS.length; i++) {
+      expect(Object.isFrozen(CAREER_RANKS[i])).toBe(true);
+      expect(CAREER_RANKS[i].badge).toHaveLength(3);
+      if (i > 0) {
+        expect(CAREER_RANKS[i].minContracts).toBeGreaterThan(
+          CAREER_RANKS[i - 1].minContracts,
+        );
+      }
+    }
+  });
+
+  it('changes rank exactly at every threshold and reports the next milestone', () => {
+    for (let i = 0; i < CAREER_RANKS.length; i++) {
+      const rank = CAREER_RANKS[i];
+      const atThreshold = careerRankProgressForContracts(rank.minContracts);
+      expect(atThreshold.current).toBe(rank);
+      expect(atThreshold.next).toBe(CAREER_RANKS[i + 1] ?? null);
+      expect(atThreshold.remaining).toBe(
+        atThreshold.next ? atThreshold.next.minContracts - rank.minContracts : 0,
+      );
+      if (rank.minContracts > 0) {
+        expect(careerRankProgressForContracts(rank.minContracts - 1).current).toBe(
+          CAREER_RANKS[i - 1],
+        );
+      }
+    }
+  });
+
+  it('normalizes fractional, negative, and non-finite totals safely', () => {
+    expect(careerRankProgressForContracts(8.9).completed).toBe(8);
+    expect(careerRankProgressForContracts(-4).completed).toBe(0);
+    expect(careerRankProgressForContracts(Number.NaN).completed).toBe(0);
+    expect(careerRankProgressForContracts(Number.POSITIVE_INFINITY).completed).toBe(0);
   });
 });
 

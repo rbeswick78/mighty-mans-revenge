@@ -13,6 +13,7 @@ import { PixelButton } from '../ui/menu/pixel-button.js';
 import { TitleLogo } from '../ui/menu/title-logo.js';
 import { MENU_FONTS } from '../ui/menu/fonts.js';
 import { formatRivalrySummary, nextDraftTeaser, rematchButtonLabel } from '../ui/rivalry-set.js';
+import { careerRankPresentation } from '../ui/career-rank.js';
 
 interface ResultsSceneData {
   result?: MatchResult;
@@ -39,13 +40,16 @@ const RIVALRY_COLOR = Wasteland.HEALTH_WARNING; // amber
 const NEXT_DRAFT_COLOR = Wasteland.LOADING_BAR_FILL; // hot orange accent
 const CONTRACT_COLOR = Wasteland.LOADING_BAR_FILL;
 const CONTRACT_COMPLETE_COLOR = Wasteland.HEALTH_GOOD;
+const CAREER_RANK_COLOR = Wasteland.COVER_FILL;
+const CAREER_RANK_UP_COLOR = Wasteland.HEALTH_WARNING;
 
-// Awards + rivalry strip sits between the stats panel (ends at y=460) and
-// the rematch status line (camHeight - 130 = 590 on the 960x720 canvas).
+// Rivalry, contract, reputation, and awards sit between the stats panel
+// (ends at y=460) and the rematch status line at y=604 on the 960x720 canvas.
 const RIVALRY_Y = 476;
 const CONTRACT_Y = 496;
-const AWARDS_START_Y = 522;
-const AWARD_ROW_H = 24;
+const CAREER_RANK_Y = 516;
+const AWARDS_START_Y = 536;
+const AWARD_ROW_H = 20;
 
 export class ResultsScene extends Phaser.Scene {
   private gameService!: GameService;
@@ -190,7 +194,7 @@ export class ResultsScene extends Phaser.Scene {
     // Rematch status text + action buttons
     // ────────────────────────────────────────────────────────────────────
     this.rematchStatusText = this.add
-      .text(centerX, camHeight - 130, '', {
+      .text(centerX, camHeight - 116, '', {
         fontFamily: MENU_FONTS.HEADER,
         fontSize: '11px',
         color: cssHex(REMATCH_STATUS_COLOR),
@@ -508,6 +512,35 @@ export class ResultsScene extends Phaser.Scene {
         duration: 400,
         delay: 400,
       });
+
+      const rank = careerRankPresentation(
+        career,
+        localProgress.completed,
+        this.result.isPractice ?? false,
+      );
+      if (rank) {
+        const rankText = this.add
+          .text(centerX, CAREER_RANK_Y, rank.text, {
+            fontFamily: MENU_FONTS.HEADER,
+            fontSize: rank.promoted ? '10px' : '8px',
+            color: cssHex(
+              rank.promoted ? CAREER_RANK_UP_COLOR : CAREER_RANK_COLOR,
+            ),
+          })
+          .setOrigin(0.5)
+          .setAlpha(0)
+          .setScale(rank.promoted ? 1.3 : 1)
+          .setDepth(WastelandStreet.DEPTH.UI);
+        this.tweens.add({
+          targets: rankText,
+          alpha: 1,
+          scaleX: 1,
+          scaleY: 1,
+          duration: 500,
+          delay: 520,
+          ease: rank.promoted ? 'Back.easeOut' : 'Quad.easeOut',
+        });
+      }
     }
 
     const awards = this.result.awards ?? [];

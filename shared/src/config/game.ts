@@ -1,6 +1,8 @@
 import type { CharacterDef } from '../types/character.js';
 import type {
   KillWeapon,
+  CareerRankDefinition,
+  CareerRankProgress,
   MatchContractDefinition,
   MatchContractId,
 } from '../types/game.js';
@@ -103,6 +105,51 @@ export function selectMatchContract(
   return MATCH_CONTRACTS[
     eligible[contractHash(`${matchId}:${mode}`) % eligible.length]
   ];
+}
+
+/**
+ * Cosmetic reputation ladder. Rank is always derived from the persisted
+ * contractsCompleted total, so it needs no new storage shape or migration.
+ * Thresholds are cumulative career clears, not a spendable currency.
+ */
+export const CAREER_RANKS: readonly CareerRankDefinition[] = Object.freeze([
+  Object.freeze({ id: 'drifter', title: 'DRIFTER', badge: 'DRF', minContracts: 0 }),
+  Object.freeze({ id: 'scavenger', title: 'SCAVENGER', badge: 'SCV', minContracts: 3 }),
+  Object.freeze({ id: 'road_dog', title: 'ROAD DOG', badge: 'DOG', minContracts: 8 }),
+  Object.freeze({ id: 'marauder', title: 'MARAUDER', badge: 'MAR', minContracts: 15 }),
+  Object.freeze({
+    id: 'wasteland_veteran',
+    title: 'WASTELAND VETERAN',
+    badge: 'VET',
+    minContracts: 25,
+  }),
+  Object.freeze({
+    id: 'legend',
+    title: 'LEGEND OF THE WASTE',
+    badge: 'LEG',
+    minContracts: 40,
+  }),
+]);
+
+/** Rank + next milestone for any wire/storage value, including old bad input. */
+export function careerRankProgressForContracts(value: number): CareerRankProgress {
+  const completed = Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
+  let current = CAREER_RANKS[0];
+  let next: CareerRankDefinition | null = null;
+  for (const rank of CAREER_RANKS) {
+    if (completed >= rank.minContracts) {
+      current = rank;
+    } else {
+      next = rank;
+      break;
+    }
+  }
+  return {
+    completed,
+    current,
+    next,
+    remaining: next ? next.minContracts - completed : 0,
+  };
 }
 
 /**

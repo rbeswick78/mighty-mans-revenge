@@ -166,6 +166,30 @@ export interface MatchContractDefinition {
   target: number;
 }
 
+export type CareerRankId =
+  | 'drifter'
+  | 'scavenger'
+  | 'road_dog'
+  | 'marauder'
+  | 'wasteland_veteran'
+  | 'legend';
+
+/** Cosmetic reputation title derived entirely from completed contracts. */
+export interface CareerRankDefinition {
+  id: CareerRankId;
+  title: string;
+  /** Three-character lobby leaderboard badge. */
+  badge: string;
+  minContracts: number;
+}
+
+export interface CareerRankProgress {
+  completed: number;
+  current: CareerRankDefinition;
+  next: CareerRankDefinition | null;
+  remaining: number;
+}
+
 export interface MatchContractPlayerProgress {
   playerId: PlayerId;
   progress: number;

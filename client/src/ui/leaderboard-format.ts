@@ -1,3 +1,4 @@
+import { careerRankProgressForContracts } from '@shared/config/game.js';
 import type { LeaderboardEntry } from '@shared/types/network.js';
 
 /**
@@ -6,14 +7,16 @@ import type { LeaderboardEntry } from '@shared/types/network.js';
  * beside the centered menu panel, so long names are clipped to keep every
  * row on one short line.
  */
-export const LEADERBOARD_NAME_MAX_CHARS = 10;
+export const LEADERBOARD_NAME_MAX_CHARS = 8;
 
 /**
  * One line of the lobby's "ALL-TIME TOP 5" panel, e.g.
- * "1. RYAN  14W 9L 12C" (C = completed contracts).
+ * "1. RYAN [DOG] 14W 9L 12C" (badge = reputation, C = contracts).
  * Pure string formatting so it stays unit-testable without Phaser.
  */
 export function formatLeaderboardRow(rank: number, entry: LeaderboardEntry): string {
   const name = entry.nickname.toUpperCase().slice(0, LEADERBOARD_NAME_MAX_CHARS);
-  return `${rank}. ${name}  ${entry.wins}W ${entry.losses}L ${entry.contractsCompleted ?? 0}C`;
+  const contracts = entry.contractsCompleted ?? 0;
+  const badge = careerRankProgressForContracts(contracts).current.badge;
+  return `${rank}. ${name} [${badge}] ${entry.wins}W ${entry.losses}L ${contracts}C`;
 }

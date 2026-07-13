@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–25 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts, solo Practice vs Rusty, streak + payback callouts, selectable Rusty difficulty, Collapsed Overpass, Blackout, fresh-chaos rematches, Last Stand, Kill Confirmed, mode briefings, character death animations, authoritative hit confirmation, blastable cover, chain-reaction barrels, Wasteland Contracts, Combat Medals). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–26 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts, solo Practice vs Rusty, streak + payback callouts, selectable Rusty difficulty, Collapsed Overpass, Blackout, fresh-chaos rematches, Last Stand, Kill Confirmed, mode briefings, character death animations, authoritative hit confirmation, blastable cover, chain-reaction barrels, Wasteland Contracts, Combat Medals, Wasteland Reputation). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -57,6 +57,7 @@ Each session below attacks one of these.
 | 23  | Chain-Reaction Barrels                        | Every arena gains tactical traps, ambushes, and explosive reversals  | **DONE** (2026-07-12) |
 | 24  | Wasteland Contracts                           | Optional side goals change tactics and build a persistent career chase | **DONE** (2026-07-12) |
 | 25  | Combat Medals                                 | First Blood, rapid chains, and posthumous kills become stories worth chasing | **DONE** (2026-07-12) |
+| 26  | Wasteland Reputation                          | Contract clears build a visible career ladder and recurring promotion chase | **DONE** (2026-07-12) |
 
 ---
 
@@ -1476,7 +1477,75 @@ celebrations without changing the fight underneath them.
 
 ---
 
+## Session 26 — Wasteland Reputation
+
+**Goal:** turn the contract completion total into a legible long-term identity,
+giving every optional objective another reason to matter without introducing a
+power grind or another persistence migration.
+
+**Locked design decisions**
+
+- Six ranks are derived from lifetime contract clears: Drifter (0), Scavenger
+  (3), Road Dog (8), Marauder (15), Wasteland Veteran (25), and Legend of the
+  Waste (40). The ordered frozen config is the sole threshold source.
+- Rank is never persisted. Existing `contractsCompleted` data is sufficient,
+  malformed values safely normalize to zero, and thresholds can evolve without
+  migrating player files.
+- The all-time board adds compact unique badges (`DRF`, `SCV`, `DOG`, `MAR`,
+  `VET`, `LEG`) while preserving rank, W/L, and contract-total readability.
+- Results show current progress to the next rank. Completing a contract exactly
+  across a threshold replaces that copy with `RANK UP!` and a restrained pulse.
+- Practice and old partial results show no rank line because they cannot bank a
+  career clear. Max-rank players see their total clears rather than a fake next
+  milestone.
+- Reputation is cosmetic. It changes no stats schema, matchmaking, contract
+  RNG, score, damage, movement, rewards, or mode rules.
+
+**Acceptance criteria**
+
+- [x] Thresholds, badges, titles, normalization, and next-rank math are covered
+      by deterministic shared tests.
+- [x] Results distinguish ordinary progress, a real threshold crossing, max
+      rank, Practice, and old partial payloads without false promotions.
+- [x] Leaderboard rows retain compatibility with stats that lack a contract
+      total and remain within the compact lobby panel.
+- [x] Desktop and mobile-landscape results keep reputation, controls, and
+      rematch space visually separate with zero browser warnings/errors.
+- [x] Typecheck, lint, all unit tests, production build, and Playwright pass.
+
+---
+
 ## Session Log
+
+### Session 26 — 2026-07-12 — Wasteland Reputation
+
+**Shipped:** contract clears now build a visible Wasteland career. Every player
+starts as a Drifter, then climbs through Scavenger, Road Dog, Marauder, and
+Wasteland Veteran toward Legend of the Waste. The lobby's all-time board carries
+a compact rank badge, and each eligible results screen reports the next milestone
+or celebrates a promotion earned in that round.
+
+The ladder is a pure projection of the existing `contractsCompleted` field. It
+adds no persistent state, migration, RNG draw, gameplay power, or matchmaking
+input. Practice stays consequence-free, old payloads degrade safely, and max-rank
+players keep accumulating visible clears instead of being pointed at a nonexistent
+next tier.
+
+**Verified:** focused shared and presentation tests cover all six thresholds,
+invalid totals, exact-boundary promotion detection, false-promotion prevention,
+max rank, Practice/partial results, and compact leaderboard formatting. A live
+two-client Wasteland deathmatch showed the seeded Scavenger badge in the lobby and
+the `3/8 TO ROAD DOG` results progress at both 1280×720 and 844×390 without layout
+collisions or browser warnings/errors. Typecheck and the focused 52-test bundle
+are clean; all 867 unit tests pass, lint and the production build succeed, and
+Playwright completes all 21 cases with 12 passes, 9 intentional skips, and zero
+failures across Chromium, Firefox, and mobile landscape.
+
+**Carry-over:** thresholds and titles are deliberately cosmetic first-pass
+tuning. Evaluate whether promotions arrive at satisfying intervals only after
+real contract completion cadence exists; do not attach combat power to rank.
+
+---
 
 ### Session 25 — 2026-07-12 — Combat Medals
 
