@@ -49,8 +49,10 @@ difficulty. `GAUNTLET` starts a three-fight run that escalates from Rookie to
 Scrapper to Warlord; win to advance, while a loss or draw restarts the run.
 Gauntlet fights rotate maps and modes but never change lifetime PvP records.
 Each stage win banks score, with bonuses for the round contract and a
-regulation finish; completing all three stages can set the device's `BEST CLEAR`
-and give the next run a target to beat.
+regulation finish. Zero-death wins add a flawless bonus, while every whole
+regulation second left adds pace points up to the stage cap; completing all
+three stages can set the device's `BEST CLEAR` and give the next run a target
+to beat.
 
 ## Where to read next
 

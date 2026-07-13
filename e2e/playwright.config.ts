@@ -36,10 +36,13 @@ export default defineConfig({
 
   webServer: [
     {
-      command: 'pnpm --filter @game/server dev',
+      // Keep Playwright's server as one non-watching process. `tsx watch`
+      // can orphan its restarted child when Playwright tears the shell down,
+      // letting a forced smoke server unexpectedly reclaim port 3000 later.
+      command: 'node --import tsx src/index.ts',
       port: 3000,
       reuseExistingServer: !process.env.CI,
-      cwd: '..',
+      cwd: '../server',
     },
     {
       command: 'pnpm --filter @game/client dev',

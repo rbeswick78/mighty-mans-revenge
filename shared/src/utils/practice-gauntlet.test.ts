@@ -21,6 +21,8 @@ describe('practice gauntlet', () => {
       runScore: 1200,
       contractBonus: 0,
       regulationBonus: 200,
+      flawlessBonus: 0,
+      paceBonus: 0,
       nextStage: 2,
       nextDifficulty: 'scrapper',
     });
@@ -38,30 +40,72 @@ describe('practice gauntlet', () => {
     });
   });
 
-  it('banks contract and regulation bonuses only on an authoritative win', () => {
+  it('banks contract, regulation, flawless, and capped pace bonuses on a win', () => {
     expect(
-      resolvePracticeGauntlet(practiceGauntletMatch(2, 1500), 'human', 'human', true, false),
+      resolvePracticeGauntlet(practiceGauntletMatch(2, 1500), 'human', 'human', {
+        contractCompleted: true,
+        deaths: 0,
+        regulationSecondsRemaining: 200,
+      }),
     ).toMatchObject({
-      stageScore: 1500,
-      runScore: 3000,
+      stageScore: 2200,
+      runScore: 3700,
       contractBonus: 300,
       regulationBonus: 200,
+      flawlessBonus: 400,
+      paceBonus: 300,
     });
     expect(
-      resolvePracticeGauntlet(practiceGauntletMatch(2, 1500), 'human', 'human', true, true),
+      resolvePracticeGauntlet(practiceGauntletMatch(2, 1500), 'human', 'human', {
+        contractCompleted: true,
+        wentToOvertime: true,
+        deaths: 0,
+        regulationSecondsRemaining: 100,
+      }),
     ).toMatchObject({
-      stageScore: 1300,
-      runScore: 2800,
+      stageScore: 1700,
+      runScore: 3200,
       contractBonus: 300,
       regulationBonus: 0,
+      flawlessBonus: 400,
+      paceBonus: 0,
     });
     expect(
-      resolvePracticeGauntlet(practiceGauntletMatch(2, 1500), 'human', 'bot', true, false),
+      resolvePracticeGauntlet(practiceGauntletMatch(2, 1500), 'human', 'bot', {
+        contractCompleted: true,
+        deaths: 0,
+        regulationSecondsRemaining: 100,
+      }),
     ).toMatchObject({
       stageScore: 0,
       runScore: 1500,
       contractBonus: 0,
       regulationBonus: 0,
+      flawlessBonus: 0,
+      paceBonus: 0,
+    });
+  });
+
+  it('floors pace seconds and requires an explicit zero-death result for flawless', () => {
+    expect(
+      resolvePracticeGauntlet(practiceGauntletMatch(1), 'human', 'human', {
+        deaths: 1,
+        regulationSecondsRemaining: 47.9,
+      }),
+    ).toMatchObject({
+      stageScore: 1294,
+      flawlessBonus: 0,
+      paceBonus: 94,
+    });
+    expect(
+      resolvePracticeGauntlet(practiceGauntletMatch(1), 'human', 'human', {
+        deaths: Number.NaN,
+        regulationSecondsRemaining: -10,
+      }),
+    ).toMatchObject({
+      stageScore: 1200,
+      flawlessBonus: 0,
+      paceBonus: 0,
     });
   });
 });

@@ -1201,13 +1201,12 @@ export class MatchmakingManager {
         const contractCompleted =
           result.contract?.players.find((progress) => progress.playerId === humanPlayerId)
             ?.completed ?? false;
-        result.gauntlet = resolvePracticeGauntlet(
-          gauntlet,
-          humanPlayerId,
-          result.winnerId,
+        result.gauntlet = resolvePracticeGauntlet(gauntlet, humanPlayerId, result.winnerId, {
           contractCompleted,
-          result.wentToOvertime,
-        );
+          wentToOvertime: result.wentToOvertime,
+          deaths: result.playerStats.get(humanPlayerId)?.deaths,
+          regulationSecondsRemaining: result.wentToOvertime ? 0 : match.matchTimer,
+        });
       }
     }
 

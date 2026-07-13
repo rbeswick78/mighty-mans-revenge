@@ -1448,6 +1448,7 @@ describe('MatchmakingManager solo practice flow', () => {
 
     const first = mgr.getActiveMatches()[0];
     first.players.get('A')!.score = 3;
+    first.matchTimer = 100;
     first.phase = MatchPhase.ENDED;
     mgr.tick(0.05, 1);
     const firstEnd = [...sent]
@@ -1460,8 +1461,10 @@ describe('MatchmakingManager solo practice flow', () => {
       stage: 1,
       difficulty: 'rookie',
       outcome: 'advanced',
-      stageScore: 1200,
-      runScore: 1200,
+      stageScore: 1800,
+      runScore: 1800,
+      flawlessBonus: 400,
+      paceBonus: 200,
       nextStage: 2,
       nextDifficulty: 'scrapper',
     });
@@ -1480,11 +1483,13 @@ describe('MatchmakingManager solo practice flow', () => {
       stage: 2,
       totalStages: 3,
       difficulty: 'scrapper',
-      runScore: 1200,
+      runScore: 1800,
     });
 
     const second = mgr.getActiveMatches()[0];
     second.players.get('A')!.score = 3;
+    second.stats.recordDeath('A');
+    second.matchTimer = 47.9;
     second.phase = MatchPhase.ENDED;
     mgr.tick(0.05, 2);
     const secondEnd = [...sent]
@@ -1497,8 +1502,10 @@ describe('MatchmakingManager solo practice flow', () => {
       stage: 2,
       difficulty: 'scrapper',
       outcome: 'advanced',
-      stageScore: 1200,
-      runScore: 2400,
+      stageScore: 1294,
+      runScore: 3094,
+      flawlessBonus: 0,
+      paceBonus: 94,
       nextStage: 3,
       nextDifficulty: 'warlord',
     });
@@ -1515,11 +1522,12 @@ describe('MatchmakingManager solo practice flow', () => {
       stage: 3,
       totalStages: 3,
       difficulty: 'warlord',
-      runScore: 2400,
+      runScore: 3094,
     });
 
     const third = mgr.getActiveMatches()[0];
     third.players.get('A')!.score = 3;
+    third.matchTimer = 0;
     third.phase = MatchPhase.ENDED;
     mgr.tick(0.05, 3);
     const cleared = [...sent]
@@ -1532,8 +1540,10 @@ describe('MatchmakingManager solo practice flow', () => {
       stage: 3,
       difficulty: 'warlord',
       outcome: 'cleared',
-      stageScore: 1200,
-      runScore: 3600,
+      stageScore: 1600,
+      runScore: 4694,
+      flawlessBonus: 400,
+      paceBonus: 0,
       nextStage: 1,
       nextDifficulty: 'rookie',
     });

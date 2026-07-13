@@ -30,11 +30,13 @@ function result(outcome: 'advanced' | 'failed' | 'cleared'): MatchResult {
       stage: outcome === 'cleared' ? 3 : 1,
       totalStages: 3,
       difficulty: outcome === 'cleared' ? 'warlord' : 'rookie',
-      runScore: outcome === 'cleared' ? 4500 : outcome === 'advanced' ? 1500 : 0,
+      runScore: outcome === 'cleared' ? 6600 : outcome === 'advanced' ? 2200 : 0,
       outcome,
-      stageScore: outcome === 'failed' ? 0 : 1500,
+      stageScore: outcome === 'failed' ? 0 : 2200,
       contractBonus: outcome === 'failed' ? 0 : 300,
       regulationBonus: outcome === 'failed' ? 0 : 200,
+      flawlessBonus: outcome === 'failed' ? 0 : 400,
+      paceBonus: outcome === 'failed' ? 0 : 300,
       nextStage: outcome === 'advanced' ? 2 : 1,
       nextDifficulty: outcome === 'advanced' ? 'scrapper' : 'rookie',
     },
@@ -57,9 +59,9 @@ describe('practice gauntlet presentation', () => {
     expect(gauntletOutcomeTitle(value)).toBe('STAGE CLEAR');
     expect(gauntletActionLabel(value)).toBe('NEXT FIGHT');
     expect(gauntletResultSummary(value)).toContain('STAGE CLEAR');
-    expect(gauntletResultSummary(value)).toContain('RUN 1,500');
+    expect(gauntletResultSummary(value)).toContain('RUN 2,200');
     expect(gauntletStageScoreSummary(value)).toBe(
-      'STAGE +1,500  //  CLEAR +1,000  //  CONTRACT +300  //  REGULATION +200',
+      'STAGE +2,200 = CLEAR 1,000 + CONTRACT 300 + REG 200 + FLAWLESS 400 + PACE 300',
     );
     expect(gauntletNextTeaser(value)).toBe('NEXT: STAGE 2/3 - SCRAPPER  //  GUN GAME - SCRAPYARD');
   });
@@ -81,14 +83,14 @@ describe('practice gauntlet presentation', () => {
       isNewBest: false,
     });
     expect(gauntletBestClearUpdate(result('cleared'), 4200)).toEqual({
-      bestScore: 4500,
+      bestScore: 6600,
       isNewBest: true,
     });
-    expect(gauntletBestClearUpdate(result('cleared'), 5000)).toEqual({
-      bestScore: 5000,
+    expect(gauntletBestClearUpdate(result('cleared'), 7000)).toEqual({
+      bestScore: 7000,
       isNewBest: false,
     });
     expect(gauntletBestClearLabel(0)).toBe('BEST CLEAR: NONE YET');
-    expect(gauntletBestClearLabel(4500, true)).toBe('NEW BEST CLEAR: 4,500');
+    expect(gauntletBestClearLabel(6600, true)).toBe('NEW BEST CLEAR: 6,600');
   });
 });

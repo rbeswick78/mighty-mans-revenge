@@ -526,6 +526,9 @@ export const PRACTICE_GAUNTLET = Object.freeze({
   STAGE_CLEAR_POINTS: 1000,
   CONTRACT_BONUS_POINTS: 300,
   REGULATION_BONUS_POINTS: 200,
+  FLAWLESS_BONUS_POINTS: 400,
+  PACE_POINTS_PER_SECOND: 2,
+  MAX_PACE_BONUS_POINTS: 300,
 });
 
 /** Skill profiles change decision cadence, never physics or damage rules. */

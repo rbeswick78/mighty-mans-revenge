@@ -287,6 +287,10 @@ export interface PracticeGauntletResult extends PracticeGauntletMatch {
   contractBonus: number;
   /** No-overtime portion of stageScore. */
   regulationBonus: number;
+  /** Zero-death portion of stageScore. */
+  flawlessBonus: number;
+  /** Regulation time-remaining portion of stageScore. */
+  paceBonus: number;
   /** Stage launched by the results-screen action (advance or retry). */
   nextStage: number;
   nextDifficulty: BotDifficulty;

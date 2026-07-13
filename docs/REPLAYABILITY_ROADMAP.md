@@ -82,6 +82,7 @@ Each session below attacks one of these.
 | 48  | Twin-Stick Controller Support                   | Console-style controls make every fight and rematch easier to settle into    | **DONE** (2026-07-13) |
 | 49  | Wasteland Gauntlet                              | A three-fight solo climb turns Practice into a run with escalating stakes    | **DONE** (2026-07-13) |
 | 50  | Gauntlet Score Attack                           | Every solo clear leaves a personal target worth one more run                 | **DONE** (2026-07-13) |
+| 51  | Gauntlet Performance Bonuses                    | Cleaner, faster victories keep even strong personal bests worth chasing      | **DONE** (2026-07-13) |
 
 ---
 
@@ -2481,7 +2482,95 @@ clear an immediate “one more run” challenge.
 
 ---
 
+## Session 51 — Gauntlet Performance Bonuses
+
+**Goal:** turn Gauntlet scoring from a small set of solved totals into a
+skill-sensitive chase where every cleaner or faster stage can improve the run.
+
+**Locked design decisions**
+
+- The existing 1,000-point clear, 300-point contract, and 200-point regulation
+  awards remain intact. A winning stage now adds 400 for zero deaths and two
+  points per whole regulation second remaining, capped at 300 pace points.
+  The theoretical stage maximum is 2,200 and the three-stage maximum is 6,600.
+- All inputs are server-authoritative: the human's `PlayerStats.deaths`, the
+  live match clock, contract result, overtime flag, and winner feed one shared
+  resolver. The client receives `flawlessBonus` and `paceBonus`; it never
+  reconstructs either from local time or presentation state.
+- Overtime never awards pace points. A win may still be flawless after
+  overtime, because flawless describes survival rather than speed. Losses and
+  draws continue to bank no stage points of any kind.
+- Missing or invalid death data cannot accidentally earn flawless, while
+  negative, fractional, or invalid clock values normalize deterministically.
+  Pace floors whole seconds before multiplying and never exceeds its cap.
+- Existing device records remain valid. No storage migration or reset is
+  needed: new clears compete against the stored number normally, and a prior
+  4,500 perfect clear becomes a meaningful target rather than stale data.
+- Results present the exact award as a compact score equation (`STAGE +2,200 =
+CLEAR 1,000 + CONTRACT 300 + REG 200 + FLAWLESS 400 + PACE 300`) so every
+  contribution remains legible on the fixed desktop canvas and mobile
+  landscape without displacing awards.
+
+**Acceptance criteria**
+
+- [x] Shared tests cover the full bonus stack, overtime, loss gating, capped
+      and fractional pace, invalid values, and explicit zero-death gating.
+- [x] Matchmaking integration proves authoritative death/time inputs and score
+      carry across three differently scored stages before clear/failure reset.
+- [x] Client tests cover the compact full-stack breakdown and existing
+      completed-clear-only personal-best behavior at the new score ceiling.
+- [x] Real authoritative desktop and 844×390 mobile runs verify lobby,
+      briefing, results, awards, and action spacing with zero client errors.
+- [x] Typecheck, lint, all 1,097 unit tests, production build, and the full
+      Playwright desktop/mobile matrix pass.
+
+---
+
 ## Session Log
+
+### Session 51 — 2026-07-13 — Gauntlet Performance Bonuses
+
+**Shipped:** Gauntlet now rewards how a stage was won, not only whether it was
+won. A deathless victory earns 400 flawless points, and each whole regulation
+second left earns two pace points up to 300. Those join the existing clear,
+contract, and regulation awards for a 2,200 stage ceiling and 6,600 run ceiling.
+The server derives every value from authoritative stats and its own clock, then
+ships the exact breakdown through `MatchResult`.
+
+The result line is a compact score equation that exposes every contribution
+without asking the player to reverse-engineer the total. Old browser-local best
+clears remain comparable and require no migration; the richer scale simply
+gives a previously perfect 4,500 run room to improve. Ordinary Practice, PvP
+stats, leaderboards, Rivalry Sets, contracts, and combat balance are unchanged.
+
+The E2E server now runs as a single non-watching `tsx` process. This prevents a
+watcher's restarted child from outliving Playwright and later reclaiming port
+3000 with stale smoke-test pins, so later runs always exercise the intended
+fresh server configuration.
+
+**Verification:** 1,097 tests pass across 73 files, including capped/fractional
+pace, invalid-input normalization, zero-death gating, overtime, loss gating,
+three-stage carry, and presentation. TypeScript, ESLint, formatting, all package
+builds, and the Vite production bundle are clean; Vite retains its existing
+chunk-size advisory. The full Playwright desktop Chromium, desktop Firefox, and
+mobile-landscape matrix passes 13 tests with 11 intentional scoped skips. Its
+first run exposed an orphaned forced-Deathmatch watch child; after the lifecycle
+fix, the isolated Bounty Hunt flow and complete matrix both passed cleanly, with
+no server listener left behind. Real authoritative desktop and 844×390 mobile
+runs verified lobby and stage copy, loss scoring, award rows, retry/lobby
+actions, fixed-canvas scaling, and zero client errors. The maximum success
+equation was kept deliberately compact and is deterministically covered by the
+client presentation test. All temporary playtest services were stopped.
+
+**Tuning watch:** pace deliberately caps below flawless, so survival remains the
+largest new skill signal and naturally slow objective modes are not buried by
+fast Deathmatch routes. Watch whether 400 makes deathless play too conservative
+and whether two points per second produces enough visible separation between
+otherwise similar clears.
+
+**Deployment:** not run; deployment still requires explicit authorization.
+
+---
 
 ### Session 50 — 2026-07-13 — Gauntlet Score Attack
 
@@ -4105,7 +4194,7 @@ setAxeless` swaps the body prefix while `abilityCooldownSeconds > 0`
   — that helper is unreliable geckos io.emit.
 
 **Verified:** 717 unit tests green (+32 this session: config invariants
-incl. altBody frame-dim integrity and hill*hog priority slot, KOTH
+incl. altBody frame-dim integrity and hill\*hog priority slot, KOTH
 hill-seconds accrual matrix incl. contested-both-accrue-score-frozen,
 Hill Hog threshold/tie/DM-never, pistol equip/replace/refresh/
 starts-active/never-announced/gun-game-veto, getTopPlayers ordering +
@@ -4119,7 +4208,8 @@ persisted players (desktop AND an 844×390 chromium mobile-landscape
 viewport), pair-up with Jack locked via 3×ArrowRight, pistol pickup
 present at match start, a BFS waypoint-walker drove a client onto
 (9,10) → weaponId flipped to pistol with exactly 12 mag + 24 reserve,
-Jack's axe throw flipped BOTH clients' body anims to `jack-noaxe*_`for the cooldown window and back to`jack\__` at expiry, zero uncaught
+Jack's axe throw flipped BOTH clients' body animation prefix to `jack-noaxe`
+for the cooldown window and back to `jack` at expiry, zero uncaught
 page errors on either client.
 
 **Known issues / notes for later sessions:**
@@ -4169,7 +4259,7 @@ special-weapon slot + generalized reload; Gun-Game-only in v1
 (pickupAmmo 0). **Punch** (`WEAPONS.punch`, flat 60 dmg, 56px reach,
 0.5s swing): validated as 7 jitter-free even-fan rays
 (`evenFanAngles`) through `processMultiShotWithRewind` — per-victim
-character hitboxes, big_heads scale, wall blocking, and the lag-comp
+character hitboxes, `big_heads` scale, wall blocking, and the lag-comp
 rewind all came free; new `WeaponDef.maxRange` hard-caps ray length
 (without it rays extend to falloffRangeMax × 2). One damage application
 per victim per swing; an arc can hit multiple victims; x-ray never

@@ -68,16 +68,23 @@ export function gauntletStageScoreSummary(result: MatchResult): string | null {
   const stageScore = safeScore(run.stageScore);
   const contractBonus = safeScore(run.contractBonus);
   const regulationBonus = safeScore(run.regulationBonus);
+  const flawlessBonus = safeScore(run.flawlessBonus);
+  const paceBonus = safeScore(run.paceBonus);
   if (stageScore <= 0) return 'NO POINTS BANKED - WIN THE STAGE TO SCORE';
 
-  const clearPoints = Math.max(0, stageScore - contractBonus - regulationBonus);
+  const clearPoints = Math.max(
+    0,
+    stageScore - contractBonus - regulationBonus - flawlessBonus - paceBonus,
+  );
   const bonuses = [
-    contractBonus > 0 ? `CONTRACT +${formatScore(contractBonus)}` : null,
-    regulationBonus > 0 ? `REGULATION +${formatScore(regulationBonus)}` : null,
+    contractBonus > 0 ? `CONTRACT ${formatScore(contractBonus)}` : null,
+    regulationBonus > 0 ? `REG ${formatScore(regulationBonus)}` : null,
+    flawlessBonus > 0 ? `FLAWLESS ${formatScore(flawlessBonus)}` : null,
+    paceBonus > 0 ? `PACE ${formatScore(paceBonus)}` : null,
   ].filter((bonus): bonus is string => bonus !== null);
   return (
-    `STAGE +${formatScore(stageScore)}  //  CLEAR +${formatScore(clearPoints)}` +
-    (bonuses.length > 0 ? `  //  ${bonuses.join('  //  ')}` : '')
+    `STAGE +${formatScore(stageScore)} = CLEAR ${formatScore(clearPoints)}` +
+    (bonuses.length > 0 ? ` + ${bonuses.join(' + ')}` : '')
   );
 }
 

@@ -12,6 +12,18 @@ function safeScore(score: number): number {
   return Math.max(0, Math.floor(score));
 }
 
+function safeCount(value: number | undefined): number | null {
+  if (!Number.isFinite(value)) return null;
+  return Math.max(0, Math.floor(value ?? 0));
+}
+
+export interface PracticeGauntletPerformance {
+  contractCompleted?: boolean;
+  wentToOvertime?: boolean;
+  deaths?: number;
+  regulationSecondsRemaining?: number;
+}
+
 export function practiceGauntletMatch(stage: number, runScore = 0): PracticeGauntletMatch {
   const normalized = safeStage(stage);
   return {
@@ -27,17 +39,32 @@ export function resolvePracticeGauntlet(
   match: PracticeGauntletMatch,
   humanPlayerId: PlayerId,
   winnerId: PlayerId | null,
-  contractCompleted = false,
-  wentToOvertime = false,
+  performance: PracticeGauntletPerformance = {},
 ): PracticeGauntletResult {
   const won = winnerId === humanPlayerId;
   const cleared = won && match.stage >= match.totalStages;
   const nextStage = won && !cleared ? match.stage + 1 : 1;
   const next = practiceGauntletMatch(nextStage);
-  const contractBonus = won && contractCompleted ? PRACTICE_GAUNTLET.CONTRACT_BONUS_POINTS : 0;
-  const regulationBonus = won && !wentToOvertime ? PRACTICE_GAUNTLET.REGULATION_BONUS_POINTS : 0;
+  const contractBonus =
+    won && performance.contractCompleted ? PRACTICE_GAUNTLET.CONTRACT_BONUS_POINTS : 0;
+  const regulationBonus =
+    won && !performance.wentToOvertime ? PRACTICE_GAUNTLET.REGULATION_BONUS_POINTS : 0;
+  const deaths = safeCount(performance.deaths);
+  const flawlessBonus = won && deaths === 0 ? PRACTICE_GAUNTLET.FLAWLESS_BONUS_POINTS : 0;
+  const secondsRemaining = safeCount(performance.regulationSecondsRemaining) ?? 0;
+  const paceBonus =
+    won && !performance.wentToOvertime
+      ? Math.min(
+          PRACTICE_GAUNTLET.MAX_PACE_BONUS_POINTS,
+          secondsRemaining * PRACTICE_GAUNTLET.PACE_POINTS_PER_SECOND,
+        )
+      : 0;
   const stageScore = won
-    ? PRACTICE_GAUNTLET.STAGE_CLEAR_POINTS + contractBonus + regulationBonus
+    ? PRACTICE_GAUNTLET.STAGE_CLEAR_POINTS +
+      contractBonus +
+      regulationBonus +
+      flawlessBonus +
+      paceBonus
     : 0;
   return {
     ...match,
@@ -46,6 +73,8 @@ export function resolvePracticeGauntlet(
     stageScore,
     contractBonus,
     regulationBonus,
+    flawlessBonus,
+    paceBonus,
     nextStage: next.stage,
     nextDifficulty: next.difficulty,
   };
