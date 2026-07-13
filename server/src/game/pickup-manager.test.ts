@@ -138,6 +138,27 @@ describe('PickupManager', () => {
     });
   });
 
+  describe('removeTypes', () => {
+    it('permanently removes only the superseded pickup kinds', () => {
+      manager.initFromMap(
+        makeMapData([
+          { x: 2, y: 2, type: 'weapon_shotgun' },
+          { x: 3, y: 3, type: 'weapon_pistol' },
+          { x: 4, y: 4, type: 'bandage' },
+        ]),
+      );
+
+      manager.removeTypes([
+        PickupType.WEAPON_SHOTGUN,
+        PickupType.WEAPON_PISTOL,
+      ]);
+      manager.update(PICKUP.WEAPON_RESPAWN_TIME * 2);
+
+      expect(manager.getPickups()).toHaveLength(1);
+      expect(manager.getPickups()[0].type).toBe(PickupType.BANDAGE);
+    });
+  });
+
   describe('update - respawn timer', () => {
     it('should decrement respawn timer and reactivate when it expires', () => {
       const mapData = makeMapData([{ x: 2, y: 2, type: 'gun_ammo' }]);

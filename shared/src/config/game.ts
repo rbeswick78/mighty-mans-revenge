@@ -624,6 +624,7 @@ export const MUTATORS = Object.freeze({
     'second_wind',
     'blackout',
     'fists_only',
+    'weapon_roulette',
   ] as const,
   /** Final-minute slot: warning/activation thresholds in seconds REMAINING. */
   WARNING_AT_REMAINING: 65,
@@ -653,6 +654,15 @@ export const MUTATORS = Object.freeze({
   SECOND_WIND_SPEED_MULTIPLIER: 1.3,
   /** ...for this many seconds (PlayerState.secondWindTimer). */
   SECOND_WIND_DURATION_SECONDS: 3,
+  /** Fair shared loadout sequence used by weapon_roulette. */
+  WEAPON_ROULETTE_ORDER: Object.freeze([
+    'shotgun',
+    'pistol',
+    'punch',
+    'rifle',
+  ] as const),
+  /** Seconds each shared roulette loadout stays active. */
+  WEAPON_ROULETTE_INTERVAL_SECONDS: 10,
 });
 
 /**

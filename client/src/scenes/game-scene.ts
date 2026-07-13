@@ -35,7 +35,8 @@ import { HealFlash } from '../rendering/heal-flash.js';
 import { EventFlash } from '../rendering/event-flash.js';
 import { eventDisplayName } from '@shared/utils/event-modifiers.js';
 import type { SerializedPlayerState } from '@shared/types/network.js';
-import { MUTATORS, type MutatorId } from '@shared/config/game.js';
+import { MUTATORS, type MutatorId, type WeaponId } from '@shared/config/game.js';
+import { weaponRouletteCallout } from '../ui/weapon-roulette.js';
 import type {
   EventStartPayload,
   EventWarningPayload,
@@ -228,6 +229,10 @@ export class GameScene extends Phaser.Scene {
   /** Cached so we can detect changes (incl. mid-match-join) and resync the label. */
   /** Joined display names of the synced active mutators, or null when none. */
   private lastSyncedMutatorLabel: string | null = null;
+  /** Last authoritative local weapon seen while Weapon Roulette is active. */
+  private lastRouletteWeapon: WeaponId | null = null;
+  /** Ignore the pre-activation weapon if eventStart beats its first snapshot. */
+  private awaitingRouletteOpeningWeapon = false;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -686,6 +691,32 @@ export class GameScene extends Phaser.Scene {
         if (mutatorLabel !== this.lastSyncedMutatorLabel) {
           this.lastSyncedMutatorLabel = mutatorLabel;
           this.hud.setActiveEventLabel(mutatorLabel);
+        }
+
+        const rouletteActive = activeMutators.includes('weapon_roulette');
+        if (rouletteActive && this.awaitingRouletteOpeningWeapon) {
+          if (currentLocalState.weaponId === MUTATORS.WEAPON_ROULETTE_ORDER[0]) {
+            this.lastRouletteWeapon = currentLocalState.weaponId;
+            this.awaitingRouletteOpeningWeapon = false;
+          }
+        } else {
+          const rouletteCallout = weaponRouletteCallout(
+            this.lastRouletteWeapon,
+            currentLocalState.weaponId,
+            rouletteActive,
+          );
+          if (rouletteCallout) {
+            this.hud.showEventBanner(rouletteCallout, 'WEAPON ROULETTE', 0x5ce1e6);
+            AudioManager.getInstance()?.play('pickupCollect', { rate: 1.25 });
+            this.zoomPulse?.trigger();
+          }
+          this.lastRouletteWeapon = rouletteActive
+            ? currentLocalState.weaponId
+            : null;
+        }
+        if (!rouletteActive) {
+          this.lastRouletteWeapon = null;
+          this.awaitingRouletteOpeningWeapon = false;
         }
       }
     }
@@ -1353,6 +1384,7 @@ export class GameScene extends Phaser.Scene {
       second_wind: 0x4fe3c1,
       blackout: 0x4b527e,
       fists_only: 0xffb347,
+      weapon_roulette: 0x5ce1e6,
     };
 
     this.onEventWarning = (payload: EventWarningPayload) => {
@@ -1366,6 +1398,10 @@ export class GameScene extends Phaser.Scene {
 
     this.onEventStart = (payload: EventStartPayload) => {
       const name = eventDisplayName(payload.event);
+      if (payload.event === 'weapon_roulette') {
+        this.lastRouletteWeapon = null;
+        this.awaitingRouletteOpeningWeapon = true;
+      }
       this.hud?.showEventBanner(`${name}!`, undefined, EVENT_BANNER_COLORS[payload.event]);
       this.hud?.setActiveEventLabel(name);
       this.eventFlash?.trigger(payload.event);
@@ -1619,6 +1655,8 @@ export class GameScene extends Phaser.Scene {
     this.healFlash = null;
     this.eventFlash = null;
     this.lastSyncedMutatorLabel = null;
+    this.lastRouletteWeapon = null;
+    this.awaitingRouletteOpeningWeapon = false;
     if (this.impactFx) {
       this.impactFx.destroy();
       this.impactFx = null;

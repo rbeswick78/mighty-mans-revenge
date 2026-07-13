@@ -26,6 +26,7 @@ describe('mutatorsToMovementModifiers', () => {
       'turbo_grenades',
       'blackout',
       'fists_only',
+      'weapon_roulette',
     ];
     for (const mutator of passthrough) {
       expect(mutatorsToMovementModifiers([mutator])).toEqual({});
@@ -112,10 +113,15 @@ describe('eventDisplayName', () => {
     }
   });
 
-  it('identifies only the symmetric fists/grenades conflict', () => {
+  it('identifies symmetric ownership conflicts between forced loadouts', () => {
     expect(mutatorsConflict('fists_only', 'grenades_only')).toBe(true);
     expect(mutatorsConflict('grenades_only', 'fists_only')).toBe(true);
+    expect(mutatorsConflict('weapon_roulette', 'fists_only')).toBe(true);
+    expect(mutatorsConflict('fists_only', 'weapon_roulette')).toBe(true);
+    expect(mutatorsConflict('weapon_roulette', 'grenades_only')).toBe(true);
+    expect(mutatorsConflict('grenades_only', 'weapon_roulette')).toBe(true);
     expect(mutatorsConflict('fists_only', 'super_speed')).toBe(false);
     expect(mutatorsConflict('grenades_only', 'turbo_grenades')).toBe(false);
+    expect(mutatorsConflict('weapon_roulette', 'weapon_roulette')).toBe(false);
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GameModeType, MatchPhase, TileType } from '@shared/game';
+import { GameModeType, MatchPhase, MUTATORS, TileType } from '@shared/game';
 import type { CollisionGrid, MapData } from '@shared/game';
 import { BotController, findGridPath } from './bot-controller.js';
 import { Match } from './match.js';
@@ -246,5 +246,53 @@ describe('BotController', () => {
 
     expect(match.stats.getStats(bot.id).shotsFired).toBeGreaterThan(0);
     expect(human.health).toBeLessThan(human.maxHealth);
+  });
+
+  it('adapts ordinary bot inputs to synchronized roulette weapon changes', () => {
+    process.env.FORCE_EVENT = 'weapon_roulette';
+    try {
+      const match = new Match(
+        'practice-roulette',
+        OPEN_MAP,
+        [
+          { id: 'human', nickname: 'Human' },
+          { id: 'bot:test', nickname: 'Rusty' },
+        ],
+        GameModeType.DEATHMATCH,
+        () => 0,
+      );
+      const human = match.players.get('human')!;
+      const bot = match.players.get('bot:test')!;
+      human.characterId = 'bubba';
+      bot.characterId = 'mighty_man';
+      human.health = 10_000;
+      human.maxHealth = 10_000;
+      human.position = { x: 5.5 * 48, y: 2.5 * 48 };
+      bot.position = { x: 2.5 * 48, y: 2.5 * 48 };
+      match.phase = MatchPhase.ACTIVE;
+      match.matchTimer = MUTATORS.ACTIVATION_AT_REMAINING + 0.01;
+      (match as unknown as { midMatchSlot: { activateAtElapsed: number } })
+        .midMatchSlot.activateAtElapsed = Number.POSITIVE_INFINITY;
+
+      match.update(0.05);
+      expect(bot.weaponId).toBe('shotgun');
+      const controller = new BotController(bot.id);
+      for (let tick = 1; tick <= 30; tick++) {
+        controller.update(0.05, match, tick);
+        match.update(0.05);
+      }
+      const shotgunShots = match.stats.getStats(bot.id).shotsFired;
+      expect(shotgunShots).toBeGreaterThan(0);
+
+      match.update(MUTATORS.WEAPON_ROULETTE_INTERVAL_SECONDS);
+      expect(bot.weaponId).toBe('pistol');
+      for (let tick = 31; tick <= 60; tick++) {
+        controller.update(0.05, match, tick);
+        match.update(0.05);
+      }
+      expect(match.stats.getStats(bot.id).shotsFired).toBeGreaterThan(shotgunShots);
+    } finally {
+      delete process.env.FORCE_EVENT;
+    }
   });
 });

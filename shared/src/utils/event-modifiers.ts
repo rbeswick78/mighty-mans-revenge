@@ -95,13 +95,20 @@ export function eventDisplayName(event: MutatorId): string {
       return 'BLACKOUT';
     case 'fists_only':
       return 'FISTS ONLY';
+    case 'weapon_roulette':
+      return 'WEAPON ROULETTE';
   }
 }
 
-/** Mutator pairs that would leave players with no usable core attack. */
+/** Mutator pairs that compete for ownership of the shared core loadout. */
 export function mutatorsConflict(a: MutatorId, b: MutatorId): boolean {
+  const aOwnsLoadout =
+    a === 'grenades_only' || a === 'fists_only' || a === 'weapon_roulette';
+  const bOwnsLoadout =
+    b === 'grenades_only' || b === 'fists_only' || b === 'weapon_roulette';
   return (
-    (a === 'fists_only' && b === 'grenades_only') ||
-    (a === 'grenades_only' && b === 'fists_only')
+    a !== b &&
+    aOwnsLoadout &&
+    bOwnsLoadout
   );
 }

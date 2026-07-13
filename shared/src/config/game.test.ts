@@ -27,6 +27,7 @@ import {
   CAREER_RANKS,
   careerRankProgressForContracts,
   CHARACTER_MASTERY_TIERS,
+  MUTATORS,
   characterMasteryProgressForWins,
   createEmptyCharacterWins,
   selectMatchContract,
@@ -68,6 +69,22 @@ describe('game mode rotation', () => {
     expect(gameModeDisplayName(GameModeType.KOTH)).toBe('KING OF THE HILL');
     expect(gameModeDisplayName(GameModeType.LAST_STAND)).toBe('LAST STAND');
     expect(gameModeDisplayName(GameModeType.KILL_CONFIRMED)).toBe('KILL CONFIRMED');
+  });
+});
+
+describe('weapon roulette mutator', () => {
+  it('cycles through every core weapon exactly once on a positive cadence', () => {
+    expect(MUTATORS.WEAPON_ROULETTE_INTERVAL_SECONDS).toBeGreaterThan(0);
+    expect(MUTATORS.WEAPON_ROULETTE_ORDER).toEqual([
+      'shotgun',
+      'pistol',
+      'punch',
+      'rifle',
+    ]);
+    expect(new Set(MUTATORS.WEAPON_ROULETTE_ORDER)).toEqual(
+      new Set(WEAPON_IDS),
+    );
+    expect(Object.isFrozen(MUTATORS.WEAPON_ROULETTE_ORDER)).toBe(true);
   });
 });
 

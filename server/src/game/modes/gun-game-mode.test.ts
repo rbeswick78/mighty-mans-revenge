@@ -356,6 +356,7 @@ describe('GunGameMode', () => {
         'grenades_only',
         'infinite_ammo',
         'fists_only',
+        'weapon_roulette',
       ]);
     });
 

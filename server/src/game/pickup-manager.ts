@@ -166,6 +166,16 @@ export class PickupManager {
     pickup.respawnTimer = respawnTimeFor(pickup.type);
   }
 
+  /** Permanently retire pickup kinds superseded by a match-long rule. */
+  removeTypes(types: readonly PickupType[]): void {
+    const removed = new Set(types);
+    for (const [id, pickup] of this.pickups) {
+      if (!removed.has(pickup.type)) continue;
+      this.pickups.delete(id);
+      this.announced.delete(id);
+    }
+  }
+
   /** Apply pickup effect to a player. Returns true if the pickup was useful. */
   applyPickup(pickup: PickupState, player: PlayerState): boolean {
     switch (pickup.type) {

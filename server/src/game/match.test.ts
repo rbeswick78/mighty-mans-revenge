@@ -1254,6 +1254,97 @@ describe('Match', () => {
         expect(p1.grenades).toBe(0);
       });
 
+      it('weapon_roulette gives everyone the same stocked weapon and cycles fairly', () => {
+        const m = startActiveMatchAt(
+          MUTATORS.ACTIVATION_AT_REMAINING + 0.01,
+          'weapon_roulette',
+        );
+        const alreadyHoldingShotgun = m.players.get('player-0')!;
+        alreadyHoldingShotgun.weaponId = 'shotgun';
+        alreadyHoldingShotgun.specialAmmo = 1;
+        alreadyHoldingShotgun.specialReserve = 0;
+        m.update(0.05);
+
+        for (const player of m.players.values()) {
+          expect(player.weaponId).toBe('shotgun');
+          expect(player.specialAmmo).toBe(WEAPONS.shotgun.magazineSize);
+          expect(player.specialReserve).toBe(WEAPONS.shotgun.magazineSize);
+        }
+
+        m.update(MUTATORS.WEAPON_ROULETTE_INTERVAL_SECONDS);
+        for (const player of m.players.values()) {
+          expect(player.weaponId).toBe('pistol');
+          expect(player.specialAmmo).toBe(WEAPONS.pistol.magazineSize);
+        }
+
+        m.update(MUTATORS.WEAPON_ROULETTE_INTERVAL_SECONDS);
+        expect([...m.players.values()].map((player) => player.weaponId)).toEqual([
+          'punch',
+          'punch',
+        ]);
+
+        m.update(MUTATORS.WEAPON_ROULETTE_INTERVAL_SECONDS);
+        for (const player of m.players.values()) {
+          expect(player.weaponId).toBe('rifle');
+          expect(player.ammo).toBe(WEAPONS.rifle.magazineSize);
+        }
+      });
+
+      it('weapon_roulette persists through respawns and retires obsolete weapon pickups', () => {
+        const map = makeMapData();
+        map.pickupSpawns = [
+          { x: 4, y: 4, type: 'gun_ammo' },
+          { x: 5, y: 5, type: 'weapon_pistol' },
+        ];
+        const m = new Match(
+          'roulette-persistence',
+          map,
+          [
+            { id: 'player-0', nickname: 'Player 0' },
+            { id: 'player-1', nickname: 'Player 1' },
+          ],
+          GameModeType.DEATHMATCH,
+          () => 0,
+        );
+        process.env.FORCE_EVENT = 'weapon_roulette';
+        try {
+          m.startCountdown();
+          m.update(MATCH.COUNTDOWN_DURATION + 0.05);
+          const internals = m as unknown as MatchInternals;
+          internals.matchTimer = MUTATORS.ACTIVATION_AT_REMAINING + 0.01;
+          internals.midMatchSlot.activateAtElapsed = Number.POSITIVE_INFINITY;
+          m.update(0.05);
+
+          const p1 = m.players.get('player-1')!;
+          m.onKill('player-0', p1.id, 'shotgun');
+          const respawnTicks = Math.ceil(RESPAWN.DELAY / 0.05) + 1;
+          for (let i = 0; i < respawnTicks; i++) m.update(0.05);
+          expect(p1.isDead).toBe(false);
+          expect(p1.weaponId).toBe('shotgun');
+
+          expect(m.pickupManager.getPickups()).toHaveLength(0);
+        } finally {
+          delete process.env.FORCE_EVENT;
+        }
+      });
+
+      it('weapon_roulette holds an exhausted weapon until the shared cycle advances', () => {
+        const m = startActiveMatchAt(
+          MUTATORS.ACTIVATION_AT_REMAINING + 0.01,
+          'weapon_roulette',
+        );
+        m.update(0.05);
+        const player = m.players.get('player-0')!;
+        player.specialAmmo = 1;
+        player.specialReserve = 0;
+
+        m.queueInput(player.id, makeInput(1, { firePressed: true, aimAngle: 0 }));
+        m.update(0.05);
+
+        expect(player.specialAmmo).toBe(0);
+        expect(player.weaponId).toBe('shotgun');
+      });
+
       it('infinite_ammo keeps the magazine full when firing', () => {
         const m = startActiveMatchAt(MUTATORS.ACTIVATION_AT_REMAINING + 0.01, 'infinite_ammo');
         const player = m.players.get('player-0')!;
@@ -1368,17 +1459,22 @@ describe('Match', () => {
         expect(m.activeMutators[1]).not.toBe(m.activeMutators[0]);
       });
 
-      it('never pairs fists_only with grenades_only in random slots', () => {
-        for (const first of ['fists_only', 'grenades_only'] as const) {
+      it('never pairs two loadout-owning mutators in random slots', () => {
+        for (const first of [
+          'fists_only',
+          'grenades_only',
+          'weapon_roulette',
+        ] as const) {
           const m = startActiveMatchWithMidMutator(first);
           const internals = m as unknown as MatchInternals;
           internals.matchTimer = MUTATORS.ACTIVATION_AT_REMAINING - 0.01;
           m.update(0.05);
 
           expect(m.activeMutators).toHaveLength(2);
-          expect(m.activeMutators).not.toEqual(
-            expect.arrayContaining(['fists_only', 'grenades_only']),
+          const loadoutOwners = m.activeMutators.filter((mutator) =>
+            ['fists_only', 'grenades_only', 'weapon_roulette'].includes(mutator),
           );
+          expect(loadoutOwners).toHaveLength(1);
         }
       });
 
@@ -1409,19 +1505,26 @@ describe('Match', () => {
         }
       });
 
-      it('a forced final-minute mutator also excludes its conflict from the random mid slot', () => {
-        process.env.FORCE_EVENT = 'grenades_only';
-        try {
-          const m = startActiveMatchWithMidMutator('fists_only');
-          expect(m.activeMutators[0]).not.toBe('fists_only');
-          expect(m.activeMutators[0]).not.toBe('grenades_only');
+      it('a forced final loadout excludes every conflicting random mid loadout', () => {
+        const owners = [
+          'grenades_only',
+          'fists_only',
+          'weapon_roulette',
+        ] as const;
+        for (const forced of owners) {
+          process.env.FORCE_EVENT = forced;
+          try {
+            const attempted = owners.find((owner) => owner !== forced)!;
+            const m = startActiveMatchWithMidMutator(attempted);
+            expect(owners).not.toContain(m.activeMutators[0]);
 
-          const internals = m as unknown as MatchInternals;
-          internals.matchTimer = MUTATORS.ACTIVATION_AT_REMAINING - 0.01;
-          m.update(0.05);
-          expect(m.activeMutators[1]).toBe('grenades_only');
-        } finally {
-          delete process.env.FORCE_EVENT;
+            const internals = m as unknown as MatchInternals;
+            internals.matchTimer = MUTATORS.ACTIVATION_AT_REMAINING - 0.01;
+            m.update(0.05);
+            expect(m.activeMutators[1]).toBe(forced);
+          } finally {
+            delete process.env.FORCE_EVENT;
+          }
         }
       });
 
@@ -3538,6 +3641,7 @@ describe('Match', () => {
           expect(m.activeMutators).not.toContain('grenades_only');
           expect(m.activeMutators).not.toContain('infinite_ammo');
           expect(m.activeMutators).not.toContain('fists_only');
+          expect(m.activeMutators).not.toContain('weapon_roulette');
         }
       });
 

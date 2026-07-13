@@ -225,6 +225,9 @@ export class Match implements MatchContext {
   private readonly rng: () => number;
   /** Mutators from the immediately previous round, excluded from random rolls. */
   private readonly rematchMutatorExclusions: ReadonlySet<MutatorId>;
+  /** Current shared step and countdown for the Weapon Roulette mutator. */
+  private weaponRouletteIndex = 0;
+  private weaponRouletteTimer = 0;
   /**
    * Regulation length in seconds — MATCH.TIME_LIMIT unless the
    * FORCE_MATCH_SECONDS env smoke pin overrides it (same family as
@@ -1257,6 +1260,12 @@ export class Match implements MatchContext {
     // Game mode tick
     this.gameMode.onTick(this, dt);
 
+    // Weapon Roulette owns the shared weapon slot after respawns, pickups,
+    // and compatible mode hooks. It rotates everyone on the same timer.
+    if (this.mutatorActive('weapon_roulette')) {
+      this.updateWeaponRoulette(dt);
+    }
+
     // Fists Only is the final loadout authority for compatible modes.
     // Reapply after respawns, pickups, and mode hooks so no one can escape
     // the brawl between snapshots.
@@ -1359,7 +1368,10 @@ export class Match implements MatchContext {
       // so the player should never be stuck holding an unusable weapon).
       player.isReloading = true;
       player.reloadTimer = weapon.reloadTime;
-    } else if (!this.mutatorActive('infinite_ammo')) {
+    } else if (
+      !this.mutatorActive('infinite_ammo') &&
+      !this.mutatorActive('weapon_roulette')
+    ) {
       // Completely dry: the pistol vanishes and the rifle comes back out.
       this.revertToRifle(player);
     }
@@ -1593,7 +1605,7 @@ export class Match implements MatchContext {
       // so the player should never be stuck holding an unusable weapon).
       player.isReloading = true;
       player.reloadTimer = shotgun.reloadTime;
-    } else if (!infiniteAmmo) {
+    } else if (!infiniteAmmo && !this.mutatorActive('weapon_roulette')) {
       // Completely dry: the shotgun vanishes and the rifle comes back out.
       this.revertToRifle(player);
     }
@@ -1945,6 +1957,19 @@ export class Match implements MatchContext {
         this.combatManager.clearGrenades();
         this.enforceFistsOnlyLoadouts();
         return;
+      case 'weapon_roulette':
+        this.weaponRouletteIndex = 0;
+        this.weaponRouletteTimer = MUTATORS.WEAPON_ROULETTE_INTERVAL_SECONDS;
+        this.pickupManager.removeTypes([
+          PickupType.GUN_AMMO,
+          PickupType.WEAPON_SHOTGUN,
+          PickupType.WEAPON_PISTOL,
+        ]);
+        this.enforceWeaponRouletteLoadouts(
+          MUTATORS.WEAPON_ROULETTE_ORDER[this.weaponRouletteIndex],
+          true,
+        );
+        return;
       case 'turbo_grenades':
         // Restart the shared regen accumulator so the first turbo refill
         // lands a full interval after activation.
@@ -1995,6 +2020,49 @@ export class Match implements MatchContext {
       player.isReloading = false;
       player.reloadTimer = 0;
       if (weaponChanged) this.clearWeaponTransients(player.id);
+    }
+  }
+
+  /** Advance the fair shared weapon cycle and reassert its current loadout. */
+  private updateWeaponRoulette(dt: number): void {
+    this.weaponRouletteTimer -= dt;
+    let advanced = false;
+    while (this.weaponRouletteTimer <= 0) {
+      this.weaponRouletteIndex =
+        (this.weaponRouletteIndex + 1) % MUTATORS.WEAPON_ROULETTE_ORDER.length;
+      this.weaponRouletteTimer += MUTATORS.WEAPON_ROULETTE_INTERVAL_SECONDS;
+      advanced = true;
+    }
+    this.enforceWeaponRouletteLoadouts(
+      MUTATORS.WEAPON_ROULETTE_ORDER[this.weaponRouletteIndex],
+      advanced,
+    );
+  }
+
+  /** Equip one synchronized roulette step without refilling it every tick. */
+  private enforceWeaponRouletteLoadouts(
+    weaponId: WeaponId,
+    restock: boolean,
+  ): void {
+    for (const player of this.players.values()) {
+      if (!restock && player.weaponId === weaponId) continue;
+
+      player.weaponId = weaponId;
+      player.isReloading = false;
+      player.reloadTimer = 0;
+      this.clearWeaponTransients(player.id);
+
+      if (weaponId === 'rifle') {
+        player.ammo = WEAPONS.rifle.magazineSize;
+        player.specialAmmo = 0;
+        player.specialReserve = 0;
+      } else if (this.usesSpecialAmmo(weaponId)) {
+        player.specialAmmo = WEAPONS[weaponId].magazineSize;
+        player.specialReserve = WEAPONS[weaponId].magazineSize;
+      } else {
+        player.specialAmmo = 0;
+        player.specialReserve = 0;
+      }
     }
   }
 

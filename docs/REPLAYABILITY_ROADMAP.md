@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–29 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts, solo Practice vs Rusty, streak + payback callouts, selectable Rusty difficulty, Collapsed Overpass, Blackout, fresh-chaos rematches, Last Stand, Kill Confirmed, mode briefings, character death animations, authoritative hit confirmation, blastable cover, chain-reaction barrels, Wasteland Contracts, Combat Medals, Wasteland Reputation, Hot Streaks, Fighter Mastery, Fists Only). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–30 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts, solo Practice vs Rusty, streak + payback callouts, selectable Rusty difficulty, Collapsed Overpass, Blackout, fresh-chaos rematches, Last Stand, Kill Confirmed, mode briefings, character death animations, authoritative hit confirmation, blastable cover, chain-reaction barrels, Wasteland Contracts, Combat Medals, Wasteland Reputation, Hot Streaks, Fighter Mastery, Fists Only, Weapon Roulette). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -61,6 +61,7 @@ Each session below attacks one of these.
 | 27  | Hot Streaks                                   | Consecutive wins survive restarts, giving every rematch another stake | **DONE** (2026-07-12) |
 | 28  | Fighter Mastery                               | Every roster pick gains its own persistent goal and identity | **DONE** (2026-07-12) |
 | 29  | Fists Only                                    | Mid-round gunfights collapse into frantic close-range brawls | **DONE** (2026-07-12) |
+| 30  | Weapon Roulette                               | Every ten seconds demands a fresh fighting style and new positioning | **DONE** (2026-07-12) |
 
 ---
 
@@ -1630,7 +1631,86 @@ differently without introducing another weapon or changing baseline balance.
 
 ---
 
+## Session 30 — Weapon Roulette
+
+**Goal:** make the full polished weapon roster matter inside ordinary matches
+by repeatedly changing the shared fighting style, while keeping every swap fair,
+readable, and independent of baseline weapon-balance changes.
+
+**Locked design decisions**
+
+- Every fighter shares the same deterministic shotgun → pistol → punch → rifle
+  cycle. Each step lasts ten seconds and restocks equal, deliberately limited
+  ammo only when the step begins.
+- Empty shotgun or pistol magazines remain empty until the next shared step;
+  they never auto-revert to rifle and then refill themselves on enforcement.
+- Respawns and compatible mode hooks cannot escape the current shared weapon.
+  Gun-ammo, shotgun, and pistol pickups disappear when Roulette activates;
+  grenades, bandages, character abilities, and objective rules remain live.
+- Random scheduling never combines Roulette with Fists Only or Grenades Only,
+  and Gun Game excludes it because both systems must own the weapon sequence.
+  Explicit FORCE pins retain their existing safety-bypass semantics.
+- Each authoritative local weapon change produces a compact cyan banner, a
+  short pickup sting, and a zoom pulse. The first activation snapshot stays
+  quiet because the normal mutator-start banner already owns that beat.
+
+**Acceptance criteria**
+
+- [x] Activation gives every fighter a fully stocked shotgun even if someone
+      already held a partially depleted shotgun, then advances all fighters
+      through pistol, punch, and rifle on the frozen ten-second cadence.
+- [x] Dry special weapons do not revert early; respawns rejoin the current step;
+      obsolete ammo and weapon pickups are retired for the rest of the match.
+- [x] Random scheduling prevents every pair of loadout-owning mutators in both
+      slot orders, including forced-final constraints, and Gun Game vetoes
+      Roulette from random rolls.
+- [x] Pure presentation tests cover silent seeding, inactive/same-weapon states,
+      and every visible weapon transition.
+- [x] A live two-player forced match renders the combined mutator label and
+      visibly advances a stocked shotgun to a stocked pistol.
+- [x] Typecheck, lint, all unit tests, production build, and Playwright pass.
+
+---
+
 ## Session Log
+
+### Session 30 — 2026-07-12 — Weapon Roulette
+
+**Shipped:** ordinary matches can now become a synchronized four-style gauntlet.
+Every ten seconds both sides receive the same shotgun, pistol, fists, or rifle,
+forcing range, route, and aggression decisions to change repeatedly without
+touching any weapon's baseline damage, cooldown, spread, or reach. Special steps
+carry one equal reserve magazine; spending it early leaves a readable dry window
+instead of silently manufacturing a rifle or free refill.
+
+The server owns the step index and timer, reasserts the current loadout after
+respawns and compatible mode hooks, and retires gun-ammo plus special-weapon
+pickups once Roulette owns the economy. The shared conflict rule now treats
+Roulette, Fists Only, and Grenades Only as mutually exclusive random loadouts;
+Gun Game also vetoes Roulette so its earned ladder stays authoritative. Clients
+turn snapshot weapon edges into concise cyan weapon callouts with a sting and
+zoom pulse, requiring no extra network event or client-side timer guess.
+
+**Verified:** focused tests cover the frozen complete weapon order, equal initial
+restocking, every timed transition, dry-weapon persistence, respawn enforcement,
+dynamic pickup retirement, all symmetric loadout conflicts, Gun Game exclusion,
+and every presentation state. A live two-player Deathmatch with forced Super
+Speed + Weapon Roulette rendered the combined active label, a stocked shotgun,
+and the next stocked pistol on the fully rendered active client.
+The inactive browser tab's WebGL screenshot was incomplete, so it is not counted
+as visual synchronization evidence; authoritative multi-player tests cover equal
+server state. All 895 unit tests pass, typecheck and lint are clean, and the
+production build succeeds. An initial Playwright run collided with stale local
+dev watchers on the matchmaking port; after retiring those repository processes
+and disabling server reuse, all 21 cases completed with 12 passes, 9 intentional
+skips, and zero failures across Chromium, Firefox, and mobile landscape.
+
+**Carry-over:** ten seconds and one reserve magazine are first-pass fun pacing,
+not a balance verdict. Watch whether shotgun windows feel deliciously scarce or
+too short, and whether the callout cadence energizes rather than interrupts; do
+not retune the underlying weapons without group-play evidence.
+
+---
 
 ### Session 29 — 2026-07-12 — Fists Only
 

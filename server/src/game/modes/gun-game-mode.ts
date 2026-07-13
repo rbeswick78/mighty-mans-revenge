@@ -36,14 +36,15 @@ import type { GameMode, MatchContext } from './game-mode.js';
 export class GunGameMode implements GameMode {
   /**
    * grenades_only would gate the very guns the ladder is about, and
-   * infinite_ammo fights the reserve-floor economy, and fists_only would
-   * bypass the ladder entirely. All three stay out of this
-   * mode's random rolls (FORCE_* env pins still bypass — smoke tools).
+   * infinite_ammo fights the reserve-floor economy, while fists_only and
+   * weapon_roulette would bypass the ladder entirely. All four stay out of
+   * this mode's random rolls (FORCE_* env pins still bypass — smoke tools).
    */
   readonly excludedMutators: readonly MutatorId[] = [
     'grenades_only',
     'infinite_ammo',
     'fists_only',
+    'weapon_roulette',
   ];
 
   /**
