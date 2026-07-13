@@ -42,6 +42,14 @@ describe('pickupPresentation', () => {
     expect(urgent.scale).not.toBe(fresh.scale);
   });
 
+  it('gives an authored Overcharge Cell a steady electric pulse', () => {
+    const first = pickupPresentation(pickup({ type: PickupType.OVERCHARGE }), 0);
+    const later = pickupPresentation(pickup({ type: PickupType.OVERCHARGE }), 120);
+    expect(first.tint).toBeNull();
+    expect(first.alpha).toBeGreaterThanOrEqual(0.9);
+    expect(first.scale).not.toBe(later.scale);
+  });
+
   it('preserves corpse-weapon gold if malformed flags overlap', () => {
     expect(
       pickupPresentation(

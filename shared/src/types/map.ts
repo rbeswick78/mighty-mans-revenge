@@ -14,7 +14,8 @@ export type PickupSpawnType =
   | 'weapon_pistol'
   | 'weapon_bat'
   | 'bandage'
-  | 'armor';
+  | 'armor'
+  | 'overcharge';
 
 export interface MapTile {
   type: TileType;

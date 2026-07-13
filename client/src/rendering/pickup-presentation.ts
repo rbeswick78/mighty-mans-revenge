@@ -1,5 +1,5 @@
 import { MUTATORS, PICKUP } from '@shared/config/game.js';
-import type { PickupState } from '@shared/types/pickup.js';
+import { PickupType, type PickupState } from '@shared/types/pickup.js';
 
 export interface PickupPresentation {
   scale: number;
@@ -35,6 +35,14 @@ export function pickupPresentation(
       scale: 1.06 + Math.sin(nowMs * (0.008 + urgency * 0.022)) * 0.14,
       tint: 0x5ce1e6,
       alpha: 0.82 + urgency * 0.18,
+    };
+  }
+
+  if (state.type === PickupType.OVERCHARGE) {
+    return {
+      scale: 1.04 + Math.sin(nowMs * 0.012) * 0.07,
+      tint: null,
+      alpha: 0.9 + (Math.sin(nowMs * 0.009) + 1) * 0.05,
     };
   }
 

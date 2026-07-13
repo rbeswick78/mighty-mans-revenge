@@ -17,6 +17,8 @@ export enum PickupType {
   BANDAGE = 'bandage',
   /** Grants a temporary combat shield, capped at PICKUP.ARMOR_MAX. */
   ARMOR = 'armor',
+  /** Instantly readies a spent character ability when its active window is over. */
+  OVERCHARGE = 'overcharge',
 }
 
 export interface PickupState {

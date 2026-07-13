@@ -195,6 +195,7 @@ export type MatchContractId =
   | 'on_a_roll'
   | 'road_warrior'
   | 'powder_keg'
+  | 'power_trip'
   | 'hill_dweller'
   | 'tag_hunter'
   | 'core_runner';
@@ -205,6 +206,7 @@ export type MatchContractMetric =
   | 'streak'
   | 'distance_tiles'
   | 'barrels'
+  | 'overcharges'
   | 'hill_seconds'
   | 'confirmed_tags'
   | 'core_seconds';

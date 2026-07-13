@@ -184,6 +184,12 @@ export function botResourcePriority(
       return player.armor < PICKUP.ARMOR_MAX
         ? BOT.RESOURCE_PRIORITY.ARMOR
         : null;
+    case PickupType.OVERCHARGE:
+      return (
+        !player.isDead &&
+        player.abilityActiveSeconds <= 0 &&
+        player.abilityCooldownSeconds >= PICKUP.OVERCHARGE_MIN_COOLDOWN_SECONDS
+      ) ? BOT.RESOURCE_PRIORITY.OVERCHARGE : null;
     case PickupType.GRENADE:
       return player.grenades < GRENADE.MAX_COUNT
         ? BOT.RESOURCE_PRIORITY.GRENADE

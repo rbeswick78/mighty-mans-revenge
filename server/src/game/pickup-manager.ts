@@ -20,6 +20,7 @@ const SPAWN_TYPE_TO_PICKUP_TYPE: Record<PickupSpawnType, PickupType> = {
   weapon_bat: PickupType.WEAPON_BAT,
   bandage: PickupType.BANDAGE,
   armor: PickupType.ARMOR,
+  overcharge: PickupType.OVERCHARGE,
 };
 
 /** A weapon pickup that will become active in `landsInMs`. */
@@ -48,6 +49,8 @@ function respawnTimeFor(type: PickupType): number {
       return PICKUP.BANDAGE_RESPAWN_TIME;
     case PickupType.ARMOR:
       return PICKUP.ARMOR_RESPAWN_TIME;
+    case PickupType.OVERCHARGE:
+      return PICKUP.OVERCHARGE_RESPAWN_TIME;
     default:
       return PICKUP.RESPAWN_TIME;
   }
@@ -326,6 +329,15 @@ export class PickupManager {
           PICKUP.ARMOR_MAX,
           player.armor + PICKUP.ARMOR_AMOUNT,
         );
+        return true;
+      }
+      case PickupType.OVERCHARGE: {
+        if (
+          player.isDead ||
+          player.abilityActiveSeconds > 0 ||
+          player.abilityCooldownSeconds < PICKUP.OVERCHARGE_MIN_COOLDOWN_SECONDS
+        ) return false;
+        player.abilityCooldownSeconds = 0;
         return true;
       }
       default:

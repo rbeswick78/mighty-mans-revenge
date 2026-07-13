@@ -594,6 +594,28 @@ describe('PickupManager', () => {
       expect(manager.applyPickup(pickup, dead)).toBe(false);
       expect(dead.armor).toBe(0);
     });
+
+    it('OVERCHARGE readies only a spent, inactive ability', () => {
+      const pickup = {
+        id: 'overcharge',
+        type: PickupType.OVERCHARGE,
+        position: { x: 0, y: 0 },
+        isActive: true,
+        respawnTimer: 0,
+      };
+      const spent = makePlayer({ abilityCooldownSeconds: 20 });
+      expect(manager.applyPickup(pickup, spent)).toBe(true);
+      expect(spent.abilityCooldownSeconds).toBe(0);
+
+      const nearlyReady = makePlayer({
+        abilityCooldownSeconds: PICKUP.OVERCHARGE_MIN_COOLDOWN_SECONDS - 0.01,
+      });
+      expect(manager.applyPickup(pickup, nearlyReady)).toBe(false);
+      const active = makePlayer({ abilityActiveSeconds: 1, abilityCooldownSeconds: 20 });
+      expect(manager.applyPickup(pickup, active)).toBe(false);
+      const dead = makePlayer({ isDead: true, abilityCooldownSeconds: 20 });
+      expect(manager.applyPickup(pickup, dead)).toBe(false);
+    });
   });
 
   describe('weapon pickups', () => {
@@ -734,6 +756,14 @@ describe('PickupManager', () => {
       expect(pickup).toMatchObject({ type: PickupType.ARMOR, isActive: true });
       manager.collectPickup(pickup.id);
       expect(pickup.respawnTimer).toBe(PICKUP.ARMOR_RESPAWN_TIME);
+    });
+
+    it('Overcharge starts active and uses its full-refresh respawn time', () => {
+      manager.initFromMap(makeMapData([{ x: 5, y: 5, type: 'overcharge' }]));
+      const [pickup] = manager.getPickups();
+      expect(pickup).toMatchObject({ type: PickupType.OVERCHARGE, isActive: true });
+      manager.collectPickup(pickup.id);
+      expect(pickup.respawnTimer).toBe(PICKUP.OVERCHARGE_RESPAWN_TIME);
     });
   });
 });

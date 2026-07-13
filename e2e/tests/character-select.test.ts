@@ -283,6 +283,51 @@ test('solo practice launches against locked Rusty and reaches live play', async 
       batSpriteReady: true,
     });
 
+  if (process.env.VERIFY_OVERCHARGE === '1') {
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() => {
+            const w = window as unknown as {
+              game?: { scene: { getScene: (key: string) => unknown } };
+            };
+            const scene = w.game?.scene.getScene('GameScene') as {
+              gameService?: {
+                getNetworkManager: () => {
+                  getPickups: () => Array<{ type: string; isActive: boolean }>;
+                };
+              };
+              pickupRenderer?: {
+                pickups?: Map<
+                  string,
+                  {
+                    container?: { visible?: boolean };
+                    auraLabel?: { text?: string };
+                  }
+                >;
+              };
+            } | null;
+            const pickups = scene?.gameService?.getNetworkManager().getPickups() ?? [];
+            const authoredCell = pickups.find((pickup) => pickup.type === 'overcharge');
+            const renderedCell = [
+              ...(scene?.pickupRenderer?.pickups?.values() ?? []),
+            ].some(
+              (pickup) =>
+                pickup.container?.visible === true && pickup.auraLabel?.text === 'CHARGE',
+            );
+            return {
+              stateActive: authoredCell?.isActive === true,
+              rendered: renderedCell,
+            };
+          }),
+        {
+          timeout: 5000,
+          message: 'expected the authoritative Overcharge Cell and CHARGE halo to render',
+        },
+      )
+      .toEqual({ stateActive: true, rendered: true });
+  }
+
   if (process.env.FORCE_MIDMATCH_MUTATOR === 'radiation_storm') {
     await expect
       .poll(
@@ -530,8 +575,8 @@ test.describe('Character select (desktop)', () => {
                     string,
                     {
                       container?: { visible?: boolean };
-                      supplyHalo?: { visible?: boolean } | null;
-                      supplyLabel?: { text?: string; visible?: boolean } | null;
+                      auraHalo?: { visible?: boolean } | null;
+                      auraLabel?: { text?: string; visible?: boolean } | null;
                     }
                   >;
                 } | null;
@@ -555,9 +600,9 @@ test.describe('Character select (desktop)', () => {
               return {
                 stateActive: supply?.isActive ?? false,
                 containerVisible: rendered?.container?.visible ?? false,
-                haloVisible: rendered?.supplyHalo?.visible ?? false,
-                label: rendered?.supplyLabel?.text ?? null,
-                labelVisible: rendered?.supplyLabel?.visible ?? false,
+                haloVisible: rendered?.auraHalo?.visible ?? false,
+                label: rendered?.auraLabel?.text ?? null,
+                labelVisible: rendered?.auraLabel?.visible ?? false,
               };
             }),
           {

@@ -179,6 +179,19 @@ describe('Rusty resource evaluation', () => {
         PickupType.ARMOR,
       ),
     ).toBeNull();
+    expect(botResourcePriority(full, PickupType.OVERCHARGE)).toBeNull();
+    expect(
+      botResourcePriority(
+        makeBotState({ abilityCooldownSeconds: 20 }),
+        PickupType.OVERCHARGE,
+      ),
+    ).toBe(BOT.RESOURCE_PRIORITY.OVERCHARGE);
+    expect(
+      botResourcePriority(
+        makeBotState({ abilityActiveSeconds: 1, abilityCooldownSeconds: 20 }),
+        PickupType.OVERCHARGE,
+      ),
+    ).toBeNull();
 
     expect(
       botResourcePriority(
@@ -237,6 +250,23 @@ describe('Rusty resource evaluation', () => {
         resource('armor', PickupType.ARMOR, 96),
       ])?.id,
     ).toBe('armor');
+  });
+
+  it('values a useful ability refresh below power weapons and above armor', () => {
+    const bot = makeBotState({ abilityCooldownSeconds: 20 });
+    expect(
+      pickBotResource(bot, [
+        resource('armor', PickupType.ARMOR, 48),
+        resource('overcharge', PickupType.OVERCHARGE, 96),
+        resource('shotgun', PickupType.WEAPON_SHOTGUN, 144),
+      ])?.id,
+    ).toBe('shotgun');
+    expect(
+      pickBotResource(bot, [
+        resource('armor', PickupType.ARMOR, 48),
+        resource('overcharge', PickupType.OVERCHARGE, 96),
+      ])?.id,
+    ).toBe('overcharge');
   });
 
   it('preserves live power weapons and refreshes only a nearly dry matching one', () => {

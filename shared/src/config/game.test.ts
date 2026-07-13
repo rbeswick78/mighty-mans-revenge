@@ -160,6 +160,15 @@ describe('scrapstorm mutator', () => {
   });
 });
 
+describe('overcharge pickup', () => {
+  it('defines a meaningful spent-cooldown gate and contested respawn', () => {
+    expect(PICKUP.OVERCHARGE_MIN_COOLDOWN_SECONDS).toBeGreaterThan(0);
+    expect(PICKUP.OVERCHARGE_RESPAWN_TIME).toBeGreaterThan(
+      PICKUP.OVERCHARGE_MIN_COOLDOWN_SECONDS,
+    );
+  });
+});
+
 describe('scavenger cache rewards', () => {
   it('uses a frozen weighted table with every collectible pickup kind', () => {
     expect(Object.isFrozen(SCAVENGER_CACHE)).toBe(true);
@@ -247,12 +256,25 @@ describe('wasteland match contracts', () => {
         selectMatchContract(`dm-${i}`, GameModeType.DEATHMATCH).id,
       ),
     );
+    const gunGameIds = new Set(
+      Array.from({ length: 100 }, (_, i) =>
+        selectMatchContract(`gun-game-${i}`, GameModeType.GUN_GAME).id,
+      ),
+    );
+    const chamberIds = new Set(
+      Array.from({ length: 100 }, (_, i) =>
+        selectMatchContract(`chamber-${i}`, GameModeType.ONE_IN_THE_CHAMBER).id,
+      ),
+    );
     expect(kothIds).toContain('hill_dweller');
     expect(confirmedIds).toContain('tag_hunter');
     expect(coreIds).toContain('core_runner');
     expect(dmIds).not.toContain('hill_dweller');
     expect(dmIds).not.toContain('tag_hunter');
     expect(dmIds).not.toContain('core_runner');
+    expect(dmIds).toContain('power_trip');
+    expect(gunGameIds).not.toContain('power_trip');
+    expect(chamberIds).not.toContain('power_trip');
   });
 });
 

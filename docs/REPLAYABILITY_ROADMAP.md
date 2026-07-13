@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–46 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty with Scavenger Instincts, four arenas, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–47 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty with Scavenger Instincts, four arenas, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Overcharge Cells, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -78,6 +78,7 @@ Each session below attacks one of these.
 | 44  | Rusty's Scavenger Instincts                   | Practice opponents contest the arena's weapons and supplies like real rivals   | **DONE** (2026-07-13) |
 | 45  | Scrap Armor                                   | A contested shield pickup rewards proactive center control                       | **DONE** (2026-07-13) |
 | 46  | Scrapstorm                                    | Telegraphed debris strikes turn settled positions into urgent dodges              | **DONE** (2026-07-13) |
+| 47  | Overcharge Cells                              | Ability refreshes turn signature powers into repeatable center-map contests       | **DONE** (2026-07-13) |
 
 ---
 
@@ -2316,7 +2317,81 @@ up passive positions without stealing kills or making damage feel arbitrary.
 
 ---
 
+## Session 47 — Overcharge Cells
+
+**Goal:** create a scarce arena resource that brings each fighter's signature
+ability back into play and makes the center worth contesting repeatedly.
+
+**Locked design decisions**
+
+- Every arena places exactly one immediately active Overcharge Cell in the
+  unused tile of its central 2x2 resource square. Authored cells respawn after
+  30 seconds; Scavenger Caches and Scavenger Rush may also roll one rarely.
+- Collection succeeds only for a living fighter whose ability effect is not
+  active and whose cooldown has at least 2 seconds remaining. A successful
+  claim clears the full cooldown; ready, nearly-ready, and active abilities
+  leave the cell available rather than wasting it.
+- Gun Game and One in the Chamber retain their bandage-only pickup economies.
+  Core Run permits the cell because it changes neither the carried objective
+  nor weapon ownership.
+- Rusty values a useful cell below the shotgun and bat, but above Scrap Armor.
+  The compatible `POWER TRIP` contract counts only successful authoritative
+  collections and asks each fighter to claim two cells.
+- The client reuses ordinary pickup snapshots and collection events. A
+  procedural violet canister with a yellow lightning core, pulsing violet
+  `CHARGE` halo, high-pitched pickup sound, and local `OVERCHARGED / ABILITY
+  READY` callout make the reward distinct without a new asset or wire message.
+
+**Acceptance criteria**
+
+- [x] Config, map, pickup, match, bot, mode, and client presentation tests cover
+      useful-collection gates, full reset, respawn, compatible modes, contract
+      progress, deterministic bot priority, central placement, and pulse.
+- [x] A pinned Practice smoke verifies authoritative state plus the visible
+      cell/halo and `POWER TRIP` HUD through the normal networked match path,
+      with a clean fresh browser console.
+- [x] Typecheck, lint, all unit tests, production build, and Playwright pass.
+
+---
+
 ## Session Log
+
+### Session 47 — 2026-07-13 — Overcharge Cells
+
+**Shipped:** every authored arena now has one contested Overcharge Cell in the
+unused tile of its central two-by-two. An eligible fighter who claims it gets a
+full signature-ability cooldown reset; ready, nearly ready, active, dead, or
+ineligible fighters leave it available instead of wasting it. Cells return
+after 30 seconds, can appear rarely in Scavenger Caches and Scavenger Rush, and
+stay out of Gun Game and One in the Chamber while remaining available in Core
+Run.
+
+Rusty values an actionable cell below a shotgun or bat but above Scrap Armor.
+The new POWER TRIP contract asks for two claims and is excluded from modes that
+exclude the pickup. The client renders a procedural violet-and-yellow cell with
+a pulsing CHARGE halo, then gives the collector an OVERCHARGED / ABILITY READY
+callout, violet screen accent, camera bump, and distinct high-pitched pickup
+sound. No asset or network-message expansion was needed.
+
+**Verification:** 1,078 unit tests pass across 69 files, including focused
+config, map registry, pickup lifecycle, eligibility, loot filtering, contracts,
+mode compatibility, Rusty priorities, rendering, and feedback coverage.
+TypeScript, ESLint, and the production build are clean; Vite retains its
+existing chunk-size advisory. The clean Playwright matrix passes 13 tests with
+11 intentional scoped skips across desktop Chromium, desktop Firefox, and
+mobile landscape. A dedicated pinned Practice assertion confirmed the
+authoritative cell and visible CHARGE label, and a clean live Wasteland Outpost
+round visibly confirmed POWER TRIP, the authored center placement, and the
+procedural presentation with zero browser warnings or errors. All local smoke
+services were stopped afterward.
+
+**Tuning watch:** watch whether the 30-second return cadence creates two or
+three meaningful center contests per round, and whether the two-second
+eligibility floor feels protective rather than surprising near cooldown-ready.
+
+**Deployment:** not run; deployment still requires explicit authorization.
+
+---
 
 ### Session 46 — 2026-07-13 — Scrapstorm
 

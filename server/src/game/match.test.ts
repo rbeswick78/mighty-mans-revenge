@@ -1301,6 +1301,43 @@ describe('Match', () => {
       expect(tags.getContractHudState().players[0].completed).toBe(true);
     });
 
+    it('feeds authoritative Overcharge collections into Power Trip', () => {
+      const map = {
+        ...makeMapData(),
+        pickupSpawns: [{ x: 5, y: 5, type: 'overcharge' as const }],
+      };
+      const m = new Match(
+        'contract-power-trip',
+        map,
+        [
+          { id: 'player-0', nickname: 'P0' },
+          { id: 'player-1', nickname: 'P1' },
+        ],
+        GameModeType.DEATHMATCH,
+        Math.random,
+        [],
+        'power_trip',
+      );
+      m.startCountdown();
+      m.update(MATCH.COUNTDOWN_DURATION + 0.05);
+      const player = m.players.get('player-0')!;
+      player.position = { x: 5 * 48 + 24, y: 5 * 48 + 24 };
+      player.abilityCooldownSeconds = 20;
+      m.update(0.05);
+      expect(m.getContractHudState().players[0]).toMatchObject({
+        progress: 1,
+        completed: false,
+      });
+
+      m.update(PICKUP.OVERCHARGE_RESPAWN_TIME - 0.05);
+      player.abilityCooldownSeconds = 20;
+      m.update(0.1);
+      expect(m.getContractHudState().players[0]).toMatchObject({
+        progress: 2,
+        completed: true,
+      });
+    });
+
     it('attaches final progress to the match result for persistence and UI', () => {
       const m = contractMatch('hot_shot');
       for (let i = 0; i < 8; i++) m.stats.recordHit('player-0');

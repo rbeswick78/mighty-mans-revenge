@@ -870,6 +870,26 @@ export class BootScene extends Phaser.Scene {
     armorGfx.generateTexture('pickup_armor', 16, 16);
     armorGfx.destroy();
 
+    // Overcharge Cell — violet power canister with a hot lightning core.
+    // The authored halo/label adds motion; this compact silhouette keeps the
+    // resource distinct from cyan Scrap Armor at the renderer's 3x scale.
+    const overchargeGfx = gfx();
+    overchargeGfx.fillStyle(0x2e222f, 1);
+    overchargeGfx.fillRect(4, 2, 8, 12);
+    overchargeGfx.fillStyle(0x6c3aa8, 1);
+    overchargeGfx.fillRect(5, 3, 6, 10);
+    overchargeGfx.fillStyle(0xc77dff, 1);
+    overchargeGfx.fillRect(6, 4, 4, 8);
+    overchargeGfx.fillStyle(0xffd166, 1);
+    overchargeGfx.fillRect(8, 4, 2, 3);
+    overchargeGfx.fillRect(7, 7, 2, 2);
+    overchargeGfx.fillRect(6, 9, 2, 3);
+    overchargeGfx.fillStyle(0xe0aaff, 1);
+    overchargeGfx.fillRect(3, 5, 1, 6);
+    overchargeGfx.fillRect(12, 5, 1, 6);
+    overchargeGfx.generateTexture('pickup_overcharge', 16, 16);
+    overchargeGfx.destroy();
+
     // Explosion — 32×32 layered hot circles
     const explosionGfx = gfx();
     explosionGfx.fillStyle(Wasteland.EXPLOSION_PARTICLE_B, 1);

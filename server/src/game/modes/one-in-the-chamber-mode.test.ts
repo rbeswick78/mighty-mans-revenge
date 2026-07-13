@@ -204,6 +204,7 @@ describe('OneInTheChamberMode', () => {
     expect(mode.areGrenadesDisabled(ctx, player)).toBe(true);
     expect(mode.isPickupTypeEnabled(PickupType.BANDAGE)).toBe(true);
     expect(mode.isPickupTypeEnabled(PickupType.ARMOR)).toBe(false);
+    expect(mode.isPickupTypeEnabled(PickupType.OVERCHARGE)).toBe(false);
     expect(mode.isPickupTypeEnabled(PickupType.WEAPON_PISTOL)).toBe(false);
     expect(mode.isPickupTypeEnabled(PickupType.WEAPON_BAT)).toBe(false);
     expect(mode.excludedMutators).toEqual([

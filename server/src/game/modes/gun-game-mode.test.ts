@@ -371,6 +371,7 @@ describe('GunGameMode', () => {
       expect(mode.isPickupTypeEnabled(PickupType.GUN_AMMO)).toBe(false);
       expect(mode.isPickupTypeEnabled(PickupType.GRENADE)).toBe(false);
       expect(mode.isPickupTypeEnabled(PickupType.ARMOR)).toBe(false);
+      expect(mode.isPickupTypeEnabled(PickupType.OVERCHARGE)).toBe(false);
     });
   });
 });

@@ -13,6 +13,7 @@ const PICKUP_TEXTURES: Record<PickupType, string> = {
   [PickupType.WEAPON_BAT]: 'pickup_bat',
   [PickupType.BANDAGE]: 'pickup_bandage',
   [PickupType.ARMOR]: 'pickup_armor',
+  [PickupType.OVERCHARGE]: 'pickup_overcharge',
 };
 
 interface PickupSprite {
@@ -20,8 +21,8 @@ interface PickupSprite {
   sprite: Phaser.GameObjects.Sprite;
   wasActive: boolean;
   bobTween: Phaser.Tweens.Tween | null;
-  supplyHalo: Phaser.GameObjects.Arc | null;
-  supplyLabel: Phaser.GameObjects.Text | null;
+  auraHalo: Phaser.GameObjects.Arc | null;
+  auraLabel: Phaser.GameObjects.Text | null;
 }
 
 export class PickupRenderer {
@@ -48,8 +49,8 @@ export class PickupRenderer {
       const presentation = pickupPresentation(state, this.scene.time.now);
       pickup.container.setScale(presentation.scale);
       pickup.sprite.setAlpha(presentation.alpha);
-      pickup.supplyHalo?.setAlpha(presentation.alpha * 0.55);
-      pickup.supplyLabel?.setAlpha(presentation.alpha);
+      pickup.auraHalo?.setAlpha(presentation.alpha * 0.55);
+      pickup.auraLabel?.setAlpha(presentation.alpha);
       if (presentation.tint !== null) {
         pickup.sprite.setTint(presentation.tint);
       } else {
@@ -99,25 +100,28 @@ export class PickupRenderer {
     sprite.setOrigin(0.5, 0.5);
     sprite.setScale(PICKUP_SCALE);
 
-    let supplyHalo: Phaser.GameObjects.Arc | null = null;
-    let supplyLabel: Phaser.GameObjects.Text | null = null;
+    let auraHalo: Phaser.GameObjects.Arc | null = null;
+    let auraLabel: Phaser.GameObjects.Text | null = null;
     const children: Phaser.GameObjects.GameObject[] = [];
-    if (state.isScavengerRushDrop) {
-      supplyHalo = this.scene.add.circle(0, 0, 18, 0x5ce1e6, 0.16);
-      supplyHalo.setStrokeStyle(2, 0x5ce1e6, 0.9);
-      children.push(supplyHalo);
+    const isOvercharge = state.type === PickupType.OVERCHARGE;
+    if (state.isScavengerRushDrop || isOvercharge) {
+      const auraColor = state.isScavengerRushDrop ? 0x5ce1e6 : 0xc77dff;
+      auraHalo = this.scene.add.circle(0, 0, 18, auraColor, 0.16);
+      auraHalo.setStrokeStyle(2, auraColor, 0.9);
+      children.push(auraHalo);
     }
     children.push(sprite);
-    if (state.isScavengerRushDrop) {
-      supplyLabel = this.scene.add.text(0, -24, 'SUPPLY', {
+    if (state.isScavengerRushDrop || isOvercharge) {
+      const auraColor = state.isScavengerRushDrop ? '#5ce1e6' : '#e0aaff';
+      auraLabel = this.scene.add.text(0, -24, state.isScavengerRushDrop ? 'SUPPLY' : 'CHARGE', {
         fontFamily: 'Courier, monospace',
         fontSize: '8px',
-        color: '#5ce1e6',
+        color: auraColor,
         stroke: '#1a1a1a',
         strokeThickness: 2,
       });
-      supplyLabel.setOrigin(0.5, 0.5);
-      children.push(supplyLabel);
+      auraLabel.setOrigin(0.5, 0.5);
+      children.push(auraLabel);
     }
 
     const container = this.scene.add.container(
@@ -135,8 +139,8 @@ export class PickupRenderer {
       sprite,
       wasActive: state.isActive,
       bobTween,
-      supplyHalo,
-      supplyLabel,
+      auraHalo,
+      auraLabel,
     };
   }
 

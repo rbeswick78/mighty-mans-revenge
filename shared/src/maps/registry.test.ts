@@ -51,11 +51,20 @@ describe('MAP_REGISTRY', () => {
       for (const p of m.pickupSpawns) {
         byType.set(p.type, (byType.get(p.type) ?? 0) + 1);
       }
-      // Exactly one contested shotgun, two bandages, plus ammo.
+      // Exactly one contested shotgun, bat, and overcharge cell, plus sustain.
       expect(byType.get('weapon_shotgun'), `${m.name} shotgun spawns`).toBe(1);
       expect(byType.get('weapon_bat'), `${m.name} bat spawns`).toBe(1);
       expect(byType.get('bandage'), `${m.name} bandage spawns`).toBe(2);
+      expect(byType.get('overcharge'), `${m.name} overcharge spawns`).toBe(1);
       expect(byType.get('gun_ammo') ?? 0, `${m.name} ammo spawns`).toBeGreaterThanOrEqual(1);
+
+      const overcharge = m.pickupSpawns.find((pickup) => pickup.type === 'overcharge')!;
+      expect(overcharge.x, `${m.name} overcharge center column`).toBeGreaterThanOrEqual(9);
+      expect(overcharge.x, `${m.name} overcharge center column`).toBeLessThanOrEqual(10);
+      expect(overcharge.y, `${m.name} overcharge center row`).toBeGreaterThanOrEqual(5);
+      expect(overcharge.y, `${m.name} overcharge center row`).toBeLessThanOrEqual(6);
+      const uniquePositions = new Set(m.pickupSpawns.map((pickup) => `${pickup.x},${pickup.y}`));
+      expect(uniquePositions.size, `${m.name} pickup positions`).toBe(m.pickupSpawns.length);
     }
   });
 

@@ -212,6 +212,7 @@ describe('CoreRunMode', () => {
     expect(mode.isPickupTypeEnabled(PickupType.GUN_AMMO)).toBe(true);
     expect(mode.isPickupTypeEnabled(PickupType.BANDAGE)).toBe(true);
     expect(mode.isPickupTypeEnabled(PickupType.ARMOR)).toBe(true);
+    expect(mode.isPickupTypeEnabled(PickupType.OVERCHARGE)).toBe(true);
     expect(mode.isPickupTypeEnabled(PickupType.GRENADE)).toBe(true);
   });
 });

@@ -1311,7 +1311,6 @@ export class GameScene extends Phaser.Scene {
 
     this.onPickupCollected = (pickupId: string, collectorId: PlayerId) => {
       const audio = AudioManager.getInstance();
-      if (!audio) return;
       const networkManager = this.gameService.getNetworkManager();
       const localId = networkManager.getPlayerId();
       const localState = networkManager.getLocalPlayerState();
@@ -1344,7 +1343,15 @@ export class GameScene extends Phaser.Scene {
         sfxOptions = { rate: 1.35 };
       } else if (pickupType === PickupType.ARMOR) {
         sfxOptions = { rate: 0.72 };
+      } else if (pickupType === PickupType.OVERCHARGE) {
+        sfxOptions = { rate: 1.65 };
+        if (collectorId === localId) {
+          this.hud?.showEventBanner('OVERCHARGED', 'ABILITY READY', 0xc77dff);
+          this.zoomPulse?.trigger();
+        }
       }
+
+      if (!audio) return;
 
       if (collectorPos && localState) {
         audio.playAtPosition(

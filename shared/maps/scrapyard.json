@@ -30,6 +30,7 @@
     { "x": 5, "y": 1, "type": "weapon_bat" },
     { "x": 9, "y": 6, "type": "gun_ammo" },
     { "x": 10, "y": 6, "type": "armor" },
+    { "x": 9, "y": 5, "type": "overcharge" },
     { "x": 1, "y": 6, "type": "grenade" },
     { "x": 18, "y": 4, "type": "grenade" },
     { "x": 9, "y": 1, "type": "bandage" },

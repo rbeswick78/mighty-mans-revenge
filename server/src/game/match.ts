@@ -154,6 +154,8 @@ export class Match implements MatchContext {
   private readonly scavengerCacheReward: PickupType;
   /** Barrel detonations credited to each player for the Powder Keg contract. */
   private readonly barrelDetonationsByPlayer = new Map<PlayerId, number>();
+  /** Ability cells claimed by each player for the Power Trip contract. */
+  private readonly overchargesByPlayer = new Map<PlayerId, number>();
   /** Shared side objective selected once for this match. */
   private readonly contractDefinition: MatchContractDefinition;
   /** Ordered input queue per player. Inputs are acked only after consumption. */
@@ -756,6 +758,8 @@ export class Match implements MatchContext {
         return Math.floor(stats.distanceTraveled / this.mapManager.getMapData().tileSize);
       case 'barrels':
         return this.barrelDetonationsByPlayer.get(playerId) ?? 0;
+      case 'overcharges':
+        return this.overchargesByPlayer.get(playerId) ?? 0;
       case 'hill_seconds':
         return Math.floor(stats.hillSeconds);
       case 'confirmed_tags':
@@ -1373,6 +1377,12 @@ export class Match implements MatchContext {
         if (applied) {
           this.pickupManager.collectPickup(pickup.id);
           this.tickPickupCollections.push({ pickupId: pickup.id, playerId: player.id });
+          if (pickup.type === PickupType.OVERCHARGE) {
+            this.overchargesByPlayer.set(
+              player.id,
+              (this.overchargesByPlayer.get(player.id) ?? 0) + 1,
+            );
+          }
           if (
             pickup.type === PickupType.WEAPON_SHOTGUN ||
             pickup.type === PickupType.WEAPON_PISTOL ||

@@ -56,6 +56,13 @@ export const MATCH_CONTRACTS = Object.freeze({
     metric: 'barrels',
     target: 2,
   }),
+  power_trip: Object.freeze({
+    id: 'power_trip',
+    title: 'POWER TRIP',
+    objective: 'CLAIM 2 OVERCHARGE CELLS',
+    metric: 'overcharges',
+    target: 2,
+  }),
   hill_dweller: Object.freeze({
     id: 'hill_dweller',
     title: 'HILL DWELLER',
@@ -99,7 +106,7 @@ function contractHash(value: string): number {
 /**
  * Scavenger Caches use one shared reward roll per match so rotationally
  * paired crates stay fair. Repeated entries are intentional weights: common
- * sustain makes up two thirds of the table, while each special weapon is a
+ * sustain makes up most of the table, while each special weapon is a
  * rare hit.
  */
 export const SCAVENGER_CACHE = Object.freeze({
@@ -111,6 +118,7 @@ export const SCAVENGER_CACHE = Object.freeze({
     PickupType.GRENADE,
     PickupType.GRENADE,
     PickupType.ARMOR,
+    PickupType.OVERCHARGE,
     PickupType.WEAPON_PISTOL,
     PickupType.WEAPON_SHOTGUN,
     PickupType.WEAPON_BAT,
@@ -138,6 +146,12 @@ export function selectMatchContract(
     return MATCH_CONTRACTS[forced as MatchContractId];
   }
   const pool = [...BASE_CONTRACT_POOL];
+  if (
+    mode !== GameModeType.GUN_GAME &&
+    mode !== GameModeType.ONE_IN_THE_CHAMBER
+  ) {
+    pool.push('power_trip');
+  }
   if (mode === GameModeType.KOTH) pool.push('hill_dweller');
   if (mode === GameModeType.KILL_CONFIRMED) pool.push('tag_hunter');
   if (mode === GameModeType.CORE_RUN) pool.push('core_runner');
@@ -390,6 +404,10 @@ export const PICKUP = Object.freeze({
   ARMOR_AMOUNT: 35,
   ARMOR_MAX: 35,
   ARMOR_RESPAWN_TIME: 25,
+  /** Full signature-ability refresh; kept scarce enough to remain contested. */
+  OVERCHARGE_RESPAWN_TIME: 30,
+  /** Prevent collecting a cell for a nearly-finished cooldown. */
+  OVERCHARGE_MIN_COOLDOWN_SECONDS: 2,
   /**
    * Respawn cycle for special-weapon pickups (shotgun). Weapon pickups
    * also start the match on this timer rather than pre-placed, so every
@@ -490,6 +508,7 @@ export const BOT = Object.freeze({
     CRITICAL_BANDAGE: 600,
     BAT: 500,
     SHOTGUN: 480,
+    OVERCHARGE: 470,
     ARMOR: 450,
     BANDAGE: 420,
     PISTOL: 340,
