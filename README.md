@@ -51,11 +51,12 @@ match death counter, so every client sees the same cosmetic beat.
 ## Solo play
 
 `RUSTY SPAR` starts the familiar single Practice match at your selected Rusty
-difficulty. Its `SPAR MODE` selector can stay on `RANDOM` for the rotating mix
-or pin any of the eight modes when you want to practice or replay a favorite;
-the choice persists on that device and rematches keep it while maps continue
-to rotate. `GAUNTLET` starts a three-fight run that escalates from Rookie to
-Scrapper to Warlord; win to advance, while a loss or draw restarts the run.
+difficulty. Its `RIVAL` selector can stay on `RANDOM` or pin any roster fighter
+for matchup practice, while `SPAR MODE` can keep the rotating mix or pin any of
+the eight modes. Both choices persist on that device and rematches keep them
+while maps continue to rotate. `GAUNTLET` starts a three-fight run that
+escalates from Rookie to Scrapper to Warlord; win to advance, while a loss or
+draw restarts the run.
 Gauntlet fights rotate maps and modes but never change lifetime PvP records.
 Each stage win banks score, with bonuses for the round contract and a
 regulation finish. Zero-death wins add a flawless bonus, while every whole

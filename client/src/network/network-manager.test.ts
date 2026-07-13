@@ -387,13 +387,20 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
       difficulty: 'scrapper',
       kind: 'gauntlet',
     });
-    manager.startPractice('Charlie', 'rookie', 'sparring', GameModeType.CORE_RUN);
+    manager.startPractice(
+      'Charlie',
+      'rookie',
+      'sparring',
+      GameModeType.CORE_RUN,
+      'frost_wizard',
+    );
     expect(hoisted.sentMessages).toContainEqual({
       type: 'client:startPractice',
       nickname: 'Charlie',
       difficulty: 'rookie',
       kind: 'sparring',
       gameMode: GameModeType.CORE_RUN,
+      opponentCharacterId: 'frost_wizard',
     });
   });
 

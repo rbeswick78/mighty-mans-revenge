@@ -58,6 +58,8 @@ export interface ClientStartPracticeMessage {
   kind?: PracticeKind;
   /** Optional validated mode pin for ordinary Sparring; Gauntlet ignores it. */
   gameMode?: GameModeType;
+  /** Optional validated Rusty fighter pin for ordinary Sparring; Gauntlet ignores it. */
+  opponentCharacterId?: CharacterId;
 }
 
 export interface ClientCancelMatchmakingMessage {

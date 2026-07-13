@@ -19,6 +19,7 @@ import {
   BOT_DIFFICULTIES,
   DEFAULT_BOT_DIFFICULTY,
   type BotDifficulty,
+  type CharacterId,
   type PracticeKind,
 } from '@shared/config/game.js';
 import type { GameModeType } from '@shared/types/game.js';
@@ -27,10 +28,16 @@ import {
   normalizePracticeModePreference,
   practiceModePreferenceLabel,
 } from '../ui/practice-mode.js';
+import {
+  nextPracticeRivalPreference,
+  normalizePracticeRivalPreference,
+  practiceRivalPreferenceLabel,
+} from '../ui/practice-rival.js';
 
 const STORAGE_KEY_NICKNAME = 'mmr_nickname';
 const STORAGE_KEY_BOT_DIFFICULTY = 'mmr_bot_difficulty';
 const STORAGE_KEY_PRACTICE_MODE = 'mmr_practice_mode';
+const STORAGE_KEY_PRACTICE_RIVAL = 'mmr_practice_rival';
 
 // Scene-local color decisions. Everything beyond the parallax backdrop is
 // pinned here so a future palette pass can re-tune the lobby in one place.
@@ -71,10 +78,12 @@ export class LobbyScene extends Phaser.Scene {
   private practiceButton!: PixelButton;
   private gauntletButton!: PixelButton;
   private difficultyButton!: PixelButton;
+  private practiceRivalButton!: PixelButton;
   private practiceModeButton!: PixelButton;
   private mightyManSprite!: Phaser.GameObjects.Sprite;
   private nickname: string;
   private practiceDifficulty: BotDifficulty;
+  private practiceRival: CharacterId | null;
   private practiceMode: GameModeType | null;
   private isSearching = false;
   private searchStartTime = 0;
@@ -97,6 +106,7 @@ export class LobbyScene extends Phaser.Scene {
     super({ key: 'LobbyScene' });
     this.nickname = '';
     this.practiceDifficulty = DEFAULT_BOT_DIFFICULTY;
+    this.practiceRival = null;
     this.practiceMode = null;
   }
 
@@ -109,6 +119,9 @@ export class LobbyScene extends Phaser.Scene {
       : DEFAULT_BOT_DIFFICULTY;
     this.practiceMode = normalizePracticeModePreference(
       localStorage.getItem(STORAGE_KEY_PRACTICE_MODE),
+    );
+    this.practiceRival = normalizePracticeRivalPreference(
+      localStorage.getItem(STORAGE_KEY_PRACTICE_RIVAL),
     );
     this.isSearching = false;
     this.menuGamepad = new MenuGamepadInput();
@@ -274,16 +287,31 @@ export class LobbyScene extends Phaser.Scene {
       this,
       panel.centerX - qmW / 2,
       206,
-      qmW,
+      soloW,
       22,
       this.difficultyLabel(),
       {
         variant: 'secondary',
-        fontSize: 8,
+        fontSize: 7,
         onClick: () => this.cyclePracticeDifficulty(),
       },
     );
     panel.add(this.difficultyButton);
+
+    this.practiceRivalButton = new PixelButton(
+      this,
+      panel.centerX - qmW / 2 + soloW + 10,
+      206,
+      soloW,
+      22,
+      practiceRivalPreferenceLabel(this.practiceRival),
+      {
+        variant: 'secondary',
+        fontSize: 6,
+        onClick: () => this.cyclePracticeRival(),
+      },
+    );
+    panel.add(this.practiceRivalButton);
 
     this.practiceModeButton = new PixelButton(
       this,
@@ -488,6 +516,7 @@ export class LobbyScene extends Phaser.Scene {
       this.practiceButton,
       this.gauntletButton,
       this.difficultyButton,
+      this.practiceRivalButton,
       this.practiceModeButton,
     ];
   }
@@ -710,6 +739,7 @@ export class LobbyScene extends Phaser.Scene {
     this.practiceButton.setVisible(false);
     this.gauntletButton.setVisible(false);
     this.difficultyButton.setVisible(false);
+    this.practiceRivalButton.setVisible(false);
     this.practiceModeButton.setVisible(false);
 
     this.searchingTween = this.tweens.add({
@@ -744,6 +774,7 @@ export class LobbyScene extends Phaser.Scene {
       this.practiceDifficulty,
       kind,
       kind === 'sparring' ? (this.practiceMode ?? undefined) : undefined,
+      kind === 'sparring' ? (this.practiceRival ?? undefined) : undefined,
     );
   }
 
@@ -755,7 +786,17 @@ export class LobbyScene extends Phaser.Scene {
   }
 
   private difficultyLabel(): string {
-    return `RUSTY LEVEL: ${this.practiceDifficulty.toUpperCase()}`;
+    return `LEVEL: ${this.practiceDifficulty.toUpperCase()}`;
+  }
+
+  private cyclePracticeRival(): void {
+    this.practiceRival = nextPracticeRivalPreference(this.practiceRival);
+    if (this.practiceRival === null) {
+      localStorage.removeItem(STORAGE_KEY_PRACTICE_RIVAL);
+    } else {
+      localStorage.setItem(STORAGE_KEY_PRACTICE_RIVAL, this.practiceRival);
+    }
+    this.practiceRivalButton.setLabel(practiceRivalPreferenceLabel(this.practiceRival));
   }
 
   private cyclePracticeMode(): void {
@@ -809,6 +850,7 @@ export class LobbyScene extends Phaser.Scene {
     this.practiceButton.setVisible(true);
     this.gauntletButton.setVisible(true);
     this.difficultyButton.setVisible(true);
+    this.practiceRivalButton.setVisible(true);
     this.practiceModeButton.setVisible(true);
     this.setNameEntryVisible(true);
 

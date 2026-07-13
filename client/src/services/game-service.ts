@@ -178,9 +178,16 @@ export class GameService {
     difficulty: BotDifficulty,
     kind: PracticeKind = 'sparring',
     gameMode?: GameModeType,
+    opponentCharacterId?: CharacterId,
   ): void {
     this.localNickname = nickname;
-    this.networkManager.startPractice(nickname, difficulty, kind, gameMode);
+    this.networkManager.startPractice(
+      nickname,
+      difficulty,
+      kind,
+      gameMode,
+      opponentCharacterId,
+    );
   }
 
   cancelMatchmaking(): void {

@@ -118,6 +118,7 @@ export class GameManager {
           message.difficulty,
           message.kind,
           message.gameMode,
+          message.opponentCharacterId,
         );
         break;
 

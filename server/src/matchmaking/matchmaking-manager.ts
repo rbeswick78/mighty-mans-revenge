@@ -97,6 +97,8 @@ interface PostMatchState {
   practiceDifficulty: BotDifficulty | null;
   /** Player-selected Spar mode retained across direct Practice rematches. */
   practiceModePin: GameModeType | null;
+  /** Player-selected Rusty fighter retained across direct Practice rematches. */
+  practiceRivalPin: CharacterId | null;
   /** Next Gauntlet fight, or stage one when the completed run must retry. */
   nextGauntlet: PracticeGauntletMatch | null;
   /** Server-authored advancement choices; empty for retries and non-Gauntlet matches. */
@@ -170,6 +172,8 @@ export class MatchmakingManager {
   private readonly practiceDifficulties: Map<string, BotDifficulty> = new Map();
   /** Optional validated mode choice for ordinary Sparring matches. */
   private readonly practiceModePins: Map<string, GameModeType> = new Map();
+  /** Optional validated Rusty fighter choice for ordinary Sparring matches. */
+  private readonly practiceRivalPins: Map<string, CharacterId> = new Map();
   /** Authoritative stage metadata for live Gauntlet matches. */
   private readonly practiceGauntlets: Map<string, PracticeGauntletMatch> = new Map();
   /** Ordered rival/forecast history for each live Gauntlet run. */
@@ -260,6 +264,7 @@ export class MatchmakingManager {
     difficulty: BotDifficulty = DEFAULT_BOT_DIFFICULTY,
     kind: PracticeKind = 'sparring',
     gameMode?: GameModeType,
+    opponentCharacterId?: CharacterId,
   ): void {
     if (this.playerMatchMap.has(playerId)) return;
     const safeDifficulty = BOT_DIFFICULTIES.includes(difficulty)
@@ -271,6 +276,12 @@ export class MatchmakingManager {
       gameMode !== undefined &&
       GAME_MODE_ROTATION.includes(gameMode)
         ? gameMode
+        : null;
+    const practiceRivalPin =
+      safeKind === 'sparring' &&
+      opponentCharacterId !== undefined &&
+      CHARACTER_IDS.includes(opponentCharacterId)
+        ? opponentCharacterId
         : null;
     const gauntlet = safeKind === 'gauntlet' ? practiceGauntletMatch(1) : null;
     this.queue.removePlayer(playerId);
@@ -301,6 +312,7 @@ export class MatchmakingManager {
       gauntlet,
       undefined,
       practiceModePin,
+      practiceRivalPin,
     );
   }
 
@@ -751,6 +763,7 @@ export class MatchmakingManager {
       forecastMutatorIds: [],
     },
     practiceModePin: GameModeType | null = null,
+    practiceRivalPin: CharacterId | null = null,
   ): void {
     const match = new Match(
       matchId,
@@ -771,12 +784,14 @@ export class MatchmakingManager {
     if (practiceDifficulty !== null) {
       this.practiceDifficulties.set(matchId, practiceDifficulty);
       if (practiceModePin !== null) this.practiceModePins.set(matchId, practiceModePin);
+      if (practiceRivalPin !== null) this.practiceRivalPins.set(matchId, practiceRivalPin);
       if (gauntlet) this.practiceGauntlets.set(matchId, gauntlet);
       const botEntry = playerEntries.find((entry) => this.botPlayerIds.has(entry.id));
       if (botEntry) {
         this.botControllers.set(matchId, new BotController(botEntry.id, practiceDifficulty));
         const character =
           gauntlet?.opponentCharacterId ??
+          practiceRivalPin ??
           CHARACTER_IDS[
             Math.min(Math.floor(this.rng() * CHARACTER_IDS.length), CHARACTER_IDS.length - 1)
           ];
@@ -1308,6 +1323,7 @@ export class MatchmakingManager {
     const result = match.getResult();
     const practiceDifficulty = this.practiceDifficulties.get(matchId) ?? null;
     const practiceModePin = this.practiceModePins.get(matchId) ?? null;
+    const practiceRivalPin = this.practiceRivalPins.get(matchId) ?? null;
     const gauntlet = this.practiceGauntlets.get(matchId) ?? null;
     const gauntletRunHistory = this.practiceGauntletRunHistories.get(matchId) ?? {
       opponentCharacterIds: [],
@@ -1513,6 +1529,7 @@ export class MatchmakingManager {
       isPractice,
       practiceDifficulty,
       practiceModePin,
+      practiceRivalPin,
       nextGauntlet,
       gauntletRoutes,
       gauntletRunHistory:
@@ -1532,6 +1549,7 @@ export class MatchmakingManager {
     this.botControllers.delete(matchId);
     this.practiceDifficulties.delete(matchId);
     this.practiceModePins.delete(matchId);
+    this.practiceRivalPins.delete(matchId);
     this.practiceGauntlets.delete(matchId);
     this.practiceGauntletRunHistories.delete(matchId);
   }
@@ -1600,6 +1618,7 @@ export class MatchmakingManager {
         postMatch.nextGauntlet,
         postMatch.gauntletRunHistory,
         postMatch.practiceModePin,
+        postMatch.practiceRivalPin,
       );
       return;
     }

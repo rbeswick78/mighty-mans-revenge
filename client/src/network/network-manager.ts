@@ -300,6 +300,7 @@ export class NetworkManager {
     difficulty: BotDifficulty,
     kind: PracticeKind = 'sparring',
     gameMode?: GameModeType,
+    opponentCharacterId?: CharacterId,
   ): void {
     this.connection.send({
       type: 'client:startPractice',
@@ -307,6 +308,7 @@ export class NetworkManager {
       difficulty,
       kind,
       ...(gameMode ? { gameMode } : {}),
+      ...(opponentCharacterId ? { opponentCharacterId } : {}),
     });
   }
 

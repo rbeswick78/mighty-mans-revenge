@@ -14,7 +14,13 @@ import {
   createEmptyCharacterWins,
   practiceGauntletChaosBounty,
 } from '@shared/game';
-import type { MutatorId, PlayerId, ServerMessage, ServerDraftStateMessage } from '@shared/game';
+import type {
+  CharacterId,
+  MutatorId,
+  PlayerId,
+  ServerMessage,
+  ServerDraftStateMessage,
+} from '@shared/game';
 import { MatchmakingManager } from './matchmaking-manager.js';
 import { getGameMode } from '../game/modes/index.js';
 import { PersistentStatsStore } from '../persistence/persistent-stats-store.js';
@@ -1446,6 +1452,28 @@ describe('MatchmakingManager solo practice flow', () => {
     expect(mgr.getActiveMatches()[0].gameModeType).toBe(GameModeType.CORE_RUN);
   });
 
+  it('pins a validated Spar rival through direct rematches', () => {
+    const { fake } = makeFakeServer();
+    const mgr = new MatchmakingManager(fake, () => 0, store, seededRng([0, 0, 0]));
+
+    mgr.handleStartPractice('A', 'Alpha', 'scrapper', 'sparring', undefined, 'frost_wizard');
+    const first = mgr.getActiveMatches()[0];
+    const firstBot = [...first.selectionState.entries()].find(([playerId]) =>
+      playerId.startsWith('bot:'),
+    );
+    expect(firstBot?.[1].locked).toBe('frost_wizard');
+
+    first.phase = MatchPhase.ENDED;
+    mgr.tick(0.05, 1);
+    mgr.handleRematchRequest('A');
+
+    const rematch = mgr.getActiveMatches()[0];
+    const rematchBot = [...rematch.selectionState.entries()].find(([playerId]) =>
+      playerId.startsWith('bot:'),
+    );
+    expect(rematchBot?.[1].locked).toBe('frost_wizard');
+  });
+
   it('rejects malformed Spar pins and ignores pins on Gauntlet requests', () => {
     const invalid = makeFakeServer();
     const invalidMgr = new MatchmakingManager(
@@ -1460,8 +1488,14 @@ describe('MatchmakingManager solo practice flow', () => {
       'scrapper',
       'sparring',
       'not-a-mode' as GameModeType,
+      'not-a-fighter' as CharacterId,
     );
-    expect(invalidMgr.getActiveMatches()[0].gameModeType).toBe(GameModeType.DEATHMATCH);
+    const invalidMatch = invalidMgr.getActiveMatches()[0];
+    expect(invalidMatch.gameModeType).toBe(GameModeType.DEATHMATCH);
+    const invalidBot = [...invalidMatch.selectionState.entries()].find(([playerId]) =>
+      playerId.startsWith('bot:'),
+    );
+    expect(invalidBot?.[1].locked).toBe('mighty_man');
 
     const gauntlet = makeFakeServer();
     const gauntletMgr = new MatchmakingManager(
@@ -1476,8 +1510,14 @@ describe('MatchmakingManager solo practice flow', () => {
       'rookie',
       'gauntlet',
       GameModeType.CORE_RUN,
+      'rook',
     );
-    expect(gauntletMgr.getActiveMatches()[0].gameModeType).toBe(GameModeType.DEATHMATCH);
+    const gauntletMatch = gauntletMgr.getActiveMatches()[0];
+    expect(gauntletMatch.gameModeType).toBe(GameModeType.DEATHMATCH);
+    const gauntletBot = [...gauntletMatch.selectionState.entries()].find(([playerId]) =>
+      playerId.startsWith('bot:'),
+    );
+    expect(gauntletBot?.[1].locked).toBe('mighty_man');
   });
 
   it('removes a queued player before opening practice', () => {

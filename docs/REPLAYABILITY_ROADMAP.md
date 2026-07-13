@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–62 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Practice vs Rusty with a favorite-mode selector and Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, style bonuses, and live style callouts, four arenas, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–63 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Practice vs Rusty with favorite-mode and choose-your-rival selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, style bonuses, and live style callouts, four arenas, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -94,6 +94,7 @@ Each session below attacks one of these.
 | 60  | Mutator Rule Callouts                          | Every surprise teaches its rule before players must react                       | **DONE** (2026-07-13) |
 | 61  | Death Animation Variety                       | Repeated eliminations stop replaying the same canned fall                        | **DONE** (2026-07-13) |
 | 62  | Favorite Mode Sparring                       | A favorite ruleset becomes deliberately replayable without losing map variety   | **DONE** (2026-07-13) |
+| 63  | Choose Your Rival                           | Any roster matchup becomes deliberate practice instead of a lucky random roll   | **DONE** (2026-07-13) |
 
 ---
 
@@ -2968,7 +2969,77 @@ against Rusty while preserving the quick variety of the existing random Spar.
 
 ---
 
+## Session 63 — Choose Your Rival
+
+**Goal:** let players deliberately train or replay any roster matchup against
+Rusty without removing the quick variety of random Sparring.
+
+**Locked design decisions**
+
+- The lobby's difficulty row is split into compact `LEVEL` and `RIVAL`
+  controls. Rival cycles `RANDOM` followed by shared roster order, uses the
+  registry display names, persists locally, and stays on the ordinary
+  pointer/touch/gamepad menu path.
+- `RANDOM` preserves the existing per-match rival roll. A selected rival is
+  locked for Rusty before human character selection and remains pinned across
+  direct Spar rematches; the normal no-duplicate-fighter rule still applies.
+- The optional wire field is only a request. Matchmaking validates it against
+  `CHARACTER_IDS`, safely ignores malformed or stale input, and owns all lock
+  and rematch state.
+- Gauntlet ignores the selector and retains server-authored route rivals and
+  run-level no-repeat history. PvP, mode/map selection, Rusty difficulty/AI,
+  stats isolation, combat, scoring, and physics are unchanged.
+
+**Acceptance criteria**
+
+- [x] Pure client tests prove saved-value normalization, the complete
+      random/roster cycle, and shared player-facing labels; the network test
+      proves the optional request payload.
+- [x] Server tests prove a valid rival is locked and survives a direct
+      rematch, malformed input falls back, and Gauntlet ignores the request.
+- [x] A real-client Chromium Spar smoke selects and persists Frost Wizard,
+      proves the longest label fits its compact button, observes Rusty's
+      authoritative lock and character-select copy, and reaches live play.
+- [x] Typecheck, lint, all 1,134 unit tests across 76 files, production build,
+      and the full Playwright desktop/mobile matrix pass.
+
+---
+
 ## Session Log
+
+### Session 63 — 2026-07-13 — Choose Your Rival
+
+**Shipped:** `RUSTY SPAR` now pairs its difficulty control with a persisted
+`RIVAL` selector for `RANDOM` or any of the six fighters. A chosen rival stays
+locked through direct rematches, turning Spar into deliberate matchup practice
+without changing random variety for players who just want a quick fight. The
+full fighter name remains visible in the compact row, and pointer, touch, and
+gamepad navigation all use the existing menu path.
+
+The client derives order and names from the shared roster and sends an optional
+request only for ordinary Sparring. Matchmaking validates the identifier,
+locks Rusty through the normal character-select authority, and owns rematch
+retention. Invalid and old-client payloads keep random selection. Gauntlet
+discards the request so its authored route rivals and no-repeat run history
+cannot be overridden; PvP and every gameplay system remain unchanged.
+
+**Verification:** 1,134 tests pass across 76 files, including preference
+cycling, optional serialization, validation, authoritative lock, rematch
+retention, and Gauntlet isolation. TypeScript, ESLint, all package builds, and
+the Vite production bundle are clean; Vite retains its existing chunk-size
+advisory. The live Chromium smoke selected Frost Wizard, measured the label
+inside its button, verified the persisted choice and Rusty's exact lock/copy,
+and reached play. The full Playwright matrix passes 16 tests with 11
+intentional scoped skips across Chromium, Firefox, and mobile landscape.
+
+**Tuning watch:** `RANDOM` remains the default for discovery. Watch whether
+pinning Rusty to a fighter makes the same-fighter player restriction surprising;
+the character-select lock is intentionally visible before considering mirror
+matches, which would be a separate roster-rule change.
+
+**Deployment:** not run; deployment still requires explicit authorization.
+
+---
 
 ### Session 62 — 2026-07-13 — Favorite Mode Sparring
 

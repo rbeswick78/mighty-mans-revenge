@@ -230,11 +230,11 @@ test('solo practice launches against locked Rusty and reaches live play', async 
   await input.fill('Solo');
 
   // Desktop canvas is 960x720 at this project viewport. Cycle the persisted
-  // Rusty level once, optionally pin a Spar mode, then launch an ordinary
-  // spar or the pinned Gauntlet journey in canvas-local coordinates.
+  // Rusty level once, optionally pin a Spar rival/mode, then launch an
+  // ordinary spar or the pinned Gauntlet journey in canvas-local coordinates.
   const canvas = page.locator('canvas');
   await expect(canvas).toHaveCount(1);
-  await canvas.click({ position: { x: 480, y: 642 } });
+  await canvas.click({ position: { x: 410, y: 642 } });
   await expect
     .poll(() => page.evaluate(() => localStorage.getItem('mmr_bot_difficulty')))
     .toBe('warlord');
@@ -246,6 +246,44 @@ test('solo practice launches against locked Rusty and reaches live play', async 
     await expect
       .poll(() => page.evaluate(() => localStorage.getItem('mmr_practice_mode')))
       .toBe('koth');
+  }
+  if (process.env.VERIFY_PRACTICE_RIVAL === '1') {
+    // RANDOM -> MIGHTY MAN -> BRUCE -> FROST WIZARD.
+    for (let click = 0; click < 3; click++) {
+      await canvas.click({ position: { x: 550, y: 642 } });
+    }
+    await expect
+      .poll(() => page.evaluate(() => localStorage.getItem('mmr_practice_rival')))
+      .toBe('frost_wizard');
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const w = window as unknown as {
+            game?: { scene: { getScene: (key: string) => unknown } };
+          };
+          type DisplayNode = {
+            text?: string;
+            width?: number;
+            list?: DisplayNode[];
+          };
+          const scene = w.game?.scene.getScene('LobbyScene') as {
+            children?: { list?: DisplayNode[] };
+          } | null;
+          const stack = [...(scene?.children?.list ?? [])];
+          let label: DisplayNode | undefined;
+          while (stack.length > 0 && !label) {
+            const child = stack.pop();
+            if (!child) continue;
+            if (child.text?.startsWith('RIVAL:')) label = child;
+            if (child.list) stack.push(...child.list);
+          }
+          return {
+            text: label?.text ?? null,
+            fitsButton: (label?.width ?? Number.POSITIVE_INFINITY) <= 117,
+          };
+        }),
+      )
+      .toEqual({ text: 'RIVAL: FROST WIZARD', fitsButton: true });
   }
   if (process.env.VERIFY_GAMEPAD === '1') {
     await page.evaluate(() => {
@@ -343,6 +381,33 @@ test('solo practice launches against locked Rusty and reaches live play', async 
         }),
       )
       .toEqual({ gameMode: 'koth', briefing: true });
+  }
+  if (process.env.VERIFY_PRACTICE_RIVAL === '1') {
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const w = window as unknown as {
+            game?: { scene: { getScene: (key: string) => unknown } };
+          };
+          const scene = w.game?.scene.getScene('CharacterSelectScene') as {
+            latestSelections?: Array<{
+              nickname: string;
+              lockedCharacterId: string | null;
+            }>;
+            children?: { list?: Array<{ text?: string }> };
+          } | null;
+          return {
+            rustyCharacter:
+              scene?.latestSelections?.find((selection) => selection.nickname === 'RUSTY')
+                ?.lockedCharacterId ?? null,
+            lockedLabel:
+              scene?.children?.list?.some((child) =>
+                child.text?.includes('LOCKED · FROST WIZARD'),
+              ) ?? false,
+          };
+        }),
+      )
+      .toEqual({ rustyCharacter: 'frost_wizard', lockedLabel: true });
   }
 
   await expect
