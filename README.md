@@ -27,6 +27,21 @@ pnpm build
 
 See `CLAUDE.md` for the full command list and deploy procedures.
 
+## Controls
+
+| Action | Keyboard + mouse | Standard gamepad | Touch |
+| --- | --- | --- | --- |
+| Move | WASD | Left stick | Left virtual stick |
+| Aim / fire | Hold / release left mouse | Right stick + hold / release RT | Hold / release right virtual stick |
+| Grenade / detonate | Hold / release right mouse | Hold / release LT | Grenade button |
+| Sprint | Shift | LB or left-stick click | Push left stick to its rim |
+| Ability | Space | RB | Ability button |
+| Reload | R | X / Square | Automatic |
+
+Gamepad menus use the D-pad or left stick, A / Cross to select, and B /
+Circle to cancel or return. Mouse, touch, keyboard, and gamepad can take over
+at any time; no settings toggle is required.
+
 ## Where to read next
 
 | If you want…                                | Read                                          |

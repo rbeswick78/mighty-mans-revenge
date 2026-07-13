@@ -5,6 +5,7 @@ import type {
 } from '@shared/types/network.js';
 import { Wasteland, cssHex } from '@shared/config/palette.js';
 import { AudioManager } from '../audio/audio-manager.js';
+import { MenuGamepadInput } from '../input/menu-gamepad.js';
 import { GameService, type MatchData } from '../services/game-service.js';
 import { WastelandStreet } from '../ui/menu/wasteland-street.js';
 import { MenuPanel } from '../ui/menu/menu-panel.js';
@@ -67,6 +68,9 @@ export class LobbyScene extends Phaser.Scene {
   private gameService!: GameService;
   private searchingTween: Phaser.Tweens.Tween | null = null;
   private searchTimerEvent: Phaser.Time.TimerEvent | null = null;
+  private menuGamepad: MenuGamepadInput | null = null;
+  private gamepadFocusActive = false;
+  private gamepadFocusIndex = 0;
 
   // Event handler references for cleanup
   private onMatchFound: ((matchData: MatchData) => void) | null = null;
@@ -91,6 +95,9 @@ export class LobbyScene extends Phaser.Scene {
       ? (savedDifficulty as BotDifficulty)
       : DEFAULT_BOT_DIFFICULTY;
     this.isSearching = false;
+    this.menuGamepad = new MenuGamepadInput();
+    this.gamepadFocusActive = false;
+    this.gamepadFocusIndex = 0;
 
     this.gameService = GameService.getInstance();
 
@@ -319,6 +326,15 @@ export class LobbyScene extends Phaser.Scene {
       .setOrigin(1, 0.5)
       .setDepth(WastelandStreet.DEPTH.UI);
 
+    this.add
+      .text(centerX, camHeight - 24, 'GAMEPAD: D-PAD + A  •  B CANCEL', {
+        fontFamily: MENU_FONTS.BODY,
+        fontSize: '10px',
+        color: cssHex(FOOTER_COLOR),
+      })
+      .setOrigin(0.5)
+      .setDepth(WastelandStreet.DEPTH.UI);
+
     // ────────────────────────────────────────────────────────────────────
     // All-time top-5 leaderboard — bottom-left column, above the player
     // count. Bottom-anchored (origin y=1) and positioned off the camera
@@ -376,6 +392,7 @@ export class LobbyScene extends Phaser.Scene {
 
   shutdown(): void {
     this.cleanupEvents();
+    this.menuGamepad = null;
     if (this.searchingTween) {
       this.searchingTween.stop();
       this.searchingTween = null;
@@ -388,6 +405,42 @@ export class LobbyScene extends Phaser.Scene {
     this.nicknameInput = null;
     this.nicknameDom = null;
     this.nameEntryUi = [];
+  }
+
+  update(): void {
+    const actions = this.menuGamepad?.poll();
+    if (!actions?.hasAction) return;
+    this.gamepadFocusActive = true;
+
+    if (this.isSearching) {
+      this.syncGamepadFocus();
+      if (actions.back) this.cancelButton.activate();
+      return;
+    }
+
+    const buttons = this.gamepadButtons();
+    if (actions.up || actions.left) {
+      this.gamepadFocusIndex =
+        (this.gamepadFocusIndex - 1 + buttons.length) % buttons.length;
+    } else if (actions.down || actions.right) {
+      this.gamepadFocusIndex = (this.gamepadFocusIndex + 1) % buttons.length;
+    }
+    this.syncGamepadFocus();
+    if (actions.confirm) buttons[this.gamepadFocusIndex]?.activate();
+  }
+
+  private gamepadButtons(): PixelButton[] {
+    return [this.quickMatchButton, this.practiceButton, this.difficultyButton];
+  }
+
+  private syncGamepadFocus(): void {
+    const buttons = this.gamepadButtons();
+    buttons.forEach((button, index) => {
+      button.setFocused(
+        this.gamepadFocusActive && !this.isSearching && index === this.gamepadFocusIndex,
+      );
+    });
+    this.cancelButton.setFocused(this.gamepadFocusActive && this.isSearching);
   }
 
   /**

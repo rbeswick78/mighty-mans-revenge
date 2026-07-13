@@ -19,6 +19,7 @@ export class Crosshair {
   private sprite: Phaser.GameObjects.Image;
   private canvasEnterHandler: () => void;
   private canvasLeaveHandler: () => void;
+  private pointerInside = false;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -37,8 +38,14 @@ export class Crosshair {
     // the OS cursor reappears naturally outside the play area (browser
     // chrome, dev tools, etc.).
     const canvas = scene.game.canvas;
-    this.canvasEnterHandler = () => this.sprite.setVisible(true);
-    this.canvasLeaveHandler = () => this.sprite.setVisible(false);
+    this.canvasEnterHandler = () => {
+      this.pointerInside = true;
+      this.sprite.setVisible(true);
+    };
+    this.canvasLeaveHandler = () => {
+      this.pointerInside = false;
+      this.sprite.setVisible(false);
+    };
     canvas.addEventListener('mouseenter', this.canvasEnterHandler);
     canvas.addEventListener('mouseleave', this.canvasLeaveHandler);
 
@@ -48,13 +55,15 @@ export class Crosshair {
     if (canvas.matches(':hover')) {
       const pointer = scene.input.activePointer;
       this.sprite.setPosition(pointer.x, pointer.y);
+      this.pointerInside = true;
       this.sprite.setVisible(true);
     }
   }
 
-  update(): void {
+  update(enabled: boolean = true): void {
     const pointer = this.scene.input.activePointer;
     this.sprite.setPosition(pointer.x, pointer.y);
+    this.sprite.setVisible(enabled && this.pointerInside);
   }
 
   destroy(): void {

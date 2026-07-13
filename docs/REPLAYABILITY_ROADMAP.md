@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–47 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty with Scavenger Instincts, four arenas, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Overcharge Cells, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–48 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty with Scavenger Instincts, four arenas, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -79,6 +79,7 @@ Each session below attacks one of these.
 | 45  | Scrap Armor                                   | A contested shield pickup rewards proactive center control                       | **DONE** (2026-07-13) |
 | 46  | Scrapstorm                                    | Telegraphed debris strikes turn settled positions into urgent dodges              | **DONE** (2026-07-13) |
 | 47  | Overcharge Cells                              | Ability refreshes turn signature powers into repeatable center-map contests       | **DONE** (2026-07-13) |
+| 48  | Twin-Stick Controller Support                 | Console-style controls make every fight and rematch easier to settle into           | **DONE** (2026-07-13) |
 
 ---
 
@@ -2354,7 +2355,88 @@ ability back into play and makes the center worth contesting repeatedly.
 
 ---
 
+## Session 48 — Twin-Stick Controller Support
+
+**Goal:** make the browser shooter feel natural from the couch and let a
+controller carry a player through the entire match/rematch loop.
+
+**Locked design decisions**
+
+- The first connected standard browser gamepad is sampled once per input tick.
+  A circular 20% dead zone removes drift while rescaling the remaining stick
+  range; meaningful stick or button intent automatically takes control, while
+  mouse movement, keyboard presses, and touch reclaim their native modes.
+- Left stick moves, right stick aims, RT holds/releases gun aim/fire, and LT
+  holds/releases grenade aim/throw or presses to detonate a live grenade. LB or
+  L3 sprints, RB uses the character ability, and X/Square reloads. These map to
+  the existing `RawInput`/`PlayerInput` contract with no new wire or physics
+  path.
+- D-pad/left stick plus A/Cross, B/Circle, and X/Square navigate the lobby,
+  map/mode draft, character select, and results. Controller focus reuses the
+  same `PixelButton` callbacks, disabled states, sounds, and server-authoritative
+  actions as pointer input.
+- Controller activation hides the stale mouse crosshair and displays one short
+  mapping callout. Optional haptics pulse only for locally valid fire, grenade,
+  ability, and damage feedback; unsupported devices fail silently.
+- Touch and mobile-landscape behavior remain unchanged and first-class. A
+  controller can be connected or removed mid-round without pausing or opening a
+  settings screen.
+
+**Acceptance criteria**
+
+- [x] Deterministic tests cover radial dead zones, persistent aim, trigger
+      release edges, grenade throw/detonate gating, sprint/reload/ability
+      buttons, disconnects, haptics, menu edge behavior, and transition-safe
+      priming.
+- [x] A synthetic standard-gamepad Playwright smoke launches Practice from the
+      lobby, locks a fighter, takes control in live play, moves, aims, fires on
+      RT release, shows the mapping callout, and invokes haptics through the
+      normal networked match path.
+- [x] Typecheck, lint, all unit tests, production build, and the unpinned
+      Playwright matrix pass; desktop visual review and mobile regression remain
+      clean.
+
+---
+
 ## Session Log
+
+### Session 48 — 2026-07-13 — Twin-Stick Controller Support
+
+**Shipped:** a connected standard browser gamepad can now carry a player from
+the lobby through Practice, character lock-in, live combat, results, and rematch.
+The left stick moves, right stick aims, triggers preserve the game's deliberate
+hold/release fire and grenade semantics, and shoulder/face buttons cover sprint,
+ability, reload, and live-grenade detonation. A rescaled radial dead zone removes
+stick drift, input modes hand off automatically, and disconnecting mid-round
+falls back safely without changing the shared input, wire, or physics contracts.
+
+Controller focus reuses the existing menu buttons and server-authoritative scene
+actions. Live play hides the stale mouse crosshair, teaches the mapping once per
+round, and adds optional haptic feedback only for valid local combat actions and
+incoming damage. Unsupported vibration hardware fails silently, while touch,
+mouse, and keyboard behavior remain intact.
+
+**Verification:** 1,088 unit tests pass across 71 files, including deterministic
+coverage for dead zones, aim persistence, trigger-release edges, grenade gates,
+combat buttons, disconnects, haptics, menu edges, and transition-safe priming.
+TypeScript, ESLint, and the production build are clean; Vite retains its existing
+chunk-size advisory. The unpinned Playwright matrix passes 13 tests with 11
+intentional scoped skips across desktop Chromium, desktop Firefox, and mobile
+landscape. A dedicated synthetic-gamepad Practice smoke drove the lobby and
+character-select scenes, then verified live movement, aim, RT-release fire,
+mapping help, and haptics through the normal networked match path. An in-app
+desktop visual review confirmed the controller hint fits the lobby cleanly. All
+local smoke services were stopped afterward.
+
+**Tuning watch:** validate the 20% radial dead zone and release-to-fire cadence
+on several physical controller models at the next group playtest. The initial
+button used to wake a newly visible browser gamepad is intentionally consumed so
+it cannot double-activate across scene transitions; watch whether that feels
+surprising on real hardware.
+
+**Deployment:** not run; deployment still requires explicit authorization.
+
+---
 
 ### Session 47 — 2026-07-13 — Overcharge Cells
 

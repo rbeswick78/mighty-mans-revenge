@@ -4,6 +4,7 @@ import type { DraftCategory, ServerDraftStateMessage } from '@shared/types/netwo
 import { DRAFT, gameModeDisplayName } from '@shared/config/game.js';
 import { Wasteland, cssHex } from '@shared/config/palette.js';
 import { AudioManager } from '../audio/audio-manager.js';
+import { MenuGamepadInput } from '../input/menu-gamepad.js';
 import { GameService, type MatchData } from '../services/game-service.js';
 import { WastelandStreet } from '../ui/menu/wasteland-street.js';
 import { PixelButton } from '../ui/menu/pixel-button.js';
@@ -97,6 +98,9 @@ export class DraftScene extends Phaser.Scene {
   private modeBadgeText: Phaser.GameObjects.Text | null = null;
   private statusText: Phaser.GameObjects.Text | null = null;
   private timerText: Phaser.GameObjects.Text | null = null;
+  private menuGamepad: MenuGamepadInput | null = null;
+  private gamepadFocusActive = false;
+  private gamepadFocusedCard: DraftCard | null = null;
 
   /**
    * Local-clock anchor for the pick countdown — re-anchored from
@@ -130,6 +134,9 @@ export class DraftScene extends Phaser.Scene {
     this.modeBadgeText = null;
     this.statusText = null;
     this.timerText = null;
+    this.menuGamepad = null;
+    this.gamepadFocusActive = false;
+    this.gamepadFocusedCard = null;
     this.deadlineAtLocalMs = null;
     this.countdownEvent = null;
   }
@@ -137,6 +144,7 @@ export class DraftScene extends Phaser.Scene {
   create(): void {
     this.cameras.main.fadeIn(300, 0, 0, 0);
     this.gameService = GameService.getInstance();
+    this.menuGamepad = new MenuGamepadInput();
 
     new WastelandStreet(this, { lowDetail: this.isLikelyMobile() });
 
@@ -155,9 +163,35 @@ export class DraftScene extends Phaser.Scene {
 
   shutdown(): void {
     this.cleanupEvents();
+    this.menuGamepad = null;
     if (this.countdownEvent) {
       this.countdownEvent.remove();
       this.countdownEvent = null;
+    }
+  }
+
+  update(): void {
+    const actions = this.menuGamepad?.poll();
+    if (!actions?.hasAction || this.phase !== 'pick' || this.transitioned) return;
+    this.gamepadFocusActive = true;
+
+    const enabled = this.enabledGamepadCards();
+    if (enabled.length === 0) {
+      this.syncGamepadCardFocus([]);
+      return;
+    }
+    if (!this.gamepadFocusedCard || !enabled.includes(this.gamepadFocusedCard)) {
+      this.gamepadFocusedCard = enabled[0];
+    }
+
+    if (actions.left) this.moveGamepadCard(-1, 0, enabled);
+    else if (actions.right) this.moveGamepadCard(1, 0, enabled);
+    else if (actions.up) this.moveGamepadCard(0, -1, enabled);
+    else if (actions.down) this.moveGamepadCard(0, 1, enabled);
+
+    this.syncGamepadCardFocus(enabled);
+    if (actions.confirm && this.gamepadFocusedCard) {
+      this.gamepadFocusedCard.button.activate();
     }
   }
 
@@ -523,7 +557,7 @@ export class DraftScene extends Phaser.Scene {
       .text(
         centerX,
         camHeight - 24,
-        'TAP A CARD TO PICK  •  THE OTHER COLUMN GOES TO YOUR OPPONENT',
+        'TAP A CARD OR USE D-PAD + A  •  OTHER COLUMN GOES TO YOUR RIVAL',
         {
           fontFamily: MENU_FONTS.BODY,
           fontSize: '12px',
@@ -616,6 +650,54 @@ export class DraftScene extends Phaser.Scene {
     this.deadlineAtLocalMs = view.complete ? null : performance.now() + draft.pickDeadlineMs;
     this.timerText?.setVisible(!view.complete);
     this.updateCountdownLabel();
+    this.syncGamepadCardFocus(this.enabledGamepadCards());
+  }
+
+  private enabledGamepadCards(): DraftCard[] {
+    const draft = this.latestDraft;
+    if (!draft || this.phase !== 'pick') return [];
+    const view = deriveDraftView(
+      draft,
+      this.gameService.getPlayerId(),
+      this.firstPicked,
+    );
+    return this.cards.filter((card) =>
+      view.enabledCategories.includes(card.category),
+    );
+  }
+
+  private syncGamepadCardFocus(enabled: DraftCard[]): void {
+    if (this.gamepadFocusedCard && !enabled.includes(this.gamepadFocusedCard)) {
+      this.gamepadFocusedCard = enabled[0] ?? null;
+    }
+    for (const card of this.cards) {
+      card.button.setFocused(
+        this.gamepadFocusActive && card === this.gamepadFocusedCard,
+      );
+    }
+  }
+
+  private moveGamepadCard(
+    directionX: -1 | 0 | 1,
+    directionY: -1 | 0 | 1,
+    enabled: DraftCard[],
+  ): void {
+    const current = this.gamepadFocusedCard;
+    if (!current) return;
+    const centerX = current.x + current.w / 2;
+    const centerY = current.y + current.h / 2;
+    const candidates = enabled
+      .filter((card) => card !== current)
+      .map((card) => {
+        const dx = card.x + card.w / 2 - centerX;
+        const dy = card.y + card.h / 2 - centerY;
+        const forward = dx * directionX + dy * directionY;
+        const sideways = Math.abs(dx * directionY - dy * directionX);
+        return { card, forward, score: forward + sideways * 0.35 };
+      })
+      .filter((candidate) => candidate.forward > 1)
+      .sort((a, b) => a.score - b.score);
+    this.gamepadFocusedCard = candidates[0]?.card ?? current;
   }
 
   /**

@@ -6,15 +6,20 @@ import { KeyboardMouseInput } from './keyboard-mouse-input.js';
 import { TouchInput } from './touch-input.js';
 import type { RawInput } from './types.js';
 import { withoutSecondaryActions } from './combat-input.js';
+import { GamepadInput } from './gamepad-input.js';
 
-type InputMode = 'keyboard' | 'touch';
+export type InputMode = 'keyboard' | 'touch' | 'gamepad';
 
 const INPUT_BUFFER_SIZE = 128;
 
 export class InputManager {
   private keyboardMouseInput: KeyboardMouseInput;
   private touchInput: TouchInput;
+  private gamepadInput: GamepadInput;
   private activeMode: InputMode;
+  private readonly canvas: HTMLCanvasElement;
+  private readonly onCanvasMouseMove: () => void;
+  private readonly onCanvasTouchStart: () => void;
   private sequenceNumber = 0;
   private inputBuffer: PlayerInput[] = [];
   private lastAcknowledged = -1;
@@ -23,6 +28,8 @@ export class InputManager {
   constructor(scene: Phaser.Scene) {
     this.keyboardMouseInput = new KeyboardMouseInput(scene);
     this.touchInput = new TouchInput(scene);
+    this.gamepadInput = new GamepadInput();
+    this.canvas = scene.game.canvas;
 
     this.activeMode = isTouchDevice() ? 'touch' : 'keyboard';
 
@@ -31,6 +38,17 @@ export class InputManager {
         this.activeMode = 'keyboard';
       });
     }
+
+    this.onCanvasMouseMove = () => {
+      this.activeMode = 'keyboard';
+    };
+    this.onCanvasTouchStart = () => {
+      this.activeMode = 'touch';
+    };
+    this.canvas.addEventListener('mousemove', this.onCanvasMouseMove);
+    this.canvas.addEventListener('touchstart', this.onCanvasTouchStart, {
+      passive: true,
+    });
   }
 
   /**
@@ -50,10 +68,18 @@ export class InputManager {
     secondaryActionsDisabled: boolean = false,
   ): PlayerInput {
     let raw: RawInput;
+    const gamepad = this.gamepadInput.poll(hasActiveGrenade);
+    if (gamepad.hasIntent) {
+      this.activeMode = 'gamepad';
+    } else if (this.activeMode === 'gamepad' && !gamepad.connected) {
+      this.activeMode = isTouchDevice() ? 'touch' : 'keyboard';
+    }
 
     this.touchInput.setSecondaryActionsEnabled(!secondaryActionsDisabled);
 
-    if (this.activeMode === 'touch') {
+    if (this.activeMode === 'gamepad') {
+      raw = gamepad.raw;
+    } else if (this.activeMode === 'touch') {
       raw = this.touchInput.getInput(hasActiveGrenade);
     } else {
       raw = this.keyboardMouseInput.getInput(playerWorldPos, hasActiveGrenade);
@@ -139,7 +165,16 @@ export class InputManager {
     return this.activeMode;
   }
 
+  /** Optional tactile feedback; silently ignored on unsupported browsers/pads. */
+  rumble(strength: number, durationMs: number): void {
+    if (this.activeMode === 'gamepad') {
+      this.gamepadInput.rumble(strength, durationMs);
+    }
+  }
+
   destroy(): void {
+    this.canvas.removeEventListener('mousemove', this.onCanvasMouseMove);
+    this.canvas.removeEventListener('touchstart', this.onCanvasTouchStart);
     this.keyboardMouseInput.destroy();
     this.touchInput.destroy();
     this.inputBuffer = [];

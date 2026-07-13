@@ -185,6 +185,44 @@ test('solo practice launches against locked Rusty and reaches live play', async 
   );
   test.setTimeout(45000);
 
+  if (process.env.VERIFY_GAMEPAD === '1') {
+    await page.addInitScript(() => {
+      const state = {
+        axes: [0, 0, 0, 0],
+        buttons: Array.from({ length: 16 }, () => ({
+          pressed: false,
+          touched: false,
+          value: 0,
+        })),
+        rumbleCount: 0,
+      };
+      const pad = {
+        id: 'Playwright Standard Gamepad',
+        index: 0,
+        connected: true,
+        mapping: 'standard',
+        get axes() {
+          return state.axes;
+        },
+        get buttons() {
+          return state.buttons;
+        },
+        timestamp: 0,
+        vibrationActuator: {
+          playEffect: async () => {
+            state.rumbleCount += 1;
+            return 'complete';
+          },
+        },
+      };
+      Object.defineProperty(navigator, 'getGamepads', {
+        configurable: true,
+        value: () => [pad],
+      });
+      (window as unknown as { __gamepadTest: typeof state }).__gamepadTest = state;
+    });
+  }
+
   await page.goto('/');
   await waitForLobby(page);
   const input = page.locator('input[type="text"]');
@@ -199,8 +237,49 @@ test('solo practice launches against locked Rusty and reaches live play', async 
   await expect
     .poll(() => page.evaluate(() => localStorage.getItem('mmr_bot_difficulty')))
     .toBe('warlord');
-  await canvas.click({ position: { x: 480, y: 614 } });
+  if (process.env.VERIFY_GAMEPAD === '1') {
+    await page.evaluate(() => {
+      const state = (window as unknown as { __gamepadTest: { axes: number[] } })
+        .__gamepadTest;
+      state.axes = [0, 1, 0, 0];
+    });
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const w = window as unknown as {
+            game?: { scene: { getScene: (key: string) => unknown } };
+          };
+          const scene = w.game?.scene.getScene('LobbyScene') as {
+            gamepadFocusIndex?: number;
+          } | null;
+          return scene?.gamepadFocusIndex ?? -1;
+        }),
+      )
+      .toBe(1);
+    await page.evaluate(() => {
+      const state = (window as unknown as {
+        __gamepadTest: {
+          axes: number[];
+          buttons: Array<{ pressed: boolean; touched: boolean; value: number }>;
+        };
+      }).__gamepadTest;
+      state.axes = [0, 0, 0, 0];
+      state.buttons[0] = { pressed: true, touched: true, value: 1 };
+    });
+  } else {
+    await canvas.click({ position: { x: 480, y: 614 } });
+  }
   await waitForActiveScene(page, 'CharacterSelectScene', 10000);
+  if (process.env.VERIFY_GAMEPAD === '1') {
+    await page.evaluate(() => {
+      const state = (window as unknown as {
+        __gamepadTest: {
+          buttons: Array<{ pressed: boolean; touched: boolean; value: number }>;
+        };
+      }).__gamepadTest;
+      state.buttons[0] = { pressed: false, touched: false, value: 0 };
+    });
+  }
 
   await expect
     .poll(
@@ -227,9 +306,31 @@ test('solo practice launches against locked Rusty and reaches live play', async 
     )
     .toBe(true);
 
-  await canvas.click({ position: { x: 480, y: 400 } });
-  await page.keyboard.press('Enter');
+  if (process.env.VERIFY_GAMEPAD === '1') {
+    await page.waitForTimeout(100);
+    await page.evaluate(() => {
+      const state = (window as unknown as {
+        __gamepadTest: {
+          buttons: Array<{ pressed: boolean; touched: boolean; value: number }>;
+        };
+      }).__gamepadTest;
+      state.buttons[0] = { pressed: true, touched: true, value: 1 };
+    });
+  } else {
+    await canvas.click({ position: { x: 480, y: 400 } });
+    await page.keyboard.press('Enter');
+  }
   await waitForActiveScene(page, 'GameScene', 10000);
+  if (process.env.VERIFY_GAMEPAD === '1') {
+    await page.evaluate(() => {
+      const state = (window as unknown as {
+        __gamepadTest: {
+          buttons: Array<{ pressed: boolean; touched: boolean; value: number }>;
+        };
+      }).__gamepadTest;
+      state.buttons[0] = { pressed: false, touched: false, value: 0 };
+    });
+  }
 
   await expect
     .poll(
@@ -282,6 +383,109 @@ test('solo practice launches against locked Rusty and reaches live play', async 
       batIconLoaded: true,
       batSpriteReady: true,
     });
+
+  if (process.env.VERIFY_GAMEPAD === '1') {
+    const opening = await page.evaluate(() => {
+      const w = window as unknown as {
+        game?: { scene: { getScene: (key: string) => unknown } };
+      };
+      const scene = w.game?.scene.getScene('GameScene') as {
+        gameService?: {
+          getNetworkManager: () => {
+            getLocalPlayerState: () => { position: { x: number }; ammo: number } | null;
+          };
+        };
+      } | null;
+      const player = scene?.gameService?.getNetworkManager().getLocalPlayerState();
+      return { x: player?.position.x ?? 0, ammo: player?.ammo ?? 0 };
+    });
+
+    await page.evaluate(() => {
+      const state = (window as unknown as {
+        __gamepadTest: {
+          axes: number[];
+          buttons: Array<{ pressed: boolean; touched: boolean; value: number }>;
+        };
+      }).__gamepadTest;
+      state.axes = [1, 0, 1, 0];
+      state.buttons[7] = { pressed: true, touched: true, value: 1 };
+    });
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() => {
+            const w = window as unknown as {
+              game?: { scene: { getScene: (key: string) => unknown } };
+            };
+            const scene = w.game?.scene.getScene('GameScene') as {
+              inputManager?: {
+                getActiveMode: () => string;
+                getLastRawInput: () => {
+                  moveX: number;
+                  aimAngle: number;
+                  aimingGun: boolean;
+                } | null;
+              };
+              hud?: { eventBannerText?: { text?: string } };
+            } | null;
+            const raw = scene?.inputManager?.getLastRawInput();
+            return {
+              mode: scene?.inputManager?.getActiveMode() ?? null,
+              movingRight: (raw?.moveX ?? 0) > 0.9,
+              aimingRight:
+                raw?.aimingGun === true && Math.abs(raw.aimAngle) < 0.01,
+              banner: scene?.hud?.eventBannerText?.text ?? '',
+            };
+          }),
+        { timeout: 5000, message: 'expected synthetic twin-stick input to take control' },
+      )
+      .toEqual({
+        mode: 'gamepad',
+        movingRight: true,
+        aimingRight: true,
+        banner: 'TWIN-STICK ONLINE\nRT FIRE  •  LT GRENADE  •  RB POWER',
+      });
+
+    await page.waitForTimeout(300);
+    await page.evaluate(() => {
+      const state = (window as unknown as {
+        __gamepadTest: {
+          axes: number[];
+          buttons: Array<{ pressed: boolean; touched: boolean; value: number }>;
+        };
+      }).__gamepadTest;
+      state.axes = [0, 0, 1, 0];
+      state.buttons[7] = { pressed: false, touched: false, value: 0 };
+    });
+    await expect
+      .poll(
+        () =>
+          page.evaluate((start) => {
+            const w = window as unknown as {
+              __gamepadTest: { rumbleCount: number };
+              game?: { scene: { getScene: (key: string) => unknown } };
+            };
+            const scene = w.game?.scene.getScene('GameScene') as {
+              gameService?: {
+                getNetworkManager: () => {
+                  getLocalPlayerState: () => {
+                    position: { x: number };
+                    ammo: number;
+                  } | null;
+                };
+              };
+            } | null;
+            const player = scene?.gameService?.getNetworkManager().getLocalPlayerState();
+            return {
+              moved: (player?.position.x ?? 0) > start.x + 4,
+              fired: (player?.ammo ?? start.ammo) < start.ammo,
+              rumbled: w.__gamepadTest.rumbleCount > 0,
+            };
+          }, opening),
+        { timeout: 5000, message: 'expected controller movement, trigger-release fire, and rumble' },
+      )
+      .toEqual({ moved: true, fired: true, rumbled: true });
+  }
 
   if (process.env.VERIFY_OVERCHARGE === '1') {
     await expect

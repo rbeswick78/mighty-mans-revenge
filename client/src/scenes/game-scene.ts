@@ -166,6 +166,8 @@ export class GameScene extends Phaser.Scene {
   private hud: HUD | null = null;
   private crosshair: Crosshair | null = null;
   private inputManager: InputManager | null = null;
+  /** Announce the first meaningful controller input once per round. */
+  private controllerAnnounced = false;
   private gameService!: GameService;
   private nickname = '';
   private matchData: MatchData | null = null;
@@ -262,6 +264,7 @@ export class GameScene extends Phaser.Scene {
     this.lastCoreCarrierId = undefined;
     this.lastBountyTargetId = undefined;
     this.lastWastelandWarpSequence = undefined;
+    this.controllerAnnounced = false;
   }
 
   create(): void {
@@ -419,6 +422,22 @@ export class GameScene extends Phaser.Scene {
               localState.weaponId === 'bat'
             ? localState.specialAmmo === 0
             : localState.ammo === 0;
+      if (input.firePressed && !heldMagEmpty) {
+        this.inputManager.rumble(0.14, 45);
+      }
+      if (
+        input.detonatePressed ||
+        (input.throwPressed && localState.grenades > 0)
+      ) {
+        this.inputManager.rumble(0.28, 80);
+      }
+      if (
+        input.abilityPressed &&
+        localState.abilityActiveSeconds <= 0 &&
+        localState.abilityCooldownSeconds <= 0
+      ) {
+        this.inputManager.rumble(0.2, 65);
+      }
       if (
         (input.firePressed && heldMagEmpty) ||
         (input.throwPressed && localState.grenades === 0)
@@ -551,6 +570,10 @@ export class GameScene extends Phaser.Scene {
         ) {
           this.aberrationPixels = CHROMATIC_INITIAL_PIXELS;
           const damage = this.prevLocalHealth - currentLocalState.health;
+          this.inputManager?.rumble(
+            Math.min(1, 0.25 + damage / currentLocalState.maxHealth),
+            damage >= ROLL_DAMAGE_THRESHOLD ? 130 : 75,
+          );
           if (damage >= ROLL_DAMAGE_THRESHOLD) {
             this.cameraRoll?.trigger();
           }
@@ -929,7 +952,16 @@ export class GameScene extends Phaser.Scene {
     this.cameraKick?.update(delta, this.cameras.main);
     this.zoomPulse?.update(delta, this.cameras.main);
     this.cameraRoll?.update(delta, this.cameras.main);
-    this.crosshair?.update();
+    const controllerActive = this.inputManager.getActiveMode() === 'gamepad';
+    if (controllerActive && !this.controllerAnnounced) {
+      this.controllerAnnounced = true;
+      this.hud.showEventBanner(
+        'TWIN-STICK ONLINE',
+        'RT FIRE  •  LT GRENADE  •  RB POWER',
+        0x5ce1e6,
+      );
+    }
+    this.crosshair?.update(!controllerActive);
   }
 
   private updateAimLine(localState: ReturnType<NetworkManager['getLocalPlayerState']>): void {

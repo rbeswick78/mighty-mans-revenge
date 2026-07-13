@@ -37,6 +37,7 @@ export class PixelButton extends Phaser.GameObjects.Container {
   private readonly sound: 'menuSelect' | null;
   private btnState: 'idle' | 'hover' | 'pressed' = 'idle';
   private disabled: boolean;
+  private focused = false;
 
   constructor(
     scene: Phaser.Scene,
@@ -127,6 +128,7 @@ export class PixelButton extends Phaser.GameObjects.Container {
   setDisabled(disabled: boolean): this {
     if (this.disabled === disabled) return this;
     this.disabled = disabled;
+    if (disabled) this.focused = false;
     this.setAlpha(disabled ? 0.5 : 1);
     if (disabled) {
       this.zone.disableInteractive();
@@ -143,9 +145,34 @@ export class PixelButton extends Phaser.GameObjects.Container {
     return this;
   }
 
+  /** Controller/keyboard focus, visually matching pointer hover. */
+  setFocused(focused: boolean): this {
+    this.focused = focused && !this.disabled;
+    this.redraw();
+    return this;
+  }
+
+  /** Trigger the same action and sound as a pointer click. */
+  activate(): boolean {
+    if (this.disabled) return false;
+    this.btnState = 'pressed';
+    this.redraw();
+    if (this.sound) AudioManager.getInstance()?.play(this.sound);
+    this.scene.time.delayedCall(80, () => {
+      if (!this.active) return;
+      this.btnState = this.focused ? 'hover' : 'idle';
+      this.redraw();
+    });
+    this.onClick?.();
+    return true;
+  }
+
   private redraw(): void {
     this.gfx.clear();
-    const fill = this.btnState === 'hover' ? this.hoverColor : this.baseColor;
+    const fill =
+      this.btnState === 'hover' || this.focused
+        ? this.hoverColor
+        : this.baseColor;
     drawBeveledChrome(
       this.gfx,
       0,

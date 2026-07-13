@@ -6,6 +6,7 @@ import type { ServerMatchmakingStatusMessage } from '@shared/types/network.js';
 import { AWARD_DEFS, createEmptyKillsByWeapon, gameModeDisplayName } from '@shared/config/game.js';
 import { Wasteland, cssHex } from '@shared/config/palette.js';
 import { AudioManager } from '../audio/audio-manager.js';
+import { MenuGamepadInput } from '../input/menu-gamepad.js';
 import { GameService, type MatchData } from '../services/game-service.js';
 import { WastelandStreet, type Outcome } from '../ui/menu/wasteland-street.js';
 import { MenuPanel } from '../ui/menu/menu-panel.js';
@@ -62,7 +63,11 @@ export class ResultsScene extends Phaser.Scene {
   private matchData: MatchData | null = null;
   private rematchStatusText: Phaser.GameObjects.Text | null = null;
   private rematchButton: PixelButton | null = null;
+  private lobbyButton: PixelButton | null = null;
   private rematchUnavailable = false;
+  private menuGamepad: MenuGamepadInput | null = null;
+  private gamepadFocusActive = false;
+  private gamepadFocusIndex = 0;
 
   // Event handler references for cleanup
   private onRematchStatus: ((opponentWantsRematch: boolean) => void) | null = null;
@@ -80,11 +85,17 @@ export class ResultsScene extends Phaser.Scene {
     this.nickname = data.nickname ?? 'Player';
     this.matchData = data.matchData ?? null;
     this.rematchUnavailable = false;
+    this.rematchButton = null;
+    this.lobbyButton = null;
+    this.menuGamepad = null;
+    this.gamepadFocusActive = false;
+    this.gamepadFocusIndex = 0;
   }
 
   create(): void {
     this.cameras.main.fadeIn(300, 0, 0, 0);
     this.gameService = GameService.getInstance();
+    this.menuGamepad = new MenuGamepadInput();
 
     const centerX = this.cameras.main.width / 2;
     const camHeight = this.cameras.main.height;
@@ -233,7 +244,7 @@ export class ResultsScene extends Phaser.Scene {
     );
     this.rematchButton.setDepth(WastelandStreet.DEPTH.UI);
 
-    new PixelButton(this, centerX + 14, btnY, btnW, btnH, 'BACK TO LOBBY', {
+    this.lobbyButton = new PixelButton(this, centerX + 14, btnY, btnW, btnH, 'BACK TO LOBBY', {
       variant: 'secondary',
       fontSize: 13,
       onClick: () => {
@@ -244,11 +255,12 @@ export class ResultsScene extends Phaser.Scene {
           this.scene.start('LobbyScene');
         });
       },
-    }).setDepth(WastelandStreet.DEPTH.UI);
+    });
+    this.lobbyButton.setDepth(WastelandStreet.DEPTH.UI);
 
     // Footer
     this.add
-      .text(centerX, camHeight - 24, "MIGHTY MAN'S REVENGE  //  POST-APOCALYPTIC SHOWDOWN", {
+      .text(centerX, camHeight - 24, "A SELECT  •  B LOBBY  //  MIGHTY MAN'S REVENGE", {
         fontFamily: MENU_FONTS.BODY,
         fontSize: '12px',
         color: cssHex(FOOTER_COLOR),
@@ -261,6 +273,34 @@ export class ResultsScene extends Phaser.Scene {
 
   shutdown(): void {
     this.cleanupEvents();
+    this.menuGamepad = null;
+  }
+
+  update(): void {
+    const actions = this.menuGamepad?.poll();
+    if (!actions?.hasAction) return;
+    this.gamepadFocusActive = true;
+    if (actions.left || actions.up) this.gamepadFocusIndex = 0;
+    else if (actions.right || actions.down) this.gamepadFocusIndex = 1;
+    this.syncGamepadFocus();
+
+    if (actions.back) {
+      this.lobbyButton?.activate();
+    } else if (actions.confirm || actions.alternate) {
+      (this.gamepadFocusIndex === 0
+        ? this.rematchButton
+        : this.lobbyButton
+      )?.activate();
+    }
+  }
+
+  private syncGamepadFocus(): void {
+    this.rematchButton?.setFocused(
+      this.gamepadFocusActive && this.gamepadFocusIndex === 0,
+    );
+    this.lobbyButton?.setFocused(
+      this.gamepadFocusActive && this.gamepadFocusIndex === 1,
+    );
   }
 
   private renderTableau(isWinner: boolean, isDraw: boolean, camHeight: number): void {

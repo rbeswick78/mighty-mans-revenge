@@ -11,6 +11,7 @@ import {
 import { Wasteland, cssHex } from '@shared/config/palette.js';
 import { GameService, type MatchData } from '../services/game-service.js';
 import { isTouchDevice } from '../input/is-touch-device.js';
+import { MenuGamepadInput } from '../input/menu-gamepad.js';
 import { WastelandStreet } from '../ui/menu/wasteland-street.js';
 import { PixelButton } from '../ui/menu/pixel-button.js';
 import { TitleLogo } from '../ui/menu/title-logo.js';
@@ -102,6 +103,7 @@ export class CharacterSelectScene extends Phaser.Scene {
   private matchData: MatchData | null = null;
 
   private cards = new Map<CharacterId, CardWidgets>();
+  private menuGamepad: MenuGamepadInput | null = null;
   private statusText!: Phaser.GameObjects.Text;
   private timerText!: Phaser.GameObjects.Text;
   private lockButton!: PixelButton;
@@ -126,6 +128,7 @@ export class CharacterSelectScene extends Phaser.Scene {
     this.matchData = data.matchData ?? null;
     this.localHoveredId = null;
     this.latestSelections = [];
+    this.menuGamepad = null;
     this.lastTapId = null;
     this.lastTapMs = 0;
     this.transitioned = false;
@@ -135,6 +138,7 @@ export class CharacterSelectScene extends Phaser.Scene {
   create(): void {
     this.cameras.main.fadeIn(300, 0, 0, 0);
     this.gameService = GameService.getInstance();
+    this.menuGamepad = new MenuGamepadInput();
 
     const centerX = this.cameras.main.width / 2;
     const camHeight = this.cameras.main.height;
@@ -236,7 +240,7 @@ export class CharacterSelectScene extends Phaser.Scene {
       .text(
         centerX,
         camHeight - 24,
-        'TAP / CLICK TO HOVER  •  ENTER OR LOCK IN BUTTON TO LOCK',
+        'TAP / CLICK OR D-PAD TO PICK  •  ENTER / A TO LOCK IN',
         {
           fontFamily: MENU_FONTS.BODY,
           fontSize: '12px',
@@ -258,9 +262,19 @@ export class CharacterSelectScene extends Phaser.Scene {
 
   shutdown(): void {
     this.cleanupEvents();
+    this.menuGamepad = null;
     for (const card of this.cards.values()) {
       card.pulseTween?.stop();
     }
+  }
+
+  update(): void {
+    const actions = this.menuGamepad?.poll();
+    if (!actions?.hasAction) return;
+    this.lockButton.setFocused(true);
+    if (actions.left || actions.up) this.cycleHover(-1);
+    else if (actions.right || actions.down) this.cycleHover(1);
+    if (actions.confirm || actions.alternate) this.lockButton.activate();
   }
 
   private createCard(id: CharacterId, x: number, y: number): CardWidgets {
