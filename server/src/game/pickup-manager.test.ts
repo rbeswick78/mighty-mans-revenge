@@ -469,6 +469,38 @@ describe('PickupManager', () => {
       );
     });
 
+    it('WEAPON_BAT equips exactly four swings with no reserve or reload', () => {
+      const player = makePlayer({ isReloading: true, reloadTimer: 0.8 });
+      const pickup = {
+        id: 'bat',
+        type: PickupType.WEAPON_BAT,
+        position: { x: 0, y: 0 },
+        isActive: true,
+        respawnTimer: 0,
+      };
+
+      expect(manager.applyPickup(pickup, player)).toBe(true);
+      expect(player.weaponId).toBe('bat');
+      expect(player.specialAmmo).toBe(WEAPONS.bat.magazineSize);
+      expect(player.specialReserve).toBe(0);
+      expect(player.isReloading).toBe(false);
+      expect(player.reloadTimer).toBe(0);
+    });
+
+    it('a one-shot bat drop preserves exact remaining swings', () => {
+      const pickup = manager.spawnOneShot(
+        PickupType.WEAPON_BAT,
+        { x: 0, y: 0 },
+        { weaponAmmo: 2 },
+      );
+      const player = makePlayer();
+
+      expect(manager.applyPickup(pickup, player)).toBe(true);
+      expect(player.weaponId).toBe('bat');
+      expect(player.specialAmmo).toBe(2);
+      expect(player.specialReserve).toBe(0);
+    });
+
     it('last-picked-up wins: a pistol replaces a held shotgun, and vice versa', () => {
       const pistolPickup = {
         id: 'p1',
@@ -546,11 +578,12 @@ describe('PickupManager', () => {
   });
 
   describe('weapon pickups', () => {
-    it('shotgun spawns inactive with the weapon respawn timer running; pistol spawns active', () => {
+    it('shotgun is delayed while pistol and bat start active', () => {
       manager.initFromMap(
         makeMapData([
           { x: 5, y: 5, type: 'weapon_shotgun' },
           { x: 7, y: 7, type: 'weapon_pistol' },
+          { x: 8, y: 8, type: 'weapon_bat' },
         ]),
       );
       const pickups = manager.getPickups();
@@ -565,6 +598,10 @@ describe('PickupManager', () => {
       const pistol = pickups.find((p) => p.type === PickupType.WEAPON_PISTOL)!;
       expect(pistol.isActive).toBe(true);
       expect(pistol.respawnTimer).toBe(0);
+
+      const bat = pickups.find((p) => p.type === PickupType.WEAPON_BAT)!;
+      expect(bat.isActive).toBe(true);
+      expect(bat.respawnTimer).toBe(0);
     });
 
     it('pistol respawns on the weapon respawn timer after collection', () => {
@@ -596,11 +633,24 @@ describe('PickupManager', () => {
       expect(pickup.isActive).toBe(true);
     });
 
+    it('the bat respawns on the weapon timer without an announcement', () => {
+      manager.initFromMap(makeMapData([{ x: 5, y: 5, type: 'weapon_bat' }]));
+      const [pickup] = manager.getPickups();
+      manager.collectPickup(pickup.id);
+
+      expect(pickup.respawnTimer).toBe(PICKUP.WEAPON_RESPAWN_TIME);
+      expect(manager.update(PICKUP.WEAPON_RESPAWN_TIME - 1)).toHaveLength(0);
+      expect(pickup.isActive).toBe(false);
+      expect(manager.update(2)).toHaveLength(0);
+      expect(pickup.isActive).toBe(true);
+    });
+
     it('a bandage-only type veto (Gun Game) filters pistol spawns out entirely', () => {
       manager.initFromMap(
         makeMapData([
           { x: 5, y: 5, type: 'weapon_pistol' },
           { x: 6, y: 6, type: 'weapon_shotgun' },
+          { x: 8, y: 8, type: 'weapon_bat' },
           { x: 7, y: 7, type: 'bandage' },
         ]),
         (type) => type === PickupType.BANDAGE,

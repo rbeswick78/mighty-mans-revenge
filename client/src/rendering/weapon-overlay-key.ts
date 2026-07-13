@@ -5,12 +5,11 @@ import type { Direction4 } from '@shared/types/character.js';
 export type GunOverlayState = 'hold' | 'shoot' | 'racking';
 
 /**
- * Whether a weapon renders a held overlay at all. Fists are a body-level
- * attack animation (CharacterDef.attackFrames) — while 'punch' is equipped
- * the PlayerRenderer hides the overlay sprite instead of swapping sheets.
+ * Whether a weapon renders a sheet-based gun overlay. Fists are body-level;
+ * the bat has its own universal held sprite in PlayerRenderer.
  */
 export function weaponRendersOverlay(weaponId: WeaponId): boolean {
-  return weaponId !== 'punch';
+  return weaponId !== 'punch' && weaponId !== 'bat';
 }
 
 /**

@@ -21,7 +21,9 @@ function makeStats(overrides: Partial<PlayerStats> = {}): PlayerStats {
 }
 
 function kills(
-  overrides: Partial<Record<'gun' | 'grenade' | 'fire' | 'shotgun' | 'pistol' | 'punch', number>>,
+  overrides: Partial<
+    Record<'gun' | 'grenade' | 'fire' | 'shotgun' | 'pistol' | 'punch' | 'bat', number>
+  >,
 ) {
   return { ...createEmptyKillsByWeapon(), ...overrides };
 }
@@ -172,6 +174,23 @@ describe('computeAwards', () => {
         p2: makeStats({ kills: 3, killsByWeapon: kills({ shotgun: 3 }) }),
       });
       expect(awards.find((a) => a.id === 'buckshot_barber')?.playerId).toBe('p2');
+    });
+
+    it('slugger goes to the strict bat-kill leader with readable detail', () => {
+      const awards = compute({
+        p1: makeStats({ kills: 2, killsByWeapon: kills({ bat: 2 }) }),
+        p2: makeStats({ kills: 1, killsByWeapon: kills({ bat: 1 }) }),
+      });
+      expect(awards.find((a) => a.id === 'slugger')).toMatchObject({
+        playerId: 'p1',
+        detail: '2 BAT KILLS',
+      });
+
+      const tied = compute({
+        p1: makeStats({ kills: 1, killsByWeapon: kills({ bat: 1 }) }),
+        p2: makeStats({ kills: 1, killsByWeapon: kills({ bat: 1 }) }),
+      });
+      expect(tied.find((a) => a.id === 'slugger')).toBeUndefined();
     });
 
     it('bare knuckles needs at least one punch kill', () => {

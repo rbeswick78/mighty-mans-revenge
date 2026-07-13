@@ -503,6 +503,7 @@ export class BootScene extends Phaser.Scene {
     this.load.image('pickup_ammo', '/assets/pickups/ammo-crate_blue.png');
     this.load.image('pickup_shotgun', '/assets/pickups/shotgun.png');
     this.load.image('pickup_pistol', '/assets/pickups/pistol.png');
+    this.load.image('pickup_bat', '/assets/pickups/bat.png');
     this.load.image('pickup_bandage', '/assets/pickups/bandage.png');
 
     // Bullet head — 2×1 px sprite, rotated to bullet angle and tweened
@@ -529,6 +530,7 @@ export class BootScene extends Phaser.Scene {
     // would overflow the left column), so only the two base indicators.
     this.load.image('pistol_bullet', '/assets/ui/pistol-bullet-indicator.png');
     this.load.image('pistol_bullet_empty', '/assets/ui/pistol-bullet-indicator_empty.png');
+    this.load.image('bat_icon', '/assets/ui/bat-icon.png');
 
     // Music tracks. Played via AudioManager.playMusic(<key>) on scene
     // entry; gameplay match length is tied to game-play track length.

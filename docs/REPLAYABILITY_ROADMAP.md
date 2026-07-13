@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–41 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty, four arenas, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–42 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty, four arenas, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -73,6 +73,7 @@ Each session below attacks one of these.
 | 39  | Power Weapon Drops                             | Every armed death creates a brief, ammo-honest scramble at the corpse        | **DONE** (2026-07-13) |
 | 40  | Clutch Kills                                  | Critical-health victories land as memorable, exact-HP highlight moments      | **DONE** (2026-07-13) |
 | 41  | Scavenger Rush                                | Rotating short-lived supplies repeatedly pull fighters into fresh contests   | **DONE** (2026-07-13) |
+| 42  | Wasteland Bat                                 | Four brutal swings create a scarce close-range map-control prize              | **DONE** (2026-07-13) |
 
 ---
 
@@ -2089,7 +2090,7 @@ moving a valuable, short-lived supply contest around the whole map.
   sequence choose positions without consuming respawn, combat, or mutator RNG;
   legacy/test maps fall back to pickup anchors and then spawn anchors.
 - Rewards reuse the weighted Scavenger Cache table: common ammo/healing/
-  grenades with rare pistol or shotgun hits. Live mode and loadout ownership
+  grenades with rare pistol, shotgun, or bat hits. Live mode and loadout ownership
   substitutes unusable rolls before the pickup enters the snapshot.
 - Gun Game and One in the Chamber exclude the random mutator because their
   complete economies reduce every reward to a low-value bandage. Explicit
@@ -2113,7 +2114,80 @@ moving a valuable, short-lived supply contest around the whole map.
 
 ---
 
+## Session 42 — Wasteland Bat
+
+**Goal:** deepen the ordinary weapon sandbox with a scarce melee power weapon
+that rewards route control, ambush timing, and the nerve to close distance.
+
+**Locked design decisions**
+
+- The bat occupies the existing special-weapon slot and carries four swings.
+  Every trigger pull spends one swing, including a miss; the fourth swing
+  immediately returns its owner to the rifle. Infinite Ammo keeps it full.
+- A swing deals 80 flat damage through nine deterministic rays spread evenly
+  across a 110-degree arc with 72px reach. Walls block it, lag compensation
+  rewinds it, and each victim can take damage only once per swing while one
+  committed sweep can still catch multiple fighters.
+- Every arena gets one active-at-opening, silent-respawning bat pickup away
+  from its pistol route. Its standard respawn remains 30 seconds. Scavenger
+  Caches and Scavenger Rush gain the bat as a third rare weapon reward.
+- Power Weapon Drops preserve the exact remaining swings for 14 seconds.
+  Core Run vetoes the bat pickup; Fists Only, Weapon Roulette, and Grenades
+  Only retire it when they take ownership. Gun Game and One in the Chamber
+  retain their complete bandage-only economies.
+- Rusty recognizes the bat as melee, closes inside 65% of its reach, never
+  attempts to reload it, and can collect it under the existing pickup rules.
+- Every fighter renders the held bat independently of gun-overlay support.
+  A handle-pivoted heavy sweep, body attack animation, pitched melee audio,
+  pickup sprite, HUD icon, remaining-swing count, and hidden long-range aim
+  line make its state readable on desktop and mobile without a new input.
+- Bat eliminations count in lifetime weapon stats and can earn the unique
+  `Slugger` end-match award for a strict match-leading total of at least one.
+
+**Acceptance criteria**
+
+- [x] Shared and server tests cover tuning, spawn/equip/respawn, finite swings,
+      cooldown, range, wall blocking, lag compensation, multi-victim sweeps,
+      infinite ammo, mode vetoes, and ammo-honest death drops.
+- [x] Bot, award, persistence, map, and cache tests cover melee pursuit,
+      Slugger, old-save backfill, exactly one spawn per arena, and rare loot.
+- [x] Client tests cover pickup/HUD presentation, every-fighter held rendering,
+      aim-line behavior, deterministic sweep transforms, and compatibility.
+- [x] Typecheck, lint, all unit tests, production build, and Playwright pass.
+
+---
+
 ## Session Log
+
+### Session 42 — 2026-07-13 — Wasteland Bat
+
+**Shipped:** every arena now holds one silent-respawning Wasteland Bat: a
+scarce special weapon with four committed swings, 80 damage, a 72px reach, and
+a broad deterministic arc. Misses spend durability, walls stop the sweep, one
+swing can catch multiple fighters, and the final use immediately restores the
+rifle. Infinite Ammo, lag compensation, Big Heads, Iron Hide, Vampire, and
+Power Weapon Drops all compose through the authoritative melee path.
+
+The bat joins Scavenger Cache and Scavenger Rush rare loot, respects each
+mode-owned economy, and gives Rusty a close-range pursuit style without reload
+loops. Every fighter receives a handle-pivoted held sprite and heavy sweep,
+including gunless silhouettes; the HUD shows remaining swings, the long-range
+aim line hides, and bat kills build lifetime weapon stats plus the unique
+`Slugger` award.
+
+**Verification:** 1,030 unit tests pass across 65 files, including 229 Match
+tests, 36 PickupManager tests, 27 award tests, 14 bot tests, and 3 pure bat-
+presentation tests. TypeScript, ESLint, and the production build are clean;
+Vite retains its existing chunk-size advisory. The full Playwright matrix
+passes 13 tests with 11 intentional scoped skips across desktop Chromium,
+desktop Firefox, and mobile landscape; its solo-practice smoke verifies the
+loaded pickup/icon assets and a live player renderer bound to the bat sprite.
+
+**Tuning watch:** 80 damage, four swings, 72px reach, and a 0.7-second cadence
+are intentionally forceful first defaults. Watch whether the authored routes
+create contests instead of free wins, whether Rusty commits believably, and
+whether the one-in-nine cache/Rush chance stays exciting without making the
+bat routine or oppressive.
 
 ### Session 41 — 2026-07-13 — Scavenger Rush
 

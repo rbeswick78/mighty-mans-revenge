@@ -116,7 +116,8 @@ export class CoreRunMode implements GameMode {
   isPickupTypeEnabled(type: PickupType): boolean {
     return (
       type !== PickupType.WEAPON_SHOTGUN &&
-      type !== PickupType.WEAPON_PISTOL
+      type !== PickupType.WEAPON_PISTOL &&
+      type !== PickupType.WEAPON_BAT
     );
   }
 

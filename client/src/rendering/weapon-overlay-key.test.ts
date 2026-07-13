@@ -3,11 +3,12 @@ import { DIRECTIONS } from '@shared/types/character.js';
 import { weaponOverlayKey, weaponRendersOverlay } from './weapon-overlay-key.js';
 
 describe('weaponRendersOverlay', () => {
-  it('only fists render no held overlay', () => {
+  it('reserves sheet overlays for guns while melee uses body or universal art', () => {
     expect(weaponRendersOverlay('rifle')).toBe(true);
     expect(weaponRendersOverlay('shotgun')).toBe(true);
     expect(weaponRendersOverlay('pistol')).toBe(true);
     expect(weaponRendersOverlay('punch')).toBe(false);
+    expect(weaponRendersOverlay('bat')).toBe(false);
   });
 });
 

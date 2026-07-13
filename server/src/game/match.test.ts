@@ -1419,6 +1419,34 @@ describe('Match', () => {
       });
     });
 
+    it('spills and restores the exact surviving bat swings', () => {
+      const m = startActivePowerDropMatch();
+      const killer = m.players.get('player-0')!;
+      const victim = m.players.get('player-1')!;
+      killer.position = { x: 700, y: 400 };
+      victim.position = { x: 240, y: 192 };
+      victim.weaponId = 'bat';
+      victim.specialAmmo = 2;
+      victim.specialReserve = 0;
+
+      m.onKill(killer.id, victim.id, 'gun');
+
+      const drop = m.pickupManager
+        .getPickups()
+        .find((pickup) => pickup.isDroppedWeapon);
+      expect(drop).toMatchObject({
+        type: PickupType.WEAPON_BAT,
+        position: victim.position,
+        isDroppedWeapon: true,
+      });
+
+      killer.position = { ...drop!.position };
+      m.update(0.05);
+      expect(killer.weaponId).toBe('bat');
+      expect(killer.specialAmmo).toBe(2);
+      expect(killer.specialReserve).toBe(0);
+    });
+
     it('does not drop dry weapons or spill weapons during overtime', () => {
       const dry = startActivePowerDropMatch();
       const dryVictim = dry.players.get('player-1')!;
@@ -1694,6 +1722,7 @@ describe('Match', () => {
         map.pickupSpawns = [
           { x: 4, y: 4, type: 'gun_ammo' },
           { x: 5, y: 5, type: 'weapon_pistol' },
+          { x: 6, y: 5, type: 'weapon_bat' },
         ];
         const m = new Match(
           'roulette-persistence',
@@ -3712,6 +3741,7 @@ describe('Match', () => {
       expect(events).toHaveLength(1);
       expect(events[0]).toEqual({
         playerId: 'player-0',
+        weaponId: 'punch',
         position: { x: 100, y: 100 },
         aimAngle: 0,
         hit: true,
@@ -3910,6 +3940,145 @@ describe('Match', () => {
       expect(stats.kills).toBe(1);
       const entry = m.getKillFeed().find((e) => e.victimId === 'player-1')!;
       expect(entry.weapon).toBe('punch');
+    });
+  });
+
+  describe('Session 42: Wasteland Bat', () => {
+    function startBatMatch(playerCount = 2, map = makeMapData()): Match {
+      const m = new Match(
+        'bat-match',
+        map,
+        Array.from({ length: playerCount }, (_, i) => ({
+          id: `player-${i}`,
+          nickname: `Player ${i}`,
+        })),
+      );
+      m.startCountdown();
+      m.update(MATCH.COUNTDOWN_DURATION + 0.05);
+      return m;
+    }
+
+    function equipBat(m: Match, playerId = 'player-0', swings = WEAPONS.bat.magazineSize): void {
+      const player = m.players.get(playerId)!;
+      player.weaponId = 'bat';
+      player.specialAmmo = swings;
+      player.specialReserve = 0;
+    }
+
+    function advance(m: Match, seconds: number): void {
+      let remaining = seconds;
+      while (remaining > 0) {
+        const dt = Math.min(0.05, remaining);
+        m.update(dt);
+        remaining -= dt;
+      }
+    }
+
+    it('deals one flat hit, spends a swing, and emits a bat-tagged melee event', () => {
+      const m = startBatMatch();
+      equipBat(m);
+      const slugger = m.players.get('player-0')!;
+      const victim = m.players.get('player-1')!;
+      slugger.position = { x: 100, y: 100 };
+      victim.position = { x: 160, y: 100 };
+      victim.invulnerableTimer = 0;
+
+      m.queueInput(slugger.id, makeInput(1, { firePressed: true, aimAngle: 0 }));
+      m.update(0.05);
+
+      expect(victim.health).toBe(victim.maxHealth - WEAPONS.bat.damageMax);
+      expect(slugger.specialAmmo).toBe(3);
+      expect(m.getTickBulletTrails()).toHaveLength(0);
+      expect(m.getTickPunchEvents()).toEqual([
+        expect.objectContaining({
+          playerId: slugger.id,
+          weaponId: 'bat',
+          aimAngle: 0,
+          hit: true,
+        }),
+      ]);
+    });
+
+    it('spends whiffs, enforces cooldown, and reverts immediately after swing four', () => {
+      const m = startBatMatch();
+      equipBat(m);
+      const slugger = m.players.get('player-0')!;
+      m.players.get('player-1')!.position = { x: 700, y: 400 };
+
+      for (let sequence = 1; sequence <= 4; sequence++) {
+        m.queueInput(slugger.id, makeInput(sequence, { firePressed: true, aimAngle: 0 }));
+        m.update(0.01);
+        if (sequence < 4) {
+          expect(slugger.weaponId).toBe('bat');
+          expect(slugger.specialAmmo).toBe(4 - sequence);
+          advance(m, WEAPONS.bat.fireCooldown + 0.01);
+        }
+      }
+
+      expect(slugger.weaponId).toBe('rifle');
+      expect(slugger.specialAmmo).toBe(0);
+      expect(m.stats.getStats(slugger.id).shotsFired).toBe(4);
+    });
+
+    it('can catch multiple fighters but never applies more than once per victim', () => {
+      const m = startBatMatch(3);
+      equipBat(m);
+      const slugger = m.players.get('player-0')!;
+      const first = m.players.get('player-1')!;
+      const second = m.players.get('player-2')!;
+      slugger.position = { x: 100, y: 100 };
+      first.position = { x: 160, y: 100 };
+      second.position = { x: 140, y: 140 };
+      first.invulnerableTimer = 0;
+      second.invulnerableTimer = 0;
+
+      m.queueInput(slugger.id, makeInput(1, { firePressed: true, aimAngle: 0 }));
+      m.update(0.05);
+
+      expect(first.health).toBe(first.maxHealth - WEAPONS.bat.damageMax);
+      expect(second.health).toBe(second.maxHealth - WEAPONS.bat.damageMax);
+      expect(m.stats.getStats(slugger.id).damageDealt).toBe(2 * WEAPONS.bat.damageMax);
+    });
+
+    it('stays full under Infinite Ammo and remains wall-blocked', () => {
+      const map = makeMapData();
+      for (let row = 1; row < 9; row++) map.tiles[row][5] = 1;
+      const m = startBatMatch(2, map);
+      equipBat(m);
+      const slugger = m.players.get('player-0')!;
+      const victim = m.players.get('player-1')!;
+      slugger.position = { x: 230, y: 120 };
+      victim.position = { x: 290, y: 120 };
+      victim.invulnerableTimer = 0;
+      (
+        m as unknown as {
+          startMutator: (mutator: MutatorId, isFinalMinute: boolean) => void;
+        }
+      ).startMutator('infinite_ammo', false);
+
+      m.queueInput(slugger.id, makeInput(1, { firePressed: true, aimAngle: 0 }));
+      m.update(0.05);
+
+      expect(victim.health).toBe(victim.maxHealth);
+      expect(slugger.weaponId).toBe('bat');
+      expect(slugger.specialAmmo).toBe(WEAPONS.bat.magazineSize);
+    });
+
+    it('attributes a lethal swing to bat for stats and the feed', () => {
+      const m = startBatMatch();
+      equipBat(m);
+      const slugger = m.players.get('player-0')!;
+      const victim = m.players.get('player-1')!;
+      slugger.position = { x: 100, y: 100 };
+      victim.position = { x: 160, y: 100 };
+      victim.health = 70;
+      victim.invulnerableTimer = 0;
+
+      m.queueInput(slugger.id, makeInput(1, { firePressed: true, aimAngle: 0 }));
+      m.update(0.05);
+
+      expect(m.stats.getStats(slugger.id).killsByWeapon.bat).toBe(1);
+      expect(m.getKillFeed().find((entry) => entry.victimId === victim.id)?.weapon).toBe('bat');
     });
   });
 

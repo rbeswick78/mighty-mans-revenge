@@ -17,6 +17,7 @@ const SPAWN_TYPE_TO_PICKUP_TYPE: Record<PickupSpawnType, PickupType> = {
   grenade: PickupType.GRENADE,
   weapon_shotgun: PickupType.WEAPON_SHOTGUN,
   weapon_pistol: PickupType.WEAPON_PISTOL,
+  weapon_bat: PickupType.WEAPON_BAT,
   bandage: PickupType.BANDAGE,
 };
 
@@ -40,6 +41,7 @@ function respawnTimeFor(type: PickupType): number {
   switch (type) {
     case PickupType.WEAPON_SHOTGUN:
     case PickupType.WEAPON_PISTOL:
+    case PickupType.WEAPON_BAT:
       return PICKUP.WEAPON_RESPAWN_TIME;
     case PickupType.BANDAGE:
       return PICKUP.BANDAGE_RESPAWN_TIME;
@@ -293,6 +295,16 @@ export class PickupManager {
         player.weaponId = 'pistol';
         player.specialAmmo = Math.min(totalAmmo, pistol.magazineSize);
         player.specialReserve = Math.max(0, totalAmmo - pistol.magazineSize);
+        player.isReloading = false;
+        player.reloadTimer = 0;
+        return true;
+      }
+      case PickupType.WEAPON_BAT: {
+        const bat = WEAPONS.bat;
+        const totalSwings = this.oneShotWeaponAmmo.get(pickup.id) ?? bat.pickupAmmo;
+        player.weaponId = 'bat';
+        player.specialAmmo = Math.min(totalSwings, bat.magazineSize);
+        player.specialReserve = 0;
         player.isReloading = false;
         player.reloadTimer = 0;
         return true;

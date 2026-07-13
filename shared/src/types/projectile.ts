@@ -45,14 +45,16 @@ export interface AxeState {
 }
 
 /**
- * One punch swing, resolved instantly on the server tick it was thrown.
- * Punches produce no bullet trails; instead the tick's swings ride the
+ * One melee swing, resolved instantly on the server tick it was thrown.
+ * Melee produces no bullet trails; instead the tick's swings ride the
  * gameState message as a transient array (same per-message delivery as
  * bulletTrails, so a swing can't be swallowed by bursty snapshots) and the
  * client plays the puncher's attack animation + SFX off each entry.
  */
 export interface PunchEvent {
   playerId: PlayerId;
+  /** Undefined on old snapshots means punch; bat reuses the melee event path. */
+  weaponId?: 'punch' | 'bat';
   /** Punch origin (the puncher's position at swing time). */
   position: Vec2;
   /** Swing direction in radians — buckets into the attack anim facing. */

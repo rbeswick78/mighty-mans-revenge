@@ -157,6 +157,7 @@ describe('StatsTracker', () => {
         axe: 0,
         pistol: 0,
         punch: 0,
+        bat: 0,
         barrel: 0,
       });
       expect(s.kills).toBe(4);
@@ -227,6 +228,7 @@ describe('StatsTracker', () => {
         axe: 0,
         pistol: 0,
         punch: 0,
+        bat: 0,
         barrel: 0,
       });
       expect(stats.longestKillStreak).toBe(0);

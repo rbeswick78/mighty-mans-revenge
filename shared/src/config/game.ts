@@ -99,7 +99,8 @@ function contractHash(value: string): number {
 /**
  * Scavenger Caches use one shared reward roll per match so rotationally
  * paired crates stay fair. Repeated entries are intentional weights: common
- * sustain makes up 75% of the table, while each special weapon is a rare hit.
+ * sustain makes up two thirds of the table, while each special weapon is a
+ * rare hit.
  */
 export const SCAVENGER_CACHE = Object.freeze({
   LOOT_TABLE: Object.freeze([
@@ -111,6 +112,7 @@ export const SCAVENGER_CACHE = Object.freeze({
     PickupType.GRENADE,
     PickupType.WEAPON_PISTOL,
     PickupType.WEAPON_SHOTGUN,
+    PickupType.WEAPON_BAT,
   ] as const),
 });
 
@@ -259,6 +261,33 @@ export const WEAPONS = Object.freeze({
     pickupAmmo: 36,
   }),
   /**
+   * Finite-use melee power weapon. Each committed swing spends one point of
+   * durability, including whiffs, and the special slot disappears at zero.
+   * Like punch, its deterministic fan can catch multiple fighters but applies
+   * damage only once to each victim.
+   */
+  bat: Object.freeze({
+    id: 'bat',
+    displayName: 'Bat',
+    damageMin: 80,
+    damageMax: 80,
+    falloffRangeMin: 72,
+    falloffRangeMax: 72,
+    burstSize: 1,
+    burstInterval: 0,
+    magazineSize: 4,
+    reloadTime: 0,
+    /** Rays in the melee arc fan, not projectiles. */
+    pelletCount: 9,
+    /** Full arc width ≈ 110°. */
+    spreadAngle: 1.92,
+    /** Heavy committed-swing cooldown. */
+    fireCooldown: 0.7,
+    pickupAmmo: 4,
+    /** Melee reach in px (1.5 tiles). Rays stop dead here. */
+    maxRange: 72,
+  }),
+  /**
    * Melee punch — the Gun Game finisher rung. Validated as an arc of
    * pelletCount deterministic even-fan rays (evenFanAngles — NO jitter,
    * so the fan can't gap past a 24px hitbox at max range) through the
@@ -307,6 +336,7 @@ export const KILL_WEAPONS = Object.freeze([
   'axe',
   'pistol',
   'punch',
+  'bat',
   'barrel',
 ] as const) satisfies readonly KillWeapon[];
 
@@ -738,7 +768,7 @@ export const MUTATORS = Object.freeze({
   SECOND_WIND_SPEED_MULTIPLIER: 1.3,
   /** ...for this many seconds (PlayerState.secondWindTimer). */
   SECOND_WIND_DURATION_SECONDS: 3,
-  /** Fair shared loadout sequence used by weapon_roulette. */
+  /** Fair shared loadout sequence used by weapon_roulette; scarce bat excluded. */
   WEAPON_ROULETTE_ORDER: Object.freeze([
     'shotgun',
     'pistol',
@@ -778,6 +808,7 @@ export const AWARD_DEFS = Object.freeze({
   spray_and_pray: Object.freeze({ displayName: 'Spray & Pray' }),
   demolition_man: Object.freeze({ displayName: 'Demolition Man' }),
   buckshot_barber: Object.freeze({ displayName: 'Buckshot Barber' }),
+  slugger: Object.freeze({ displayName: 'Slugger' }),
   bare_knuckles: Object.freeze({ displayName: 'Bare Knuckles' }),
   untouchable: Object.freeze({ displayName: 'Untouchable' }),
   pincushion: Object.freeze({ displayName: 'Pincushion' }),

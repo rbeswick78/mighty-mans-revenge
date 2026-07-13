@@ -404,11 +404,13 @@ export class GameScene extends Phaser.Scene {
       // Fists are exempt — a punch has no ammo pool, so no mag count may
       // produce a false out-of-ammo click. The beep tracks the HELD
       // weapon's pool (same rule as the aim-line empty-mag tint):
-      // shotgun/pistol fire from specialAmmo, not the rifle magazine.
+      // shotgun/pistol/bat fire from specialAmmo, not the rifle magazine.
       const heldMagEmpty =
         localState.weaponId === 'punch'
           ? false
-          : localState.weaponId === 'shotgun' || localState.weaponId === 'pistol'
+          : localState.weaponId === 'shotgun' ||
+              localState.weaponId === 'pistol' ||
+              localState.weaponId === 'bat'
             ? localState.specialAmmo === 0
             : localState.ammo === 0;
       if (
@@ -929,11 +931,11 @@ export class GameScene extends Phaser.Scene {
     const piercing =
       localState.characterId === 'mighty_man' && localState.abilityActiveSeconds > 0;
 
-    // Melee draws no aim line — a 56px "ray" would read as a broken gun
-    // preview, and the punch arc is validated server-side anyway. The
+    // Melee draws no aim line — a short "ray" would read as a broken gun
+    // preview, and the arc is validated server-side anyway. The
     // pistol falls through to the normal ray (predictBulletRay reads
     // WEAPONS[weaponId] for its range).
-    if (raw.aimingGun && localState.weaponId === 'punch') {
+    if (raw.aimingGun && 'maxRange' in WEAPONS[localState.weaponId]) {
       this.effectsRenderer.clearAim();
       return;
     }
@@ -1308,6 +1310,8 @@ export class GameScene extends Phaser.Scene {
         sfxOptions = { rate: 0.6 };
       } else if (pickupType === PickupType.WEAPON_PISTOL) {
         sfxOptions = { rate: 0.85 };
+      } else if (pickupType === PickupType.WEAPON_BAT) {
+        sfxOptions = { rate: 0.7 };
       } else if (pickupType === PickupType.BANDAGE) {
         sfxOptions = { rate: 1.35 };
       }
@@ -1399,11 +1403,15 @@ export class GameScene extends Phaser.Scene {
     // The swing drives the puncher's body-level attack anim; melee has no
     // bullet trail, so no muzzle flash and no tracer.
     this.onPunchSwung = (punch: PunchEvent) => {
-      this.playerManager?.getRenderer(punch.playerId)?.playAttackAnimation();
+      const weaponId = punch.weaponId ?? 'punch';
+      const renderer = this.playerManager?.getRenderer(punch.playerId);
+      renderer?.playAttackAnimation();
+      renderer?.playMeleeSwing(weaponId, punch.aimAngle);
 
       const audio = AudioManager.getInstance();
       if (!audio) return;
       const localState = this.gameService.getNetworkManager().getLocalPlayerState();
+      const whooshOptions = weaponId === 'bat' ? { rate: 0.72 } : undefined;
       // Band-passed noise-sweep whoosh (generated WAV, replaces the
       // Session 7 pitched grenade-throw stand-in).
       if (localState) {
@@ -1413,9 +1421,10 @@ export class GameScene extends Phaser.Scene {
           punch.position.y,
           localState.position.x,
           localState.position.y,
+          whooshOptions,
         );
       } else {
-        audio.play('punchWhoosh');
+        audio.play('punchWhoosh', whooshOptions);
       }
 
       if (punch.hit) {
@@ -1428,9 +1437,10 @@ export class GameScene extends Phaser.Scene {
             punch.position.y,
             localState.position.x,
             localState.position.y,
+            weaponId === 'bat' ? { rate: 0.68 } : undefined,
           );
         } else {
-          audio.play('punchImpact');
+          audio.play('punchImpact', weaponId === 'bat' ? { rate: 0.68 } : undefined);
         }
       }
     };

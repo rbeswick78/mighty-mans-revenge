@@ -11,6 +11,8 @@ export enum PickupType {
    * pre-announced (the INCOMING banner stays shotgun-only).
    */
   WEAPON_PISTOL = 'weapon_pistol',
+  /** Finite-use melee power weapon: auto-equips four heavy swings. */
+  WEAPON_BAT = 'weapon_bat',
   /** Heals PICKUP.BANDAGE_HEAL, capped at the player's max health. */
   BANDAGE = 'bandage',
 }

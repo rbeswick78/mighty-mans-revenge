@@ -88,6 +88,7 @@ describe('PersistentStatsStore', () => {
       axe: 0,
       pistol: 0,
       punch: 0,
+      bat: 0,
       barrel: 0,
     });
     expect(ryan.nickname).toBe('Ryan');
@@ -253,8 +254,8 @@ describe('PersistentStatsStore', () => {
     expect(Object.keys(file.headToHead)).toEqual(['amy|zed']);
   });
 
-  it('defaults weaponKills keys missing from an older file to 0 (pistol/punch back-compat)', () => {
-    // Hand-built file in the shape written BEFORE 'pistol'/'punch' joined
+  it('defaults weaponKills keys missing from an older file to 0', () => {
+    // Hand-built file in the shape written before later weapons joined
     // KILL_WEAPONS — their keys are absent from weaponKills entirely.
     const oldShape = {
       version: 1,
@@ -289,6 +290,7 @@ describe('PersistentStatsStore', () => {
       axe: 0,
       pistol: 0,
       punch: 0,
+      bat: 0,
       barrel: 0,
     });
     expect(ryan.contractsCompleted).toBe(0);
@@ -299,11 +301,12 @@ describe('PersistentStatsStore', () => {
 
     // Accumulating a new-era match on top of the migrated record works.
     store.recordMatch(
-      [entry('Ryan', 3, 0, { pistol: 2, punch: 1 }), entry('Dave', 0, 3)],
+      [entry('Ryan', 3, 0, { pistol: 2, punch: 1, bat: 1 }), entry('Dave', 0, 3)],
       'Ryan',
     );
     expect(store.getLifetime('Ryan')!.weaponKills.pistol).toBe(2);
     expect(store.getLifetime('Ryan')!.weaponKills.punch).toBe(1);
+    expect(store.getLifetime('Ryan')!.weaponKills.bat).toBe(1);
     expect(store.getLifetime('Ryan')!.weaponKills.gun).toBe(7);
   });
 

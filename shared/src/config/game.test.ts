@@ -131,7 +131,7 @@ describe('weapon roulette mutator', () => {
       'rifle',
     ]);
     expect(new Set(MUTATORS.WEAPON_ROULETTE_ORDER)).toEqual(
-      new Set(WEAPON_IDS),
+      new Set(WEAPON_IDS.filter((id) => id !== 'bat')),
     );
     expect(Object.isFrozen(MUTATORS.WEAPON_ROULETTE_ORDER)).toBe(true);
   });
@@ -551,8 +551,8 @@ describe('WEAPONS registry', () => {
 
   it('every entry has coherent tuning values', () => {
     for (const [key, def] of Object.entries(WEAPONS) as [string, WeaponDef][]) {
-      // The punch is ammo-less flat-damage melee: mag/reload are 0 and
-      // its falloff range collapses to a point (min == max == reach).
+      // Melee uses flat damage and a hard reach. Fists are ammo-less; the
+      // bat spends finite durability from the special slot.
       const isMelee = def.maxRange !== undefined;
       expect(def.id).toBe(key);
       expect(def.displayName.length).toBeGreaterThan(0);
@@ -561,8 +561,9 @@ describe('WEAPONS registry', () => {
       expect(def.falloffRangeMin).toBeGreaterThan(0);
       if (isMelee) {
         expect(def.falloffRangeMax).toBeGreaterThanOrEqual(def.falloffRangeMin);
-        expect(def.magazineSize).toBe(0);
         expect(def.reloadTime).toBe(0);
+        if (key === 'punch') expect(def.magazineSize).toBe(0);
+        else expect(def.magazineSize).toBeGreaterThan(0);
       } else {
         expect(def.falloffRangeMax).toBeGreaterThan(def.falloffRangeMin);
         expect(def.magazineSize).toBeGreaterThan(0);
@@ -604,6 +605,19 @@ describe('WEAPONS registry', () => {
   it('a shotgun weapon pickup fills the magazine plus a non-negative reserve', () => {
     const s = WEAPONS.shotgun;
     expect(s.pickupAmmo).toBeGreaterThanOrEqual(s.magazineSize);
+  });
+
+  it('locks the bat to four finite, flat-damage heavy swings', () => {
+    expect(WEAPONS.bat).toMatchObject({
+      damageMin: 80,
+      damageMax: 80,
+      maxRange: 72,
+      pelletCount: 9,
+      magazineSize: 4,
+      pickupAmmo: 4,
+      reloadTime: 0,
+    });
+    expect(KILL_WEAPONS).toContain('bat');
   });
 
   it('weapon announce lead fits inside the weapon respawn cycle', () => {

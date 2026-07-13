@@ -18,6 +18,7 @@ import { MENU_FONTS } from './menu/fonts.js';
 import { oneInTheChamberStatus } from './one-in-the-chamber-hud.js';
 import { coreRunStatus } from './core-run-hud.js';
 import { bountyHuntStatus } from './bounty-hunt-hud.js';
+import { batDurabilityLabel } from '../rendering/bat-presentation.js';
 
 // Press Start 2P is much wider per glyph than Courier, so the final-minute
 // banner size drops to compensate (Courier 40px ≈ PS2P 22-24px in width).
@@ -259,8 +260,8 @@ export class HUD {
     this.specialWeaponLabel.setDepth(1000);
     this.specialWeaponLabel.setVisible(false);
 
-    // Enough icon slots for the shotgun's per-shell row; the pistol reuses
-    // slot 0 as its single bullet icon.
+    // Enough icon slots for the shotgun's per-shell row; pistol and bat
+    // reuse slot 0 with a numeric count.
     this.specialIconStartX = hbX + 96;
     for (let i = 0; i < WEAPONS.shotgun.magazineSize; i++) {
       const icon = scene.add.image(this.specialIconStartX + i * 24, specialY, 'shotgun_shell');
@@ -594,6 +595,7 @@ export class HUD {
    *   shotgun — one filled/empty icon per magazine shell + "+reserve".
    *   pistol  — label + a single bullet icon + "mag +reserve" as text
    *             (12 per-shell icons would overflow the left column).
+   *   bat     — held-bat icon + remaining committed swings.
    *   punch   — label only ("FISTS"); fists have no ammo, and the rifle
    *             ammo row hides too (syncAmmoRowVisibility).
    */
@@ -627,6 +629,15 @@ export class HUD {
       // shotgun's shell run.
       this.specialReserveText.setX(this.specialIconStartX + 24);
       this.specialReserveText.setText(`${magAmmo} +${reserve}`);
+      this.specialReserveText.setVisible(true);
+    } else if (weaponId === 'bat') {
+      for (let i = 0; i < this.specialShellIcons.length; i++) {
+        const icon = this.specialShellIcons[i];
+        icon.setVisible(i === 0);
+        if (i === 0) icon.setTexture('bat_icon');
+      }
+      this.specialReserveText.setX(this.specialIconStartX + 34);
+      this.specialReserveText.setText(batDurabilityLabel(magAmmo));
       this.specialReserveText.setVisible(true);
     } else {
       for (const icon of this.specialShellIcons) {

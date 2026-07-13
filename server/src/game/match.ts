@@ -1099,8 +1099,8 @@ export class Match implements MatchContext {
         if (!gunsDisabled && input.firePressed) {
           if (player.weaponId === 'shotgun') {
             this.tryFireShotgun(player, input, grid, infiniteAmmo);
-          } else if (player.weaponId === 'punch') {
-            this.tryPunch(player, input, grid);
+          } else if (player.weaponId === 'punch' || player.weaponId === 'bat') {
+            this.tryMelee(player, input, grid, player.weaponId, infiniteAmmo);
           } else {
             this.tryFireHitscan(player, input, grid);
           }
@@ -1317,9 +1317,13 @@ export class Match implements MatchContext {
         if (applied) {
           this.pickupManager.collectPickup(pickup.id);
           this.tickPickupCollections.push({ pickupId: pickup.id, playerId: player.id });
-          if (pickup.type === PickupType.WEAPON_SHOTGUN) {
+          if (
+            pickup.type === PickupType.WEAPON_SHOTGUN ||
+            pickup.type === PickupType.WEAPON_PISTOL ||
+            pickup.type === PickupType.WEAPON_BAT
+          ) {
             // Auto-equip side effects that live on Match: stop any rifle
-            // burst mid-flight and clear a stale racking timer.
+            // burst mid-flight and clear a stale weapon cooldown.
             this.pendingBursts.delete(player.id);
             this.fireCooldownTimers.delete(player.id);
           }
@@ -1512,31 +1516,39 @@ export class Match implements MatchContext {
   }
 
   /**
-   * Swing the fists: pelletCount deterministic even-fan rays across the
-   * punch arc (no jitter — a jittered fan could gap past a hitbox at
+   * Swing a melee weapon: pelletCount deterministic even-fan rays across
+   * its arc (no jitter — a jittered fan could gap past a hitbox at
    * melee range), each validated against a single lag-comp rewind
-   * snapshot like a shotgun blast, with WEAPONS.punch.maxRange capping
+   * snapshot like a shotgun blast, with the weapon's maxRange capping
    * the reach. Every victim takes ONE flat damage application no matter
    * how many rays cross their box; a wide arc CAN strike several
    * distinct victims. Refuses while the swing cooldown runs or a rifle
-   * burst is somehow still in flight. Punches never pierce walls —
-   * Mighty Man's x-ray applies to bullets, not fists.
+   * burst is somehow still in flight. Melee never pierces walls — Mighty
+   * Man's x-ray applies to bullets, not fists or bats.
    *
    * Accuracy bookkeeping mirrors the shotgun: one swing = one shot
    * fired, one hit if anyone was struck. No bullet trails — a one-shot
    * PunchEvent rides this tick's gameState instead, driving swing anims
    * and SFX on every client.
    */
-  private tryPunch(
+  private tryMelee(
     player: PlayerState,
     input: PlayerInput,
     grid: ReturnType<MapManager['getCollisionGrid']>,
+    weaponId: 'punch' | 'bat',
+    infiniteAmmo: boolean,
   ): void {
-    const punch = WEAPONS.punch;
+    const weapon = WEAPONS[weaponId];
     const coolingDown = (this.fireCooldownTimers.get(player.id) ?? 0) > 0;
-    if (coolingDown || this.pendingBursts.has(player.id)) return;
+    if (
+      coolingDown ||
+      this.pendingBursts.has(player.id) ||
+      (weaponId === 'bat' && player.specialAmmo <= 0)
+    ) {
+      return;
+    }
 
-    const angles = evenFanAngles(input.aimAngle, punch.pelletCount, punch.spreadAngle);
+    const angles = evenFanAngles(input.aimAngle, weapon.pelletCount, weapon.spreadAngle);
     const rtt = this.rttForShooter(player.id);
     const shots = this.lagCompensator.processMultiShotWithRewind(
       player.id,
@@ -1544,8 +1556,8 @@ export class Match implements MatchContext {
       this.players,
       grid,
       rtt,
-      false, // walls always block a punch
-      'punch',
+      false, // walls always block melee
+      weaponId,
       this.hitValidationScale(),
     );
 
@@ -1561,14 +1573,14 @@ export class Match implements MatchContext {
       if (!victim || victim.isDead) continue;
       struckVictims.add(shot.victimId);
       const damage =
-        this.gameMode.damageForWeaponHit?.(this, player, victim, 'punch', shot.damage) ??
+        this.gameMode.damageForWeaponHit?.(this, player, victim, weaponId, shot.damage) ??
         shot.damage;
       const result = this.combatManager.applyDamage(victim, damage, player.id);
       // damageApplied, not shot.damage — Iron Hide may have halved it.
       this.stats.recordDamage(player.id, result.damageApplied);
       this.applyVampireHeal(player.id, shot.victimId, result.damageApplied);
       if (result.killed) {
-        this.onKill(player.id, shot.victimId, 'punch');
+        this.onKill(player.id, shot.victimId, weaponId);
       }
     }
 
@@ -1576,13 +1588,22 @@ export class Match implements MatchContext {
       this.stats.recordHit(player.id);
     }
 
-    this.fireCooldownTimers.set(player.id, punch.fireCooldown);
     this.tickPunchEvents.push({
       playerId: player.id,
+      weaponId,
       position: { x: player.position.x, y: player.position.y },
       aimAngle: input.aimAngle,
       hit: struckVictims.size > 0,
     });
+
+    if (weaponId === 'bat' && !infiniteAmmo) {
+      player.specialAmmo = Math.max(0, player.specialAmmo - 1);
+      if (player.specialAmmo <= 0 && !this.mutatorActive('weapon_roulette')) {
+        this.revertToRifle(player);
+        return;
+      }
+    }
+    this.fireCooldownTimers.set(player.id, weapon.fireCooldown);
   }
 
   /**
@@ -1775,7 +1796,13 @@ export class Match implements MatchContext {
   /** Spill the exact surviving special ammo as a short-lived contested pickup. */
   private dropPowerWeapon(victim: PlayerState): void {
     if (this.isOvertime) return;
-    if (victim.weaponId !== 'shotgun' && victim.weaponId !== 'pistol') return;
+    if (
+      victim.weaponId !== 'shotgun' &&
+      victim.weaponId !== 'pistol' &&
+      victim.weaponId !== 'bat'
+    ) {
+      return;
+    }
     if (
       this.mutatorActive('fists_only') ||
       this.mutatorActive('weapon_roulette') ||
@@ -1786,7 +1813,9 @@ export class Match implements MatchContext {
     const type =
       victim.weaponId === 'shotgun'
         ? PickupType.WEAPON_SHOTGUN
-        : PickupType.WEAPON_PISTOL;
+        : victim.weaponId === 'pistol'
+          ? PickupType.WEAPON_PISTOL
+          : PickupType.WEAPON_BAT;
     if (this.gameMode.isPickupTypeEnabled?.(type) === false) return;
     const remainingAmmo = victim.specialAmmo + victim.specialReserve;
     if (remainingAmmo <= 0) return;
@@ -2143,6 +2172,7 @@ export class Match implements MatchContext {
         this.pickupManager.removeTypes([
           PickupType.WEAPON_SHOTGUN,
           PickupType.WEAPON_PISTOL,
+          PickupType.WEAPON_BAT,
         ]);
         this.enforceFistsOnlyLoadouts();
         return;
@@ -2153,6 +2183,7 @@ export class Match implements MatchContext {
           PickupType.GUN_AMMO,
           PickupType.WEAPON_SHOTGUN,
           PickupType.WEAPON_PISTOL,
+          PickupType.WEAPON_BAT,
         ]);
         this.enforceWeaponRouletteLoadouts(
           MUTATORS.WEAPON_ROULETTE_ORDER[this.weaponRouletteIndex],
@@ -2170,6 +2201,7 @@ export class Match implements MatchContext {
         this.pickupManager.removeTypes([
           PickupType.WEAPON_SHOTGUN,
           PickupType.WEAPON_PISTOL,
+          PickupType.WEAPON_BAT,
         ]);
         for (const player of this.players.values()) {
           player.grenades = GRENADE.MAX_COUNT;

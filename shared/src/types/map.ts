@@ -12,6 +12,7 @@ export type PickupSpawnType =
   | 'grenade'
   | 'weapon_shotgun'
   | 'weapon_pistol'
+  | 'weapon_bat'
   | 'bandage';
 
 export interface MapTile {

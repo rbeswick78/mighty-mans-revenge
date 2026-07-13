@@ -14,6 +14,7 @@ import {
   weaponRendersOverlay,
   type GunOverlayState,
 } from './weapon-overlay-key.js';
+import { batHeldRotation, batSwingRotations } from './bat-presentation.js';
 
 const SPRITE_SCALE = 3;
 
@@ -87,6 +88,7 @@ const SHOTGUN_RACK_DURATION_MS = 475;
  * window regardless of sheet frame count.
  */
 const ATTACK_SWING_DURATION_MS = 350;
+const BAT_SWING_DURATION_MS = 310;
 
 type AnimState = 'idle' | 'run';
 
@@ -103,6 +105,10 @@ export class PlayerRenderer {
    * the on-character gun visual is suppressed.
    */
   private gunSprite: Phaser.GameObjects.Sprite | null;
+  /** Universal handle-pivoted bat sprite; available to every fighter. */
+  private batSprite: Phaser.GameObjects.Image;
+  private batSwingTween: Phaser.Tweens.Tween | null = null;
+  private lastAimAngle = 0;
   private readonly hasGun: boolean;
   private healthBarBg: Phaser.GameObjects.Rectangle;
   private healthBarFg: Phaser.GameObjects.Rectangle;
@@ -210,6 +216,12 @@ export class PlayerRenderer {
       this.gunSprite = null;
     }
 
+    this.batSprite = scene.add.image(0, 0, 'pickup_bat');
+    this.batSprite.setOrigin(0.86, 0.86);
+    this.batSprite.setScale(SPRITE_SCALE);
+    this.batSprite.setRotation(batHeldRotation(0));
+    this.batSprite.setVisible(false);
+
     // Frost Wizard cosmetics: an always-on mist puddle under the feet and a
     // drawn wand that takes the gun overlay's role. Both are local-space
     // graphics inside the container, so they follow the player automatically.
@@ -286,6 +298,7 @@ export class PlayerRenderer {
     children.push(this.sprite);
     if (this.gunSprite) children.push(this.gunSprite);
     if (this.bodyOverlaySprite) children.push(this.bodyOverlaySprite);
+    children.push(this.batSprite);
     if (this.wandGraphics) children.push(this.wandGraphics);
     if (this.frozenCrystalGraphics) children.push(this.frozenCrystalGraphics);
     children.push(
@@ -411,6 +424,8 @@ export class PlayerRenderer {
    * No free rotation — this asset pack is 4-direction.
    */
   setAimAngle(angle: number): void {
+    this.lastAimAngle = angle;
+    if (!this.batSwingTween) this.batSprite.setRotation(batHeldRotation(angle));
     this.deathDirection = deathDirectionForAim(angle);
     const direction = bucketAimAngle(angle);
     if (direction !== this.currentDirection) {
@@ -433,10 +448,15 @@ export class PlayerRenderer {
   setWeapon(weaponId: WeaponId): void {
     if (weaponId === this.currentWeaponId) return;
     this.currentWeaponId = weaponId;
-    if (!this.gunSprite) return;
+    this.batSwingTween?.stop();
+    this.batSwingTween = null;
+    this.batSprite.setRotation(batHeldRotation(this.lastAimAngle));
+    this.batSprite.setVisible(!this.isDead && weaponId === 'bat');
+    this.wandGraphics?.setVisible(!this.isDead && weaponId !== 'bat');
     this.gunShootTimer?.remove(false);
     this.gunShootTimer = null;
     this.currentGunState = 'hold';
+    if (!this.gunSprite) return;
     if (this.isDead) {
       this.gunSprite.setVisible(false);
       return;
@@ -506,6 +526,24 @@ export class PlayerRenderer {
     });
   }
 
+  /** Sweep the held bat around the server-authored aim direction. */
+  playMeleeSwing(weaponId: 'punch' | 'bat', aimAngle: number): void {
+    if (weaponId !== 'bat' || this.isDead || this.currentWeaponId !== 'bat') return;
+    const swing = batSwingRotations(aimAngle);
+    this.batSwingTween?.stop();
+    this.batSprite.setRotation(swing.from);
+    this.batSwingTween = this.scene.tweens.add({
+      targets: this.batSprite,
+      rotation: swing.to,
+      duration: BAT_SWING_DURATION_MS,
+      ease: 'Quad.easeInOut',
+      onComplete: () => {
+        this.batSwingTween = null;
+        this.batSprite.setRotation(batHeldRotation(this.lastAimAngle));
+      },
+    });
+  }
+
   /** Cancel an in-flight punch swing and restore the idle/run loop. */
   private endAttackAnimation(): void {
     this.attackTimer?.remove(false);
@@ -560,6 +598,7 @@ export class PlayerRenderer {
     const scale = SPRITE_SCALE * multiplier;
     this.sprite.setScale(scale);
     this.gunSprite?.setScale(scale);
+    this.batSprite.setScale(scale);
     this.bodyOverlaySprite?.setScale(scale);
     this.wandGraphics?.setScale(scale);
     this.applyCurrentBodyOverlayTransform();
@@ -624,7 +663,8 @@ export class PlayerRenderer {
 
   private setAliveVisualsVisible(alive: boolean): void {
     this.gunSprite?.setVisible(alive && weaponRendersOverlay(this.currentWeaponId));
-    this.wandGraphics?.setVisible(alive);
+    this.batSprite.setVisible(alive && this.currentWeaponId === 'bat');
+    this.wandGraphics?.setVisible(alive && this.currentWeaponId !== 'bat');
     this.frostMistGraphics?.setVisible(alive);
     if (!alive) this.frozenCrystalGraphics?.setVisible(false);
     this.healthBarBg.setVisible(alive);
@@ -699,6 +739,8 @@ export class PlayerRenderer {
     this.gunShootTimer = null;
     this.attackTimer?.remove(false);
     this.attackTimer = null;
+    this.batSwingTween?.stop();
+    this.batSwingTween = null;
     // Container.destroy disposes children, so wand/mist/crystal graphics
     // are torn down with the container — no extra cleanup needed.
     this.container.destroy();

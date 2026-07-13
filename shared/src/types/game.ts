@@ -99,6 +99,7 @@ export type KillWeapon =
   | 'axe'
   | 'pistol'
   | 'punch'
+  | 'bat'
   | 'barrel';
 
 export interface KillFeedEntry {

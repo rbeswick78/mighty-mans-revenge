@@ -412,9 +412,11 @@ export class BotController {
     if (hasDirectPath) {
       this.waypoint = null;
       if (!isCombatTarget) return toward;
-      const isMelee = bot.weaponId === 'punch';
+      const heldWeapon = WEAPONS[bot.weaponId];
+      const meleeReach = 'maxRange' in heldWeapon ? heldWeapon.maxRange : undefined;
+      const isMelee = meleeReach !== undefined;
       const preferredDistance = isMelee
-        ? WEAPONS.punch.maxRange * 0.65
+        ? meleeReach * 0.65
         : BOT.PREFERRED_DISTANCE;
       if (distance > preferredDistance) return toward;
       if (!isMelee && distance < BOT.RETREAT_DISTANCE) {
@@ -455,7 +457,7 @@ export class BotController {
   }
 
   private shouldReload(bot: PlayerState): boolean {
-    if (bot.isReloading || bot.weaponId === 'punch') return false;
+    if (bot.isReloading || 'maxRange' in WEAPONS[bot.weaponId]) return false;
     if (bot.weaponId === 'rifle') return bot.ammo <= 0;
     return bot.specialAmmo <= 0 && bot.specialReserve > 0;
   }

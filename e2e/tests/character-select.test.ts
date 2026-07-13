@@ -245,19 +245,43 @@ test('solo practice launches against locked Rusty and reaches live play', async 
             mapRenderer?: {
               cacheSpritesByCell?: { size: number };
             };
+            gameService?: {
+              getNetworkManager: () => {
+                getPlayerId: () => string | null;
+              };
+            };
+            playerManager?: {
+              getRenderer: (playerId: string) => {
+                batSprite?: { texture?: { key?: string } };
+              } | undefined;
+            };
           } | null;
+          const networkManager = scene?.gameService?.getNetworkManager();
+          const localPlayerId = networkManager?.getPlayerId();
+          const localRenderer = localPlayerId
+            ? scene?.playerManager?.getRenderer(localPlayerId)
+            : undefined;
           return {
             textureLoaded:
               w.game?.textures.exists('deco_scavenger_cache') ?? false,
             cacheCount: scene?.mapRenderer?.cacheSpritesByCell?.size ?? 0,
+            batTextureLoaded: w.game?.textures.exists('pickup_bat') ?? false,
+            batIconLoaded: w.game?.textures.exists('bat_icon') ?? false,
+            batSpriteReady: localRenderer?.batSprite?.texture?.key === 'pickup_bat',
           };
         }),
       {
         timeout: 5000,
-        message: 'expected both Wasteland Outpost scavenger caches to render',
+        message: 'expected Wasteland Outpost caches and bat presentation to render',
       },
     )
-    .toEqual({ textureLoaded: true, cacheCount: 2 });
+    .toEqual({
+      textureLoaded: true,
+      cacheCount: 2,
+      batTextureLoaded: true,
+      batIconLoaded: true,
+      batSpriteReady: true,
+    });
 });
 
 test.describe('Character select (desktop)', () => {

@@ -110,6 +110,11 @@ function evaluate(id: AwardId, playerId: PlayerId, s: PlayerStats): Candidate | 
       if (shotgunKills < 1) return null;
       return { playerId, value: shotgunKills, detail: countDetail(shotgunKills, 'SHOTGUN KILL') };
     }
+    case 'slugger': {
+      const batKills = s.killsByWeapon.bat;
+      if (batKills < 1) return null;
+      return { playerId, value: batKills, detail: countDetail(batKills, 'BAT KILL') };
+    }
     case 'bare_knuckles': {
       const punchKills = s.killsByWeapon.punch;
       if (punchKills < 1) return null;

@@ -207,6 +207,7 @@ describe('CoreRunMode', () => {
     const mode = new CoreRunMode();
     expect(mode.isPickupTypeEnabled(PickupType.WEAPON_SHOTGUN)).toBe(false);
     expect(mode.isPickupTypeEnabled(PickupType.WEAPON_PISTOL)).toBe(false);
+    expect(mode.isPickupTypeEnabled(PickupType.WEAPON_BAT)).toBe(false);
     expect(mode.isPickupTypeEnabled(PickupType.GUN_AMMO)).toBe(true);
     expect(mode.isPickupTypeEnabled(PickupType.BANDAGE)).toBe(true);
     expect(mode.isPickupTypeEnabled(PickupType.GRENADE)).toBe(true);

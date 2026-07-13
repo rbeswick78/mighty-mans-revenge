@@ -52,7 +52,7 @@ export class ClientPlayerManager {
       renderer.setPosition(playerState.position.x, playerState.position.y);
       renderer.setAimAngle(playerState.aimAngle);
       // Held-weapon overlay follows the server-authoritative weapon slot
-      // (shotgun/pistol swap sheets; fists hide the overlay entirely).
+      // (guns swap sheets; fists hide them; bat uses universal held art).
       renderer.setWeapon(playerState.weaponId);
       // Jack's no-axe body renders exactly while his ability cooldown
       // runs (axe in flight / regrowing). No-op for every character

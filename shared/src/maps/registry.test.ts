@@ -53,6 +53,7 @@ describe('MAP_REGISTRY', () => {
       }
       // Exactly one contested shotgun, two bandages, plus ammo.
       expect(byType.get('weapon_shotgun'), `${m.name} shotgun spawns`).toBe(1);
+      expect(byType.get('weapon_bat'), `${m.name} bat spawns`).toBe(1);
       expect(byType.get('bandage'), `${m.name} bandage spawns`).toBe(2);
       expect(byType.get('gun_ammo') ?? 0, `${m.name} ammo spawns`).toBeGreaterThanOrEqual(1);
     }

@@ -361,6 +361,41 @@ describe('BotController', () => {
     expect(human.health).toBeLessThan(human.maxHealth);
   });
 
+  it('recognizes the bat as melee, closes to its reach, and swings without reloading', () => {
+    const match = new Match(
+      'practice-bat',
+      OPEN_MAP,
+      [
+        { id: 'human', nickname: 'Human' },
+        { id: 'bot:test', nickname: 'Rusty' },
+      ],
+      GameModeType.DEATHMATCH,
+      () => 0,
+    );
+    const human = match.players.get('human')!;
+    const bot = match.players.get('bot:test')!;
+    human.health = 10_000;
+    human.maxHealth = 10_000;
+    human.position = { x: 5.5 * 48, y: 2.5 * 48 };
+    bot.position = { x: 2.5 * 48, y: 2.5 * 48 };
+    bot.weaponId = 'bat';
+    bot.specialAmmo = 4;
+    bot.specialReserve = 0;
+    bot.grenades = 0;
+    match.phase = MatchPhase.ACTIVE;
+    match.matchTimer = 100;
+
+    const controller = new BotController(bot.id);
+    for (let tick = 1; tick <= 60 && bot.specialAmmo === 4; tick++) {
+      controller.update(0.05, match, tick);
+      match.update(0.05);
+    }
+
+    expect(bot.specialAmmo).toBeLessThan(4);
+    expect(bot.isReloading).toBe(false);
+    expect(human.health).toBeLessThan(human.maxHealth);
+  });
+
   it('uses its one chambered round, then closes for a lethal recovery punch', () => {
     const match = new Match(
       'practice-chamber',
