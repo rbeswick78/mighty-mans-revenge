@@ -17,6 +17,7 @@ import {
   predictGrenadePath,
 } from '@shared/utils/trajectory-prediction.js';
 import { gunGameRungForScore } from '@shared/utils/gun-game.js';
+import { practiceGauntletStylePointsForKill } from '@shared/utils/practice-gauntlet.js';
 import type { PlayerState } from '@shared/types/player.js';
 import { MapRenderer } from '../rendering/map-renderer.js';
 import { ClientPlayerManager } from '../rendering/player-manager.js';
@@ -72,7 +73,7 @@ import {
   BLOOM_STRENGTH,
 } from '../rendering/post-fx/bloom-config.js';
 import { Crosshair } from '../rendering/crosshair.js';
-import { combatCalloutFor } from '../ui/combat-callout.js';
+import { combatCalloutFor, withGauntletStyle } from '../ui/combat-callout.js';
 import { confirmedTagCallout } from '../ui/confirmed-tag.js';
 import { HUD } from '../ui/hud.js';
 import { InputManager } from '../input/input-manager.js';
@@ -1321,7 +1322,14 @@ export class GameScene extends Phaser.Scene {
       // (killer === victim, e.g. own grenade) plays only the death sound.
       const localId = this.gameService.getNetworkManager().getPlayerId();
       if (!localId) return;
-      const callout = combatCalloutFor(entry, localId);
+      const baseCallout = combatCalloutFor(entry, localId);
+      // The reliable kill event is authoritative, but the displayed points are
+      // still provisional until the server confirms a stage win. Avoid a
+      // client-side running total because reconnects do not replay old kills.
+      const stylePoints = this.matchData?.gauntlet
+        ? practiceGauntletStylePointsForKill(entry, localId)
+        : 0;
+      const callout = withGauntletStyle(baseCallout, stylePoints);
       if (callout) {
         this.hud?.showCombatCallout(
           callout.headline,

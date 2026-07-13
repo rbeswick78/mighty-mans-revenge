@@ -8,6 +8,7 @@ import {
   practiceGauntletOpponentChoices,
   practiceGauntletRoutes,
   practiceGauntletStyleBonus,
+  practiceGauntletStylePointsForKill,
   resolvePracticeGauntlet,
   selectPracticeGauntletRoute,
 } from './practice-gauntlet.js';
@@ -104,6 +105,14 @@ describe('practice gauntlet', () => {
   });
 
   it('scores authoritative combat highlights once per kill and caps the stage bonus', () => {
+    expect(
+      practiceGauntletStylePointsForKill(
+        kill({ isPosthumous: true, rapidKillCount: 4, isFirstBlood: true }),
+        'human',
+      ),
+    ).toBe(PRACTICE_GAUNTLET.STYLE_POSTHUMOUS_POINTS);
+    expect(practiceGauntletStylePointsForKill(kill({ killerId: 'bot' }), 'human')).toBe(0);
+
     expect(
       practiceGauntletStyleBonus(
         [

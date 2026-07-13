@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–57 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty with Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, and style bonuses, four arenas, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–58 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty with Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, style bonuses, and live style callouts, four arenas, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -89,6 +89,7 @@ Each session below attacks one of these.
 | 55  | Gauntlet Chaos Bounties                         | Dangerous route choices become explicit high-score gambles                   | **DONE** (2026-07-13) |
 | 56  | Demolition Wave                                | Familiar lanes erupt into exposed, permanently rewritten battlefields        | **DONE** (2026-07-13) |
 | 57  | Gauntlet Style Bonuses                         | Combat highlights become capped score-chase rewards worth mastering           | **DONE** (2026-07-13) |
+| 58  | Live Gauntlet Style Callouts                   | Every highlight immediately teaches the score chase it can bank                | **DONE** (2026-07-13) |
 
 ---
 
@@ -2786,7 +2787,71 @@ Gauntlet run without letting kill farming eclipse the stage objective.
 
 ---
 
+## Session 58 — Live Gauntlet Style Callouts
+
+**Goal:** teach the new style-scoring ladder at the moment a highlight lands,
+so players can deliberately chase it instead of discovering its value later.
+
+**Locked design decisions**
+
+- Gauntlet-only combat callouts append the exact single-kill style value as
+  `STYLE +N IF CLEARED`. The conditional copy is mandatory because a loss or
+  draw still banks no points.
+- `practiceGauntletStylePointsForKill` is the shared source for both live copy
+  and final server aggregation. Award priority and rapid-kill thresholds cannot
+  drift between presentation and scoring.
+- Live feedback is driven by the ordinary reliable authoritative kill event.
+  The client does not predict kills, invent awards, or change combat behavior.
+- Do not display or accumulate a client-side style total. Reconnects do not
+  replay prior kill events, so only the server's result can safely own the
+  complete capped stage total.
+- Spar and PvP retain their existing combat callouts byte-for-byte. The style
+  suffix appears only when the live match metadata identifies a Gauntlet.
+
+**Acceptance criteria**
+
+- [x] Shared tests prove the extracted per-kill function honors highest-award
+      priority and rejects non-human kills while the aggregate cap stays green.
+- [x] Client tests prove positive points append conditional Gauntlet copy and
+      zero/null inputs preserve ordinary presentation.
+- [x] GameScene uses Gauntlet match metadata, the reliable kill entry, and the
+      shared award function without maintaining reconnect-unsafe score state.
+- [x] Typecheck, lint, all 1,115 unit tests, production build, and the full
+      Playwright desktop/mobile matrix pass.
+
+---
+
 ## Session Log
+
+### Session 58 — 2026-07-13 — Live Gauntlet Style Callouts
+
+**Shipped:** every score-worthy Gauntlet highlight now reveals its value in the
+existing combat callout: `STYLE +50 IF CLEARED` for First Blood through
+`STYLE +300 IF CLEARED` for Mayhem. Players learn the ladder during the fight,
+at the exact moment the risky or skillful play lands, instead of reverse-
+engineering the results breakdown afterward.
+
+The live number and final result share one per-kill award function, including
+the medal thresholds and one-award priority. Presentation is based on the
+ordinary authoritative kill event and activates only when match metadata marks
+the fight as Gauntlet. It intentionally shows no running total because prior
+kills are not replayed after a reconnect; the server remains the sole owner of
+the complete 600-point cap, victory requirement, and banked stage score.
+
+**Verification:** 1,115 tests pass across 73 files. Focused shared/client tests
+cover award priority, ignored kills, conditional copy, and unchanged null/zero
+behavior. TypeScript, ESLint, all package builds, and the Vite production bundle
+are clean; Vite retains its existing chunk-size advisory. The full Playwright
+matrix passes 16 tests with 11 intentional scoped skips across Chromium,
+Firefox, and mobile landscape, and teardown leaves no game ports open.
+
+**Tuning watch:** the suffix makes score information denser during an already
+celebratory moment. Watch readability on smaller phones and whether `IF
+CLEARED` feels motivating rather than punitive before shortening the copy.
+
+**Deployment:** not run; deployment still requires explicit authorization.
+
+---
 
 ### Session 57 — 2026-07-13 — Gauntlet Style Bonuses
 

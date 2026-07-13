@@ -12,6 +12,18 @@ export interface CombatCallout {
   pulse?: boolean;
 }
 
+/** Add provisional Gauntlet value without changing ordinary combat copy. */
+export function withGauntletStyle(
+  callout: CombatCallout | null,
+  stylePoints: number,
+): CombatCallout | null {
+  if (!callout || !Number.isFinite(stylePoints) || stylePoints <= 0) return callout;
+  return {
+    ...callout,
+    detail: `${callout.detail}  //  STYLE +${Math.floor(stylePoints)} IF CLEARED`,
+  };
+}
+
 /** Celebratory local-killer copy derived entirely from authoritative context. */
 export function combatCalloutFor(
   entry: KillFeedEntry,

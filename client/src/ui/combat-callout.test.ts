@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Wasteland } from '@shared/config/palette.js';
 import type { KillFeedEntry } from '@shared/types/game.js';
-import { combatCalloutFor } from './combat-callout.js';
+import { combatCalloutFor, withGauntletStyle } from './combat-callout.js';
 
 function entry(overrides: Partial<KillFeedEntry> = {}): KillFeedEntry {
   return {
@@ -21,6 +21,17 @@ function entry(overrides: Partial<KillFeedEntry> = {}): KillFeedEntry {
 }
 
 describe('combatCalloutFor', () => {
+  it('adds provisional Gauntlet style while leaving ordinary callouts unchanged', () => {
+    const callout = combatCalloutFor(entry({ isFirstBlood: true }), 'local');
+    expect(withGauntletStyle(callout, 50)).toMatchObject({
+      headline: 'FIRST BLOOD!',
+      detail: 'OPENING STATEMENT  //  STYLE +50 IF CLEARED',
+      pulse: true,
+    });
+    expect(withGauntletStyle(callout, 0)).toBe(callout);
+    expect(withGauntletStyle(null, 50)).toBeNull();
+  });
+
   it('escalates local streak language at the shared thresholds', () => {
     expect(combatCalloutFor(entry({ killerStreak: 1 }), 'local')).toBeNull();
     expect(combatCalloutFor(entry({ killerStreak: 2 }), 'local')).toMatchObject({

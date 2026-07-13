@@ -1,4 +1,5 @@
 import {
+  COMBAT_MEDALS,
   GAUNTLET_CHAOS_BOUNTIES,
   PRACTICE_GAUNTLET,
   type CharacterId,
@@ -40,10 +41,31 @@ export function practiceGauntletChaosBounty(mutatorId: MutatorId): number {
   return GAUNTLET_CHAOS_BOUNTIES[mutatorId];
 }
 
+/** Score one authoritative human highlight using the frozen medal ladder. */
+export function practiceGauntletStylePointsForKill(
+  entry: KillFeedEntry,
+  playerId: PlayerId,
+): number {
+  if (entry.killerId !== playerId || entry.killerId === entry.victimId) return 0;
+  if (entry.isPosthumous) return PRACTICE_GAUNTLET.STYLE_POSTHUMOUS_POINTS;
+  if ((entry.rapidKillCount ?? 0) >= COMBAT_MEDALS.MAYHEM_COUNT) {
+    return PRACTICE_GAUNTLET.STYLE_MAYHEM_POINTS;
+  }
+  if ((entry.rapidKillCount ?? 0) >= COMBAT_MEDALS.TRIPLE_KILL_COUNT) {
+    return PRACTICE_GAUNTLET.STYLE_TRIPLE_KILL_POINTS;
+  }
+  if ((entry.rapidKillCount ?? 0) >= COMBAT_MEDALS.DOUBLE_KILL_COUNT) {
+    return PRACTICE_GAUNTLET.STYLE_DOUBLE_KILL_POINTS;
+  }
+  if (entry.clutchHealth !== undefined) return PRACTICE_GAUNTLET.STYLE_CLUTCH_POINTS;
+  if (entry.isFirstBlood) return PRACTICE_GAUNTLET.STYLE_FIRST_BLOOD_POINTS;
+  return 0;
+}
+
 /**
- * Score the human's authoritative combat highlights. The priority mirrors the
- * medal callout ladder so one kill earns one style award, then the stage cap
- * prevents a long deathmatch from outscoring the actual clear objective.
+ * Score the human's authoritative combat highlights. One kill earns one
+ * award, then the stage cap prevents a long deathmatch from outscoring the
+ * actual clear objective.
  */
 export function practiceGauntletStyleBonus(
   killFeed: readonly KillFeedEntry[],
@@ -51,20 +73,7 @@ export function practiceGauntletStyleBonus(
 ): number {
   let score = 0;
   for (const entry of killFeed) {
-    if (entry.killerId !== playerId || entry.killerId === entry.victimId) continue;
-    if (entry.isPosthumous) {
-      score += PRACTICE_GAUNTLET.STYLE_POSTHUMOUS_POINTS;
-    } else if ((entry.rapidKillCount ?? 0) >= 4) {
-      score += PRACTICE_GAUNTLET.STYLE_MAYHEM_POINTS;
-    } else if ((entry.rapidKillCount ?? 0) >= 3) {
-      score += PRACTICE_GAUNTLET.STYLE_TRIPLE_KILL_POINTS;
-    } else if ((entry.rapidKillCount ?? 0) >= 2) {
-      score += PRACTICE_GAUNTLET.STYLE_DOUBLE_KILL_POINTS;
-    } else if (entry.clutchHealth !== undefined) {
-      score += PRACTICE_GAUNTLET.STYLE_CLUTCH_POINTS;
-    } else if (entry.isFirstBlood) {
-      score += PRACTICE_GAUNTLET.STYLE_FIRST_BLOOD_POINTS;
-    }
+    score += practiceGauntletStylePointsForKill(entry, playerId);
     if (score >= PRACTICE_GAUNTLET.MAX_STYLE_BONUS_POINTS) {
       return PRACTICE_GAUNTLET.MAX_STYLE_BONUS_POINTS;
     }
