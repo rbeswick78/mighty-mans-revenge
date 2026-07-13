@@ -136,6 +136,23 @@ describe('PickupManager', () => {
       expect(pickups[0].isActive).toBe(false);
       expect(pickups[0].respawnTimer).toBe(PICKUP.RESPAWN_TIME);
     });
+
+    it('keeps a one-shot reward for one inactive snapshot, then retires it', () => {
+      manager.initFromMap(makeMapData());
+      const reward = manager.spawnOneShot(PickupType.WEAPON_PISTOL, {
+        x: 120,
+        y: 168,
+      });
+
+      expect(manager.getPickups()).toEqual([reward]);
+      manager.collectPickup(reward.id);
+      expect(reward.isActive).toBe(false);
+      expect(reward.respawnTimer).toBe(0);
+      expect(manager.getPickups()).toEqual([reward]);
+
+      manager.update(0.05);
+      expect(manager.getPickups()).toEqual([]);
+    });
   });
 
   describe('removeTypes', () => {

@@ -21,6 +21,7 @@ import {
   ONE_IN_THE_CHAMBER,
   GameModeType,
   TileType,
+  PickupType,
 } from '@shared/game';
 import type {
   CharacterId,
@@ -808,6 +809,51 @@ describe('Match', () => {
       return m;
     }
 
+    function startScavengerCacheMatch(
+      mode: GameModeType = GameModeType.DEATHMATCH,
+    ): Match {
+      const map: MapData = {
+        name: 'Scavenger Cache Lab',
+        width: 9,
+        height: 5,
+        tileSize: 48,
+        tiles: [
+          [1, 1, 1, 1, 1, 1, 1, 1, 1],
+          [1, 0, 0, 0, 0, 0, 0, 0, 1],
+          [1, 0, 0, 2, 0, 2, 0, 0, 1],
+          [1, 3, 0, 0, 0, 0, 0, 3, 1],
+          [1, 1, 1, 1, 1, 1, 1, 1, 1],
+        ],
+        spawnPoints: [
+          { x: 1, y: 3 },
+          { x: 7, y: 3 },
+        ],
+        pickupSpawns: [],
+        decorations: [3, 5].map((x) => ({
+          x,
+          y: 2,
+          w: 1,
+          h: 1,
+          texture: 'deco_scavenger_cache',
+          interaction: 'scavenger_cache' as const,
+        })),
+      };
+      const m = new Match(
+        'cache-lab',
+        map,
+        [
+          { id: 'player-0', nickname: 'P0' },
+          { id: 'player-1', nickname: 'P1' },
+        ],
+        mode,
+      );
+      m.startCountdown();
+      m.update(MATCH.COUNTDOWN_DURATION + 0.05);
+      m.players.get('player-0')!.position = { x: 72, y: 120 };
+      m.players.get('player-1')!.position = { x: 360, y: 120 };
+      return m;
+    }
+
     function plantGrenade(m: Match): GrenadeState {
       m.queueInput('player-0', makeInput(1, { throwPressed: true, aimAngle: 0 }));
       m.update(0.05);
@@ -964,6 +1010,94 @@ describe('Match', () => {
 
       expect(m.getTickDestroyedTiles()).toContainEqual({ col: 3, row: 2 });
       expect(m.mapManager.getCollisionGrid().solid[2][3]).toBe(false);
+    });
+
+    it('a rifle opens a scavenger cache and spills an active one-shot reward', () => {
+      const m = startScavengerCacheMatch();
+
+      m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+      m.update(0.05);
+
+      expect(m.getTickDestroyedTiles()).toEqual([{ col: 3, row: 2 }]);
+      expect(m.mapManager.getCollisionGrid().solid[2][3]).toBe(false);
+      expect(m.pickupManager.getPickups()).toMatchObject([
+        {
+          position: { x: 168, y: 120 },
+          isActive: true,
+          respawnTimer: 0,
+        },
+      ]);
+    });
+
+    it('a shotgun opens one cache once even when several pellets strike it', () => {
+      const m = startScavengerCacheMatch();
+      const shooter = m.players.get('player-0')!;
+      shooter.weaponId = 'shotgun';
+      shooter.specialAmmo = 2;
+      shooter.specialReserve = 0;
+
+      m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+      m.update(0.05);
+
+      expect(m.getTickDestroyedTiles()).toEqual([{ col: 3, row: 2 }]);
+      expect(m.pickupManager.getPickups()).toHaveLength(1);
+    });
+
+    it('rotational cache partners spill the same per-match reward', () => {
+      const m = startScavengerCacheMatch();
+
+      m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+      m.update(0.05);
+      m.queueInput(
+        'player-1',
+        makeInput(1, { firePressed: true, aimAngle: Math.PI }),
+      );
+      m.update(0.05);
+
+      const rewards = m.pickupManager.getPickups();
+      expect(rewards).toHaveLength(2);
+      expect(rewards[0].type).toBe(rewards[1].type);
+      expect(rewards.map((reward) => reward.position)).toEqual([
+        { x: 168, y: 120 },
+        { x: 264, y: 120 },
+      ]);
+    });
+
+    it('a grenade blast opens an exposed cache through world destruction', () => {
+      const m = startScavengerCacheMatch();
+      plantGrenade(m);
+
+      m.queueInput('player-0', makeInput(2, { detonatePressed: true }));
+      m.update(0.05);
+
+      expect(m.getTickDestroyedTiles()).toContainEqual({ col: 3, row: 2 });
+      expect(m.pickupManager.getPickups()).toMatchObject([
+        { position: { x: 168, y: 120 }, isActive: true },
+      ]);
+    });
+
+    it('One in the Chamber caches respect its bandage-only economy', () => {
+      const m = startScavengerCacheMatch(GameModeType.ONE_IN_THE_CHAMBER);
+
+      m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+      m.update(0.05);
+
+      expect(m.pickupManager.getPickups()).toMatchObject([
+        { type: PickupType.BANDAGE, isActive: true },
+      ]);
+    });
+
+    it('Gun Game cache substitutions cannot bypass its pickup economy', () => {
+      const m = startScavengerCacheMatch(GameModeType.GUN_GAME);
+      const internals = m as unknown as { _activeMutators: MutatorId[] };
+      internals._activeMutators.push('low_health');
+
+      m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+      m.update(0.05);
+
+      expect(m.pickupManager.getPickups()).toMatchObject([
+        { type: PickupType.BANDAGE, isActive: true },
+      ]);
     });
 
     it('a grenade-triggered barrel recursively chains into another exposed barrel once', () => {

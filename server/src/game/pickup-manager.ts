@@ -53,6 +53,10 @@ function isAnnouncedWeapon(type: PickupType): boolean {
 export class PickupManager {
   private pickups: Map<string, PickupState> = new Map();
   private nextId = 0;
+  /** Dynamic cache rewards disappear permanently after their first pickup. */
+  private oneShotIds: Set<string> = new Set();
+  /** Keep a collected one-shot for one snapshot so collection SFX know its type. */
+  private pendingOneShotRemoval: Set<string> = new Set();
   /**
    * Weapon pickups whose landing warning has already been emitted this
    * respawn cycle. Server-internal — deliberately NOT part of the shared
@@ -72,6 +76,8 @@ export class PickupManager {
   ): void {
     this.pickups.clear();
     this.announced.clear();
+    this.oneShotIds.clear();
+    this.pendingOneShotRemoval.clear();
     this.nextId = 0;
 
     for (const spawn of mapData.pickupSpawns) {
@@ -106,6 +112,13 @@ export class PickupManager {
   update(dt: number): WeaponIncomingAnnouncement[] {
     const announcements: WeaponIncomingAnnouncement[] = [];
 
+    for (const id of this.pendingOneShotRemoval) {
+      this.pickups.delete(id);
+      this.oneShotIds.delete(id);
+      this.announced.delete(id);
+    }
+    this.pendingOneShotRemoval.clear();
+
     for (const pickup of this.pickups.values()) {
       if (pickup.isActive || pickup.respawnTimer <= 0) continue;
 
@@ -133,6 +146,21 @@ export class PickupManager {
     }
 
     return announcements;
+  }
+
+  /** Spawn an immediately active reward that never respawns after collection. */
+  spawnOneShot(type: PickupType, position: Vec2): PickupState {
+    const id = `pickup-${this.nextId++}`;
+    const pickup: PickupState = {
+      id,
+      type,
+      position: { ...position },
+      isActive: true,
+      respawnTimer: 0,
+    };
+    this.pickups.set(id, pickup);
+    this.oneShotIds.add(id);
+    return pickup;
   }
 
   /** Check if the player's hitbox overlaps any active pickup. Returns the first match or null. */
@@ -163,6 +191,11 @@ export class PickupManager {
     if (!pickup) return;
 
     pickup.isActive = false;
+    if (this.oneShotIds.has(pickupId)) {
+      pickup.respawnTimer = 0;
+      this.pendingOneShotRemoval.add(pickupId);
+      return;
+    }
     pickup.respawnTimer = respawnTimeFor(pickup.type);
   }
 
@@ -173,6 +206,8 @@ export class PickupManager {
       if (!removed.has(pickup.type)) continue;
       this.pickups.delete(id);
       this.announced.delete(id);
+      this.oneShotIds.delete(id);
+      this.pendingOneShotRemoval.delete(id);
     }
   }
 

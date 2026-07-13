@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–33 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts, solo Practice vs Rusty, streak + payback callouts, selectable Rusty difficulty, Collapsed Overpass, Blackout, fresh-chaos rematches, Last Stand, Kill Confirmed, mode briefings, character death animations, authoritative hit confirmation, blastable cover, chain-reaction barrels, Wasteland Contracts, Combat Medals, Wasteland Reputation, Hot Streaks, Fighter Mastery, Fists Only, Weapon Roulette, One in the Chamber, shootable arena gates, Rook + Breach Dash). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–34 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty, four arenas, six modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -65,6 +65,7 @@ Each session below attacks one of these.
 | 31  | One in the Chamber                            | One precious shot turns every aim, miss, and recovery punch into drama | **DONE** (2026-07-12) |
 | 32  | Shootable Arena Gates                         | Every firefight can permanently reveal a shortcut or surprise sightline | **DONE** (2026-07-12) |
 | 33  | Rook + Breach Dash                            | A sixth main turns every fight into a positioning puzzle             | **DONE** (2026-07-13) |
+| 34  | Scavenger Caches                              | Shooting cover open creates fair loot races and round-to-round surprise | **DONE** (2026-07-13) |
 
 ---
 
@@ -1807,7 +1808,94 @@ changes without adding another damage source.
 
 ---
 
+## Session 34 — Scavenger Caches
+
+**Goal:** turn ordinary cover into an optional tactical bet: spend attention
+and ammunition opening a route, reveal a shared unknown reward, then decide
+whether to claim it immediately or bait the opponent into the new sightline.
+
+**Locked design decisions**
+
+- Every shipped arena gets exactly two one-cell caches arranged as a 180°
+  rotational pair. Each uses the existing red ammo-crate art over
+  `COVER_LOW`; opening it permanently clears that match-local collision cell.
+- Rifle, pistol, and shotgun scenery hits can open caches. Exposed grenade and
+  barrel blasts use the same blastable-cover path. Bruce remains wall-only,
+  while punches and Mighty Man's piercing shots retain their existing scenery
+  semantics; this feature does not silently broaden unrelated abilities.
+- Both caches in one match contain the same deterministic reward, selected
+  from a frozen weighted table without consuming spawn/mutator RNG: two slots
+  each for ammo, bandage, and grenade, plus one each for pistol and shotgun.
+  The first opened cache reveals the round's hidden value without creating an
+  asymmetric loot roll.
+- Mode pickup filters apply before selection, so Gun Game and One in the
+  Chamber caches contain bandages only. If a loadout-owning mutator activates
+  before a cache opens, stale gear becomes sustain; infinite-ammo and
+  low-health edge cases swap a redundant reward to a grenade.
+- Cache drops are active one-shot `PickupState`s. After collection they remain
+  inactive for one snapshot (preserving typed positional SFX), then disappear
+  forever. They do not respawn or participate in shotgun incoming warnings.
+- The client needs no parallel cache-open message: the reliable existing
+  tile-destruction event clears prediction collision, crushes/fades the crate,
+  emits a gold burst, and the next authoritative pickup snapshot reveals loot.
+
+**Acceptance criteria**
+
+- [x] Every arena has one validator-approved rotational cache pair on low
+      cover, without overlapping spawns or authored pickup locations.
+- [x] Rifle/shotgun impacts and exposed explosions open each cache once,
+      clear live collision, and spawn exactly one reward at tile centre.
+- [x] Paired caches share a deterministic weighted reward; incompatible modes
+      and mutators cannot leak unusable weapons or ammo.
+- [x] Cache rewards collect through normal pickup effects and retire without
+      respawning; the live client renders both crates and their open burst.
+- [x] Typecheck, lint, all unit tests, production build, and Playwright pass.
+
+---
+
 ## Session Log
+
+### Session 34 — 2026-07-13 — Scavenger Caches
+
+**Shipped:** every arena now hides two red scavenger caches in a fair
+180-degree rotational pair. Shooting one permanently clears its low-cover
+cell and reveals the match's shared hidden reward, creating a small tactical
+choice between conserving ammunition, opening a route, racing for loot, or
+using the exposed pickup as bait. Rifle, pistol, shotgun, grenade, and exposed
+barrel damage all feed the existing authoritative scenery-destruction path.
+
+Both caches use one deterministic match-id roll from a weighted ammo,
+bandage, grenade, pistol, and shotgun table without consuming gameplay RNG.
+Mode and active-mutator filters convert incompatible loot to something useful,
+including bandage-only caches in Gun Game and One in the Chamber. Rewards use
+normal authoritative pickup effects but are explicitly one-shot: collection
+gets one inactive snapshot for reliable feedback, then the pickup retires
+instead of respawning. The client reuses the attributed red ammo-crate art,
+immediately clears prediction collision on the reliable tile event, and adds a
+quick crush, fade, and gold reveal burst without another network message.
+
+The final regression pass also fixed a lag-compensation edge case uncovered by
+the new tests: multiple rewind snapshots can share one `Date.now()` millisecond,
+and timestamp ties now use server tick order so zero-latency shots always see
+the freshest snapshot rather than intermittently rewinding to an old spawn.
+
+**Verification:** 950 unit tests pass across 58 files (295 suites), including
+202 Match tests and a dedicated rewind timestamp-tie regression. TypeScript,
+ESLint, and the production build are clean; Vite still reports only its existing
+chunk-size advisory. The full Playwright matrix passes 13 tests with 11
+intentional scoped skips across desktop Chromium, desktop Firefox, and mobile
+landscape, while a focused Practice smoke confirms both cache sprites load and
+render in the live game scene.
+
+**Tuning watch:** the two-cache count, authored locations, shared reward, and
+2/2/2/1/1 weighting are strong symmetric defaults rather than group-tested
+balance verdicts. Watch whether opening a cache is worth the ammunition and
+lost cover, whether the reveal creates contested movement, and whether weapon
+drops arrive often enough to feel exciting without overwhelming normal map
+control. No fighter, weapon, mode, or mutator values changed.
+
+**Deployment:** not run; production deployment remains an explicit separate
+operation under `CLAUDE.md`.
 
 ### Session 33 — 2026-07-13 — Rook + Breach Dash
 

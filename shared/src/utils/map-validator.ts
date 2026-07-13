@@ -116,6 +116,13 @@ export function validateMap(mapData: MapData): ValidationResult {
         errors.push(`Shootable gate at (${deco.x}, ${deco.y}) must be inside the arena perimeter`);
       }
     }
+    if (deco.interaction === 'scavenger_cache') {
+      if (deco.w !== 1 || deco.h !== 1) {
+        errors.push(`Scavenger cache at (${deco.x}, ${deco.y}) must be exactly 1x1`);
+      } else if (mapData.tiles[deco.y]?.[deco.x] !== TileType.COVER_LOW) {
+        errors.push(`Scavenger cache at (${deco.x}, ${deco.y}) must stand on COVER_LOW`);
+      }
+    }
     if (deco.hazard !== undefined && deco.interaction !== undefined) {
       errors.push(
         `Decoration at (${deco.x}, ${deco.y}) cannot be both a hazard and an interaction`,

@@ -25,6 +25,7 @@ import {
   TileType,
   PickupType,
   selectMatchContract,
+  selectScavengerCacheReward,
 } from '@shared/game';
 import type {
   PlayerId,
@@ -136,6 +137,10 @@ export class Match implements MatchContext {
   private readonly activeBarrels = new Set<string>();
   /** Closed shootable gates in this round, keyed as `col,row`. */
   private readonly activeGates = new Set<string>();
+  /** Unopened one-shot loot crates in this round, keyed as `col,row`. */
+  private readonly activeScavengerCaches = new Set<string>();
+  /** Shared deterministic base reward used by every cache in this match. */
+  private readonly scavengerCacheReward: PickupType;
   /** Barrel detonations credited to each player for the Powder Keg contract. */
   private readonly barrelDetonationsByPlayer = new Map<PlayerId, number>();
   /** Shared side objective selected once for this match. */
@@ -264,6 +269,10 @@ export class Match implements MatchContext {
     this.mapManager = new MapManager();
     this.gameModeType = gameModeType;
     this.gameMode = getGameMode(gameModeType);
+    this.scavengerCacheReward = selectScavengerCacheReward(
+      matchId,
+      (type) => this.gameMode.isPickupTypeEnabled?.(type) ?? true,
+    );
     this.contractDefinition = selectMatchContract(
       matchId,
       gameModeType,
@@ -278,6 +287,11 @@ export class Match implements MatchContext {
       }
       if (decoration.interaction === 'shootable_gate') {
         this.activeGates.add(this.tileKey(decoration.x, decoration.y));
+      }
+      if (decoration.interaction === 'scavenger_cache') {
+        this.activeScavengerCaches.add(
+          this.tileKey(decoration.x, decoration.y),
+        );
       }
     }
     // Modes can veto whole pickup categories (Gun Game: everything but
@@ -1646,6 +1660,9 @@ export class Match implements MatchContext {
     for (const tile of blastable) {
       if (this.mapManager.destroyTile(tile.col, tile.row)) {
         this.tickDestroyedTiles.push(tile);
+        if (this.activeScavengerCaches.delete(this.tileKey(tile.col, tile.row))) {
+          this.spawnScavengerCacheReward(tile.col, tile.row);
+        }
       }
     }
 
@@ -1692,6 +1709,7 @@ export class Match implements MatchContext {
   /** Resolve the first authored interaction carried by a bullet-struck tile. */
   private resolveShotSceneryAt(col: number, row: number, instigatorId: PlayerId): void {
     if (this.detonateBarrelAt(col, row, instigatorId)) return;
+    if (this.openScavengerCacheAt(col, row)) return;
     this.openGateAt(col, row);
   }
 
@@ -1716,6 +1734,53 @@ export class Match implements MatchContext {
     this.activeGates.delete(key);
     this.tickDestroyedTiles.push({ col, row });
     return true;
+  }
+
+  /** Break one cache, clear its collision, and spill its one-shot reward. */
+  private openScavengerCacheAt(col: number, row: number): boolean {
+    const key = this.tileKey(col, row);
+    if (!this.activeScavengerCaches.has(key)) return false;
+    if (!this.mapManager.destroyTile(col, row)) return false;
+    this.activeScavengerCaches.delete(key);
+    this.tickDestroyedTiles.push({ col, row });
+    this.spawnScavengerCacheReward(col, row);
+    return true;
+  }
+
+  /**
+   * Spawn at tile centre. Loadout-owning mutators turn stale weapon/ammo
+   * rolls into sustain so a late-opened cache is always worth contesting.
+   */
+  private spawnScavengerCacheReward(col: number, row: number): void {
+    let type = this.scavengerCacheReward;
+    if (
+      this.mutatorActive('fists_only') ||
+      this.mutatorActive('weapon_roulette') ||
+      this.mutatorActive('grenades_only')
+    ) {
+      type = PickupType.BANDAGE;
+    } else if (
+      this.mutatorActive('infinite_ammo') &&
+      type === PickupType.GUN_AMMO
+    ) {
+      type = PickupType.GRENADE;
+    } else if (
+      this.mutatorActive('low_health') &&
+      type === PickupType.BANDAGE
+    ) {
+      type = PickupType.GRENADE;
+    }
+    // Mutator substitutions still obey the mode's final economy contract.
+    // Gun Game, for example, permits Low Health but owns its grenade rung.
+    if (this.gameMode.isPickupTypeEnabled?.(type) === false) {
+      type = PickupType.BANDAGE;
+    }
+
+    const tileSize = this.mapManager.getMapData().tileSize;
+    this.pickupManager.spawnOneShot(type, {
+      x: col * tileSize + tileSize / 2,
+      y: row * tileSize + tileSize / 2,
+    });
   }
 
   /** Resolve one already-consumed barrel, recursively triggering exposed props. */

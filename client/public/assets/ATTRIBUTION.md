@@ -23,7 +23,7 @@ This game uses pixel art assets from third-party packs. Source archives are
 - `tiles/wire-fence-closing-no-lock.png` — Tiles/Wire-Fence/Wire-Fence_Closing_No-Lock_Sheet7
 - `tiles/iron-fence.png` — Tiles/Iron-Fence_TileSet
 - `pickups/ammo-crate_blue.png` — Objects/Pickable
-- `pickups/ammo-crate_red.png` — Objects/Pickable
+- `pickups/ammo-crate_red.png` — Objects/Pickable/Ammo-crate_Red (scavenger cache)
 - `pickups/shotgun.png` — Objects/Pickable/Shotgun
 - `pickups/bandage.png` — Objects/Pickable/Bandage
 - `player/shotgun_*_hold.png` — Character/Guns/Shotgun idle-and-run Sheet6 (4 directions)

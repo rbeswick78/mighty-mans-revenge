@@ -15,7 +15,7 @@
     [1, 0, 0, 2, 2, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1],
     [1, 2, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 1, 1, 0, 0, 1],
     [1, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1],
-    [1, 0, 3, 0, 0, 0, 1, 0, 0, 0, 4, 1, 1, 0, 0, 0, 0, 3, 0, 1],
+    [1, 0, 3, 0, 0, 0, 1, 0, 0, 0, 4, 1, 1, 2, 0, 0, 0, 3, 0, 1],
     [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
   ],
   "spawnPoints": [
@@ -40,6 +40,8 @@
     { "x": 3, "y": 7, "w": 2, "h": 1, "texture": "deco_container_gray" },
     { "x": 9, "y": 3, "w": 1, "h": 1, "texture": "deco_barrel_red", "hazard": "explosive_barrel" },
     { "x": 13, "y": 8, "w": 1, "h": 1, "texture": "deco_barrel_red", "hazard": "explosive_barrel" },
+    { "x": 6, "y": 1, "w": 1, "h": 1, "texture": "deco_scavenger_cache", "interaction": "scavenger_cache" },
+    { "x": 13, "y": 10, "w": 1, "h": 1, "texture": "deco_scavenger_cache", "interaction": "scavenger_cache" },
     {
       "x": 7,
       "y": 5,

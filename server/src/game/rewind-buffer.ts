@@ -70,7 +70,10 @@ export class RewindBuffer {
   getStateAtTime(targetTime: number): RewindState | null {
     if (this.count === 0) return null;
 
-    // Collect all valid entries sorted by timestamp
+    // Collect all valid entries sorted by timestamp. Date.now() only has
+    // millisecond precision, so several server ticks can legitimately share
+    // a timestamp in tests or after a short event-loop burst. Tick order is
+    // the authoritative tie-breaker in that case.
     const entries: RewindState[] = [];
     for (let i = 0; i < this.count; i++) {
       const idx = (this.writeIndex - 1 - i + this.size) % this.size;
@@ -81,10 +84,12 @@ export class RewindBuffer {
     if (entries.length === 0) return null;
 
     // Sort by timestamp ascending
-    entries.sort((a, b) => a.timestamp - b.timestamp);
+    entries.sort((a, b) => a.timestamp - b.timestamp || a.tick - b.tick);
 
-    // If target is before or at the earliest entry, return earliest
-    if (targetTime <= entries[0].timestamp) {
+    // If target is strictly before the earliest entry, return earliest. An
+    // exact timestamp may be shared by several snapshots, in which case the
+    // latest tick at that time is the freshest valid state.
+    if (targetTime < entries[0].timestamp) {
       return entries[0];
     }
 

@@ -40,6 +40,8 @@
     { "x": 14, "y": 6, "w": 2, "h": 1, "texture": "deco_container_red" },
     { "x": 7, "y": 3, "w": 1, "h": 1, "texture": "deco_barrel_red", "hazard": "explosive_barrel" },
     { "x": 12, "y": 8, "w": 1, "h": 1, "texture": "deco_barrel_red", "hazard": "explosive_barrel" },
+    { "x": 3, "y": 4, "w": 1, "h": 1, "texture": "deco_scavenger_cache", "interaction": "scavenger_cache" },
+    { "x": 16, "y": 7, "w": 1, "h": 1, "texture": "deco_scavenger_cache", "interaction": "scavenger_cache" },
     {
       "x": 8,
       "y": 5,

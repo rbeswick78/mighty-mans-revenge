@@ -102,6 +102,24 @@ describe('RewindBuffer', () => {
     expect(state!.players.get('p1')!.position.x).toBe(100);
   });
 
+  it('returns the latest tick when snapshots share an exact timestamp', () => {
+    const earlyPlayers = new Map<PlayerId, PlayerState>([
+      ['p1', createPlayer({ id: 'p1', position: { x: 100, y: 200 } })],
+    ]);
+    const latestPlayers = new Map<PlayerId, PlayerState>([
+      ['p1', createPlayer({ id: 'p1', position: { x: 300, y: 200 } })],
+    ]);
+
+    buffer.saveState(1, 1000, earlyPlayers);
+    buffer.saveState(2, 1000, latestPlayers);
+
+    const state = buffer.getStateAtTime(1000);
+
+    expect(state).not.toBeNull();
+    expect(state!.tick).toBe(2);
+    expect(state!.players.get('p1')!.position.x).toBe(300);
+  });
+
   it('interpolates between two ticks', () => {
     const players1 = new Map<PlayerId, PlayerState>([
       ['p1', createPlayer({ id: 'p1', position: { x: 0, y: 0 } })],

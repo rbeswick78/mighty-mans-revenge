@@ -32,10 +32,13 @@ import {
   characterMasteryProgressForWins,
   createEmptyCharacterWins,
   selectMatchContract,
+  SCAVENGER_CACHE,
+  selectScavengerCacheReward,
   type CharacterId,
   type WeaponId,
 } from './game.js';
 import { GameModeType } from '../types/game.js';
+import { PickupType } from '../types/pickup.js';
 import {
   DEATH_DIRECTIONS,
   DIRECTIONS,
@@ -102,6 +105,28 @@ describe('weapon roulette mutator', () => {
       new Set(WEAPON_IDS),
     );
     expect(Object.isFrozen(MUTATORS.WEAPON_ROULETTE_ORDER)).toBe(true);
+  });
+});
+
+describe('scavenger cache rewards', () => {
+  it('uses a frozen weighted table with every collectible pickup kind', () => {
+    expect(Object.isFrozen(SCAVENGER_CACHE)).toBe(true);
+    expect(Object.isFrozen(SCAVENGER_CACHE.LOOT_TABLE)).toBe(true);
+    expect(new Set(SCAVENGER_CACHE.LOOT_TABLE)).toEqual(
+      new Set(Object.values(PickupType)),
+    );
+  });
+
+  it('selects one deterministic reward from only mode-enabled types', () => {
+    const first = selectScavengerCacheReward('cache-match');
+    expect(selectScavengerCacheReward('cache-match')).toBe(first);
+
+    expect(
+      selectScavengerCacheReward(
+        'gun-game-cache',
+        (type) => type === PickupType.BANDAGE,
+      ),
+    ).toBe(PickupType.BANDAGE);
   });
 });
 

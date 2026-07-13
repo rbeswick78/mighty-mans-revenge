@@ -8,6 +8,7 @@ import type {
 } from '../types/game.js';
 import type { WeaponDef } from '../types/weapon.js';
 import { GameModeType } from '../types/game.js';
+import { PickupType } from '../types/pickup.js';
 
 export const PLAYER = Object.freeze({
   BASE_SPEED: 200,
@@ -86,6 +87,34 @@ function contractHash(value: string): number {
     hash = Math.imul(hash, 0x01000193);
   }
   return hash >>> 0;
+}
+
+/**
+ * Scavenger Caches use one shared reward roll per match so rotationally
+ * paired crates stay fair. Repeated entries are intentional weights: common
+ * sustain makes up 75% of the table, while each special weapon is a rare hit.
+ */
+export const SCAVENGER_CACHE = Object.freeze({
+  LOOT_TABLE: Object.freeze([
+    PickupType.GUN_AMMO,
+    PickupType.GUN_AMMO,
+    PickupType.BANDAGE,
+    PickupType.BANDAGE,
+    PickupType.GRENADE,
+    PickupType.GRENADE,
+    PickupType.WEAPON_PISTOL,
+    PickupType.WEAPON_SHOTGUN,
+  ] as const),
+});
+
+/** Stable reward selection that consumes none of Match's gameplay RNG. */
+export function selectScavengerCacheReward(
+  matchId: string,
+  isTypeEnabled: (type: PickupType) => boolean = () => true,
+): PickupType {
+  const eligible = SCAVENGER_CACHE.LOOT_TABLE.filter(isTypeEnabled);
+  if (eligible.length === 0) return PickupType.BANDAGE;
+  return eligible[contractHash(`${matchId}:scavenger-cache`) % eligible.length];
 }
 
 /** Stable per-match selection that consumes none of Match's gameplay RNG. */

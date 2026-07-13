@@ -39,7 +39,7 @@ export interface MapDecoration {
   /** Optional server-authored gameplay carried by this decorated solid. */
   hazard?: 'explosive_barrel';
   /** Optional interaction carried by this decorated solid. */
-  interaction?: 'shootable_gate';
+  interaction?: 'shootable_gate' | 'scavenger_cache';
 }
 
 export interface MapData {

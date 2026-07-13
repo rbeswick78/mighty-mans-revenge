@@ -111,11 +111,30 @@ describe('MAP_REGISTRY', () => {
     }
   });
 
+  it('every arena has exactly one rotational pair of scavenger caches', () => {
+    for (const m of MAP_REGISTRY.values()) {
+      const caches = (m.decorations ?? []).filter(
+        (decoration) => decoration.interaction === 'scavenger_cache',
+      );
+      expect(caches, `${m.name} caches`).toHaveLength(2);
+
+      const keys = new Set(caches.map((cache) => `${cache.x},${cache.y}`));
+      for (const cache of caches) {
+        expect([cache.w, cache.h], `${m.name} cache size`).toEqual([1, 1]);
+        expect(m.tiles[cache.y][cache.x], `${m.name} cache tile`).toBe(2);
+        expect(
+          keys.has(`${m.width - 1 - cache.x},${m.height - 1 - cache.y}`),
+          `${m.name} cache (${cache.x},${cache.y}) rotational partner`,
+        ).toBe(true);
+      }
+    }
+  });
+
   it('Collapsed Overpass keeps its six-hill objective identity', () => {
     const overpass = getMap('Collapsed Overpass');
     expect(overpass.theme).toBe('overpass');
     expect(overpass.kothHills).toHaveLength(6);
-    expect(overpass.decorations).toHaveLength(10);
+    expect(overpass.decorations).toHaveLength(12);
   });
 });
 

@@ -53,6 +53,8 @@ export class MapRenderer {
   private decorationSpritesByCell = new Map<number, Phaser.GameObjects.Sprite>();
   /** Closed gate cells keep their sprite so destruction can animate it open. */
   private gateSpritesByCell = new Map<number, Phaser.GameObjects.Sprite>();
+  /** Scavenger cache cells keep their sprite for the loot-burst animation. */
+  private cacheSpritesByCell = new Map<number, Phaser.GameObjects.Sprite>();
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -142,6 +144,7 @@ export class MapRenderer {
       const cx = (deco.x + deco.w / 2) * tileSize;
       const cy = (deco.y + deco.h / 2) * tileSize;
       const isGate = deco.interaction === 'shootable_gate';
+      const isCache = deco.interaction === 'scavenger_cache';
       const sprite = this.scene.add.sprite(
         cx,
         cy,
@@ -156,6 +159,7 @@ export class MapRenderer {
           const key = row * mapData.width + col;
           this.decorationSpritesByCell.set(key, sprite);
           if (isGate) this.gateSpritesByCell.set(key, sprite);
+          if (isCache) this.cacheSpritesByCell.set(key, sprite);
         }
       }
     }
@@ -270,10 +274,15 @@ export class MapRenderer {
     if (this.decoratedCells.has(key)) {
       const prop = this.decorationSpritesByCell.get(key);
       const gate = this.gateSpritesByCell.get(key);
+      const cache = this.cacheSpritesByCell.get(key);
       if (gate) {
         gate.play(WIRE_GATE_OPEN_ANIMATION_KEY);
         this.decorationSpritesByCell.delete(key);
         this.gateSpritesByCell.delete(key);
+      } else if (cache && prop) {
+        this.decorationSpritesByCell.delete(key);
+        this.cacheSpritesByCell.delete(key);
+        this.animateScavengerCacheOpen(prop);
       } else if (prop) {
         prop.destroy();
         for (const [cell, sprite] of this.decorationSpritesByCell) {
@@ -304,6 +313,36 @@ export class MapRenderer {
     }
   }
 
+  /** Gold pop + crushed-crate flicker driven by authoritative destruction. */
+  private animateScavengerCacheOpen(
+    sprite: Phaser.GameObjects.Sprite,
+  ): void {
+    const burst = this.scene.add.circle(sprite.x, sprite.y, 8, 0xffc857, 0.25);
+    burst.setStrokeStyle(2, 0xffe29a, 0.9);
+    this.container?.add(burst);
+
+    sprite.setTint(0xffd166);
+    this.scene.tweens.add({
+      targets: sprite,
+      scaleX: sprite.scaleX * 1.3,
+      scaleY: sprite.scaleY * 0.7,
+      angle: 8,
+      alpha: 0,
+      duration: 170,
+      ease: 'Quad.easeOut',
+      onComplete: () => sprite.destroy(),
+    });
+    this.scene.tweens.add({
+      targets: burst,
+      scaleX: 3,
+      scaleY: 3,
+      alpha: 0,
+      duration: 260,
+      ease: 'Quad.easeOut',
+      onComplete: () => burst.destroy(),
+    });
+  }
+
   destroy(): void {
     if (this.container) {
       this.container.destroy(true);
@@ -317,6 +356,7 @@ export class MapRenderer {
     this.decoratedCells.clear();
     this.decorationSpritesByCell.clear();
     this.gateSpritesByCell.clear();
+    this.cacheSpritesByCell.clear();
     this.mapWidth = 0;
     this.mapHeight = 0;
     this.mapTileSize = 0;

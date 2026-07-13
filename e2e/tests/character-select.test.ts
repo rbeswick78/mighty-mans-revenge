@@ -224,6 +224,34 @@ test('solo practice launches against locked Rusty and reaches live play', async 
   await canvas.click({ position: { x: 480, y: 400 } });
   await page.keyboard.press('Enter');
   await waitForActiveScene(page, 'GameScene', 10000);
+
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const w = window as unknown as {
+            game?: {
+              textures: { exists: (key: string) => boolean };
+              scene: { getScene: (key: string) => unknown };
+            };
+          };
+          const scene = w.game?.scene.getScene('GameScene') as {
+            mapRenderer?: {
+              cacheSpritesByCell?: { size: number };
+            };
+          } | null;
+          return {
+            textureLoaded:
+              w.game?.textures.exists('deco_scavenger_cache') ?? false,
+            cacheCount: scene?.mapRenderer?.cacheSpritesByCell?.size ?? 0,
+          };
+        }),
+      {
+        timeout: 5000,
+        message: 'expected both Wasteland Outpost scavenger caches to render',
+      },
+    )
+    .toEqual({ textureLoaded: true, cacheCount: 2 });
 });
 
 test.describe('Character select (desktop)', () => {

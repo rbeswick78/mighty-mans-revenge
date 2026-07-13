@@ -305,6 +305,55 @@ describe('validateMap', () => {
     );
   });
 
+  it('requires scavenger caches to be one-cell low-cover decorations', () => {
+    const valid = makeValidMap();
+    valid.tiles[2][1] = TileType.COVER_LOW;
+    valid.decorations = [
+      {
+        x: 1,
+        y: 2,
+        w: 1,
+        h: 1,
+        texture: 'deco_scavenger_cache',
+        interaction: 'scavenger_cache',
+      },
+    ];
+    expect(validateMap(valid).valid).toBe(true);
+
+    const oversized = makeValidMap();
+    oversized.tiles[2][1] = TileType.COVER_LOW;
+    oversized.tiles[2][2] = TileType.COVER_LOW;
+    oversized.decorations = [
+      {
+        x: 1,
+        y: 2,
+        w: 2,
+        h: 1,
+        texture: 'deco_scavenger_cache',
+        interaction: 'scavenger_cache',
+      },
+    ];
+    expect(validateMap(oversized).errors).toContainEqual(
+      expect.stringContaining('must be exactly 1x1'),
+    );
+
+    const onFloor = makeValidMap({
+      decorations: [
+        {
+          x: 2,
+          y: 2,
+          w: 1,
+          h: 1,
+          texture: 'deco_scavenger_cache',
+          interaction: 'scavenger_cache',
+        },
+      ],
+    });
+    expect(validateMap(onFloor).errors).toContainEqual(
+      expect.stringContaining('must stand on COVER_LOW'),
+    );
+  });
+
   it('rejects decorations that combine a hazard and an interaction', () => {
     const map = makeValidMap();
     map.tiles[1][2] = TileType.WALL;
