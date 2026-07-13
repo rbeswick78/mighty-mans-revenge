@@ -5,6 +5,7 @@ import {
   DEATH_DIRECTIONS,
   DIRECTIONS,
   type CharacterDef,
+  type DeathVariantDef,
   type Direction4,
   type FrameDim,
 } from '@shared/types/character.js';
@@ -290,6 +291,7 @@ export class BootScene extends Phaser.Scene {
           );
         }
       }
+      this.loadDeathVariants(char.deathVariants, char.assetFolder, loadedPrefixes);
 
       // Alt-body sheets (Jack's no-axe body while his thrown axe is in
       // flight / on cooldown). By CharacterDef.altBody contract the alt
@@ -335,6 +337,7 @@ export class BootScene extends Phaser.Scene {
           );
         }
       }
+      this.loadDeathVariants(alt?.deathVariants, char.assetFolder, loadedPrefixes);
 
       // Optional synchronized cosmetic layer (Rook's helmet). It owns
       // tightly cropped frames but follows the body's state and frame count.
@@ -572,6 +575,28 @@ export class BootScene extends Phaser.Scene {
     this.load.spritesheet(key, path, { frameWidth: dim.w, frameHeight: dim.h });
   }
 
+  /** Load cosmetic-only death strips without inventing idle/run textures. */
+  private loadDeathVariants(
+    variants: readonly DeathVariantDef[] | undefined,
+    assetFolder: string,
+    loadedPrefixes: Set<string>,
+  ): void {
+    for (const variant of variants ?? []) {
+      if (loadedPrefixes.has(variant.spritePrefix)) continue;
+      loadedPrefixes.add(variant.spritePrefix);
+      for (const dir of DEATH_DIRECTIONS) {
+        this.loadCharacterSheet(
+          variant.spritePrefix,
+          dir,
+          'death',
+          variant.deathFrames[dir],
+          assetFolder,
+          variant.assetBaseName,
+        );
+      }
+    }
+  }
+
   /**
    * Define looping idle and run animations for every registered character.
    * Each anim key matches its texture key (Phaser keeps anims and textures
@@ -597,6 +622,7 @@ export class BootScene extends Phaser.Scene {
         animatedPrefixes.add(char.spritePrefix);
         this.createBodyAnimationSet(char.spritePrefix, char, char.deathFrameCount);
       }
+      this.createDeathVariantAnimations(char.deathVariants, animatedPrefixes);
 
       // Alt-body anim set (Jack's no-axe body) — same frame counts and
       // pacing as the base set by CharacterDef.altBody contract, so it
@@ -606,6 +632,7 @@ export class BootScene extends Phaser.Scene {
         animatedPrefixes.add(alt.spritePrefix);
         this.createBodyAnimationSet(alt.spritePrefix, char, alt.deathFrameCount);
       }
+      this.createDeathVariantAnimations(alt?.deathVariants, animatedPrefixes);
 
       const overlay = char.bodyOverlay;
       if (overlay && !animatedPrefixes.has(overlay.spritePrefix)) {
@@ -762,6 +789,22 @@ export class BootScene extends Phaser.Scene {
       });
     }
 
+    this.createDeathAnimationSet(prefix, deathFrameCount);
+  }
+
+  private createDeathVariantAnimations(
+    variants: readonly DeathVariantDef[] | undefined,
+    animatedPrefixes: Set<string>,
+  ): void {
+    for (const variant of variants ?? []) {
+      if (animatedPrefixes.has(variant.spritePrefix)) continue;
+      animatedPrefixes.add(variant.spritePrefix);
+      this.createDeathAnimationSet(variant.spritePrefix, variant.deathFrameCount);
+    }
+  }
+
+  /** Normalize every body collapse to the same presentation duration. */
+  private createDeathAnimationSet(prefix: string, deathFrameCount: number): void {
     for (const dir of DEATH_DIRECTIONS) {
       const deathKey = `${prefix}_${dir}_death`;
       this.anims.create({

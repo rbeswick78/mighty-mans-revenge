@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–60 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty with Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, style bonuses, and live style callouts, four arenas, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–61 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Practice vs Rusty with Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, style bonuses, and live style callouts, four arenas, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -92,6 +92,7 @@ Each session below attacks one of these.
 | 58  | Live Gauntlet Style Callouts                   | Every highlight immediately teaches the score chase it can bank                | **DONE** (2026-07-13) |
 | 59  | Blood Rush                                     | Every kill can ignite a fast, aggressive chase for the next                     | **DONE** (2026-07-13) |
 | 60  | Mutator Rule Callouts                          | Every surprise teaches its rule before players must react                       | **DONE** (2026-07-13) |
+| 61  | Death Animation Variety                       | Repeated eliminations stop replaying the same canned fall                        | **DONE** (2026-07-13) |
 
 ---
 
@@ -2894,7 +2895,78 @@ can react to a surprise instead of learning its hidden rule by losing to it.
 
 ---
 
+## Session 61 — Death Animation Variety
+
+**Goal:** make repeated eliminations feel less canned by using the compatible
+collapse art already shipped in the source pack, without touching combat or
+adding presentation-only network state.
+
+**Locked design decisions**
+
+- The first death uses the familiar base collapse. Later deaths cycle through
+  registry-declared variants and back to the base from the authoritative
+  per-match death count; clients use no RNG and reconnects choose identically.
+- Mighty Man and Frost Wizard share three complete collapses. Bruce and Bubba
+  each have two. Jack's no-axe body has two when that authoritative body state
+  is active.
+- Rook keeps its original because alternate human bodies lack matching helmet
+  strips. Armed Jack keeps its original because the source pack lacks the
+  alternate right-facing strip. Incomplete art never replaces a synchronized
+  pair.
+- All frame dimensions and counts remain registry-owned. BootScene loads only
+  the extra horizontal death textures, and every strip is normalized to the
+  existing 0.65-second playback duration.
+- This is cosmetic only: no damage, death, respawn, movement, physics, mode,
+  score, AI, protocol, or server-authority rule changes.
+
+**Acceptance criteria**
+
+- [x] Pure tests prove deterministic cycles, invalid-count normalization,
+      Jack body-state selection, and Rook's synchronized fallback.
+- [x] Registry tests validate every configured variant's prefix, asset name,
+      frame count, and both horizontal frame dimensions.
+- [x] A forced real-client Chromium Practice smoke proves all ten strips load
+      and the live renderer selects the exact second-death texture/animation.
+- [x] Typecheck, lint, all 1,125 unit tests, production build, and the full
+      Playwright desktop/mobile matrix pass.
+
+---
+
 ## Session Log
+
+### Session 61 — 2026-07-13 — Death Animation Variety
+
+**Shipped:** repeated eliminations now rotate through every complete,
+compatible collapse in the bundled art pack. Mighty Man and Frost Wizard get
+three distinct falls, Bruce and Bubba get two, and Jack's no-axe body gets a
+second. The familiar animation always plays first, then later deaths vary the
+silhouette and motion so rematches feel less mechanically repeated.
+
+`CharacterDef.deathVariants` keeps asset names, frame dimensions, and counts
+beside the rest of the roster presentation contract. A pure selector reads the
+existing authoritative match death count, while BootScene registers
+death-only texture/animation prefixes and normalizes their differing frame
+counts to the same 0.65-second beat. There is no client RNG, protocol field,
+server behavior, or gameplay change. Rook and armed Jack deliberately retain
+their complete synchronized originals rather than combining missing art.
+
+**Verification:** 1,125 tests pass across 74 files, including deterministic
+cycles, fallback coverage, and registry integrity. TypeScript, ESLint, all
+package builds, and the Vite production bundle are clean; Vite retains its
+existing chunk-size advisory. A forced live Chromium Practice smoke verified
+all ten new textures plus the exact character-aware second-death texture and
+animation key. The full Playwright matrix passes 16 tests with 11 intentional
+scoped skips across Chromium, Firefox, and mobile landscape, and teardown
+leaves no game ports open.
+
+**Tuning watch:** the base-first deterministic cadence keeps each fighter
+recognizable and makes variation guaranteed. Watch whether the extra collapses
+remain readable under Big Heads and on mobile before changing their shared
+0.65-second duration.
+
+**Deployment:** not run; deployment still requires explicit authorization.
+
+---
 
 ### Session 60 — 2026-07-13 — Mutator Rule Callouts
 

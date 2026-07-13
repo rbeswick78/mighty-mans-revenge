@@ -62,10 +62,14 @@ This game uses pixel art assets from third-party packs. Source archives are
 - `enemies/zombie-axe-noaxe_*_attack.png` — Enemies/Zombie_Axe/No-Axe First-Attack Sheet7 (4 directions)
 
 - `player/character_{side,side-left}_death.png` — Character/Main/Death death1 NoHands Sheet6
+- `player/character-death{2,3}_{side,side-left}_death.png` — Character/Main/Death death2/death3 NoHands strips
 - `enemies/zombie_{side,side-left}_death.png` — Enemies/Zombie_Small First-Death Sheet6
+- `enemies/zombie-death2_{side,side-left}_death.png` — Enemies/Zombie_Small Second-Death Sheet7
 - `enemies/zombie-big_{side,side-left}_death.png` — Enemies/Zombie_Big First-Death Sheet7
+- `enemies/zombie-big-death2_{side,side-left}_death.png` — Enemies/Zombie_Big Second-Death Sheet8
 - `enemies/zombie-axe_{side,side-left}_death.png` — Enemies/Zombie_Axe First-Death Sheet6
 - `enemies/zombie-axe-noaxe_{side,side-left}_death.png` — Enemies/Zombie_Axe/No-Axe First-Death Sheet6
+- `enemies/zombie-axe-noaxe-death2_{side,side-left}_death.png` — Enemies/Zombie_Axe/No-Axe Second-Death Sheet7
 - `effects/player-hit-1.png` — Enemies/Shot/shot_1 Sheet3
 - `effects/player-hit-2.png` — Enemies/Shot/shot_2 Sheet3
 

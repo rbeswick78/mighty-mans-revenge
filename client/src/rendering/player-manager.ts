@@ -69,7 +69,7 @@ export class ClientPlayerManager {
       // Death presentation is edge-driven inside the renderer. Repeated
       // dead snapshots must hold the corpse's final frame, not hide or
       // restart the one-shot animation.
-      renderer.updateLifeState(playerState.isDead);
+      renderer.updateLifeState(playerState.isDead, playerState.deaths);
       renderer.setBountyMarked(playerState.id === bountyTargetId);
 
       if (playerState.invulnerableTimer > 0) {

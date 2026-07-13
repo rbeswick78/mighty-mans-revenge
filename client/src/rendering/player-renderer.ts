@@ -15,6 +15,7 @@ import {
   type GunOverlayState,
 } from './weapon-overlay-key.js';
 import { batHeldRotation, batSwingRotations } from './bat-presentation.js';
+import { deathVariantPrefix } from './death-variant.js';
 import { armorPresentation } from '../ui/armor-presentation.js';
 
 const SPRITE_SCALE = 3;
@@ -144,6 +145,8 @@ export class PlayerRenderer {
   private isAxeless = false;
   private currentDirection: Direction4 = 'down';
   private deathDirection: DeathDirection = 'side';
+  /** Body prefix selected for the current authoritative death edge. */
+  private currentDeathPrefix: string;
   private isDead = false;
   private currentAnimState: AnimState = 'idle';
   private currentGunState: GunOverlayState = 'hold';
@@ -182,6 +185,7 @@ export class PlayerRenderer {
     this.characterId = characterId;
     this.texturePrefix = def.spritePrefix;
     this.altBodyPrefix = def.altBody?.spritePrefix ?? null;
+    this.currentDeathPrefix = def.spritePrefix;
     this.hasGun = def.hasGun;
 
     this.sprite = scene.add.sprite(0, 0, this.animKey('down', 'idle'), 0);
@@ -651,10 +655,15 @@ export class PlayerRenderer {
    * character sheet and hold the final corpse frame for the respawn window;
    * repeated snapshots cannot restart or hide the animation.
    */
-  updateLifeState(dead: boolean): void {
+  updateLifeState(dead: boolean, deathCount = 1): void {
     if (dead === this.isDead) return;
     this.isDead = dead;
     if (dead) {
+      this.currentDeathPrefix = deathVariantPrefix(
+        this.characterDef,
+        this.isAxeless,
+        deathCount,
+      );
       this.playDeathAnimation();
     } else {
       this.playRespawnAnimation();
@@ -828,7 +837,7 @@ export class PlayerRenderer {
   }
 
   private deathKey(): string {
-    return `${this.bodyPrefix()}_${this.deathDirection}_death`;
+    return `${this.currentDeathPrefix}_${this.deathDirection}_death`;
   }
 
   private bodyOverlayAnimKey(direction: Direction4, state: AnimState): string {

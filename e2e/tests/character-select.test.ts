@@ -402,6 +402,18 @@ test('solo practice launches against locked Rusty and reaches live play', async 
             batTextureLoaded: w.game?.textures.exists('pickup_bat') ?? false,
             batIconLoaded: w.game?.textures.exists('bat_icon') ?? false,
             batSpriteReady: localRenderer?.batSprite?.texture?.key === 'pickup_bat',
+            deathVariantsLoaded: [
+              'mighty_man_death2_side_death',
+              'mighty_man_death2_side-left_death',
+              'mighty_man_death3_side_death',
+              'mighty_man_death3_side-left_death',
+              'bruce_death2_side_death',
+              'bruce_death2_side-left_death',
+              'bubba_death2_side_death',
+              'bubba_death2_side-left_death',
+              'jack-noaxe_death2_side_death',
+              'jack-noaxe_death2_side-left_death',
+            ].every((key) => w.game?.textures.exists(key) === true),
           };
         }),
       {
@@ -415,7 +427,60 @@ test('solo practice launches against locked Rusty and reaches live play', async 
       batTextureLoaded: true,
       batIconLoaded: true,
       batSpriteReady: true,
+      deathVariantsLoaded: true,
     });
+
+  if (process.env.VERIFY_DEATH_VARIANTS === '1') {
+    const collapse = await page.evaluate(() => {
+      const w = window as unknown as {
+        game?: { scene: { getScene: (key: string) => unknown } };
+      };
+      const scene = w.game?.scene.getScene('GameScene') as {
+        gameService?: {
+          getNetworkManager: () => {
+            getPlayerId: () => string | null;
+            getLocalPlayerState: () => { characterId?: string } | null;
+          };
+        };
+        playerManager?: {
+          getRenderer: (playerId: string) => {
+            setAimAngle: (angle: number) => void;
+            updateLifeState: (dead: boolean, deathCount: number) => void;
+            sprite?: {
+              texture?: { key?: string };
+              anims?: { currentAnim?: { key?: string } };
+            };
+          } | undefined;
+        };
+      } | null;
+      const network = scene?.gameService?.getNetworkManager();
+      const playerId = network?.getPlayerId();
+      const renderer = playerId
+        ? scene?.playerManager?.getRenderer(playerId)
+        : undefined;
+      renderer?.setAimAngle(0);
+      renderer?.updateLifeState(true, 2);
+      const result = {
+        characterId: network?.getLocalPlayerState()?.characterId ?? '',
+        texture: renderer?.sprite?.texture?.key ?? '',
+        animation: renderer?.sprite?.anims?.currentAnim?.key ?? '',
+      };
+      renderer?.updateLifeState(false, 2);
+      return result;
+    });
+    const expectedSecondDeath: Record<string, string> = {
+      mighty_man: 'mighty_man_death2_side_death',
+      bruce: 'bruce_death2_side_death',
+      frost_wizard: 'mighty_man_death2_side_death',
+      bubba: 'bubba_death2_side_death',
+      jack: 'jack_side_death',
+      rook: 'mighty_man_side_death',
+    };
+    const expected = expectedSecondDeath[collapse.characterId];
+    expect(expected).toBeTruthy();
+    expect(collapse.texture).toBe(expected);
+    expect(collapse.animation).toBe(expected);
+  }
 
   if (process.env.VERIFY_GAMEPAD === '1') {
     const opening = await page.evaluate(() => {

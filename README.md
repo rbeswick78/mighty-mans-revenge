@@ -42,6 +42,12 @@ Gamepad menus use the D-pad or left stick, A / Cross to select, and B /
 Circle to cancel or return. Mouse, touch, keyboard, and gamepad can take over
 at any time; no settings toggle is required.
 
+## Combat feel
+
+Repeated knockouts cycle through roster-aware collapse animations instead of
+replaying the same fall every time. The choice comes from the synchronized
+match death counter, so every client sees the same cosmetic beat.
+
 ## Solo play
 
 `RUSTY SPAR` starts the familiar single Practice match at your selected Rusty

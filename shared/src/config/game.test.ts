@@ -485,7 +485,8 @@ describe('CHARACTERS registry', () => {
   });
 
   it('every entry declares positive frame counts', () => {
-    for (const def of Object.values(CHARACTERS)) {
+    for (const entry of Object.values(CHARACTERS)) {
+      const def: CharacterDef = entry;
       expect(def.idleFrameCount).toBeGreaterThan(0);
       expect(def.runFrameCount).toBeGreaterThan(0);
       expect(def.attackFrameCount).toBeGreaterThan(0);
@@ -493,6 +494,16 @@ describe('CHARACTERS registry', () => {
       for (const dir of DEATH_DIRECTIONS) {
         expect(def.deathFrames[dir].w).toBeGreaterThan(0);
         expect(def.deathFrames[dir].h).toBeGreaterThan(0);
+      }
+      if (def.deathVariants) expect(Object.isFrozen(def.deathVariants)).toBe(true);
+      for (const variant of def.deathVariants ?? []) {
+        expect(variant.spritePrefix).not.toBe(def.spritePrefix);
+        expect(variant.assetBaseName).toBeTruthy();
+        expect(variant.deathFrameCount).toBeGreaterThan(0);
+        for (const dir of DEATH_DIRECTIONS) {
+          expect(variant.deathFrames[dir].w).toBeGreaterThan(0);
+          expect(variant.deathFrames[dir].h).toBeGreaterThan(0);
+        }
       }
     }
     // The pack's Zombie_Big / Zombie_Axe walk sheets are 8-frame; their
@@ -739,6 +750,15 @@ describe('session-8 polish backlog config', () => {
       for (const dir of DEATH_DIRECTIONS) {
         expect(alt.deathFrames[dir].w).toBeGreaterThan(0);
         expect(alt.deathFrames[dir].h).toBeGreaterThan(0);
+      }
+      if (alt.deathVariants) expect(Object.isFrozen(alt.deathVariants)).toBe(true);
+      for (const variant of alt.deathVariants ?? []) {
+        expect(variant.spritePrefix).not.toBe(alt.spritePrefix);
+        expect(variant.deathFrameCount).toBeGreaterThan(0);
+        for (const dir of DEATH_DIRECTIONS) {
+          expect(variant.deathFrames[dir].w).toBeGreaterThan(0);
+          expect(variant.deathFrames[dir].h).toBeGreaterThan(0);
+        }
       }
     }
   });

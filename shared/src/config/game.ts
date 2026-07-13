@@ -1114,6 +1114,26 @@ export const CHARACTERS = Object.freeze({
       side: { w: 21, h: 16 },
       'side-left': { w: 21, h: 16 },
     },
+    deathVariants: Object.freeze([
+      {
+        spritePrefix: 'mighty_man_death2',
+        assetBaseName: 'character-death2',
+        deathFrameCount: 7,
+        deathFrames: {
+          side: { w: 21, h: 16 },
+          'side-left': { w: 21, h: 16 },
+        },
+      },
+      {
+        spritePrefix: 'mighty_man_death3',
+        assetBaseName: 'character-death3',
+        deathFrameCount: 7,
+        deathFrames: {
+          side: { w: 21, h: 16 },
+          'side-left': { w: 21, h: 16 },
+        },
+      },
+    ]),
   },
   bruce: {
     id: 'bruce',
@@ -1151,6 +1171,17 @@ export const CHARACTERS = Object.freeze({
       side: { w: 16, h: 14 },
       'side-left': { w: 16, h: 14 },
     },
+    deathVariants: Object.freeze([
+      {
+        spritePrefix: 'bruce_death2',
+        assetBaseName: 'zombie-death2',
+        deathFrameCount: 7,
+        deathFrames: {
+          side: { w: 16, h: 16 },
+          'side-left': { w: 16, h: 16 },
+        },
+      },
+    ]),
   },
   // Frost Wizard intentionally shares Mighty Man's spritePrefix, asset
   // folder, base name, and frame dimensions — he reuses the exact same
@@ -1195,6 +1226,26 @@ export const CHARACTERS = Object.freeze({
       side: { w: 21, h: 16 },
       'side-left': { w: 21, h: 16 },
     },
+    deathVariants: Object.freeze([
+      {
+        spritePrefix: 'mighty_man_death2',
+        assetBaseName: 'character-death2',
+        deathFrameCount: 7,
+        deathFrames: {
+          side: { w: 21, h: 16 },
+          'side-left': { w: 21, h: 16 },
+        },
+      },
+      {
+        spritePrefix: 'mighty_man_death3',
+        assetBaseName: 'character-death3',
+        deathFrameCount: 7,
+        deathFrames: {
+          side: { w: 21, h: 16 },
+          'side-left': { w: 21, h: 16 },
+        },
+      },
+    ]),
   },
   // Bubba — the tank. Pack's Zombie_Big: huge HP pool, slow, and a bigger
   // hit-validation box (he's simply easier to hit). Ability: Iron Hide
@@ -1235,6 +1286,17 @@ export const CHARACTERS = Object.freeze({
       side: { w: 29, h: 23 },
       'side-left': { w: 29, h: 23 },
     },
+    deathVariants: Object.freeze([
+      {
+        spritePrefix: 'bubba_death2',
+        assetBaseName: 'zombie-big-death2',
+        deathFrameCount: 8,
+        deathFrames: {
+          side: { w: 29, h: 24 },
+          'side-left': { w: 29, h: 24 },
+        },
+      },
+    ]),
   },
   // Jack — the skirmisher. Pack's Zombie_Axe (with-axe body variant).
   // Baseline stats; his identity is the Axe Throw projectile
@@ -1305,6 +1367,17 @@ export const CHARACTERS = Object.freeze({
         'side-left': { w: 22, h: 18 },
       },
       deathFrameCount: 6,
+      deathVariants: Object.freeze([
+        {
+          spritePrefix: 'jack-noaxe_death2',
+          assetBaseName: 'zombie-axe-noaxe-death2',
+          deathFrameCount: 7,
+          deathFrames: {
+            side: { w: 22, h: 19 },
+            'side-left': { w: 22, h: 19 },
+          },
+        },
+      ]),
     },
   },
   // Rook — the mobile flanker. Reuses Mighty Man's body sheets under the

@@ -27,6 +27,14 @@ export interface FrameDim {
 
 export type FramesByDirection = Record<Direction4, FrameDim>;
 
+/** Cosmetic-only alternate horizontal death strip for a character body. */
+export interface DeathVariantDef {
+  readonly spritePrefix: string;
+  readonly assetBaseName: string;
+  readonly deathFrames: Record<DeathDirection, FrameDim>;
+  readonly deathFrameCount: number;
+}
+
 /**
  * Per-character metadata. Sprite assets live under
  * `client/public/assets/{assetFolder}/{assetBaseName}_{direction}_{state}.png`.
@@ -64,6 +72,8 @@ export interface CharacterDef {
   readonly attackFrameCount: number;
   /** Horizontal frames per death sheet. */
   readonly deathFrameCount: number;
+  /** Optional extra collapses cycled by authoritative match death count. */
+  readonly deathVariants?: readonly DeathVariantDef[];
   /**
    * Whether to render the held-gun overlay and matching muzzle flash for
    * this character. Gameplay (bullets, damage) is identical regardless —
@@ -104,6 +114,7 @@ export interface CharacterDef {
     readonly attackFrames: FramesByDirection;
     readonly deathFrames: Record<DeathDirection, FrameDim>;
     readonly deathFrameCount: number;
+    readonly deathVariants?: readonly DeathVariantDef[];
   };
   /**
    * Stat identity — what makes picking this character a real decision.
