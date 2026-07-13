@@ -59,6 +59,14 @@ chaos event. The selected event is locked into the fight, and forecasts do not
 repeat during the same run. Forecasts also advertise a 100, 200, or 300 point
 danger bounty; win that stage to bank it into the run and `BEST CLEAR` chase.
 
+## Match chaos
+
+Every round gains two announced match-wide mutators that can stack. The pool
+includes loadout swaps, storms, teleports, supply races, and Demolition Wave:
+one arena-wide blast that permanently opens ordinary low cover and wire gates.
+Barrels and scavenger caches survive the wave, leaving their traps and rewards
+available inside the newly exposed sightlines.
+
 ## Where to read next
 
 | If you want…                                | Read                                     |

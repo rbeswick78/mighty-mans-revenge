@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–55 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty with Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, and danger bounties, four arenas, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–56 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty with Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, and danger bounties, four arenas, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -87,6 +87,7 @@ Each session below attacks one of these.
 | 53  | Gauntlet Rival Drafts                           | Route previews turn each branch into a readable matchup decision             | **DONE** (2026-07-13) |
 | 54  | Gauntlet Chaos Forecasts                        | Every branch reveals a different mid-fight twist worth planning around       | **DONE** (2026-07-13) |
 | 55  | Gauntlet Chaos Bounties                         | Dangerous route choices become explicit high-score gambles                   | **DONE** (2026-07-13) |
+| 56  | Demolition Wave                                | Familiar lanes erupt into exposed, permanently rewritten battlefields        | **DONE** (2026-07-13) |
 
 ---
 
@@ -2667,7 +2668,7 @@ that make the best-clear chase ask for courage as well as clean execution.
 
 **Locked design decisions**
 
-- `GAUNTLET_CHAOS_BOUNTIES` exhaustively assigns all 16 mutators to a frozen
+- `GAUNTLET_CHAOS_BOUNTIES` exhaustively assigns all 17 mutators to a frozen
   100, 200, or 300 point tier. Mostly beneficial spectacle pays 100, disruptive
   rules pay 200, and lethal health, loadout replacement, or persistent arena
   pressure pays 300. Offer generation and mode compatibility stay unchanged.
@@ -2706,7 +2707,83 @@ that make the best-clear chase ask for courage as well as clean execution.
 
 ---
 
+## Session 56 — Demolition Wave
+
+**Goal:** make a memorized arena transform under the players mid-fight, forcing
+new peeks, escapes, and long sightlines without adding a second map state model.
+
+**Locked design decisions**
+
+- `demolition_wave` is a one-shot shared mutator. Its activation permanently
+  removes every still-solid ordinary low-cover cell and shootable wire gate for
+  the rest of that match. It does not repeat or pulse.
+- Explosive barrels and scavenger caches are protected even though their map
+  cells use low cover. Ordinary and perimeter walls are also untouched. The
+  event therefore rewrites movement and sightlines without silently dealing
+  damage, opening loot, or erasing authored boundaries.
+- The authoritative Match selects and destroys cells, then reuses the existing
+  reliable tile-destruction stream. Client rendering and prediction collision,
+  Rusty's pathing, bullets, grenades, and abilities all observe the same live
+  collision grid; immutable map data still rebuilds every rematch.
+- The existing warning/start banners announce the event. Activation adds an
+  amber flash, short camera shake, and zoom pulse, while actual geometry opens
+  from authoritative tile messages. No new wire message or snapshot state is
+  introduced.
+- Demolition Wave is compatible with every mode and existing mutator. Its
+  Gauntlet forecast bounty is 300 because the one-way arena rewrite can remove
+  safe approach routes for the rest of a stage.
+
+**Acceptance criteria**
+
+- [x] Pure selector tests prove ordinary cover and gates qualify while barrels,
+      caches, walls, and already-open cells do not.
+- [x] Match integration proves activation clears authoritative collision,
+      queues each changed tile once, keeps map data immutable, and triggers no
+      barrel explosion or cache reward.
+- [x] Shared and client exhaustive mutator surfaces recognize the new id,
+      uppercase label, amber feedback, and 300-point Gauntlet bounty.
+- [x] Typecheck, lint, all unit tests, production build, and focused live
+      Chromium smoke pass.
+
+---
+
 ## Session Log
+
+### Session 56 — 2026-07-13 — Demolition Wave
+
+**Shipped:** the new `demolition_wave` mutator turns an established firefight
+into a different arena in one authoritative beat. Every ordinary low-cover cell
+and still-closed wire gate drops for the rest of the round, exposing long
+sightlines, opening flanks, and invalidating safe positions players had already
+settled into. The normal warning banner telegraphs the change; activation lands
+with an amber flash, camera shake, and zoom pulse.
+
+The server computes the affected cells from immutable map data plus the live
+collision grid, then uses the existing reliable tile-destruction stream. Client
+rendering and prediction, Rusty's pathing, hitscan, grenades, and abilities all
+see the same open geometry without a parallel state model or new wire payload.
+Barrel and scavenger-cache cells are protected, ordinary walls remain intact,
+already-open cells never rebroadcast, and a rematch reconstructs the authored
+arena. Demolition Wave joins every mode's random pool and the Gauntlet forecast
+table at a 300-point danger bounty.
+
+**Verification:** 1,111 tests pass across 73 files, including the pure arena
+selector, authoritative Match activation, immutable-map behavior, protected
+hazards/loot, and exhaustive shared labels/bounties. TypeScript, ESLint, all
+package builds, and the Vite production bundle are clean; Vite retains its
+existing chunk-size advisory. A forced live Chromium Practice smoke verified
+the active HUD label and zero remaining closed-gate renderers. The full
+Playwright matrix passes 16 tests with 11 intentional scoped skips across
+Chromium, Firefox, and mobile landscape, and teardown left no game ports open.
+
+**Tuning watch:** the wave deliberately favors aggression and long-range aim,
+but the practical swing depends on arena, mode, and when it arrives. Watch for
+maps becoming too sparse or objective carriers losing all viable approach
+routes before changing its 300-point bounty or introducing mode exclusions.
+
+**Deployment:** not run; deployment still requires explicit authorization.
+
+---
 
 ### Session 55 — 2026-07-13 — Gauntlet Chaos Bounties
 
@@ -2717,7 +2794,7 @@ preference picker. The payout appears on the route card, follows the selected
 fight into its character-select briefing, and is itemized in the winning score
 breakdown before rolling into the run and `BEST CLEAR` total.
 
-The frozen table covers all 16 mutators at compile time. Shared boons and light
+The frozen table covers all 17 mutators at compile time. Shared boons and light
 spectacle pay 100; disruptive rules pay 200; one-shot health, forced loadouts,
 and sustained arena threats pay 300. Only a server-authored forecast can create
 a bounty, and only an authoritative human win banks it. The payout does not wait

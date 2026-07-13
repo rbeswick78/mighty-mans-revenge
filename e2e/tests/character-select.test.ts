@@ -636,6 +636,48 @@ test('solo practice launches against locked Rusty and reaches live play', async 
       )
       .toContain('"warningActive":true,"warningDrawn":true');
   }
+
+  if (
+    process.env.FORCE_MIDMATCH_MUTATOR === 'demolition_wave' ||
+    process.env.FORCE_EVENT === 'demolition_wave'
+  ) {
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() => {
+            const w = window as unknown as {
+              game?: { scene: { getScene: (key: string) => unknown } };
+            };
+            const scene = w.game?.scene.getScene('GameScene') as {
+              gameService?: {
+                getNetworkManager: () => {
+                  getActiveMutators: () => readonly string[];
+                };
+              };
+              hud?: { activeEventLabel?: { text?: string; visible?: boolean } };
+              mapRenderer?: { gateSpritesByCell?: Map<number, unknown> };
+            } | null;
+            const active =
+              scene?.gameService
+                ?.getNetworkManager()
+                .getActiveMutators()
+                .includes('demolition_wave') ?? false;
+            return {
+              active,
+              label: scene?.hud?.activeEventLabel?.text ?? '',
+              labelVisible: scene?.hud?.activeEventLabel?.visible ?? false,
+              closedGates: scene?.mapRenderer?.gateSpritesByCell?.size ?? -1,
+            };
+          }),
+        { timeout: 15000, message: 'expected synchronized Demolition Wave arena opening' },
+      )
+      .toEqual({
+        active: true,
+        label: 'DEMOLITION WAVE',
+        labelVisible: true,
+        closedGates: 0,
+      });
+  }
 });
 
 test.describe('Character select (desktop)', () => {

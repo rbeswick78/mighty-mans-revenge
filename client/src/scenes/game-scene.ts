@@ -1583,6 +1583,7 @@ export class GameScene extends Phaser.Scene {
       fists_only: 0xffb347,
       weapon_roulette: 0x5ce1e6,
       wasteland_warp: 0xb56cff,
+      demolition_wave: 0xffb000,
       last_laugh: 0xff3b30,
       scavenger_rush: 0x5ce1e6,
       radiation_storm: 0x8cff2f,
@@ -1603,6 +1604,10 @@ export class GameScene extends Phaser.Scene {
       if (payload.event === 'weapon_roulette') {
         this.lastRouletteWeapon = null;
         this.awaitingRouletteOpeningWeapon = true;
+      }
+      if (payload.event === 'demolition_wave') {
+        this.cameras.main.shake(450, 0.012);
+        this.zoomPulse?.trigger();
       }
       this.hud?.showEventBanner(`${name}!`, undefined, EVENT_BANNER_COLORS[payload.event]);
       this.hud?.setActiveEventLabel(name);

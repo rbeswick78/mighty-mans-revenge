@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { TileType, createCollisionGrid, getMap, type MapData } from '@shared/game';
-import { findBlastableCoverTiles } from './destructible-cover.js';
+import {
+  findBlastableCoverTiles,
+  findDemolitionWaveTiles,
+} from './destructible-cover.js';
 
 const W = TileType.WALL;
 const F = TileType.FLOOR;
@@ -119,5 +122,52 @@ describe('findBlastableCoverTiles', () => {
     const shielded = findBlastableCoverTiles(map, grid, { x: 288, y: 216 });
     expect(shielded).not.toContainEqual({ col: 5, row: 2 });
     expect(shielded).not.toContainEqual({ col: 6, row: 2 });
+  });
+});
+
+describe('findDemolitionWaveTiles', () => {
+  it('opens ordinary low cover and live gates while sparing hazards, loot, and walls', () => {
+    const map = makeMap(
+      [
+        [W, W, W, W, W, W, W, W, W],
+        [W, F, F, F, F, F, F, F, W],
+        [W, F, C, W, C, C, W, C, W],
+        [W, F, F, F, F, F, F, F, W],
+        [W, W, W, W, W, W, W, W, W],
+      ],
+      [
+        {
+          x: 3,
+          y: 2,
+          w: 1,
+          h: 1,
+          texture: 'tiles_wire_fence_closing',
+          interaction: 'shootable_gate',
+        },
+        {
+          x: 4,
+          y: 2,
+          w: 1,
+          h: 1,
+          texture: 'deco_barrel_red',
+          hazard: 'explosive_barrel',
+        },
+        {
+          x: 5,
+          y: 2,
+          w: 1,
+          h: 1,
+          texture: 'deco_scavenger_cache',
+          interaction: 'scavenger_cache',
+        },
+      ],
+    );
+    const grid = createCollisionGrid(map);
+    grid.solid[2][7] = false;
+
+    expect(findDemolitionWaveTiles(map, grid)).toEqual([
+      { col: 2, row: 2 },
+      { col: 3, row: 2 },
+    ]);
   });
 });

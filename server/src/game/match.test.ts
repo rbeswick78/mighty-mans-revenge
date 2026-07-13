@@ -1640,6 +1640,83 @@ describe('Match', () => {
       return m;
     }
 
+    it('Demolition Wave opens cover and gates without consuming barrels or caches', () => {
+      const map: MapData = {
+        name: 'Demolition Lab',
+        width: 7,
+        height: 5,
+        tileSize: 48,
+        tiles: [
+          [1, 1, 1, 1, 1, 1, 1],
+          [1, 0, 0, 0, 0, 0, 1],
+          [1, 0, 2, 1, 2, 2, 1],
+          [1, 3, 0, 0, 0, 3, 1],
+          [1, 1, 1, 1, 1, 1, 1],
+        ],
+        spawnPoints: [
+          { x: 1, y: 3 },
+          { x: 5, y: 3 },
+        ],
+        pickupSpawns: [],
+        decorations: [
+          {
+            x: 3,
+            y: 2,
+            w: 1,
+            h: 1,
+            texture: 'tiles_wire_fence_closing',
+            interaction: 'shootable_gate',
+          },
+          {
+            x: 4,
+            y: 2,
+            w: 1,
+            h: 1,
+            texture: 'deco_barrel_red',
+            hazard: 'explosive_barrel',
+          },
+          {
+            x: 5,
+            y: 2,
+            w: 1,
+            h: 1,
+            texture: 'deco_scavenger_cache',
+            interaction: 'scavenger_cache',
+          },
+        ],
+      };
+      const m = new Match('demolition-wave', map, [
+        { id: 'player-0', nickname: 'P0' },
+        { id: 'player-1', nickname: 'P1' },
+      ]);
+      m.startCountdown();
+      m.update(MATCH.COUNTDOWN_DURATION + 0.05);
+
+      (m as unknown as {
+        startMutator: (mutator: MutatorId, isFinalMinute: boolean) => void;
+      }).startMutator('demolition_wave', false);
+
+      expect(m.getTickDestroyedTiles()).toEqual([
+        { col: 2, row: 2 },
+        { col: 3, row: 2 },
+      ]);
+      expect(m.mapManager.getCollisionGrid().solid[2]).toEqual([
+        true,
+        false,
+        false,
+        false,
+        true,
+        true,
+        true,
+      ]);
+      expect(m.getTickBarrelExplosions()).toEqual([]);
+      expect(m.pickupManager.getPickups()).toEqual([]);
+      expect(m.getMapData().tiles[2][2]).toBe(TileType.COVER_LOW);
+      expect(m.consumeTickMutatorStarts()).toEqual([
+        { event: 'demolition_wave', isFinalMinute: false },
+      ]);
+    });
+
     describe('final-minute slot', () => {
       it('broadcasts a warning the tick the timer crosses the warning threshold', () => {
         const m = startActiveMatchAt(MUTATORS.WARNING_AT_REMAINING + 0.01, 'super_speed');

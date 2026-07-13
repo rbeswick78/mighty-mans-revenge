@@ -118,13 +118,56 @@ export function findBlastableCoverTiles(
     .sort((a, b) => a.row - b.row || a.col - b.col);
 }
 
+/**
+ * Select the live arena cells removed by Demolition Wave. The event opens
+ * ordinary low cover and shootable gates, but leaves interactive hazards and
+ * loot intact so it cannot silently detonate barrels or erase cache rewards.
+ */
+export function findDemolitionWaveTiles(
+  mapData: MapData,
+  grid: CollisionGrid,
+): DestroyedTile[] {
+  const gateTiles = decoratedTileKeysMatching(
+    mapData,
+    (decoration) => decoration.interaction === 'shootable_gate',
+  );
+  const protectedTiles = decoratedTileKeysMatching(
+    mapData,
+    (decoration) =>
+      decoration.hazard === 'explosive_barrel' ||
+      decoration.interaction === 'scavenger_cache',
+  );
+  const result: DestroyedTile[] = [];
+
+  for (let row = 0; row < mapData.height; row++) {
+    for (let col = 0; col < mapData.width; col++) {
+      const key = tileKey(col, row, mapData.width);
+      if (protectedTiles.has(key) || !grid.solid[row]?.[col]) continue;
+      if (mapData.tiles[row][col] !== TileType.COVER_LOW && !gateTiles.has(key)) {
+        continue;
+      }
+      result.push({ col, row });
+    }
+  }
+
+  return result;
+}
+
 function tileKey(col: number, row: number, width: number): number {
   return row * width + col;
 }
 
 function decoratedTileKeys(mapData: MapData): Set<number> {
+  return decoratedTileKeysMatching(mapData, () => true);
+}
+
+function decoratedTileKeysMatching(
+  mapData: MapData,
+  predicate: (decoration: NonNullable<MapData['decorations']>[number]) => boolean,
+): Set<number> {
   const keys = new Set<number>();
   for (const decoration of mapData.decorations ?? []) {
+    if (!predicate(decoration)) continue;
     for (let row = decoration.y; row < decoration.y + decoration.h; row++) {
       for (let col = decoration.x; col < decoration.x + decoration.w; col++) {
         if (row >= 0 && row < mapData.height && col >= 0 && col < mapData.width) {

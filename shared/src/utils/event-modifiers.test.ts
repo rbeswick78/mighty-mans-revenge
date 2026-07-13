@@ -28,6 +28,7 @@ describe('mutatorsToMovementModifiers', () => {
       'fists_only',
       'weapon_roulette',
       'wasteland_warp',
+      'demolition_wave',
       'last_laugh',
       'scavenger_rush',
       'radiation_storm',

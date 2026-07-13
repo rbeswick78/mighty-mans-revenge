@@ -66,7 +66,10 @@ import { PickupManager } from './pickup-manager.js';
 import { StatsTracker } from './stats-tracker.js';
 import { MapManager } from './map-manager.js';
 import { CombatManager, type ExplosionResult } from './combat-manager.js';
-import { findBlastableCoverTiles } from './destructible-cover.js';
+import {
+  findBlastableCoverTiles,
+  findDemolitionWaveTiles,
+} from './destructible-cover.js';
 import { LagCompensator } from './lag-compensator.js';
 import { getGameMode } from './modes/index.js';
 import type { GameMode, MatchContext } from './modes/game-mode.js';
@@ -2238,6 +2241,9 @@ export class Match implements MatchContext {
       case 'last_laugh':
         // Per-tick behavior only; nothing to mutate at activation.
         return;
+      case 'demolition_wave':
+        this.triggerDemolitionWave();
+        return;
       case 'scrapstorm':
         this.scrapstormTimer = MUTATORS.SCRAPSTORM_FIRST_WARNING_DELAY_SECONDS;
         this.scrapstormTargetPosition = null;
@@ -2328,6 +2334,17 @@ export class Match implements MatchContext {
           }
         }
         return;
+    }
+  }
+
+  /** Permanently open ordinary low cover and live wire gates in one wave. */
+  private triggerDemolitionWave(): void {
+    const map = this.mapManager.getMapData();
+    const grid = this.mapManager.getCollisionGrid();
+    for (const tile of findDemolitionWaveTiles(map, grid)) {
+      if (!this.mapManager.destroyTile(tile.col, tile.row)) continue;
+      this.activeGates.delete(this.tileKey(tile.col, tile.row));
+      this.tickDestroyedTiles.push(tile);
     }
   }
 
