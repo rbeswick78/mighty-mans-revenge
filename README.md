@@ -7,13 +7,13 @@ Post-apocalyptic 1v1 retro shooter (late-1980s pixel art) — Phaser.js client, 
 
 ## Repo layout
 
-| Path       | What lives here                                                            |
-| ---------- | -------------------------------------------------------------------------- |
-| `/client`  | Phaser.js game client (Vite-bundled TypeScript)                            |
-| `/server`  | Authoritative game server (Node.js TypeScript)                             |
-| `/shared`  | Types, frozen game constants, physics/math/collision used by both packages |
-| `/e2e`     | Playwright end-to-end + visual-regression tests                            |
-| `/docs`    | Architecture Decision Records (`docs/adr/`) and infrastructure notes       |
+| Path      | What lives here                                                            |
+| --------- | -------------------------------------------------------------------------- |
+| `/client` | Phaser.js game client (Vite-bundled TypeScript)                            |
+| `/server` | Authoritative game server (Node.js TypeScript)                             |
+| `/shared` | Types, frozen game constants, physics/math/collision used by both packages |
+| `/e2e`    | Playwright end-to-end + visual-regression tests                            |
+| `/docs`   | Architecture Decision Records (`docs/adr/`) and infrastructure notes       |
 
 ## Quick start
 
@@ -29,14 +29,14 @@ See `CLAUDE.md` for the full command list and deploy procedures.
 
 ## Controls
 
-| Action | Keyboard + mouse | Standard gamepad | Touch |
-| --- | --- | --- | --- |
-| Move | WASD | Left stick | Left virtual stick |
-| Aim / fire | Hold / release left mouse | Right stick + hold / release RT | Hold / release right virtual stick |
-| Grenade / detonate | Hold / release right mouse | Hold / release LT | Grenade button |
-| Sprint | Shift | LB or left-stick click | Push left stick to its rim |
-| Ability | Space | RB | Ability button |
-| Reload | R | X / Square | Automatic |
+| Action             | Keyboard + mouse           | Standard gamepad                | Touch                              |
+| ------------------ | -------------------------- | ------------------------------- | ---------------------------------- |
+| Move               | WASD                       | Left stick                      | Left virtual stick                 |
+| Aim / fire         | Hold / release left mouse  | Right stick + hold / release RT | Hold / release right virtual stick |
+| Grenade / detonate | Hold / release right mouse | Hold / release LT               | Grenade button                     |
+| Sprint             | Shift                      | LB or left-stick click          | Push left stick to its rim         |
+| Ability            | Space                      | RB                              | Ability button                     |
+| Reload             | R                          | X / Square                      | Automatic                          |
 
 Gamepad menus use the D-pad or left stick, A / Cross to select, and B /
 Circle to cancel or return. Mouse, touch, keyboard, and gamepad can take over
@@ -48,13 +48,16 @@ at any time; no settings toggle is required.
 difficulty. `GAUNTLET` starts a three-fight run that escalates from Rookie to
 Scrapper to Warlord; win to advance, while a loss or draw restarts the run.
 Gauntlet fights rotate maps and modes but never change lifetime PvP records.
+Each stage win banks score, with bonuses for the round contract and a
+regulation finish; completing all three stages can set the device's `BEST CLEAR`
+and give the next run a target to beat.
 
 ## Where to read next
 
-| If you want…                                | Read                                          |
-| ------------------------------------------- | --------------------------------------------- |
-| Conventions, architecture, deploy, pitfalls | [`CLAUDE.md`](./CLAUDE.md)                    |
-| Why each big decision was made              | [`docs/adr/`](./docs/adr/)                    |
-| Full feature spec / user stories            | [`USER_STORIES.md`](./USER_STORIES.md)        |
-| Visual / graphics roadmap                   | [`GRAPHICS_PLAN.md`](./GRAPHICS_PLAN.md)      |
-| Idea backlog                                | [`IDEAS.md`](./IDEAS.md)                      |
+| If you want…                                | Read                                     |
+| ------------------------------------------- | ---------------------------------------- |
+| Conventions, architecture, deploy, pitfalls | [`CLAUDE.md`](./CLAUDE.md)               |
+| Why each big decision was made              | [`docs/adr/`](./docs/adr/)               |
+| Full feature spec / user stories            | [`USER_STORIES.md`](./USER_STORIES.md)   |
+| Visual / graphics roadmap                   | [`GRAPHICS_PLAN.md`](./GRAPHICS_PLAN.md) |
+| Idea backlog                                | [`IDEAS.md`](./IDEAS.md)                 |

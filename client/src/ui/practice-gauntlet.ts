@@ -1,9 +1,39 @@
-import type {
-  GameModeType,
-  MatchResult,
-  PracticeGauntletMatch,
-} from '@shared/types/game.js';
+import type { GameModeType, MatchResult, PracticeGauntletMatch } from '@shared/types/game.js';
 import { gameModeDisplayName } from '@shared/config/game.js';
+
+export const GAUNTLET_BEST_CLEAR_STORAGE_KEY = 'mmr_gauntlet_best_clear';
+
+function safeScore(score: number | undefined): number {
+  return Number.isFinite(score) ? Math.max(0, Math.floor(score ?? 0)) : 0;
+}
+
+function formatScore(score: number | undefined): string {
+  return safeScore(score).toLocaleString('en-US');
+}
+
+export function normalizeGauntletBestClear(value: string | null): number {
+  if (value === null || value.trim() === '') return 0;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Math.max(0, Math.floor(parsed)) : 0;
+}
+
+export function gauntletBestClearUpdate(
+  result: MatchResult | null,
+  previousBest: number,
+): { bestScore: number; isNewBest: boolean } {
+  const safeBest = safeScore(previousBest);
+  const score = result?.gauntlet?.runScore ?? 0;
+  const isNewBest = result?.gauntlet?.outcome === 'cleared' && score > safeBest;
+  return {
+    bestScore: isNewBest ? score : safeBest,
+    isNewBest,
+  };
+}
+
+export function gauntletBestClearLabel(bestScore: number, isNewBest = false): string {
+  if (bestScore <= 0) return 'BEST CLEAR: NONE YET';
+  return `${isNewBest ? 'NEW BEST CLEAR' : 'BEST CLEAR'}: ${formatScore(bestScore)}`;
+}
 
 export function gauntletMatchLabel(
   gauntlet: PracticeGauntletMatch,
@@ -12,7 +42,7 @@ export function gauntletMatchLabel(
 ): string {
   return (
     `GAUNTLET ${gauntlet.stage}/${gauntlet.totalStages} - ` +
-    `${gauntlet.difficulty.toUpperCase()}  //  ` +
+    `${gauntlet.difficulty.toUpperCase()}  //  RUN ${formatScore(gauntlet.runScore)}  //  ` +
     `${gameModeDisplayName(gameMode)} - ${mapName.toUpperCase()}`
   );
 }
@@ -28,7 +58,26 @@ export function gauntletResultSummary(result: MatchResult): string | null {
         : 'RUN ENDED';
   return (
     `GAUNTLET ${run.stage}/${run.totalStages}  •  ` +
-    `${run.difficulty.toUpperCase()}  •  ${outcome}`
+    `${run.difficulty.toUpperCase()}  •  ${outcome}  •  RUN ${formatScore(run.runScore)}`
+  );
+}
+
+export function gauntletStageScoreSummary(result: MatchResult): string | null {
+  const run = result.gauntlet;
+  if (!run) return null;
+  const stageScore = safeScore(run.stageScore);
+  const contractBonus = safeScore(run.contractBonus);
+  const regulationBonus = safeScore(run.regulationBonus);
+  if (stageScore <= 0) return 'NO POINTS BANKED - WIN THE STAGE TO SCORE';
+
+  const clearPoints = Math.max(0, stageScore - contractBonus - regulationBonus);
+  const bonuses = [
+    contractBonus > 0 ? `CONTRACT +${formatScore(contractBonus)}` : null,
+    regulationBonus > 0 ? `REGULATION +${formatScore(regulationBonus)}` : null,
+  ].filter((bonus): bonus is string => bonus !== null);
+  return (
+    `STAGE +${formatScore(stageScore)}  //  CLEAR +${formatScore(clearPoints)}` +
+    (bonuses.length > 0 ? `  //  ${bonuses.join('  //  ')}` : '')
   );
 }
 

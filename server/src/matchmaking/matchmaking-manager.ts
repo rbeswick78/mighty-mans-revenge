@@ -247,15 +247,11 @@ export class MatchmakingManager {
     this.botPlayerIds.add(botId);
     this.playerNicknames.set(botId, BOT.NICKNAME);
     const names = listMapNames();
-    const mapName = names[
-      Math.min(Math.floor(this.rng() * names.length), names.length - 1)
-    ];
-    const gameMode = GAME_MODE_ROTATION[
-      Math.min(
-        Math.floor(this.rng() * GAME_MODE_ROTATION.length),
-        GAME_MODE_ROTATION.length - 1,
-      )
-    ];
+    const mapName = names[Math.min(Math.floor(this.rng() * names.length), names.length - 1)];
+    const gameMode =
+      GAME_MODE_ROTATION[
+        Math.min(Math.floor(this.rng() * GAME_MODE_ROTATION.length), GAME_MODE_ROTATION.length - 1)
+      ];
     this.launchMatch(
       crypto.randomUUID(),
       this.forcedMap() ?? getMap(mapName),
@@ -674,16 +670,11 @@ export class MatchmakingManager {
       if (gauntlet) this.practiceGauntlets.set(matchId, gauntlet);
       const botEntry = playerEntries.find((entry) => this.botPlayerIds.has(entry.id));
       if (botEntry) {
-        this.botControllers.set(
-          matchId,
-          new BotController(botEntry.id, practiceDifficulty),
-        );
-        const character = CHARACTER_IDS[
-          Math.min(
-            Math.floor(this.rng() * CHARACTER_IDS.length),
-            CHARACTER_IDS.length - 1,
-          )
-        ];
+        this.botControllers.set(matchId, new BotController(botEntry.id, practiceDifficulty));
+        const character =
+          CHARACTER_IDS[
+            Math.min(Math.floor(this.rng() * CHARACTER_IDS.length), CHARACTER_IDS.length - 1)
+          ];
         match.setLock(botEntry.id, character);
       }
     }
@@ -1201,18 +1192,21 @@ export class MatchmakingManager {
     const gauntlet = this.practiceGauntlets.get(matchId) ?? null;
     const isPractice = practiceDifficulty !== null;
     result.isPractice = isPractice;
-    result.rivalrySet = gauntlet
-      ? null
-      : this.recordRivalrySet(match, result.winnerId);
+    result.rivalrySet = gauntlet ? null : this.recordRivalrySet(match, result.winnerId);
     if (gauntlet) {
       const humanPlayerId = [...match.players.keys()].find(
         (playerId) => !this.botPlayerIds.has(playerId),
       );
       if (humanPlayerId) {
+        const contractCompleted =
+          result.contract?.players.find((progress) => progress.playerId === humanPlayerId)
+            ?.completed ?? false;
         result.gauntlet = resolvePracticeGauntlet(
           gauntlet,
           humanPlayerId,
           result.winnerId,
+          contractCompleted,
+          result.wentToOvertime,
         );
       }
     }
@@ -1233,10 +1227,7 @@ export class MatchmakingManager {
     // fs.promises — nothing here blocks the tick.
     if (this.statsStore && !isPractice) {
       const entries: MatchStatsEntry[] = [];
-      const previousStreaks = new Map<
-        PlayerId,
-        { current: number; best: number }
-      >();
+      const previousStreaks = new Map<PlayerId, { current: number; best: number }>();
       for (const [playerId, player] of match.players) {
         const stats = result.playerStats.get(playerId);
         if (!stats) continue;
@@ -1337,7 +1328,10 @@ export class MatchmakingManager {
       isPractice,
       practiceDifficulty,
       nextGauntlet: result.gauntlet
-        ? practiceGauntletMatch(result.gauntlet.nextStage)
+        ? practiceGauntletMatch(
+            result.gauntlet.nextStage,
+            result.gauntlet.outcome === 'advanced' ? result.gauntlet.runScore : 0,
+          )
         : null,
       previousMutators: [...match.activeMutators],
       previousContractId: result.contract?.id ?? match.getContractHudState().id,

@@ -1,8 +1,5 @@
 import Phaser from 'phaser';
-import type {
-  LeaderboardEntry,
-  ServerMatchmakingStatusMessage,
-} from '@shared/types/network.js';
+import type { LeaderboardEntry, ServerMatchmakingStatusMessage } from '@shared/types/network.js';
 import { Wasteland, cssHex } from '@shared/config/palette.js';
 import { AudioManager } from '../audio/audio-manager.js';
 import { MenuGamepadInput } from '../input/menu-gamepad.js';
@@ -13,6 +10,11 @@ import { PixelButton } from '../ui/menu/pixel-button.js';
 import { TitleLogo } from '../ui/menu/title-logo.js';
 import { MENU_FONTS } from '../ui/menu/fonts.js';
 import { formatLeaderboardRow } from '../ui/leaderboard-format.js';
+import {
+  GAUNTLET_BEST_CLEAR_STORAGE_KEY,
+  gauntletBestClearLabel,
+  normalizeGauntletBestClear,
+} from '../ui/practice-gauntlet.js';
 import {
   BOT_DIFFICULTIES,
   DEFAULT_BOT_DIFFICULTY,
@@ -25,18 +27,19 @@ const STORAGE_KEY_BOT_DIFFICULTY = 'mmr_bot_difficulty';
 
 // Scene-local color decisions. Everything beyond the parallax backdrop is
 // pinned here so a future palette pass can re-tune the lobby in one place.
-const SUBTITLE_COLOR = Wasteland.COVER_FILL;          // weathered tan
-const LABEL_COLOR = Wasteland.COVER_FILL;             // weathered tan
-const NICKNAME_COLOR = Wasteland.HEALTH_GOOD;         // dusty mint terminal-green
-const INPUT_BG = Wasteland.HUD_STRIP_BG;              // near-black plum
-const INPUT_BORDER = Wasteland.LOADING_BAR_FILL;      // hot orange
-const SEARCHING_COLOR = Wasteland.LOADING_BAR_FILL;   // hot orange (active state)
+const SUBTITLE_COLOR = Wasteland.COVER_FILL; // weathered tan
+const LABEL_COLOR = Wasteland.COVER_FILL; // weathered tan
+const NICKNAME_COLOR = Wasteland.HEALTH_GOOD; // dusty mint terminal-green
+const INPUT_BG = Wasteland.HUD_STRIP_BG; // near-black plum
+const INPUT_BORDER = Wasteland.LOADING_BAR_FILL; // hot orange
+const SEARCHING_COLOR = Wasteland.LOADING_BAR_FILL; // hot orange (active state)
 const SEARCH_TIMER_COLOR = Wasteland.COVER_FILL;
-const PLAYER_COUNT_COLOR = Wasteland.WALL_FILL;       // dim
-const FOOTER_COLOR = Wasteland.WALL_LINE;             // very dim ash-shadow
-const ERROR_COLOR = Wasteland.HIT_FLASH;              // dried blood
+const PLAYER_COUNT_COLOR = Wasteland.WALL_FILL; // dim
+const FOOTER_COLOR = Wasteland.WALL_LINE; // very dim ash-shadow
+const ERROR_COLOR = Wasteland.HIT_FLASH; // dried blood
 const LEADERBOARD_TITLE_COLOR = Wasteland.COVER_FILL; // weathered tan
-const LEADERBOARD_ROW_COLOR = Wasteland.WALL_FILL;    // dim, matches footer
+const LEADERBOARD_ROW_COLOR = Wasteland.WALL_FILL; // dim, matches footer
+const GAUNTLET_BEST_COLOR = Wasteland.HEALTH_WARNING;
 
 export class LobbyScene extends Phaser.Scene {
   private nicknameText!: Phaser.GameObjects.Text;
@@ -91,9 +94,7 @@ export class LobbyScene extends Phaser.Scene {
     this.cameras.main.fadeIn(300, 0, 0, 0);
     this.nickname = localStorage.getItem(STORAGE_KEY_NICKNAME) ?? '';
     const savedDifficulty = localStorage.getItem(STORAGE_KEY_BOT_DIFFICULTY);
-    this.practiceDifficulty = BOT_DIFFICULTIES.includes(
-      savedDifficulty as BotDifficulty,
-    )
+    this.practiceDifficulty = BOT_DIFFICULTIES.includes(savedDifficulty as BotDifficulty)
       ? (savedDifficulty as BotDifficulty)
       : DEFAULT_BOT_DIFFICULTY;
     this.isSearching = false;
@@ -147,9 +148,9 @@ export class LobbyScene extends Phaser.Scene {
     // searching-state UI shares this panel, swapping visibility.
     // ────────────────────────────────────────────────────────────────────
     const panelW = 380;
-    const panelH = 256;
+    const panelH = 268;
     const panelX = centerX - panelW / 2;
-    const panelY = camHeight - 286;
+    const panelY = camHeight - 298;
     const panel = new MenuPanel(this, panelX, panelY, panelW, panelH);
     panel.setDepth(WastelandStreet.DEPTH.UI);
 
@@ -202,10 +203,7 @@ export class LobbyScene extends Phaser.Scene {
     // soft keyboards.
     const inputCenterAbsX = panelX + panel.centerX;
     const inputCenterAbsY = panelY + inputLocalY + inputH / 2;
-    this.nicknameInput = this.createNicknameInput(
-      inputCenterAbsX,
-      inputCenterAbsY,
-    );
+    this.nicknameInput = this.createNicknameInput(inputCenterAbsX, inputCenterAbsY);
 
     // Fresh array each create() — scene restarts rebuild these objects.
     this.nameEntryUi = [callsignLabel, inputBgGfx, this.nicknameText];
@@ -274,6 +272,23 @@ export class LobbyScene extends Phaser.Scene {
     );
     panel.add(this.difficultyButton);
 
+    const gauntletBestText = this.add
+      .text(
+        panel.centerX,
+        252,
+        gauntletBestClearLabel(
+          normalizeGauntletBestClear(localStorage.getItem(GAUNTLET_BEST_CLEAR_STORAGE_KEY)),
+        ),
+        {
+          fontFamily: MENU_FONTS.HEADER,
+          fontSize: '8px',
+          color: cssHex(GAUNTLET_BEST_COLOR),
+        },
+      )
+      .setOrigin(0.5);
+    panel.add(gauntletBestText);
+    this.nameEntryUi.push(gauntletBestText);
+
     // ────────────────────────────────────────────────────────────────────
     // Searching state — sits in the same panel real estate, hidden by
     // default. Searching text replaces the button area; cancel button
@@ -331,16 +346,11 @@ export class LobbyScene extends Phaser.Scene {
       .setDepth(WastelandStreet.DEPTH.UI);
 
     this.add
-      .text(
-        this.cameras.main.width - 36,
-        camHeight - 24,
-        'v0.1.0 // PRE-ALPHA',
-        {
-          fontFamily: MENU_FONTS.BODY,
-          fontSize: '14px',
-          color: cssHex(FOOTER_COLOR),
-        },
-      )
+      .text(this.cameras.main.width - 36, camHeight - 24, 'v0.1.0 // PRE-ALPHA', {
+        fontFamily: MENU_FONTS.BODY,
+        fontSize: '14px',
+        color: cssHex(FOOTER_COLOR),
+      })
       .setOrigin(1, 0.5)
       .setDepth(WastelandStreet.DEPTH.UI);
 
@@ -399,9 +409,7 @@ export class LobbyScene extends Phaser.Scene {
     this.wireGameServiceEvents();
 
     // Connect to server if not already connected
-    if (
-      this.gameService.getNetworkManager().getConnectionState() !== 'connected'
-    ) {
+    if (this.gameService.getNetworkManager().getConnectionState() !== 'connected') {
       this.gameService.connect().catch((err) => {
         console.error('[LobbyScene] Failed to connect:', err);
       });
@@ -438,8 +446,7 @@ export class LobbyScene extends Phaser.Scene {
 
     const buttons = this.gamepadButtons();
     if (actions.up || actions.left) {
-      this.gamepadFocusIndex =
-        (this.gamepadFocusIndex - 1 + buttons.length) % buttons.length;
+      this.gamepadFocusIndex = (this.gamepadFocusIndex - 1 + buttons.length) % buttons.length;
     } else if (actions.down || actions.right) {
       this.gamepadFocusIndex = (this.gamepadFocusIndex + 1) % buttons.length;
     }
@@ -448,12 +455,7 @@ export class LobbyScene extends Phaser.Scene {
   }
 
   private gamepadButtons(): PixelButton[] {
-    return [
-      this.quickMatchButton,
-      this.practiceButton,
-      this.gauntletButton,
-      this.difficultyButton,
-    ];
+    return [this.quickMatchButton, this.practiceButton, this.gauntletButton, this.difficultyButton];
   }
 
   private syncGamepadFocus(): void {
@@ -622,9 +624,7 @@ export class LobbyScene extends Phaser.Scene {
       .setDepth(WastelandStreet.DEPTH.UI + 1);
 
     input.addEventListener('input', () => {
-      const sanitized = input.value
-        .replace(/[^a-zA-Z0-9_\-.]/g, '')
-        .slice(0, 16);
+      const sanitized = input.value.replace(/[^a-zA-Z0-9_\-.]/g, '').slice(0, 16);
       if (sanitized !== input.value) input.value = sanitized;
       this.nickname = sanitized;
       this.saveNickname();
@@ -690,14 +690,10 @@ export class LobbyScene extends Phaser.Scene {
       loop: true,
       callback: () => {
         if (!this.isSearching) return;
-        const elapsed = Math.floor(
-          (Date.now() - this.searchStartTime) / 1000,
-        );
+        const elapsed = Math.floor((Date.now() - this.searchStartTime) / 1000);
         const mins = Math.floor(elapsed / 60);
         const secs = elapsed % 60;
-        this.searchTimerText.setText(
-          `${mins}:${secs.toString().padStart(2, '0')}`,
-        );
+        this.searchTimerText.setText(`${mins}:${secs.toString().padStart(2, '0')}`);
       },
     });
 
@@ -713,8 +709,7 @@ export class LobbyScene extends Phaser.Scene {
 
   private cyclePracticeDifficulty(): void {
     const current = BOT_DIFFICULTIES.indexOf(this.practiceDifficulty);
-    this.practiceDifficulty =
-      BOT_DIFFICULTIES[(current + 1) % BOT_DIFFICULTIES.length];
+    this.practiceDifficulty = BOT_DIFFICULTIES[(current + 1) % BOT_DIFFICULTIES.length];
     localStorage.setItem(STORAGE_KEY_BOT_DIFFICULTY, this.practiceDifficulty);
     this.difficultyButton.setLabel(this.difficultyLabel());
   }
@@ -738,16 +733,11 @@ export class LobbyScene extends Phaser.Scene {
     if (this.nickname.length >= 2) return true;
     const centerX = this.cameras.main.width / 2;
     const flash = this.add
-      .text(
-        centerX,
-        this.cameras.main.height - 70,
-        'CALLSIGN MUST BE AT LEAST 2 CHARACTERS',
-        {
-          fontFamily: MENU_FONTS.BODY,
-          fontSize: '14px',
-          color: cssHex(ERROR_COLOR),
-        },
-      )
+      .text(centerX, this.cameras.main.height - 70, 'CALLSIGN MUST BE AT LEAST 2 CHARACTERS', {
+        fontFamily: MENU_FONTS.BODY,
+        fontSize: '14px',
+        color: cssHex(ERROR_COLOR),
+      })
       .setOrigin(0.5)
       .setDepth(WastelandStreet.DEPTH.UI + 2);
     this.time.delayedCall(2000, () => flash.destroy());
@@ -783,8 +773,7 @@ export class LobbyScene extends Phaser.Scene {
   }
 
   setPlayerCount(count: number): void {
-    const label =
-      count === 1 ? '1 PLAYER ONLINE' : `${count} PLAYERS ONLINE`;
+    const label = count === 1 ? '1 PLAYER ONLINE' : `${count} PLAYERS ONLINE`;
     this.playerCountText.setText(label);
   }
 
@@ -792,8 +781,6 @@ export class LobbyScene extends Phaser.Scene {
     // Match the convention used elsewhere in client (is-touch-device.ts):
     // touch capability + small viewport. Used to decide on reduced
     // particle counts in the parallax backdrop.
-    return (
-      'ontouchstart' in window && Math.min(window.innerWidth, window.innerHeight) < 600
-    );
+    return 'ontouchstart' in window && Math.min(window.innerWidth, window.innerHeight) < 600;
   }
 }

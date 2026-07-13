@@ -17,10 +17,15 @@ import { formatRivalrySummary, nextDraftTeaser, rematchButtonLabel } from '../ui
 import { careerRankPresentation } from '../ui/career-rank.js';
 import { winStreakPresentation, type WinStreakTone } from '../ui/win-streak.js';
 import {
+  GAUNTLET_BEST_CLEAR_STORAGE_KEY,
+  gauntletBestClearLabel,
+  gauntletBestClearUpdate,
   gauntletActionLabel,
   gauntletNextTeaser,
   gauntletOutcomeTitle,
   gauntletResultSummary,
+  gauntletStageScoreSummary,
+  normalizeGauntletBestClear,
 } from '../ui/practice-gauntlet.js';
 
 interface ResultsSceneData {
@@ -74,6 +79,8 @@ export class ResultsScene extends Phaser.Scene {
   private menuGamepad: MenuGamepadInput | null = null;
   private gamepadFocusActive = false;
   private gamepadFocusIndex = 0;
+  private gauntletBestClear = 0;
+  private isNewGauntletBest = false;
 
   // Event handler references for cleanup
   private onRematchStatus: ((opponentWantsRematch: boolean) => void) | null = null;
@@ -96,12 +103,26 @@ export class ResultsScene extends Phaser.Scene {
     this.menuGamepad = null;
     this.gamepadFocusActive = false;
     this.gamepadFocusIndex = 0;
+    this.gauntletBestClear = 0;
+    this.isNewGauntletBest = false;
   }
 
   create(): void {
     this.cameras.main.fadeIn(300, 0, 0, 0);
     this.gameService = GameService.getInstance();
     this.menuGamepad = new MenuGamepadInput();
+
+    if (this.result?.gauntlet) {
+      const previousBest = normalizeGauntletBestClear(
+        localStorage.getItem(GAUNTLET_BEST_CLEAR_STORAGE_KEY),
+      );
+      const update = gauntletBestClearUpdate(this.result, previousBest);
+      this.gauntletBestClear = update.bestScore;
+      this.isNewGauntletBest = update.isNewBest;
+      if (update.isNewBest) {
+        localStorage.setItem(GAUNTLET_BEST_CLEAR_STORAGE_KEY, String(update.bestScore));
+      }
+    }
 
     const centerX = this.cameras.main.width / 2;
     const camHeight = this.cameras.main.height;
@@ -131,8 +152,7 @@ export class ResultsScene extends Phaser.Scene {
     // Outcome banner (Press Start 2P, big)
     // ────────────────────────────────────────────────────────────────────
     const titleText =
-      gauntletOutcomeTitle(this.result) ??
-      (isDraw ? 'DRAW' : isWinner ? 'VICTORY' : 'DEFEAT');
+      gauntletOutcomeTitle(this.result) ?? (isDraw ? 'DRAW' : isWinner ? 'VICTORY' : 'DEFEAT');
     const titleColor = isDraw ? DRAW_COLOR : isWinner ? VICTORY_COLOR : DEFEAT_COLOR;
     new TitleLogo(this, centerX, 70, [titleText], {
       fontSize: 44,
@@ -299,20 +319,13 @@ export class ResultsScene extends Phaser.Scene {
     if (actions.back) {
       this.lobbyButton?.activate();
     } else if (actions.confirm || actions.alternate) {
-      (this.gamepadFocusIndex === 0
-        ? this.rematchButton
-        : this.lobbyButton
-      )?.activate();
+      (this.gamepadFocusIndex === 0 ? this.rematchButton : this.lobbyButton)?.activate();
     }
   }
 
   private syncGamepadFocus(): void {
-    this.rematchButton?.setFocused(
-      this.gamepadFocusActive && this.gamepadFocusIndex === 0,
-    );
-    this.lobbyButton?.setFocused(
-      this.gamepadFocusActive && this.gamepadFocusIndex === 1,
-    );
+    this.rematchButton?.setFocused(this.gamepadFocusActive && this.gamepadFocusIndex === 0);
+    this.lobbyButton?.setFocused(this.gamepadFocusActive && this.gamepadFocusIndex === 1);
   }
 
   private renderTableau(isWinner: boolean, isDraw: boolean, camHeight: number): void {
@@ -513,15 +526,8 @@ export class ResultsScene extends Phaser.Scene {
     isDraw: boolean,
   ): void {
     if (!this.result || !playerId) return;
-    const outcome = isDraw
-      ? 'draw'
-      : this.result.winnerId === playerId
-        ? 'win'
-        : 'loss';
-    const presentation = winStreakPresentation(
-      this.result.winStreaks?.[playerId],
-      outcome,
-    );
+    const outcome = isDraw ? 'draw' : this.result.winnerId === playerId ? 'win' : 'loss';
+    const presentation = winStreakPresentation(this.result.winStreaks?.[playerId], outcome);
     if (!presentation) return;
 
     const colorForTone = (tone: WinStreakTone): number => {
@@ -563,10 +569,7 @@ export class ResultsScene extends Phaser.Scene {
    * record for 1v1 matches; both are absent on old/partial payloads, so
    * everything here degrades to rendering nothing.
    */
-  private renderAwardsAndRivalry(
-    centerX: number,
-    localPlayerId: PlayerId | null,
-  ): void {
+  private renderAwardsAndRivalry(centerX: number, localPlayerId: PlayerId | null): void {
     if (!this.result) return;
 
     const line = gauntletResultSummary(this.result) ?? formatRivalrySummary(this.result);
@@ -583,14 +586,58 @@ export class ResultsScene extends Phaser.Scene {
       this.tweens.add({ targets: rivalryText, alpha: 1, duration: 400, delay: 300 });
     }
 
+    if (this.result.gauntlet) {
+      const scoreLine = gauntletStageScoreSummary(this.result);
+      if (scoreLine) {
+        const scoreText = this.add
+          .text(centerX, CONTRACT_Y, scoreLine, {
+            fontFamily: MENU_FONTS.HEADER,
+            fontSize: '8px',
+            color: cssHex(
+              this.result.gauntlet.stageScore > 0 ? CONTRACT_COMPLETE_COLOR : DEFEAT_COLOR,
+            ),
+          })
+          .setOrigin(0.5)
+          .setAlpha(0)
+          .setDepth(WastelandStreet.DEPTH.UI);
+        this.tweens.add({
+          targets: scoreText,
+          alpha: 1,
+          duration: 400,
+          delay: 400,
+        });
+      }
+
+      const bestText = this.add
+        .text(
+          centerX,
+          CAREER_RANK_Y,
+          gauntletBestClearLabel(this.gauntletBestClear, this.isNewGauntletBest),
+          {
+            fontFamily: MENU_FONTS.HEADER,
+            fontSize: this.isNewGauntletBest ? '10px' : '8px',
+            color: cssHex(this.isNewGauntletBest ? CAREER_RANK_UP_COLOR : CAREER_RANK_COLOR),
+          },
+        )
+        .setOrigin(0.5)
+        .setAlpha(0)
+        .setScale(this.isNewGauntletBest ? 1.3 : 1)
+        .setDepth(WastelandStreet.DEPTH.UI);
+      this.tweens.add({
+        targets: bestText,
+        alpha: 1,
+        scaleX: 1,
+        scaleY: 1,
+        duration: 500,
+        delay: 520,
+        ease: this.isNewGauntletBest ? 'Back.easeOut' : 'Quad.easeOut',
+      });
+    }
+
     const contract = this.result.contract;
-    const localProgress = contract?.players.find(
-      (progress) => progress.playerId === localPlayerId,
-    );
-    if (contract && localProgress) {
-      const career = localPlayerId
-        ? contract.careerCompletions[localPlayerId]
-        : undefined;
+    const localProgress = contract?.players.find((progress) => progress.playerId === localPlayerId);
+    if (!this.result.gauntlet && contract && localProgress) {
+      const career = localPlayerId ? contract.careerCompletions[localPlayerId] : undefined;
       const suffix = localProgress.completed
         ? this.result.isPractice
           ? 'PRACTICE CLEAR'
@@ -606,11 +653,7 @@ export class ResultsScene extends Phaser.Scene {
           {
             fontFamily: MENU_FONTS.HEADER,
             fontSize: '9px',
-            color: cssHex(
-              localProgress.completed
-                ? CONTRACT_COMPLETE_COLOR
-                : CONTRACT_COLOR,
-            ),
+            color: cssHex(localProgress.completed ? CONTRACT_COMPLETE_COLOR : CONTRACT_COLOR),
           },
         )
         .setOrigin(0.5)
@@ -633,9 +676,7 @@ export class ResultsScene extends Phaser.Scene {
           .text(centerX, CAREER_RANK_Y, rank.text, {
             fontFamily: MENU_FONTS.HEADER,
             fontSize: rank.promoted ? '10px' : '8px',
-            color: cssHex(
-              rank.promoted ? CAREER_RANK_UP_COLOR : CAREER_RANK_COLOR,
-            ),
+            color: cssHex(rank.promoted ? CAREER_RANK_UP_COLOR : CAREER_RANK_COLOR),
           })
           .setOrigin(0.5)
           .setAlpha(0)

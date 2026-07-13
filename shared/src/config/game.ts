@@ -146,19 +146,14 @@ export function selectMatchContract(
     return MATCH_CONTRACTS[forced as MatchContractId];
   }
   const pool = [...BASE_CONTRACT_POOL];
-  if (
-    mode !== GameModeType.GUN_GAME &&
-    mode !== GameModeType.ONE_IN_THE_CHAMBER
-  ) {
+  if (mode !== GameModeType.GUN_GAME && mode !== GameModeType.ONE_IN_THE_CHAMBER) {
     pool.push('power_trip');
   }
   if (mode === GameModeType.KOTH) pool.push('hill_dweller');
   if (mode === GameModeType.KILL_CONFIRMED) pool.push('tag_hunter');
   if (mode === GameModeType.CORE_RUN) pool.push('core_runner');
   const eligible = excluded ? pool.filter((id) => id !== excluded) : pool;
-  return MATCH_CONTRACTS[
-    eligible[contractHash(`${matchId}:${mode}`) % eligible.length]
-  ];
+  return MATCH_CONTRACTS[eligible[contractHash(`${matchId}:${mode}`) % eligible.length]];
 }
 
 /**
@@ -528,6 +523,9 @@ export type PracticeKind = (typeof PRACTICE_KINDS)[number];
 export const PRACTICE_GAUNTLET = Object.freeze({
   TOTAL_STAGES: 3,
   DIFFICULTIES: Object.freeze([...BOT_DIFFICULTIES]),
+  STAGE_CLEAR_POINTS: 1000,
+  CONTRACT_BONUS_POINTS: 300,
+  REGULATION_BONUS_POINTS: 200,
 });
 
 /** Skill profiles change decision cadence, never physics or damage rules. */
@@ -628,9 +626,7 @@ export const GAME_MODES = Object.freeze({
     displayName: 'BOUNTY HUNT',
     objective: 'MARK KILLS ×2 · BOUNTY KILLS ×3 · FIRST TO 25',
   }),
-}) satisfies Readonly<
-  Record<GameModeType, { displayName: string; objective: string }>
->;
+}) satisfies Readonly<Record<GameModeType, { displayName: string; objective: string }>>;
 
 /** Rotation cycle for fresh matches and rematch succession. */
 export const GAME_MODE_ROTATION: readonly GameModeType[] = Object.freeze([
@@ -825,12 +821,7 @@ export const MUTATORS = Object.freeze({
   /** ...for this many seconds (PlayerState.secondWindTimer). */
   SECOND_WIND_DURATION_SECONDS: 3,
   /** Fair shared loadout sequence used by weapon_roulette; scarce bat excluded. */
-  WEAPON_ROULETTE_ORDER: Object.freeze([
-    'shotgun',
-    'pistol',
-    'punch',
-    'rifle',
-  ] as const),
+  WEAPON_ROULETTE_ORDER: Object.freeze(['shotgun', 'pistol', 'punch', 'rifle'] as const),
   /** Seconds each shared roulette loadout stays active. */
   WEAPON_ROULETTE_INTERVAL_SECONDS: 10,
   /** Delay before the first position rotation after Wasteland Warp begins. */
@@ -1345,12 +1336,7 @@ export const CHARACTERS = Object.freeze({
 export type CharacterId = keyof typeof CHARACTERS;
 export const CHARACTER_IDS = Object.keys(CHARACTERS) as CharacterId[];
 
-export type CharacterMasteryTierId =
-  | 'untested'
-  | 'blooded'
-  | 'proven'
-  | 'veteran'
-  | 'master';
+export type CharacterMasteryTierId = 'untested' | 'blooded' | 'proven' | 'veteran' | 'master';
 
 export interface CharacterMasteryTier {
   id: CharacterMasteryTierId;
@@ -1394,10 +1380,7 @@ export function characterMasteryProgressForWins(value: number): CharacterMastery
 }
 
 export function createEmptyCharacterWins(): Record<CharacterId, number> {
-  return Object.fromEntries(CHARACTER_IDS.map((id) => [id, 0])) as Record<
-    CharacterId,
-    number
-  >;
+  return Object.fromEntries(CHARACTER_IDS.map((id) => [id, 0])) as Record<CharacterId, number>;
 }
 
 /**

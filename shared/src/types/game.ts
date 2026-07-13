@@ -275,10 +275,18 @@ export interface PracticeGauntletMatch {
   stage: number;
   totalStages: number;
   difficulty: BotDifficulty;
+  /** Authoritative score banked before this stage begins. */
+  runScore: number;
 }
 
 export interface PracticeGauntletResult extends PracticeGauntletMatch {
   outcome: 'advanced' | 'failed' | 'cleared';
+  /** Points banked by this stage; zero unless the human won. */
+  stageScore: number;
+  /** Contract portion of stageScore. */
+  contractBonus: number;
+  /** No-overtime portion of stageScore. */
+  regulationBonus: number;
   /** Stage launched by the results-screen action (advance or retry). */
   nextStage: number;
   nextDifficulty: BotDifficulty;

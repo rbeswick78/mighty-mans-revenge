@@ -13,12 +13,7 @@ import {
   GAME_MODE_ROTATION,
   createEmptyCharacterWins,
 } from '@shared/game';
-import type {
-  MutatorId,
-  PlayerId,
-  ServerMessage,
-  ServerDraftStateMessage,
-} from '@shared/game';
+import type { MutatorId, PlayerId, ServerMessage, ServerDraftStateMessage } from '@shared/game';
 import { MatchmakingManager } from './matchmaking-manager.js';
 import { PersistentStatsStore } from '../persistence/persistent-stats-store.js';
 import type { GameServer } from '../network/server.js';
@@ -230,9 +225,7 @@ describe('MatchmakingManager rematch flow', () => {
     mgr.handleRematchRequest('B');
     walkDraft(mgr, sent);
 
-    expect(mgr.getActiveMatches()[0].getContractHudState().id).not.toBe(
-      previousContract,
-    );
+    expect(mgr.getActiveMatches()[0].getContractHudState().id).not.toBe(previousContract);
   });
 
   it('resets the post-match timeout when a player requests rematch', () => {
@@ -688,23 +681,28 @@ describe('MatchmakingManager mode rotation (FORCE-pinned, draft skipped)', () =>
     const toActive = Math.ceil(MATCH.COUNTDOWN_DURATION / dt) + 5;
     for (let i = 1; i <= toActive; i++) mgr.tick(dt, i);
 
-    const before = [...sent].reverse().find(
-      (entry) => entry.message.type === 'server:gameState' &&
-        entry.message.phase === MatchPhase.ACTIVE,
-    );
-    expect(before?.message.type === 'server:gameState' && before.message.wastelandWarp)
-      .toBeUndefined();
+    const before = [...sent]
+      .reverse()
+      .find(
+        (entry) =>
+          entry.message.type === 'server:gameState' && entry.message.phase === MatchPhase.ACTIVE,
+      );
+    expect(
+      before?.message.type === 'server:gameState' && before.message.wastelandWarp,
+    ).toBeUndefined();
 
     const match = mgr.getActiveMatches()[0];
-    (match as unknown as {
-      startMutator: (mutator: MutatorId, isFinalMinute: boolean) => void;
-    }).startMutator('wasteland_warp', false);
+    (
+      match as unknown as {
+        startMutator: (mutator: MutatorId, isFinalMinute: boolean) => void;
+      }
+    ).startMutator('wasteland_warp', false);
     sent.length = 0;
     mgr.tick(dt, 1000);
 
     const after = sent.find(
-      (entry) => entry.message.type === 'server:gameState' &&
-        entry.message.phase === MatchPhase.ACTIVE,
+      (entry) =>
+        entry.message.type === 'server:gameState' && entry.message.phase === MatchPhase.ACTIVE,
     );
     if (!after || after.message.type !== 'server:gameState') {
       throw new Error('missing active warp snapshot');
@@ -726,17 +724,22 @@ describe('MatchmakingManager mode rotation (FORCE-pinned, draft skipped)', () =>
     for (let i = 1; i <= toActive; i++) mgr.tick(dt, i);
 
     const match = mgr.getActiveMatches()[0];
-    (match as unknown as {
-      startMutator: (mutator: MutatorId, isFinalMinute: boolean) => void;
-    }).startMutator('scrapstorm', false);
+    (
+      match as unknown as {
+        startMutator: (mutator: MutatorId, isFinalMinute: boolean) => void;
+      }
+    ).startMutator('scrapstorm', false);
     sent.length = 0;
     const warningTicks = Math.ceil(MUTATORS.SCRAPSTORM_FIRST_WARNING_DELAY_SECONDS / dt) + 1;
     for (let i = 1; i <= warningTicks; i++) mgr.tick(dt, 1000 + i);
 
-    const warning = [...sent].reverse().find(
-      (entry) => entry.message.type === 'server:gameState' &&
-        entry.message.scrapstorm?.targetPosition != null,
-    );
+    const warning = [...sent]
+      .reverse()
+      .find(
+        (entry) =>
+          entry.message.type === 'server:gameState' &&
+          entry.message.scrapstorm?.targetPosition != null,
+      );
     if (!warning || warning.message.type !== 'server:gameState') {
       throw new Error('missing Scrapstorm warning snapshot');
     }
@@ -751,8 +754,8 @@ describe('MatchmakingManager mode rotation (FORCE-pinned, draft skipped)', () =>
     const impactTicks = Math.ceil(MUTATORS.SCRAPSTORM_WARNING_SECONDS / dt) + 1;
     for (let i = 1; i <= impactTicks; i++) mgr.tick(dt, 2000 + i);
     const impact = sent.find(
-      (entry) => entry.message.type === 'server:gameState' &&
-        entry.message.barrelExplosions.length > 0,
+      (entry) =>
+        entry.message.type === 'server:gameState' && entry.message.barrelExplosions.length > 0,
     );
     expect(impact).toBeDefined();
   });
@@ -1245,9 +1248,9 @@ describe('MatchmakingManager persistent stats integration', () => {
     mgr.handleRematchRequest('A');
     mgr.handleRematchRequest('B');
     walkDraft(mgr, sent);
-    const rematchFound = [...sent].reverse().find(
-      (entry) => entry.playerId === 'A' && entry.message.type === 'server:matchFound',
-    );
+    const rematchFound = [...sent]
+      .reverse()
+      .find((entry) => entry.playerId === 'A' && entry.message.type === 'server:matchFound');
     if (!rematchFound || rematchFound.message.type !== 'server:matchFound') {
       throw new Error('missing rematch matchFound');
     }
@@ -1384,9 +1387,9 @@ describe('MatchmakingManager solo practice flow', () => {
     first.players.get('A')!.score = 3;
     first.phase = MatchPhase.ENDED;
     mgr.tick(0.05, 1);
-    const ended = [...sent].reverse().find(
-      (entry) => entry.playerId === 'A' && entry.message.type === 'server:matchEnd',
-    );
+    const ended = [...sent]
+      .reverse()
+      .find((entry) => entry.playerId === 'A' && entry.message.type === 'server:matchEnd');
     if (!ended || ended.message.type !== 'server:matchEnd') {
       throw new Error('missing practice matchEnd');
     }
@@ -1440,15 +1443,16 @@ describe('MatchmakingManager solo practice flow', () => {
       stage: 1,
       totalStages: 3,
       difficulty: 'rookie',
+      runScore: 0,
     });
 
     const first = mgr.getActiveMatches()[0];
     first.players.get('A')!.score = 3;
     first.phase = MatchPhase.ENDED;
     mgr.tick(0.05, 1);
-    const firstEnd = [...sent].reverse().find(
-      (entry) => entry.playerId === 'A' && entry.message.type === 'server:matchEnd',
-    );
+    const firstEnd = [...sent]
+      .reverse()
+      .find((entry) => entry.playerId === 'A' && entry.message.type === 'server:matchEnd');
     if (!firstEnd || firstEnd.message.type !== 'server:matchEnd') {
       throw new Error('missing Gauntlet stage-one result');
     }
@@ -1456,6 +1460,8 @@ describe('MatchmakingManager solo practice flow', () => {
       stage: 1,
       difficulty: 'rookie',
       outcome: 'advanced',
+      stageScore: 1200,
+      runScore: 1200,
       nextStage: 2,
       nextDifficulty: 'scrapper',
     });
@@ -1474,15 +1480,16 @@ describe('MatchmakingManager solo practice flow', () => {
       stage: 2,
       totalStages: 3,
       difficulty: 'scrapper',
+      runScore: 1200,
     });
 
     const second = mgr.getActiveMatches()[0];
     second.players.get('A')!.score = 3;
     second.phase = MatchPhase.ENDED;
     mgr.tick(0.05, 2);
-    const secondEnd = [...sent].reverse().find(
-      (entry) => entry.playerId === 'A' && entry.message.type === 'server:matchEnd',
-    );
+    const secondEnd = [...sent]
+      .reverse()
+      .find((entry) => entry.playerId === 'A' && entry.message.type === 'server:matchEnd');
     if (!secondEnd || secondEnd.message.type !== 'server:matchEnd') {
       throw new Error('missing Gauntlet stage-two result');
     }
@@ -1490,6 +1497,8 @@ describe('MatchmakingManager solo practice flow', () => {
       stage: 2,
       difficulty: 'scrapper',
       outcome: 'advanced',
+      stageScore: 1200,
+      runScore: 2400,
       nextStage: 3,
       nextDifficulty: 'warlord',
     });
@@ -1506,15 +1515,16 @@ describe('MatchmakingManager solo practice flow', () => {
       stage: 3,
       totalStages: 3,
       difficulty: 'warlord',
+      runScore: 2400,
     });
 
     const third = mgr.getActiveMatches()[0];
     third.players.get('A')!.score = 3;
     third.phase = MatchPhase.ENDED;
     mgr.tick(0.05, 3);
-    const cleared = [...sent].reverse().find(
-      (entry) => entry.playerId === 'A' && entry.message.type === 'server:matchEnd',
-    );
+    const cleared = [...sent]
+      .reverse()
+      .find((entry) => entry.playerId === 'A' && entry.message.type === 'server:matchEnd');
     if (!cleared || cleared.message.type !== 'server:matchEnd') {
       throw new Error('missing Gauntlet clear result');
     }
@@ -1522,6 +1532,8 @@ describe('MatchmakingManager solo practice flow', () => {
       stage: 3,
       difficulty: 'warlord',
       outcome: 'cleared',
+      stageScore: 1200,
+      runScore: 3600,
       nextStage: 1,
       nextDifficulty: 'rookie',
     });
@@ -1538,18 +1550,17 @@ describe('MatchmakingManager solo practice flow', () => {
       stage: 1,
       totalStages: 3,
       difficulty: 'rookie',
+      runScore: 0,
     });
 
     const retryMatch = mgr.getActiveMatches()[0];
-    const bot = [...retryMatch.players.values()].find((player) =>
-      player.id.startsWith('bot:'),
-    )!;
+    const bot = [...retryMatch.players.values()].find((player) => player.id.startsWith('bot:'))!;
     bot.score = 3;
     retryMatch.phase = MatchPhase.ENDED;
     mgr.tick(0.05, 4);
-    const failed = [...sent].reverse().find(
-      (entry) => entry.playerId === 'A' && entry.message.type === 'server:matchEnd',
-    );
+    const failed = [...sent]
+      .reverse()
+      .find((entry) => entry.playerId === 'A' && entry.message.type === 'server:matchEnd');
     if (!failed || failed.message.type !== 'server:matchEnd') {
       throw new Error('missing Gauntlet failure result');
     }
@@ -1557,6 +1568,8 @@ describe('MatchmakingManager solo practice flow', () => {
       stage: 1,
       difficulty: 'rookie',
       outcome: 'failed',
+      stageScore: 0,
+      runScore: 0,
       nextStage: 1,
       nextDifficulty: 'rookie',
     });
