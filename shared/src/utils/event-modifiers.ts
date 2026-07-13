@@ -97,6 +97,8 @@ export function eventDisplayName(event: MutatorId): string {
       return 'FISTS ONLY';
     case 'weapon_roulette':
       return 'WEAPON ROULETTE';
+    case 'wasteland_warp':
+      return 'WASTELAND WARP';
   }
 }
 

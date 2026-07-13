@@ -689,6 +689,7 @@ export const MUTATORS = Object.freeze({
     'blackout',
     'fists_only',
     'weapon_roulette',
+    'wasteland_warp',
   ] as const,
   /** Final-minute slot: warning/activation thresholds in seconds REMAINING. */
   WARNING_AT_REMAINING: 65,
@@ -727,6 +728,10 @@ export const MUTATORS = Object.freeze({
   ] as const),
   /** Seconds each shared roulette loadout stays active. */
   WEAPON_ROULETTE_INTERVAL_SECONDS: 10,
+  /** Delay before the first position rotation after Wasteland Warp begins. */
+  WASTELAND_WARP_FIRST_DELAY_SECONDS: 8,
+  /** Seconds between later living-player position rotations. */
+  WASTELAND_WARP_INTERVAL_SECONDS: 12,
 });
 
 /**

@@ -38,6 +38,7 @@ import { eventDisplayName } from '@shared/utils/event-modifiers.js';
 import type { SerializedPlayerState } from '@shared/types/network.js';
 import { MUTATORS, type MutatorId, type WeaponId } from '@shared/config/game.js';
 import { weaponRouletteCallout } from '../ui/weapon-roulette.js';
+import { activeMutatorLabel, didWastelandWarp } from '../ui/wasteland-warp.js';
 import type {
   EventStartPayload,
   EventWarningPayload,
@@ -237,6 +238,8 @@ export class GameScene extends Phaser.Scene {
   private awaitingRouletteOpeningWeapon = false;
   /** Undefined before the first Core Run snapshot; null means loose. */
   private lastCoreCarrierId: PlayerId | null | undefined = undefined;
+  /** Undefined before the first warp snapshot; later edges trigger feedback. */
+  private lastWastelandWarpSequence: number | undefined = undefined;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -252,6 +255,7 @@ export class GameScene extends Phaser.Scene {
     this.prevAbilityActive = false;
     this.prevAbilityCoolingDown = false;
     this.lastCoreCarrierId = undefined;
+    this.lastWastelandWarpSequence = undefined;
   }
 
   create(): void {
@@ -718,13 +722,23 @@ export class GameScene extends Phaser.Scene {
         // two mutators stacked (mid-match + final-minute) the label joins
         // both names.
         const activeMutators = networkManager.getActiveMutators();
-        const mutatorLabel =
-          activeMutators.length > 0
-            ? activeMutators.map(eventDisplayName).join(' + ')
-            : null;
+        const warpState = networkManager.getWastelandWarpState();
+        const mutatorLabel = activeMutatorLabel(activeMutators, warpState);
         if (mutatorLabel !== this.lastSyncedMutatorLabel) {
           this.lastSyncedMutatorLabel = mutatorLabel;
           this.hud.setActiveEventLabel(mutatorLabel);
+        }
+
+        if (warpState) {
+          if (didWastelandWarp(this.lastWastelandWarpSequence, warpState)) {
+            this.hud.showEventBanner('POSITIONS WARPED!', 'REASSESS THE FIGHT', 0xb56cff);
+            this.eventFlash?.trigger('wasteland_warp');
+            this.zoomPulse?.trigger();
+            AudioManager.getInstance()?.play('menuSelect', { rate: 0.55 });
+          }
+          this.lastWastelandWarpSequence = warpState.sequence;
+        } else {
+          this.lastWastelandWarpSequence = undefined;
         }
 
         const rouletteActive = activeMutators.includes('weapon_roulette');
@@ -1444,6 +1458,7 @@ export class GameScene extends Phaser.Scene {
       blackout: 0x4b527e,
       fists_only: 0xffb347,
       weapon_roulette: 0x5ce1e6,
+      wasteland_warp: 0xb56cff,
     };
 
     this.onEventWarning = (payload: EventWarningPayload) => {

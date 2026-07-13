@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–35 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty, four arenas, seven modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–36 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty, four arenas, seven modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -67,6 +67,7 @@ Each session below attacks one of these.
 | 33  | Rook + Breach Dash                            | A sixth main turns every fight into a positioning puzzle             | **DONE** (2026-07-13) |
 | 34  | Scavenger Caches                              | Shooting cover open creates fair loot races and round-to-round surprise | **DONE** (2026-07-13) |
 | 35  | Core Run                                      | A moving objective turns every second of possession into a chase          | **DONE** (2026-07-13) |
+| 36  | Wasteland Warp                                | Synchronized position swaps turn settled fights into instant reversals    | **DONE** (2026-07-13) |
 
 ---
 
@@ -1895,7 +1896,83 @@ urgent reason to hunt them.
 
 ---
 
+## Session 36 — Wasteland Warp
+
+**Goal:** add a legible chaos mutator that repeatedly overturns positioning,
+making players improvise around new sightlines, pickups, hazards, and moving
+objectives instead of settling into one dominant route.
+
+**Locked design decisions**
+
+- Activation starts an 8-second warning clock; every 12 seconds afterward,
+  all living fighters rotate through one another's current positions.
+- Rotation order is stable player id, destinations are already-valid player
+  coordinates, and arrival velocity is zero. This avoids random unfairness,
+  wall placement, and 1v1-only assumptions.
+- Dead fighters neither donate nor receive a destination. Fewer than two
+  living fighters advance the clock without emitting a false rotation edge.
+- The authoritative persistent snapshot carries seconds until warp and a
+  sequence that increments only after a real rotation. Reconnects see the
+  correct countdown without replaying old effects.
+- The active-mutator strip shows the rounded countdown. Each later sequence
+  edge adds a violet flash, callout, zoom beat, and low UI sting; the first
+  observed snapshot stays quiet.
+- Existing combat, projectiles, objectives, pickups, bots, modes, and stacked
+  mutators continue normally from the new positions. Sudden-death overtime
+  retires further warps.
+
+**Acceptance criteria**
+
+- [x] Server tests cover timed swaps, velocity clearing, lone-survivor skips,
+      overtime retirement, and persistent snapshot delivery.
+- [x] Client tests cover countdown composition, reset/mirroring, and stale-edge
+      suppression; every exhaustive mutator surface recognizes the new id.
+- [x] A forced two-player Chromium smoke observes sequence 0, the first real
+      authoritative rotation, and the client-presented sequence 1 edge.
+- [x] Typecheck, lint, all unit tests, production build, and Playwright pass.
+
+---
+
 ## Session Log
+
+### Session 36 — 2026-07-13 — Wasteland Warp
+
+**Shipped:** Wasteland Warp joins the shared mutator pool as a recurring,
+readable position reversal. Eight seconds after activation, then every 12
+seconds, all living fighters rotate through one another's current positions.
+Stable player-id ordering makes the result deterministic and N-player safe;
+using real occupied destinations avoids walls and invalid terrain, while zeroed
+arrival velocity gives everyone the same clean reaction beat. Dead fighters
+are excluded, and a lone survivor advances the timer without a fake warp.
+
+Every active snapshot carries the authoritative countdown and a sequence that
+increments only on a real rotation. The HUD folds a rounded timer into the
+stacked mutator label, while later sequence edges trigger a violet flash,
+reassessment callout, zoom pulse, and low sting. The first observed snapshot
+stays quiet, so reconnecting cannot replay an old warp. Combat, projectiles,
+pickups, Rusty, and every regulation mode continue from the new positions;
+sudden-death overtime retires further swaps.
+
+**Verification:** 973 unit tests pass across 61 files (304 suites), including
+208 Match tests plus dedicated movement-label, network reset/mirroring, and
+matchmaking snapshot coverage. TypeScript, ESLint, and the production build are
+clean; Vite reports only its existing chunk-size advisory. A forced live
+two-player Chromium smoke shortens regulation, observes the activation
+countdown, waits through the first real rotation, and confirms both authority
+and presentation at sequence 1. The normal full Playwright matrix passes 13
+tests with 11 intentional scoped skips across desktop Chromium, desktop
+Firefox, and mobile landscape.
+
+**Tuning watch:** the 8-second opening warning and 12-second repeat interval
+are strong readable defaults rather than group-tested verdicts. Watch whether
+warps happen often enough to create stories without erasing earned positioning,
+whether Core Run carrier swaps are delightfully tense or too disorienting, and
+whether the violet full-screen beat should become a tighter world-space effect.
+No fighter, weapon, ability, mode, objective, or existing-mutator balance value
+changed.
+
+**Deployment:** not run; production deployment remains an explicit separate
+operation under `CLAUDE.md`.
 
 ### Session 35 — 2026-07-13 — Core Run
 

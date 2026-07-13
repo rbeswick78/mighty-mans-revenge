@@ -197,6 +197,7 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
             returnInSeconds: null,
             carryFraction: 0.4,
           },
+          wastelandWarp: { secondsUntilSwap: 5.5, sequence: 2 },
         },
       ),
     );
@@ -205,6 +206,7 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
     expect(manager.getActiveMutators()).toEqual(['big_heads']);
     expect(manager.getConfirmedTags()).toHaveLength(1);
     expect(manager.getCoreRunState()?.carrierId).toBe(LOCAL_ID);
+    expect(manager.getWastelandWarpState()).toEqual({ secondsUntilSwap: 5.5, sequence: 2 });
     expect(manager.getContractState()).toMatchObject({ id: 'hot_shot' });
 
     deliver({
@@ -220,6 +222,7 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
     expect(manager.getPickups()).toHaveLength(0);
     expect(manager.getConfirmedTags()).toHaveLength(0);
     expect(manager.getCoreRunState()).toBeNull();
+    expect(manager.getWastelandWarpState()).toBeNull();
     expect(manager.getRemotePlayerIds()).toHaveLength(0);
     expect(manager.getActiveMutators()).toHaveLength(0);
     expect(manager.getContractState()).toBeNull();
@@ -239,6 +242,15 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
 
     deliver(makeGameState([makeSerialized()], { tick: 2 }));
     expect(manager.getCoreRunState()).toBeNull();
+  });
+
+  it('mirrors and clears the persistent Wasteland Warp countdown', () => {
+    const wastelandWarp = { secondsUntilSwap: 6.25, sequence: 4 };
+    deliver(makeGameState([makeSerialized()], { wastelandWarp }));
+    expect(manager.getWastelandWarpState()).toEqual(wastelandWarp);
+
+    deliver(makeGameState([makeSerialized()], { tick: 2 }));
+    expect(manager.getWastelandWarpState()).toBeNull();
   });
 
   it('still emits matchFound to listeners after the reset', () => {

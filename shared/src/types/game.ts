@@ -40,6 +40,13 @@ export interface CoreRunState {
   carryFraction: number;
 }
 
+/** Persistent timing edge for the Wasteland Warp mutator. */
+export interface WastelandWarpState {
+  secondsUntilSwap: number;
+  /** Increments only when at least two living fighters actually rotate. */
+  sequence: number;
+}
+
 /** A contested token dropped by a death in Kill Confirmed. */
 export interface KillConfirmedTagState {
   id: string;

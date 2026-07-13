@@ -310,7 +310,7 @@ test.describe('Character select (desktop)', () => {
 
   // eslint-disable-next-line no-empty-pattern
   test('lock-and-go: both players Enter and transition to GameScene', async ({}, testInfo) => {
-    test.setTimeout(45000);
+    test.setTimeout(process.env.FORCE_EVENT === 'wasteland_warp' ? 75000 : 45000);
     test.fixme(
       testInfo.project.name === 'desktop-firefox',
       'Two-context WebRTC pair-up is unreliable on Firefox locally',
@@ -376,6 +376,41 @@ test.describe('Character select (desktop)', () => {
         },
       )
       .toEqual({ mode: 'core_run', hasState: true, markerVisible: true });
+
+    if (process.env.FORCE_EVENT === 'wasteland_warp') {
+      await expect
+        .poll(
+          () =>
+            pageA.evaluate(() => {
+              const w = window as unknown as {
+                game?: { scene: { getScene: (key: string) => unknown } };
+              };
+              const scene = w.game?.scene.getScene('GameScene') as {
+                lastWastelandWarpSequence?: number;
+                gameService?: {
+                  getNetworkManager: () => {
+                    getWastelandWarpState: () => {
+                      secondsUntilSwap: number;
+                      sequence: number;
+                    } | null;
+                  };
+                };
+              } | null;
+              const state = scene?.gameService
+                ?.getNetworkManager()
+                .getWastelandWarpState();
+              return {
+                sequence: state?.sequence ?? -1,
+                presentedSequence: scene?.lastWastelandWarpSequence ?? -1,
+              };
+            }),
+          {
+            timeout: 25000,
+            message: 'expected a live authoritative Wasteland Warp rotation',
+          },
+        )
+        .toEqual({ sequence: 1, presentedSequence: 1 });
+    }
   });
 
   // eslint-disable-next-line no-empty-pattern

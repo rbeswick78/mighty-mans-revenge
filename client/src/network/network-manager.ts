@@ -7,6 +7,7 @@ import type {
   KillConfirmedTagState,
   MatchContractHudState,
   CoreRunState,
+  WastelandWarpState,
 } from '@shared/types/game.js';
 import type {
   DraftCategory,
@@ -108,6 +109,7 @@ export class NetworkManager {
   private latestPickups: PickupState[] = [];
   private latestConfirmedTags: KillConfirmedTagState[] = [];
   private _coreRunState: CoreRunState | null = null;
+  private _wastelandWarpState: WastelandWarpState | null = null;
 
   /**
    * Local-clock timestamp (performance.now() ms) at which the current
@@ -198,6 +200,7 @@ export class NetworkManager {
     this.latestPickups = [];
     this.latestConfirmedTags = [];
     this._coreRunState = null;
+    this._wastelandWarpState = null;
     this.matchEndsAtLocalMs = null;
     this._activeMutators = [];
     this._kothState = null;
@@ -210,6 +213,10 @@ export class NetworkManager {
   /** Currently active mutators, in activation order (empty if none). */
   getActiveMutators(): readonly MutatorId[] {
     return this._activeMutators;
+  }
+
+  getWastelandWarpState(): WastelandWarpState | null {
+    return this._wastelandWarpState;
   }
 
   setAbilitiesEnabled(enabled: boolean): void {
@@ -617,6 +624,7 @@ export class NetworkManager {
     this.latestPickups = msg.pickups;
     this.latestConfirmedTags = msg.confirmedTags ?? [];
     this._coreRunState = msg.coreRun ?? null;
+    this._wastelandWarpState = msg.wastelandWarp ?? null;
     for (const collection of msg.confirmedTagCollections ?? []) {
       this.emit('confirmedTagCollected', collection);
     }

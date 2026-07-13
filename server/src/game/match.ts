@@ -46,6 +46,7 @@ import type {
   KillConfirmedTagState,
   KillConfirmedCollection,
   CoreRunState,
+  WastelandWarpState,
   ServerCharacterSelectStateMessage,
   MatchContractDefinition,
   MatchContractHudState,
@@ -240,6 +241,9 @@ export class Match implements MatchContext {
   /** Current shared step and countdown for the Weapon Roulette mutator. */
   private weaponRouletteIndex = 0;
   private weaponRouletteTimer = 0;
+  /** Persistent countdown/edge for deterministic living-player warps. */
+  private wastelandWarpTimer = 0;
+  private wastelandWarpSequence = 0;
   /**
    * Regulation length in seconds — MATCH.TIME_LIMIT unless the
    * FORCE_MATCH_SECONDS env smoke pin overrides it (same family as
@@ -793,6 +797,18 @@ export class Match implements MatchContext {
     return this.gameMode.getCoreRunState?.(this) ?? null;
   }
 
+  getWastelandWarpState(): WastelandWarpState | null {
+    if (
+      !this.mutatorActive('wasteland_warp') ||
+      this.isOvertime ||
+      this.phase !== MatchPhase.ACTIVE
+    ) return null;
+    return {
+      secondsUntilSwap: Math.max(0, this.wastelandWarpTimer),
+      sequence: this.wastelandWarpSequence,
+    };
+  }
+
   /**
    * Consume the one-shot overtime announcement generated this tick (if
    * any) for broadcasting. Returns null on subsequent calls.
@@ -1246,6 +1262,10 @@ export class Match implements MatchContext {
         player.secondWindTimer = Math.max(0, player.secondWindTimer - dt);
       }
     }
+
+    // Rotate living fighters before objective/pickup collection so every
+    // downstream rule observes the new authoritative positions this tick.
+    this.updateWastelandWarp(dt);
 
     // Update pickups. Weapon pickups about to land generate one-shot
     // "INCOMING" warnings for the HUD banner.
@@ -2035,6 +2055,10 @@ export class Match implements MatchContext {
       case 'blackout':
         // Per-tick behavior only; nothing to mutate at activation.
         return;
+      case 'wasteland_warp':
+        this.wastelandWarpTimer = MUTATORS.WASTELAND_WARP_FIRST_DELAY_SECONDS;
+        this.wastelandWarpSequence = 0;
+        return;
       case 'fists_only':
         this.combatManager.clearGrenades();
         this.enforceFistsOnlyLoadouts();
@@ -2088,6 +2112,27 @@ export class Match implements MatchContext {
         }
         return;
     }
+  }
+
+  /** Rotate sorted living fighters through already-valid player positions. */
+  private updateWastelandWarp(dt: number): void {
+    if (!this.mutatorActive('wasteland_warp') || this.isOvertime) return;
+    this.wastelandWarpTimer -= dt;
+    if (this.wastelandWarpTimer > 0) return;
+    while (this.wastelandWarpTimer <= 0) {
+      this.wastelandWarpTimer += MUTATORS.WASTELAND_WARP_INTERVAL_SECONDS;
+    }
+
+    const living = [...this.players.values()]
+      .filter((player) => !player.isDead)
+      .sort((a, b) => a.id.localeCompare(b.id));
+    if (living.length < 2) return;
+    const positions = living.map((player) => ({ ...player.position }));
+    for (let i = 0; i < living.length; i++) {
+      living[i].position = { ...positions[(i + 1) % positions.length] };
+      living[i].velocity = { x: 0, y: 0 };
+    }
+    this.wastelandWarpSequence += 1;
   }
 
   /** Equip fists, retire grenades, and cancel only stale prior-weapon state. */

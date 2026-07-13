@@ -645,6 +645,43 @@ describe('MatchmakingManager mode rotation (FORCE-pinned, draft skipped)', () =>
     }
   });
 
+  it('snapshots carry Wasteland Warp countdown state only after activation', () => {
+    process.env.FORCE_MODE = GameModeType.DEATHMATCH;
+    const dt = 0.05;
+    mgr.handleJoinMatchmaking('A', 'A');
+    mgr.handleJoinMatchmaking('B', 'B');
+    mgr.handleCharacterLock('A', 'mighty_man');
+    mgr.handleCharacterLock('B', 'bruce');
+    const toActive = Math.ceil(MATCH.COUNTDOWN_DURATION / dt) + 5;
+    for (let i = 1; i <= toActive; i++) mgr.tick(dt, i);
+
+    const before = [...sent].reverse().find(
+      (entry) => entry.message.type === 'server:gameState' &&
+        entry.message.phase === MatchPhase.ACTIVE,
+    );
+    expect(before?.message.type === 'server:gameState' && before.message.wastelandWarp)
+      .toBeUndefined();
+
+    const match = mgr.getActiveMatches()[0];
+    (match as unknown as {
+      startMutator: (mutator: MutatorId, isFinalMinute: boolean) => void;
+    }).startMutator('wasteland_warp', false);
+    sent.length = 0;
+    mgr.tick(dt, 1000);
+
+    const after = sent.find(
+      (entry) => entry.message.type === 'server:gameState' &&
+        entry.message.phase === MatchPhase.ACTIVE,
+    );
+    if (!after || after.message.type !== 'server:gameState') {
+      throw new Error('missing active warp snapshot');
+    }
+    expect(after.message.wastelandWarp).toMatchObject({
+      secondsUntilSwap: expect.any(Number),
+      sequence: 0,
+    });
+  });
+
   it('broadcasts overtimeStart and flags gameState when a tie runs out the clock', () => {
     const dt = 0.05;
     mgr.handleJoinMatchmaking('A', 'A');

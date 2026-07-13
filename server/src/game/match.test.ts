@@ -1609,6 +1609,43 @@ describe('Match', () => {
       });
     });
 
+    describe('Wasteland Warp', () => {
+      it('rotates living positions on the shared countdown and clears velocity', () => {
+        const m = startActiveMatchWithMidMutator('wasteland_warp');
+        const a = m.players.get('player-0')!;
+        const b = m.players.get('player-1')!;
+        a.position = { x: 100, y: 120 };
+        b.position = { x: 700, y: 420 };
+        a.velocity = { x: 5, y: 6 };
+        b.velocity = { x: -5, y: -6 };
+
+        expect(m.getWastelandWarpState()).toMatchObject({ sequence: 0 });
+        m.update(MUTATORS.WASTELAND_WARP_FIRST_DELAY_SECONDS);
+
+        expect(a.position).toEqual({ x: 700, y: 420 });
+        expect(b.position).toEqual({ x: 100, y: 120 });
+        expect(a.velocity).toEqual({ x: 0, y: 0 });
+        expect(b.velocity).toEqual({ x: 0, y: 0 });
+        expect(m.getWastelandWarpState()).toMatchObject({ sequence: 1 });
+      });
+
+      it('skips rotation with fewer than two living fighters and retires in overtime', () => {
+        const m = startActiveMatchWithMidMutator('wasteland_warp');
+        const a = m.players.get('player-0')!;
+        const b = m.players.get('player-1')!;
+        const before = { ...a.position };
+        b.isDead = true;
+        b.respawnTimer = 999;
+
+        m.update(MUTATORS.WASTELAND_WARP_FIRST_DELAY_SECONDS);
+        expect(a.position).toEqual(before);
+        expect(m.getWastelandWarpState()).toMatchObject({ sequence: 0 });
+
+        (m as unknown as { isOvertime: boolean }).isOvertime = true;
+        expect(m.getWastelandWarpState()).toBeNull();
+      });
+    });
+
     describe('mid-match slot scheduling', () => {
       it('rolls the activation time inside the 40–70% elapsed window from the injected rng', () => {
         const low = createMatchWithPick(MUTATORS.POOL[0]); // rng ≈ 0

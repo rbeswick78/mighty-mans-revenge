@@ -1057,6 +1057,7 @@ export class MatchmakingManager {
         match.gameModeType === GameModeType.CORE_RUN
           ? (match.getCoreRunState() ?? undefined)
           : undefined,
+      wastelandWarp: match.getWastelandWarpState() ?? undefined,
     };
 
     // Send only to players in this match

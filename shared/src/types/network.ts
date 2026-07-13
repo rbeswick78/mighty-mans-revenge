@@ -11,6 +11,7 @@ import {
   KillConfirmedCollection,
   MatchContractHudState,
   CoreRunState,
+  WastelandWarpState,
 } from './game.js';
 import type {
   BotDifficulty,
@@ -183,6 +184,8 @@ export interface ServerGameStateMessage {
   confirmedTagCollections?: KillConfirmedCollection[];
   /** Moving carry objective; present only in active Core Run regulation. */
   coreRun?: CoreRunState;
+  /** Reconnect-safe countdown and edge for the Wasteland Warp mutator. */
+  wastelandWarp?: WastelandWarpState;
 }
 
 /** Per-snapshot King of the Hill HUD state. Tile coords, not pixels. */
