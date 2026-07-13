@@ -249,6 +249,8 @@ export class Match implements MatchContext {
   private readonly rng: () => number;
   /** Mutators from the immediately previous round, excluded from random rolls. */
   private readonly rematchMutatorExclusions: ReadonlySet<MutatorId>;
+  /** Optional server-authored Gauntlet promise for the mid-match slot. */
+  private readonly plannedMidMatchMutator: MutatorId | undefined;
   /** Current shared step and countdown for the Weapon Roulette mutator. */
   private weaponRouletteIndex = 0;
   private weaponRouletteTimer = 0;
@@ -288,10 +290,12 @@ export class Match implements MatchContext {
     rematchMutatorExclusions: readonly MutatorId[] = [],
     contractOverride?: MatchContractId,
     previousContractId?: MatchContractId,
+    plannedMidMatchMutator?: MutatorId,
   ) {
     this.matchId = matchId;
     this.rng = rng;
     this.rematchMutatorExclusions = new Set(rematchMutatorExclusions);
+    this.plannedMidMatchMutator = plannedMidMatchMutator;
     this.timeLimitSeconds = resolveTimeLimitSeconds();
     this.stats = new StatsTracker();
     this.pickupManager = new PickupManager();
@@ -2145,10 +2149,10 @@ export class Match implements MatchContext {
    * Pick a slot's mutator. Env overrides win first: FORCE_EVENT pins the
    * final-minute slot (its pre-mutator semantics), FORCE_MIDMATCH_MUTATOR
    * the mid-match slot — both test/e2e/smoke hooks, and both bypass the
-   * mode's exclusion list by design. Random picks draw uniformly from
-   * POOL minus the mode's excluded mutators, minus the other slot's
-   * choice (and minus FORCE_EVENT's value, so an earlier mid-match draw
-   * can't steal a forced final-minute pick).
+   * mode's exclusion list by design. A compatible Gauntlet forecast owns
+   * the ordinary mid-match slot next. Otherwise random picks draw uniformly
+   * from POOL minus the mode's excluded mutators, recent rematch events, the
+   * other slot's choice, and FORCE_EVENT's reserved value.
    */
   private pickMutator(isFinalMinute: boolean): MutatorId {
     const pool = MUTATORS.POOL as readonly string[];
@@ -2184,6 +2188,13 @@ export class Match implements MatchContext {
     }
 
     const candidates = MUTATORS.POOL.filter((m) => !excluded.has(m));
+    if (
+      !isFinalMinute &&
+      this.plannedMidMatchMutator &&
+      candidates.includes(this.plannedMidMatchMutator)
+    ) {
+      return this.plannedMidMatchMutator;
+    }
     const idx = Math.floor(this.rng() * candidates.length);
     return candidates[Math.min(idx, candidates.length - 1)];
   }

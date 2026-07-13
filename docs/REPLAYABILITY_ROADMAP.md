@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–53 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty with Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, and rival drafts, four arenas, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–54 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty with Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, and chaos forecasts, four arenas, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -85,6 +85,7 @@ Each session below attacks one of these.
 | 51  | Gauntlet Performance Bonuses                    | Cleaner, faster victories keep even strong personal bests worth chasing      | **DONE** (2026-07-13) |
 | 52  | Gauntlet Route Draft                            | Every cleared stage offers a meaningful next-fight choice                    | **DONE** (2026-07-13) |
 | 53  | Gauntlet Rival Drafts                           | Route previews turn each branch into a readable matchup decision             | **DONE** (2026-07-13) |
+| 54  | Gauntlet Chaos Forecasts                        | Every branch reveals a different mid-fight twist worth planning around       | **DONE** (2026-07-13) |
 
 ---
 
@@ -2613,7 +2614,93 @@ fighter waits on the other side, while keeping every run varied.
 
 ---
 
+## Session 54 — Gauntlet Chaos Forecasts
+
+**Goal:** make every advanced Gauntlet branch a tactical risk/reward decision
+by revealing the mid-match twist waiting inside the next fight.
+
+**Locked design decisions**
+
+- Stage one keeps its ordinary random mid-match event. After an advanced
+  result, Route A and Route B each preview a compatible chaos event alongside
+  their arena, mode, and rival. Selecting the route pins that promise into the
+  next authoritative `Match` and the character-select briefing.
+- Offers use a stable hash of the complete server-authored route. They consume
+  neither matchmaking nor Match RNG, and Route B excludes Route A's forecast
+  so ordinary branches reveal different twists.
+- One server-owned run history carries both encountered rivals and promised
+  forecasts. Active events from the completed stage and every earlier promise
+  are excluded from later offers, even when a stage ended before its forecast
+  activated. This guarantees no repeated forecast across a three-stage run.
+- Ordinary forecasts respect the destination mode's exclusion list and reserve
+  a valid `FORCE_EVENT` plus every conflicting event for the final-minute slot.
+  A valid `FORCE_MIDMATCH_MUTATOR` remains the strongest smoke override and is
+  previewed honestly. `Match` revalidates a planned forecast against its live
+  exclusions and falls back to an ordinary random choice if it is stale.
+- Forecast fields remain optional. Older results keep their prior labels,
+  ordinary Spar and PvP keep random event selection, and missing or invalid
+  route input still launches the complete Route A offer authored by the server.
+
+**Acceptance criteria**
+
+- [x] Shared tests prove deterministic selection, blocked-history handling,
+      exhausted-pool behavior, and distinct forecast routes on an otherwise
+      identical destination.
+- [x] Matchmaking integration proves Route A/B distinction, exact Route B
+      lock-in, run-wide no-repeat behavior, Route A fallback, and mode-specific
+      compatibility under a forced One in the Chamber route.
+- [x] Match tests prove a compatible promise owns the mid-match slot while an
+      incompatible promise is rejected by live mode validation.
+- [x] Presentation tests preserve old payload labels and cover four-line route
+      cards plus the pinned briefing. Chromium, Firefox, and mobile touch all
+      select the forecast route through the live result screen.
+- [x] Typecheck, lint, all 1,107 unit tests, production build, and the full
+      Playwright desktop/mobile matrix pass.
+
+---
+
 ## Session Log
+
+### Session 54 — 2026-07-13 — Gauntlet Chaos Forecasts
+
+**Shipped:** advanced Gauntlet routes now reveal the compatible mid-match chaos
+event waiting inside each next fight. The route cards show arena, mode, rival,
+and event together, so players can choose a matchup they want to solve instead
+of accepting a hidden random twist. The selected forecast is repeated in the
+next character-select briefing and then pinned into the authoritative Match.
+
+Forecast generation is stable and consumes no matchmaking or gameplay RNG.
+The server excludes the completed fight's active events, every forecast already
+promised during the run, the destination mode's vetoes, and a forced final
+event plus its conflicts. Route B also excludes Route A's offer, so the branches
+remain meaningfully different. A shared run history records a promise when its
+stage launches, preventing repeats even when the fight ends before activation.
+Forced smoke hooks retain precedence and Match performs a final compatibility
+check before honoring a plan.
+
+Results use readable four-line route cards without moving the established
+pointer/touch targets, and older payloads retain their one-, two-, or three-line
+layouts. The longest current forecast label (`WEAPON ROULETTE`) was visually
+reviewed at the 8 px route-card size in desktop and mobile-landscape geometry.
+
+**Verification:** 1,107 tests pass across 73 files, including deterministic
+forecast generation, no-repeat carry, exact route lock-in, mode compatibility,
+live Match revalidation, old-payload presentation, and route-card labels.
+TypeScript, ESLint, formatting, all package builds, and the Vite production
+bundle are clean; Vite retains its existing chunk-size advisory. The full
+Playwright matrix passes 16 tests with 11 intentional scoped skips, including
+the forecast route screen in Chromium, Firefox, and mobile touch. Desktop and
+mobile-landscape captures were reviewed and removed, and Playwright teardown
+left ports 3000, 3001, and 5173 clear.
+
+**Tuning watch:** knowing the event turns randomness into planning, but some
+event/mode/rival combinations may become obvious auto-picks. Watch route-choice
+rates before weighting forecasts; the optional field and deterministic picker
+leave room to tune offers without changing the wire contract.
+
+**Deployment:** not run; deployment still requires explicit authorization.
+
+---
 
 ### Session 53 — 2026-07-13 — Gauntlet Rival Drafts
 

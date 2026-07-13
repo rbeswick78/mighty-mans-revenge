@@ -3,6 +3,7 @@ import type { CharacterId } from '../config/game.js';
 import { GameModeType } from '../types/game.js';
 import {
   practiceGauntletMatch,
+  practiceGauntletMutatorChoice,
   practiceGauntletOpponentChoices,
   practiceGauntletRoutes,
   resolvePracticeGauntlet,
@@ -49,6 +50,37 @@ describe('practice gauntlet', () => {
         },
       ),
     ).toHaveLength(2);
+  });
+
+  it('keeps pinned destinations distinct when they forecast different chaos', () => {
+    expect(
+      practiceGauntletRoutes(
+        {
+          mapName: 'Scrapyard',
+          gameMode: GameModeType.DEATHMATCH,
+          opponentCharacterId: 'bruce',
+          forecastMutatorId: 'blackout',
+        },
+        {
+          mapName: 'Scrapyard',
+          gameMode: GameModeType.DEATHMATCH,
+          opponentCharacterId: 'bruce',
+          forecastMutatorId: 'scrapstorm',
+        },
+      ),
+    ).toHaveLength(2);
+  });
+
+  it('selects stable forecast events without returning blocked choices', () => {
+    const pool = ['blackout', 'scrapstorm', 'vampire'] as const;
+    const first = practiceGauntletMutatorChoice(pool, [], 'stage-2-route-a');
+    expect(first).toBe(practiceGauntletMutatorChoice(pool, [], 'stage-2-route-a'));
+    expect(pool).toContain(first);
+
+    const next = practiceGauntletMutatorChoice(pool, [first!], 'stage-2-route-a');
+    expect(next).not.toBe(first);
+    expect(pool).toContain(next);
+    expect(practiceGauntletMutatorChoice(pool, [...pool], 'anything')).toBeUndefined();
   });
 
   it('offers deterministic non-repeating rivals after the current matchup', () => {

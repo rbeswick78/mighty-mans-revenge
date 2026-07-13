@@ -257,9 +257,15 @@ export class ResultsScene extends Phaser.Scene {
     const hasRouteDraft = routeChoices.length > 1;
     const hasRivalPreview =
       hasRouteDraft && routeChoices.some((route) => route.opponentCharacterId !== undefined);
+    const hasChaosForecast =
+      hasRouteDraft && routeChoices.some((route) => route.forecastMutatorId !== undefined);
     const btnW = hasRouteDraft ? 250 : 200;
-    const btnH = hasRivalPreview ? 54 : 46;
-    const adjustedBtnY = hasRivalPreview ? camHeight - 94 : btnY;
+    const btnH = hasChaosForecast ? 64 : hasRivalPreview ? 54 : 46;
+    const adjustedBtnY = hasChaosForecast
+      ? camHeight - 99
+      : hasRivalPreview
+        ? camHeight - 94
+        : btnY;
     const btnGap = 14;
     const totalButtons = hasRouteDraft ? 3 : 2;
     const firstBtnX = centerX - (btnW * totalButtons + btnGap * (totalButtons - 1)) / 2;
@@ -292,7 +298,7 @@ export class ResultsScene extends Phaser.Scene {
         : (gauntletActionLabel(this.result) ?? rematchButtonLabel(this.result)),
       {
         variant: 'primary',
-        fontSize: hasRivalPreview ? 8 : hasRouteDraft ? 9 : 13,
+        fontSize: hasChaosForecast ? 8 : hasRivalPreview ? 8 : hasRouteDraft ? 9 : 13,
         onClick: () => requestNextFight(hasRouteDraft ? routeChoices[0].id : undefined),
       },
     );
@@ -308,7 +314,7 @@ export class ResultsScene extends Phaser.Scene {
         gauntletRouteButtonLabel(routeChoices[1]),
         {
           variant: 'primary',
-          fontSize: hasRivalPreview ? 8 : 9,
+          fontSize: hasChaosForecast ? 8 : hasRivalPreview ? 8 : 9,
           onClick: () => requestNextFight(routeChoices[1].id),
         },
       );

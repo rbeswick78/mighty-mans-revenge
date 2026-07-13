@@ -2316,6 +2316,64 @@ describe('Match', () => {
         }
       });
 
+      it('uses a compatible server-planned Gauntlet forecast for the mid-match slot', () => {
+        const m = new Match(
+          'planned-gauntlet-chaos',
+          makeMapData(),
+          [
+            { id: 'player-0', nickname: 'Player 0' },
+            { id: 'player-1', nickname: 'Player 1' },
+          ],
+          GameModeType.DEATHMATCH,
+          () => 0,
+          [],
+          undefined,
+          undefined,
+          'blackout',
+        );
+        m.startCountdown();
+        m.update(MATCH.COUNTDOWN_DURATION + 0.05);
+        const internals = m as unknown as MatchInternals;
+        internals.midMatchSlot.activateAtElapsed = 80;
+        internals.matchTimer = MATCH.TIME_LIMIT - 80.1;
+
+        m.update(0.05);
+
+        expect(m.consumeTickMutatorWarnings()).toContainEqual({
+          event: 'blackout',
+          activatesInMs: 0,
+          isFinalMinute: false,
+        });
+        expect(m.activeMutators).toEqual(['blackout']);
+      });
+
+      it('rejects a mode-incompatible server-planned Gauntlet forecast', () => {
+        const m = new Match(
+          'invalid-gauntlet-chaos',
+          makeMapData(),
+          [
+            { id: 'player-0', nickname: 'Player 0' },
+            { id: 'player-1', nickname: 'Player 1' },
+          ],
+          GameModeType.ONE_IN_THE_CHAMBER,
+          () => 0,
+          [],
+          undefined,
+          undefined,
+          'grenades_only',
+        );
+        m.startCountdown();
+        m.update(MATCH.COUNTDOWN_DURATION + 0.05);
+        const internals = m as unknown as MatchInternals;
+        internals.midMatchSlot.activateAtElapsed = 80;
+        internals.matchTimer = MATCH.TIME_LIMIT - 80.1;
+
+        m.update(0.05);
+
+        expect(m.activeMutators).toHaveLength(1);
+        expect(m.activeMutators[0]).not.toBe('grenades_only');
+      });
+
       it('a forced final loadout excludes every conflicting random mid loadout', () => {
         const owners = ['grenades_only', 'fists_only', 'weapon_roulette'] as const;
         for (const forced of owners) {

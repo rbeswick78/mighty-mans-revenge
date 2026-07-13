@@ -78,12 +78,14 @@ test.describe('Gauntlet route draft', () => {
                 mapName: 'Overgrown Suburb',
                 gameMode: 'koth',
                 opponentCharacterId: 'bruce',
+                forecastMutatorId: 'blackout',
               },
               {
                 id: 'route_b',
                 mapName: 'Scrapyard',
                 gameMode: 'gun_game',
                 opponentCharacterId: 'frost_wizard',
+                forecastMutatorId: 'weapon_roulette',
               },
             ],
           },
@@ -128,10 +130,16 @@ test.describe('Gauntlet route draft', () => {
       return {
         buttonXs: [scene.rematchButton.x, scene.alternateRouteButton.x, scene.lobbyButton.x],
         routeA: scene.rematchButton.list.some(
-          (child) => child.text?.includes('ROUTE A') && child.text.includes('VS BRUCE'),
+          (child) =>
+            child.text?.includes('ROUTE A') &&
+            child.text.includes('VS BRUCE') &&
+            child.text.includes('CHAOS: BLACKOUT'),
         ),
         routeB: scene.alternateRouteButton.list.some(
-          (child) => child.text?.includes('ROUTE B') && child.text.includes('VS FROST WIZARD'),
+          (child) =>
+            child.text?.includes('ROUTE B') &&
+            child.text.includes('VS FROST WIZARD') &&
+            child.text.includes('CHAOS: WEAPON ROULETTE'),
         ),
         teaser: scene.children.list.some((child) => child.text === 'CHOOSE: STAGE 2/3 - SCRAPPER'),
       };

@@ -54,7 +54,9 @@ regulation second left adds pace points up to the stage cap; completing all
 three stages can set the device's `BEST CLEAR` and give the next run a target
 to beat. After the first two wins, both next-fight routes preview a different
 Rusty fighter; the chosen matchup is locked for that stage, and no opponent
-repeats during the run.
+repeats during the run. Each route also forecasts its compatible mid-match
+chaos event. The selected event is locked into the fight, and forecasts do not
+repeat during the same run.
 
 ## Where to read next
 

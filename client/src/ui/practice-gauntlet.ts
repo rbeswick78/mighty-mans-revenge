@@ -5,6 +5,7 @@ import type {
   PracticeGauntletRoute,
 } from '@shared/types/game.js';
 import { CHARACTERS, gameModeDisplayName } from '@shared/config/game.js';
+import { eventDisplayName } from '@shared/utils/event-modifiers.js';
 
 export const GAUNTLET_BEST_CLEAR_STORAGE_KEY = 'mmr_gauntlet_best_clear';
 
@@ -49,11 +50,16 @@ export function gauntletMatchLabel(
     `GAUNTLET ${gauntlet.stage}/${gauntlet.totalStages} - ` +
     `${gauntlet.difficulty.toUpperCase()}  //  RUN ${formatScore(gauntlet.runScore)}`;
   const destination = `${gameModeDisplayName(gameMode)} - ${mapName.toUpperCase()}`;
-  if (!gauntlet.opponentCharacterId) return `${summary}  //  ${destination}`;
-  return (
-    `${summary}\n${destination}  //  RUSTY: ` +
-    CHARACTERS[gauntlet.opponentCharacterId].displayName.toUpperCase()
-  );
+  if (!gauntlet.opponentCharacterId && !gauntlet.forecastMutatorId) {
+    return `${summary}  //  ${destination}`;
+  }
+  const rival = gauntlet.opponentCharacterId
+    ? `  //  RUSTY: ${CHARACTERS[gauntlet.opponentCharacterId].displayName.toUpperCase()}`
+    : '';
+  const forecast = gauntlet.forecastMutatorId
+    ? `\nMID-MATCH: ${eventDisplayName(gauntlet.forecastMutatorId)}`
+    : '';
+  return `${summary}\n${destination}${rival}${forecast}`;
 }
 
 export function gauntletResultSummary(result: MatchResult): string | null {
@@ -126,9 +132,12 @@ export function gauntletRouteButtonLabel(route: PracticeGauntletRoute): string {
   const rival = route.opponentCharacterId
     ? `\nVS ${CHARACTERS[route.opponentCharacterId].displayName.toUpperCase()}`
     : '';
+  const forecast = route.forecastMutatorId
+    ? `\nCHAOS: ${eventDisplayName(route.forecastMutatorId)}`
+    : '';
   return (
     `ROUTE ${letter} · ${gameModeDisplayName(route.gameMode)}\n` +
-    `${route.mapName.toUpperCase()}${rival}`
+    `${route.mapName.toUpperCase()}${rival}${forecast}`
   );
 }
 

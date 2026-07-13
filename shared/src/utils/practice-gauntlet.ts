@@ -1,4 +1,4 @@
-import { PRACTICE_GAUNTLET, type CharacterId } from '../config/game.js';
+import { PRACTICE_GAUNTLET, type CharacterId, type MutatorId } from '../config/game.js';
 import type {
   PracticeGauntletMatch,
   PracticeGauntletResult,
@@ -40,11 +40,34 @@ export function practiceGauntletRoutes(
   if (
     alternate.mapName !== primary.mapName ||
     alternate.gameMode !== primary.gameMode ||
-    alternate.opponentCharacterId !== primary.opponentCharacterId
+    alternate.opponentCharacterId !== primary.opponentCharacterId ||
+    alternate.forecastMutatorId !== primary.forecastMutatorId
   ) {
     routes.push({ id: 'route_b', ...alternate });
   }
   return routes;
+}
+
+/**
+ * Pick one stable Gauntlet forecast without touching Match's RNG stream.
+ * The caller supplies mode/conflict/history exclusions so the returned event
+ * is safe to promise before the next Match exists.
+ */
+export function practiceGauntletMutatorChoice(
+  pool: readonly MutatorId[],
+  blocked: readonly MutatorId[],
+  seed: string,
+): MutatorId | undefined {
+  const blockedSet = new Set(blocked);
+  const candidates = pool.filter((mutator) => !blockedSet.has(mutator));
+  if (candidates.length === 0) return undefined;
+
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < seed.length; i++) {
+    hash ^= seed.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return candidates[(hash >>> 0) % candidates.length];
 }
 
 /**

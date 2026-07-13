@@ -9,6 +9,7 @@ import {
   DEFAULT_BOT_DIFFICULTY,
   PRACTICE_KINDS,
   CHARACTER_IDS,
+  MUTATORS,
   createEmptyCharacterWins,
   LEADERBOARD,
   getNextGameMode,
@@ -17,10 +18,12 @@ import {
   listMapNames,
   MAP_REGISTRY,
   practiceGauntletMatch,
+  practiceGauntletMutatorChoice,
   practiceGauntletOpponentChoices,
   practiceGauntletRoutes,
   resolvePracticeGauntlet,
   selectPracticeGauntletRoute,
+  mutatorsConflict,
 } from '@shared/game';
 import type { MapData } from '@shared/game';
 import type {
@@ -43,6 +46,7 @@ import type {
 } from '@shared/game';
 import { Match } from '../game/match.js';
 import { BotController } from '../game/bot-controller.js';
+import { getGameMode } from '../game/modes/index.js';
 import { GameServer } from '../network/server.js';
 import { MatchmakingQueue } from './matchmaking-queue.js';
 import { logger } from '../utils/logger.js';
@@ -61,6 +65,11 @@ import type {
  * already torn down. See handleRematchRequest.
  */
 const REMATCH_TIMEOUT_MS = 60_000;
+
+interface PracticeGauntletRunHistory {
+  opponentCharacterIds: CharacterId[];
+  forecastMutatorIds: MutatorId[];
+}
 
 interface PostMatchState {
   matchId: string;
@@ -89,8 +98,8 @@ interface PostMatchState {
   nextGauntlet: PracticeGauntletMatch | null;
   /** Server-authored advancement choices; empty for retries and non-Gauntlet matches. */
   gauntletRoutes: PracticeGauntletRoute[];
-  /** Rivals already faced in this run, carried only while advancing. */
-  gauntletOpponentHistory: CharacterId[];
+  /** Server-only no-repeat history carried only while a Gauntlet advances. */
+  gauntletRunHistory: PracticeGauntletRunHistory;
   /** Both mutators from the completed round; random rematch rolls skip them. */
   previousMutators: MutatorId[];
   /** Previous round's contract; direct rematches must roll something fresh. */
@@ -158,8 +167,9 @@ export class MatchmakingManager {
   private readonly practiceDifficulties: Map<string, BotDifficulty> = new Map();
   /** Authoritative stage metadata for live Gauntlet matches. */
   private readonly practiceGauntlets: Map<string, PracticeGauntletMatch> = new Map();
-  /** Ordered, non-repeating Rusty fighters encountered by each live run. */
-  private readonly practiceGauntletOpponentHistories: Map<string, CharacterId[]> = new Map();
+  /** Ordered rival/forecast history for each live Gauntlet run. */
+  private readonly practiceGauntletRunHistories: Map<string, PracticeGauntletRunHistory> =
+    new Map();
   /** Synthetic ids survive across direct practice rematches. */
   private readonly botPlayerIds: Set<PlayerId> = new Set();
   /** Track nicknames for players (set when they join matchmaking). */
@@ -389,6 +399,9 @@ export class MatchmakingManager {
         postMatch.nextGameMode = route.gameMode;
         if (postMatch.nextGauntlet && route.opponentCharacterId) {
           postMatch.nextGauntlet.opponentCharacterId = route.opponentCharacterId;
+        }
+        if (postMatch.nextGauntlet && route.forecastMutatorId) {
+          postMatch.nextGauntlet.forecastMutatorId = route.forecastMutatorId;
         }
       }
     }
@@ -635,6 +648,49 @@ export class MatchmakingManager {
     return !!process.env.FORCE_MAP || !!process.env.FORCE_MODE;
   }
 
+  /**
+   * Build a route's deterministic mid-match forecast before the Match exists.
+   * Smoke overrides remain strongest; ordinary offers respect mode vetoes,
+   * final-minute pins, recent active events, and this run's prior forecasts.
+   */
+  private pickPracticeGauntletForecast(
+    routeId: PracticeGauntletRouteId,
+    route: Omit<PracticeGauntletRoute, 'id' | 'forecastMutatorId'>,
+    nextStage: number,
+    blocked: readonly MutatorId[],
+  ): MutatorId | undefined {
+    const pool = MUTATORS.POOL as readonly MutatorId[];
+    const forcedMid = process.env.FORCE_MIDMATCH_MUTATOR;
+    if (forcedMid && (pool as readonly string[]).includes(forcedMid)) {
+      return forcedMid as MutatorId;
+    }
+
+    const excluded = new Set<MutatorId>(blocked);
+    for (const mutator of getGameMode(route.gameMode).excludedMutators ?? []) {
+      excluded.add(mutator);
+    }
+    const forcedFinal = process.env.FORCE_EVENT;
+    if (forcedFinal && (pool as readonly string[]).includes(forcedFinal)) {
+      const finalMutator = forcedFinal as MutatorId;
+      excluded.add(finalMutator);
+      for (const candidate of pool) {
+        if (mutatorsConflict(candidate, finalMutator)) excluded.add(candidate);
+      }
+    }
+
+    return practiceGauntletMutatorChoice(
+      pool,
+      [...excluded],
+      [
+        nextStage,
+        routeId,
+        route.mapName,
+        route.gameMode,
+        route.opponentCharacterId ?? 'unknown_rival',
+      ].join('|'),
+    );
+  }
+
   private tryCreateMatch(): void {
     const pair = this.queue.tryMatch();
     if (!pair) return;
@@ -674,7 +730,10 @@ export class MatchmakingManager {
     rematchMutatorExclusions: readonly MutatorId[] = [],
     previousContractId?: MatchContractId,
     gauntlet: PracticeGauntletMatch | null = null,
-    gauntletOpponentHistory: readonly CharacterId[] = [],
+    gauntletRunHistory: Readonly<PracticeGauntletRunHistory> = {
+      opponentCharacterIds: [],
+      forecastMutatorIds: [],
+    },
   ): void {
     const match = new Match(
       matchId,
@@ -685,6 +744,7 @@ export class MatchmakingManager {
       rematchMutatorExclusions,
       undefined,
       previousContractId,
+      gauntlet?.forecastMutatorId,
     );
     match.setRttResolver(this.getPlayerRTT);
     this.activeMatches.set(matchId, match);
@@ -704,12 +764,16 @@ export class MatchmakingManager {
           ];
         if (gauntlet) {
           gauntlet.opponentCharacterId = character;
-          this.practiceGauntletOpponentHistories.set(
-            matchId,
-            gauntletOpponentHistory.includes(character)
-              ? [...gauntletOpponentHistory]
-              : [...gauntletOpponentHistory, character],
-          );
+          this.practiceGauntletRunHistories.set(matchId, {
+            opponentCharacterIds: gauntletRunHistory.opponentCharacterIds.includes(character)
+              ? [...gauntletRunHistory.opponentCharacterIds]
+              : [...gauntletRunHistory.opponentCharacterIds, character],
+            forecastMutatorIds:
+              gauntlet.forecastMutatorId &&
+              !gauntletRunHistory.forecastMutatorIds.includes(gauntlet.forecastMutatorId)
+                ? [...gauntletRunHistory.forecastMutatorIds, gauntlet.forecastMutatorId]
+                : [...gauntletRunHistory.forecastMutatorIds],
+          });
         }
         match.setLock(botEntry.id, character);
       }
@@ -1226,7 +1290,10 @@ export class MatchmakingManager {
     const result = match.getResult();
     const practiceDifficulty = this.practiceDifficulties.get(matchId) ?? null;
     const gauntlet = this.practiceGauntlets.get(matchId) ?? null;
-    const gauntletOpponentHistory = this.practiceGauntletOpponentHistories.get(matchId) ?? [];
+    const gauntletRunHistory = this.practiceGauntletRunHistories.get(matchId) ?? {
+      opponentCharacterIds: [],
+      forecastMutatorIds: [],
+    };
     const isPractice = practiceDifficulty !== null;
     result.isPractice = isPractice;
     result.rivalrySet = gauntlet ? null : this.recordRivalrySet(match, result.winnerId);
@@ -1264,20 +1331,47 @@ export class MatchmakingManager {
       : null;
     const rivalChoices =
       result.gauntlet?.outcome === 'advanced'
-        ? practiceGauntletOpponentChoices(CHARACTER_IDS, gauntletOpponentHistory)
+        ? practiceGauntletOpponentChoices(CHARACTER_IDS, gauntletRunHistory.opponentCharacterIds)
         : [];
+    const primaryRoute = {
+      mapName: nextMapName,
+      gameMode: nextGameMode,
+      opponentCharacterId: rivalChoices[0],
+    };
+    const alternateRoute = {
+      mapName: this.forcedMap()?.name ?? getNextMapName(nextMapName),
+      gameMode: this.forcedMode() ?? getNextGameMode(nextGameMode),
+      opponentCharacterId: rivalChoices[1],
+    };
+    const priorForecasts = [...gauntletRunHistory.forecastMutatorIds, ...match.activeMutators];
+    const primaryForecast =
+      result.gauntlet?.outcome === 'advanced'
+        ? this.pickPracticeGauntletForecast(
+            'route_a',
+            primaryRoute,
+            result.gauntlet.nextStage,
+            priorForecasts,
+          )
+        : undefined;
+    const alternateForecast =
+      result.gauntlet?.outcome === 'advanced'
+        ? this.pickPracticeGauntletForecast(
+            'route_b',
+            alternateRoute,
+            result.gauntlet.nextStage,
+            primaryForecast ? [...priorForecasts, primaryForecast] : priorForecasts,
+          )
+        : undefined;
     const gauntletRoutes =
       result.gauntlet?.outcome === 'advanced'
         ? practiceGauntletRoutes(
             {
-              mapName: nextMapName,
-              gameMode: nextGameMode,
-              opponentCharacterId: rivalChoices[0],
+              ...primaryRoute,
+              ...(primaryForecast ? { forecastMutatorId: primaryForecast } : {}),
             },
             {
-              mapName: this.forcedMap()?.name ?? getNextMapName(nextMapName),
-              gameMode: this.forcedMode() ?? getNextGameMode(nextGameMode),
-              opponentCharacterId: rivalChoices[1],
+              ...alternateRoute,
+              ...(alternateForecast ? { forecastMutatorId: alternateForecast } : {}),
             },
           )
         : [];
@@ -1285,6 +1379,9 @@ export class MatchmakingManager {
       result.gauntlet.routeOptions = gauntletRoutes;
       if (nextGauntlet && gauntletRoutes[0]?.opponentCharacterId) {
         nextGauntlet.opponentCharacterId = gauntletRoutes[0].opponentCharacterId;
+      }
+      if (nextGauntlet && gauntletRoutes[0]?.forecastMutatorId) {
+        nextGauntlet.forecastMutatorId = gauntletRoutes[0].forecastMutatorId;
       }
     }
 
@@ -1396,8 +1493,13 @@ export class MatchmakingManager {
       practiceDifficulty,
       nextGauntlet,
       gauntletRoutes,
-      gauntletOpponentHistory:
-        result.gauntlet?.outcome === 'advanced' ? [...gauntletOpponentHistory] : [],
+      gauntletRunHistory:
+        result.gauntlet?.outcome === 'advanced'
+          ? {
+              opponentCharacterIds: [...gauntletRunHistory.opponentCharacterIds],
+              forecastMutatorIds: [...gauntletRunHistory.forecastMutatorIds],
+            }
+          : { opponentCharacterIds: [], forecastMutatorIds: [] },
       previousMutators: [...match.activeMutators],
       previousContractId: result.contract?.id ?? match.getContractHudState().id,
     });
@@ -1408,7 +1510,7 @@ export class MatchmakingManager {
     this.botControllers.delete(matchId);
     this.practiceDifficulties.delete(matchId);
     this.practiceGauntlets.delete(matchId);
-    this.practiceGauntletOpponentHistories.delete(matchId);
+    this.practiceGauntletRunHistories.delete(matchId);
   }
 
   private onRematchTimeout(matchId: string): void {
@@ -1473,7 +1575,7 @@ export class MatchmakingManager {
         postMatch.previousMutators,
         postMatch.previousContractId,
         postMatch.nextGauntlet,
-        postMatch.gauntletOpponentHistory,
+        postMatch.gauntletRunHistory,
       );
       return;
     }
