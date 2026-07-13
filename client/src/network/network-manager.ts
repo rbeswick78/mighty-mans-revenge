@@ -9,6 +9,7 @@ import type {
   CoreRunState,
   BountyHuntState,
   WastelandWarpState,
+  RadiationStormState,
 } from '@shared/types/game.js';
 import type {
   DraftCategory,
@@ -112,6 +113,7 @@ export class NetworkManager {
   private _coreRunState: CoreRunState | null = null;
   private _bountyHuntState: BountyHuntState | null = null;
   private _wastelandWarpState: WastelandWarpState | null = null;
+  private _radiationStormState: RadiationStormState | null = null;
 
   /**
    * Local-clock timestamp (performance.now() ms) at which the current
@@ -204,6 +206,7 @@ export class NetworkManager {
     this._coreRunState = null;
     this._bountyHuntState = null;
     this._wastelandWarpState = null;
+    this._radiationStormState = null;
     this.matchEndsAtLocalMs = null;
     this._activeMutators = [];
     this._kothState = null;
@@ -220,6 +223,10 @@ export class NetworkManager {
 
   getWastelandWarpState(): WastelandWarpState | null {
     return this._wastelandWarpState;
+  }
+
+  getRadiationStormState(): RadiationStormState | null {
+    return this._radiationStormState;
   }
 
   setAbilitiesEnabled(enabled: boolean): void {
@@ -633,6 +640,7 @@ export class NetworkManager {
     this._coreRunState = msg.coreRun ?? null;
     this._bountyHuntState = msg.bountyHunt ?? null;
     this._wastelandWarpState = msg.wastelandWarp ?? null;
+    this._radiationStormState = msg.radiationStorm ?? null;
     for (const collection of msg.confirmedTagCollections ?? []) {
       this.emit('confirmedTagCollected', collection);
     }

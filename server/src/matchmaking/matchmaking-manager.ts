@@ -1062,6 +1062,7 @@ export class MatchmakingManager {
           ? (match.getBountyHuntState() ?? undefined)
           : undefined,
       wastelandWarp: match.getWastelandWarpState() ?? undefined,
+      radiationStorm: match.getRadiationStormState() ?? undefined,
     };
 
     // Send only to players in this match

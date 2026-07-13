@@ -28,6 +28,10 @@ import {
   PICKUP,
   selectMatchContract,
   selectScavengerCacheReward,
+  radiationStormCenter,
+  radiationStormInitialRadius,
+  radiationStormRadius,
+  isOutsideRadiationStorm,
 } from '@shared/game';
 import type {
   PlayerId,
@@ -50,6 +54,7 @@ import type {
   CoreRunState,
   BountyHuntState,
   WastelandWarpState,
+  RadiationStormState,
   ServerCharacterSelectStateMessage,
   MatchContractDefinition,
   MatchContractHudState,
@@ -250,6 +255,11 @@ export class Match implements MatchContext {
   /** Rotating one-shot supply cadence for the Scavenger Rush mutator. */
   private scavengerRushTimer = 0;
   private scavengerRushSequence = 0;
+  /** Snapshot-driven nonlethal closing zone for Radiation Storm. */
+  private radiationStormCenter = { x: 0, y: 0 };
+  private radiationStormInitialRadius = 0;
+  private radiationStormElapsed = 0;
+  private radiationStormPulseTimer = 0;
   /**
    * Regulation length in seconds — MATCH.TIME_LIMIT unless the
    * FORCE_MATCH_SECONDS env smoke pin overrides it (same family as
@@ -834,6 +844,25 @@ export class Match implements MatchContext {
     };
   }
 
+  getRadiationStormState(): RadiationStormState | null {
+    if (
+      !this.mutatorActive('radiation_storm') ||
+      this.isOvertime ||
+      this.phase !== MatchPhase.ACTIVE
+    ) return null;
+    return {
+      center: { ...this.radiationStormCenter },
+      radius: radiationStormRadius(
+        this.radiationStormInitialRadius,
+        this.radiationStormElapsed,
+      ),
+      shrinkSecondsRemaining: Math.max(
+        0,
+        MUTATORS.RADIATION_STORM_SHRINK_SECONDS - this.radiationStormElapsed,
+      ),
+    };
+  }
+
   /**
    * Consume the one-shot overtime announcement generated this tick (if
    * any) for broadcasting. Returns null on subsequent calls.
@@ -1291,6 +1320,7 @@ export class Match implements MatchContext {
     // Rotate living fighters before objective/pickup collection so every
     // downstream rule observes the new authoritative positions this tick.
     this.updateWastelandWarp(dt);
+    this.updateRadiationStorm(dt);
 
     // Update pickups. Weapon pickups about to land generate one-shot
     // "INCOMING" warnings for the HUD banner.
@@ -2159,6 +2189,17 @@ export class Match implements MatchContext {
       case 'last_laugh':
         // Per-tick behavior only; nothing to mutate at activation.
         return;
+      case 'radiation_storm': {
+        const map = this.mapManager.getMapData();
+        this.radiationStormCenter = radiationStormCenter(this.matchId, map);
+        this.radiationStormInitialRadius = radiationStormInitialRadius(
+          map,
+          this.radiationStormCenter,
+        );
+        this.radiationStormElapsed = 0;
+        this.radiationStormPulseTimer = MUTATORS.RADIATION_STORM_PULSE_SECONDS;
+        return;
+      }
       case 'scavenger_rush':
         this.scavengerRushTimer = 0;
         this.scavengerRushSequence = 0;
@@ -2252,6 +2293,29 @@ export class Match implements MatchContext {
       living[i].velocity = { x: 0, y: 0 };
     }
     this.wastelandWarpSequence += 1;
+  }
+
+  /** Close the safe zone and apply nonlethal, non-attributed outside pulses. */
+  private updateRadiationStorm(dt: number): void {
+    if (!this.mutatorActive('radiation_storm') || this.isOvertime) return;
+    this.radiationStormElapsed = Math.min(
+      MUTATORS.RADIATION_STORM_SHRINK_SECONDS,
+      this.radiationStormElapsed + dt,
+    );
+    this.radiationStormPulseTimer -= dt;
+    while (this.radiationStormPulseTimer <= 0) {
+      this.radiationStormPulseTimer += MUTATORS.RADIATION_STORM_PULSE_SECONDS;
+      const state = this.getRadiationStormState();
+      if (!state) continue;
+      for (const player of this.players.values()) {
+        if (player.isDead || player.invulnerableTimer > 0) continue;
+        if (!isOutsideRadiationStorm(player.position, state)) continue;
+        player.health = Math.max(
+          1,
+          player.health - MUTATORS.RADIATION_STORM_DAMAGE_PER_PULSE,
+        );
+      }
+    }
   }
 
   /** Keep one short-lived supply moving through deterministic arena anchors. */

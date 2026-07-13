@@ -199,6 +199,11 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
           },
           bountyHunt: { targetId: REMOTE_ID },
           wastelandWarp: { secondsUntilSwap: 5.5, sequence: 2 },
+          radiationStorm: {
+            center: { x: 480, y: 288 },
+            radius: 240,
+            shrinkSecondsRemaining: 9,
+          },
         },
       ),
     );
@@ -209,6 +214,7 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
     expect(manager.getCoreRunState()?.carrierId).toBe(LOCAL_ID);
     expect(manager.getBountyHuntState()).toEqual({ targetId: REMOTE_ID });
     expect(manager.getWastelandWarpState()).toEqual({ secondsUntilSwap: 5.5, sequence: 2 });
+    expect(manager.getRadiationStormState()?.radius).toBe(240);
     expect(manager.getContractState()).toMatchObject({ id: 'hot_shot' });
 
     deliver({
@@ -226,6 +232,7 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
     expect(manager.getCoreRunState()).toBeNull();
     expect(manager.getBountyHuntState()).toBeNull();
     expect(manager.getWastelandWarpState()).toBeNull();
+    expect(manager.getRadiationStormState()).toBeNull();
     expect(manager.getRemotePlayerIds()).toHaveLength(0);
     expect(manager.getActiveMutators()).toHaveLength(0);
     expect(manager.getContractState()).toBeNull();
@@ -262,6 +269,19 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
 
     deliver(makeGameState([makeSerialized()], { tick: 2 }));
     expect(manager.getWastelandWarpState()).toBeNull();
+  });
+
+  it('mirrors and clears the authoritative Radiation Storm zone', () => {
+    const radiationStorm = {
+      center: { x: 240, y: 144 },
+      radius: 180,
+      shrinkSecondsRemaining: 4.5,
+    };
+    deliver(makeGameState([makeSerialized()], { radiationStorm }));
+    expect(manager.getRadiationStormState()).toEqual(radiationStorm);
+
+    deliver(makeGameState([makeSerialized()], { tick: 2 }));
+    expect(manager.getRadiationStormState()).toBeNull();
   });
 
   it('still emits matchFound to listeners after the reset', () => {

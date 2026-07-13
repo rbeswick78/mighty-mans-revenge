@@ -126,5 +126,8 @@ describe('eventDisplayName', () => {
     expect(mutatorsConflict('fists_only', 'super_speed')).toBe(false);
     expect(mutatorsConflict('grenades_only', 'turbo_grenades')).toBe(false);
     expect(mutatorsConflict('weapon_roulette', 'weapon_roulette')).toBe(false);
+    expect(mutatorsConflict('low_health', 'radiation_storm')).toBe(true);
+    expect(mutatorsConflict('radiation_storm', 'low_health')).toBe(true);
+    expect(mutatorsConflict('radiation_storm', 'blackout')).toBe(false);
   });
 });

@@ -739,6 +739,7 @@ export const MUTATORS = Object.freeze({
     'wasteland_warp',
     'last_laugh',
     'scavenger_rush',
+    'radiation_storm',
   ] as const,
   /** Final-minute slot: warning/activation thresholds in seconds REMAINING. */
   WARNING_AT_REMAINING: 65,
@@ -787,6 +788,14 @@ export const MUTATORS = Object.freeze({
   SCAVENGER_RUSH_DROP_LIFETIME_SECONDS: 8,
   /** Seconds between rotating Scavenger Rush supplies. */
   SCAVENGER_RUSH_DROP_INTERVAL_SECONDS: 12,
+  /** Seconds the Radiation Storm boundary takes to reach its final radius. */
+  RADIATION_STORM_SHRINK_SECONDS: 18,
+  /** Final safe radius once the Radiation Storm finishes closing. */
+  RADIATION_STORM_FINAL_RADIUS_PX: 144,
+  /** Nonlethal damage applied by each outside-zone radiation pulse. */
+  RADIATION_STORM_DAMAGE_PER_PULSE: 10,
+  /** Seconds between authoritative outside-zone radiation pulses. */
+  RADIATION_STORM_PULSE_SECONDS: 1,
 });
 
 /**

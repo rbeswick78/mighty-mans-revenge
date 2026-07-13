@@ -13,6 +13,7 @@ import {
   CoreRunState,
   BountyHuntState,
   WastelandWarpState,
+  RadiationStormState,
 } from './game.js';
 import type {
   BotDifficulty,
@@ -189,6 +190,8 @@ export interface ServerGameStateMessage {
   bountyHunt?: BountyHuntState;
   /** Reconnect-safe countdown and edge for the Wasteland Warp mutator. */
   wastelandWarp?: WastelandWarpState;
+  /** Authoritative safe zone for the Radiation Storm mutator. */
+  radiationStorm?: RadiationStormState;
 }
 
 /** Per-snapshot King of the Hill HUD state. Tile coords, not pixels. */

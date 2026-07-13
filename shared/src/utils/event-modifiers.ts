@@ -103,18 +103,19 @@ export function eventDisplayName(event: MutatorId): string {
       return 'LAST LAUGH';
     case 'scavenger_rush':
       return 'SCAVENGER RUSH';
+    case 'radiation_storm':
+      return 'RADIATION STORM';
   }
 }
 
-/** Mutator pairs that compete for ownership of the shared core loadout. */
+/** Mutator pairs whose combined rules would be redundant or contradictory. */
 export function mutatorsConflict(a: MutatorId, b: MutatorId): boolean {
   const aOwnsLoadout =
     a === 'grenades_only' || a === 'fists_only' || a === 'weapon_roulette';
   const bOwnsLoadout =
     b === 'grenades_only' || b === 'fists_only' || b === 'weapon_roulette';
-  return (
-    a !== b &&
-    aOwnsLoadout &&
-    bOwnsLoadout
-  );
+  const lowHealthStormPair =
+    (a === 'low_health' && b === 'radiation_storm') ||
+    (a === 'radiation_storm' && b === 'low_health');
+  return a !== b && ((aOwnsLoadout && bOwnsLoadout) || lowHealthStormPair);
 }

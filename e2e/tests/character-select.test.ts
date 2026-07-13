@@ -183,7 +183,7 @@ test('solo practice launches against locked Rusty and reaches live play', async 
     testInfo.project.name !== 'desktop-chromium',
     'One authoritative browser flow is sufficient; mobile rendering has separate coverage',
   );
-  test.setTimeout(30000);
+  test.setTimeout(45000);
 
   await page.goto('/');
   await waitForLobby(page);
@@ -282,6 +282,36 @@ test('solo practice launches against locked Rusty and reaches live play', async 
       batIconLoaded: true,
       batSpriteReady: true,
     });
+
+  if (process.env.FORCE_MIDMATCH_MUTATOR === 'radiation_storm') {
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() => {
+            const w = window as unknown as {
+              game?: { scene: { getScene: (key: string) => unknown } };
+            };
+            const scene = w.game?.scene.getScene('GameScene') as {
+              gameService?: {
+                getNetworkManager: () => {
+                  getRadiationStormState: () => unknown | null;
+                };
+              };
+              radiationStormRenderer?: {
+                boundary?: { commandBuffer?: unknown[] };
+              };
+            } | null;
+            return {
+              stateActive:
+                scene?.gameService?.getNetworkManager().getRadiationStormState() != null,
+              boundaryDrawn:
+                (scene?.radiationStormRenderer?.boundary?.commandBuffer?.length ?? 0) > 0,
+            };
+          }),
+        { timeout: 15000, message: 'expected authoritative Radiation Storm rendering' },
+      )
+      .toEqual({ stateActive: true, boundaryDrawn: true });
+  }
 });
 
 test.describe('Character select (desktop)', () => {

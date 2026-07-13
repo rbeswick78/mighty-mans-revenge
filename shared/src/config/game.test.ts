@@ -137,6 +137,16 @@ describe('weapon roulette mutator', () => {
   });
 });
 
+describe('radiation storm mutator', () => {
+  it('defines a positive nonlethal pulse and shrinking-zone cadence', () => {
+    expect(MUTATORS.POOL).toContain('radiation_storm');
+    expect(MUTATORS.RADIATION_STORM_SHRINK_SECONDS).toBeGreaterThan(0);
+    expect(MUTATORS.RADIATION_STORM_FINAL_RADIUS_PX).toBeGreaterThan(0);
+    expect(MUTATORS.RADIATION_STORM_DAMAGE_PER_PULSE).toBeGreaterThan(0);
+    expect(MUTATORS.RADIATION_STORM_PULSE_SECONDS).toBeGreaterThan(0);
+  });
+});
+
 describe('scavenger cache rewards', () => {
   it('uses a frozen weighted table with every collectible pickup kind', () => {
     expect(Object.isFrozen(SCAVENGER_CACHE)).toBe(true);

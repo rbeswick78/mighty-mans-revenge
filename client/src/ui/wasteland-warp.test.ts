@@ -15,4 +15,16 @@ describe('Wasteland Warp HUD helpers', () => {
     expect(didWastelandWarp(3, { secondsUntilSwap: 12, sequence: 4 })).toBe(true);
     expect(didWastelandWarp(3, null)).toBe(false);
   });
+
+  it('shows the storm close clock and retires its label without state', () => {
+    const storm = {
+      center: { x: 480, y: 288 },
+      radius: 240,
+      shrinkSecondsRemaining: 7.1,
+    };
+    expect(activeMutatorLabel(['radiation_storm'], null, storm)).toBe(
+      'RADIATION STORM · 8S',
+    );
+    expect(activeMutatorLabel(['radiation_storm'], null, null)).toBeNull();
+  });
 });

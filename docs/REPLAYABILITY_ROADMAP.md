@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–42 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty, four arenas, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–43 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty, four arenas, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -74,6 +74,7 @@ Each session below attacks one of these.
 | 40  | Clutch Kills                                  | Critical-health victories land as memorable, exact-HP highlight moments      | **DONE** (2026-07-13) |
 | 41  | Scavenger Rush                                | Rotating short-lived supplies repeatedly pull fighters into fresh contests   | **DONE** (2026-07-13) |
 | 42  | Wasteland Bat                                 | Four brutal swings create a scarce close-range map-control prize              | **DONE** (2026-07-13) |
+| 43  | Radiation Storm                               | A shrinking safe zone turns passive corners into urgent closing fights         | **DONE** (2026-07-13) |
 
 ---
 
@@ -2157,7 +2158,80 @@ that rewards route control, ambush timing, and the nerve to close distance.
 
 ---
 
+## Session 43 — Radiation Storm
+
+**Goal:** break late-match corner camping with a readable moving-pressure rule
+that creates closing fights without awarding arbitrary environmental kills.
+
+**Locked design decisions**
+
+- Radiation Storm joins the ordinary two-slot mutator pool. It conflicts with
+  Low Health so both random slots always retain meaningful pressure; explicit
+  FORCE pins keep their existing smoke-test override semantics.
+- The safe-zone center is chosen deterministically from the arena's authored
+  KOTH anchors using the match id, without consuming combat, respawn, mutator,
+  or bot RNG. Legacy/test maps fall back to a walkable spawn anchor.
+- On activation the safe radius covers the entire arena, then shrinks linearly
+  for 18 seconds to 144px and holds there. One-second radiation pulses remove
+  10 health outside the radius, but never below 1 HP and never through spawn
+  invulnerability. The storm therefore creates finishing opportunities without
+  kills, score, stats, contracts, Vampire healing, or Iron Hide ambiguity.
+- Sudden-death overtime retires the storm completely before its fresh spawns.
+  Every reconnecting client receives the authoritative center, radius, and
+  shrink progress in normal game snapshots.
+- Rusty treats reaching the safe zone as its first movement priority only while
+  outside; once safe, mode objectives, supplies, and combat regain their normal
+  ordering. It still aims and fights while retreating.
+- The client renders a pulsing radioactive boundary plus an outside-only green
+  screen wash and `RADIATION — MOVE INSIDE` warning. The persistent mutator
+  label shows rounded shrink time, and all presentation is snapshot-driven for
+  desktop, mobile, reconnects, and Practice.
+
+**Acceptance criteria**
+
+- [x] Shared/server tests cover constants, display/conflict semantics,
+      deterministic anchors, full-arena opening radius, linear shrink, final
+      hold, pulse cadence, nonlethal floor, invulnerability, and overtime.
+- [x] Network and bot tests cover reconnect/clear behavior plus outside-first
+      routing that yields back to ordinary goals inside the zone.
+- [x] Client tests cover boundary projection, rounded countdown copy, outside
+      detection, warning visibility, and exhaustive event color/display maps.
+- [x] Typecheck, lint, all unit tests, production build, and Playwright pass.
+
+---
+
 ## Session Log
+
+### Session 43 — 2026-07-13 — Radiation Storm
+
+**Shipped:** Radiation Storm joins the mutator pool as a deterministic closing
+zone centered on one authored arena anchor. Its opening radius contains the
+whole map, closes for 18 seconds to 144px, then holds. Fighters outside take a
+10-HP pulse each second, but never fall below 1 HP; spawn protection remains
+safe and radiation creates finish opportunities without awarding kills or
+touching combat stats, contracts, Vampire, or Iron Hide.
+
+The full center/radius/countdown state rides in every snapshot for reconnects.
+Overtime retires the storm before fresh spawns, and random scheduling prevents
+the redundant Low Health pairing. Rusty retreats toward safety only while
+outside, continuing to aim and fight, then yields back to objectives, supplies,
+and ordinary combat. The client adds a pulsing lime boundary, outside-only wash
+and warning, plus a rounded shrink clock in the stacked mutator label.
+
+**Verification:** 1,044 unit tests pass across 67 files, including 232 Match
+tests, 15 bot tests, 13 network-manager tests, 4 pure storm-geometry tests, and
+3 pure renderer-projection tests. TypeScript, ESLint, and the production build
+are clean; Vite retains its existing chunk-size advisory. The standard
+Playwright matrix passes 13 tests with 11 intentional scoped skips across
+desktop Chromium, desktop Firefox, and mobile landscape. A separate forced
+12-second Practice smoke also passes, verifying the live authoritative state
+and a drawn Phaser boundary.
+
+**Tuning watch:** the 18-second close, 144px final radius, and nonlethal 10-HP
+one-second pulse are deliberately readable first defaults. Watch whether the
+zone creates daring rotations rather than a single dominant hold, whether the
+final area is spacious enough around every authored anchor, and whether the
+green wash warns without obscuring close-range combat.
 
 ### Session 42 — 2026-07-13 — Wasteland Bat
 

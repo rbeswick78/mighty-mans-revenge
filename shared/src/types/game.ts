@@ -54,6 +54,13 @@ export interface WastelandWarpState {
   sequence: number;
 }
 
+/** Reconnect-safe shrinking safe zone for the Radiation Storm mutator. */
+export interface RadiationStormState {
+  center: Vec2;
+  radius: number;
+  shrinkSecondsRemaining: number;
+}
+
 /** A contested token dropped by a death in Kill Confirmed. */
 export interface KillConfirmedTagState {
   id: string;

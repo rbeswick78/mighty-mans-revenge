@@ -21,6 +21,7 @@ const EVENT_COLORS: Record<MutatorId, number> = {
   wasteland_warp: 0xb56cff,   // dimensional violet
   last_laugh: 0xff3b30,       // armed corpse red
   scavenger_rush: 0x5ce1e6,  // supply-drop cyan
+  radiation_storm: 0x8cff2f, // radioactive lime
 };
 
 /**

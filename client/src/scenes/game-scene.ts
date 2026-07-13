@@ -52,6 +52,7 @@ import { XrayFx } from '../rendering/xray-fx.js';
 import { AbilityAura } from '../rendering/ability-aura.js';
 import { DecalRenderer } from '../rendering/decal-renderer.js';
 import { KothHillRenderer } from '../rendering/koth-hill-renderer.js';
+import { RadiationStormRenderer } from '../rendering/radiation-storm-renderer.js';
 import { CameraKick } from '../rendering/camera-kick.js';
 import { ZoomPulse } from '../rendering/zoom-pulse.js';
 import { CameraRoll, ROLL_DAMAGE_THRESHOLD } from '../rendering/camera-roll.js';
@@ -122,6 +123,7 @@ export class GameScene extends Phaser.Scene {
   private pickupRenderer: PickupRenderer | null = null;
   private confirmedTagRenderer: ConfirmedTagRenderer | null = null;
   private coreRunRenderer: CoreRunRenderer | null = null;
+  private radiationStormRenderer: RadiationStormRenderer | null = null;
   private grenadeRenderer: GrenadeRenderer | null = null;
   private axeRenderer: AxeRenderer | null = null;
   private lightingRenderer: LightingRenderer | null = null;
@@ -310,6 +312,7 @@ export class GameScene extends Phaser.Scene {
     this.pickupRenderer = new PickupRenderer(this);
     this.confirmedTagRenderer = new ConfirmedTagRenderer(this);
     this.coreRunRenderer = new CoreRunRenderer(this);
+    this.radiationStormRenderer = new RadiationStormRenderer(this);
     this.grenadeRenderer = new GrenadeRenderer(this);
     this.axeRenderer = new AxeRenderer(this);
     this.lightingRenderer = new LightingRenderer(this);
@@ -759,7 +762,11 @@ export class GameScene extends Phaser.Scene {
         // both names.
         const activeMutators = networkManager.getActiveMutators();
         const warpState = networkManager.getWastelandWarpState();
-        const mutatorLabel = activeMutatorLabel(activeMutators, warpState);
+        const mutatorLabel = activeMutatorLabel(
+          activeMutators,
+          warpState,
+          networkManager.getRadiationStormState(),
+        );
         if (mutatorLabel !== this.lastSyncedMutatorLabel) {
           this.lastSyncedMutatorLabel = mutatorLabel;
           this.hud.setActiveEventLabel(mutatorLabel);
@@ -832,6 +839,11 @@ export class GameScene extends Phaser.Scene {
     this.confirmedTagRenderer?.update(
       networkManager.getConfirmedTags(),
       networkManager.getPlayerId(),
+    );
+    this.radiationStormRenderer?.update(
+      networkManager.getRadiationStormState(),
+      networkManager.getLocalPlayerState()?.position ?? null,
+      this.time.now,
     );
     const coreRunState = networkManager.getCoreRunState();
     this.coreRunRenderer?.update(coreRunState, networkManager.getPlayerId());
@@ -1516,6 +1528,7 @@ export class GameScene extends Phaser.Scene {
       wasteland_warp: 0xb56cff,
       last_laugh: 0xff3b30,
       scavenger_rush: 0x5ce1e6,
+      radiation_storm: 0x8cff2f,
     };
 
     this.onEventWarning = (payload: EventWarningPayload) => {
@@ -1770,6 +1783,10 @@ export class GameScene extends Phaser.Scene {
     if (this.coreRunRenderer) {
       this.coreRunRenderer.destroy();
       this.coreRunRenderer = null;
+    }
+    if (this.radiationStormRenderer) {
+      this.radiationStormRenderer.destroy();
+      this.radiationStormRenderer = null;
     }
     if (this.axeRenderer) {
       this.axeRenderer.destroy();

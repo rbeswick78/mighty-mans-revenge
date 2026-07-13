@@ -8,6 +8,7 @@ import {
   WEAPONS,
   gunGameRungForScore,
   raycastAgainstGrid,
+  isOutsideRadiationStorm,
 } from '@shared/game';
 import type {
   CollisionGrid,
@@ -285,6 +286,15 @@ export class BotController {
     match: Match,
     grid: CollisionGrid,
   ): { position: Vec2; holdPosition: boolean; isCombatTarget: boolean } {
+    const storm = match.getRadiationStormState();
+    if (storm && isOutsideRadiationStorm(bot.position, storm)) {
+      return {
+        position: storm.center,
+        holdPosition: false,
+        isCombatTarget: false,
+      };
+    }
+
     if (objectiveTag) {
       return {
         position: objectiveTag.position,

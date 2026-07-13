@@ -1,4 +1,4 @@
-import type { WastelandWarpState } from '@shared/types/game.js';
+import type { RadiationStormState, WastelandWarpState } from '@shared/types/game.js';
 import type { MutatorId } from '@shared/config/game.js';
 import { eventDisplayName } from '@shared/utils/event-modifiers.js';
 
@@ -6,13 +6,25 @@ import { eventDisplayName } from '@shared/utils/event-modifiers.js';
 export function activeMutatorLabel(
   active: readonly MutatorId[],
   warp: WastelandWarpState | null,
+  radiationStorm: RadiationStormState | null = null,
 ): string | null {
-  if (active.length === 0) return null;
-  return active.map((mutator) =>
-    mutator === 'wasteland_warp' && warp
-      ? `WASTELAND WARP · ${Math.max(1, Math.ceil(warp.secondsUntilSwap))}S`
-      : eventDisplayName(mutator),
-  ).join(' + ');
+  const visible = active.filter(
+    (mutator) => mutator !== 'radiation_storm' || radiationStorm !== null,
+  );
+  if (visible.length === 0) return null;
+  return visible.map((mutator) => {
+    if (mutator === 'wasteland_warp' && warp) {
+      return `WASTELAND WARP · ${Math.max(1, Math.ceil(warp.secondsUntilSwap))}S`;
+    }
+    if (
+      mutator === 'radiation_storm' &&
+      radiationStorm &&
+      radiationStorm.shrinkSecondsRemaining > 0
+    ) {
+      return `RADIATION STORM · ${Math.ceil(radiationStorm.shrinkSecondsRemaining)}S`;
+    }
+    return eventDisplayName(mutator);
+  }).join(' + ');
 }
 
 /** Ignore the first snapshot; celebrate only a later authoritative edge. */

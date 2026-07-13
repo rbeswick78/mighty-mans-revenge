@@ -103,6 +103,50 @@ describe('BotController', () => {
     expect(human.health).toBeLessThan(human.maxHealth);
   });
 
+  it('retreats into Radiation Storm safety before resuming its ordinary chase', () => {
+    const match = new Match(
+      'practice-storm',
+      OPEN_MAP,
+      [
+        { id: 'human', nickname: 'Human' },
+        { id: 'bot:test', nickname: 'Rusty' },
+      ],
+      GameModeType.DEATHMATCH,
+      () => 0,
+    );
+    match.phase = MatchPhase.ACTIVE;
+    match.matchTimer = 100;
+    const human = match.players.get('human')!;
+    const bot = match.players.get('bot:test')!;
+    human.position = { x: 2.5 * 48, y: 2.5 * 48 };
+    bot.position = { x: 1.5 * 48, y: 2.5 * 48 };
+    const internals = match as unknown as {
+      _activeMutators: Array<'radiation_storm'>;
+      radiationStormCenter: { x: number; y: number };
+      radiationStormInitialRadius: number;
+      radiationStormElapsed: number;
+      radiationStormPulseTimer: number;
+    };
+    internals._activeMutators.push('radiation_storm');
+    internals.radiationStormCenter = { x: 6.5 * 48, y: 2.5 * 48 };
+    internals.radiationStormInitialRadius = 300;
+    internals.radiationStormElapsed = MUTATORS.RADIATION_STORM_SHRINK_SECONDS;
+    internals.radiationStormPulseTimer = 999;
+
+    const controller = new BotController(bot.id);
+    const outsideStart = bot.position.x;
+    controller.update(0.05, match, 1);
+    match.update(0.05);
+    expect(bot.position.x).toBeGreaterThan(outsideStart);
+
+    bot.position = { ...internals.radiationStormCenter };
+    human.position = { x: 1.5 * 48, y: 2.5 * 48 };
+    const insideStart = bot.position.x;
+    controller.update(0.05, match, 2);
+    match.update(0.05);
+    expect(bot.position.x).toBeLessThan(insideStart);
+  });
+
   it('does nothing outside active play or without a living target', () => {
     const match = new Match(
       'practice-2',

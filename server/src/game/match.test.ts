@@ -1853,6 +1853,64 @@ describe('Match', () => {
       });
     });
 
+    describe('Radiation Storm', () => {
+      it('ships a deterministic full-arena zone that closes linearly and holds', () => {
+        const first = startActiveMatchWithMidMutator('radiation_storm');
+        const second = startActiveMatchWithMidMutator('radiation_storm');
+        const opening = first.getRadiationStormState()!;
+
+        expect(second.getRadiationStormState()?.center).toEqual(opening.center);
+        expect(opening.radius).toBeGreaterThan(MUTATORS.RADIATION_STORM_FINAL_RADIUS_PX);
+        expect(opening.shrinkSecondsRemaining).toBeGreaterThan(17);
+
+        first.update(9);
+        const halfway = first.getRadiationStormState()!;
+        expect(halfway.radius).toBeLessThan(opening.radius);
+        expect(halfway.shrinkSecondsRemaining).toBeCloseTo(8.95);
+
+        first.update(20);
+        expect(first.getRadiationStormState()).toMatchObject({
+          radius: MUTATORS.RADIATION_STORM_FINAL_RADIUS_PX,
+          shrinkSecondsRemaining: 0,
+        });
+      });
+
+      it('pulses outside players to a nonlethal floor and respects invulnerability', () => {
+        const m = startActiveMatchWithMidMutator('radiation_storm');
+        const state = m.getRadiationStormState()!;
+        const exposed = m.players.get('player-0')!;
+        const protectedPlayer = m.players.get('player-1')!;
+        const outside = { x: state.center.x + state.radius + 100, y: state.center.y };
+        exposed.position = { ...outside };
+        protectedPlayer.position = { ...outside };
+        exposed.health = 31;
+        protectedPlayer.health = 31;
+        protectedPlayer.invulnerableTimer = 10;
+
+        m.update(MUTATORS.RADIATION_STORM_PULSE_SECONDS);
+        expect(exposed.health).toBe(21);
+        expect(protectedPlayer.health).toBe(31);
+
+        m.update(MUTATORS.RADIATION_STORM_PULSE_SECONDS * 3);
+        expect(exposed.health).toBe(1);
+        expect(exposed.isDead).toBe(false);
+        expect(exposed.deaths).toBe(0);
+      });
+
+      it('retires its snapshot and damage before sudden-death overtime', () => {
+        const m = startActiveMatchWithMidMutator('radiation_storm');
+        const player = m.players.get('player-0')!;
+        const state = m.getRadiationStormState()!;
+        player.position = { x: state.center.x + state.radius + 100, y: state.center.y };
+        player.health = 50;
+        (m as unknown as { isOvertime: boolean }).isOvertime = true;
+
+        expect(m.getRadiationStormState()).toBeNull();
+        m.update(MUTATORS.RADIATION_STORM_PULSE_SECONDS);
+        expect(player.health).toBe(50);
+      });
+    });
+
     describe('Scavenger Rush', () => {
       function startRush(mode = GameModeType.DEATHMATCH): Match {
         const map = {
