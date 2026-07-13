@@ -387,6 +387,14 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
       difficulty: 'scrapper',
       kind: 'gauntlet',
     });
+    manager.startPractice('Charlie', 'rookie', 'sparring', GameModeType.CORE_RUN);
+    expect(hoisted.sentMessages).toContainEqual({
+      type: 'client:startPractice',
+      nickname: 'Charlie',
+      difficulty: 'rookie',
+      kind: 'sparring',
+      gameMode: GameModeType.CORE_RUN,
+    });
   });
 
   it('sends backward-compatible rematches and optional Gauntlet route choices', () => {

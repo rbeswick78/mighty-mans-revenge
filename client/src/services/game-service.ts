@@ -177,9 +177,10 @@ export class GameService {
     nickname: string,
     difficulty: BotDifficulty,
     kind: PracticeKind = 'sparring',
+    gameMode?: GameModeType,
   ): void {
     this.localNickname = nickname;
-    this.networkManager.startPractice(nickname, difficulty, kind);
+    this.networkManager.startPractice(nickname, difficulty, kind, gameMode);
   }
 
   cancelMatchmaking(): void {

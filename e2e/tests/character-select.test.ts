@@ -230,14 +230,23 @@ test('solo practice launches against locked Rusty and reaches live play', async 
   await input.fill('Solo');
 
   // Desktop canvas is 960x720 at this project viewport. Cycle the persisted
-  // Rusty level once, then launch an ordinary spar or the pinned Gauntlet
-  // journey in canvas-local coordinates.
+  // Rusty level once, optionally pin a Spar mode, then launch an ordinary
+  // spar or the pinned Gauntlet journey in canvas-local coordinates.
   const canvas = page.locator('canvas');
   await expect(canvas).toHaveCount(1);
-  await canvas.click({ position: { x: 480, y: 660 } });
+  await canvas.click({ position: { x: 480, y: 642 } });
   await expect
     .poll(() => page.evaluate(() => localStorage.getItem('mmr_bot_difficulty')))
     .toBe('warlord');
+  if (process.env.VERIFY_PRACTICE_MODE === '1') {
+    // RANDOM -> DEATHMATCH -> KING OF THE HILL. Use two clicks so the
+    // browser flow also proves the selector cycles through shared order.
+    await canvas.click({ position: { x: 480, y: 666 } });
+    await canvas.click({ position: { x: 480, y: 666 } });
+    await expect
+      .poll(() => page.evaluate(() => localStorage.getItem('mmr_practice_mode')))
+      .toBe('koth');
+  }
   if (process.env.VERIFY_GAMEPAD === '1') {
     await page.evaluate(() => {
       const state = (window as unknown as { __gamepadTest: { axes: number[] } })
@@ -312,6 +321,28 @@ test('solo practice launches against locked Rusty and reaches live play', async 
         gauntlet: { stage: 1, totalStages: 3, difficulty: 'rookie' },
         briefing: true,
       });
+  }
+  if (process.env.VERIFY_PRACTICE_MODE === '1') {
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const w = window as unknown as {
+            game?: { scene: { getScene: (key: string) => unknown } };
+          };
+          const scene = w.game?.scene.getScene('CharacterSelectScene') as {
+            matchData?: { gameMode?: string };
+            children?: { list?: Array<{ text?: string }> };
+          } | null;
+          return {
+            gameMode: scene?.matchData?.gameMode ?? null,
+            briefing:
+              scene?.children?.list?.some((child) =>
+                child.text?.includes('KING OF THE HILL'),
+              ) ?? false,
+          };
+        }),
+      )
+      .toEqual({ gameMode: 'koth', briefing: true });
   }
 
   await expect

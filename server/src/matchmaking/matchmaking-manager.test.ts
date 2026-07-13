@@ -1418,6 +1418,68 @@ describe('MatchmakingManager solo practice flow', () => {
     expect([...rematchInternals.rematchMutatorExclusions]).toEqual(previousMutators);
   });
 
+  it('pins a validated Spar mode through the result promise and direct rematch', () => {
+    const { fake, sent } = makeFakeServer();
+    const mgr = new MatchmakingManager(fake, () => 0, store, seededRng([0, 0, 0]));
+
+    mgr.handleStartPractice(
+      'A',
+      'Alpha',
+      'scrapper',
+      'sparring',
+      GameModeType.CORE_RUN,
+    );
+    const first = mgr.getActiveMatches()[0];
+    expect(first.gameModeType).toBe(GameModeType.CORE_RUN);
+
+    first.phase = MatchPhase.ENDED;
+    mgr.tick(0.05, 1);
+    const ended = [...sent]
+      .reverse()
+      .find((entry) => entry.playerId === 'A' && entry.message.type === 'server:matchEnd');
+    if (!ended || ended.message.type !== 'server:matchEnd') {
+      throw new Error('missing pinned practice matchEnd');
+    }
+    expect(ended.message.result.nextGameMode).toBe(GameModeType.CORE_RUN);
+
+    mgr.handleRematchRequest('A');
+    expect(mgr.getActiveMatches()[0].gameModeType).toBe(GameModeType.CORE_RUN);
+  });
+
+  it('rejects malformed Spar pins and ignores pins on Gauntlet requests', () => {
+    const invalid = makeFakeServer();
+    const invalidMgr = new MatchmakingManager(
+      invalid.fake,
+      () => 0,
+      store,
+      seededRng([0, 0, 0]),
+    );
+    invalidMgr.handleStartPractice(
+      'A',
+      'Alpha',
+      'scrapper',
+      'sparring',
+      'not-a-mode' as GameModeType,
+    );
+    expect(invalidMgr.getActiveMatches()[0].gameModeType).toBe(GameModeType.DEATHMATCH);
+
+    const gauntlet = makeFakeServer();
+    const gauntletMgr = new MatchmakingManager(
+      gauntlet.fake,
+      () => 0,
+      store,
+      seededRng([0, 0, 0]),
+    );
+    gauntletMgr.handleStartPractice(
+      'B',
+      'Bravo',
+      'rookie',
+      'gauntlet',
+      GameModeType.CORE_RUN,
+    );
+    expect(gauntletMgr.getActiveMatches()[0].gameModeType).toBe(GameModeType.DEATHMATCH);
+  });
+
   it('removes a queued player before opening practice', () => {
     const { fake } = makeFakeServer();
     const mgr = new MatchmakingManager(fake, () => 0, store, seededRng([0, 0, 0]));

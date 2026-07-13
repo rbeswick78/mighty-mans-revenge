@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–61 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Practice vs Rusty with Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, style bonuses, and live style callouts, four arenas, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–62 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Practice vs Rusty with a favorite-mode selector and Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, style bonuses, and live style callouts, four arenas, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -93,6 +93,7 @@ Each session below attacks one of these.
 | 59  | Blood Rush                                     | Every kill can ignite a fast, aggressive chase for the next                     | **DONE** (2026-07-13) |
 | 60  | Mutator Rule Callouts                          | Every surprise teaches its rule before players must react                       | **DONE** (2026-07-13) |
 | 61  | Death Animation Variety                       | Repeated eliminations stop replaying the same canned fall                        | **DONE** (2026-07-13) |
+| 62  | Favorite Mode Sparring                       | A favorite ruleset becomes deliberately replayable without losing map variety   | **DONE** (2026-07-13) |
 
 ---
 
@@ -2932,7 +2933,75 @@ adding presentation-only network state.
 
 ---
 
+## Session 62 — Favorite Mode Sparring
+
+**Goal:** let players deliberately practice or replay any favorite ruleset
+against Rusty while preserving the quick variety of the existing random Spar.
+
+**Locked design decisions**
+
+- The lobby selector cycles `RANDOM` followed by the shared eight-mode
+  rotation, uses the ordinary player-facing display names, persists locally,
+  and is reachable through pointer, touch, and the existing gamepad menu path.
+- `RANDOM` keeps the old behavior: a random first mode followed by the normal
+  mode rotation. A selected mode stays pinned through direct Spar rematches,
+  while maps continue rotating so repeat practice does not become one fixed
+  encounter.
+- The optional wire value is only a request. The server validates it against
+  `GAME_MODE_ROTATION`; malformed or stale values fall back safely. `FORCE_MODE`
+  remains strongest for verification and operations.
+- Gauntlet ignores the selector and retains server-authored route modes. PvP
+  draft, mode rules, scoring, Rusty AI, combat, physics, stats, and leaderboard
+  isolation remain unchanged.
+
+**Acceptance criteria**
+
+- [x] Pure client tests prove normalization, the full random/mode cycle, and
+      shared player-facing labels; network tests prove the optional request.
+- [x] Server tests prove a valid pin starts and survives results/rematches,
+      malformed input falls back, and Gauntlet ignores the request.
+- [x] A real-client Chromium Spar smoke clicks the selector to KOTH, verifies
+      its persisted value, observes the authoritative KOTH match and briefing,
+      and reaches live play.
+- [x] Typecheck, lint, all 1,130 unit tests across 75 files, production build,
+      and the full Playwright desktop/mobile matrix pass.
+
+---
+
 ## Session Log
+
+### Session 62 — 2026-07-13 — Favorite Mode Sparring
+
+**Shipped:** `RUSTY SPAR` now has a compact `SPAR MODE` selector for `RANDOM`
+or any of the game's eight rulesets. The selection survives reloads, works
+through the existing pointer/touch/gamepad menu controls, and pins that mode
+through direct rematches while the arena still changes. Players can drill
+Core Run, chase another Bounty Hunt, or settle into any favorite without
+giving up the rotating mix as the default.
+
+The client derives order and copy from the shared mode registry and sends an
+optional request only for ordinary Sparring. Matchmaking validates the value,
+keeps `FORCE_MODE` strongest, owns rematch retention, and ignores the field for
+Gauntlet so route offers remain authoritative. Invalid and old-client payloads
+fall back to the existing random behavior. PvP, stats isolation, AI, combat,
+scoring, physics, and every individual mode rule are unchanged.
+
+**Verification:** 1,130 tests pass across 75 files, including the preference
+cycle, optional network payload, server validation, Gauntlet isolation, result
+metadata, and direct-rematch retention. TypeScript, ESLint, all package builds,
+and the Vite production bundle are clean; Vite retains its existing chunk-size
+advisory. A forced live Chromium Spar smoke selected and persisted KOTH,
+observed the authoritative KOTH match and briefing, and reached play. The full
+Playwright matrix passes 16 tests with 11 intentional scoped skips across
+Chromium, Firefox, and mobile landscape.
+
+**Tuning watch:** `RANDOM` remains the default because discovery matters. Watch
+whether players leave one mode pinned unintentionally between sessions; the
+persistent label is deliberately explicit before considering a reset policy.
+
+**Deployment:** not run; deployment still requires explicit authorization.
+
+---
 
 ### Session 61 — 2026-07-13 — Death Animation Variety
 

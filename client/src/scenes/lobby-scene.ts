@@ -21,9 +21,16 @@ import {
   type BotDifficulty,
   type PracticeKind,
 } from '@shared/config/game.js';
+import type { GameModeType } from '@shared/types/game.js';
+import {
+  nextPracticeModePreference,
+  normalizePracticeModePreference,
+  practiceModePreferenceLabel,
+} from '../ui/practice-mode.js';
 
 const STORAGE_KEY_NICKNAME = 'mmr_nickname';
 const STORAGE_KEY_BOT_DIFFICULTY = 'mmr_bot_difficulty';
+const STORAGE_KEY_PRACTICE_MODE = 'mmr_practice_mode';
 
 // Scene-local color decisions. Everything beyond the parallax backdrop is
 // pinned here so a future palette pass can re-tune the lobby in one place.
@@ -64,9 +71,11 @@ export class LobbyScene extends Phaser.Scene {
   private practiceButton!: PixelButton;
   private gauntletButton!: PixelButton;
   private difficultyButton!: PixelButton;
+  private practiceModeButton!: PixelButton;
   private mightyManSprite!: Phaser.GameObjects.Sprite;
   private nickname: string;
   private practiceDifficulty: BotDifficulty;
+  private practiceMode: GameModeType | null;
   private isSearching = false;
   private searchStartTime = 0;
   private cursorVisible = true;
@@ -88,6 +97,7 @@ export class LobbyScene extends Phaser.Scene {
     super({ key: 'LobbyScene' });
     this.nickname = '';
     this.practiceDifficulty = DEFAULT_BOT_DIFFICULTY;
+    this.practiceMode = null;
   }
 
   create(): void {
@@ -97,6 +107,9 @@ export class LobbyScene extends Phaser.Scene {
     this.practiceDifficulty = BOT_DIFFICULTIES.includes(savedDifficulty as BotDifficulty)
       ? (savedDifficulty as BotDifficulty)
       : DEFAULT_BOT_DIFFICULTY;
+    this.practiceMode = normalizePracticeModePreference(
+      localStorage.getItem(STORAGE_KEY_PRACTICE_MODE),
+    );
     this.isSearching = false;
     this.menuGamepad = new MenuGamepadInput();
     this.gamepadFocusActive = false;
@@ -260,22 +273,37 @@ export class LobbyScene extends Phaser.Scene {
     this.difficultyButton = new PixelButton(
       this,
       panel.centerX - qmW / 2,
-      212,
+      206,
       qmW,
-      28,
+      22,
       this.difficultyLabel(),
       {
         variant: 'secondary',
-        fontSize: 9,
+        fontSize: 8,
         onClick: () => this.cyclePracticeDifficulty(),
       },
     );
     panel.add(this.difficultyButton);
 
+    this.practiceModeButton = new PixelButton(
+      this,
+      panel.centerX - qmW / 2,
+      232,
+      qmW,
+      22,
+      practiceModePreferenceLabel(this.practiceMode),
+      {
+        variant: 'secondary',
+        fontSize: 8,
+        onClick: () => this.cyclePracticeMode(),
+      },
+    );
+    panel.add(this.practiceModeButton);
+
     const gauntletBestText = this.add
       .text(
         panel.centerX,
-        252,
+        260,
         gauntletBestClearLabel(
           normalizeGauntletBestClear(localStorage.getItem(GAUNTLET_BEST_CLEAR_STORAGE_KEY)),
         ),
@@ -455,7 +483,13 @@ export class LobbyScene extends Phaser.Scene {
   }
 
   private gamepadButtons(): PixelButton[] {
-    return [this.quickMatchButton, this.practiceButton, this.gauntletButton, this.difficultyButton];
+    return [
+      this.quickMatchButton,
+      this.practiceButton,
+      this.gauntletButton,
+      this.difficultyButton,
+      this.practiceModeButton,
+    ];
   }
 
   private syncGamepadFocus(): void {
@@ -676,6 +710,7 @@ export class LobbyScene extends Phaser.Scene {
     this.practiceButton.setVisible(false);
     this.gauntletButton.setVisible(false);
     this.difficultyButton.setVisible(false);
+    this.practiceModeButton.setVisible(false);
 
     this.searchingTween = this.tweens.add({
       targets: this.searchingText,
@@ -704,7 +739,12 @@ export class LobbyScene extends Phaser.Scene {
     if (this.isSearching || !this.validateNickname()) return;
     this.nicknameInput?.blur();
     this.tryStartFullscreen();
-    this.gameService.startPractice(this.nickname, this.practiceDifficulty, kind);
+    this.gameService.startPractice(
+      this.nickname,
+      this.practiceDifficulty,
+      kind,
+      kind === 'sparring' ? (this.practiceMode ?? undefined) : undefined,
+    );
   }
 
   private cyclePracticeDifficulty(): void {
@@ -716,6 +756,16 @@ export class LobbyScene extends Phaser.Scene {
 
   private difficultyLabel(): string {
     return `RUSTY LEVEL: ${this.practiceDifficulty.toUpperCase()}`;
+  }
+
+  private cyclePracticeMode(): void {
+    this.practiceMode = nextPracticeModePreference(this.practiceMode);
+    if (this.practiceMode === null) {
+      localStorage.removeItem(STORAGE_KEY_PRACTICE_MODE);
+    } else {
+      localStorage.setItem(STORAGE_KEY_PRACTICE_MODE, this.practiceMode);
+    }
+    this.practiceModeButton.setLabel(practiceModePreferenceLabel(this.practiceMode));
   }
 
   /** Fullscreen improves play, but browser policy must never block a match. */
@@ -759,6 +809,7 @@ export class LobbyScene extends Phaser.Scene {
     this.practiceButton.setVisible(true);
     this.gauntletButton.setVisible(true);
     this.difficultyButton.setVisible(true);
+    this.practiceModeButton.setVisible(true);
     this.setNameEntryVisible(true);
 
     if (this.searchingTween) {

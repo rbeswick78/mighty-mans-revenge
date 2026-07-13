@@ -117,6 +117,7 @@ export class GameManager {
           message.nickname,
           message.difficulty,
           message.kind,
+          message.gameMode,
         );
         break;
 

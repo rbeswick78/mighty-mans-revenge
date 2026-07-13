@@ -6,6 +6,7 @@ import type { PickupState } from '@shared/types/pickup.js';
 import type {
   KillConfirmedTagState,
   MatchContractHudState,
+  GameModeType,
   PracticeGauntletRouteId,
   CoreRunState,
   BountyHuntState,
@@ -298,12 +299,14 @@ export class NetworkManager {
     nickname: string,
     difficulty: BotDifficulty,
     kind: PracticeKind = 'sparring',
+    gameMode?: GameModeType,
   ): void {
     this.connection.send({
       type: 'client:startPractice',
       nickname,
       difficulty,
       kind,
+      ...(gameMode ? { gameMode } : {}),
     });
   }
 

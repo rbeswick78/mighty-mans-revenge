@@ -56,6 +56,8 @@ export interface ClientStartPracticeMessage {
   difficulty: BotDifficulty;
   /** Optional for backward compatibility; old clients start ordinary sparring. */
   kind?: PracticeKind;
+  /** Optional validated mode pin for ordinary Sparring; Gauntlet ignores it. */
+  gameMode?: GameModeType;
 }
 
 export interface ClientCancelMatchmakingMessage {
