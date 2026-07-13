@@ -279,6 +279,15 @@ export interface PracticeGauntletMatch {
   runScore: number;
 }
 
+export type PracticeGauntletRouteId = 'route_a' | 'route_b';
+
+/** One server-authored next-fight choice after a cleared Gauntlet stage. */
+export interface PracticeGauntletRoute {
+  id: PracticeGauntletRouteId;
+  mapName: string;
+  gameMode: GameModeType;
+}
+
 export interface PracticeGauntletResult extends PracticeGauntletMatch {
   outcome: 'advanced' | 'failed' | 'cleared';
   /** Points banked by this stage; zero unless the human won. */
@@ -294,6 +303,8 @@ export interface PracticeGauntletResult extends PracticeGauntletMatch {
   /** Stage launched by the results-screen action (advance or retry). */
   nextStage: number;
   nextDifficulty: BotDifficulty;
+  /** Present only after advancement; missing clients take the first route. */
+  routeOptions?: PracticeGauntletRoute[];
 }
 
 export interface MatchResult {

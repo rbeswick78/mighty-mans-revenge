@@ -1,7 +1,37 @@
 import { describe, expect, it } from 'vitest';
-import { practiceGauntletMatch, resolvePracticeGauntlet } from './practice-gauntlet.js';
+import { GameModeType } from '../types/game.js';
+import {
+  practiceGauntletMatch,
+  practiceGauntletRoutes,
+  resolvePracticeGauntlet,
+  selectPracticeGauntletRoute,
+} from './practice-gauntlet.js';
 
 describe('practice gauntlet', () => {
+  it('offers two distinct routes and safely defaults invalid selections', () => {
+    const routes = practiceGauntletRoutes(
+      { mapName: 'Overgrown Suburb', gameMode: GameModeType.KOTH },
+      { mapName: 'Scrapyard', gameMode: GameModeType.GUN_GAME },
+    );
+    expect(routes).toEqual([
+      { id: 'route_a', mapName: 'Overgrown Suburb', gameMode: 'koth' },
+      { id: 'route_b', mapName: 'Scrapyard', gameMode: 'gun_game' },
+    ]);
+    expect(selectPracticeGauntletRoute(routes, 'route_b')).toEqual(routes[1]);
+    expect(selectPracticeGauntletRoute(routes, 'tampered')).toEqual(routes[0]);
+    expect(selectPracticeGauntletRoute(routes, undefined)).toEqual(routes[0]);
+    expect(selectPracticeGauntletRoute([], 'route_a')).toBeNull();
+  });
+
+  it('omits a duplicate route when smoke pins fix both destinations', () => {
+    expect(
+      practiceGauntletRoutes(
+        { mapName: 'Scrapyard', gameMode: GameModeType.DEATHMATCH },
+        { mapName: 'Scrapyard', gameMode: GameModeType.DEATHMATCH },
+      ),
+    ).toEqual([{ id: 'route_a', mapName: 'Scrapyard', gameMode: 'deathmatch' }]);
+  });
+
   it('maps the three stages to escalating Rusty profiles and clamps input', () => {
     expect(practiceGauntletMatch(0)).toMatchObject({ stage: 1, difficulty: 'rookie' });
     expect(practiceGauntletMatch(Number.NaN)).toMatchObject({

@@ -11,6 +11,7 @@ import {
   KillConfirmedCollection,
   MatchContractHudState,
   PracticeGauntletMatch,
+  PracticeGauntletRouteId,
   CoreRunState,
   BountyHuntState,
   WastelandWarpState,
@@ -63,6 +64,8 @@ export interface ClientCancelMatchmakingMessage {
 
 export interface ClientRematchRequestMessage {
   type: 'client:rematchRequest';
+  /** Optional Gauntlet route choice; old clients take the first offer. */
+  gauntletRouteId?: PracticeGauntletRouteId;
 }
 
 export interface ClientReturnToLobbyMessage {

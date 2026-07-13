@@ -6,6 +6,7 @@ import type { PickupState } from '@shared/types/pickup.js';
 import type {
   KillConfirmedTagState,
   MatchContractHudState,
+  PracticeGauntletRouteId,
   CoreRunState,
   BountyHuntState,
   WastelandWarpState,
@@ -331,9 +332,13 @@ export class NetworkManager {
     this.connection.send({ type: 'client:characterLock', characterId });
   }
 
-  /** Request a rematch. */
-  requestRematch(): void {
-    this.connection.send({ type: 'client:rematchRequest' });
+  /** Request a rematch, optionally selecting a server-authored Gauntlet route. */
+  requestRematch(gauntletRouteId?: PracticeGauntletRouteId): void {
+    this.connection.send(
+      gauntletRouteId
+        ? { type: 'client:rematchRequest', gauntletRouteId }
+        : { type: 'client:rematchRequest' },
+    );
   }
 
   /** Return to lobby. */

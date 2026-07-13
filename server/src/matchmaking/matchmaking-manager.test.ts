@@ -1467,12 +1467,16 @@ describe('MatchmakingManager solo practice flow', () => {
       paceBonus: 200,
       nextStage: 2,
       nextDifficulty: 'scrapper',
+      routeOptions: [
+        { id: 'route_a', mapName: 'Overgrown Suburb', gameMode: GameModeType.KOTH },
+        { id: 'route_b', mapName: 'Scrapyard', gameMode: GameModeType.GUN_GAME },
+      ],
     });
     expect(firstEnd.message.result.rivalrySet).toBeNull();
     expect(store.getLifetime('Alpha')).toBeNull();
 
     sent.length = 0;
-    mgr.handleRematchRequest('A');
+    mgr.handleRematchRequest('A', 'route_b');
     const secondFound = sent.find(
       (entry) => entry.playerId === 'A' && entry.message.type === 'server:matchFound',
     );
@@ -1485,6 +1489,8 @@ describe('MatchmakingManager solo practice flow', () => {
       difficulty: 'scrapper',
       runScore: 1800,
     });
+    expect(secondFound.message.mapName).toBe('Scrapyard');
+    expect(secondFound.message.gameMode).toBe(GameModeType.GUN_GAME);
 
     const second = mgr.getActiveMatches()[0];
     second.players.get('A')!.score = 3;
@@ -1508,10 +1514,17 @@ describe('MatchmakingManager solo practice flow', () => {
       paceBonus: 94,
       nextStage: 3,
       nextDifficulty: 'warlord',
+      routeOptions: [
+        { id: 'route_a', mapName: 'Collapsed Overpass', gameMode: GameModeType.LAST_STAND },
+        { id: 'route_b', mapName: 'Wasteland Outpost', gameMode: GameModeType.KILL_CONFIRMED },
+      ],
     });
 
     sent.length = 0;
-    mgr.handleRematchRequest('A');
+    mgr.handleRematchRequest(
+      'A',
+      'not-a-server-route' as Parameters<MatchmakingManager['handleRematchRequest']>[1],
+    );
     const thirdFound = sent.find(
       (entry) => entry.playerId === 'A' && entry.message.type === 'server:matchFound',
     );
@@ -1524,6 +1537,8 @@ describe('MatchmakingManager solo practice flow', () => {
       difficulty: 'warlord',
       runScore: 3094,
     });
+    expect(thirdFound.message.mapName).toBe('Collapsed Overpass');
+    expect(thirdFound.message.gameMode).toBe(GameModeType.LAST_STAND);
 
     const third = mgr.getActiveMatches()[0];
     third.players.get('A')!.score = 3;
@@ -1547,6 +1562,7 @@ describe('MatchmakingManager solo practice flow', () => {
       nextStage: 1,
       nextDifficulty: 'rookie',
     });
+    expect(cleared.message.result.gauntlet?.routeOptions).toBeUndefined();
 
     sent.length = 0;
     mgr.handleRematchRequest('A');
@@ -1583,6 +1599,7 @@ describe('MatchmakingManager solo practice flow', () => {
       nextStage: 1,
       nextDifficulty: 'rookie',
     });
+    expect(failed.message.result.gauntlet?.routeOptions).toBeUndefined();
   });
 });
 

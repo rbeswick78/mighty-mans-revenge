@@ -125,7 +125,7 @@ export class GameManager {
         break;
 
       case 'client:rematchRequest':
-        this.matchmaking.handleRematchRequest(playerId);
+        this.matchmaking.handleRematchRequest(playerId, message.gauntletRouteId);
         break;
 
       case 'client:returnToLobby':

@@ -5,6 +5,7 @@ import type {
   GameModeType,
   KillConfirmedCollection,
   PracticeGauntletMatch,
+  PracticeGauntletRouteId,
 } from '@shared/types/game.js';
 import type {
   DraftCategory,
@@ -201,8 +202,8 @@ export class GameService {
     this.networkManager.sendInput(input);
   }
 
-  requestRematch(): void {
-    this.networkManager.requestRematch();
+  requestRematch(gauntletRouteId?: PracticeGauntletRouteId): void {
+    this.networkManager.requestRematch(gauntletRouteId);
   }
 
   returnToLobby(): void {

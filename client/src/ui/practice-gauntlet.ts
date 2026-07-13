@@ -1,4 +1,9 @@
-import type { GameModeType, MatchResult, PracticeGauntletMatch } from '@shared/types/game.js';
+import type {
+  GameModeType,
+  MatchResult,
+  PracticeGauntletMatch,
+  PracticeGauntletRoute,
+} from '@shared/types/game.js';
 import { gameModeDisplayName } from '@shared/config/game.js';
 
 export const GAUNTLET_BEST_CLEAR_STORAGE_KEY = 'mmr_gauntlet_best_clear';
@@ -91,6 +96,11 @@ export function gauntletStageScoreSummary(result: MatchResult): string | null {
 export function gauntletNextTeaser(result: MatchResult): string | null {
   const run = result.gauntlet;
   if (!run) return null;
+  if (run.outcome === 'advanced' && (run.routeOptions?.length ?? 0) > 1) {
+    return (
+      `CHOOSE: STAGE ${run.nextStage}/${run.totalStages} - ` + `${run.nextDifficulty.toUpperCase()}`
+    );
+  }
   const prefix = run.outcome === 'advanced' ? 'NEXT' : 'RETRY';
   const destination =
     result.nextGameMode && result.nextMapName
@@ -100,6 +110,16 @@ export function gauntletNextTeaser(result: MatchResult): string | null {
     `${prefix}: STAGE ${run.nextStage}/${run.totalStages} - ` +
     `${run.nextDifficulty.toUpperCase()}${destination}`
   );
+}
+
+export function gauntletRouteChoices(result: MatchResult | null): PracticeGauntletRoute[] {
+  if (result?.gauntlet?.outcome !== 'advanced') return [];
+  return result.gauntlet.routeOptions ?? [];
+}
+
+export function gauntletRouteButtonLabel(route: PracticeGauntletRoute): string {
+  const letter = route.id === 'route_a' ? 'A' : 'B';
+  return `ROUTE ${letter} · ${gameModeDisplayName(route.gameMode)}\n` + route.mapName.toUpperCase();
 }
 
 export function gauntletActionLabel(result: MatchResult | null): string | null {

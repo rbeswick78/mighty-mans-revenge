@@ -17,7 +17,9 @@ import {
   listMapNames,
   MAP_REGISTRY,
   practiceGauntletMatch,
+  practiceGauntletRoutes,
   resolvePracticeGauntlet,
+  selectPracticeGauntletRoute,
 } from '@shared/game';
 import type { MapData } from '@shared/game';
 import type {
@@ -35,6 +37,8 @@ import type {
   MatchContractId,
   PracticeKind,
   PracticeGauntletMatch,
+  PracticeGauntletRoute,
+  PracticeGauntletRouteId,
 } from '@shared/game';
 import { Match } from '../game/match.js';
 import { BotController } from '../game/bot-controller.js';
@@ -82,6 +86,8 @@ interface PostMatchState {
   practiceDifficulty: BotDifficulty | null;
   /** Next Gauntlet fight, or stage one when the completed run must retry. */
   nextGauntlet: PracticeGauntletMatch | null;
+  /** Server-authored advancement choices; empty for retries and non-Gauntlet matches. */
+  gauntletRoutes: PracticeGauntletRoute[];
   /** Both mutators from the completed round; random rematch rolls skip them. */
   previousMutators: MutatorId[];
   /** Previous round's contract; direct rematches must roll something fresh. */
@@ -353,7 +359,7 @@ export class MatchmakingManager {
     }
   }
 
-  handleRematchRequest(playerId: PlayerId): void {
+  handleRematchRequest(playerId: PlayerId, gauntletRouteId?: PracticeGauntletRouteId): void {
     const matchId = this.playerMatchMap.get(playerId);
     if (!matchId) {
       logger.warn({ playerId }, 'Ignoring rematch request from player with no match');
@@ -366,6 +372,17 @@ export class MatchmakingManager {
       logger.warn({ playerId, matchId }, 'Ignoring rematch request outside post-match state');
       this.sendRematchUnavailable(playerId);
       return;
+    }
+
+    // The route is server-authored and selected only while this completed
+    // Gauntlet stage is awaiting advancement. Missing or tampered values
+    // preserve the legacy Route A behavior.
+    if (postMatch.gauntletRoutes.length > 0) {
+      const route = selectPracticeGauntletRoute(postMatch.gauntletRoutes, gauntletRouteId);
+      if (route) {
+        postMatch.nextMapName = route.mapName;
+        postMatch.nextGameMode = route.gameMode;
+      }
     }
 
     postMatch.rematchRequests.add(playerId);
@@ -1219,6 +1236,19 @@ export class MatchmakingManager {
     result.nextMapName = nextMapName;
     const nextGameMode = this.forcedMode() ?? getNextGameMode(match.gameModeType);
     result.nextGameMode = nextGameMode;
+    const gauntletRoutes =
+      result.gauntlet?.outcome === 'advanced'
+        ? practiceGauntletRoutes(
+            { mapName: nextMapName, gameMode: nextGameMode },
+            {
+              mapName: this.forcedMap()?.name ?? getNextMapName(nextMapName),
+              gameMode: this.forcedMode() ?? getNextGameMode(nextGameMode),
+            },
+          )
+        : [];
+    if (result.gauntlet?.outcome === 'advanced') {
+      result.gauntlet.routeOptions = gauntletRoutes;
+    }
 
     // Fold this match into the lifetime records and attach the pairing's
     // all-time rivalry line before shipping the result. The in-memory
@@ -1332,6 +1362,7 @@ export class MatchmakingManager {
             result.gauntlet.outcome === 'advanced' ? result.gauntlet.runScore : 0,
           )
         : null,
+      gauntletRoutes,
       previousMutators: [...match.activeMutators],
       previousContractId: result.contract?.id ?? match.getContractHudState().id,
     });

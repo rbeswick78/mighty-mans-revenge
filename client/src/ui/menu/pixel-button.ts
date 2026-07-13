@@ -86,7 +86,9 @@ export class PixelButton extends Phaser.GameObjects.Container {
     this.add([this.gfx, this.label, this.zone]);
 
     this.zone.on('pointerover', () => {
-      if (this.disabled) return;
+      // Touch browsers may synthesize pointerover after pointerdown. Keep
+      // the pressed state until release so a valid tap still activates.
+      if (this.disabled || this.btnState === 'pressed') return;
       this.btnState = 'hover';
       this.redraw();
     });

@@ -1,5 +1,10 @@
 import { PRACTICE_GAUNTLET } from '../config/game.js';
-import type { PracticeGauntletMatch, PracticeGauntletResult } from '../types/game.js';
+import type {
+  GameModeType,
+  PracticeGauntletMatch,
+  PracticeGauntletResult,
+  PracticeGauntletRoute,
+} from '../types/game.js';
 import type { PlayerId } from '../types/common.js';
 
 function safeStage(stage: number): number {
@@ -22,6 +27,29 @@ export interface PracticeGauntletPerformance {
   wentToOvertime?: boolean;
   deaths?: number;
   regulationSecondsRemaining?: number;
+}
+
+/**
+ * Build the ordered server offer. Route A preserves the old automatic
+ * successor; Route B is omitted when FORCE pins make it identical.
+ */
+export function practiceGauntletRoutes(
+  primary: { mapName: string; gameMode: GameModeType },
+  alternate: { mapName: string; gameMode: GameModeType },
+): PracticeGauntletRoute[] {
+  const routes: PracticeGauntletRoute[] = [{ id: 'route_a', ...primary }];
+  if (alternate.mapName !== primary.mapName || alternate.gameMode !== primary.gameMode) {
+    routes.push({ id: 'route_b', ...alternate });
+  }
+  return routes;
+}
+
+/** Untrusted/missing selections safely preserve the legacy first route. */
+export function selectPracticeGauntletRoute(
+  routes: readonly PracticeGauntletRoute[],
+  routeId: string | undefined,
+): PracticeGauntletRoute | null {
+  return routes.find((route) => route.id === routeId) ?? routes[0] ?? null;
 }
 
 export function practiceGauntletMatch(stage: number, runScore = 0): PracticeGauntletMatch {

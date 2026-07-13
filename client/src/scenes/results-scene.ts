@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import type { PlayerId } from '@shared/types/common.js';
 import type { PlayerStats } from '@shared/types/player.js';
-import type { MatchResult } from '@shared/types/game.js';
+import type { MatchResult, PracticeGauntletRouteId } from '@shared/types/game.js';
 import type { ServerMatchmakingStatusMessage } from '@shared/types/network.js';
 import { AWARD_DEFS, createEmptyKillsByWeapon, gameModeDisplayName } from '@shared/config/game.js';
 import { Wasteland, cssHex } from '@shared/config/palette.js';
@@ -24,6 +24,8 @@ import {
   gauntletNextTeaser,
   gauntletOutcomeTitle,
   gauntletResultSummary,
+  gauntletRouteButtonLabel,
+  gauntletRouteChoices,
   gauntletStageScoreSummary,
   normalizeGauntletBestClear,
 } from '../ui/practice-gauntlet.js';
@@ -74,6 +76,7 @@ export class ResultsScene extends Phaser.Scene {
   private matchData: MatchData | null = null;
   private rematchStatusText: Phaser.GameObjects.Text | null = null;
   private rematchButton: PixelButton | null = null;
+  private alternateRouteButton: PixelButton | null = null;
   private lobbyButton: PixelButton | null = null;
   private rematchUnavailable = false;
   private menuGamepad: MenuGamepadInput | null = null;
@@ -99,6 +102,7 @@ export class ResultsScene extends Phaser.Scene {
     this.matchData = data.matchData ?? null;
     this.rematchUnavailable = false;
     this.rematchButton = null;
+    this.alternateRouteButton = null;
     this.lobbyButton = null;
     this.menuGamepad = null;
     this.gamepadFocusActive = false;
@@ -249,45 +253,85 @@ export class ResultsScene extends Phaser.Scene {
       .setDepth(WastelandStreet.DEPTH.UI);
 
     const btnY = camHeight - 90;
-    const btnW = 200;
+    const routeChoices = gauntletRouteChoices(this.result);
+    const hasRouteDraft = routeChoices.length > 1;
+    const btnW = hasRouteDraft ? 250 : 200;
     const btnH = 46;
+    const btnGap = 14;
+    const totalButtons = hasRouteDraft ? 3 : 2;
+    const firstBtnX = centerX - (btnW * totalButtons + btnGap * (totalButtons - 1)) / 2;
+    const requestNextFight = (gauntletRouteId?: PracticeGauntletRouteId): void => {
+      if (this.rematchUnavailable) {
+        this.showRematchUnavailable();
+        return;
+      }
+      this.gameService.requestRematch(gauntletRouteId);
+      if (hasRouteDraft) this.setRematchButtonsDisabled(true);
+      this.rematchStatusText
+        ?.setText(
+          hasRouteDraft
+            ? 'Route locked. Preparing next fight...'
+            : this.result?.gauntlet
+              ? 'Preparing next fight...'
+              : 'Waiting for opponent...',
+        )
+        .setVisible(true);
+    };
 
     this.rematchButton = new PixelButton(
       this,
-      centerX - btnW - 14,
+      firstBtnX,
       btnY,
       btnW,
       btnH,
-      gauntletActionLabel(this.result) ?? rematchButtonLabel(this.result),
+      hasRouteDraft
+        ? gauntletRouteButtonLabel(routeChoices[0])
+        : (gauntletActionLabel(this.result) ?? rematchButtonLabel(this.result)),
       {
         variant: 'primary',
-        fontSize: 13,
-        onClick: () => {
-          if (this.rematchUnavailable) {
-            this.showRematchUnavailable();
-            return;
-          }
-          this.gameService.requestRematch();
-          this.rematchStatusText
-            ?.setText(this.result?.gauntlet ? 'Preparing next fight...' : 'Waiting for opponent...')
-            .setVisible(true);
-        },
+        fontSize: hasRouteDraft ? 9 : 13,
+        onClick: () => requestNextFight(hasRouteDraft ? routeChoices[0].id : undefined),
       },
     );
     this.rematchButton.setDepth(WastelandStreet.DEPTH.UI);
 
-    this.lobbyButton = new PixelButton(this, centerX + 14, btnY, btnW, btnH, 'BACK TO LOBBY', {
-      variant: 'secondary',
-      fontSize: 13,
-      onClick: () => {
-        this.gameService.returnToLobby();
-        this.cameras.main.fadeOut(300, 0, 0, 0);
-        this.cameras.main.once('camerafadeoutcomplete', () => {
-          this.cleanupEvents();
-          this.scene.start('LobbyScene');
-        });
+    if (hasRouteDraft) {
+      this.alternateRouteButton = new PixelButton(
+        this,
+        firstBtnX + btnW + btnGap,
+        btnY,
+        btnW,
+        btnH,
+        gauntletRouteButtonLabel(routeChoices[1]),
+        {
+          variant: 'primary',
+          fontSize: 9,
+          onClick: () => requestNextFight(routeChoices[1].id),
+        },
+      );
+      this.alternateRouteButton.setDepth(WastelandStreet.DEPTH.UI);
+    }
+
+    this.lobbyButton = new PixelButton(
+      this,
+      firstBtnX + (btnW + btnGap) * (totalButtons - 1),
+      btnY,
+      btnW,
+      btnH,
+      'BACK TO LOBBY',
+      {
+        variant: 'secondary',
+        fontSize: 13,
+        onClick: () => {
+          this.gameService.returnToLobby();
+          this.cameras.main.fadeOut(300, 0, 0, 0);
+          this.cameras.main.once('camerafadeoutcomplete', () => {
+            this.cleanupEvents();
+            this.scene.start('LobbyScene');
+          });
+        },
       },
-    });
+    );
     this.lobbyButton.setDepth(WastelandStreet.DEPTH.UI);
 
     // Footer
@@ -312,20 +356,39 @@ export class ResultsScene extends Phaser.Scene {
     const actions = this.menuGamepad?.poll();
     if (!actions?.hasAction) return;
     this.gamepadFocusActive = true;
-    if (actions.left || actions.up) this.gamepadFocusIndex = 0;
-    else if (actions.right || actions.down) this.gamepadFocusIndex = 1;
+    const actionButtons = this.actionButtons();
+    if (actions.left || actions.up) {
+      this.gamepadFocusIndex =
+        (this.gamepadFocusIndex - 1 + actionButtons.length) % actionButtons.length;
+    } else if (actions.right || actions.down) {
+      this.gamepadFocusIndex = (this.gamepadFocusIndex + 1) % actionButtons.length;
+    }
     this.syncGamepadFocus();
 
     if (actions.back) {
       this.lobbyButton?.activate();
     } else if (actions.confirm || actions.alternate) {
-      (this.gamepadFocusIndex === 0 ? this.rematchButton : this.lobbyButton)?.activate();
+      actionButtons[this.gamepadFocusIndex]?.activate();
     }
   }
 
   private syncGamepadFocus(): void {
     this.rematchButton?.setFocused(this.gamepadFocusActive && this.gamepadFocusIndex === 0);
-    this.lobbyButton?.setFocused(this.gamepadFocusActive && this.gamepadFocusIndex === 1);
+    this.alternateRouteButton?.setFocused(this.gamepadFocusActive && this.gamepadFocusIndex === 1);
+    this.lobbyButton?.setFocused(
+      this.gamepadFocusActive && this.gamepadFocusIndex === (this.alternateRouteButton ? 2 : 1),
+    );
+  }
+
+  private actionButtons(): PixelButton[] {
+    return [this.rematchButton, this.alternateRouteButton, this.lobbyButton].filter(
+      (button): button is PixelButton => button !== null,
+    );
+  }
+
+  private setRematchButtonsDisabled(disabled: boolean): void {
+    this.rematchButton?.setDisabled(disabled);
+    this.alternateRouteButton?.setDisabled(disabled);
   }
 
   private renderTableau(isWinner: boolean, isDraw: boolean, camHeight: number): void {
@@ -827,7 +890,7 @@ export class ResultsScene extends Phaser.Scene {
 
     this.onOpponentDisconnected = (_playerId: PlayerId) => {
       this.rematchUnavailable = true;
-      this.rematchButton?.setDisabled(true);
+      this.setRematchButtonsDisabled(true);
       if (this.rematchStatusText) {
         this.rematchStatusText.setText('Opponent has left.').setVisible(true);
         this.rematchStatusText.setColor(cssHex(OPPONENT_LEFT_COLOR));
@@ -875,7 +938,7 @@ export class ResultsScene extends Phaser.Scene {
 
   private showRematchUnavailable(): void {
     if (!this.rematchStatusText) return;
-    this.rematchButton?.setDisabled(true);
+    this.setRematchButtonsDisabled(true);
     this.rematchStatusText.setText('Rematch unavailable - return to lobby.').setVisible(true);
     this.rematchStatusText.setColor(cssHex(OPPONENT_LEFT_COLOR));
   }

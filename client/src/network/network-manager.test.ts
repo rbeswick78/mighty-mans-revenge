@@ -388,4 +388,14 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
       kind: 'gauntlet',
     });
   });
+
+  it('sends backward-compatible rematches and optional Gauntlet route choices', () => {
+    manager.requestRematch();
+    manager.requestRematch('route_b');
+    expect(hoisted.sentMessages).toContainEqual({ type: 'client:rematchRequest' });
+    expect(hoisted.sentMessages).toContainEqual({
+      type: 'client:rematchRequest',
+      gauntletRouteId: 'route_b',
+    });
+  });
 });

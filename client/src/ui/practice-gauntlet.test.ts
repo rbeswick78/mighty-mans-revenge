@@ -8,6 +8,8 @@ import {
   gauntletNextTeaser,
   gauntletOutcomeTitle,
   gauntletResultSummary,
+  gauntletRouteButtonLabel,
+  gauntletRouteChoices,
   gauntletStageScoreSummary,
   normalizeGauntletBestClear,
 } from './practice-gauntlet.js';
@@ -39,6 +41,21 @@ function result(outcome: 'advanced' | 'failed' | 'cleared'): MatchResult {
       paceBonus: outcome === 'failed' ? 0 : 300,
       nextStage: outcome === 'advanced' ? 2 : 1,
       nextDifficulty: outcome === 'advanced' ? 'scrapper' : 'rookie',
+      routeOptions:
+        outcome === 'advanced'
+          ? [
+              {
+                id: 'route_a',
+                mapName: 'Scrapyard',
+                gameMode: 'gun_game' as MatchResult['gameMode'],
+              },
+              {
+                id: 'route_b',
+                mapName: 'Collapsed Overpass',
+                gameMode: 'last_stand' as MatchResult['gameMode'],
+              },
+            ]
+          : undefined,
     },
   };
 }
@@ -54,7 +71,7 @@ describe('practice gauntlet presentation', () => {
     ).toBe('GAUNTLET 2/3 - SCRAPPER  //  RUN 1,500  //  KING OF THE HILL - SCRAPYARD');
   });
 
-  it('celebrates advancement and promises the next fight', () => {
+  it('celebrates advancement and invites a route choice', () => {
     const value = result('advanced');
     expect(gauntletOutcomeTitle(value)).toBe('STAGE CLEAR');
     expect(gauntletActionLabel(value)).toBe('NEXT FIGHT');
@@ -63,7 +80,14 @@ describe('practice gauntlet presentation', () => {
     expect(gauntletStageScoreSummary(value)).toBe(
       'STAGE +2,200 = CLEAR 1,000 + CONTRACT 300 + REG 200 + FLAWLESS 400 + PACE 300',
     );
-    expect(gauntletNextTeaser(value)).toBe('NEXT: STAGE 2/3 - SCRAPPER  //  GUN GAME - SCRAPYARD');
+    expect(gauntletNextTeaser(value)).toBe('CHOOSE: STAGE 2/3 - SCRAPPER');
+    expect(gauntletRouteChoices(value)).toHaveLength(2);
+    expect(gauntletRouteButtonLabel(gauntletRouteChoices(value)[0])).toBe(
+      'ROUTE A · GUN GAME\nSCRAPYARD',
+    );
+    expect(gauntletRouteButtonLabel(gauntletRouteChoices(value)[1])).toBe(
+      'ROUTE B · LAST STAND\nCOLLAPSED OVERPASS',
+    );
   });
 
   it('turns failures and full clears into explicit stage-one retries', () => {
@@ -72,6 +96,7 @@ describe('practice gauntlet presentation', () => {
     expect(gauntletOutcomeTitle(result('cleared'))).toBe('GAUNTLET CLEAR');
     expect(gauntletNextTeaser(result('cleared'))).toContain('RETRY: STAGE 1/3 - ROOKIE');
     expect(gauntletStageScoreSummary(result('failed'))).toContain('NO POINTS BANKED');
+    expect(gauntletRouteChoices(result('failed'))).toEqual([]);
   });
 
   it('normalizes and updates a browser-local best only for completed clears', () => {

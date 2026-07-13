@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–50 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty with Scavenger Instincts, the three-stage Wasteland Gauntlet and its score-attack chase, four arenas, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–52 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty with Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, and route drafts, four arenas, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -83,6 +83,7 @@ Each session below attacks one of these.
 | 49  | Wasteland Gauntlet                              | A three-fight solo climb turns Practice into a run with escalating stakes    | **DONE** (2026-07-13) |
 | 50  | Gauntlet Score Attack                           | Every solo clear leaves a personal target worth one more run                 | **DONE** (2026-07-13) |
 | 51  | Gauntlet Performance Bonuses                    | Cleaner, faster victories keep even strong personal bests worth chasing      | **DONE** (2026-07-13) |
+| 52  | Gauntlet Route Draft                            | Every cleared stage offers a meaningful next-fight choice                    | **DONE** (2026-07-13) |
 
 ---
 
@@ -2526,7 +2527,92 @@ CLEAR 1,000 + CONTRACT 300 + REG 200 + FLAWLESS 400 + PACE 300`) so every
 
 ---
 
+## Session 52 — Gauntlet Route Draft
+
+**Goal:** let a successful solo run branch between two distinct next fights,
+so replaying the Gauntlet asks for decisions as well as cleaner execution.
+
+**Locked design decisions**
+
+- Only an advanced stage offers a draft. Route A preserves the prior automatic
+  next map and mode; Route B advances one additional step through both existing
+  rotations. Failure and full-clear results retain their single stage-one retry.
+- Routes are authored and validated by the server. `MatchResult` carries the
+  exact offers, and the optional rematch request route ID selects one. Missing,
+  invalid, or tampered values safely choose Route A for old-client compatibility.
+- FORCE pins remain authoritative. A valid forced map or mode is used on both
+  routes, and a fully duplicate destination is presented only once rather than
+  offering a fake choice. Route generation consumes no gameplay RNG.
+- Route choice changes only the next arena and mode. Stage difficulty, score
+  carry, fresh contracts, fresh mutator exclusions, and Gauntlet reset rules are
+  untouched. Ordinary Spar, PvP rematches, drafts, stats, and combat balance are
+  unchanged.
+- Advanced results present `CHOOSE` plus two compact route buttons and Back to
+  Lobby. Pointer, touch, D-pad/stick traversal, confirm, alternate confirm, and
+  controller back all use the existing menu conventions. Both routes lock after
+  selection so a delayed transition cannot send contradictory requests.
+
+**Acceptance criteria**
+
+- [x] Shared tests cover ordered route construction, duplicate removal, explicit
+      selection, and safe missing/invalid fallback; wire tests cover old and new
+      rematch payloads.
+- [x] Matchmaking integration proves Route B launches the promised map/mode and
+      stage, the next offers follow that branch, invalid input falls back to Route
+      A, and failure/clear results expose no route draft.
+- [x] Client presentation tests cover the `CHOOSE` teaser and route labels; a
+      real browser regression activates Route B on desktop Chromium, desktop
+      Firefox, and 844×390 touch input with readable three-button spacing.
+- [x] Typecheck, lint, all 1,100 unit tests, production build, and the full
+      Playwright desktop/mobile matrix pass.
+
+---
+
 ## Session Log
+
+### Session 52 — 2026-07-13 — Gauntlet Route Draft
+
+**Shipped:** every cleared Rookie or Scrapper stage now offers two
+server-authored next fights. Route A keeps the familiar next rotation entry;
+Route B skips one entry forward in both the arena and mode cycles. Choosing a
+branch immediately launches the same authoritative next stage with the same
+Rusty difficulty and score bank, while the following offer naturally continues
+from the chosen destination. Failed and completed runs still offer one clean
+stage-one retry.
+
+The rematch message gained one optional route ID, so older clients and missing
+choices continue through Route A. The server validates against its stored
+offers; invalid values cannot invent a map or mode. FORCE pins are honored and
+duplicate destinations collapse to one action. PvP, ordinary Spar, contracts,
+mutators, stats, scoring, and combat tuning are unchanged.
+
+Results now show a `CHOOSE` teaser and Route A / Route B / Back to Lobby actions
+with pointer, touch, and controller traversal. The live mobile regression
+uncovered a shared button ordering edge where a touch-generated `pointerover`
+could overwrite the pressed state before release. `PixelButton` now preserves a
+press through that sequence, hardening every menu button rather than adding a
+route-only workaround.
+
+**Verification:** 1,100 tests pass across 73 files, including route generation,
+deduplication, missing/tampered fallback, wire compatibility, authoritative
+branch progression, reset isolation, and presentation. TypeScript, ESLint,
+formatting, all package builds, and the Vite production bundle are clean; Vite
+retains its existing chunk-size advisory. The full Playwright matrix passes 16
+tests with 11 intentional scoped skips. The route browser regression renders
+the real ResultsScene and activates Route B in desktop Chromium, desktop
+Firefox, and 844×390 mobile touch; desktop and mobile captures were visually
+checked for label fit and action spacing. Playwright teardown left ports 3000,
+3001, and 5173 clear.
+
+**Tuning watch:** both routes currently advance map and mode together, making
+the choice fast and legible rather than a four-way matrix. Watch whether players
+develop favorites or simply prefer Route B's novelty; if one branch dominates,
+future route offers can compare independent map/mode combinations without
+changing the selection protocol.
+
+**Deployment:** not run; deployment still requires explicit authorization.
+
+---
 
 ### Session 51 — 2026-07-13 — Gauntlet Performance Bonuses
 
