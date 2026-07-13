@@ -4,7 +4,7 @@ import type {
   PracticeGauntletMatch,
   PracticeGauntletRoute,
 } from '@shared/types/game.js';
-import { gameModeDisplayName } from '@shared/config/game.js';
+import { CHARACTERS, gameModeDisplayName } from '@shared/config/game.js';
 
 export const GAUNTLET_BEST_CLEAR_STORAGE_KEY = 'mmr_gauntlet_best_clear';
 
@@ -45,10 +45,14 @@ export function gauntletMatchLabel(
   gameMode: GameModeType,
   mapName: string,
 ): string {
-  return (
+  const summary =
     `GAUNTLET ${gauntlet.stage}/${gauntlet.totalStages} - ` +
-    `${gauntlet.difficulty.toUpperCase()}  //  RUN ${formatScore(gauntlet.runScore)}  //  ` +
-    `${gameModeDisplayName(gameMode)} - ${mapName.toUpperCase()}`
+    `${gauntlet.difficulty.toUpperCase()}  //  RUN ${formatScore(gauntlet.runScore)}`;
+  const destination = `${gameModeDisplayName(gameMode)} - ${mapName.toUpperCase()}`;
+  if (!gauntlet.opponentCharacterId) return `${summary}  //  ${destination}`;
+  return (
+    `${summary}\n${destination}  //  RUSTY: ` +
+    CHARACTERS[gauntlet.opponentCharacterId].displayName.toUpperCase()
   );
 }
 
@@ -119,7 +123,13 @@ export function gauntletRouteChoices(result: MatchResult | null): PracticeGauntl
 
 export function gauntletRouteButtonLabel(route: PracticeGauntletRoute): string {
   const letter = route.id === 'route_a' ? 'A' : 'B';
-  return `ROUTE ${letter} · ${gameModeDisplayName(route.gameMode)}\n` + route.mapName.toUpperCase();
+  const rival = route.opponentCharacterId
+    ? `\nVS ${CHARACTERS[route.opponentCharacterId].displayName.toUpperCase()}`
+    : '';
+  return (
+    `ROUTE ${letter} · ${gameModeDisplayName(route.gameMode)}\n` +
+    `${route.mapName.toUpperCase()}${rival}`
+  );
 }
 
 export function gauntletActionLabel(result: MatchResult | null): string | null {

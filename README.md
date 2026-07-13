@@ -52,7 +52,9 @@ Each stage win banks score, with bonuses for the round contract and a
 regulation finish. Zero-death wins add a flawless bonus, while every whole
 regulation second left adds pace points up to the stage cap; completing all
 three stages can set the device's `BEST CLEAR` and give the next run a target
-to beat.
+to beat. After the first two wins, both next-fight routes preview a different
+Rusty fighter; the chosen matchup is locked for that stage, and no opponent
+repeats during the run.
 
 ## Where to read next
 

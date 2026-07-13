@@ -1,6 +1,5 @@
-import { PRACTICE_GAUNTLET } from '../config/game.js';
+import { PRACTICE_GAUNTLET, type CharacterId } from '../config/game.js';
 import type {
-  GameModeType,
   PracticeGauntletMatch,
   PracticeGauntletResult,
   PracticeGauntletRoute,
@@ -34,14 +33,44 @@ export interface PracticeGauntletPerformance {
  * successor; Route B is omitted when FORCE pins make it identical.
  */
 export function practiceGauntletRoutes(
-  primary: { mapName: string; gameMode: GameModeType },
-  alternate: { mapName: string; gameMode: GameModeType },
+  primary: Omit<PracticeGauntletRoute, 'id'>,
+  alternate: Omit<PracticeGauntletRoute, 'id'>,
 ): PracticeGauntletRoute[] {
   const routes: PracticeGauntletRoute[] = [{ id: 'route_a', ...primary }];
-  if (alternate.mapName !== primary.mapName || alternate.gameMode !== primary.gameMode) {
+  if (
+    alternate.mapName !== primary.mapName ||
+    alternate.gameMode !== primary.gameMode ||
+    alternate.opponentCharacterId !== primary.opponentCharacterId
+  ) {
     routes.push({ id: 'route_b', ...alternate });
   }
   return routes;
+}
+
+/**
+ * Walk forward through roster order after the current rival, skipping every
+ * fighter already encountered in this run. This yields stable, distinct route
+ * previews without consuming the gameplay or matchmaking RNG streams.
+ */
+export function practiceGauntletOpponentChoices(
+  roster: readonly CharacterId[],
+  encountered: readonly CharacterId[],
+  count = 2,
+): CharacterId[] {
+  const targetCount = Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0;
+  if (roster.length === 0 || targetCount === 0) return [];
+
+  const blocked = new Set(encountered);
+  const current = encountered[encountered.length - 1];
+  const currentIndex = current === undefined ? -1 : roster.indexOf(current);
+  const startIndex = currentIndex >= 0 ? currentIndex + 1 : 0;
+  const choices: CharacterId[] = [];
+  for (let offset = 0; offset < roster.length && choices.length < targetCount; offset++) {
+    const candidate = roster[(startIndex + offset) % roster.length];
+    if (!candidate || blocked.has(candidate) || choices.includes(candidate)) continue;
+    choices.push(candidate);
+  }
+  return choices;
 }
 
 /** Untrusted/missing selections safely preserve the legacy first route. */

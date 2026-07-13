@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import type { CharacterId } from '../config/game.js';
 import { GameModeType } from '../types/game.js';
 import {
   practiceGauntletMatch,
+  practiceGauntletOpponentChoices,
   practiceGauntletRoutes,
   resolvePracticeGauntlet,
   selectPracticeGauntletRoute,
@@ -30,6 +32,48 @@ describe('practice gauntlet', () => {
         { mapName: 'Scrapyard', gameMode: GameModeType.DEATHMATCH },
       ),
     ).toEqual([{ id: 'route_a', mapName: 'Scrapyard', gameMode: 'deathmatch' }]);
+  });
+
+  it('keeps pinned destinations distinct when they offer different rivals', () => {
+    expect(
+      practiceGauntletRoutes(
+        {
+          mapName: 'Scrapyard',
+          gameMode: GameModeType.DEATHMATCH,
+          opponentCharacterId: 'bruce',
+        },
+        {
+          mapName: 'Scrapyard',
+          gameMode: GameModeType.DEATHMATCH,
+          opponentCharacterId: 'frost_wizard',
+        },
+      ),
+    ).toHaveLength(2);
+  });
+
+  it('offers deterministic non-repeating rivals after the current matchup', () => {
+    const roster = [
+      'mighty_man',
+      'bruce',
+      'frost_wizard',
+      'bubba',
+      'jack',
+      'rook',
+    ] satisfies CharacterId[];
+    expect(practiceGauntletOpponentChoices(roster, ['mighty_man'])).toEqual([
+      'bruce',
+      'frost_wizard',
+    ]);
+    expect(practiceGauntletOpponentChoices(roster, ['mighty_man', 'frost_wizard'])).toEqual([
+      'bubba',
+      'jack',
+    ]);
+    expect(practiceGauntletOpponentChoices(roster, ['rook', 'mighty_man'])).toEqual([
+      'bruce',
+      'frost_wizard',
+    ]);
+    expect(practiceGauntletOpponentChoices([], ['mighty_man'])).toEqual([]);
+    expect(practiceGauntletOpponentChoices(roster, [], Number.NaN)).toEqual([]);
   });
 
   it('maps the three stages to escalating Rusty profiles and clamps input', () => {

@@ -17,6 +17,7 @@ import {
   listMapNames,
   MAP_REGISTRY,
   practiceGauntletMatch,
+  practiceGauntletOpponentChoices,
   practiceGauntletRoutes,
   resolvePracticeGauntlet,
   selectPracticeGauntletRoute,
@@ -88,6 +89,8 @@ interface PostMatchState {
   nextGauntlet: PracticeGauntletMatch | null;
   /** Server-authored advancement choices; empty for retries and non-Gauntlet matches. */
   gauntletRoutes: PracticeGauntletRoute[];
+  /** Rivals already faced in this run, carried only while advancing. */
+  gauntletOpponentHistory: CharacterId[];
   /** Both mutators from the completed round; random rematch rolls skip them. */
   previousMutators: MutatorId[];
   /** Previous round's contract; direct rematches must roll something fresh. */
@@ -155,6 +158,8 @@ export class MatchmakingManager {
   private readonly practiceDifficulties: Map<string, BotDifficulty> = new Map();
   /** Authoritative stage metadata for live Gauntlet matches. */
   private readonly practiceGauntlets: Map<string, PracticeGauntletMatch> = new Map();
+  /** Ordered, non-repeating Rusty fighters encountered by each live run. */
+  private readonly practiceGauntletOpponentHistories: Map<string, CharacterId[]> = new Map();
   /** Synthetic ids survive across direct practice rematches. */
   private readonly botPlayerIds: Set<PlayerId> = new Set();
   /** Track nicknames for players (set when they join matchmaking). */
@@ -382,6 +387,9 @@ export class MatchmakingManager {
       if (route) {
         postMatch.nextMapName = route.mapName;
         postMatch.nextGameMode = route.gameMode;
+        if (postMatch.nextGauntlet && route.opponentCharacterId) {
+          postMatch.nextGauntlet.opponentCharacterId = route.opponentCharacterId;
+        }
       }
     }
 
@@ -666,6 +674,7 @@ export class MatchmakingManager {
     rematchMutatorExclusions: readonly MutatorId[] = [],
     previousContractId?: MatchContractId,
     gauntlet: PracticeGauntletMatch | null = null,
+    gauntletOpponentHistory: readonly CharacterId[] = [],
   ): void {
     const match = new Match(
       matchId,
@@ -689,9 +698,19 @@ export class MatchmakingManager {
       if (botEntry) {
         this.botControllers.set(matchId, new BotController(botEntry.id, practiceDifficulty));
         const character =
+          gauntlet?.opponentCharacterId ??
           CHARACTER_IDS[
             Math.min(Math.floor(this.rng() * CHARACTER_IDS.length), CHARACTER_IDS.length - 1)
           ];
+        if (gauntlet) {
+          gauntlet.opponentCharacterId = character;
+          this.practiceGauntletOpponentHistories.set(
+            matchId,
+            gauntletOpponentHistory.includes(character)
+              ? [...gauntletOpponentHistory]
+              : [...gauntletOpponentHistory, character],
+          );
+        }
         match.setLock(botEntry.id, character);
       }
     }
@@ -1207,6 +1226,7 @@ export class MatchmakingManager {
     const result = match.getResult();
     const practiceDifficulty = this.practiceDifficulties.get(matchId) ?? null;
     const gauntlet = this.practiceGauntlets.get(matchId) ?? null;
+    const gauntletOpponentHistory = this.practiceGauntletOpponentHistories.get(matchId) ?? [];
     const isPractice = practiceDifficulty !== null;
     result.isPractice = isPractice;
     result.rivalrySet = gauntlet ? null : this.recordRivalrySet(match, result.winnerId);
@@ -1236,18 +1256,36 @@ export class MatchmakingManager {
     result.nextMapName = nextMapName;
     const nextGameMode = this.forcedMode() ?? getNextGameMode(match.gameModeType);
     result.nextGameMode = nextGameMode;
+    const nextGauntlet = result.gauntlet
+      ? practiceGauntletMatch(
+          result.gauntlet.nextStage,
+          result.gauntlet.outcome === 'advanced' ? result.gauntlet.runScore : 0,
+        )
+      : null;
+    const rivalChoices =
+      result.gauntlet?.outcome === 'advanced'
+        ? practiceGauntletOpponentChoices(CHARACTER_IDS, gauntletOpponentHistory)
+        : [];
     const gauntletRoutes =
       result.gauntlet?.outcome === 'advanced'
         ? practiceGauntletRoutes(
-            { mapName: nextMapName, gameMode: nextGameMode },
+            {
+              mapName: nextMapName,
+              gameMode: nextGameMode,
+              opponentCharacterId: rivalChoices[0],
+            },
             {
               mapName: this.forcedMap()?.name ?? getNextMapName(nextMapName),
               gameMode: this.forcedMode() ?? getNextGameMode(nextGameMode),
+              opponentCharacterId: rivalChoices[1],
             },
           )
         : [];
     if (result.gauntlet?.outcome === 'advanced') {
       result.gauntlet.routeOptions = gauntletRoutes;
+      if (nextGauntlet && gauntletRoutes[0]?.opponentCharacterId) {
+        nextGauntlet.opponentCharacterId = gauntletRoutes[0].opponentCharacterId;
+      }
     }
 
     // Fold this match into the lifetime records and attach the pairing's
@@ -1356,13 +1394,10 @@ export class MatchmakingManager {
       setComplete: result.rivalrySet?.championId != null,
       isPractice,
       practiceDifficulty,
-      nextGauntlet: result.gauntlet
-        ? practiceGauntletMatch(
-            result.gauntlet.nextStage,
-            result.gauntlet.outcome === 'advanced' ? result.gauntlet.runScore : 0,
-          )
-        : null,
+      nextGauntlet,
       gauntletRoutes,
+      gauntletOpponentHistory:
+        result.gauntlet?.outcome === 'advanced' ? [...gauntletOpponentHistory] : [],
       previousMutators: [...match.activeMutators],
       previousContractId: result.contract?.id ?? match.getContractHudState().id,
     });
@@ -1373,6 +1408,7 @@ export class MatchmakingManager {
     this.botControllers.delete(matchId);
     this.practiceDifficulties.delete(matchId);
     this.practiceGauntlets.delete(matchId);
+    this.practiceGauntletOpponentHistories.delete(matchId);
   }
 
   private onRematchTimeout(matchId: string): void {
@@ -1437,6 +1473,7 @@ export class MatchmakingManager {
         postMatch.previousMutators,
         postMatch.previousContractId,
         postMatch.nextGauntlet,
+        postMatch.gauntletOpponentHistory,
       );
       return;
     }

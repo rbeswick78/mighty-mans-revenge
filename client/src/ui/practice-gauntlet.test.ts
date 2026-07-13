@@ -48,11 +48,13 @@ function result(outcome: 'advanced' | 'failed' | 'cleared'): MatchResult {
                 id: 'route_a',
                 mapName: 'Scrapyard',
                 gameMode: 'gun_game' as MatchResult['gameMode'],
+                opponentCharacterId: 'bruce',
               },
               {
                 id: 'route_b',
                 mapName: 'Collapsed Overpass',
                 gameMode: 'last_stand' as MatchResult['gameMode'],
+                opponentCharacterId: 'frost_wizard',
               },
             ]
           : undefined,
@@ -69,6 +71,22 @@ describe('practice gauntlet presentation', () => {
         'Scrapyard',
       ),
     ).toBe('GAUNTLET 2/3 - SCRAPPER  //  RUN 1,500  //  KING OF THE HILL - SCRAPYARD');
+    expect(
+      gauntletMatchLabel(
+        {
+          stage: 2,
+          totalStages: 3,
+          difficulty: 'scrapper',
+          runScore: 1500,
+          opponentCharacterId: 'frost_wizard',
+        },
+        'koth' as MatchResult['gameMode'],
+        'Scrapyard',
+      ),
+    ).toBe(
+      'GAUNTLET 2/3 - SCRAPPER  //  RUN 1,500\n' +
+        'KING OF THE HILL - SCRAPYARD  //  RUSTY: FROST WIZARD',
+    );
   });
 
   it('celebrates advancement and invites a route choice', () => {
@@ -83,10 +101,10 @@ describe('practice gauntlet presentation', () => {
     expect(gauntletNextTeaser(value)).toBe('CHOOSE: STAGE 2/3 - SCRAPPER');
     expect(gauntletRouteChoices(value)).toHaveLength(2);
     expect(gauntletRouteButtonLabel(gauntletRouteChoices(value)[0])).toBe(
-      'ROUTE A · GUN GAME\nSCRAPYARD',
+      'ROUTE A · GUN GAME\nSCRAPYARD\nVS BRUCE',
     );
     expect(gauntletRouteButtonLabel(gauntletRouteChoices(value)[1])).toBe(
-      'ROUTE B · LAST STAND\nCOLLAPSED OVERPASS',
+      'ROUTE B · LAST STAND\nCOLLAPSED OVERPASS\nVS FROST WIZARD',
     );
   });
 

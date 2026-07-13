@@ -2,7 +2,7 @@ import { PlayerId, MatchId, Tick, Vec2 } from './common.js';
 import { PlayerState, PlayerStats } from './player.js';
 import { AxeState, GrenadeState, BulletTrail, PunchEvent } from './projectile.js';
 import { PickupState } from './pickup.js';
-import type { AwardId, BotDifficulty } from '../config/game.js';
+import type { AwardId, BotDifficulty, CharacterId } from '../config/game.js';
 
 export enum MatchPhase {
   WAITING = 'waiting',
@@ -277,6 +277,8 @@ export interface PracticeGauntletMatch {
   difficulty: BotDifficulty;
   /** Authoritative score banked before this stage begins. */
   runScore: number;
+  /** Rusty's server-pinned fighter for this stage; absent on older payloads. */
+  opponentCharacterId?: CharacterId;
 }
 
 export type PracticeGauntletRouteId = 'route_a' | 'route_b';
@@ -286,6 +288,8 @@ export interface PracticeGauntletRoute {
   id: PracticeGauntletRouteId;
   mapName: string;
   gameMode: GameModeType;
+  /** The distinct Rusty matchup this branch will launch. */
+  opponentCharacterId?: CharacterId;
 }
 
 export interface PracticeGauntletResult extends PracticeGauntletMatch {

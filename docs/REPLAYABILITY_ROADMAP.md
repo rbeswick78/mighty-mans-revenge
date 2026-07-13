@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–52 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty with Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, and route drafts, four arenas, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–53 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty with Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, and rival drafts, four arenas, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -84,6 +84,7 @@ Each session below attacks one of these.
 | 50  | Gauntlet Score Attack                           | Every solo clear leaves a personal target worth one more run                 | **DONE** (2026-07-13) |
 | 51  | Gauntlet Performance Bonuses                    | Cleaner, faster victories keep even strong personal bests worth chasing      | **DONE** (2026-07-13) |
 | 52  | Gauntlet Route Draft                            | Every cleared stage offers a meaningful next-fight choice                    | **DONE** (2026-07-13) |
+| 53  | Gauntlet Rival Drafts                           | Route previews turn each branch into a readable matchup decision             | **DONE** (2026-07-13) |
 
 ---
 
@@ -2568,7 +2569,92 @@ so replaying the Gauntlet asks for decisions as well as cleaner execution.
 
 ---
 
+## Session 53 — Gauntlet Rival Drafts
+
+**Goal:** make each Gauntlet branch a matchup decision by showing which Rusty
+fighter waits on the other side, while keeping every run varied.
+
+**Locked design decisions**
+
+- Stage one keeps the ordinary server-side random Rusty roll. After an
+  advanced stage, Route A and Route B preview different available fighters in
+  addition to their arena and mode. The selected route pins that exact fighter
+  into the next authoritative match and its character-select briefing.
+- A server-owned encounter history follows only a live advancing run. Rival
+  offers walk forward through stable roster order after the current opponent,
+  skip everyone already faced, and consume no matchmaking or gameplay RNG.
+  With six fighters and three stages, a run can never repeat an opponent.
+- Rival metadata is optional on shared match and route payloads. Older results
+  retain their previous one-line briefing and two-line route labels; missing,
+  invalid, or tampered route input still falls back to the complete Route A
+  offer authored by the server.
+- Fully pinned FORCE runs may still show two branches when their destinations
+  match but their opponents differ. This is a real matchup choice, not the fake
+  duplicate that Session 52 collapses.
+- The feature changes only Rusty's fighter assignment and preview. Difficulty,
+  fighter stats, human selection rules, maps, modes, score, bonuses, contracts,
+  mutators, ordinary Spar, PvP, and persistence remain untouched.
+
+**Acceptance criteria**
+
+- [x] Shared tests prove stable forward selection, history skipping, roster
+      wraparound, invalid-count handling, and distinct-rival routes on an
+      otherwise identical pinned destination.
+- [x] Matchmaking integration proves the opening random rival is exposed, a
+      selected Route B fighter is locked into stage two, invalid input pins the
+      full Route A offer for stage three, all three rivals are unique, and a
+      completed run resets opponent history.
+- [x] Presentation tests preserve old payload labels and cover the new current
+      rival briefing plus both route previews. The live route regression checks
+      the rival copy and activates Route B in Chromium, Firefox, and 844×390
+      touch input.
+- [x] Typecheck, lint, all 1,102 unit tests, production build, and the full
+      Playwright desktop/mobile matrix pass.
+
+---
+
 ## Session Log
+
+### Session 53 — 2026-07-13 — Gauntlet Rival Drafts
+
+**Shipped:** Gauntlet routes now reveal more than the next arena and ruleset:
+each branch previews a different fighter for Rusty. Picking a route locks the
+entire server-authored offer, so the next character-select screen names the
+rival and the bot is already locked to that character. Players can now make a
+real counter-pick instead of learning Rusty's matchup only after committing to
+the branch.
+
+The server records the opponents encountered by an advancing run and selects
+future offers deterministically from roster order without consuming RNG. It
+skips every fighter already faced, guaranteeing three distinct matchups across
+the three-stage climb. A clear, loss, or draw discards that history, so the next
+run starts with an ordinary fresh Rusty roll. Optional wire fields preserve old
+payload presentation and Route A fallback behavior, while fully forced
+map/mode runs correctly keep two choices when the rivals differ.
+
+Results use compact three-line route buttons for the arena, mode, and matchup;
+the character-select briefing names the pinned rival on its own line. The
+longest current label (`FROST WIZARD`) was visually checked in both desktop and
+844×390 mobile layouts, with pointer and touch selection following the existing
+button path.
+
+**Verification:** 1,102 tests pass across 73 files, including deterministic
+rival generation, no-repeat history, exact server lock-in, reset isolation,
+old-payload presentation, and route labels. TypeScript, ESLint, formatting, all
+package builds, and the Vite production bundle are clean; Vite retains its
+existing chunk-size advisory. The full Playwright matrix passes 16 tests with
+11 intentional scoped skips, including the rival route screen in Chromium,
+Firefox, and mobile touch. Visual captures were reviewed and removed, and
+Playwright teardown left ports 3000, 3001, and 5173 clear.
+
+**Tuning watch:** stable roster order makes choices learnable and avoids hidden
+randomness, but it can create favorite matchup sequences. Watch whether players
+always counter-pick the same fighter; the optional rival field leaves room for
+future weighted or archetype-based offers without changing the protocol.
+
+**Deployment:** not run; deployment still requires explicit authorization.
+
+---
 
 ### Session 52 — 2026-07-13 — Gauntlet Route Draft
 

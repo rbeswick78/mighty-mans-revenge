@@ -255,8 +255,11 @@ export class ResultsScene extends Phaser.Scene {
     const btnY = camHeight - 90;
     const routeChoices = gauntletRouteChoices(this.result);
     const hasRouteDraft = routeChoices.length > 1;
+    const hasRivalPreview =
+      hasRouteDraft && routeChoices.some((route) => route.opponentCharacterId !== undefined);
     const btnW = hasRouteDraft ? 250 : 200;
-    const btnH = 46;
+    const btnH = hasRivalPreview ? 54 : 46;
+    const adjustedBtnY = hasRivalPreview ? camHeight - 94 : btnY;
     const btnGap = 14;
     const totalButtons = hasRouteDraft ? 3 : 2;
     const firstBtnX = centerX - (btnW * totalButtons + btnGap * (totalButtons - 1)) / 2;
@@ -281,7 +284,7 @@ export class ResultsScene extends Phaser.Scene {
     this.rematchButton = new PixelButton(
       this,
       firstBtnX,
-      btnY,
+      adjustedBtnY,
       btnW,
       btnH,
       hasRouteDraft
@@ -289,7 +292,7 @@ export class ResultsScene extends Phaser.Scene {
         : (gauntletActionLabel(this.result) ?? rematchButtonLabel(this.result)),
       {
         variant: 'primary',
-        fontSize: hasRouteDraft ? 9 : 13,
+        fontSize: hasRivalPreview ? 8 : hasRouteDraft ? 9 : 13,
         onClick: () => requestNextFight(hasRouteDraft ? routeChoices[0].id : undefined),
       },
     );
@@ -299,13 +302,13 @@ export class ResultsScene extends Phaser.Scene {
       this.alternateRouteButton = new PixelButton(
         this,
         firstBtnX + btnW + btnGap,
-        btnY,
+        adjustedBtnY,
         btnW,
         btnH,
         gauntletRouteButtonLabel(routeChoices[1]),
         {
           variant: 'primary',
-          fontSize: 9,
+          fontSize: hasRivalPreview ? 8 : 9,
           onClick: () => requestNextFight(routeChoices[1].id),
         },
       );
@@ -315,7 +318,7 @@ export class ResultsScene extends Phaser.Scene {
     this.lobbyButton = new PixelButton(
       this,
       firstBtnX + (btnW + btnGap) * (totalButtons - 1),
-      btnY,
+      adjustedBtnY,
       btnW,
       btnH,
       'BACK TO LOBBY',

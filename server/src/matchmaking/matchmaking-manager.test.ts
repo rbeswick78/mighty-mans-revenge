@@ -1444,9 +1444,14 @@ describe('MatchmakingManager solo practice flow', () => {
       totalStages: 3,
       difficulty: 'rookie',
       runScore: 0,
+      opponentCharacterId: 'mighty_man',
     });
 
     const first = mgr.getActiveMatches()[0];
+    const firstRival = [...first.selectionState.entries()].find(([id]) =>
+      id.startsWith('bot:'),
+    )?.[1].locked;
+    expect(firstRival).toBe('mighty_man');
     first.players.get('A')!.score = 3;
     first.matchTimer = 100;
     first.phase = MatchPhase.ENDED;
@@ -1460,6 +1465,7 @@ describe('MatchmakingManager solo practice flow', () => {
     expect(firstEnd.message.result.gauntlet).toMatchObject({
       stage: 1,
       difficulty: 'rookie',
+      opponentCharacterId: 'mighty_man',
       outcome: 'advanced',
       stageScore: 1800,
       runScore: 1800,
@@ -1468,8 +1474,18 @@ describe('MatchmakingManager solo practice flow', () => {
       nextStage: 2,
       nextDifficulty: 'scrapper',
       routeOptions: [
-        { id: 'route_a', mapName: 'Overgrown Suburb', gameMode: GameModeType.KOTH },
-        { id: 'route_b', mapName: 'Scrapyard', gameMode: GameModeType.GUN_GAME },
+        {
+          id: 'route_a',
+          mapName: 'Overgrown Suburb',
+          gameMode: GameModeType.KOTH,
+          opponentCharacterId: 'bruce',
+        },
+        {
+          id: 'route_b',
+          mapName: 'Scrapyard',
+          gameMode: GameModeType.GUN_GAME,
+          opponentCharacterId: 'frost_wizard',
+        },
       ],
     });
     expect(firstEnd.message.result.rivalrySet).toBeNull();
@@ -1488,11 +1504,16 @@ describe('MatchmakingManager solo practice flow', () => {
       totalStages: 3,
       difficulty: 'scrapper',
       runScore: 1800,
+      opponentCharacterId: 'frost_wizard',
     });
     expect(secondFound.message.mapName).toBe('Scrapyard');
     expect(secondFound.message.gameMode).toBe(GameModeType.GUN_GAME);
 
     const second = mgr.getActiveMatches()[0];
+    const secondRival = [...second.selectionState.entries()].find(([id]) =>
+      id.startsWith('bot:'),
+    )?.[1].locked;
+    expect(secondRival).toBe('frost_wizard');
     second.players.get('A')!.score = 3;
     second.stats.recordDeath('A');
     second.matchTimer = 47.9;
@@ -1507,6 +1528,7 @@ describe('MatchmakingManager solo practice flow', () => {
     expect(secondEnd.message.result.gauntlet).toMatchObject({
       stage: 2,
       difficulty: 'scrapper',
+      opponentCharacterId: 'frost_wizard',
       outcome: 'advanced',
       stageScore: 1294,
       runScore: 3094,
@@ -1515,8 +1537,18 @@ describe('MatchmakingManager solo practice flow', () => {
       nextStage: 3,
       nextDifficulty: 'warlord',
       routeOptions: [
-        { id: 'route_a', mapName: 'Collapsed Overpass', gameMode: GameModeType.LAST_STAND },
-        { id: 'route_b', mapName: 'Wasteland Outpost', gameMode: GameModeType.KILL_CONFIRMED },
+        {
+          id: 'route_a',
+          mapName: 'Collapsed Overpass',
+          gameMode: GameModeType.LAST_STAND,
+          opponentCharacterId: 'bubba',
+        },
+        {
+          id: 'route_b',
+          mapName: 'Wasteland Outpost',
+          gameMode: GameModeType.KILL_CONFIRMED,
+          opponentCharacterId: 'jack',
+        },
       ],
     });
 
@@ -1536,11 +1568,17 @@ describe('MatchmakingManager solo practice flow', () => {
       totalStages: 3,
       difficulty: 'warlord',
       runScore: 3094,
+      opponentCharacterId: 'bubba',
     });
     expect(thirdFound.message.mapName).toBe('Collapsed Overpass');
     expect(thirdFound.message.gameMode).toBe(GameModeType.LAST_STAND);
 
     const third = mgr.getActiveMatches()[0];
+    const thirdRival = [...third.selectionState.entries()].find(([id]) =>
+      id.startsWith('bot:'),
+    )?.[1].locked;
+    expect(thirdRival).toBe('bubba');
+    expect(new Set([firstRival, secondRival, thirdRival]).size).toBe(3);
     third.players.get('A')!.score = 3;
     third.matchTimer = 0;
     third.phase = MatchPhase.ENDED;
@@ -1554,6 +1592,7 @@ describe('MatchmakingManager solo practice flow', () => {
     expect(cleared.message.result.gauntlet).toMatchObject({
       stage: 3,
       difficulty: 'warlord',
+      opponentCharacterId: 'bubba',
       outcome: 'cleared',
       stageScore: 1600,
       runScore: 4694,
@@ -1577,6 +1616,7 @@ describe('MatchmakingManager solo practice flow', () => {
       totalStages: 3,
       difficulty: 'rookie',
       runScore: 0,
+      opponentCharacterId: 'mighty_man',
     });
 
     const retryMatch = mgr.getActiveMatches()[0];
@@ -1593,6 +1633,7 @@ describe('MatchmakingManager solo practice flow', () => {
     expect(failed.message.result.gauntlet).toMatchObject({
       stage: 1,
       difficulty: 'rookie',
+      opponentCharacterId: 'mighty_man',
       outcome: 'failed',
       stageScore: 0,
       runScore: 0,

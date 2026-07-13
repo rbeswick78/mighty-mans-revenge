@@ -63,6 +63,7 @@ test.describe('Gauntlet route draft', () => {
             totalStages: 3,
             difficulty: 'rookie',
             runScore: 1800,
+            opponentCharacterId: 'mighty_man',
             outcome: 'advanced',
             stageScore: 1800,
             contractBonus: 0,
@@ -72,8 +73,18 @@ test.describe('Gauntlet route draft', () => {
             nextStage: 2,
             nextDifficulty: 'scrapper',
             routeOptions: [
-              { id: 'route_a', mapName: 'Overgrown Suburb', gameMode: 'koth' },
-              { id: 'route_b', mapName: 'Scrapyard', gameMode: 'gun_game' },
+              {
+                id: 'route_a',
+                mapName: 'Overgrown Suburb',
+                gameMode: 'koth',
+                opponentCharacterId: 'bruce',
+              },
+              {
+                id: 'route_b',
+                mapName: 'Scrapyard',
+                gameMode: 'gun_game',
+                opponentCharacterId: 'frost_wizard',
+              },
             ],
           },
         },
@@ -116,8 +127,12 @@ test.describe('Gauntlet route draft', () => {
       };
       return {
         buttonXs: [scene.rematchButton.x, scene.alternateRouteButton.x, scene.lobbyButton.x],
-        routeA: scene.rematchButton.list.some((child) => child.text?.includes('ROUTE A')),
-        routeB: scene.alternateRouteButton.list.some((child) => child.text?.includes('ROUTE B')),
+        routeA: scene.rematchButton.list.some(
+          (child) => child.text?.includes('ROUTE A') && child.text.includes('VS BRUCE'),
+        ),
+        routeB: scene.alternateRouteButton.list.some(
+          (child) => child.text?.includes('ROUTE B') && child.text.includes('VS FROST WIZARD'),
+        ),
         teaser: scene.children.list.some((child) => child.text === 'CHOOSE: STAGE 2/3 - SCRAPPER'),
       };
     });
