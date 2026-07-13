@@ -295,6 +295,7 @@ describe('PersistentStatsStore', () => {
     expect(ryan.currentWinStreak).toBe(0);
     expect(ryan.bestWinStreak).toBe(0);
     expect(ryan.characterWins).toEqual(createEmptyCharacterWins());
+    expect(ryan.characterWins.rook).toBe(0);
 
     // Accumulating a new-era match on top of the migrated record works.
     store.recordMatch(

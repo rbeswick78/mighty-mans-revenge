@@ -249,45 +249,46 @@ export class BootScene extends Phaser.Scene {
     // the frozen registry literal narrows each entry to its own shape.
     const roster: CharacterDef[] = Object.values(CHARACTERS);
     for (const char of roster) {
-      if (loadedPrefixes.has(char.spritePrefix)) continue;
-      loadedPrefixes.add(char.spritePrefix);
-      for (const dir of DIRECTIONS) {
-        this.loadCharacterSheet(
-          char.spritePrefix,
-          dir,
-          'idle',
-          char.idleFrames[dir],
-          char.assetFolder,
-          char.assetBaseName,
-        );
-        this.loadCharacterSheet(
-          char.spritePrefix,
-          dir,
-          'run',
-          char.runFrames[dir],
-          char.assetFolder,
-          char.assetBaseName,
-        );
-        // Melee attack sheets (the Gun Game punch rung) — body-level
-        // states, one per character, same registry-driven pipeline.
-        this.loadCharacterSheet(
-          char.spritePrefix,
-          dir,
-          'attack',
-          char.attackFrames[dir],
-          char.assetFolder,
-          char.assetBaseName,
-        );
-      }
-      for (const dir of DEATH_DIRECTIONS) {
-        this.loadCharacterSheet(
-          char.spritePrefix,
-          dir,
-          'death',
-          char.deathFrames[dir],
-          char.assetFolder,
-          char.assetBaseName,
-        );
+      if (!loadedPrefixes.has(char.spritePrefix)) {
+        loadedPrefixes.add(char.spritePrefix);
+        for (const dir of DIRECTIONS) {
+          this.loadCharacterSheet(
+            char.spritePrefix,
+            dir,
+            'idle',
+            char.idleFrames[dir],
+            char.assetFolder,
+            char.assetBaseName,
+          );
+          this.loadCharacterSheet(
+            char.spritePrefix,
+            dir,
+            'run',
+            char.runFrames[dir],
+            char.assetFolder,
+            char.assetBaseName,
+          );
+          // Melee attack sheets (the Gun Game punch rung) — body-level
+          // states, one per character, same registry-driven pipeline.
+          this.loadCharacterSheet(
+            char.spritePrefix,
+            dir,
+            'attack',
+            char.attackFrames[dir],
+            char.assetFolder,
+            char.assetBaseName,
+          );
+        }
+        for (const dir of DEATH_DIRECTIONS) {
+          this.loadCharacterSheet(
+            char.spritePrefix,
+            dir,
+            'death',
+            char.deathFrames[dir],
+            char.assetFolder,
+            char.assetBaseName,
+          );
+        }
       }
 
       // Alt-body sheets (Jack's no-axe body while his thrown axe is in
@@ -331,6 +332,49 @@ export class BootScene extends Phaser.Scene {
             alt.deathFrames[dir],
             char.assetFolder,
             alt.assetBaseName,
+          );
+        }
+      }
+
+      // Optional synchronized cosmetic layer (Rook's helmet). It owns
+      // tightly cropped frames but follows the body's state and frame count.
+      const overlay = char.bodyOverlay;
+      if (overlay && !loadedPrefixes.has(overlay.spritePrefix)) {
+        loadedPrefixes.add(overlay.spritePrefix);
+        for (const dir of DIRECTIONS) {
+          this.loadCharacterSheet(
+            overlay.spritePrefix,
+            dir,
+            'idle',
+            overlay.idleFrames[dir],
+            overlay.assetFolder,
+            overlay.assetBaseName,
+          );
+          this.loadCharacterSheet(
+            overlay.spritePrefix,
+            dir,
+            'run',
+            overlay.runFrames[dir],
+            overlay.assetFolder,
+            overlay.assetBaseName,
+          );
+          this.loadCharacterSheet(
+            overlay.spritePrefix,
+            dir,
+            'attack',
+            overlay.attackFrames[dir],
+            overlay.assetFolder,
+            overlay.assetBaseName,
+          );
+        }
+        for (const dir of DEATH_DIRECTIONS) {
+          this.loadCharacterSheet(
+            overlay.spritePrefix,
+            dir,
+            'death',
+            overlay.deathFrames[dir],
+            overlay.assetFolder,
+            overlay.assetBaseName,
           );
         }
       }
@@ -546,9 +590,10 @@ export class BootScene extends Phaser.Scene {
     // Same CharacterDef annotation rationale as loadRealAssets.
     const roster: CharacterDef[] = Object.values(CHARACTERS);
     for (const char of roster) {
-      if (animatedPrefixes.has(char.spritePrefix)) continue;
-      animatedPrefixes.add(char.spritePrefix);
-      this.createBodyAnimationSet(char.spritePrefix, char, char.deathFrameCount);
+      if (!animatedPrefixes.has(char.spritePrefix)) {
+        animatedPrefixes.add(char.spritePrefix);
+        this.createBodyAnimationSet(char.spritePrefix, char, char.deathFrameCount);
+      }
 
       // Alt-body anim set (Jack's no-axe body) — same frame counts and
       // pacing as the base set by CharacterDef.altBody contract, so it
@@ -557,6 +602,16 @@ export class BootScene extends Phaser.Scene {
       if (alt && !animatedPrefixes.has(alt.spritePrefix)) {
         animatedPrefixes.add(alt.spritePrefix);
         this.createBodyAnimationSet(alt.spritePrefix, char, alt.deathFrameCount);
+      }
+
+      const overlay = char.bodyOverlay;
+      if (overlay && !animatedPrefixes.has(overlay.spritePrefix)) {
+        animatedPrefixes.add(overlay.spritePrefix);
+        this.createBodyAnimationSet(
+          overlay.spritePrefix,
+          char,
+          char.deathFrameCount,
+        );
       }
     }
 

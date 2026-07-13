@@ -2862,6 +2862,10 @@ describe('Match', () => {
           PLAYER.BASE_SPEED * CHARACTERS.frost_wizard.speedMultiplier * 0.05,
           5,
         );
+        expect(distancePerTick('rook')).toBeCloseTo(
+          PLAYER.BASE_SPEED * CHARACTERS.rook.speedMultiplier * 0.05,
+          5,
+        );
       });
     });
 
@@ -3098,6 +3102,53 @@ describe('Match', () => {
         m.update(0.05);
         expect(m.isOvertime).toBe(true);
         expect(m.getActiveAxes()).toHaveLength(0);
+      });
+    });
+
+    describe('Rook: Breach Dash', () => {
+      it('moves three tiles along aim and starts the short cooldown', () => {
+        const m = startActiveWithRoster('rook', 'mighty_man');
+        const rook = m.players.get('player-0')!;
+        rook.position = { x: 200, y: 200 };
+
+        m.queueInput('player-0', makeInput(1, { abilityPressed: true, aimAngle: 0 }));
+        m.update(0.001);
+
+        expect(rook.position.x).toBeCloseTo(
+          200 + ABILITY.ROOK_BREACH_DASH.DISTANCE_TILES * 48,
+          5,
+        );
+        expect(rook.position.y).toBeCloseTo(200, 5);
+        expect(rook.abilityCooldownSeconds).toBeCloseTo(
+          ABILITY.ROOK_BREACH_DASH.COOLDOWN,
+          2,
+        );
+        expect(rook.abilityActiveSeconds).toBe(0);
+      });
+
+      it('cannot dash again during cooldown', () => {
+        const m = startActiveWithRoster('rook', 'mighty_man');
+        const rook = m.players.get('player-0')!;
+        rook.position = { x: 200, y: 200 };
+        m.queueInput('player-0', makeInput(1, { abilityPressed: true, aimAngle: 0 }));
+        m.update(0.001);
+
+        rook.position = { x: 200, y: 200 };
+        m.queueInput('player-0', makeInput(2, { abilityPressed: true, aimAngle: 0 }));
+        m.update(0.001);
+        expect(rook.position).toEqual({ x: 200, y: 200 });
+      });
+
+      it('refunds a point-blank dash into the map boundary', () => {
+        const m = startActiveWithRoster('rook', 'mighty_man');
+        const rook = m.players.get('player-0')!;
+        rook.position = { x: 10 * 48 - PLAYER.HITBOX_WIDTH / 2, y: 200 };
+
+        m.queueInput('player-0', makeInput(1, { abilityPressed: true, aimAngle: 0 }));
+        m.update(0.001);
+
+        expect(rook.position.x).toBe(10 * 48 - PLAYER.HITBOX_WIDTH / 2);
+        expect(rook.abilityCooldownSeconds).toBe(0);
       });
     });
   });

@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import type { PlayerId } from '@shared/types/common.js';
+import type { CharacterDef } from '@shared/types/character.js';
 import type { ServerCharacterSelectStateMessage } from '@shared/types/network.js';
 import {
   CHARACTERS,
@@ -36,17 +37,17 @@ const MASTERY_COLOR = Wasteland.HEALTH_WARNING;
 const FOOTER_COLOR = Wasteland.COVER_FILL; // weathered tan — readable against the near-ground band
 
 // Card sizing scales with roster count: the original 3-card layout used
-// 240px cards with 48px gaps, but 5 cards at that size would need 1392px
-// against a 960px canvas. Past 3 cards, shrink card + gap + type so the
-// whole roster fits with margins (5 × 172 + 4 × 16 = 924 ≤ 960).
+// 240px cards with 48px gaps, but larger rosters need a dense pass. Six
+// fighters use 142px cards with 12px gaps (912px total on the 960px canvas).
 const CARD_COUNT = CHARACTER_IDS.length;
 const COMPACT = CARD_COUNT > 3;
-const SPRITE_SCALE = COMPACT ? 4 : 6;
-const CARD_WIDTH = COMPACT ? 172 : 240;
+const DENSE = CARD_COUNT > 5;
+const SPRITE_SCALE = DENSE ? 3.5 : COMPACT ? 4 : 6;
+const CARD_WIDTH = DENSE ? 142 : COMPACT ? 172 : 240;
 const CARD_HEIGHT = 260;
-const CARD_GAP = COMPACT ? 16 : 48;
-const NAME_FONT_PX = COMPACT ? 12 : 14;
-const BLURB_FONT_PX = COMPACT ? 10 : 13;
+const CARD_GAP = DENSE ? 12 : COMPACT ? 16 : 48;
+const NAME_FONT_PX = DENSE ? 10 : COMPACT ? 12 : 14;
+const BLURB_FONT_PX = DENSE ? 8 : COMPACT ? 10 : 13;
 const DOUBLE_TAP_MS = 400;
 
 // Stat-bar normalization for the HP/SPD pips: HP fills relative to the
@@ -91,6 +92,7 @@ function abilityBlurb(id: CharacterId): string {
   if (id === 'frost_wizard') return 'FROST LOCK\nfreeze enemy 2s (30s)';
   if (id === 'bubba') return 'IRON HIDE\nhalf damage 4s (30s)';
   if (id === 'jack') return 'AXE THROW\n60 dmg axe (12s)';
+  if (id === 'rook') return 'BREACH DASH\n3 tiles, wall-safe (8s)';
   return '';
 }
 
@@ -262,7 +264,7 @@ export class CharacterSelectScene extends Phaser.Scene {
   }
 
   private createCard(id: CharacterId, x: number, y: number): CardWidgets {
-    const def = CHARACTERS[id];
+    const def: CharacterDef = CHARACTERS[id];
 
     // Beveled pixel-art card chrome (square corners), matching the menu
     // panels on the lobby + results screens.
@@ -283,6 +285,17 @@ export class CharacterSelectScene extends Phaser.Scene {
     const sprite = this.add.sprite(0, -56, `${def.spritePrefix}_down_idle`);
     sprite.setScale(SPRITE_SCALE);
     sprite.play(`${def.spritePrefix}_down_idle`);
+
+    let bodyOverlay: Phaser.GameObjects.Sprite | null = null;
+    if (def.bodyOverlay) {
+      const key = `${def.bodyOverlay.spritePrefix}_down_idle`;
+      const offsetY =
+        ((def.bodyOverlay.idleFrames.down.h - def.idleFrames.down.h) / 2) *
+        SPRITE_SCALE;
+      bodyOverlay = this.add.sprite(0, -56 + offsetY, key);
+      bodyOverlay.setScale(SPRITE_SCALE);
+      bodyOverlay.play(key);
+    }
 
     const nameText = this.add
       .text(0, 4, def.displayName.toUpperCase(), {
@@ -341,6 +354,7 @@ export class CharacterSelectScene extends Phaser.Scene {
       bg,
       border,
       sprite,
+      ...(bodyOverlay ? [bodyOverlay] : []),
       nameText,
       masteryText,
       ...statWidgets,

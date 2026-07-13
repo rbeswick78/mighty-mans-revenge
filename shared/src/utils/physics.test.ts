@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateMovement } from './physics.js';
+import { calculateDashEndpoint, calculateMovement } from './physics.js';
 import { PLAYER } from '../config/game.js';
 import { PlayerInput } from '../types/player.js';
 import { CollisionGrid } from '../types/map.js';
@@ -302,5 +302,40 @@ describe('calculateMovement', () => {
       );
       expect(result.newStamina).toBe(startingStamina);
     });
+  });
+});
+
+describe('calculateDashEndpoint', () => {
+  it('travels the full distance through open floor', () => {
+    const open: CollisionGrid = {
+      width: 10,
+      height: 10,
+      tileSize: 48,
+      solid: Array.from({ length: 10 }, () => Array.from({ length: 10 }, () => false)),
+    };
+    const result = calculateDashEndpoint({ x: 200, y: 200 }, 0, 144, open);
+    expect(result.x).toBeCloseTo(344, 8);
+    expect(result.y).toBeCloseTo(200, 8);
+  });
+
+  it('stops at the last safe point before a wall', () => {
+    const wallGrid = makeOpenGrid();
+    wallGrid.solid[2][3] = true;
+    const result = calculateDashEndpoint({ x: 100, y: 120 }, 0, 144, wallGrid);
+    expect(result.x).toBeGreaterThan(100);
+    expect(result.x + PLAYER.HITBOX_WIDTH / 2).toBeLessThanOrEqual(144);
+    expect(result.y).toBe(120);
+  });
+
+  it('sweeps diagonally without exceeding the requested distance', () => {
+    const open: CollisionGrid = {
+      width: 10,
+      height: 10,
+      tileSize: 48,
+      solid: Array.from({ length: 10 }, () => Array.from({ length: 10 }, () => false)),
+    };
+    const start = { x: 200, y: 200 };
+    const result = calculateDashEndpoint(start, Math.PI / 4, 144, open);
+    expect(Math.hypot(result.x - start.x, result.y - start.y)).toBeCloseTo(144, 8);
   });
 });

@@ -13,6 +13,7 @@ import {
   ABILITY,
   CHARACTER_IDS,
   MAP,
+  calculateDashEndpoint,
   calculateMovement,
   characterHitbox,
   characterMaxHealth,
@@ -2139,6 +2140,22 @@ export class Match implements MatchContext {
       // bookkeeping happens where updateActive consumes updateAxes' hits.
       this.combatManager.spawnAxe(player.id, player.position, aimAngle);
       player.abilityCooldownSeconds = ABILITY.JACK_AXE_THROW.COOLDOWN;
+    } else if (player.characterId === 'rook') {
+      const before = player.position;
+      const endpoint = calculateDashEndpoint(
+        before,
+        aimAngle,
+        ABILITY.ROOK_BREACH_DASH.DISTANCE_TILES * MAP.TILE_SIZE,
+        this.mapManager.getCollisionGrid(),
+      );
+      const distance = Math.hypot(endpoint.x - before.x, endpoint.y - before.y);
+      // A point-blank wall does not eat the cooldown. Any legal partial dash
+      // does: stopping early at cover is part of the ability's skill ceiling.
+      if (distance < 1) return;
+      player.position = endpoint;
+      player.velocity = { x: 0, y: 0 };
+      this.stats.recordDistance(player.id, distance);
+      player.abilityCooldownSeconds = ABILITY.ROOK_BREACH_DASH.COOLDOWN;
     }
   }
 

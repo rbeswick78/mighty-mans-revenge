@@ -69,6 +69,10 @@ This game uses pixel art assets from third-party packs. Source archives are
 
 - `decor/barrel-red.png` - Objects/Barrel_red_1
 
+- `player/rook-helmet_*_{idle,run}.png` - Character/Helmet idle-and-run Sheet6 (4 directions; vertical source serves up/down)
+- `player/rook-helmet_*_attack.png` - Character/Helmet punch Sheet4 (4 directions; vertical source serves up/down)
+- `player/rook-helmet_{side,side-left}_death.png` - Character/Helmet death Sheet6
+
 ## Original audio
 
 The pack ships no audio. `audio/punch-whoosh.wav`, `audio/punch-impact.wav`,

@@ -80,6 +80,8 @@ export class NetworkManager {
   private localPlayerState: PlayerState | null = null;
   private collisionGrid: CollisionGrid | null = null;
   private lastCountdownEmitted = -1;
+  /** False in modes whose server contract disables character abilities. */
+  private abilitiesEnabled = true;
 
   /**
    * Most recent grenades from server gameState. Scene polls this each
@@ -199,11 +201,16 @@ export class NetworkManager {
     this._contractState = null;
     this._isOvertime = false;
     this.lastCountdownEmitted = -1;
+    this.abilitiesEnabled = true;
   }
 
   /** Currently active mutators, in activation order (empty if none). */
   getActiveMutators(): readonly MutatorId[] {
     return this._activeMutators;
+  }
+
+  setAbilitiesEnabled(enabled: boolean): void {
+    this.abilitiesEnabled = enabled;
   }
 
   /** Latest KOTH hill state; null in DM matches and during overtime. */
@@ -241,6 +248,7 @@ export class NetworkManager {
         this._activeMutators,
         this.localPlayerState.secondWindTimer,
       ),
+      this.abilitiesEnabled,
     );
 
     this.prediction.addPrediction(input, predicted);
@@ -685,6 +693,7 @@ export class NetworkManager {
         this._activeMutators,
         serverState.secondWindTimer,
       ),
+      this.abilitiesEnabled,
     );
 
     this.applyReconciledLocalState(serverState, result);

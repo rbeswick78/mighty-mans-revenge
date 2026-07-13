@@ -245,6 +245,8 @@ export class GameScene extends Phaser.Scene {
     this.fadeComplete = false;
     this.pendingResult = null;
     this.modeBriefingShown = false;
+    this.prevAbilityActive = false;
+    this.prevAbilityCoolingDown = false;
   }
 
   create(): void {
@@ -268,6 +270,9 @@ export class GameScene extends Phaser.Scene {
     // Wire the collision grid into the network manager so client-side
     // prediction and reconciliation use the same physics as the server.
     const grid = this.mapRenderer.getCollisionGrid();
+    this.gameService
+      .getNetworkManager()
+      .setAbilitiesEnabled(this.matchData?.gameMode !== GameModeType.ONE_IN_THE_CHAMBER);
     if (grid) {
       this.gameService.getNetworkManager().setCollisionGrid(grid);
     }
@@ -404,6 +409,14 @@ export class GameScene extends Phaser.Scene {
 
       const updatedState = networkManager.getLocalPlayerState();
       if (updatedState) {
+        if (
+          input.abilityPressed &&
+          localState.characterId === 'rook' &&
+          localState.abilityCooldownSeconds <= 0 &&
+          updatedState.abilityCooldownSeconds > 0
+        ) {
+          this.effectsRenderer?.showDash(localState.position, updatedState.position);
+        }
         this.currLocalPos = { x: updatedState.position.x, y: updatedState.position.y };
       }
     }
@@ -584,6 +597,9 @@ export class GameScene extends Phaser.Scene {
             this.zoomPulse?.trigger();
           } else if (currentLocalState.characterId === 'jack') {
             this.hud.showAbilityActivation('AXE THROW!', 0xffb347);
+            this.zoomPulse?.trigger();
+          } else if (currentLocalState.characterId === 'rook') {
+            this.hud.showAbilityActivation('BREACH DASH!', 0x70e6ff);
             this.zoomPulse?.trigger();
           }
         }
@@ -1690,6 +1706,7 @@ export class GameScene extends Phaser.Scene {
       this.abilityAura = null;
     }
     this.prevAbilityActive = false;
+    this.prevAbilityCoolingDown = false;
     this.shockwaveController = null;
     if (this.cameraKick) {
       this.cameraKick.reset(this.cameras.main);

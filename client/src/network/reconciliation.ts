@@ -2,8 +2,12 @@ import type { Vec2 } from '@shared/types/common.js';
 import type { CollisionGrid } from '@shared/types/map.js';
 import type { SerializedPlayerState } from '@shared/types/network.js';
 import type { PlayerState } from '@shared/types/player.js';
-import { calculateMovement, type MovementModifiers } from '@shared/utils/physics.js';
-import { SERVER } from '@shared/config/game.js';
+import {
+  calculateDashEndpoint,
+  calculateMovement,
+  type MovementModifiers,
+} from '@shared/utils/physics.js';
+import { ABILITY, MAP, SERVER } from '@shared/config/game.js';
 import type { PredictionEntry } from './types.js';
 
 /** Below this distance (px), smoothly interpolate toward the server position. */
@@ -37,6 +41,7 @@ export class ServerReconciliation {
     predictions: PredictionEntry[],
     grid: CollisionGrid,
     modifiers?: MovementModifiers,
+    abilitiesEnabled = true,
   ): ReconciliationResult {
     const dt = 1 / SERVER.TICK_RATE;
 
@@ -49,9 +54,27 @@ export class ServerReconciliation {
     let pos: Vec2 = { x: serverState.position.x, y: serverState.position.y };
     let vel: Vec2 = { x: serverState.velocity.x, y: serverState.velocity.y };
     let stamina = serverState.stamina;
+    let abilityCooldownSeconds = serverState.abilityCooldownSeconds;
 
     // Replay unacknowledged inputs on top of server state
     for (const entry of unacked) {
+      if (
+        abilitiesEnabled &&
+        serverState.characterId === 'rook' &&
+        entry.input.abilityPressed &&
+        abilityCooldownSeconds <= 0
+      ) {
+        const endpoint = calculateDashEndpoint(
+          pos,
+          entry.input.aimAngle,
+          ABILITY.ROOK_BREACH_DASH.DISTANCE_TILES * MAP.TILE_SIZE,
+          grid,
+        );
+        if (Math.hypot(endpoint.x - pos.x, endpoint.y - pos.y) >= 1) {
+          pos = endpoint;
+          abilityCooldownSeconds = ABILITY.ROOK_BREACH_DASH.COOLDOWN;
+        }
+      }
       const result = calculateMovement(entry.input, pos, stamina, dt, grid, modifiers);
       pos = result.newPos;
       vel = result.velocity;

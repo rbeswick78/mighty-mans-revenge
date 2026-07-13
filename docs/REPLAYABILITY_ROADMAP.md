@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–32 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts, solo Practice vs Rusty, streak + payback callouts, selectable Rusty difficulty, Collapsed Overpass, Blackout, fresh-chaos rematches, Last Stand, Kill Confirmed, mode briefings, character death animations, authoritative hit confirmation, blastable cover, chain-reaction barrels, Wasteland Contracts, Combat Medals, Wasteland Reputation, Hot Streaks, Fighter Mastery, Fists Only, Weapon Roulette, One in the Chamber, shootable arena gates). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–33 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts, solo Practice vs Rusty, streak + payback callouts, selectable Rusty difficulty, Collapsed Overpass, Blackout, fresh-chaos rematches, Last Stand, Kill Confirmed, mode briefings, character death animations, authoritative hit confirmation, blastable cover, chain-reaction barrels, Wasteland Contracts, Combat Medals, Wasteland Reputation, Hot Streaks, Fighter Mastery, Fists Only, Weapon Roulette, One in the Chamber, shootable arena gates, Rook + Breach Dash). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -64,6 +64,7 @@ Each session below attacks one of these.
 | 30  | Weapon Roulette                               | Every ten seconds demands a fresh fighting style and new positioning | **DONE** (2026-07-12) |
 | 31  | One in the Chamber                            | One precious shot turns every aim, miss, and recovery punch into drama | **DONE** (2026-07-12) |
 | 32  | Shootable Arena Gates                         | Every firefight can permanently reveal a shortcut or surprise sightline | **DONE** (2026-07-12) |
+| 33  | Rook + Breach Dash                            | A sixth main turns every fight into a positioning puzzle             | **DONE** (2026-07-13) |
 
 ---
 
@@ -1271,7 +1272,7 @@ vanish on the first dead snapshot.
 
 **Acceptance criteria**
 
-- [x] All five fighters have measured death metadata and curated attributed
+- [x] All six fighters have measured death metadata and curated attributed
       sheets; Jack's with-axe and no-axe bodies both resolve valid frames.
 - [x] Local and remote renderers transition only on authoritative life edges,
       hold corpses until respawn, and cannot have death animation overwritten
@@ -1587,7 +1588,7 @@ feel like career progress rather than a disposable menu choice.
 - [x] Tier thresholds, exact boundaries, invalid input, full-roster zero creation,
       and compact card copy are covered by deterministic pure tests.
 - [x] Persistence credits only a winning locked fighter, survives restarts, and
-      backfills all five characters in older files.
+      backfills the complete current roster in older files.
 - [x] Initial and rematch `matchFound` messages carry local-only normalized totals;
       the rematch reflects the win recorded moments earlier.
 - [x] All five tier/progress variants fit simultaneously on the live five-card
@@ -1766,7 +1767,90 @@ that changes how the rest of the round is played.
 
 ---
 
+## Session 33 — Rook + Breach Dash
+
+**Goal:** add a sixth main whose ability changes moment-to-moment positioning,
+giving aggressive players a frequent tool for flanks, escapes, and sudden angle
+changes without adding another damage source.
+
+**Locked design decisions**
+
+- Rook is a 95 HP, 1.10× speed flanker. Breach Dash moves three tiles along
+  the current aim angle on an 8-second cooldown. It deals no damage, grants no
+  invulnerability, ignores other players like ordinary movement, and stops at
+  the last safe point before live map collision.
+- `calculateDashEndpoint()` is shared physics. Server activation, immediate
+  client prediction, and unacknowledged-input reconciliation all call the same
+  sweep. A point-blank obstruction refunds the cooldown; a legal partial dash
+  consumes it. One in the Chamber disables both authority and prediction.
+- Rook reuses Mighty Man's body and shared weapon overlays, then layers the
+  asset pack's real Helmet strips through `CharacterDef.bodyOverlay`. The
+  overlay stays synchronized through idle, run, punch, death, freeze tint, and
+  big-head scaling. Only the curated rendered sheets are checked in.
+- The six-card selector remains a single readable row at 960px. Rook receives
+  the same persistent Fighter Mastery path automatically through the dynamic
+  `CHARACTER_IDS`/`createEmptyCharacterWins()` contracts.
+
+**Acceptance criteria**
+
+- [x] Rook can dash instantly in any aim direction, travel the full three
+      tiles on open floor, stop before walls/bounds, and cannot recast during
+      the 8-second cooldown.
+- [x] Prediction and reconciliation reproduce the server endpoint exactly;
+      ability-disabled modes do not predict a dash.
+- [x] Helmet art animates over every living/combat/death state and appears in
+      the six-fighter selector; attribution lists every curated source family.
+- [x] HUD cooldown, activation callout, local streak/ring effect, bots, roster
+      selection, stats, and mastery all accept Rook without special persistence
+      migration.
+- [x] Typecheck, lint, all unit tests, production build, and Playwright pass.
+
+---
+
 ## Session Log
+
+### Session 33 — 2026-07-13 — Rook + Breach Dash
+
+**Shipped:** Rook joins as the sixth selectable fighter and the roster's first
+frequent mobility specialist. At 95 HP and 1.10× baseline speed, Rook trades
+durability for tempo. Breach Dash covers up to three tiles along aim every
+eight seconds, stopping cleanly at current collision—including closed gates
+and intact destructible cover—without damage, immunity, or player collision.
+A blocked zero-distance cast is refunded, while a useful partial dash commits
+the cooldown.
+
+The dash is responsive without weakening authority: one shared swept-AABB
+helper feeds server activation, immediate client prediction, and reconciliation
+replay. Prediction receives the selected mode's ability contract so One in the
+Chamber cannot create a false local jump. The local presentation adds a quick
+cyan travel streak, arrival ring, camera tick, cooldown sweep, and activation
+callout; remote fighters remain readable through normal buffered interpolation.
+
+Rook's look uses the dormant Helmet art as intended: a separate synchronized
+head layer over the existing human body, not a tiny standalone character. The
+new registry-level `bodyOverlay` contract loads and animates the tightly cropped
+idle/run/punch/death sheets, keeps freeze tint and big-head scale in sync, and
+also composes the helmet on Rook's selector card. Six dense cards fit the
+existing 960px canvas in one row. Dynamic mastery/backfill paths already derive
+from `CHARACTER_IDS`, so older version-1 stats files receive `rook: 0` on load
+without a schema-version change.
+
+**Verification:** 938 unit tests pass across 58 files, including shared
+dash/registry coverage, immediate prediction, reconciliation, persistence
+backfill, and 196 Match tests. TypeScript, ESLint, and the production build are
+clean; the full Playwright matrix passes 13 tests with 11 intentional scoped
+skips across desktop Chromium, desktop Firefox, and mobile landscape. A
+dedicated two-client Rook flow verifies both the authoritative selection and
+the live helmet renderer layer.
+
+**Tuning watch:** 95 HP / 1.10× speed / 3 tiles / 8 seconds are deliberately
+aggressive starting values. Group play should watch whether the dash is strong
+enough to justify the health trade, whether the visual trail gives opponents
+enough information, and whether 8 seconds creates too much disengage uptime.
+No existing fighter, weapon, mode, mutator, or map values changed.
+
+**Deployment:** not run; production deployment remains an explicit separate
+operation under `CLAUDE.md`.
 
 ### Session 32 — 2026-07-12 — Shootable Arena Gates
 
@@ -1932,7 +2016,8 @@ do not tune punch damage or range without the next group playtest's evidence.
 
 ### Session 28 — 2026-07-12 — Fighter Mastery
 
-**Shipped:** each of the five fighters now owns a persistent mastery journey.
+**Shipped:** each selectable fighter owns a persistent mastery journey (six as
+of Session 33).
 The character-select roster shows Untested, Blooded, Proven, Veteran, or Master
 plus exact progress toward the next tier, turning every choice into a visible
 long-term goal and making underplayed fighters inviting rather than anonymous.

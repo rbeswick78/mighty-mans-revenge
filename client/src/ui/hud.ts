@@ -1016,6 +1016,7 @@ export class HUD {
       : characterId === 'mighty_man' ? 0x4ad8e8
       : characterId === 'bubba' ? 0xb8c4d0
       : characterId === 'jack' ? 0xffb347
+      : characterId === 'rook' ? 0x70e6ff
       : 0xaaddff; // frost_wizard
     const cooldownColor = 0x3a4252;
     // Total recharge cycle from the moment activation should be measured.
@@ -1028,9 +1029,10 @@ export class HUD {
         ? ABILITY.MIGHTY_MAN_XRAY.DURATION + ABILITY.MIGHTY_MAN_XRAY.COOLDOWN
       : characterId === 'bubba' ? ABILITY.BUBBA_IRON_HIDE.COOLDOWN
       : characterId === 'jack' ? ABILITY.JACK_AXE_THROW.COOLDOWN
+      : characterId === 'rook' ? ABILITY.ROOK_BREACH_DASH.COOLDOWN
       : ABILITY.FROST_WIZARD_FREEZE.COOLDOWN;
-    // Instant-cast characters (Frost Wizard, Jack) never take the isActive
-    // path — the fallback just keeps the sweep math from dividing by zero.
+    // Instant-cast characters (Frost Wizard, Jack, Rook) never take the
+    // isActive path — the fallback keeps sweep math from dividing by zero.
     const activeDuration =
       characterId === 'bruce' ? ABILITY.BRUCE_FIRE_BREATH.DURATION
       : characterId === 'mighty_man' ? ABILITY.MIGHTY_MAN_XRAY.DURATION

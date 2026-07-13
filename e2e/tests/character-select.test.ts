@@ -305,6 +305,94 @@ test.describe('Character select (desktop)', () => {
       waitForActiveScene(pageB, 'GameScene', 10000),
     ]);
   });
+
+  // eslint-disable-next-line no-empty-pattern
+  test('Rook locks with a live helmet overlay and reaches play', async ({}, testInfo) => {
+    test.setTimeout(45000);
+    test.fixme(
+      testInfo.project.name === 'desktop-firefox',
+      'Two-context WebRTC pair-up is unreliable on Firefox locally',
+    );
+
+    await Promise.all([pageA.goto('/'), pageB.goto('/')]);
+    await Promise.all([waitForLobby(pageA), waitForLobby(pageB)]);
+
+    await startQuickMatch(pageA, 'RookAlpha');
+    await startQuickMatch(pageB, 'Bravo');
+
+    await completeDraft(pageA, pageB);
+
+    await pageA.locator('canvas').click({ position: { x: 10, y: 10 } });
+    await pageB.locator('canvas').click({ position: { x: 10, y: 10 } });
+
+    // Page A starts on Mighty Man. Moving left wraps to the final roster
+    // entry, proving Rook participates in the real keyboard selection path.
+    await pageA.keyboard.press('ArrowLeft');
+    await expect
+      .poll(
+        () =>
+          pageA.evaluate(() => {
+            const w = window as unknown as {
+              game?: { scene: { getScene: (key: string) => unknown } };
+            };
+            const scene = w.game?.scene.getScene('CharacterSelectScene') as {
+              localHoveredId?: string | null;
+            } | null;
+            return scene?.localHoveredId ?? null;
+          }),
+        { timeout: 5000, message: 'expected Page A to hover Rook' },
+      )
+      .toBe('rook');
+
+    await pageA.keyboard.press('Enter');
+    await pageB.keyboard.press('Enter');
+
+    await Promise.all([
+      waitForActiveScene(pageA, 'GameScene', 10000),
+      waitForActiveScene(pageB, 'GameScene', 10000),
+    ]);
+
+    // Verify the authoritative selection and the actual renderer layer. This
+    // catches missing helmet loads/animations that a scene-transition smoke
+    // test cannot see.
+    await expect
+      .poll(
+        () =>
+          pageA.evaluate(() => {
+            const w = window as unknown as {
+              game?: { scene: { getScene: (key: string) => unknown } };
+            };
+            const scene = w.game?.scene.getScene('GameScene') as {
+              gameService?: {
+                getNetworkManager: () => {
+                  getPlayerId: () => string | null;
+                  getLocalPlayerState: () => { characterId?: string } | null;
+                };
+              };
+              playerManager?: {
+                getRenderer: (playerId: string) => unknown;
+              };
+            } | null;
+            const network = scene?.gameService?.getNetworkManager();
+            const playerId = network?.getPlayerId();
+            const renderer =
+              playerId && scene?.playerManager
+                ? scene.playerManager.getRenderer(playerId)
+                : null;
+            const hasOverlay = Boolean(
+              (renderer as { bodyOverlaySprite?: unknown } | null)
+                ?.bodyOverlaySprite,
+            );
+            return {
+              characterId:
+                network?.getLocalPlayerState()?.characterId ?? null,
+              hasOverlay,
+            };
+          }),
+        { timeout: 10000, message: 'expected live Rook renderer and helmet' },
+      )
+      .toEqual({ characterId: 'rook', hasOverlay: true });
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────

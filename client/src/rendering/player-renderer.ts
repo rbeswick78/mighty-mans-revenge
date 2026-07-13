@@ -91,6 +91,9 @@ type AnimState = 'idle' | 'run';
 export class PlayerRenderer {
   private container: Phaser.GameObjects.Container;
   private sprite: Phaser.GameObjects.Sprite;
+  /** Optional animated cosmetic synchronized to the body (Rook's helmet). */
+  private bodyOverlaySprite: Phaser.GameObjects.Sprite | null;
+  private readonly characterDef: CharacterDef;
   /**
    * Held weapon overlay. Null for characters whose CharacterDef.hasGun is
    * false (e.g. Bruce, whose zombie sprite already shows his hands and
@@ -159,6 +162,7 @@ export class PlayerRenderer {
     // Annotated as CharacterDef so optional fields (altBody) are visible —
     // the frozen registry literal narrows each entry to its own shape.
     const def: CharacterDef = CHARACTERS[characterId];
+    this.characterDef = def;
     this.characterId = characterId;
     this.texturePrefix = def.spritePrefix;
     this.altBodyPrefix = def.altBody?.spritePrefix ?? null;
@@ -168,6 +172,17 @@ export class PlayerRenderer {
     this.sprite.setOrigin(0.5, 0.5);
     this.sprite.setScale(SPRITE_SCALE);
     this.sprite.play(this.animKey('down', 'idle'));
+
+    if (def.bodyOverlay) {
+      const overlayKey = `${def.bodyOverlay.spritePrefix}_down_idle`;
+      this.bodyOverlaySprite = scene.add.sprite(0, 0, overlayKey, 0);
+      this.bodyOverlaySprite.setOrigin(0.5, 0.5);
+      this.bodyOverlaySprite.setScale(SPRITE_SCALE);
+      this.bodyOverlaySprite.play(overlayKey);
+      this.applyBodyOverlayTransform('down', 'idle');
+    } else {
+      this.bodyOverlaySprite = null;
+    }
     // Frost Wizard reuses Mighty Man's sprite sheets — a vertical
     // white-to-ice-blue gradient via per-corner tint is the primary
     // differentiator (flat tint barely shifts the palette). A frozen
@@ -255,6 +270,7 @@ export class PlayerRenderer {
     if (this.frostMistGraphics) children.push(this.frostMistGraphics);
     children.push(this.sprite);
     if (this.gunSprite) children.push(this.gunSprite);
+    if (this.bodyOverlaySprite) children.push(this.bodyOverlaySprite);
     if (this.wandGraphics) children.push(this.wandGraphics);
     if (this.frozenCrystalGraphics) children.push(this.frozenCrystalGraphics);
     children.push(this.healthBarBg, this.healthBarFg, this.nicknameText);
@@ -291,10 +307,12 @@ export class PlayerRenderer {
     if (isFrozen !== this.wasFrozen) {
       if (isFrozen) {
         this.sprite.setTint(FROZEN_TARGET_TINT);
+        this.bodyOverlaySprite?.setTint(FROZEN_TARGET_TINT);
       } else if (this.characterId === 'frost_wizard') {
         this.applyFrostWizardTint();
       } else {
         this.sprite.clearTint();
+        this.bodyOverlaySprite?.clearTint();
       }
       this.wasFrozen = isFrozen;
     }
@@ -457,6 +475,10 @@ export class PlayerRenderer {
     this.isAttacking = true;
     // ignoreIfPlaying = false: a rapid re-swing restarts the animation.
     this.sprite.play(this.attackKey(this.currentDirection), false);
+    if (this.bodyOverlaySprite) {
+      this.bodyOverlaySprite.play(this.bodyOverlayAttackKey(this.currentDirection), false);
+      this.applyBodyOverlayTransform(this.currentDirection, 'attack');
+    }
     this.attackTimer = this.scene.time.delayedCall(ATTACK_SWING_DURATION_MS, () => {
       this.attackTimer = null;
       this.isAttacking = false;
@@ -518,7 +540,9 @@ export class PlayerRenderer {
     const scale = SPRITE_SCALE * multiplier;
     this.sprite.setScale(scale);
     this.gunSprite?.setScale(scale);
+    this.bodyOverlaySprite?.setScale(scale);
     this.wandGraphics?.setScale(scale);
+    this.applyCurrentBodyOverlayTransform();
   }
 
   updateHealthBar(health: number, maxHealth: number): void {
@@ -555,6 +579,10 @@ export class PlayerRenderer {
     this.container.setAlpha(1);
     this.setAliveVisualsVisible(false);
     this.sprite.play(this.deathKey(), false);
+    if (this.bodyOverlaySprite) {
+      this.bodyOverlaySprite.play(this.bodyOverlayDeathKey(), false);
+      this.applyBodyOverlayTransform(this.deathDirection, 'death');
+    }
   }
 
   private playRespawnAnimation(): void {
@@ -567,6 +595,7 @@ export class PlayerRenderer {
       this.applyFrostWizardTint();
     } else {
       this.sprite.clearTint();
+      this.bodyOverlaySprite?.clearTint();
     }
     this.applyWandTransform(this.currentDirection);
     this.playCurrentAnim();
@@ -652,6 +681,16 @@ export class PlayerRenderer {
       : this.animKey(this.currentDirection, this.currentAnimState);
     // ignoreIfPlaying = true means re-calling with the same key is a no-op.
     this.sprite.play(key, true);
+    if (this.bodyOverlaySprite) {
+      const overlayKey = this.isAttacking
+        ? this.bodyOverlayAttackKey(this.currentDirection)
+        : this.bodyOverlayAnimKey(this.currentDirection, this.currentAnimState);
+      this.bodyOverlaySprite.play(overlayKey, true);
+      this.applyBodyOverlayTransform(
+        this.currentDirection,
+        this.isAttacking ? 'attack' : this.currentAnimState,
+      );
+    }
   }
 
   private playCurrentGunAnim(): void {
@@ -678,6 +717,57 @@ export class PlayerRenderer {
 
   private deathKey(): string {
     return `${this.bodyPrefix()}_${this.deathDirection}_death`;
+  }
+
+  private bodyOverlayAnimKey(direction: Direction4, state: AnimState): string {
+    return `${this.characterDef.bodyOverlay!.spritePrefix}_${direction}_${state}`;
+  }
+
+  private bodyOverlayAttackKey(direction: Direction4): string {
+    return `${this.characterDef.bodyOverlay!.spritePrefix}_${direction}_attack`;
+  }
+
+  private bodyOverlayDeathKey(): string {
+    return `${this.characterDef.bodyOverlay!.spritePrefix}_${this.deathDirection}_death`;
+  }
+
+  /** Top-align a tightly cropped overlay frame with its body frame. */
+  private applyBodyOverlayTransform(
+    direction: Direction4,
+    state: AnimState | 'attack' | 'death',
+  ): void {
+    const overlay = this.characterDef.bodyOverlay;
+    if (!overlay || !this.bodyOverlaySprite) return;
+
+    const bodyHeight =
+      state === 'death'
+        ? this.characterDef.deathFrames[direction as DeathDirection].h
+        : state === 'attack'
+          ? this.characterDef.attackFrames[direction].h
+          : state === 'run'
+            ? this.characterDef.runFrames[direction].h
+            : this.characterDef.idleFrames[direction].h;
+    const overlayHeight =
+      state === 'death'
+        ? overlay.deathFrames[direction as DeathDirection].h
+        : state === 'attack'
+          ? overlay.attackFrames[direction].h
+          : state === 'run'
+            ? overlay.runFrames[direction].h
+            : overlay.idleFrames[direction].h;
+    const scale = SPRITE_SCALE * this.renderScaleMultiplier;
+    this.bodyOverlaySprite.setPosition(0, ((overlayHeight - bodyHeight) / 2) * scale);
+  }
+
+  private applyCurrentBodyOverlayTransform(): void {
+    if (this.isDead) {
+      this.applyBodyOverlayTransform(this.deathDirection, 'death');
+      return;
+    }
+    this.applyBodyOverlayTransform(
+      this.currentDirection,
+      this.isAttacking ? 'attack' : this.currentAnimState,
+    );
   }
 
   private gunKey(direction: Direction4, state: GunOverlayState): string {

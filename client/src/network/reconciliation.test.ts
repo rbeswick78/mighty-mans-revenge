@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CHARACTERS, SERVER, WEAPONS, PLAYER } from '@shared/config/game.js';
+import { ABILITY, CHARACTERS, MAP, SERVER, WEAPONS, PLAYER } from '@shared/config/game.js';
 import type { CollisionGrid } from '@shared/types/map.js';
 import type { PlayerInput, PlayerState } from '@shared/types/player.js';
 import type { SerializedPlayerState } from '@shared/types/network.js';
@@ -172,5 +172,95 @@ describe('ServerReconciliation', () => {
     expect(result.shouldSnap).toBe(false);
     expect(result.position.x).toBeCloseTo(serverSide.newPos.x, 8);
     expect(result.position.y).toBeCloseTo(serverSide.newPos.y, 8);
+  });
+
+  it('replays an unacknowledged Rook dash with the server-identical endpoint', () => {
+    const grid: CollisionGrid = {
+      width: 20,
+      height: 20,
+      tileSize: MAP.TILE_SIZE,
+      solid: Array.from({ length: 20 }, () => Array.from({ length: 20 }, () => false)),
+    };
+    const input: PlayerInput = {
+      sequenceNumber: 5,
+      moveX: 0,
+      moveY: 0,
+      aimAngle: 0,
+      aimingGun: false,
+      firePressed: false,
+      aimingGrenade: false,
+      throwPressed: false,
+      detonatePressed: false,
+      sprint: false,
+      reload: false,
+      abilityPressed: true,
+      tick: 5,
+    };
+    const endpoint = {
+      x: 200 + ABILITY.ROOK_BREACH_DASH.DISTANCE_TILES * MAP.TILE_SIZE,
+      y: 200,
+    };
+    const server = makeServerState({
+      characterId: 'rook',
+      position: { x: 200, y: 200 },
+      lastProcessedInput: 4,
+    });
+    const predicted = makePlayerState({
+      characterId: 'rook',
+      position: endpoint,
+      lastProcessedInput: 5,
+    });
+
+    const result = new ServerReconciliation().reconcile(
+      server,
+      [{ input, predictedState: predicted }],
+      grid,
+    );
+
+    expect(result.shouldSnap).toBe(false);
+    expect(result.position).toEqual(endpoint);
+  });
+
+  it('does not replay Rook dash when the mode disables abilities', () => {
+    const grid: CollisionGrid = {
+      width: 20,
+      height: 20,
+      tileSize: MAP.TILE_SIZE,
+      solid: Array.from({ length: 20 }, () => Array.from({ length: 20 }, () => false)),
+    };
+    const input: PlayerInput = {
+      sequenceNumber: 5,
+      moveX: 0,
+      moveY: 0,
+      aimAngle: 0,
+      aimingGun: false,
+      firePressed: false,
+      aimingGrenade: false,
+      throwPressed: false,
+      detonatePressed: false,
+      sprint: false,
+      reload: false,
+      abilityPressed: true,
+      tick: 5,
+    };
+    const predicted = makePlayerState({
+      characterId: 'rook',
+      position: { x: 200, y: 200 },
+      lastProcessedInput: 5,
+    });
+
+    const result = new ServerReconciliation().reconcile(
+      makeServerState({
+        characterId: 'rook',
+        position: { x: 200, y: 200 },
+        lastProcessedInput: 4,
+      }),
+      [{ input, predictedState: predicted }],
+      grid,
+      undefined,
+      false,
+    );
+
+    expect(result.position).toEqual({ x: 200, y: 200 });
   });
 });

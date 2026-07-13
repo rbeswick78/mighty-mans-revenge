@@ -1,7 +1,11 @@
 import type { PlayerInput, PlayerState } from '@shared/types/player.js';
 import type { CollisionGrid } from '@shared/types/map.js';
-import { calculateMovement, type MovementModifiers } from '@shared/utils/physics.js';
-import { SERVER } from '@shared/config/game.js';
+import {
+  calculateDashEndpoint,
+  calculateMovement,
+  type MovementModifiers,
+} from '@shared/utils/physics.js';
+import { ABILITY, MAP, SERVER } from '@shared/config/game.js';
 import type { PredictionEntry } from './types.js';
 
 export class ClientPrediction {
@@ -16,6 +20,7 @@ export class ClientPrediction {
     currentState: PlayerState,
     grid: CollisionGrid,
     modifiers?: MovementModifiers,
+    abilitiesEnabled = true,
   ): PlayerState {
     const dt = 1 / SERVER.TICK_RATE;
 
@@ -50,9 +55,32 @@ export class ClientPrediction {
       };
     }
 
+    let movementOrigin = currentState.position;
+    let dashActivated = false;
+    if (
+      abilitiesEnabled &&
+      currentState.characterId === 'rook' &&
+      input.abilityPressed &&
+      currentState.abilityActiveSeconds <= 0 &&
+      currentState.abilityCooldownSeconds <= 0
+    ) {
+      const endpoint = calculateDashEndpoint(
+        currentState.position,
+        input.aimAngle,
+        ABILITY.ROOK_BREACH_DASH.DISTANCE_TILES * MAP.TILE_SIZE,
+        grid,
+      );
+      dashActivated =
+        Math.hypot(
+          endpoint.x - currentState.position.x,
+          endpoint.y - currentState.position.y,
+        ) >= 1;
+      if (dashActivated) movementOrigin = endpoint;
+    }
+
     const { newPos, newStamina, velocity } = calculateMovement(
       input,
-      currentState.position,
+      movementOrigin,
       currentState.stamina,
       dt,
       grid,
@@ -66,6 +94,9 @@ export class ClientPrediction {
       stamina: newStamina,
       isSprinting: input.sprint && (input.moveX !== 0 || input.moveY !== 0) && newStamina > 0,
       aimAngle: input.aimAngle,
+      abilityCooldownSeconds: dashActivated
+        ? ABILITY.ROOK_BREACH_DASH.COOLDOWN
+        : currentState.abilityCooldownSeconds,
       lastProcessedInput: input.sequenceNumber,
     };
 

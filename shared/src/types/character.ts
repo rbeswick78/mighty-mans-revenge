@@ -73,6 +73,22 @@ export interface CharacterDef {
    */
   readonly hasGun: boolean;
   /**
+   * Optional animated cosmetic layered over the body. The overlay owns the
+   * same state names and frame counts as the base body, but can use tightly
+   * cropped frames of its own. Rook's helmet is the first use: keeping the
+   * helmet separate lets the existing human body and weapon pipeline stay
+   * authoritative while the cosmetic follows idle, run, punch, and death.
+   */
+  readonly bodyOverlay?: {
+    readonly spritePrefix: string;
+    readonly assetFolder: string;
+    readonly assetBaseName: string;
+    readonly idleFrames: FramesByDirection;
+    readonly runFrames: FramesByDirection;
+    readonly attackFrames: FramesByDirection;
+    readonly deathFrames: Record<DeathDirection, FrameDim>;
+  };
+  /**
    * Optional alternate body sheet set (same idle/run/attack states and the
    * SAME frame counts as the base sheets, but its own frame dimensions —
    * pack variants are cropped differently). Loaded by BootScene alongside

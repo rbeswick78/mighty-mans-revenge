@@ -21,6 +21,7 @@ const BULLET_TAIL_LIFESPAN_MS = 140;
 const BULLET_TAIL_FREQUENCY_MS = 8;
 const BULLET_TAIL_ALPHA_START = 0.7;
 const BULLET_TAIL_SCALE_START = 0.7;
+const DASH_COLOR = 0x70e6ff;
 
 export class EffectsRenderer {
   private scene: Phaser.Scene;
@@ -180,6 +181,44 @@ export class EffectsRenderer {
 
     // Screen shake
     this.scene.cameras.main.shake(200, 0.01);
+  }
+
+  /** Fast under-player streak and arrival ring for Rook's predicted dash. */
+  showDash(start: Vec2, end: Vec2): void {
+    const streak = this.scene.add.graphics();
+    streak.setDepth(9);
+    streak.lineStyle(12, DASH_COLOR, 0.14);
+    streak.beginPath();
+    streak.moveTo(start.x, start.y);
+    streak.lineTo(end.x, end.y);
+    streak.strokePath();
+    streak.lineStyle(3, DASH_COLOR, 0.7);
+    streak.beginPath();
+    streak.moveTo(start.x, start.y);
+    streak.lineTo(end.x, end.y);
+    streak.strokePath();
+
+    const arrival = this.scene.add.circle(end.x, end.y, 9, DASH_COLOR, 0.18);
+    arrival.setDepth(9);
+    arrival.setStrokeStyle(2, DASH_COLOR, 0.8);
+
+    this.scene.tweens.add({
+      targets: streak,
+      alpha: 0,
+      duration: 220,
+      ease: 'Quad.easeOut',
+      onComplete: () => streak.destroy(),
+    });
+    this.scene.tweens.add({
+      targets: arrival,
+      scaleX: 2.4,
+      scaleY: 2.4,
+      alpha: 0,
+      duration: 260,
+      ease: 'Quad.easeOut',
+      onComplete: () => arrival.destroy(),
+    });
+    this.scene.cameras.main.shake(80, 0.002);
   }
 
   /**

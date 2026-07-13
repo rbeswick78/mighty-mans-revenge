@@ -832,6 +832,15 @@ export const ABILITY = Object.freeze({
     /** Flight speed in px/s (~0.55s to reach max range). */
     SPEED: 520,
   },
+  /**
+   * Rook's Breach Dash: an instant, aim-directed reposition that stops at
+   * the last collision-free point before map geometry. It deals no damage
+   * and grants no invulnerability, so its value comes from positioning.
+   */
+  ROOK_BREACH_DASH: {
+    COOLDOWN: 8,
+    DISTANCE_TILES: 3,
+  },
 });
 
 /**
@@ -1077,6 +1086,74 @@ export const CHARACTERS = Object.freeze({
         'side-left': { w: 22, h: 18 },
       },
       deathFrameCount: 6,
+    },
+  },
+  // Rook — the mobile flanker. Reuses Mighty Man's body sheets under the
+  // same prefix, then layers the pack's synchronized helmet strips on top.
+  // Breach Dash is intentionally utility-only: fast repositioning without
+  // damage or invulnerability keeps the 8-second cycle skill-driven.
+  rook: {
+    id: 'rook',
+    displayName: 'Rook',
+    spritePrefix: 'mighty_man',
+    assetFolder: 'player',
+    assetBaseName: 'character',
+    hasGun: true,
+    maxHealth: 95,
+    speedMultiplier: 1.1,
+    hitbox: { width: 24, height: 24 },
+    idleFrameCount: 6,
+    runFrameCount: 6,
+    attackFrameCount: 4,
+    deathFrameCount: 6,
+    idleFrames: {
+      down: { w: 11, h: 16 },
+      up: { w: 11, h: 16 },
+      side: { w: 10, h: 16 },
+      'side-left': { w: 10, h: 16 },
+    },
+    runFrames: {
+      down: { w: 11, h: 17 },
+      up: { w: 11, h: 17 },
+      side: { w: 10, h: 17 },
+      'side-left': { w: 10, h: 17 },
+    },
+    attackFrames: {
+      down: { w: 12, h: 18 },
+      up: { w: 12, h: 17 },
+      side: { w: 20, h: 18 },
+      'side-left': { w: 20, h: 18 },
+    },
+    deathFrames: {
+      side: { w: 21, h: 16 },
+      'side-left': { w: 21, h: 16 },
+    },
+    bodyOverlay: {
+      spritePrefix: 'rook-helmet',
+      assetFolder: 'player',
+      assetBaseName: 'rook-helmet',
+      idleFrames: {
+        down: { w: 10, h: 9 },
+        up: { w: 10, h: 9 },
+        side: { w: 10, h: 8 },
+        'side-left': { w: 10, h: 8 },
+      },
+      runFrames: {
+        down: { w: 10, h: 9 },
+        up: { w: 10, h: 9 },
+        side: { w: 10, h: 8 },
+        'side-left': { w: 10, h: 8 },
+      },
+      attackFrames: {
+        down: { w: 10, h: 10 },
+        up: { w: 10, h: 10 },
+        side: { w: 13, h: 8 },
+        'side-left': { w: 13, h: 8 },
+      },
+      deathFrames: {
+        side: { w: 21, h: 18 },
+        'side-left': { w: 21, h: 18 },
+      },
     },
   },
 }) satisfies Readonly<Record<string, CharacterDef>>;

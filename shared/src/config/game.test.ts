@@ -346,13 +346,14 @@ describe('CHARACTERS registry', () => {
     expect(Object.isFrozen(CHARACTERS)).toBe(true);
   });
 
-  it('ships the full session-6 roster of five', () => {
+  it('ships the full six-fighter roster', () => {
     expect(CHARACTER_IDS).toEqual([
       'mighty_man',
       'bruce',
       'frost_wizard',
       'bubba',
       'jack',
+      'rook',
     ]);
   });
 
@@ -373,6 +374,29 @@ describe('CHARACTERS registry', () => {
     expect(CHARACTERS.jack.runFrameCount).toBe(8);
     expect(CHARACTERS.bubba.idleFrameCount).toBe(6);
     expect(CHARACTERS.mighty_man.runFrameCount).toBe(6);
+  });
+
+  it('Rook is the only synchronized body-overlay fighter and all frames are valid', () => {
+    for (const id of CHARACTER_IDS) {
+      const def: CharacterDef = CHARACTERS[id];
+      if (id !== 'rook') {
+        expect(def.bodyOverlay).toBeUndefined();
+        continue;
+      }
+      const overlay = def.bodyOverlay;
+      expect(overlay).toBeDefined();
+      if (!overlay) continue;
+      for (const frames of [overlay.idleFrames, overlay.runFrames, overlay.attackFrames]) {
+        for (const dir of DIRECTIONS) {
+          expect(frames[dir].w).toBeGreaterThan(0);
+          expect(frames[dir].h).toBeGreaterThan(0);
+        }
+      }
+      for (const dir of DEATH_DIRECTIONS) {
+        expect(overlay.deathFrames[dir].w).toBeGreaterThan(0);
+        expect(overlay.deathFrames[dir].h).toBeGreaterThan(0);
+      }
+    }
   });
 
   it('every entry has a coherent stat identity', () => {
@@ -397,6 +421,9 @@ describe('CHARACTERS registry', () => {
     expect(CHARACTERS.jack.maxHealth).toBe(100);
     expect(CHARACTERS.jack.speedMultiplier).toBe(1.0);
     expect(CHARACTERS.jack.hitbox).toEqual({ width: 24, height: 24 });
+    expect(CHARACTERS.rook.maxHealth).toBe(95);
+    expect(CHARACTERS.rook.speedMultiplier).toBe(1.1);
+    expect(CHARACTERS.rook.hitbox).toEqual({ width: 24, height: 24 });
   });
 });
 
@@ -569,5 +596,11 @@ describe('session-8 polish backlog config', () => {
         expect(alt.deathFrames[dir].h).toBeGreaterThan(0);
       }
     }
+  });
+
+  it('Breach Dash is a frequent, utility-only reposition', () => {
+    expect(ABILITY.ROOK_BREACH_DASH.DISTANCE_TILES).toBe(3);
+    expect(ABILITY.ROOK_BREACH_DASH.COOLDOWN).toBe(8);
+    expect(CHARACTERS.rook.bodyOverlay?.spritePrefix).toBe('rook-helmet');
   });
 });

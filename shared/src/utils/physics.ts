@@ -28,6 +28,58 @@ export interface MovementModifiers {
   frozen?: boolean;
 }
 
+/**
+ * Trace an instant dash along `angle`, stopping at the last collision-free
+ * point. Small fixed steps make the sweep independent of tile size and
+ * prevent tunnelling through thin geometry. Players do not collide with one
+ * another elsewhere in movement, so this deliberately tests map tiles only.
+ */
+export function calculateDashEndpoint(
+  currentPos: Vec2,
+  angle: number,
+  distance: number,
+  grid: CollisionGrid,
+): Vec2 {
+  if (distance <= 0) return { ...currentPos };
+
+  const halfW = PLAYER.HITBOX_WIDTH / 2;
+  const halfH = PLAYER.HITBOX_HEIGHT / 2;
+  const maxX = grid.width * grid.tileSize - halfW;
+  const maxY = grid.height * grid.tileSize - halfH;
+  const stepLength = Math.min(4, distance);
+  const stepCount = Math.ceil(distance / stepLength);
+  const dirX = Math.cos(angle);
+  const dirY = Math.sin(angle);
+  let lastSafe = { x: currentPos.x, y: currentPos.y };
+
+  for (let step = 1; step <= stepCount; step++) {
+    const travelled = Math.min(distance, step * stepLength);
+    const candidate = {
+      x: clamp(currentPos.x + dirX * travelled, halfW, maxX),
+      y: clamp(currentPos.y + dirY * travelled, halfH, maxY),
+    };
+    const colliding = getCollidingTiles(
+      grid,
+      candidate.x - halfW,
+      candidate.y - halfH,
+      PLAYER.HITBOX_WIDTH,
+      PLAYER.HITBOX_HEIGHT,
+    );
+    if (colliding.length > 0) break;
+    lastSafe = candidate;
+    if (
+      candidate.x === halfW ||
+      candidate.x === maxX ||
+      candidate.y === halfH ||
+      candidate.y === maxY
+    ) {
+      break;
+    }
+  }
+
+  return lastSafe;
+}
+
 export function calculateMovement(
   input: PlayerInput,
   currentPos: Vec2,
