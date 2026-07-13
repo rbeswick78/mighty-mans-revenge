@@ -30,9 +30,7 @@ describe('MAP_REGISTRY', () => {
   it('every registered map passes validateMap', () => {
     for (const m of MAP_REGISTRY.values()) {
       const r = validateMap(m);
-      expect(r.valid, `invalid map "${m.name}": ${r.errors.join('; ')}`).toBe(
-        true,
-      );
+      expect(r.valid, `invalid map "${m.name}": ${r.errors.join('; ')}`).toBe(true);
     }
   });
 
@@ -86,11 +84,38 @@ describe('MAP_REGISTRY', () => {
     }
   });
 
+  it('every arena has rotationally paired shootable gates bridging walkable lanes', () => {
+    for (const m of MAP_REGISTRY.values()) {
+      const gates = (m.decorations ?? []).filter(
+        (decoration) => decoration.interaction === 'shootable_gate',
+      );
+      expect(gates.length, `${m.name} gate count`).toBeGreaterThanOrEqual(2);
+      expect(gates.length % 2, `${m.name} gate pairing`).toBe(0);
+
+      const keys = new Set(gates.map((gate) => `${gate.x},${gate.y}`));
+      const walkable = (x: number, y: number) => [0, 3, 4].includes(m.tiles[y]?.[x]);
+      for (const gate of gates) {
+        expect([gate.w, gate.h], `${m.name} gate size`).toEqual([1, 1]);
+        expect(m.tiles[gate.y][gate.x], `${m.name} gate tile`).toBe(1);
+        expect(
+          keys.has(`${m.width - 1 - gate.x},${m.height - 1 - gate.y}`),
+          `${m.name} gate (${gate.x},${gate.y}) rotational partner`,
+        ).toBe(true);
+        const bridgesHorizontal = walkable(gate.x - 1, gate.y) && walkable(gate.x + 1, gate.y);
+        const bridgesVertical = walkable(gate.x, gate.y - 1) && walkable(gate.x, gate.y + 1);
+        expect(
+          bridgesHorizontal || bridgesVertical,
+          `${m.name} gate (${gate.x},${gate.y}) must bridge a lane`,
+        ).toBe(true);
+      }
+    }
+  });
+
   it('Collapsed Overpass keeps its six-hill objective identity', () => {
     const overpass = getMap('Collapsed Overpass');
     expect(overpass.theme).toBe('overpass');
     expect(overpass.kothHills).toHaveLength(6);
-    expect(overpass.decorations).toHaveLength(6);
+    expect(overpass.decorations).toHaveLength(10);
   });
 });
 

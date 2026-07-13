@@ -4,13 +4,12 @@ import type { MapData, CollisionGrid } from '@shared/types/map.js';
 import { TileType } from '@shared/types/map.js';
 import { createCollisionGrid } from '@shared/utils/collision.js';
 import { Wasteland } from '@shared/config/palette.js';
+import { getTheme, isOuterWall, pickVariant, WALL_STYLES, type MapTheme } from './map-themes.js';
 import {
-  getTheme,
-  isOuterWall,
-  pickVariant,
-  WALL_STYLES,
-  type MapTheme,
-} from './map-themes.js';
+  WIRE_GATE_CLOSED_FRAME,
+  WIRE_GATE_OPEN_ANIMATION_KEY,
+  wireGateScale,
+} from './wire-gate.js';
 
 /**
  * Renders a MapData grid using the map's visual theme (map-themes.ts):
@@ -52,6 +51,8 @@ export class MapRenderer {
   private decoratedCells = new Set<number>();
   /** Every cell in an atomic prop rect points at the same decoration sprite. */
   private decorationSpritesByCell = new Map<number, Phaser.GameObjects.Sprite>();
+  /** Closed gate cells keep their sprite so destruction can animate it open. */
+  private gateSpritesByCell = new Map<number, Phaser.GameObjects.Sprite>();
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -73,9 +74,7 @@ export class MapRenderer {
     this.tileSprites = Array.from({ length: mapData.height }, () =>
       new Array<Phaser.GameObjects.Sprite | null>(mapData.width).fill(null),
     );
-    this.tileTypes = Array.from({ length: mapData.height }, (_, r) =>
-      mapData.tiles[r].slice(),
-    );
+    this.tileTypes = Array.from({ length: mapData.height }, (_, r) => mapData.tiles[r].slice());
 
     // Cells hidden by a decoration sprite render as plain floor — a
     // rubble/garbage tile peeking out from under a car reads as noise.
@@ -100,8 +99,7 @@ export class MapRenderer {
         const y = row * tileSize + tileSize / 2;
 
         const isInnerWall =
-          tileType === TileType.WALL &&
-          !isOuterWall(row, col, mapData.height, mapData.width);
+          tileType === TileType.WALL && !isOuterWall(row, col, mapData.height, mapData.width);
         const isCover = tileType === TileType.COVER_LOW;
 
         if (isInnerWall || isCover) {
@@ -115,7 +113,15 @@ export class MapRenderer {
           this.container.add(floorSprite);
         }
 
-        const { texture, frame } = this.pickTile(theme, mapData.tiles, mapData.height, mapData.width, row, col, decoCovered);
+        const { texture, frame } = this.pickTile(
+          theme,
+          mapData.tiles,
+          mapData.height,
+          mapData.width,
+          row,
+          col,
+          decoCovered,
+        );
         const sprite = this.scene.add.sprite(x, y, texture, frame);
         sprite.setScale(scale);
         this.container.add(sprite);
@@ -135,13 +141,21 @@ export class MapRenderer {
       }
       const cx = (deco.x + deco.w / 2) * tileSize;
       const cy = (deco.y + deco.h / 2) * tileSize;
-      const sprite = this.scene.add.sprite(cx, cy, deco.texture);
-      sprite.setScale(scale);
+      const isGate = deco.interaction === 'shootable_gate';
+      const sprite = this.scene.add.sprite(
+        cx,
+        cy,
+        deco.texture,
+        isGate ? WIRE_GATE_CLOSED_FRAME : undefined,
+      );
+      sprite.setScale(isGate ? wireGateScale(tileSize) : scale);
       sprite.setFlipX(deco.flipX ?? false);
       this.container.add(sprite);
       for (let row = deco.y; row < deco.y + deco.h; row++) {
         for (let col = deco.x; col < deco.x + deco.w; col++) {
-          this.decorationSpritesByCell.set(row * mapData.width + col, sprite);
+          const key = row * mapData.width + col;
+          this.decorationSpritesByCell.set(key, sprite);
+          if (isGate) this.gateSpritesByCell.set(key, sprite);
         }
       }
     }
@@ -183,8 +197,7 @@ export class MapRenderer {
     const tileType = tiles[row][col];
 
     if (tileType === TileType.WALL) {
-      const style =
-        WALL_STYLES[isOuterWall(row, col, h, w) ? theme.outerWall : theme.innerWall];
+      const style = WALL_STYLES[isOuterWall(row, col, h, w) ? theme.outerWall : theme.innerWall];
       return { texture: style.texture, frame: style.pick(tiles, h, w, row, col) };
     }
 
@@ -256,7 +269,12 @@ export class MapRenderer {
     const key = row * this.mapWidth + col;
     if (this.decoratedCells.has(key)) {
       const prop = this.decorationSpritesByCell.get(key);
-      if (prop) {
+      const gate = this.gateSpritesByCell.get(key);
+      if (gate) {
+        gate.play(WIRE_GATE_OPEN_ANIMATION_KEY);
+        this.decorationSpritesByCell.delete(key);
+        this.gateSpritesByCell.delete(key);
+      } else if (prop) {
         prop.destroy();
         for (const [cell, sprite] of this.decorationSpritesByCell) {
           if (sprite === prop) this.decorationSpritesByCell.delete(cell);
@@ -298,6 +316,7 @@ export class MapRenderer {
     this.scorchedCells.clear();
     this.decoratedCells.clear();
     this.decorationSpritesByCell.clear();
+    this.gateSpritesByCell.clear();
     this.mapWidth = 0;
     this.mapHeight = 0;
     this.mapTileSize = 0;

@@ -39,7 +39,23 @@
     { "x": 15, "y": 6, "w": 2, "h": 1, "texture": "deco_car_scrap_red", "flipX": true },
     { "x": 3, "y": 7, "w": 2, "h": 1, "texture": "deco_container_gray" },
     { "x": 9, "y": 3, "w": 1, "h": 1, "texture": "deco_barrel_red", "hazard": "explosive_barrel" },
-    { "x": 13, "y": 8, "w": 1, "h": 1, "texture": "deco_barrel_red", "hazard": "explosive_barrel" }
+    { "x": 13, "y": 8, "w": 1, "h": 1, "texture": "deco_barrel_red", "hazard": "explosive_barrel" },
+    {
+      "x": 7,
+      "y": 5,
+      "w": 1,
+      "h": 1,
+      "texture": "tiles_wire_fence_closing",
+      "interaction": "shootable_gate"
+    },
+    {
+      "x": 12,
+      "y": 6,
+      "w": 1,
+      "h": 1,
+      "texture": "tiles_wire_fence_closing",
+      "interaction": "shootable_gate"
+    }
   ],
   "kothHills": [
     { "x": 9, "y": 5 },

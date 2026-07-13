@@ -18,17 +18,13 @@ export function validateMap(mapData: MapData): ValidationResult {
 
   for (let row = 0; row < mapData.tiles.length; row++) {
     if (mapData.tiles[row].length !== mapData.width) {
-      errors.push(
-        `Row ${row} has ${mapData.tiles[row].length} columns, expected ${mapData.width}`,
-      );
+      errors.push(`Row ${row} has ${mapData.tiles[row].length} columns, expected ${mapData.width}`);
     }
   }
 
   // Check minimum spawn points
   if (mapData.spawnPoints.length < 2) {
-    errors.push(
-      `Map must have at least 2 spawn points, found ${mapData.spawnPoints.length}`,
-    );
+    errors.push(`Map must have at least 2 spawn points, found ${mapData.spawnPoints.length}`);
   }
 
   // Check border tiles are all walls
@@ -101,14 +97,29 @@ export function validateMap(mapData: MapData): ValidationResult {
     }
     if (deco.hazard === 'explosive_barrel') {
       if (deco.w !== 1 || deco.h !== 1) {
-        errors.push(
-          `Explosive barrel at (${deco.x}, ${deco.y}) must be exactly 1x1`,
-        );
+        errors.push(`Explosive barrel at (${deco.x}, ${deco.y}) must be exactly 1x1`);
       } else if (mapData.tiles[deco.y]?.[deco.x] !== TileType.COVER_LOW) {
-        errors.push(
-          `Explosive barrel at (${deco.x}, ${deco.y}) must stand on COVER_LOW`,
-        );
+        errors.push(`Explosive barrel at (${deco.x}, ${deco.y}) must stand on COVER_LOW`);
       }
+    }
+    if (deco.interaction === 'shootable_gate') {
+      if (deco.w !== 1 || deco.h !== 1) {
+        errors.push(`Shootable gate at (${deco.x}, ${deco.y}) must be exactly 1x1`);
+      } else if (mapData.tiles[deco.y]?.[deco.x] !== TileType.WALL) {
+        errors.push(`Shootable gate at (${deco.x}, ${deco.y}) must stand on WALL`);
+      } else if (
+        deco.x === 0 ||
+        deco.y === 0 ||
+        deco.x === mapData.width - 1 ||
+        deco.y === mapData.height - 1
+      ) {
+        errors.push(`Shootable gate at (${deco.x}, ${deco.y}) must be inside the arena perimeter`);
+      }
+    }
+    if (deco.hazard !== undefined && deco.interaction !== undefined) {
+      errors.push(
+        `Decoration at (${deco.x}, ${deco.y}) cannot be both a hazard and an interaction`,
+      );
     }
   }
 
@@ -118,9 +129,7 @@ export function validateMap(mapData: MapData): ValidationResult {
   // hill overlapping cover would be partially unstandable.
   if (mapData.kothHills !== undefined) {
     if (mapData.kothHills.length < 3) {
-      errors.push(
-        `kothHills must have at least 3 entries, found ${mapData.kothHills.length}`,
-      );
+      errors.push(`kothHills must have at least 3 entries, found ${mapData.kothHills.length}`);
     }
     const size = KOTH.HILL_SIZE_TILES;
     for (const hill of mapData.kothHills) {
@@ -130,9 +139,7 @@ export function validateMap(mapData: MapData): ValidationResult {
         hill.x + size > mapData.width ||
         hill.y + size > mapData.height
       ) {
-        errors.push(
-          `KOTH hill (${hill.x}, ${hill.y}) extends out of map bounds`,
-        );
+        errors.push(`KOTH hill (${hill.x}, ${hill.y}) extends out of map bounds`);
         continue;
       }
       for (let dy = 0; dy < size; dy++) {

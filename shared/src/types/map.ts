@@ -38,6 +38,8 @@ export interface MapDecoration {
   flipX?: boolean;
   /** Optional server-authored gameplay carried by this decorated solid. */
   hazard?: 'explosive_barrel';
+  /** Optional interaction carried by this decorated solid. */
+  interaction?: 'shootable_gate';
 }
 
 export interface MapData {
@@ -54,7 +56,7 @@ export interface MapData {
    * the default wasteland look. Purely cosmetic — no gameplay effect.
    */
   theme?: string;
-  /** Cosmetic overlay sprites; see MapDecoration. */
+  /** Overlay sprites, some with optional authored gameplay; see MapDecoration. */
   decorations?: MapDecoration[];
   /**
    * King of the Hill zone positions — top-left tile of each

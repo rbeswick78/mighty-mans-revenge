@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–31 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts, solo Practice vs Rusty, streak + payback callouts, selectable Rusty difficulty, Collapsed Overpass, Blackout, fresh-chaos rematches, Last Stand, Kill Confirmed, mode briefings, character death animations, authoritative hit confirmation, blastable cover, chain-reaction barrels, Wasteland Contracts, Combat Medals, Wasteland Reputation, Hot Streaks, Fighter Mastery, Fists Only, Weapon Roulette, One in the Chamber). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–32 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts, solo Practice vs Rusty, streak + payback callouts, selectable Rusty difficulty, Collapsed Overpass, Blackout, fresh-chaos rematches, Last Stand, Kill Confirmed, mode briefings, character death animations, authoritative hit confirmation, blastable cover, chain-reaction barrels, Wasteland Contracts, Combat Medals, Wasteland Reputation, Hot Streaks, Fighter Mastery, Fists Only, Weapon Roulette, One in the Chamber, shootable arena gates). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -63,6 +63,7 @@ Each session below attacks one of these.
 | 29  | Fists Only                                    | Mid-round gunfights collapse into frantic close-range brawls | **DONE** (2026-07-12) |
 | 30  | Weapon Roulette                               | Every ten seconds demands a fresh fighting style and new positioning | **DONE** (2026-07-12) |
 | 31  | One in the Chamber                            | One precious shot turns every aim, miss, and recovery punch into drama | **DONE** (2026-07-12) |
+| 32  | Shootable Arena Gates                         | Every firefight can permanently reveal a shortcut or surprise sightline | **DONE** (2026-07-12) |
 
 ---
 
@@ -1722,7 +1723,93 @@ every kill creates the satisfying promise of another loaded chamber.
 
 ---
 
+## Session 32 — Shootable Arena Gates
+
+**Goal:** make arenas evolve through deliberate player choices, turning a
+single shot into a permanent shortcut, flank, escape route, or fresh sightline
+that changes how the rest of the round is played.
+
+**Locked design decisions**
+
+- Every arena authors rotationally paired one-cell gates on interior `WALL`
+  tiles. Wasteland Outpost, Overgrown Suburb, and Scrapyard carry two; the
+  denser Collapsed Overpass carries four. Each gate bridges walkable cells on
+  opposite sides, and every map remains fully connected while gates are closed.
+- A non-piercing rifle, pistol, or shotgun ray that terminates on a closed gate
+  opens it permanently. Exposed grenade/barrel blasts and Bruce's fire breath
+  also open gates through their existing destruction paths. Punches and
+  Mighty Man's piercing rays do not stop on scenery and therefore do not open
+  gates; this keeps the rule consistent with existing hit semantics.
+- The server owns the closed-gate set and live collision mutation. Gate openings
+  reuse the reliable `server:tilesDestroyed` message, so there is no parallel
+  wire state, client timer, respawn reset, or new network message. Rusty reads
+  the same live grid and naturally replans through newly opened routes.
+- `MapDecoration.interaction: "shootable_gate"` carries the authored gameplay
+  meaning. Validation requires a one-cell interior wall and forbids combining
+  an interaction with a hazard. Registry tests enforce pairing, solid backing,
+  and meaningful opposite-side walkability on every shipped map.
+- The client starts the 21×22 art on closed frame 6, scales by frame height to
+  fit one 48px tile, plays frames 6→0 at 18 FPS, and retains frame 0 as open
+  fence posts after removing the wall layer and prediction collision.
+
+**Acceptance criteria**
+
+- [x] Every shipped map has validator-approved, rotationally paired gates that
+      bridge real lanes without breaking closed-map spawn reachability.
+- [x] Rifle/pistol, multi-pellet shotgun, grenade/barrel blasts, and Bruce's
+      fire breath open a gate once and broadcast one authoritative cell update.
+- [x] Client collision clears on the existing reliable event while the gate
+      animates from closed to open and remains visibly open afterward.
+- [x] Pure presentation tests cover reverse frame order and tile-fit scaling;
+      match tests cover every supported destruction route and one-shot state.
+- [x] Typecheck, lint, all unit tests, production build, and Playwright pass.
+
+---
+
 ## Session Log
+
+### Session 32 — 2026-07-12 — Shootable Arena Gates
+
+**Shipped:** every arena now contains permanent tactical shortcuts players can
+choose to reveal mid-fight. Wasteland and Scrapyard expose dormant cuts through
+existing walls; Suburb closes two narrow passages; Overpass adds four gates
+that let teams punch side entrances into the central objective bank. Every
+placement has a 180-degree partner and bridges walkable space on opposite sides,
+so the opportunity is fair and legible rather than random map destruction.
+
+The server initializes closed gates from map decorations and consumes a gate
+exactly once when an ordinary bullet or shotgun pellet stops on it. Grenades,
+barrel chains, and Bruce's fire breath feed the same match-local collision and
+reliable tile-destruction machinery. No new wire message or replicated state was
+needed, and Rusty's pathfinding sees newly opened routes immediately. The map
+validator rejects oversized, perimeter, non-wall, or hazard-combined gates;
+registry coverage locks every arena's pair symmetry and lane value.
+
+The client gives the dormant seven-frame asset a gameplay role: closed gates
+start at frame 6, fit within one tile despite the 21×22 source dimensions, then
+play backward to frame 0 when the server clears the tile. The wall underneath
+is removed while the open posts remain, preserving both a satisfying opening
+beat and a readable reminder that the route is now passable.
+
+**Verified:** focused shared validation/map tests, pure client frame/scale tests,
+and the 193-test Match suite cover rifle, pistol, shotgun, grenade, fire-breath,
+state, and collision behavior. The complete suite passes 925 tests across 57 files;
+typecheck, lint, and the production build are clean (the existing Vite chunk-size
+warning remains). Playwright passes all 12 applicable Chromium, Firefox, and
+mobile-landscape cases with 9 intentional project skips. An attempted in-app
+browser smoke was stopped by its localhost navigation policy after an initial
+loopback connection miss; no policy bypass was attempted, so presentation is
+covered by deterministic client tests plus the repository browser suite rather
+than a separate manual canvas capture.
+
+**Carry-over:** gate count, locations, permanent opening, and one-shot cost are
+strong authored defaults, not group-tested balance verdicts. Watch whether
+players notice the closed gates quickly, whether opening one feels tactically
+worth ammunition, and whether Overpass's four options make the center more
+interesting without becoming too porous. Move gates only after real play rather
+than adding health bars or automatic resets speculatively.
+
+---
 
 ### Session 31 — 2026-07-12 — One in the Chamber
 

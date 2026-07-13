@@ -34,7 +34,23 @@
   ],
   "decorations": [
     { "x": 6, "y": 2, "w": 1, "h": 1, "texture": "deco_barrel_red", "hazard": "explosive_barrel" },
-    { "x": 13, "y": 9, "w": 1, "h": 1, "texture": "deco_barrel_red", "hazard": "explosive_barrel" }
+    { "x": 13, "y": 9, "w": 1, "h": 1, "texture": "deco_barrel_red", "hazard": "explosive_barrel" },
+    {
+      "x": 5,
+      "y": 6,
+      "w": 1,
+      "h": 1,
+      "texture": "tiles_wire_fence_closing",
+      "interaction": "shootable_gate"
+    },
+    {
+      "x": 14,
+      "y": 5,
+      "w": 1,
+      "h": 1,
+      "texture": "tiles_wire_fence_closing",
+      "interaction": "shootable_gate"
+    }
   ],
   "kothHills": [
     { "x": 9, "y": 5 },

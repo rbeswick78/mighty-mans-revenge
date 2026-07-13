@@ -10,8 +10,8 @@
     [1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1],
     [1, 0, 0, 0, 0, 1, 1, 2, 0, 0, 0, 0, 2, 1, 1, 0, 0, 0, 0, 1],
     [1, 0, 0, 2, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 2, 0, 0, 1],
-    [1, 4, 0, 0, 1, 1, 1, 0, 0, 4, 4, 0, 0, 1, 1, 1, 0, 0, 4, 1],
-    [1, 0, 0, 0, 1, 1, 1, 0, 0, 4, 4, 0, 0, 1, 1, 1, 0, 0, 0, 1],
+    [1, 4, 0, 0, 1, 1, 1, 0, 1, 4, 4, 1, 0, 1, 1, 1, 0, 0, 4, 1],
+    [1, 0, 0, 0, 1, 1, 1, 0, 1, 4, 4, 1, 0, 1, 1, 1, 0, 0, 0, 1],
     [1, 0, 0, 2, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 2, 0, 0, 1],
     [1, 0, 0, 0, 0, 1, 1, 2, 0, 0, 0, 0, 2, 1, 1, 0, 0, 0, 0, 1],
     [1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1],
@@ -39,7 +39,39 @@
     { "x": 4, "y": 5, "w": 2, "h": 1, "texture": "deco_container_gray" },
     { "x": 14, "y": 6, "w": 2, "h": 1, "texture": "deco_container_red" },
     { "x": 7, "y": 3, "w": 1, "h": 1, "texture": "deco_barrel_red", "hazard": "explosive_barrel" },
-    { "x": 12, "y": 8, "w": 1, "h": 1, "texture": "deco_barrel_red", "hazard": "explosive_barrel" }
+    { "x": 12, "y": 8, "w": 1, "h": 1, "texture": "deco_barrel_red", "hazard": "explosive_barrel" },
+    {
+      "x": 8,
+      "y": 5,
+      "w": 1,
+      "h": 1,
+      "texture": "tiles_wire_fence_closing",
+      "interaction": "shootable_gate"
+    },
+    {
+      "x": 8,
+      "y": 6,
+      "w": 1,
+      "h": 1,
+      "texture": "tiles_wire_fence_closing",
+      "interaction": "shootable_gate"
+    },
+    {
+      "x": 11,
+      "y": 5,
+      "w": 1,
+      "h": 1,
+      "texture": "tiles_wire_fence_closing",
+      "interaction": "shootable_gate"
+    },
+    {
+      "x": 11,
+      "y": 6,
+      "w": 1,
+      "h": 1,
+      "texture": "tiles_wire_fence_closing",
+      "interaction": "shootable_gate"
+    }
   ],
   "kothHills": [
     { "x": 9, "y": 5 },

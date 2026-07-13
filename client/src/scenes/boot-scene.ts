@@ -11,6 +11,14 @@ import {
 import { AudioManager } from '../audio/audio-manager.js';
 import { generateMenuTextures } from '../ui/menu/wasteland-street.js';
 import { MENU_FONT_CHECK_LIST } from '../ui/menu/fonts.js';
+import {
+  WIRE_GATE_FRAME_HEIGHT,
+  WIRE_GATE_FRAME_WIDTH,
+  WIRE_GATE_OPEN_ANIMATION_KEY,
+  WIRE_GATE_OPEN_FPS,
+  WIRE_GATE_OPENING_FRAMES,
+  WIRE_GATE_TEXTURE_KEY,
+} from '../rendering/wire-gate.js';
 
 /**
  * Per-direction frame dimensions for the gun overlay (the "Gun" weapon —
@@ -25,17 +33,17 @@ import { MENU_FONT_CHECK_LIST } from '../ui/menu/fonts.js';
  * /shared and are loaded automatically by the loop in `loadRealAssets`.
  */
 const GUN_HOLD_FRAMES: Record<Direction4, FrameDim> = {
-  down: { w: 5, h: 16 },          // 30 × 16
-  up: { w: 5, h: 16 },            // 30 × 16
-  side: { w: 16, h: 10 },         // 96 × 10
-  'side-left': { w: 16, h: 10 },  // 96 × 10
+  down: { w: 5, h: 16 }, // 30 × 16
+  up: { w: 5, h: 16 }, // 30 × 16
+  side: { w: 16, h: 10 }, // 96 × 10
+  'side-left': { w: 16, h: 10 }, // 96 × 10
 };
 
 const GUN_SHOOT_FRAMES: Record<Direction4, FrameDim> = {
-  down: { w: 5, h: 17 },          // 15 × 17
-  up: { w: 5, h: 17 },            // 15 × 17
-  side: { w: 18, h: 10 },         // 54 × 10
-  'side-left': { w: 18, h: 10 },  // 54 × 10
+  down: { w: 5, h: 17 }, // 15 × 17
+  up: { w: 5, h: 17 }, // 15 × 17
+  side: { w: 18, h: 10 }, // 54 × 10
+  'side-left': { w: 18, h: 10 }, // 54 × 10
 };
 
 /**
@@ -44,10 +52,10 @@ const GUN_SHOOT_FRAMES: Record<Direction4, FrameDim> = {
  * spawn position with the direction matching the bullet's travel angle.
  */
 const FIRE_FRAMES: Record<Direction4, FrameDim> = {
-  down: { w: 7, h: 10 },          // 21 × 10
-  up: { w: 7, h: 10 },            // 21 × 10
-  side: { w: 10, h: 7 },          // 30 × 7
-  'side-left': { w: 10, h: 7 },   // 30 × 7
+  down: { w: 7, h: 10 }, // 21 × 10
+  up: { w: 7, h: 10 }, // 21 × 10
+  side: { w: 10, h: 7 }, // 30 × 7
+  'side-left': { w: 10, h: 7 }, // 30 × 7
 };
 
 /** Two three-frame player-hit splashes from Enemies/Shot. */
@@ -64,24 +72,24 @@ const HIT_SPLASH_FPS = 30;
  * hand). hold = idle-and-run Sheet6, shoot = Sheet3, racking = Sheet2.
  */
 const SHOTGUN_HOLD_FRAMES: Record<Direction4, FrameDim> = {
-  down: { w: 6, h: 14 },          // 36 × 14
-  up: { w: 6, h: 16 },            // 36 × 16
-  side: { w: 15, h: 8 },          // 90 × 8
-  'side-left': { w: 15, h: 8 },   // 90 × 8
+  down: { w: 6, h: 14 }, // 36 × 14
+  up: { w: 6, h: 16 }, // 36 × 16
+  side: { w: 15, h: 8 }, // 90 × 8
+  'side-left': { w: 15, h: 8 }, // 90 × 8
 };
 
 const SHOTGUN_SHOOT_FRAMES: Record<Direction4, FrameDim> = {
-  down: { w: 6, h: 15 },          // 18 × 15
-  up: { w: 6, h: 17 },            // 18 × 17
-  side: { w: 18, h: 8 },          // 54 × 8
-  'side-left': { w: 18, h: 8 },   // 54 × 8
+  down: { w: 6, h: 15 }, // 18 × 15
+  up: { w: 6, h: 17 }, // 18 × 17
+  side: { w: 18, h: 8 }, // 54 × 8
+  'side-left': { w: 18, h: 8 }, // 54 × 8
 };
 
 const SHOTGUN_RACK_FRAMES: Record<Direction4, FrameDim> = {
-  down: { w: 6, h: 14 },          // 12 × 14
-  up: { w: 6, h: 16 },            // 12 × 16
-  side: { w: 16, h: 7 },          // 32 × 7
-  'side-left': { w: 16, h: 7 },   // 32 × 7
+  down: { w: 6, h: 14 }, // 12 × 14
+  up: { w: 6, h: 16 }, // 12 × 16
+  side: { w: 16, h: 7 }, // 32 × 7
+  'side-left': { w: 16, h: 7 }, // 32 × 7
 };
 
 /**
@@ -91,17 +99,17 @@ const SHOTGUN_RACK_FRAMES: Record<Direction4, FrameDim> = {
  * the server's fireCooldown, with no pump animation to fill it.
  */
 const PISTOL_HOLD_FRAMES: Record<Direction4, FrameDim> = {
-  down: { w: 5, h: 11 },          // 30 × 11
-  up: { w: 5, h: 11 },            // 30 × 11
-  side: { w: 8, h: 9 },           // 48 × 9
-  'side-left': { w: 8, h: 9 },    // 48 × 9
+  down: { w: 5, h: 11 }, // 30 × 11
+  up: { w: 5, h: 11 }, // 30 × 11
+  side: { w: 8, h: 9 }, // 48 × 9
+  'side-left': { w: 8, h: 9 }, // 48 × 9
 };
 
 const PISTOL_SHOOT_FRAMES: Record<Direction4, FrameDim> = {
-  down: { w: 5, h: 11 },          // 15 × 11
-  up: { w: 5, h: 11 },            // 15 × 11
-  side: { w: 10, h: 8 },          // 30 × 8
-  'side-left': { w: 10, h: 8 },   // 30 × 8
+  down: { w: 5, h: 11 }, // 15 × 11
+  up: { w: 5, h: 11 }, // 15 × 11
+  side: { w: 10, h: 8 }, // 30 × 8
+  'side-left': { w: 10, h: 8 }, // 30 × 8
 };
 
 const IDLE_FPS = 6;
@@ -119,19 +127,19 @@ const AXE_LANDING_FPS = 20;
  */
 const AXE_THROWN_DIRS = ['side', 'side-left', 'vertical'] as const;
 const AXE_THROWN_FRAMES: Record<(typeof AXE_THROWN_DIRS)[number], FrameDim> = {
-  side: { w: 14, h: 14 },          // 126 × 14, 9 frames
-  'side-left': { w: 14, h: 14 },   // 126 × 14, 9 frames
-  vertical: { w: 3, h: 16 },       // 27 × 16, 9 frames
+  side: { w: 14, h: 14 }, // 126 × 14, 9 frames
+  'side-left': { w: 14, h: 14 }, // 126 × 14, 9 frames
+  vertical: { w: 3, h: 16 }, // 27 × 16, 9 frames
 };
 const AXE_LANDING_FRAMES: Record<Direction4, FrameDim> = {
-  down: { w: 13, h: 18 },          // 65 × 18, 5 frames
-  up: { w: 13, h: 15 },            // 65 × 15, 5 frames
-  side: { w: 19, h: 16 },          // 95 × 16, 5 frames
-  'side-left': { w: 19, h: 16 },   // 95 × 16, 5 frames
+  down: { w: 13, h: 18 }, // 65 × 18, 5 frames
+  up: { w: 13, h: 15 }, // 65 × 15, 5 frames
+  side: { w: 19, h: 16 }, // 95 × 16, 5 frames
+  'side-left': { w: 19, h: 16 }, // 95 × 16, 5 frames
 };
-const GUN_HOLD_FPS = 9;     // between idle and run — visually close enough either way
-const GUN_SHOOT_FPS = 24;   // 3 frames in ~125 ms
-const FIRE_FPS = 30;        // 3 frames in ~100 ms — matches old procedural flash duration
+const GUN_HOLD_FPS = 9; // between idle and run — visually close enough either way
+const GUN_SHOOT_FPS = 24; // 3 frames in ~125 ms
+const FIRE_FPS = 30; // 3 frames in ~100 ms — matches old procedural flash duration
 /** 2 racking frames spread over the shotgun's 0.6 s pump delay. */
 const SHOTGUN_RACK_FPS = 2 / 0.6;
 /**
@@ -186,9 +194,7 @@ export class BootScene extends Phaser.Scene {
   private async awaitMenuFonts(): Promise<void> {
     if (!('fonts' in document)) return;
     try {
-      await Promise.all(
-        MENU_FONT_CHECK_LIST.map((spec) => document.fonts.load(spec)),
-      );
+      await Promise.all(MENU_FONT_CHECK_LIST.map((spec) => document.fonts.load(spec)));
       await document.fonts.ready;
     } catch {
       // Fall through to Courier fallback — never block startup on font load.
@@ -207,16 +213,11 @@ export class BootScene extends Phaser.Scene {
 
     const progressBar = this.add.graphics();
 
-    const loadingText = this.add.text(
-      this.cameras.main.width / 2,
-      barY - 30,
-      'LOADING...',
-      {
-        fontFamily: '"Courier New", Courier, monospace',
-        fontSize: '16px',
-        color: cssHex(Wasteland.TEXT_LOADING),
-      },
-    );
+    const loadingText = this.add.text(this.cameras.main.width / 2, barY - 30, 'LOADING...', {
+      fontFamily: '"Courier New", Courier, monospace',
+      fontSize: '16px',
+      color: cssHex(Wasteland.TEXT_LOADING),
+    });
     loadingText.setOrigin(0.5);
 
     this.load.on('progress', (value: number) => {
@@ -298,22 +299,38 @@ export class BootScene extends Phaser.Scene {
         loadedPrefixes.add(alt.spritePrefix);
         for (const dir of DIRECTIONS) {
           this.loadCharacterSheet(
-            alt.spritePrefix, dir, 'idle', alt.idleFrames[dir],
-            char.assetFolder, alt.assetBaseName,
+            alt.spritePrefix,
+            dir,
+            'idle',
+            alt.idleFrames[dir],
+            char.assetFolder,
+            alt.assetBaseName,
           );
           this.loadCharacterSheet(
-            alt.spritePrefix, dir, 'run', alt.runFrames[dir],
-            char.assetFolder, alt.assetBaseName,
+            alt.spritePrefix,
+            dir,
+            'run',
+            alt.runFrames[dir],
+            char.assetFolder,
+            alt.assetBaseName,
           );
           this.loadCharacterSheet(
-            alt.spritePrefix, dir, 'attack', alt.attackFrames[dir],
-            char.assetFolder, alt.assetBaseName,
+            alt.spritePrefix,
+            dir,
+            'attack',
+            alt.attackFrames[dir],
+            char.assetFolder,
+            alt.assetBaseName,
           );
         }
         for (const dir of DEATH_DIRECTIONS) {
           this.loadCharacterSheet(
-            alt.spritePrefix, dir, 'death', alt.deathFrames[dir],
-            char.assetFolder, alt.assetBaseName,
+            alt.spritePrefix,
+            dir,
+            'death',
+            alt.deathFrames[dir],
+            char.assetFolder,
+            alt.assetBaseName,
           );
         }
       }
@@ -323,125 +340,107 @@ export class BootScene extends Phaser.Scene {
     // side/side-left/vertical, landing one-shots + landed stills for all
     // four directions.
     for (const dir of AXE_THROWN_DIRS) {
-      this.load.spritesheet(
-        `axe_${dir}_thrown`,
-        `/assets/enemies/axe_${dir}_thrown.png`,
-        { frameWidth: AXE_THROWN_FRAMES[dir].w, frameHeight: AXE_THROWN_FRAMES[dir].h },
-      );
+      this.load.spritesheet(`axe_${dir}_thrown`, `/assets/enemies/axe_${dir}_thrown.png`, {
+        frameWidth: AXE_THROWN_FRAMES[dir].w,
+        frameHeight: AXE_THROWN_FRAMES[dir].h,
+      });
     }
     for (const dir of DIRECTIONS) {
-      this.load.spritesheet(
-        `axe_${dir}_landing`,
-        `/assets/enemies/axe_${dir}_landing.png`,
-        { frameWidth: AXE_LANDING_FRAMES[dir].w, frameHeight: AXE_LANDING_FRAMES[dir].h },
-      );
+      this.load.spritesheet(`axe_${dir}_landing`, `/assets/enemies/axe_${dir}_landing.png`, {
+        frameWidth: AXE_LANDING_FRAMES[dir].w,
+        frameHeight: AXE_LANDING_FRAMES[dir].h,
+      });
       this.load.image(`axe_${dir}_landed`, `/assets/enemies/axe_${dir}_landed.png`);
     }
 
     // Gun overlay + muzzle flash — 4 directions each. Shared across all
     // characters (not character-specific assets).
     for (const dir of DIRECTIONS) {
-      this.load.spritesheet(
-        `gun_${dir}_hold`,
-        `/assets/player/gun_${dir}_hold.png`,
-        { frameWidth: GUN_HOLD_FRAMES[dir].w, frameHeight: GUN_HOLD_FRAMES[dir].h },
-      );
-      this.load.spritesheet(
-        `gun_${dir}_shoot`,
-        `/assets/player/gun_${dir}_shoot.png`,
-        { frameWidth: GUN_SHOOT_FRAMES[dir].w, frameHeight: GUN_SHOOT_FRAMES[dir].h },
-      );
-      this.load.spritesheet(
-        `fire_${dir}`,
-        `/assets/player/fire_${dir}.png`,
-        { frameWidth: FIRE_FRAMES[dir].w, frameHeight: FIRE_FRAMES[dir].h },
-      );
+      this.load.spritesheet(`gun_${dir}_hold`, `/assets/player/gun_${dir}_hold.png`, {
+        frameWidth: GUN_HOLD_FRAMES[dir].w,
+        frameHeight: GUN_HOLD_FRAMES[dir].h,
+      });
+      this.load.spritesheet(`gun_${dir}_shoot`, `/assets/player/gun_${dir}_shoot.png`, {
+        frameWidth: GUN_SHOOT_FRAMES[dir].w,
+        frameHeight: GUN_SHOOT_FRAMES[dir].h,
+      });
+      this.load.spritesheet(`fire_${dir}`, `/assets/player/fire_${dir}.png`, {
+        frameWidth: FIRE_FRAMES[dir].w,
+        frameHeight: FIRE_FRAMES[dir].h,
+      });
     }
 
     // Shotgun held overlay — 4 directions × (hold loop / shoot / racking).
     for (const dir of DIRECTIONS) {
-      this.load.spritesheet(
-        `shotgun_${dir}_hold`,
-        `/assets/player/shotgun_${dir}_hold.png`,
-        { frameWidth: SHOTGUN_HOLD_FRAMES[dir].w, frameHeight: SHOTGUN_HOLD_FRAMES[dir].h },
-      );
-      this.load.spritesheet(
-        `shotgun_${dir}_shoot`,
-        `/assets/player/shotgun_${dir}_shoot.png`,
-        { frameWidth: SHOTGUN_SHOOT_FRAMES[dir].w, frameHeight: SHOTGUN_SHOOT_FRAMES[dir].h },
-      );
-      this.load.spritesheet(
-        `shotgun_${dir}_racking`,
-        `/assets/player/shotgun_${dir}_racking.png`,
-        { frameWidth: SHOTGUN_RACK_FRAMES[dir].w, frameHeight: SHOTGUN_RACK_FRAMES[dir].h },
-      );
+      this.load.spritesheet(`shotgun_${dir}_hold`, `/assets/player/shotgun_${dir}_hold.png`, {
+        frameWidth: SHOTGUN_HOLD_FRAMES[dir].w,
+        frameHeight: SHOTGUN_HOLD_FRAMES[dir].h,
+      });
+      this.load.spritesheet(`shotgun_${dir}_shoot`, `/assets/player/shotgun_${dir}_shoot.png`, {
+        frameWidth: SHOTGUN_SHOOT_FRAMES[dir].w,
+        frameHeight: SHOTGUN_SHOOT_FRAMES[dir].h,
+      });
+      this.load.spritesheet(`shotgun_${dir}_racking`, `/assets/player/shotgun_${dir}_racking.png`, {
+        frameWidth: SHOTGUN_RACK_FRAMES[dir].w,
+        frameHeight: SHOTGUN_RACK_FRAMES[dir].h,
+      });
     }
 
     // Pistol held overlay — 4 directions × (hold loop / shoot). No racking.
     for (const dir of DIRECTIONS) {
-      this.load.spritesheet(
-        `pistol_${dir}_hold`,
-        `/assets/player/pistol_${dir}_hold.png`,
-        { frameWidth: PISTOL_HOLD_FRAMES[dir].w, frameHeight: PISTOL_HOLD_FRAMES[dir].h },
-      );
-      this.load.spritesheet(
-        `pistol_${dir}_shoot`,
-        `/assets/player/pistol_${dir}_shoot.png`,
-        { frameWidth: PISTOL_SHOOT_FRAMES[dir].w, frameHeight: PISTOL_SHOOT_FRAMES[dir].h },
-      );
+      this.load.spritesheet(`pistol_${dir}_hold`, `/assets/player/pistol_${dir}_hold.png`, {
+        frameWidth: PISTOL_HOLD_FRAMES[dir].w,
+        frameHeight: PISTOL_HOLD_FRAMES[dir].h,
+      });
+      this.load.spritesheet(`pistol_${dir}_shoot`, `/assets/player/pistol_${dir}_shoot.png`, {
+        frameWidth: PISTOL_SHOOT_FRAMES[dir].w,
+        frameHeight: PISTOL_SHOOT_FRAMES[dir].h,
+      });
     }
 
     // Bleak-yellow tileset (16×16 tiles, 24 cols × 17 rows = 408 frames).
     // Specific frame indices are tunable in map-renderer.ts.
-    this.load.spritesheet(
-      'tiles_bleak',
-      '/assets/tiles/background_bleak-yellow.png',
-      { frameWidth: 16, frameHeight: 16 },
-    );
+    this.load.spritesheet('tiles_bleak', '/assets/tiles/background_bleak-yellow.png', {
+      frameWidth: 16,
+      frameHeight: 16,
+    });
     // Brick-wall tileset (16×16 tiles, 6 cols × 3 rows = 18 frames).
     // Used for wall variants — see WALL_VARIANTS in map-renderer.ts.
-    this.load.spritesheet(
-      'tiles_brick',
-      '/assets/tiles/brick-wall.png',
-      { frameWidth: 16, frameHeight: 16 },
-    );
+    this.load.spritesheet('tiles_brick', '/assets/tiles/brick-wall.png', {
+      frameWidth: 16,
+      frameHeight: 16,
+    });
     // Wire-fence closing animation (21×22 px frames, 7 frames in a row).
     // Not a placement tileset — single-strip animation. Loaded so the
     // tile picker can preview frames and decide how to use them.
-    this.load.spritesheet(
-      'tiles_wire_fence_closing',
-      '/assets/tiles/wire-fence-closing-no-lock.png',
-      { frameWidth: 21, frameHeight: 22 },
-    );
+    this.load.spritesheet(WIRE_GATE_TEXTURE_KEY, '/assets/tiles/wire-fence-closing-no-lock.png', {
+      frameWidth: WIRE_GATE_FRAME_WIDTH,
+      frameHeight: WIRE_GATE_FRAME_HEIGHT,
+    });
     // Iron-fence tileset (16×16 tiles, 3 cols × 4 rows = 12 frames).
-    this.load.spritesheet(
-      'tiles_iron_fence',
-      '/assets/tiles/iron-fence.png',
-      { frameWidth: 16, frameHeight: 16 },
-    );
+    this.load.spritesheet('tiles_iron_fence', '/assets/tiles/iron-fence.png', {
+      frameWidth: 16,
+      frameHeight: 16,
+    });
     // Theme tilesets (see map-themes.ts). The green/dark-green background
     // sheets are palette swaps of the bleak-yellow layout (24×17 frames);
     // roof is 16×5 (corrugated walls), garbage 8×4 (cover accents).
-    this.load.spritesheet(
-      'tiles_green',
-      '/assets/tiles/background_green.png',
-      { frameWidth: 16, frameHeight: 16 },
-    );
-    this.load.spritesheet(
-      'tiles_dark_green',
-      '/assets/tiles/background_dark-green.png',
-      { frameWidth: 16, frameHeight: 16 },
-    );
-    this.load.spritesheet(
-      'tiles_roof',
-      '/assets/tiles/roof.png',
-      { frameWidth: 16, frameHeight: 16 },
-    );
-    this.load.spritesheet(
-      'tiles_garbage',
-      '/assets/tiles/garbage.png',
-      { frameWidth: 16, frameHeight: 16 },
-    );
+    this.load.spritesheet('tiles_green', '/assets/tiles/background_green.png', {
+      frameWidth: 16,
+      frameHeight: 16,
+    });
+    this.load.spritesheet('tiles_dark_green', '/assets/tiles/background_dark-green.png', {
+      frameWidth: 16,
+      frameHeight: 16,
+    });
+    this.load.spritesheet('tiles_roof', '/assets/tiles/roof.png', {
+      frameWidth: 16,
+      frameHeight: 16,
+    });
+    this.load.spritesheet('tiles_garbage', '/assets/tiles/garbage.png', {
+      frameWidth: 16,
+      frameHeight: 16,
+    });
 
     // Map decorations — free-placed cosmetic sprites referenced by
     // texture key from map JSON `decorations` (see MapRenderer).
@@ -467,18 +466,20 @@ export class BootScene extends Phaser.Scene {
     // Shotgun pellet head — 3×1 px, one per pellet trail.
     this.load.image('shotgun-bullet', '/assets/player/shotgun-bullet.png');
     for (const splash of HIT_SPLASH_SHEETS) {
-      this.load.spritesheet(
-        splash.key,
-        `/assets/effects/${splash.file}`,
-        { frameWidth: splash.frameWidth, frameHeight: HIT_SPLASH_FRAME_HEIGHT },
-      );
+      this.load.spritesheet(splash.key, `/assets/effects/${splash.file}`, {
+        frameWidth: splash.frameWidth,
+        frameHeight: HIT_SPLASH_FRAME_HEIGHT,
+      });
     }
 
     // HUD shell indicators for the special-weapon ammo panel.
     this.load.image('shotgun_shell', '/assets/ui/shotgun-bullet-indicator.png');
     this.load.image('shotgun_shell_empty', '/assets/ui/shotgun-bullet-indicator_empty.png');
     this.load.image('shotgun_shell_small', '/assets/ui/shotgun-bullet-indicator_small.png');
-    this.load.image('shotgun_shell_small_empty', '/assets/ui/shotgun-bullet-indicator_small_empty.png');
+    this.load.image(
+      'shotgun_shell_small_empty',
+      '/assets/ui/shotgun-bullet-indicator_small_empty.png',
+    );
     // Pistol row uses a single icon + numeric count (12 per-shell icons
     // would overflow the left column), so only the two base indicators.
     this.load.image('pistol_bullet', '/assets/ui/pistol-bullet-indicator.png');
@@ -530,6 +531,15 @@ export class BootScene extends Phaser.Scene {
    * in separate registries so this isn't ambiguous).
    */
   private createCharacterAnimations(): void {
+    this.anims.create({
+      key: WIRE_GATE_OPEN_ANIMATION_KEY,
+      frames: this.anims.generateFrameNumbers(WIRE_GATE_TEXTURE_KEY, {
+        frames: [...WIRE_GATE_OPENING_FRAMES],
+      }),
+      frameRate: WIRE_GATE_OPEN_FPS,
+      repeat: 0,
+    });
+
     // Same dedupe rationale as loadRealAssets — sharing a spritePrefix
     // means sharing the animation keys.
     const animatedPrefixes = new Set<string>();
@@ -667,8 +677,7 @@ export class BootScene extends Phaser.Scene {
         // so "all frames in the sheet" is only trustworthy if the
         // frameWidth divided the sheet exactly; the explicit range also
         // guards against sheets with trailing padding.
-        const frameCount =
-          state === 'run' ? char.runFrameCount : char.idleFrameCount;
+        const frameCount = state === 'run' ? char.runFrameCount : char.idleFrameCount;
         this.anims.create({
           key,
           frames: this.anims.generateFrameNumbers(key, {
@@ -758,20 +767,33 @@ export class BootScene extends Phaser.Scene {
       for (let x = xStart; x <= xEnd; x++) px(BODY, x, y);
     }
     // Pineapple grooves (3-dot horizontal pattern, two rows).
-    px(GROOVE, 5, 10); px(GROOVE, 8, 10); px(GROOVE, 10, 10);
-    px(GROOVE, 5, 12); px(GROOVE, 8, 12); px(GROOVE, 10, 12);
+    px(GROOVE, 5, 10);
+    px(GROOVE, 8, 10);
+    px(GROOVE, 10, 10);
+    px(GROOVE, 5, 12);
+    px(GROOVE, 8, 12);
+    px(GROOVE, 10, 12);
     // Left-edge highlight pixels.
-    px(HIGHLIGHT, 5, 9); px(HIGHLIGHT, 5, 11);
+    px(HIGHLIGHT, 5, 9);
+    px(HIGHLIGHT, 5, 11);
     // Neck (steel collar between body and lever).
-    px(STEEL, 7, 7); px(STEEL, 8, 7);
+    px(STEEL, 7, 7);
+    px(STEEL, 8, 7);
     // Spoon/lever sweeping up to the right.
-    px(STEEL, 7, 6); px(STEEL, 8, 6); px(STEEL, 9, 6);
-    px(STEEL, 9, 5); px(STEEL, 10, 5); px(STEEL, 11, 5);
+    px(STEEL, 7, 6);
+    px(STEEL, 8, 6);
+    px(STEEL, 9, 6);
+    px(STEEL, 9, 5);
+    px(STEEL, 10, 5);
+    px(STEEL, 11, 5);
     px(STEEL, 11, 4);
     // Pin ring (gold loop above the lever).
-    px(PIN, 11, 3); px(PIN, 12, 3);
-    px(PIN, 10, 2); px(PIN, 13, 2);
-    px(PIN, 11, 1); px(PIN, 12, 1);
+    px(PIN, 11, 3);
+    px(PIN, 12, 3);
+    px(PIN, 10, 2);
+    px(PIN, 13, 2);
+    px(PIN, 11, 1);
+    px(PIN, 12, 1);
     pickupGrenadeGfx.generateTexture('pickup_grenade', 16, 16);
     pickupGrenadeGfx.destroy();
 

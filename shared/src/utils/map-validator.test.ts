@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { validateMap } from './map-validator.js';
-import { MapData } from '../types/map.js';
+import { TileType, type MapData } from '../types/map.js';
 
 function makeValidMap(overrides?: Partial<MapData>): MapData {
   // Minimal 4x4 valid map with wall borders and 2 spawn points
@@ -44,9 +44,7 @@ describe('validateMap', () => {
     });
     const result = validateMap(map);
     expect(result.valid).toBe(false);
-    expect(result.errors).toContainEqual(
-      expect.stringContaining('row count'),
-    );
+    expect(result.errors).toContainEqual(expect.stringContaining('row count'));
   });
 
   it('catches wrong tile grid column count', () => {
@@ -60,18 +58,14 @@ describe('validateMap', () => {
     });
     const result = validateMap(map);
     expect(result.valid).toBe(false);
-    expect(result.errors).toContainEqual(
-      expect.stringContaining('Row 1'),
-    );
+    expect(result.errors).toContainEqual(expect.stringContaining('Row 1'));
   });
 
   it('catches missing spawn points', () => {
     const map = makeValidMap({ spawnPoints: [{ x: 1, y: 1 }] });
     const result = validateMap(map);
     expect(result.valid).toBe(false);
-    expect(result.errors).toContainEqual(
-      expect.stringContaining('at least 2 spawn points'),
-    );
+    expect(result.errors).toContainEqual(expect.stringContaining('at least 2 spawn points'));
   });
 
   it('catches non-wall border tiles', () => {
@@ -85,9 +79,7 @@ describe('validateMap', () => {
     });
     const result = validateMap(map);
     expect(result.valid).toBe(false);
-    expect(result.errors).toContainEqual(
-      expect.stringContaining('Top border'),
-    );
+    expect(result.errors).toContainEqual(expect.stringContaining('Top border'));
   });
 
   it('catches non-wall left/right border tiles', () => {
@@ -114,9 +106,7 @@ describe('validateMap', () => {
     });
     const result = validateMap(map);
     expect(result.valid).toBe(false);
-    expect(result.errors).toContainEqual(
-      expect.stringContaining('Spawn point (0, 0)'),
-    );
+    expect(result.errors).toContainEqual(expect.stringContaining('Spawn point (0, 0)'));
   });
 
   it('catches pickup spawns on wall tiles', () => {
@@ -125,9 +115,7 @@ describe('validateMap', () => {
     });
     const result = validateMap(map);
     expect(result.valid).toBe(false);
-    expect(result.errors).toContainEqual(
-      expect.stringContaining('Pickup spawn (0, 0)'),
-    );
+    expect(result.errors).toContainEqual(expect.stringContaining('Pickup spawn (0, 0)'));
   });
 
   it('catches unreachable spawn points', () => {
@@ -150,9 +138,7 @@ describe('validateMap', () => {
     };
     const result = validateMap(map);
     expect(result.valid).toBe(false);
-    expect(result.errors).toContainEqual(
-      expect.stringContaining('not reachable'),
-    );
+    expect(result.errors).toContainEqual(expect.stringContaining('not reachable'));
   });
 
   it('passes when pickup spawns are on PICKUP_SPAWN tiles', () => {
@@ -178,9 +164,7 @@ describe('validateMap', () => {
     });
     const result = validateMap(map);
     expect(result.valid).toBe(false);
-    expect(result.errors).toContainEqual(
-      expect.stringContaining('out of map bounds'),
-    );
+    expect(result.errors).toContainEqual(expect.stringContaining('out of map bounds'));
   });
 
   it('accepts in-bounds decorations and maps with none', () => {
@@ -197,9 +181,7 @@ describe('validateMap', () => {
     });
     const result = validateMap(map);
     expect(result.valid).toBe(false);
-    expect(result.errors).toContainEqual(
-      expect.stringContaining('extends out of map bounds'),
-    );
+    expect(result.errors).toContainEqual(expect.stringContaining('extends out of map bounds'));
   });
 
   it('catches decorations with non-positive size', () => {
@@ -208,9 +190,7 @@ describe('validateMap', () => {
     });
     const result = validateMap(map);
     expect(result.valid).toBe(false);
-    expect(result.errors).toContainEqual(
-      expect.stringContaining('non-positive size'),
-    );
+    expect(result.errors).toContainEqual(expect.stringContaining('non-positive size'));
   });
 
   it('requires explosive barrels to be one-cell decorations on low cover', () => {
@@ -261,6 +241,89 @@ describe('validateMap', () => {
     );
   });
 
+  it('requires shootable gates to be one-cell interior wall decorations', () => {
+    const valid = makeValidMap();
+    valid.tiles[1][2] = TileType.WALL;
+    valid.decorations = [
+      {
+        x: 2,
+        y: 1,
+        w: 1,
+        h: 1,
+        texture: 'tiles_wire_fence_closing',
+        interaction: 'shootable_gate',
+      },
+    ];
+    expect(validateMap(valid).valid).toBe(true);
+
+    const oversized = makeValidMap({
+      decorations: [
+        {
+          x: 1,
+          y: 2,
+          w: 2,
+          h: 1,
+          texture: 'tiles_wire_fence_closing',
+          interaction: 'shootable_gate',
+        },
+      ],
+    });
+    expect(validateMap(oversized).errors).toContainEqual(
+      expect.stringContaining('must be exactly 1x1'),
+    );
+
+    const onFloor = makeValidMap({
+      decorations: [
+        {
+          x: 1,
+          y: 2,
+          w: 1,
+          h: 1,
+          texture: 'tiles_wire_fence_closing',
+          interaction: 'shootable_gate',
+        },
+      ],
+    });
+    expect(validateMap(onFloor).errors).toContainEqual(
+      expect.stringContaining('must stand on WALL'),
+    );
+
+    const perimeter = makeValidMap({
+      decorations: [
+        {
+          x: 0,
+          y: 2,
+          w: 1,
+          h: 1,
+          texture: 'tiles_wire_fence_closing',
+          interaction: 'shootable_gate',
+        },
+      ],
+    });
+    expect(validateMap(perimeter).errors).toContainEqual(
+      expect.stringContaining('inside the arena perimeter'),
+    );
+  });
+
+  it('rejects decorations that combine a hazard and an interaction', () => {
+    const map = makeValidMap();
+    map.tiles[1][2] = TileType.WALL;
+    map.decorations = [
+      {
+        x: 2,
+        y: 1,
+        w: 1,
+        h: 1,
+        texture: 'impossible_prop',
+        hazard: 'explosive_barrel',
+        interaction: 'shootable_gate',
+      },
+    ];
+    expect(validateMap(map).errors).toContainEqual(
+      expect.stringContaining('cannot be both a hazard and an interaction'),
+    );
+  });
+
   describe('kothHills', () => {
     /** 8x6 open interior — room for several distinct 2x2 hills. */
     function makeHillMap(kothHills?: { x: number; y: number }[]): MapData {
@@ -299,11 +362,14 @@ describe('validateMap', () => {
     });
 
     it('rejects fewer than 3 declared hills', () => {
-      const result = validateMap(makeHillMap([{ x: 1, y: 1 }, { x: 3, y: 2 }]));
-      expect(result.valid).toBe(false);
-      expect(result.errors).toContainEqual(
-        expect.stringContaining('at least 3 entries'),
+      const result = validateMap(
+        makeHillMap([
+          { x: 1, y: 1 },
+          { x: 3, y: 2 },
+        ]),
       );
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContainEqual(expect.stringContaining('at least 3 entries'));
     });
 
     it('rejects hills extending out of bounds', () => {
@@ -315,9 +381,7 @@ describe('validateMap', () => {
         ]),
       );
       expect(result.valid).toBe(false);
-      expect(result.errors).toContainEqual(
-        expect.stringContaining('extends out of map bounds'),
-      );
+      expect(result.errors).toContainEqual(expect.stringContaining('extends out of map bounds'));
     });
 
     it('rejects hills covering walls or cover (COVER_LOW blocks movement)', () => {
@@ -329,9 +393,7 @@ describe('validateMap', () => {
         ]),
       );
       expect(result.valid).toBe(false);
-      expect(result.errors).toContainEqual(
-        expect.stringContaining('non-walkable tile at (5, 2)'),
-      );
+      expect(result.errors).toContainEqual(expect.stringContaining('non-walkable tile at (5, 2)'));
     });
   });
 });

@@ -66,9 +66,7 @@ function makeMapData(): MapData {
   };
 }
 
-function createMatch(
-  playerCount = 2,
-): Match {
+function createMatch(playerCount = 2): Match {
   const players = Array.from({ length: playerCount }, (_, i) => ({
     id: `player-${i}`,
     nickname: `Player ${i}`,
@@ -152,13 +150,9 @@ describe('Match', () => {
 
       // P2 default hover is bruce; trying to hover mighty_man (P1's lock)
       // should be silently rejected, leaving the hover unchanged.
-      const before = m.getSelectStateMessage().selections.find(
-        (s) => s.playerId === 'player-1',
-      )!;
+      const before = m.getSelectStateMessage().selections.find((s) => s.playerId === 'player-1')!;
       m.setHover('player-1', 'mighty_man');
-      const after = m.getSelectStateMessage().selections.find(
-        (s) => s.playerId === 'player-1',
-      )!;
+      const after = m.getSelectStateMessage().selections.find((s) => s.playerId === 'player-1')!;
 
       expect(after.hoveredCharacterId).toBe(before.hoveredCharacterId);
       expect(after.hoveredCharacterId).not.toBe('mighty_man');
@@ -169,9 +163,7 @@ describe('Match', () => {
       m.setLock('player-0', 'mighty_man');
       m.setLock('player-1', 'mighty_man');
 
-      const p1 = m.getSelectStateMessage().selections.find(
-        (s) => s.playerId === 'player-1',
-      )!;
+      const p1 = m.getSelectStateMessage().selections.find((s) => s.playerId === 'player-1')!;
       expect(p1.lockedCharacterId).toBeNull();
     });
 
@@ -232,9 +224,9 @@ describe('Match', () => {
 
       m.setLock('player-0', 'mighty_man');
       // P1's hover was auto-snapped to bruce; lock that.
-      const p1Selection = m.getSelectStateMessage().selections.find(
-        (s) => s.playerId === 'player-1',
-      )!;
+      const p1Selection = m
+        .getSelectStateMessage()
+        .selections.find((s) => s.playerId === 'player-1')!;
       m.setLock('player-1', p1Selection.hoveredCharacterId!);
 
       m.update(0.1);
@@ -443,11 +435,7 @@ describe('Match', () => {
       match.matchTimer -= 6.001;
       match.onKill('player-0', 'player-1', 'pistol');
 
-      expect(match.getKillFeed().map((entry) => entry.rapidKillCount)).toEqual([
-        1,
-        2,
-        1,
-      ]);
+      expect(match.getKillFeed().map((entry) => entry.rapidKillCount)).toEqual([1, 2, 1]);
     });
 
     it('marks a kill made after the killer is already dead as posthumous', () => {
@@ -731,10 +719,7 @@ describe('Match', () => {
       return m;
     }
 
-    function startBarrelMatch(
-      secondBarrelCol: number | null = null,
-      shieldingWall = false,
-    ): Match {
+    function startBarrelMatch(secondBarrelCol: number | null = null, shieldingWall = false): Match {
       const barrelCols = [3, ...(secondBarrelCol === null ? [] : [secondBarrelCol])];
       const middleRow = [1, 0, 0, 2, shieldingWall ? 1 : 0, 0, 0, 0, 1];
       if (secondBarrelCol !== null) middleRow[secondBarrelCol] = 2;
@@ -764,14 +749,62 @@ describe('Match', () => {
           hazard: 'explosive_barrel' as const,
         })),
       };
-      const m = new Match('barrel-lab', map, [
-        { id: 'player-0', nickname: 'P0' },
-        { id: 'player-1', nickname: 'P1' },
-      ], GameModeType.DEATHMATCH, Math.random, [], 'powder_keg');
+      const m = new Match(
+        'barrel-lab',
+        map,
+        [
+          { id: 'player-0', nickname: 'P0' },
+          { id: 'player-1', nickname: 'P1' },
+        ],
+        GameModeType.DEATHMATCH,
+        Math.random,
+        [],
+        'powder_keg',
+      );
       m.startCountdown();
       m.update(MATCH.COUNTDOWN_DURATION + 0.05);
       m.players.get('player-0')!.position = { x: 72, y: 120 };
       m.players.get('player-1')!.position = { x: 216, y: 120 };
+      return m;
+    }
+
+    function startGateMatch(): Match {
+      const map: MapData = {
+        name: 'Shootable Gate Lab',
+        width: 7,
+        height: 5,
+        tileSize: 48,
+        tiles: [
+          [1, 1, 1, 1, 1, 1, 1],
+          [1, 0, 0, 0, 0, 0, 1],
+          [1, 0, 0, 1, 0, 0, 1],
+          [1, 3, 0, 0, 0, 3, 1],
+          [1, 1, 1, 1, 1, 1, 1],
+        ],
+        spawnPoints: [
+          { x: 1, y: 3 },
+          { x: 5, y: 3 },
+        ],
+        pickupSpawns: [],
+        decorations: [
+          {
+            x: 3,
+            y: 2,
+            w: 1,
+            h: 1,
+            texture: 'tiles_wire_fence_closing',
+            interaction: 'shootable_gate',
+          },
+        ],
+      };
+      const m = new Match('gate-lab', map, [
+        { id: 'player-0', nickname: 'P0' },
+        { id: 'player-1', nickname: 'P1' },
+      ]);
+      m.startCountdown();
+      m.update(MATCH.COUNTDOWN_DURATION + 0.05);
+      m.players.get('player-0')!.position = { x: 72, y: 120 };
+      m.players.get('player-1')!.position = { x: 264, y: 120 };
       return m;
     }
 
@@ -807,7 +840,7 @@ describe('Match', () => {
       expect(m.getActiveGrenades().length).toBe(1);
     });
 
-    it('detonatePressed explodes the player\'s grenade and removes it', () => {
+    it("detonatePressed explodes the player's grenade and removes it", () => {
       const m = startActiveMatch();
 
       m.queueInput('player-0', makeInput(1, { throwPressed: true, aimAngle: 0 }));
@@ -867,6 +900,70 @@ describe('Match', () => {
       expect(m.players.get('player-1')!.isDead).toBe(true);
       expect(m.getTickKillFeedEntries()[0]?.weapon).toBe('barrel');
       expect(m.stats.getStats('player-0').killsByWeapon.barrel).toBe(1);
+    });
+
+    it('a rifle impact permanently opens a gate and broadcasts the cell once', () => {
+      const m = startGateMatch();
+
+      m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+      m.update(0.05);
+
+      expect(m.getTickDestroyedTiles()).toEqual([{ col: 3, row: 2 }]);
+      expect(m.getTickBarrelExplosions()).toEqual([]);
+      expect(m.mapManager.getCollisionGrid().solid[2][3]).toBe(false);
+
+      m.update(0.05);
+      expect(m.getTickDestroyedTiles()).toEqual([]);
+    });
+
+    it('a pistol impact opens a gate through the shared single-shot path', () => {
+      const m = startGateMatch();
+      const shooter = m.players.get('player-0')!;
+      shooter.weaponId = 'pistol';
+      shooter.specialAmmo = 1;
+      shooter.specialReserve = 0;
+
+      m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+      m.update(0.05);
+
+      expect(m.getTickDestroyedTiles()).toEqual([{ col: 3, row: 2 }]);
+      expect(m.mapManager.getCollisionGrid().solid[2][3]).toBe(false);
+    });
+
+    it('a shotgun blast opens a gate once even when several pellets strike it', () => {
+      const m = startGateMatch();
+      const shooter = m.players.get('player-0')!;
+      shooter.weaponId = 'shotgun';
+      shooter.specialAmmo = 2;
+      shooter.specialReserve = 0;
+
+      m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+      m.update(0.05);
+
+      expect(m.getTickDestroyedTiles()).toEqual([{ col: 3, row: 2 }]);
+      expect(m.mapManager.getCollisionGrid().solid[2][3]).toBe(false);
+    });
+
+    it('a grenade blast opens a gate through the same destruction event', () => {
+      const m = startGateMatch();
+      plantGrenade(m);
+
+      m.queueInput('player-0', makeInput(2, { detonatePressed: true }));
+      m.update(0.05);
+
+      expect(m.getTickDestroyedTiles()).toEqual([{ col: 3, row: 2 }]);
+      expect(m.mapManager.getCollisionGrid().solid[2][3]).toBe(false);
+    });
+
+    it("Bruce's fire breath opens gates in its wall-clearing cone", () => {
+      const m = startGateMatch();
+      m.players.get('player-0')!.characterId = 'bruce';
+
+      m.queueInput('player-0', makeInput(1, { abilityPressed: true, aimAngle: 0 }));
+      m.update(0.05);
+
+      expect(m.getTickDestroyedTiles()).toContainEqual({ col: 3, row: 2 });
+      expect(m.mapManager.getCollisionGrid().solid[2][3]).toBe(false);
     });
 
     it('a grenade-triggered barrel recursively chains into another exposed barrel once', () => {
@@ -1198,10 +1295,7 @@ describe('Match', () => {
       });
 
       it('fists_only equips everyone, retires grenades, and routes fire to punches', () => {
-        const m = startActiveMatchAt(
-          MUTATORS.ACTIVATION_AT_REMAINING + 0.01,
-          'fists_only',
-        );
+        const m = startActiveMatchAt(MUTATORS.ACTIVATION_AT_REMAINING + 0.01, 'fists_only');
         const p0 = m.players.get('player-0')!;
         const p1 = m.players.get('player-1')!;
         p0.weaponId = 'shotgun';
@@ -1222,10 +1316,7 @@ describe('Match', () => {
         }
         expect(m.getActiveGrenades()).toHaveLength(0);
 
-        m.queueInput(
-          p0.id,
-          makeInput(1, { firePressed: true, throwPressed: true, aimAngle: 0 }),
-        );
+        m.queueInput(p0.id, makeInput(1, { firePressed: true, throwPressed: true, aimAngle: 0 }));
         m.update(0.05);
 
         expect(m.getTickPunchEvents()).toHaveLength(1);
@@ -1234,10 +1325,7 @@ describe('Match', () => {
       });
 
       it('fists_only reasserts the brawl after pickups and respawns', () => {
-        const m = startActiveMatchAt(
-          MUTATORS.ACTIVATION_AT_REMAINING + 0.01,
-          'fists_only',
-        );
+        const m = startActiveMatchAt(MUTATORS.ACTIVATION_AT_REMAINING + 0.01, 'fists_only');
         m.update(0.05);
         const p1 = m.players.get('player-1')!;
 
@@ -1256,10 +1344,7 @@ describe('Match', () => {
       });
 
       it('weapon_roulette gives everyone the same stocked weapon and cycles fairly', () => {
-        const m = startActiveMatchAt(
-          MUTATORS.ACTIVATION_AT_REMAINING + 0.01,
-          'weapon_roulette',
-        );
+        const m = startActiveMatchAt(MUTATORS.ACTIVATION_AT_REMAINING + 0.01, 'weapon_roulette');
         const alreadyHoldingShotgun = m.players.get('player-0')!;
         alreadyHoldingShotgun.weaponId = 'shotgun';
         alreadyHoldingShotgun.specialAmmo = 1;
@@ -1330,10 +1415,7 @@ describe('Match', () => {
       });
 
       it('weapon_roulette holds an exhausted weapon until the shared cycle advances', () => {
-        const m = startActiveMatchAt(
-          MUTATORS.ACTIVATION_AT_REMAINING + 0.01,
-          'weapon_roulette',
-        );
+        const m = startActiveMatchAt(MUTATORS.ACTIVATION_AT_REMAINING + 0.01, 'weapon_roulette');
         m.update(0.05);
         const player = m.players.get('player-0')!;
         player.specialAmmo = 1;
@@ -1461,11 +1543,7 @@ describe('Match', () => {
       });
 
       it('never pairs two loadout-owning mutators in random slots', () => {
-        for (const first of [
-          'fists_only',
-          'grenades_only',
-          'weapon_roulette',
-        ] as const) {
+        for (const first of ['fists_only', 'grenades_only', 'weapon_roulette'] as const) {
           const m = startActiveMatchWithMidMutator(first);
           const internals = m as unknown as MatchInternals;
           internals.matchTimer = MUTATORS.ACTIVATION_AT_REMAINING - 0.01;
@@ -1507,11 +1585,7 @@ describe('Match', () => {
       });
 
       it('a forced final loadout excludes every conflicting random mid loadout', () => {
-        const owners = [
-          'grenades_only',
-          'fists_only',
-          'weapon_roulette',
-        ] as const;
+        const owners = ['grenades_only', 'fists_only', 'weapon_roulette'] as const;
         for (const forced of owners) {
           process.env.FORCE_EVENT = forced;
           try {
@@ -1639,10 +1713,7 @@ describe('Match', () => {
 
         const damageDealt = PLAYER.MAX_HEALTH - p1.health;
         expect(damageDealt).toBeGreaterThan(0);
-        expect(p0.health).toBeCloseTo(
-          40 + damageDealt * MUTATORS.VAMPIRE_HEAL_FRACTION,
-          5,
-        );
+        expect(p0.health).toBeCloseTo(40 + damageDealt * MUTATORS.VAMPIRE_HEAL_FRACTION, 5);
       });
 
       it('never heals above maxHealth', () => {
@@ -1706,9 +1777,7 @@ describe('Match', () => {
           m.update(0.05);
         }
         expect(p1.isDead).toBe(false);
-        expect(p1.secondWindTimer).toBeGreaterThan(
-          MUTATORS.SECOND_WIND_DURATION_SECONDS - 0.2,
-        );
+        expect(p1.secondWindTimer).toBeGreaterThan(MUTATORS.SECOND_WIND_DURATION_SECONDS - 0.2);
 
         // One boosted movement tick: BASE_SPEED × 1.3 × dt.
         const startX = p1.position.x;
@@ -1809,7 +1878,10 @@ describe('Match', () => {
   });
 
   describe('character abilities (spacebar)', () => {
-    function startActiveWithCharacters(p0Char: 'mighty_man' | 'bruce' | 'frost_wizard', p1Char: 'mighty_man' | 'bruce' | 'frost_wizard'): Match {
+    function startActiveWithCharacters(
+      p0Char: 'mighty_man' | 'bruce' | 'frost_wizard',
+      p1Char: 'mighty_man' | 'bruce' | 'frost_wizard',
+    ): Match {
       const m = createMatch();
       m.setLock('player-0', p0Char);
       m.setLock('player-1', p1Char);
@@ -1846,9 +1918,7 @@ describe('Match', () => {
         m.update(0.05);
 
         expect(victim.isDead).toBe(false);
-        expect(victim.health).toBe(
-          PLAYER.MAX_HEALTH - ABILITY.BRUCE_FIRE_BREATH.DAMAGE_PER_TICK,
-        );
+        expect(victim.health).toBe(PLAYER.MAX_HEALTH - ABILITY.BRUCE_FIRE_BREATH.DAMAGE_PER_TICK);
       });
 
       it('does nothing to opponents beyond the 4-tile range', () => {
@@ -1924,8 +1994,7 @@ describe('Match', () => {
         for (let i = 0; i < 30; i++) m.update(0.05);
 
         const expectedTotal =
-          ABILITY.BRUCE_FIRE_BREATH.DAMAGE_TICK_COUNT *
-          ABILITY.BRUCE_FIRE_BREATH.DAMAGE_PER_TICK;
+          ABILITY.BRUCE_FIRE_BREATH.DAMAGE_TICK_COUNT * ABILITY.BRUCE_FIRE_BREATH.DAMAGE_PER_TICK;
         expect(victim.health).toBe(bigHp - expectedTotal);
       });
 
@@ -2041,10 +2110,7 @@ describe('Match', () => {
         expect(target.frozenTimer).toBeCloseTo(ABILITY.FROST_WIZARD_FREEZE.DURATION, 2);
         // Frost Lock has no active window — only cooldown advances.
         expect(wizard.abilityActiveSeconds).toBe(0);
-        expect(wizard.abilityCooldownSeconds).toBeCloseTo(
-          ABILITY.FROST_WIZARD_FREEZE.COOLDOWN,
-          2,
-        );
+        expect(wizard.abilityCooldownSeconds).toBeCloseTo(ABILITY.FROST_WIZARD_FREEZE.COOLDOWN, 2);
       });
 
       it('is a no-op when on cooldown — second press does nothing', () => {
@@ -2257,9 +2323,7 @@ describe('Match', () => {
         expect(warnings).toHaveLength(1);
         expect(warnings[0].weaponId).toBe('shotgun');
         expect(warnings[0].landsInMs).toBeGreaterThan(0);
-        expect(warnings[0].landsInMs).toBeLessThanOrEqual(
-          PICKUP.WEAPON_ANNOUNCE_LEAD * 1000,
-        );
+        expect(warnings[0].landsInMs).toBeLessThanOrEqual(PICKUP.WEAPON_ANNOUNCE_LEAD * 1000);
 
         const shotgunPickup = m.pickupManager
           .getPickups()
@@ -2284,9 +2348,7 @@ describe('Match', () => {
         );
         // Rifle magazine untouched by the equip.
         expect(player.ammo).toBe(WEAPONS.rifle.magazineSize);
-        expect(m.getTickPickupCollections().some((c) => c.playerId === 'player-0')).toBe(
-          true,
-        );
+        expect(m.getTickPickupCollections().some((c) => c.playerId === 'player-0')).toBe(true);
       });
     });
 
@@ -2303,9 +2365,7 @@ describe('Match', () => {
         for (const trail of trails) {
           expect(trail.weaponId).toBe('shotgun');
         }
-        expect(m.players.get('player-0')!.specialAmmo).toBe(
-          WEAPONS.shotgun.magazineSize - 1,
-        );
+        expect(m.players.get('player-0')!.specialAmmo).toBe(WEAPONS.shotgun.magazineSize - 1);
       });
 
       it('pump-racking blocks a second shot until fireCooldown elapses', () => {
@@ -2424,13 +2484,14 @@ describe('Match', () => {
         const damage = startHp - victim.health;
         // All pellets land at ~50px: total well above a single pellet's max.
         expect(damage).toBeGreaterThan(WEAPONS.shotgun.damageMax);
-        const confirmedTrails = m.getTickBulletTrails().filter(
-          (trail) => trail.hitPlayerId === 'player-1',
-        );
+        const confirmedTrails = m
+          .getTickBulletTrails()
+          .filter((trail) => trail.hitPlayerId === 'player-1');
         expect(confirmedTrails.length).toBeGreaterThan(1);
-        expect(
-          confirmedTrails.reduce((sum, trail) => sum + trail.damageApplied, 0),
-        ).toBeCloseTo(damage, 5);
+        expect(confirmedTrails.reduce((sum, trail) => sum + trail.damageApplied, 0)).toBeCloseTo(
+          damage,
+          5,
+        );
         const stats = m.stats.getStats('player-0');
         expect(stats.shotsFired).toBe(1);
         expect(stats.shotsHit).toBe(1);
@@ -2500,9 +2561,7 @@ describe('Match', () => {
         m.update(0.05);
 
         expect(player.health).toBe(Math.min(player.maxHealth, 50 + PICKUP.BANDAGE_HEAL));
-        const bandage = m.pickupManager
-          .getPickups()
-          .find((p) => p.type === 'bandage')!;
+        const bandage = m.pickupManager.getPickups().find((p) => p.type === 'bandage')!;
         expect(bandage.isActive).toBe(false);
         expect(bandage.respawnTimer).toBeCloseTo(PICKUP.BANDAGE_RESPAWN_TIME, 1);
       });
@@ -2514,9 +2573,7 @@ describe('Match', () => {
         m.update(0.05);
 
         expect(player.health).toBe(player.maxHealth);
-        const bandage = m.pickupManager
-          .getPickups()
-          .find((p) => p.type === 'bandage')!;
+        const bandage = m.pickupManager.getPickups().find((p) => p.type === 'bandage')!;
         expect(bandage.isActive).toBe(true);
       });
 
@@ -2530,9 +2587,7 @@ describe('Match', () => {
         player.position = { x: 100, y: 400 };
 
         advance(m, PICKUP.BANDAGE_RESPAWN_TIME + 0.5);
-        const bandage = m.pickupManager
-          .getPickups()
-          .find((p) => p.type === 'bandage')!;
+        const bandage = m.pickupManager.getPickups().find((p) => p.type === 'bandage')!;
         expect(bandage.isActive).toBe(true);
       });
     });
@@ -2950,10 +3005,7 @@ describe('Match', () => {
         axe.queueInput('player-1', makeInput(1, { abilityPressed: true, aimAngle: 0 }));
         // Fly the axe into Bubba (150px at 520px/s ≈ 0.29s).
         for (let i = 0; i < 10; i++) axe.update(0.05);
-        expect(aBubba.maxHealth - aBubba.health).toBeCloseTo(
-          ABILITY.JACK_AXE_THROW.DAMAGE / 2,
-          5,
-        );
+        expect(aBubba.maxHealth - aBubba.health).toBeCloseTo(ABILITY.JACK_AXE_THROW.DAMAGE / 2, 5);
       });
 
       it('death cancels the active window but the cooldown keeps running', () => {
@@ -3228,7 +3280,7 @@ describe('Match', () => {
       expect(victim.health).toBe(victim.maxHealth - WEAPONS.punch.damageMax);
     });
 
-    it("Iron Hide halves punch damage (stats credit the applied amount)", () => {
+    it('Iron Hide halves punch damage (stats credit the applied amount)', () => {
       const m = createMatch();
       m.setLock('player-0', 'mighty_man');
       m.setLock('player-1', 'bubba');
@@ -3386,9 +3438,7 @@ describe('Match', () => {
       m.update(0.05);
       // Run past the rifle burst interval: no follow-up rounds appear.
       advance(m, 0.5);
-      expect(m.players.get('player-0')!.specialAmmo).toBe(
-        WEAPONS.pistol.magazineSize - 1,
-      );
+      expect(m.players.get('player-0')!.specialAmmo).toBe(WEAPONS.pistol.magazineSize - 1);
     });
 
     it('auto-reloads from reserve when the mag empties, refusing fire mid-reload', () => {
@@ -3928,9 +3978,7 @@ describe('Match', () => {
       expect(victim.weaponId).toBe('pistol');
       expect(victim.specialAmmo).toBe(1);
       expect(victim.specialReserve).toBe(0);
-      expect(m.pickupManager.getPickups().map((pickup) => pickup.type)).toEqual([
-        'bandage',
-      ]);
+      expect(m.pickupManager.getPickups().map((pickup) => pickup.type)).toEqual(['bandage']);
     });
 
     it('ends at the score target and re-chambers a tied overtime duel', () => {

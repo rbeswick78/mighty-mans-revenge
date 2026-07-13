@@ -78,7 +78,8 @@ export class Match implements MatchContext {
    * constructor; mutated by setHover / setLock and consumed by
    * updateCharacterSelect when select completes.
    */
-  selectionState: Map<PlayerId, { hovered: CharacterId | null; locked: CharacterId | null }> = new Map();
+  selectionState: Map<PlayerId, { hovered: CharacterId | null; locked: CharacterId | null }> =
+    new Map();
   /** Seconds remaining on the character-select auto-lock timer. */
   private selectTimer: number = MATCH.CHARACTER_SELECT_TIMEOUT_SEC;
   readonly stats: StatsTracker;
@@ -104,9 +105,7 @@ export class Match implements MatchContext {
    * using the shooter's measured RTT. Wraps combatManager — see
    * lag-compensator.ts.
    */
-  private readonly lagCompensator: LagCompensator = new LagCompensator(
-    this.combatManager,
-  );
+  private readonly lagCompensator: LagCompensator = new LagCompensator(this.combatManager);
   /**
    * Monotonic counter passed to the rewind buffer as its tick key. Distinct
    * from server tick — internal so tests don't need to thread an external
@@ -134,6 +133,8 @@ export class Match implements MatchContext {
   private tickBarrelExplosions: Array<{ x: number; y: number }> = [];
   /** Unspent explosive barrels in this round, keyed as `col,row`. */
   private readonly activeBarrels = new Set<string>();
+  /** Closed shootable gates in this round, keyed as `col,row`. */
+  private readonly activeGates = new Set<string>();
   /** Barrel detonations credited to each player for the Powder Keg contract. */
   private readonly barrelDetonationsByPlayer = new Map<PlayerId, number>();
   /** Shared side objective selected once for this match. */
@@ -218,7 +219,11 @@ export class Match implements MatchContext {
   /** Mutators that have activated, in activation order. */
   private readonly _activeMutators: MutatorId[] = [];
   /** One-shot warnings to broadcast this tick (consumed by matchmaking-manager). */
-  private _tickMutatorWarnings: Array<{ event: MutatorId; activatesInMs: number; isFinalMinute: boolean }> = [];
+  private _tickMutatorWarnings: Array<{
+    event: MutatorId;
+    activatesInMs: number;
+    isFinalMinute: boolean;
+  }> = [];
   /** One-shot starts to broadcast this tick (consumed by matchmaking-manager). */
   private _tickMutatorStarts: Array<{ event: MutatorId; isFinalMinute: boolean }> = [];
   /** Injected RNG for mutator timing/selection — defaults to Math.random, override in tests. */
@@ -268,7 +273,10 @@ export class Match implements MatchContext {
     this.mapManager.loadMap(mapData);
     for (const decoration of mapData.decorations ?? []) {
       if (decoration.hazard === 'explosive_barrel') {
-        this.activeBarrels.add(this.barrelKey(decoration.x, decoration.y));
+        this.activeBarrels.add(this.tileKey(decoration.x, decoration.y));
+      }
+      if (decoration.interaction === 'shootable_gate') {
+        this.activeGates.add(this.tileKey(decoration.x, decoration.y));
       }
     }
     // Modes can veto whole pickup categories (Gun Game: everything but
@@ -494,10 +502,8 @@ export class Match implements MatchContext {
   onKill(killerId: PlayerId, victimId: PlayerId, weapon: KillWeapon): void {
     const isOpponentKill = killerId !== victimId;
     const victimStreakEnded = this.stats.getCurrentStreak(victimId);
-    const isRevenge =
-      isOpponentKill && this.lastKillerByVictim.get(killerId) === victimId;
-    const isPosthumous =
-      isOpponentKill && (this.players.get(killerId)?.isDead ?? false);
+    const isRevenge = isOpponentKill && this.lastKillerByVictim.get(killerId) === victimId;
+    const isPosthumous = isOpponentKill && (this.players.get(killerId)?.isDead ?? false);
     const isFirstBlood = isOpponentKill && !this.firstBloodClaimed;
     let rapidKillCount = 0;
     if (isOpponentKill) {
@@ -505,8 +511,7 @@ export class Match implements MatchContext {
       const now = this.getElapsedSeconds();
       const previous = this.rapidKillsByPlayer.get(killerId);
       rapidKillCount =
-        previous &&
-        now - previous.lastKillAtSeconds <= COMBAT_MEDALS.RAPID_KILL_WINDOW_SECONDS
+        previous && now - previous.lastKillAtSeconds <= COMBAT_MEDALS.RAPID_KILL_WINDOW_SECONDS
           ? previous.count + 1
           : 1;
       this.rapidKillsByPlayer.set(killerId, {
@@ -515,8 +520,7 @@ export class Match implements MatchContext {
       });
     }
     this.stats.recordKill(killerId, victimId, weapon);
-    const killerStreak =
-      isOpponentKill ? this.stats.getCurrentStreak(killerId) : 0;
+    const killerStreak = isOpponentKill ? this.stats.getCurrentStreak(killerId) : 0;
     this.stats.recordDeath(victimId);
     if (isOpponentKill) this.lastKillerByVictim.set(victimId, killerId);
 
@@ -667,10 +671,7 @@ export class Match implements MatchContext {
   /** Current authoritative progress for the round's shared side objective. */
   getContractHudState(): MatchContractHudState {
     const players = [...this.players.keys()].map((playerId) => {
-      const progress = Math.min(
-        this.contractDefinition.target,
-        this.contractProgressFor(playerId),
-      );
+      const progress = Math.min(this.contractDefinition.target, this.contractProgressFor(playerId));
       return {
         playerId,
         progress,
@@ -696,9 +697,7 @@ export class Match implements MatchContext {
       case 'streak':
         return stats.longestKillStreak;
       case 'distance_tiles':
-        return Math.floor(
-          stats.distanceTraveled / this.mapManager.getMapData().tileSize,
-        );
+        return Math.floor(stats.distanceTraveled / this.mapManager.getMapData().tileSize);
       case 'barrels':
         return this.barrelDetonationsByPlayer.get(playerId) ?? 0;
       case 'hill_seconds':
@@ -833,7 +832,11 @@ export class Match implements MatchContext {
    * Returns [] on subsequent calls in the same tick. Usually 0 or 1
    * entries; both slots can warn in the same tick in degenerate timings.
    */
-  consumeTickMutatorWarnings(): Array<{ event: MutatorId; activatesInMs: number; isFinalMinute: boolean }> {
+  consumeTickMutatorWarnings(): Array<{
+    event: MutatorId;
+    activatesInMs: number;
+    isFinalMinute: boolean;
+  }> {
     const w = this._tickMutatorWarnings;
     this._tickMutatorWarnings = [];
     return w;
@@ -875,8 +878,7 @@ export class Match implements MatchContext {
       const windowSpan =
         MUTATORS.MIDMATCH_MAX_ELAPSED_FRACTION - MUTATORS.MIDMATCH_MIN_ELAPSED_FRACTION;
       this.midMatchSlot.activateAtElapsed =
-        this.timeLimitSeconds *
-        (MUTATORS.MIDMATCH_MIN_ELAPSED_FRACTION + this.rng() * windowSpan);
+        this.timeLimitSeconds * (MUTATORS.MIDMATCH_MIN_ELAPSED_FRACTION + this.rng() * windowSpan);
       this.gameMode.onStart(this);
     }
   }
@@ -903,11 +905,7 @@ export class Match implements MatchContext {
     // when empty (first tick of the match), so this is safe even before
     // any state is stored.
     this.rewindTickCounter += 1;
-    this.lagCompensator.saveCurrentState(
-      this.rewindTickCounter,
-      Date.now(),
-      this.players,
-    );
+    this.lagCompensator.saveCurrentState(this.rewindTickCounter, Date.now(), this.players);
 
     // No NEW mutator activations during overtime — resetting matchTimer to
     // OVERTIME.DURATION would otherwise re-trip the final-minute
@@ -976,8 +974,7 @@ export class Match implements MatchContext {
         // While Bruce is breathing fire his position and combat actions are
         // pinned, but he can still re-aim mid-cast so the cone sweeps with
         // the cursor. Update aim only and skip the rest of the input.
-        const isBruceLocked =
-          player.characterId === 'bruce' && player.abilityActiveSeconds > 0;
+        const isBruceLocked = player.characterId === 'bruce' && player.abilityActiveSeconds > 0;
         if (isBruceLocked) {
           player.aimAngle = input.aimAngle;
           player.lastProcessedInput = input.sequenceNumber;
@@ -1015,17 +1012,11 @@ export class Match implements MatchContext {
         if (!infiniteAmmo && input.reload && !player.isReloading) {
           if (this.usesSpecialAmmo(player.weaponId)) {
             const held = WEAPONS[player.weaponId];
-            if (
-              player.specialAmmo < held.magazineSize &&
-              player.specialReserve > 0
-            ) {
+            if (player.specialAmmo < held.magazineSize && player.specialReserve > 0) {
               player.isReloading = true;
               player.reloadTimer = held.reloadTime;
             }
-          } else if (
-            player.weaponId === 'rifle' &&
-            player.ammo < WEAPONS.rifle.magazineSize
-          ) {
+          } else if (player.weaponId === 'rifle' && player.ammo < WEAPONS.rifle.magazineSize) {
             player.isReloading = true;
             player.reloadTimer = WEAPONS.rifle.reloadTime;
           }
@@ -1067,9 +1058,7 @@ export class Match implements MatchContext {
             player.position,
             input.aimAngle,
             grenadePiercing,
-            this.mutatorActive('turbo_grenades')
-              ? MUTATORS.TURBO_GRENADES_SPEED_MULTIPLIER
-              : 1,
+            this.mutatorActive('turbo_grenades') ? MUTATORS.TURBO_GRENADES_SPEED_MULTIPLIER : 1,
           );
           player.grenades -= 1;
           this.stats.recordGrenade(playerId);
@@ -1375,10 +1364,7 @@ export class Match implements MatchContext {
       // so the player should never be stuck holding an unusable weapon).
       player.isReloading = true;
       player.reloadTimer = weapon.reloadTime;
-    } else if (
-      !this.mutatorActive('infinite_ammo') &&
-      !this.mutatorActive('weapon_roulette')
-    ) {
+    } else if (!this.mutatorActive('infinite_ammo') && !this.mutatorActive('weapon_roulette')) {
       // Completely dry: the pistol vanishes and the rifle comes back out.
       this.revertToRifle(player);
     }
@@ -1408,8 +1394,7 @@ export class Match implements MatchContext {
     const rtt = this.rttForShooter(playerId);
     // Piercing is evaluated at fire-time per shot. Stickiness for in-flight
     // bullets is automatic — each shot's outcome is computed when fired.
-    const piercing =
-      player.characterId === 'mighty_man' && player.abilityActiveSeconds > 0;
+    const piercing = player.characterId === 'mighty_man' && player.abilityActiveSeconds > 0;
     const shot = this.lagCompensator.processShootWithRewind(
       playerId,
       aimAngle,
@@ -1433,13 +1418,9 @@ export class Match implements MatchContext {
     if (shot.hit && shot.victimId && shot.damage !== undefined) {
       const victim = this.players.get(shot.victimId);
       if (victim) {
-        const damage = this.gameMode.damageForWeaponHit?.(
-          this,
-          player,
-          victim,
-          weaponId,
-          shot.damage,
-        ) ?? shot.damage;
+        const damage =
+          this.gameMode.damageForWeaponHit?.(this, player, victim, weaponId, shot.damage) ??
+          shot.damage;
         const result = this.combatManager.applyDamage(victim, damage, playerId);
         shot.trail.hitPlayerId = shot.victimId;
         shot.trail.damageApplied = result.damageApplied;
@@ -1452,7 +1433,7 @@ export class Match implements MatchContext {
         }
       }
     } else if (shot.hitTile) {
-      this.detonateBarrelAt(shot.hitTile.col, shot.hitTile.row, playerId);
+      this.resolveShotSceneryAt(shot.hitTile.col, shot.hitTile.row, playerId);
     }
   }
 
@@ -1505,13 +1486,9 @@ export class Match implements MatchContext {
       const victim = this.players.get(shot.victimId);
       if (!victim || victim.isDead) continue;
       struckVictims.add(shot.victimId);
-      const damage = this.gameMode.damageForWeaponHit?.(
-        this,
-        player,
-        victim,
-        'punch',
-        shot.damage,
-      ) ?? shot.damage;
+      const damage =
+        this.gameMode.damageForWeaponHit?.(this, player, victim, 'punch', shot.damage) ??
+        shot.damage;
       const result = this.combatManager.applyDamage(victim, damage, player.id);
       // damageApplied, not shot.damage — Iron Hide may have halved it.
       this.stats.recordDamage(player.id, result.damageApplied);
@@ -1563,8 +1540,7 @@ export class Match implements MatchContext {
     );
 
     const rtt = this.rttForShooter(player.id);
-    const piercing =
-      player.characterId === 'mighty_man' && player.abilityActiveSeconds > 0;
+    const piercing = player.characterId === 'mighty_man' && player.abilityActiveSeconds > 0;
     const shots = this.lagCompensator.processMultiShotWithRewind(
       player.id,
       angles,
@@ -1578,12 +1554,12 @@ export class Match implements MatchContext {
 
     this.stats.recordShot(player.id);
     let anyPelletHit = false;
-    const struckBarrels = new Set<string>();
+    const struckScenery = new Set<string>();
 
     for (const shot of shots) {
       this.tickBulletTrails.push(shot.trail);
       if (!shot.hit && shot.hitTile) {
-        struckBarrels.add(this.barrelKey(shot.hitTile.col, shot.hitTile.row));
+        struckScenery.add(this.tileKey(shot.hitTile.col, shot.hitTile.row));
       }
       if (!shot.hit || !shot.victimId || shot.damage === undefined) continue;
       const victim = this.players.get(shot.victimId);
@@ -1607,11 +1583,11 @@ export class Match implements MatchContext {
       this.stats.recordHit(player.id);
     }
 
-    // Resolve hazards after every pellet's already-authoritative player hit.
-    // Several pellets hitting one barrel still produce one explosion.
-    for (const key of struckBarrels) {
+    // Resolve interactive scenery after every pellet's already-authoritative
+    // player hit. Several pellets hitting one prop still consume it once.
+    for (const key of struckScenery) {
       const [col, row] = key.split(',').map(Number);
-      this.detonateBarrelAt(col, row, player.id);
+      this.resolveShotSceneryAt(col, row, player.id);
     }
 
     if (!infiniteAmmo) {
@@ -1652,10 +1628,7 @@ export class Match implements MatchContext {
   }
 
   /** Apply world destruction, chain reactions, stats, and kill credit. */
-  private recordExplosion(
-    explosion: ExplosionResult,
-    killWeapon: KillWeapon = 'grenade',
-  ): void {
+  private recordExplosion(explosion: ExplosionResult, killWeapon: KillWeapon = 'grenade'): void {
     // Damage was already resolved by CombatManager against the untouched grid,
     // so cover protects players from the same blast that tears it down.
     const blastable = findBlastableCoverTiles(
@@ -1665,8 +1638,9 @@ export class Match implements MatchContext {
     );
     const chainedBarrels: Array<{ col: number; row: number }> = [];
     for (const tile of blastable) {
-      const key = this.barrelKey(tile.col, tile.row);
+      const key = this.tileKey(tile.col, tile.row);
       if (this.activeBarrels.delete(key)) chainedBarrels.push(tile);
+      this.activeGates.delete(key);
     }
     for (const tile of blastable) {
       if (this.mapManager.destroyTile(tile.col, tile.row)) {
@@ -1710,17 +1684,37 @@ export class Match implements MatchContext {
     }
   }
 
-  private barrelKey(col: number, row: number): string {
+  private tileKey(col: number, row: number): string {
     return `${col},${row}`;
   }
 
+  /** Resolve the first authored interaction carried by a bullet-struck tile. */
+  private resolveShotSceneryAt(col: number, row: number, instigatorId: PlayerId): void {
+    if (this.detonateBarrelAt(col, row, instigatorId)) return;
+    this.openGateAt(col, row);
+  }
+
   /** Consume a bullet-struck barrel and open its collision before it blasts. */
-  private detonateBarrelAt(col: number, row: number, instigatorId: PlayerId): void {
-    if (!this.activeBarrels.delete(this.barrelKey(col, row))) return;
+  private detonateBarrelAt(col: number, row: number, instigatorId: PlayerId): boolean {
+    const key = this.tileKey(col, row);
+    if (!this.activeBarrels.has(key)) return false;
     if (this.mapManager.destroyTile(col, row)) {
+      this.activeBarrels.delete(key);
       this.tickDestroyedTiles.push({ col, row });
+      this.resolveBarrelExplosion(col, row, instigatorId);
+      return true;
     }
-    this.resolveBarrelExplosion(col, row, instigatorId);
+    return false;
+  }
+
+  /** Permanently open a closed gate and broadcast its cleared collision cell. */
+  private openGateAt(col: number, row: number): boolean {
+    const key = this.tileKey(col, row);
+    if (!this.activeGates.has(key)) return false;
+    if (!this.mapManager.destroyTile(col, row)) return false;
+    this.activeGates.delete(key);
+    this.tickDestroyedTiles.push({ col, row });
+    return true;
   }
 
   /** Resolve one already-consumed barrel, recursively triggering exposed props. */
@@ -1772,8 +1766,9 @@ export class Match implements MatchContext {
     this.fireCooldownTimers.delete(player.id);
     player.stamina = PLAYER.SPRINT_DURATION;
     // During grenades_only, top up to MAX so respawning isn't a death sentence.
-    player.grenades =
-      this.mutatorActive('grenades_only') ? GRENADE.MAX_COUNT : GRENADE.STARTING_COUNT;
+    player.grenades = this.mutatorActive('grenades_only')
+      ? GRENADE.MAX_COUNT
+      : GRENADE.STARTING_COUNT;
     player.grenadeRegenSeconds = 0;
     // Don't carry a freeze through death — respawning frozen would be
     // unrecoverable and is never the intent.
@@ -1785,7 +1780,11 @@ export class Match implements MatchContext {
       : 0;
   }
 
-  private createPlayerState(id: PlayerId, nickname: string, position: { x: number; y: number }): PlayerState {
+  private createPlayerState(
+    id: PlayerId,
+    nickname: string,
+    position: { x: number; y: number },
+  ): PlayerState {
     return {
       id,
       nickname,
@@ -1864,18 +1863,11 @@ export class Match implements MatchContext {
       fin.warningSent = true;
       this._tickMutatorWarnings.push({
         event: fin.mutator,
-        activatesInMs: Math.max(
-          0,
-          (this.matchTimer - MUTATORS.ACTIVATION_AT_REMAINING) * 1000,
-        ),
+        activatesInMs: Math.max(0, (this.matchTimer - MUTATORS.ACTIVATION_AT_REMAINING) * 1000),
         isFinalMinute: true,
       });
     }
-    if (
-      !fin.started &&
-      fin.warningSent &&
-      this.matchTimer <= MUTATORS.ACTIVATION_AT_REMAINING
-    ) {
+    if (!fin.started && fin.warningSent && this.matchTimer <= MUTATORS.ACTIVATION_AT_REMAINING) {
       fin.started = true;
       this.startMutator(fin.mutator!, true);
     }
@@ -1892,9 +1884,7 @@ export class Match implements MatchContext {
    */
   private pickMutator(isFinalMinute: boolean): MutatorId {
     const pool = MUTATORS.POOL as readonly string[];
-    const forced = isFinalMinute
-      ? process.env.FORCE_EVENT
-      : process.env.FORCE_MIDMATCH_MUTATOR;
+    const forced = isFinalMinute ? process.env.FORCE_EVENT : process.env.FORCE_MIDMATCH_MUTATOR;
     if (forced && pool.includes(forced)) {
       return forced as MutatorId;
     }
@@ -1907,9 +1897,7 @@ export class Match implements MatchContext {
     for (const recent of this.rematchMutatorExclusions) {
       excluded.add(recent);
     }
-    const other = isFinalMinute
-      ? this.midMatchSlot.mutator
-      : this.finalMinuteSlot.mutator;
+    const other = isFinalMinute ? this.midMatchSlot.mutator : this.finalMinuteSlot.mutator;
     if (other) {
       excluded.add(other);
       for (const candidate of MUTATORS.POOL) {
@@ -1950,11 +1938,7 @@ export class Match implements MatchContext {
    * grenade can still explode), and the heal caps at maxHealth — which
    * low_health may have pinned to 1, making vampire moot but harmless.
    */
-  private applyVampireHeal(
-    attackerId: PlayerId,
-    victimId: PlayerId,
-    damage: number,
-  ): void {
+  private applyVampireHeal(attackerId: PlayerId, victimId: PlayerId, damage: number): void {
     if (!this.mutatorActive('vampire')) return;
     if (attackerId === victimId) return;
     const attacker = this.players.get(attackerId);
@@ -2061,10 +2045,7 @@ export class Match implements MatchContext {
   }
 
   /** Equip one synchronized roulette step without refilling it every tick. */
-  private enforceWeaponRouletteLoadouts(
-    weaponId: WeaponId,
-    restock: boolean,
-  ): void {
+  private enforceWeaponRouletteLoadouts(weaponId: WeaponId, restock: boolean): void {
     for (const player of this.players.values()) {
       if (!restock && player.weaponId === weaponId) continue;
 
@@ -2350,6 +2331,7 @@ export class Match implements MatchContext {
         if (perp > widthMargin) continue;
 
         if (this.mapManager.destroyTile(col, row)) {
+          this.activeGates.delete(this.tileKey(col, row));
           this.tickDestroyedTiles.push({ col, row });
         }
       }
