@@ -529,6 +529,14 @@ export const PRACTICE_GAUNTLET = Object.freeze({
   FLAWLESS_BONUS_POINTS: 400,
   PACE_POINTS_PER_SECOND: 2,
   MAX_PACE_BONUS_POINTS: 300,
+  /** Capped stage bonus for already-earned authoritative combat highlights. */
+  MAX_STYLE_BONUS_POINTS: 600,
+  STYLE_FIRST_BLOOD_POINTS: 50,
+  STYLE_DOUBLE_KILL_POINTS: 100,
+  STYLE_TRIPLE_KILL_POINTS: 200,
+  STYLE_MAYHEM_POINTS: 300,
+  STYLE_POSTHUMOUS_POINTS: 250,
+  STYLE_CLUTCH_POINTS: 150,
 });
 
 /** Skill profiles change decision cadence, never physics or damage rules. */

@@ -1461,6 +1461,32 @@ describe('MatchmakingManager solo practice flow', () => {
     }
   });
 
+  it('banks the human combat highlights into the authoritative Gauntlet result', () => {
+    const { fake, sent } = makeFakeServer();
+    const mgr = new MatchmakingManager(fake, () => 0, store, seededRng([0, 0, 0, 0]));
+    mgr.handleStartPractice('A', 'Alpha', 'rookie', 'gauntlet');
+
+    const match = mgr.getActiveMatches()[0];
+    const botId = [...match.players.keys()].find((playerId) => playerId.startsWith('bot:'))!;
+    match.onKill('A', botId, 'gun');
+    match.players.get('A')!.score = 3;
+    match.phase = MatchPhase.ENDED;
+    mgr.tick(0.05, 1);
+
+    const ended = [...sent]
+      .reverse()
+      .find((entry) => entry.playerId === 'A' && entry.message.type === 'server:matchEnd');
+    if (!ended || ended.message.type !== 'server:matchEnd') {
+      throw new Error('missing styled Gauntlet result');
+    }
+    expect(ended.message.result.gauntlet).toMatchObject({
+      outcome: 'advanced',
+      stageScore: 1650,
+      runScore: 1650,
+      styleBonus: 50,
+    });
+  });
+
   it('runs an escalating three-stage Gauntlet and resets a failed run', () => {
     const { fake, sent, connected } = makeFakeServer();
     connected.push('A');

@@ -5,6 +5,7 @@ import {
   type MutatorId,
 } from '../config/game.js';
 import type {
+  KillFeedEntry,
   PracticeGauntletMatch,
   PracticeGauntletResult,
   PracticeGauntletRoute,
@@ -31,11 +32,44 @@ export interface PracticeGauntletPerformance {
   wentToOvertime?: boolean;
   deaths?: number;
   regulationSecondsRemaining?: number;
+  stylePointsEarned?: number;
 }
 
 /** Frozen danger payout for a server-authored route forecast. */
 export function practiceGauntletChaosBounty(mutatorId: MutatorId): number {
   return GAUNTLET_CHAOS_BOUNTIES[mutatorId];
+}
+
+/**
+ * Score the human's authoritative combat highlights. The priority mirrors the
+ * medal callout ladder so one kill earns one style award, then the stage cap
+ * prevents a long deathmatch from outscoring the actual clear objective.
+ */
+export function practiceGauntletStyleBonus(
+  killFeed: readonly KillFeedEntry[],
+  playerId: PlayerId,
+): number {
+  let score = 0;
+  for (const entry of killFeed) {
+    if (entry.killerId !== playerId || entry.killerId === entry.victimId) continue;
+    if (entry.isPosthumous) {
+      score += PRACTICE_GAUNTLET.STYLE_POSTHUMOUS_POINTS;
+    } else if ((entry.rapidKillCount ?? 0) >= 4) {
+      score += PRACTICE_GAUNTLET.STYLE_MAYHEM_POINTS;
+    } else if ((entry.rapidKillCount ?? 0) >= 3) {
+      score += PRACTICE_GAUNTLET.STYLE_TRIPLE_KILL_POINTS;
+    } else if ((entry.rapidKillCount ?? 0) >= 2) {
+      score += PRACTICE_GAUNTLET.STYLE_DOUBLE_KILL_POINTS;
+    } else if (entry.clutchHealth !== undefined) {
+      score += PRACTICE_GAUNTLET.STYLE_CLUTCH_POINTS;
+    } else if (entry.isFirstBlood) {
+      score += PRACTICE_GAUNTLET.STYLE_FIRST_BLOOD_POINTS;
+    }
+    if (score >= PRACTICE_GAUNTLET.MAX_STYLE_BONUS_POINTS) {
+      return PRACTICE_GAUNTLET.MAX_STYLE_BONUS_POINTS;
+    }
+  }
+  return score;
 }
 
 /**
@@ -151,13 +185,20 @@ export function resolvePracticeGauntlet(
       : 0;
   const chaosBountyBonus =
     won && match.forecastMutatorId ? practiceGauntletChaosBounty(match.forecastMutatorId) : 0;
+  const styleBonus = won
+    ? Math.min(
+        PRACTICE_GAUNTLET.MAX_STYLE_BONUS_POINTS,
+        safeCount(performance.stylePointsEarned) ?? 0,
+      )
+    : 0;
   const stageScore = won
     ? PRACTICE_GAUNTLET.STAGE_CLEAR_POINTS +
       contractBonus +
       regulationBonus +
       flawlessBonus +
       paceBonus +
-      chaosBountyBonus
+      chaosBountyBonus +
+      styleBonus
     : 0;
   return {
     ...match,
@@ -169,6 +210,7 @@ export function resolvePracticeGauntlet(
     flawlessBonus,
     paceBonus,
     chaosBountyBonus,
+    styleBonus,
     nextStage: next.stage,
     nextDifficulty: next.difficulty,
   };

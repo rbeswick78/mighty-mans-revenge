@@ -1,15 +1,26 @@
 import { describe, expect, it } from 'vitest';
-import { MUTATORS, type CharacterId } from '../config/game.js';
-import { GameModeType } from '../types/game.js';
+import { MUTATORS, PRACTICE_GAUNTLET, type CharacterId } from '../config/game.js';
+import { GameModeType, type KillFeedEntry } from '../types/game.js';
 import {
   practiceGauntletMatch,
   practiceGauntletChaosBounty,
   practiceGauntletMutatorChoice,
   practiceGauntletOpponentChoices,
   practiceGauntletRoutes,
+  practiceGauntletStyleBonus,
   resolvePracticeGauntlet,
   selectPracticeGauntletRoute,
 } from './practice-gauntlet.js';
+
+function kill(overrides: Partial<KillFeedEntry> = {}): KillFeedEntry {
+  return {
+    killerId: 'human',
+    victimId: 'bot',
+    weapon: 'gun',
+    timestamp: 0,
+    ...overrides,
+  };
+}
 
 describe('practice gauntlet', () => {
   it('offers two distinct routes and safely defaults invalid selections', () => {
@@ -90,6 +101,35 @@ describe('practice gauntlet', () => {
     expect(practiceGauntletChaosBounty('infinite_ammo')).toBe(100);
     expect(practiceGauntletChaosBounty('blackout')).toBe(200);
     expect(practiceGauntletChaosBounty('scrapstorm')).toBe(300);
+  });
+
+  it('scores authoritative combat highlights once per kill and caps the stage bonus', () => {
+    expect(
+      practiceGauntletStyleBonus(
+        [
+          kill({ isFirstBlood: true }),
+          kill({ rapidKillCount: 2 }),
+          kill({ rapidKillCount: 3 }),
+          kill({ rapidKillCount: 4 }),
+        ],
+        'human',
+      ),
+    ).toBe(PRACTICE_GAUNTLET.MAX_STYLE_BONUS_POINTS);
+
+    expect(
+      practiceGauntletStyleBonus(
+        [
+          kill({ isPosthumous: true, rapidKillCount: 4 }),
+          kill({ clutchHealth: 1, isFirstBlood: true }),
+          kill({ killerId: 'bot', victimId: 'human', isFirstBlood: true }),
+          kill({ victimId: 'human', isFirstBlood: true }),
+        ],
+        'human',
+      ),
+    ).toBe(
+      PRACTICE_GAUNTLET.STYLE_POSTHUMOUS_POINTS +
+        PRACTICE_GAUNTLET.STYLE_CLUTCH_POINTS,
+    );
   });
 
   it('offers deterministic non-repeating rivals after the current matchup', () => {
@@ -220,6 +260,29 @@ describe('practice gauntlet', () => {
       stageScore: 0,
       runScore: 1500,
       chaosBountyBonus: 0,
+    });
+  });
+
+  it('banks capped combat style only when that Gauntlet stage is won', () => {
+    expect(
+      resolvePracticeGauntlet(practiceGauntletMatch(2, 1500), 'human', 'human', {
+        wentToOvertime: true,
+        deaths: 1,
+        stylePointsEarned: 425.9,
+      }),
+    ).toMatchObject({
+      stageScore: 1425,
+      runScore: 2925,
+      styleBonus: 425,
+    });
+    expect(
+      resolvePracticeGauntlet(practiceGauntletMatch(2, 1500), 'human', 'bot', {
+        stylePointsEarned: 9999,
+      }),
+    ).toMatchObject({
+      stageScore: 0,
+      runScore: 1500,
+      styleBonus: 0,
     });
   });
 

@@ -21,6 +21,7 @@ import {
   practiceGauntletMutatorChoice,
   practiceGauntletOpponentChoices,
   practiceGauntletRoutes,
+  practiceGauntletStyleBonus,
   resolvePracticeGauntlet,
   selectPracticeGauntletRoute,
   mutatorsConflict,
@@ -1310,6 +1311,7 @@ export class MatchmakingManager {
           wentToOvertime: result.wentToOvertime,
           deaths: result.playerStats.get(humanPlayerId)?.deaths,
           regulationSecondsRemaining: result.wentToOvertime ? 0 : match.matchTimer,
+          stylePointsEarned: practiceGauntletStyleBonus(match.getKillFeed(), humanPlayerId),
         });
       }
     }

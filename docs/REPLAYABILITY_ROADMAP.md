@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–56 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty with Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, and danger bounties, four arenas, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–57 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty with Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, and style bonuses, four arenas, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -88,6 +88,7 @@ Each session below attacks one of these.
 | 54  | Gauntlet Chaos Forecasts                        | Every branch reveals a different mid-fight twist worth planning around       | **DONE** (2026-07-13) |
 | 55  | Gauntlet Chaos Bounties                         | Dangerous route choices become explicit high-score gambles                   | **DONE** (2026-07-13) |
 | 56  | Demolition Wave                                | Familiar lanes erupt into exposed, permanently rewritten battlefields        | **DONE** (2026-07-13) |
+| 57  | Gauntlet Style Bonuses                         | Combat highlights become capped score-chase rewards worth mastering           | **DONE** (2026-07-13) |
 
 ---
 
@@ -2747,7 +2748,77 @@ new peeks, escapes, and long sightlines without adding a second map state model.
 
 ---
 
+## Session 57 — Gauntlet Style Bonuses
+
+**Goal:** make already-memorable combat highlights materially improve a
+Gauntlet run without letting kill farming eclipse the stage objective.
+
+**Locked design decisions**
+
+- A won Gauntlet stage converts the human's authoritative kill-feed highlights
+  into score: First Blood 50, Double Kill 100, Clutch 150, Triple Kill 200,
+  From the Grave 250, and Mayhem 300.
+- One kill earns one style award. Posthumous has priority over rapid-chain
+  tiers; rapid chains have priority over Clutch; Clutch has priority over First
+  Blood. Ordinary kills, suicides, and the opponent's highlights pay nothing.
+- The stage style bonus caps at 600 and only banks on a win. Losses and draws
+  pay zero, preserving the clear objective and preventing long deathmatches
+  from becoming the optimal score strategy.
+- Matchmaking computes the payout from the completed authoritative Match kill
+  feed and passes it through normal Gauntlet resolution. The client only
+  itemizes `STYLE` in the score breakdown; no client event can invent points.
+- `styleBonus` is optional on the wire for compatibility with older results.
+  Ordinary match score, medal callouts, combat, stats persistence, contracts,
+  and leaderboards are unchanged.
+
+**Acceptance criteria**
+
+- [x] Pure tests prove award priority, ignored suicides/opponent kills, and the
+      frozen 600-point cap.
+- [x] Gauntlet resolution proves fractional input is sanitized, wins bank the
+      bonus, and failed stages bank zero.
+- [x] Matchmaking integration proves a real authoritative First Blood reaches
+      the human's result as 50 style points.
+- [x] Presentation tests prove old results still render correctly and styled
+      wins itemize the exact bonus without corrupting the clear subtotal.
+- [x] Typecheck, lint, all unit tests, production build, and the full
+      Playwright desktop/mobile matrix pass.
+
+---
+
 ## Session Log
+
+### Session 57 — 2026-07-13 — Gauntlet Style Bonuses
+
+**Shipped:** Gauntlet now turns the human player's combat highlights into a
+capped `STYLE` payout when the stage is won. First Blood, Double/Triple Kill,
+Mayhem, Clutch, and From the Grave each have a readable value, so aggressive
+execution and highlight hunting create another route to a personal best beyond
+contracts, flawless clears, pace, and forecast danger.
+
+The payout is derived only from the completed Match's authoritative kill feed.
+One kill receives its highest-priority eligible award, suicides and opponent
+kills are ignored, and a 600-point stage cap keeps the clear objective and fast
+finish more important than farming a long deathmatch. Failed stages bank no
+style. The client only displays the server-authored result, with an optional
+wire field so older results retain their original subtotal and layout.
+
+**Verification:** 1,114 tests pass across 73 files, including award priority,
+cap and loss behavior, authoritative matchmaking integration, and old/new
+result presentation. TypeScript, ESLint, all package builds, and the Vite
+production bundle are clean; Vite retains its existing chunk-size advisory.
+The full Playwright matrix passes 16 tests with 11 intentional scoped skips
+across Chromium, Firefox, and mobile landscape, and teardown leaves no game
+ports open.
+
+**Tuning watch:** 600 deliberately allows two exceptional highlights or a
+short multikill sequence to matter without outscoring the 1,000-point clear.
+Watch whether posthumous or repeated Mayhem entries hit the cap too routinely
+before changing individual values or the ceiling.
+
+**Deployment:** not run; deployment still requires explicit authorization.
+
+---
 
 ### Session 56 — 2026-07-13 — Demolition Wave
 

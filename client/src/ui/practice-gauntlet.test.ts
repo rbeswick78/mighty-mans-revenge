@@ -124,6 +124,12 @@ describe('practice gauntlet presentation', () => {
     expect(gauntletStageScoreSummary(value)).toBe(
       'STAGE +2,400 = CLEAR 1,000 + CONTRACT 300 + REG 200 + FLAWLESS 400 + PACE 300 + CHAOS 200',
     );
+    value.gauntlet!.stageScore = 2850;
+    value.gauntlet!.runScore = 2850;
+    value.gauntlet!.styleBonus = 450;
+    expect(gauntletStageScoreSummary(value)).toBe(
+      'STAGE +2,850 = CLEAR 1,000 + CONTRACT 300 + REG 200 + FLAWLESS 400 + PACE 300 + CHAOS 200 + STYLE 450',
+    );
     expect(gauntletNextTeaser(value)).toBe('CHOOSE: STAGE 2/3 - SCRAPPER');
     expect(gauntletRouteChoices(value)).toHaveLength(2);
     expect(gauntletRouteButtonLabel(gauntletRouteChoices(value)[0])).toBe(
