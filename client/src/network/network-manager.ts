@@ -22,6 +22,7 @@ import { MatchPhase } from '@shared/types/game.js';
 import {
   SERVER,
   type BotDifficulty,
+  type PracticeKind,
   type CharacterId,
   type MutatorId,
 } from '@shared/config/game.js';
@@ -292,8 +293,17 @@ export class NetworkManager {
   }
 
   /** Start an immediate authoritative solo match. */
-  startPractice(nickname: string, difficulty: BotDifficulty): void {
-    this.connection.send({ type: 'client:startPractice', nickname, difficulty });
+  startPractice(
+    nickname: string,
+    difficulty: BotDifficulty,
+    kind: PracticeKind = 'sparring',
+  ): void {
+    this.connection.send({
+      type: 'client:startPractice',
+      nickname,
+      difficulty,
+      kind,
+    });
   }
 
   /** Cancel matchmaking. */

@@ -4,6 +4,7 @@ import type {
   MatchResult,
   GameModeType,
   KillConfirmedCollection,
+  PracticeGauntletMatch,
 } from '@shared/types/game.js';
 import type {
   DraftCategory,
@@ -15,7 +16,7 @@ import type {
   ServerCharacterSelectStateMessage,
 } from '@shared/types/network.js';
 import { createEmptyCharacterWins } from '@shared/config/game.js';
-import type { BotDifficulty } from '@shared/config/game.js';
+import type { BotDifficulty, PracticeKind } from '@shared/config/game.js';
 import type { CharacterId, WeaponId, MutatorId } from '@shared/config/game.js';
 import { NetworkManager, type LocalCorrection } from '../network/network-manager.js';
 
@@ -45,6 +46,8 @@ export interface MatchData {
   gameMode: GameModeType;
   /** Persisted real-match wins for every selectable fighter. */
   characterWins: Record<CharacterId, number>;
+  /** Present only during the escalating three-fight solo run. */
+  gauntlet?: PracticeGauntletMatch;
 }
 
 type GameServiceEvent =
@@ -169,9 +172,13 @@ export class GameService {
     this.networkManager.joinMatchmaking(nickname);
   }
 
-  startPractice(nickname: string, difficulty: BotDifficulty): void {
+  startPractice(
+    nickname: string,
+    difficulty: BotDifficulty,
+    kind: PracticeKind = 'sparring',
+  ): void {
     this.localNickname = nickname;
-    this.networkManager.startPractice(nickname, difficulty);
+    this.networkManager.startPractice(nickname, difficulty, kind);
   }
 
   cancelMatchmaking(): void {
@@ -242,6 +249,7 @@ export class GameService {
           ...createEmptyCharacterWins(),
           ...msg.characterWins,
         },
+        gauntlet: msg.gauntlet,
       };
       // matchFound ends any draft (both picks in, or the FORCE/no-draft
       // path) — drop the cache so a later scene can't render a stale one.

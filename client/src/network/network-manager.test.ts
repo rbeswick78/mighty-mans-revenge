@@ -378,6 +378,14 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
       type: 'client:startPractice',
       nickname: 'Alpha',
       difficulty: 'warlord',
+      kind: 'sparring',
+    });
+    manager.startPractice('Bravo', 'scrapper', 'gauntlet');
+    expect(hoisted.sentMessages).toContainEqual({
+      type: 'client:startPractice',
+      nickname: 'Bravo',
+      difficulty: 'scrapper',
+      kind: 'gauntlet',
     });
   });
 });

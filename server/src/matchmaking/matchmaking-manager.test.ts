@@ -1422,6 +1422,145 @@ describe('MatchmakingManager solo practice flow', () => {
     expect(mgr.getQueueLength()).toBe(0);
     expect(mgr.getActiveMatches()).toHaveLength(1);
   });
+
+  it('runs an escalating three-stage Gauntlet and resets a failed run', () => {
+    const { fake, sent, connected } = makeFakeServer();
+    connected.push('A');
+    const mgr = new MatchmakingManager(fake, () => 0, store, seededRng([0, 0, 0, 0]));
+
+    // The selected sparring difficulty is deliberately ignored in Gauntlet.
+    mgr.handleStartPractice('A', 'Alpha', 'warlord', 'gauntlet');
+    const opening = sent.find(
+      (entry) => entry.playerId === 'A' && entry.message.type === 'server:matchFound',
+    );
+    if (!opening || opening.message.type !== 'server:matchFound') {
+      throw new Error('missing Gauntlet matchFound');
+    }
+    expect(opening.message.gauntlet).toEqual({
+      stage: 1,
+      totalStages: 3,
+      difficulty: 'rookie',
+    });
+
+    const first = mgr.getActiveMatches()[0];
+    first.players.get('A')!.score = 3;
+    first.phase = MatchPhase.ENDED;
+    mgr.tick(0.05, 1);
+    const firstEnd = [...sent].reverse().find(
+      (entry) => entry.playerId === 'A' && entry.message.type === 'server:matchEnd',
+    );
+    if (!firstEnd || firstEnd.message.type !== 'server:matchEnd') {
+      throw new Error('missing Gauntlet stage-one result');
+    }
+    expect(firstEnd.message.result.gauntlet).toMatchObject({
+      stage: 1,
+      difficulty: 'rookie',
+      outcome: 'advanced',
+      nextStage: 2,
+      nextDifficulty: 'scrapper',
+    });
+    expect(firstEnd.message.result.rivalrySet).toBeNull();
+    expect(store.getLifetime('Alpha')).toBeNull();
+
+    sent.length = 0;
+    mgr.handleRematchRequest('A');
+    const secondFound = sent.find(
+      (entry) => entry.playerId === 'A' && entry.message.type === 'server:matchFound',
+    );
+    if (!secondFound || secondFound.message.type !== 'server:matchFound') {
+      throw new Error('missing Gauntlet stage-two matchFound');
+    }
+    expect(secondFound.message.gauntlet).toEqual({
+      stage: 2,
+      totalStages: 3,
+      difficulty: 'scrapper',
+    });
+
+    const second = mgr.getActiveMatches()[0];
+    second.players.get('A')!.score = 3;
+    second.phase = MatchPhase.ENDED;
+    mgr.tick(0.05, 2);
+    const secondEnd = [...sent].reverse().find(
+      (entry) => entry.playerId === 'A' && entry.message.type === 'server:matchEnd',
+    );
+    if (!secondEnd || secondEnd.message.type !== 'server:matchEnd') {
+      throw new Error('missing Gauntlet stage-two result');
+    }
+    expect(secondEnd.message.result.gauntlet).toMatchObject({
+      stage: 2,
+      difficulty: 'scrapper',
+      outcome: 'advanced',
+      nextStage: 3,
+      nextDifficulty: 'warlord',
+    });
+
+    sent.length = 0;
+    mgr.handleRematchRequest('A');
+    const thirdFound = sent.find(
+      (entry) => entry.playerId === 'A' && entry.message.type === 'server:matchFound',
+    );
+    if (!thirdFound || thirdFound.message.type !== 'server:matchFound') {
+      throw new Error('missing Gauntlet stage-three matchFound');
+    }
+    expect(thirdFound.message.gauntlet).toEqual({
+      stage: 3,
+      totalStages: 3,
+      difficulty: 'warlord',
+    });
+
+    const third = mgr.getActiveMatches()[0];
+    third.players.get('A')!.score = 3;
+    third.phase = MatchPhase.ENDED;
+    mgr.tick(0.05, 3);
+    const cleared = [...sent].reverse().find(
+      (entry) => entry.playerId === 'A' && entry.message.type === 'server:matchEnd',
+    );
+    if (!cleared || cleared.message.type !== 'server:matchEnd') {
+      throw new Error('missing Gauntlet clear result');
+    }
+    expect(cleared.message.result.gauntlet).toMatchObject({
+      stage: 3,
+      difficulty: 'warlord',
+      outcome: 'cleared',
+      nextStage: 1,
+      nextDifficulty: 'rookie',
+    });
+
+    sent.length = 0;
+    mgr.handleRematchRequest('A');
+    const retry = sent.find(
+      (entry) => entry.playerId === 'A' && entry.message.type === 'server:matchFound',
+    );
+    if (!retry || retry.message.type !== 'server:matchFound') {
+      throw new Error('missing post-clear Gauntlet retry');
+    }
+    expect(retry.message.gauntlet).toEqual({
+      stage: 1,
+      totalStages: 3,
+      difficulty: 'rookie',
+    });
+
+    const retryMatch = mgr.getActiveMatches()[0];
+    const bot = [...retryMatch.players.values()].find((player) =>
+      player.id.startsWith('bot:'),
+    )!;
+    bot.score = 3;
+    retryMatch.phase = MatchPhase.ENDED;
+    mgr.tick(0.05, 4);
+    const failed = [...sent].reverse().find(
+      (entry) => entry.playerId === 'A' && entry.message.type === 'server:matchEnd',
+    );
+    if (!failed || failed.message.type !== 'server:matchEnd') {
+      throw new Error('missing Gauntlet failure result');
+    }
+    expect(failed.message.result.gauntlet).toMatchObject({
+      stage: 1,
+      difficulty: 'rookie',
+      outcome: 'failed',
+      nextStage: 1,
+      nextDifficulty: 'rookie',
+    });
+  });
 });
 
 describe('match clock alignment (regression: 3-second event/timer offset)', () => {

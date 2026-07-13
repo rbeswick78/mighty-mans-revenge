@@ -10,6 +10,7 @@ import {
   KillConfirmedTagState,
   KillConfirmedCollection,
   MatchContractHudState,
+  PracticeGauntletMatch,
   CoreRunState,
   BountyHuntState,
   WastelandWarpState,
@@ -18,6 +19,7 @@ import {
 } from './game.js';
 import type {
   BotDifficulty,
+  PracticeKind,
   CharacterId,
   WeaponId,
   MutatorId,
@@ -51,6 +53,8 @@ export interface ClientStartPracticeMessage {
   type: 'client:startPractice';
   nickname: string;
   difficulty: BotDifficulty;
+  /** Optional for backward compatibility; old clients start ordinary sparring. */
+  kind?: PracticeKind;
 }
 
 export interface ClientCancelMatchmakingMessage {
@@ -286,6 +290,8 @@ export interface ServerMatchFoundMessage {
   gameMode: GameModeType;
   /** Local player's persisted real-match wins per fighter; absent on old servers. */
   characterWins?: Record<CharacterId, number>;
+  /** Present only while traversing the three-fight solo Gauntlet. */
+  gauntlet?: PracticeGauntletMatch;
 }
 
 /**

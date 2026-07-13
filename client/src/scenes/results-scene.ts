@@ -16,6 +16,12 @@ import { MENU_FONTS } from '../ui/menu/fonts.js';
 import { formatRivalrySummary, nextDraftTeaser, rematchButtonLabel } from '../ui/rivalry-set.js';
 import { careerRankPresentation } from '../ui/career-rank.js';
 import { winStreakPresentation, type WinStreakTone } from '../ui/win-streak.js';
+import {
+  gauntletActionLabel,
+  gauntletNextTeaser,
+  gauntletOutcomeTitle,
+  gauntletResultSummary,
+} from '../ui/practice-gauntlet.js';
 
 interface ResultsSceneData {
   result?: MatchResult;
@@ -124,7 +130,9 @@ export class ResultsScene extends Phaser.Scene {
     // ────────────────────────────────────────────────────────────────────
     // Outcome banner (Press Start 2P, big)
     // ────────────────────────────────────────────────────────────────────
-    const titleText = isDraw ? 'DRAW' : isWinner ? 'VICTORY' : 'DEFEAT';
+    const titleText =
+      gauntletOutcomeTitle(this.result) ??
+      (isDraw ? 'DRAW' : isWinner ? 'VICTORY' : 'DEFEAT');
     const titleColor = isDraw ? DRAW_COLOR : isWinner ? VICTORY_COLOR : DEFEAT_COLOR;
     new TitleLogo(this, centerX, 70, [titleText], {
       fontSize: 44,
@@ -157,7 +165,9 @@ export class ResultsScene extends Phaser.Scene {
       .text(
         centerX,
         112,
-        this.result ? nextDraftTeaser(this.result) : 'NEXT: COIN TOSS PICKS WHO DRAFTS MAP + MODE',
+        this.result
+          ? (gauntletNextTeaser(this.result) ?? nextDraftTeaser(this.result))
+          : 'NEXT: COIN TOSS PICKS WHO DRAFTS MAP + MODE',
         {
           fontFamily: MENU_FONTS.HEADER,
           fontSize: '10px',
@@ -228,7 +238,7 @@ export class ResultsScene extends Phaser.Scene {
       btnY,
       btnW,
       btnH,
-      rematchButtonLabel(this.result),
+      gauntletActionLabel(this.result) ?? rematchButtonLabel(this.result),
       {
         variant: 'primary',
         fontSize: 13,
@@ -238,7 +248,9 @@ export class ResultsScene extends Phaser.Scene {
             return;
           }
           this.gameService.requestRematch();
-          this.rematchStatusText?.setText('Waiting for opponent...').setVisible(true);
+          this.rematchStatusText
+            ?.setText(this.result?.gauntlet ? 'Preparing next fight...' : 'Waiting for opponent...')
+            .setVisible(true);
         },
       },
     );
@@ -557,7 +569,7 @@ export class ResultsScene extends Phaser.Scene {
   ): void {
     if (!this.result) return;
 
-    const line = formatRivalrySummary(this.result);
+    const line = gauntletResultSummary(this.result) ?? formatRivalrySummary(this.result);
     if (line) {
       const rivalryText = this.add
         .text(centerX, RIVALRY_Y, line, {

@@ -18,6 +18,7 @@ import { TitleLogo } from '../ui/menu/title-logo.js';
 import { MENU_FONTS } from '../ui/menu/fonts.js';
 import { drawBeveledChrome } from '../ui/menu/menu-panel.js';
 import { characterMasteryLabel } from '../ui/character-mastery.js';
+import { gauntletMatchLabel } from '../ui/practice-gauntlet.js';
 
 // Scene-local color decisions. HEALTH_GOOD (mint) doubles as the "you"
 // highlight — same color the HUD uses for the local player's health bar,
@@ -171,8 +172,15 @@ export class CharacterSelectScene extends Phaser.Scene {
     // lobby fades straight into this screen.
     if (this.matchData) {
       const modeName = gameModeDisplayName(this.matchData.gameMode);
+      const matchLabel = this.matchData.gauntlet
+        ? gauntletMatchLabel(
+            this.matchData.gauntlet,
+            this.matchData.gameMode,
+            this.matchData.mapName,
+          )
+        : `NEXT: ${modeName} - ${this.matchData.mapName.toUpperCase()}`;
       this.add
-        .text(centerX, 142, `NEXT: ${modeName} - ${this.matchData.mapName.toUpperCase()}`, {
+        .text(centerX, 142, matchLabel, {
           fontFamily: MENU_FONTS.HEADER,
           fontSize: '11px',
           color: cssHex(TIMER_COLOR),

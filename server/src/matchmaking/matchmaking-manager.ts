@@ -7,6 +7,7 @@ import {
   BOT,
   BOT_DIFFICULTIES,
   DEFAULT_BOT_DIFFICULTY,
+  PRACTICE_KINDS,
   CHARACTER_IDS,
   createEmptyCharacterWins,
   LEADERBOARD,
@@ -15,6 +16,8 @@ import {
   getNextMapName,
   listMapNames,
   MAP_REGISTRY,
+  practiceGauntletMatch,
+  resolvePracticeGauntlet,
 } from '@shared/game';
 import type { MapData } from '@shared/game';
 import type {
@@ -30,6 +33,8 @@ import type {
   BotDifficulty,
   MutatorId,
   MatchContractId,
+  PracticeKind,
+  PracticeGauntletMatch,
 } from '@shared/game';
 import { Match } from '../game/match.js';
 import { BotController } from '../game/bot-controller.js';
@@ -75,6 +80,8 @@ interface PostMatchState {
   /** Practice rematches auto-accept for the synthetic opponent. */
   isPractice: boolean;
   practiceDifficulty: BotDifficulty | null;
+  /** Next Gauntlet fight, or stage one when the completed run must retry. */
+  nextGauntlet: PracticeGauntletMatch | null;
   /** Both mutators from the completed round; random rematch rolls skip them. */
   previousMutators: MutatorId[];
   /** Previous round's contract; direct rematches must roll something fresh. */
@@ -140,6 +147,8 @@ export class MatchmakingManager {
   private readonly botControllers: Map<string, BotController> = new Map();
   /** Match ids whose lifetime stats must stay out of friend leaderboards. */
   private readonly practiceDifficulties: Map<string, BotDifficulty> = new Map();
+  /** Authoritative stage metadata for live Gauntlet matches. */
+  private readonly practiceGauntlets: Map<string, PracticeGauntletMatch> = new Map();
   /** Synthetic ids survive across direct practice rematches. */
   private readonly botPlayerIds: Set<PlayerId> = new Set();
   /** Track nicknames for players (set when they join matchmaking). */
@@ -223,11 +232,14 @@ export class MatchmakingManager {
     playerId: PlayerId,
     nickname: string,
     difficulty: BotDifficulty = DEFAULT_BOT_DIFFICULTY,
+    kind: PracticeKind = 'sparring',
   ): void {
     if (this.playerMatchMap.has(playerId)) return;
     const safeDifficulty = BOT_DIFFICULTIES.includes(difficulty)
       ? difficulty
       : DEFAULT_BOT_DIFFICULTY;
+    const safeKind = PRACTICE_KINDS.includes(kind) ? kind : 'sparring';
+    const gauntlet = safeKind === 'gauntlet' ? practiceGauntletMatch(1) : null;
     this.queue.removePlayer(playerId);
     this.playerNicknames.set(playerId, nickname);
 
@@ -252,7 +264,10 @@ export class MatchmakingManager {
         { id: playerId, nickname },
         { id: botId, nickname: BOT.NICKNAME },
       ],
-      safeDifficulty,
+      gauntlet?.difficulty ?? safeDifficulty,
+      [],
+      undefined,
+      gauntlet,
     );
   }
 
@@ -637,6 +652,7 @@ export class MatchmakingManager {
     practiceDifficulty: BotDifficulty | null = null,
     rematchMutatorExclusions: readonly MutatorId[] = [],
     previousContractId?: MatchContractId,
+    gauntlet: PracticeGauntletMatch | null = null,
   ): void {
     const match = new Match(
       matchId,
@@ -655,6 +671,7 @@ export class MatchmakingManager {
     }
     if (practiceDifficulty !== null) {
       this.practiceDifficulties.set(matchId, practiceDifficulty);
+      if (gauntlet) this.practiceGauntlets.set(matchId, gauntlet);
       const botEntry = playerEntries.find((entry) => this.botPlayerIds.has(entry.id));
       if (botEntry) {
         this.botControllers.set(
@@ -698,6 +715,7 @@ export class MatchmakingManager {
           mapName: mapData.name,
           gameMode,
           characterWins,
+          gauntlet: gauntlet ?? undefined,
         },
         { reliable: true },
       );
@@ -1180,9 +1198,24 @@ export class MatchmakingManager {
   private onMatchEnded(matchId: string, match: Match): void {
     const result = match.getResult();
     const practiceDifficulty = this.practiceDifficulties.get(matchId) ?? null;
+    const gauntlet = this.practiceGauntlets.get(matchId) ?? null;
     const isPractice = practiceDifficulty !== null;
     result.isPractice = isPractice;
-    result.rivalrySet = this.recordRivalrySet(match, result.winnerId);
+    result.rivalrySet = gauntlet
+      ? null
+      : this.recordRivalrySet(match, result.winnerId);
+    if (gauntlet) {
+      const humanPlayerId = [...match.players.keys()].find(
+        (playerId) => !this.botPlayerIds.has(playerId),
+      );
+      if (humanPlayerId) {
+        result.gauntlet = resolvePracticeGauntlet(
+          gauntlet,
+          humanPlayerId,
+          result.winnerId,
+        );
+      }
+    }
 
     // Rotation: a rematch plays the map AND mode AFTER this one (registry/
     // rotation order). Attached to the result so the results screen's
@@ -1303,6 +1336,9 @@ export class MatchmakingManager {
       setComplete: result.rivalrySet?.championId != null,
       isPractice,
       practiceDifficulty,
+      nextGauntlet: result.gauntlet
+        ? practiceGauntletMatch(result.gauntlet.nextStage)
+        : null,
       previousMutators: [...match.activeMutators],
       previousContractId: result.contract?.id ?? match.getContractHudState().id,
     });
@@ -1312,6 +1348,7 @@ export class MatchmakingManager {
     this.previousPhases.delete(matchId);
     this.botControllers.delete(matchId);
     this.practiceDifficulties.delete(matchId);
+    this.practiceGauntlets.delete(matchId);
   }
 
   private onRematchTimeout(matchId: string): void {
@@ -1372,9 +1409,10 @@ export class MatchmakingManager {
         getMap(postMatch.nextMapName),
         postMatch.nextGameMode,
         playerEntries,
-        postMatch.practiceDifficulty,
+        postMatch.nextGauntlet?.difficulty ?? postMatch.practiceDifficulty,
         postMatch.previousMutators,
         postMatch.previousContractId,
+        postMatch.nextGauntlet,
       );
       return;
     }

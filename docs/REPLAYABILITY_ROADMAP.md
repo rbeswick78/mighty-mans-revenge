@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–48 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty with Scavenger Instincts, four arenas, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–49 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty with Scavenger Instincts, the three-stage Wasteland Gauntlet, four arenas, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -80,6 +80,7 @@ Each session below attacks one of these.
 | 46  | Scrapstorm                                    | Telegraphed debris strikes turn settled positions into urgent dodges              | **DONE** (2026-07-13) |
 | 47  | Overcharge Cells                              | Ability refreshes turn signature powers into repeatable center-map contests       | **DONE** (2026-07-13) |
 | 48  | Twin-Stick Controller Support                 | Console-style controls make every fight and rematch easier to settle into           | **DONE** (2026-07-13) |
+| 49  | Wasteland Gauntlet                            | A three-fight solo climb turns Practice into a run with escalating stakes             | **DONE** (2026-07-13) |
 
 ---
 
@@ -2398,7 +2399,88 @@ controller carry a player through the entire match/rematch loop.
 
 ---
 
+## Session 49 — Wasteland Gauntlet
+
+**Goal:** turn solo play into a compact, escalating run with a clear beginning,
+climax, and immediate reason to try again.
+
+**Locked design decisions**
+
+- Gauntlet is an explicit lobby choice beside ordinary Rusty Spar. Spar keeps
+  the player's selected difficulty; Gauntlet always opens at Rookie and ignores
+  any client-supplied difficulty.
+- The run is exactly three authoritative Practice fights: Rookie, Scrapper,
+  then Warlord. A human win advances one stage, a stage-three win clears the
+  run, and either a loss or draw ends it and resets the next fight to stage one.
+- The server owns stage assignment and resolution. Optional Gauntlet metadata
+  rides in `server:matchFound` and `MatchResult`; the client only presents it
+  and requests the ordinary direct-Practice rematch action.
+- Maps and modes rotate through the existing direct-rematch path. Fresh-chaos
+  mutator exclusions and fresh contracts carry forward unchanged, so the run
+  gains variety without a second match engine.
+- Gauntlet remains Practice: it never writes lifetime stats or leaderboards.
+  It also omits ephemeral Rivalry Set scoring so its only visible score is the
+  run itself.
+- Character select names the current stage and Rusty level. Results distinguish
+  `STAGE CLEAR`, `RUN ENDED`, and `GAUNTLET CLEAR`, preview the next fight, and
+  offer `NEXT FIGHT` or `RETRY RUN` through the normal rematch callback.
+
+**Acceptance criteria**
+
+- [x] Pure shared tests cover stage normalization plus win, loss, draw, advance,
+      and clear outcomes; pure client tests cover all labels and action states.
+- [x] Matchmaking integration proves server-owned Rookie/Scrapper/Warlord
+      progression, reset after failure, and isolation from Rivalry Sets and
+      lifetime PvP stats.
+- [x] A dedicated real-client Practice smoke launches Gauntlet, observes
+      authoritative stage-one Rookie metadata and briefing copy, and reaches
+      live play through the normal network path.
+- [x] The lobby choice and solo-run copy fit the desktop UI without weakening
+      Quick Match or ordinary difficulty-selectable Spar.
+- [x] Typecheck, lint, all unit tests, production build, and the unpinned
+      Playwright matrix pass.
+
+---
+
 ## Session Log
+
+### Session 49 — 2026-07-13 — Wasteland Gauntlet
+
+**Shipped:** solo Practice now offers two intentional experiences. Rusty Spar
+keeps the selected one-off difficulty, while Gauntlet begins a three-fight run
+through Rookie, Scrapper, and Warlord. Only a human win advances; a loss or draw
+ends the run, and defeating Warlord clears it. Results immediately offer the
+next fight or a stage-one retry, with the next rotating map and mode previewed.
+
+The server owns every stage transition and sends optional run metadata through
+the existing match-found and result messages. Direct rematches preserve normal
+map/mode rotation, fresh-mutator exclusions, and fresh contracts, while all
+combat and Rusty inputs keep their ordinary authoritative paths. Gauntlet stays
+fully isolated from lifetime PvP records, leaderboards, and Rivalry Sets. The
+lobby, character select, and results screens clearly distinguish Spar from the
+run and present `STAGE CLEAR`, `RUN ENDED`, or `GAUNTLET CLEAR` without adding a
+second match flow.
+
+**Verification:** 1,094 unit tests pass across 73 files, including pure stage
+resolution and client-copy coverage plus matchmaking integration for server-
+owned progression, failure reset, and persistent-stat isolation. TypeScript,
+ESLint, and the production build are clean; Vite retains its existing chunk-
+size advisory. The unpinned Playwright matrix passes 13 tests with 11
+intentional scoped skips across desktop Chromium, desktop Firefox, and mobile
+landscape. A dedicated Gauntlet Practice smoke observed authoritative stage-one
+Rookie metadata and briefing copy before reaching live play. In-app desktop
+visual review confirmed the balanced Spar/Gauntlet lobby treatment. All local
+smoke services were stopped afterward.
+
+**Tuning watch:** the fixed Rookie → Scrapper → Warlord arc is intentionally
+easy to understand and currently carries no persistent best-run record. Watch
+whether three full rotating fights feel like a satisfying compact run, whether
+draws should continue to count as failure, and whether repeated clears create
+enough pull before considering any durable solo progression.
+
+**Deployment:** not run; deployment still requires explicit authorization.
+
+---
 
 ### Session 48 — 2026-07-13 — Twin-Stick Controller Support
 

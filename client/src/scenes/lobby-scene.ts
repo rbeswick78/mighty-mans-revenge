@@ -17,6 +17,7 @@ import {
   BOT_DIFFICULTIES,
   DEFAULT_BOT_DIFFICULTY,
   type BotDifficulty,
+  type PracticeKind,
 } from '@shared/config/game.js';
 
 const STORAGE_KEY_NICKNAME = 'mmr_nickname';
@@ -58,6 +59,7 @@ export class LobbyScene extends Phaser.Scene {
   private leaderboardRowsText!: Phaser.GameObjects.Text;
   private quickMatchButton!: PixelButton;
   private practiceButton!: PixelButton;
+  private gauntletButton!: PixelButton;
   private difficultyButton!: PixelButton;
   private mightyManSprite!: Phaser.GameObjects.Sprite;
   private nickname: string;
@@ -226,20 +228,36 @@ export class LobbyScene extends Phaser.Scene {
     );
     panel.add(this.quickMatchButton);
 
+    const soloW = (qmW - 10) / 2;
     this.practiceButton = new PixelButton(
       this,
       panel.centerX - qmW / 2,
       158,
-      qmW,
+      soloW,
       qmH,
-      'PRACTICE VS RUSTY',
+      'RUSTY SPAR',
       {
         variant: 'secondary',
-        fontSize: 12,
-        onClick: () => this.onPractice(),
+        fontSize: 10,
+        onClick: () => this.onPractice('sparring'),
       },
     );
     panel.add(this.practiceButton);
+
+    this.gauntletButton = new PixelButton(
+      this,
+      panel.centerX - qmW / 2 + soloW + 10,
+      158,
+      soloW,
+      qmH,
+      'GAUNTLET',
+      {
+        variant: 'secondary',
+        fontSize: 10,
+        onClick: () => this.onPractice('gauntlet'),
+      },
+    );
+    panel.add(this.gauntletButton);
 
     this.difficultyButton = new PixelButton(
       this,
@@ -430,7 +448,12 @@ export class LobbyScene extends Phaser.Scene {
   }
 
   private gamepadButtons(): PixelButton[] {
-    return [this.quickMatchButton, this.practiceButton, this.difficultyButton];
+    return [
+      this.quickMatchButton,
+      this.practiceButton,
+      this.gauntletButton,
+      this.difficultyButton,
+    ];
   }
 
   private syncGamepadFocus(): void {
@@ -651,6 +674,7 @@ export class LobbyScene extends Phaser.Scene {
     this.cancelButton.setVisible(true);
     this.quickMatchButton.setVisible(false);
     this.practiceButton.setVisible(false);
+    this.gauntletButton.setVisible(false);
     this.difficultyButton.setVisible(false);
 
     this.searchingTween = this.tweens.add({
@@ -680,11 +704,11 @@ export class LobbyScene extends Phaser.Scene {
     this.gameService.joinMatchmaking(this.nickname);
   }
 
-  private onPractice(): void {
+  private onPractice(kind: PracticeKind): void {
     if (this.isSearching || !this.validateNickname()) return;
     this.nicknameInput?.blur();
     this.tryStartFullscreen();
-    this.gameService.startPractice(this.nickname, this.practiceDifficulty);
+    this.gameService.startPractice(this.nickname, this.practiceDifficulty, kind);
   }
 
   private cyclePracticeDifficulty(): void {
@@ -743,6 +767,7 @@ export class LobbyScene extends Phaser.Scene {
     this.cancelButton.setVisible(false);
     this.quickMatchButton.setVisible(true);
     this.practiceButton.setVisible(true);
+    this.gauntletButton.setVisible(true);
     this.difficultyButton.setVisible(true);
     this.setNameEntryVisible(true);
 

@@ -230,7 +230,8 @@ test('solo practice launches against locked Rusty and reaches live play', async 
   await input.fill('Solo');
 
   // Desktop canvas is 960x720 at this project viewport. Cycle the persisted
-  // Rusty level once, then click the practice CTA in canvas-local coordinates.
+  // Rusty level once, then launch an ordinary spar or the pinned Gauntlet
+  // journey in canvas-local coordinates.
   const canvas = page.locator('canvas');
   await expect(canvas).toHaveCount(1);
   await canvas.click({ position: { x: 480, y: 660 } });
@@ -267,7 +268,12 @@ test('solo practice launches against locked Rusty and reaches live play', async 
       state.buttons[0] = { pressed: true, touched: true, value: 1 };
     });
   } else {
-    await canvas.click({ position: { x: 480, y: 614 } });
+    await canvas.click({
+      position: {
+        x: process.env.VERIFY_GAUNTLET === '1' ? 550 : 410,
+        y: 614,
+      },
+    });
   }
   await waitForActiveScene(page, 'CharacterSelectScene', 10000);
   if (process.env.VERIFY_GAMEPAD === '1') {
@@ -279,6 +285,33 @@ test('solo practice launches against locked Rusty and reaches live play', async 
       }).__gamepadTest;
       state.buttons[0] = { pressed: false, touched: false, value: 0 };
     });
+  }
+  if (process.env.VERIFY_GAUNTLET === '1') {
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const w = window as unknown as {
+            game?: { scene: { getScene: (key: string) => unknown } };
+          };
+          const scene = w.game?.scene.getScene('CharacterSelectScene') as {
+            matchData?: {
+              gauntlet?: { stage: number; totalStages: number; difficulty: string };
+            };
+            children?: { list?: Array<{ text?: string }> };
+          } | null;
+          return {
+            gauntlet: scene?.matchData?.gauntlet ?? null,
+            briefing:
+              scene?.children?.list?.some((child) =>
+                child.text?.includes('GAUNTLET 1/3 - ROOKIE'),
+              ) ?? false,
+          };
+        }),
+      )
+      .toEqual({
+        gauntlet: { stage: 1, totalStages: 3, difficulty: 'rookie' },
+        briefing: true,
+      });
   }
 
   await expect

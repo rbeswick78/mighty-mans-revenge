@@ -521,6 +521,15 @@ export const BOT_DIFFICULTIES = ['rookie', 'scrapper', 'warlord'] as const;
 export type BotDifficulty = (typeof BOT_DIFFICULTIES)[number];
 export const DEFAULT_BOT_DIFFICULTY: BotDifficulty = 'scrapper';
 
+export const PRACTICE_KINDS = ['sparring', 'gauntlet'] as const;
+export type PracticeKind = (typeof PRACTICE_KINDS)[number];
+
+/** Three escalating, otherwise rules-honest solo fights. */
+export const PRACTICE_GAUNTLET = Object.freeze({
+  TOTAL_STAGES: 3,
+  DIFFICULTIES: Object.freeze([...BOT_DIFFICULTIES]),
+});
+
 /** Skill profiles change decision cadence, never physics or damage rules. */
 export const BOT_PROFILES: Readonly<
   Record<

@@ -10,3 +10,4 @@ export * from './event-modifiers.js';
 export * from './pellet-spread.js';
 export * from './gun-game.js';
 export * from './radiation-storm.js';
+export * from './practice-gauntlet.js';

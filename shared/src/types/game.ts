@@ -2,7 +2,7 @@ import { PlayerId, MatchId, Tick, Vec2 } from './common.js';
 import { PlayerState, PlayerStats } from './player.js';
 import { AxeState, GrenadeState, BulletTrail, PunchEvent } from './projectile.js';
 import { PickupState } from './pickup.js';
-import type { AwardId } from '../config/game.js';
+import type { AwardId, BotDifficulty } from '../config/game.js';
 
 export enum MatchPhase {
   WAITING = 'waiting',
@@ -271,6 +271,19 @@ export interface WinStreakResult {
   previousBest: number;
 }
 
+export interface PracticeGauntletMatch {
+  stage: number;
+  totalStages: number;
+  difficulty: BotDifficulty;
+}
+
+export interface PracticeGauntletResult extends PracticeGauntletMatch {
+  outcome: 'advanced' | 'failed' | 'cleared';
+  /** Stage launched by the results-screen action (advance or retry). */
+  nextStage: number;
+  nextDifficulty: BotDifficulty;
+}
+
 export interface MatchResult {
   matchId: MatchId;
   winnerId: PlayerId | null;
@@ -311,4 +324,6 @@ export interface MatchResult {
   contract?: MatchContractResult;
   /** Lifetime streak snapshots; absent for Practice and older payloads. */
   winStreaks?: Record<PlayerId, WinStreakResult>;
+  /** Authoritative solo-run progress; absent for ordinary Practice/PvP. */
+  gauntlet?: PracticeGauntletResult;
 }

@@ -42,6 +42,13 @@ Gamepad menus use the D-pad or left stick, A / Cross to select, and B /
 Circle to cancel or return. Mouse, touch, keyboard, and gamepad can take over
 at any time; no settings toggle is required.
 
+## Solo play
+
+`RUSTY SPAR` starts the familiar single Practice match at your selected Rusty
+difficulty. `GAUNTLET` starts a three-fight run that escalates from Rookie to
+Scrapper to Warlord; win to advance, while a loss or draw restarts the run.
+Gauntlet fights rotate maps and modes but never change lifetime PvP records.
+
 ## Where to read next
 
 | If you want…                                | Read                                          |
