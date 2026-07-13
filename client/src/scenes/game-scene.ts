@@ -1117,11 +1117,12 @@ export class GameScene extends Phaser.Scene {
           callout.detail,
           callout.tint,
         );
+        if (callout.pulse) this.zoomPulse?.trigger();
       }
       const audio = AudioManager.getInstance();
       if (!audio) return;
       if (entry.killerId === localId && entry.killerId !== entry.victimId) {
-        audio.play('kill');
+        audio.play('kill', callout?.killSfx);
         this.healFlash?.trigger();
       }
       if (entry.victimId === localId) {

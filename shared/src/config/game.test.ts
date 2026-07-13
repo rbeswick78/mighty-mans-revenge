@@ -23,6 +23,7 @@ import {
   AWARDS,
   LEADERBOARD,
   MATCH_CONTRACTS,
+  COMBAT_MEDALS,
   selectMatchContract,
   type CharacterId,
   type WeaponId,
@@ -129,6 +130,20 @@ describe('wasteland match contracts', () => {
     expect(confirmedIds).toContain('tag_hunter');
     expect(dmIds).not.toContain('hill_dweller');
     expect(dmIds).not.toContain('tag_hunter');
+  });
+});
+
+describe('combat medals', () => {
+  it('defines frozen, positive, strictly escalating rapid-kill thresholds', () => {
+    expect(Object.isFrozen(COMBAT_MEDALS)).toBe(true);
+    expect(COMBAT_MEDALS.RAPID_KILL_WINDOW_SECONDS).toBeGreaterThan(0);
+    expect(COMBAT_MEDALS.DOUBLE_KILL_COUNT).toBe(2);
+    expect(COMBAT_MEDALS.TRIPLE_KILL_COUNT).toBeGreaterThan(
+      COMBAT_MEDALS.DOUBLE_KILL_COUNT,
+    );
+    expect(COMBAT_MEDALS.MAYHEM_COUNT).toBeGreaterThan(
+      COMBAT_MEDALS.TRIPLE_KILL_COUNT,
+    );
   });
 });
 

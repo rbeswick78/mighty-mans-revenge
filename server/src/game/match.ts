@@ -9,6 +9,7 @@ import {
   GRENADE,
   SERVER,
   MUTATORS,
+  COMBAT_MEDALS,
   ABILITY,
   CHARACTER_IDS,
   MAP,
@@ -88,6 +89,13 @@ export class Match implements MatchContext {
   private readonly killFeed: KillFeedEntry[] = [];
   /** Most recent opponent to kill each player, for authoritative payback. */
   private readonly lastKillerByVictim: Map<PlayerId, PlayerId> = new Map();
+  /** First non-suicide kill is a once-per-match medal. */
+  private firstBloodClaimed = false;
+  /** Rolling rapid-kill chain state; uses simulated match time, not wall time. */
+  private readonly rapidKillsByPlayer = new Map<
+    PlayerId,
+    { lastKillAtSeconds: number; count: number }
+  >();
   readonly combatManager: CombatManager = new CombatManager();
   /**
    * Server-side rewind path for "favor the shooter" hit detection. Owns a
@@ -480,14 +488,33 @@ export class Match implements MatchContext {
 
   /** Record a kill event. */
   onKill(killerId: PlayerId, victimId: PlayerId, weapon: KillWeapon): void {
+    const isOpponentKill = killerId !== victimId;
     const victimStreakEnded = this.stats.getCurrentStreak(victimId);
     const isRevenge =
-      killerId !== victimId && this.lastKillerByVictim.get(killerId) === victimId;
+      isOpponentKill && this.lastKillerByVictim.get(killerId) === victimId;
+    const isPosthumous =
+      isOpponentKill && (this.players.get(killerId)?.isDead ?? false);
+    const isFirstBlood = isOpponentKill && !this.firstBloodClaimed;
+    let rapidKillCount = 0;
+    if (isOpponentKill) {
+      this.firstBloodClaimed = true;
+      const now = this.getElapsedSeconds();
+      const previous = this.rapidKillsByPlayer.get(killerId);
+      rapidKillCount =
+        previous &&
+        now - previous.lastKillAtSeconds <= COMBAT_MEDALS.RAPID_KILL_WINDOW_SECONDS
+          ? previous.count + 1
+          : 1;
+      this.rapidKillsByPlayer.set(killerId, {
+        lastKillAtSeconds: now,
+        count: rapidKillCount,
+      });
+    }
     this.stats.recordKill(killerId, victimId, weapon);
     const killerStreak =
-      killerId === victimId ? 0 : this.stats.getCurrentStreak(killerId);
+      isOpponentKill ? this.stats.getCurrentStreak(killerId) : 0;
     this.stats.recordDeath(victimId);
-    if (killerId !== victimId) this.lastKillerByVictim.set(victimId, killerId);
+    if (isOpponentKill) this.lastKillerByVictim.set(victimId, killerId);
 
     this.gameMode.onKill(this, killerId, victimId, weapon);
 
@@ -533,6 +560,9 @@ export class Match implements MatchContext {
       killerStreak,
       victimStreakEnded,
       isRevenge,
+      isFirstBlood,
+      rapidKillCount,
+      isPosthumous,
     };
     this.killFeed.push(entry);
     this.tickKillFeedEntries.push(entry);

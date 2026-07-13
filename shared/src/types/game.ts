@@ -84,6 +84,15 @@ export interface KillFeedEntry {
   victimStreakEnded?: number;
   /** True when the killer just answered the opponent who last killed them. */
   isRevenge?: boolean;
+  /** True for the match's first non-suicide kill. */
+  isFirstBlood?: boolean;
+  /**
+   * Consecutive non-suicide kills inside COMBAT_MEDALS' rolling time window.
+   * One is shipped too, keeping the event self-contained for old/new clients.
+   */
+  rapidKillCount?: number;
+  /** True when the killer was already dead as this victim was eliminated. */
+  isPosthumous?: boolean;
 }
 
 /**

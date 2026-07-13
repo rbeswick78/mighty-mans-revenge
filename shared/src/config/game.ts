@@ -405,6 +405,18 @@ export const COMBAT_CALLOUTS = Object.freeze({
 });
 
 /**
+ * Combat-medal timing is evaluated only by the authoritative server. Kills
+ * inside this rolling window form a rapid chain; the client merely presents
+ * the count stamped onto KillFeedEntry.
+ */
+export const COMBAT_MEDALS = Object.freeze({
+  RAPID_KILL_WINDOW_SECONDS: 6,
+  DOUBLE_KILL_COUNT: 2,
+  TRIPLE_KILL_COUNT: 3,
+  MAYHEM_COUNT: 4,
+});
+
+/**
  * Game mode metadata + rotation. Rotation order doubles as the cycle fresh
  * matches walk through (mirrors the map registry's rotation contract):
  * fresh matches advance a global cursor, rematches play the mode AFTER the

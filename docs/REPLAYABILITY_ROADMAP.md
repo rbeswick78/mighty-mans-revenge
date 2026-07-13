@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–24 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts, solo Practice vs Rusty, streak + payback callouts, selectable Rusty difficulty, Collapsed Overpass, Blackout, fresh-chaos rematches, Last Stand, Kill Confirmed, mode briefings, character death animations, authoritative hit confirmation, blastable cover, chain-reaction barrels, Wasteland Contracts). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–25 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts, solo Practice vs Rusty, streak + payback callouts, selectable Rusty difficulty, Collapsed Overpass, Blackout, fresh-chaos rematches, Last Stand, Kill Confirmed, mode briefings, character death animations, authoritative hit confirmation, blastable cover, chain-reaction barrels, Wasteland Contracts, Combat Medals). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -56,6 +56,7 @@ Each session below attacks one of these.
 | 22  | Blastable Cover                               | Grenades permanently carve new routes through each round's arena     | **DONE** (2026-07-12) |
 | 23  | Chain-Reaction Barrels                        | Every arena gains tactical traps, ambushes, and explosive reversals  | **DONE** (2026-07-12) |
 | 24  | Wasteland Contracts                           | Optional side goals change tactics and build a persistent career chase | **DONE** (2026-07-12) |
+| 25  | Combat Medals                                 | First Blood, rapid chains, and posthumous kills become stories worth chasing | **DONE** (2026-07-12) |
 
 ---
 
@@ -1436,7 +1437,81 @@ career chase, encouraging players to change tactics without changing who wins.
 
 ---
 
+## Session 25 — Combat Medals
+
+**Goal:** recognize the improbable combat beats players retell after a round,
+turning clean openers, rapid chains, and dead-man explosives into immediate
+celebrations without changing the fight underneath them.
+
+**Locked design decisions**
+
+- The server stamps First Blood on the first non-suicide kill only. A suicide
+  neither earns nor consumes it, so every match still has a real opener.
+- Each killer owns a rolling rapid chain based on simulated match time. Kills
+  at or before six seconds from the previous kill chain; anything later starts
+  over at one. Counts 2/3/4+ present as Double Kill, Triple Kill, and Mayhem.
+- From the Grave is true when the killer is already dead as the victim is
+  eliminated, covering delayed grenades, barrels, axes, and other authoritative
+  damage paths without weapon-specific client inference.
+- `KillFeedEntry` carries optional `isFirstBlood`, `rapidKillCount`, and
+  `isPosthumous` fields. Old clients ignore them; new clients gracefully retain
+  the Session 12 streak/payback behavior when the fields are absent.
+- Presentation priority is deterministic: Shutdown > From the Grave > rapid
+  chain > First Blood > Payback > ordinary streak. This preserves the rarest
+  story when one kill qualifies for several labels.
+- Medals stay in the existing dedicated combat lane, with a subtle zoom pulse
+  and pitch-shaped version of the existing kill sound. They never alter score,
+  damage, vampire healing, respawns, awards, contracts, or mode rules.
+
+**Acceptance criteria**
+
+- [x] First Blood is once per match and cannot be stolen by a suicide.
+- [x] Rapid chains use deterministic simulated time, include the six-second
+      boundary, reset just beyond it, and scale without an N-player cap.
+- [x] Delayed kills from an already-dead attacker are marked posthumous.
+- [x] Local presentation resolves overlapping medals by the locked priority,
+      stays silent for remote kills/suicides, and adds audiovisual emphasis.
+- [x] Existing partial/old kill events retain streak/payback compatibility.
+- [x] Typecheck, lint, all unit tests, production build, and Playwright pass.
+
+---
+
 ## Session Log
+
+### Session 25 — 2026-07-12 — Combat Medals
+
+**Shipped:** every authoritative kill now carries the combat story around it.
+The opening non-suicide earns First Blood; kills chained inside six simulated
+seconds escalate through Double Kill, Triple Kill, and open-ended Mayhem; and a
+grenade or other delayed attack that finishes the job after its owner dies earns
+From the Grave. The local winner sees a punchy dedicated-lane callout, zoom beat,
+and pitch-shaped kill cue while everyone else keeps the normal feed and audio.
+
+The implementation is match-scoped and N-player safe. It does not read wall
+clock time, does not consume RNG, and does not add a new reliable message—the
+existing `server:playerKilled` path carries optional context that older clients
+can ignore. Shutdown remains the highest-priority story, followed by posthumous
+and rapid medals, so simultaneous qualifications never flicker through several
+labels or erase mutator/overtime messaging.
+
+**Verified:** focused authority tests cover suicide exclusion, once-only First
+Blood, the inclusive six-second edge, reset just beyond the window, and a killer
+already dead. Pure client tests cover Double/Triple/unbounded Mayhem copy,
+posthumous sound/pulse presentation, remote/suicide silence, and the complete
+priority ladder. A live two-client run completed lobby, draft, character lock,
+and active KOTH at desktop and 844×390 mobile landscape with zero browser
+warnings/errors; the forced short match rolled Grenades Only before the static
+test fighters connected a medal kill, so medal animation/audio truth remains
+the focused deterministic presentation suite rather than a claimed live sighting.
+Typecheck and lint are clean; all 858 unit tests pass; the production build
+succeeds; and Playwright completes all 21 cases with 12 passes, 9 intentional
+skips, and zero failures across Chromium, Firefox, and mobile landscape.
+
+**Carry-over:** six seconds and the current presentation priority are first-pass
+feel tuning. Watch whether real 1v1 respawn cadence makes Double Kill satisfyingly
+rare or practically impossible; change the window only after group-night evidence.
+
+---
 
 ### Session 24 — 2026-07-12 — Wasteland Contracts
 

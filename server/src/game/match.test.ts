@@ -404,6 +404,63 @@ describe('Match', () => {
       expect(killFeed[0].killerStreak).toBe(1);
       expect(killFeed[0].victimStreakEnded).toBe(0);
       expect(killFeed[0].isRevenge).toBe(false);
+      expect(killFeed[0].isFirstBlood).toBe(true);
+      expect(killFeed[0].rapidKillCount).toBe(1);
+      expect(killFeed[0].isPosthumous).toBe(false);
+    });
+
+    it('ignores suicides for First Blood and rapid-kill chains', () => {
+      match.startCountdown();
+      match.update(MATCH.COUNTDOWN_DURATION + 0.1);
+
+      match.onKill('player-0', 'player-0', 'grenade');
+      match.players.get('player-0')!.isDead = false;
+      match.onKill('player-1', 'player-0', 'gun');
+
+      const [suicide, opener] = match.getKillFeed();
+      expect(suicide).toMatchObject({
+        isFirstBlood: false,
+        rapidKillCount: 0,
+        isPosthumous: false,
+      });
+      expect(opener).toMatchObject({
+        isFirstBlood: true,
+        rapidKillCount: 1,
+      });
+    });
+
+    it('builds rapid-kill chains inside the shared window and resets after it', () => {
+      match.startCountdown();
+      match.update(MATCH.COUNTDOWN_DURATION + 0.1);
+
+      match.onKill('player-0', 'player-1', 'gun');
+      match.players.get('player-1')!.isDead = false;
+      // The boundary is inclusive: exactly six simulated seconds still chains.
+      match.matchTimer -= 6;
+      match.onKill('player-0', 'player-1', 'shotgun');
+      match.players.get('player-1')!.isDead = false;
+      match.matchTimer -= 6.001;
+      match.onKill('player-0', 'player-1', 'pistol');
+
+      expect(match.getKillFeed().map((entry) => entry.rapidKillCount)).toEqual([
+        1,
+        2,
+        1,
+      ]);
+    });
+
+    it('marks a kill made after the killer is already dead as posthumous', () => {
+      match.startCountdown();
+      match.update(MATCH.COUNTDOWN_DURATION + 0.1);
+      match.players.get('player-0')!.isDead = true;
+
+      match.onKill('player-0', 'player-1', 'grenade');
+
+      expect(match.getKillFeed()[0]).toMatchObject({
+        killerId: 'player-0',
+        victimId: 'player-1',
+        isPosthumous: true,
+      });
     });
 
     it('ships streak shutdown and payback context with each kill', () => {
@@ -420,6 +477,7 @@ describe('Match', () => {
 
       const feed = match.getKillFeed();
       expect(feed.map((entry) => entry.killerStreak)).toEqual([1, 2, 3, 1]);
+      expect(feed.map((entry) => entry.rapidKillCount)).toEqual([1, 2, 3, 1]);
       expect(feed[3]).toMatchObject({
         killerId: 'player-1',
         victimId: 'player-0',
