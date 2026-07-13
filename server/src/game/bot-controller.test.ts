@@ -248,6 +248,55 @@ describe('BotController', () => {
     expect(human.health).toBeLessThan(human.maxHealth);
   });
 
+  it('uses its one chambered round, then closes for a lethal recovery punch', () => {
+    const match = new Match(
+      'practice-chamber',
+      OPEN_MAP,
+      [
+        { id: 'human', nickname: 'Human' },
+        { id: 'bot:test', nickname: 'Rusty' },
+      ],
+      GameModeType.ONE_IN_THE_CHAMBER,
+      () => 0,
+    );
+    match.setLock('human', 'bubba');
+    match.setLock('bot:test', 'mighty_man');
+    match.update(0);
+    match.update(10);
+
+    const human = match.players.get('human')!;
+    const bot = match.players.get('bot:test')!;
+    human.position = { x: 5.5 * 48, y: 2.5 * 48 };
+    bot.position = { x: 2.5 * 48, y: 2.5 * 48 };
+    human.invulnerableTimer = 0;
+    const controller = new BotController(bot.id, 'warlord');
+
+    controller.update(0.05, match, 1);
+    match.update(0.05);
+    expect(human.isDead).toBe(true);
+    expect(bot.score).toBe(1);
+    expect(bot.weaponId).toBe('pistol');
+    expect(bot.specialAmmo).toBe(1);
+
+    // Put a fresh target in melee range and spend Rusty's earned round.
+    human.isDead = false;
+    human.health = human.maxHealth;
+    human.invulnerableTimer = 0;
+    human.position = { x: bot.position.x + 48, y: bot.position.y };
+    bot.specialAmmo = 0;
+    match.update(0.05);
+    expect(bot.weaponId).toBe('punch');
+
+    for (let tick = 2; tick <= 20 && !human.isDead; tick++) {
+      controller.update(0.05, match, tick);
+      match.update(0.05);
+    }
+    expect(human.isDead).toBe(true);
+    expect(bot.score).toBe(2);
+    expect(bot.weaponId).toBe('pistol');
+    expect(bot.specialAmmo).toBe(1);
+  });
+
   it('adapts ordinary bot inputs to synchronized roulette weapon changes', () => {
     process.env.FORCE_EVENT = 'weapon_roulette';
     try {

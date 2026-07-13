@@ -172,6 +172,8 @@ export class BotController {
       directAngle + Math.sin(this.elapsedSeconds * 1.7) * this.profile.aimWobbleRadians;
 
     const activeGrenade = match.combatManager.getActiveGrenadeFor(this.playerId);
+    const chamberRules =
+      match.gameModeType === GameModeType.ONE_IN_THE_CHAMBER;
     let throwPressed = false;
     let detonatePressed = false;
     if (activeGrenade) {
@@ -186,6 +188,7 @@ export class BotController {
         match.gameModeType === GameModeType.GUN_GAME &&
         gunGameRungForScore(bot.score).weapon === 'grenade';
       if (
+        !chamberRules &&
         this.grenadeSeconds <= 0 &&
         target !== null &&
         bot.grenades > 0 &&
@@ -214,6 +217,7 @@ export class BotController {
     if (firePressed) this.fireSeconds = this.profile.fireIntervalSeconds;
 
     const abilityPressed =
+      !chamberRules &&
       target !== null &&
       hasLineOfSight &&
       distance <= BOT.FIRE_RANGE &&

@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–30 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts, solo Practice vs Rusty, streak + payback callouts, selectable Rusty difficulty, Collapsed Overpass, Blackout, fresh-chaos rematches, Last Stand, Kill Confirmed, mode briefings, character death animations, authoritative hit confirmation, blastable cover, chain-reaction barrels, Wasteland Contracts, Combat Medals, Wasteland Reputation, Hot Streaks, Fighter Mastery, Fists Only, Weapon Roulette). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–31 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts, solo Practice vs Rusty, streak + payback callouts, selectable Rusty difficulty, Collapsed Overpass, Blackout, fresh-chaos rematches, Last Stand, Kill Confirmed, mode briefings, character death animations, authoritative hit confirmation, blastable cover, chain-reaction barrels, Wasteland Contracts, Combat Medals, Wasteland Reputation, Hot Streaks, Fighter Mastery, Fists Only, Weapon Roulette, One in the Chamber). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -62,6 +62,7 @@ Each session below attacks one of these.
 | 28  | Fighter Mastery                               | Every roster pick gains its own persistent goal and identity | **DONE** (2026-07-12) |
 | 29  | Fists Only                                    | Mid-round gunfights collapse into frantic close-range brawls | **DONE** (2026-07-12) |
 | 30  | Weapon Roulette                               | Every ten seconds demands a fresh fighting style and new positioning | **DONE** (2026-07-12) |
+| 31  | One in the Chamber                            | One precious shot turns every aim, miss, and recovery punch into drama | **DONE** (2026-07-12) |
 
 ---
 
@@ -1672,7 +1673,104 @@ readable, and independent of baseline weapon-balance changes.
 
 ---
 
+## Session 31 — One in the Chamber
+
+**Goal:** add a tense, instantly understandable party mode where one accurate
+shot can decide an exchange, a miss forces a dangerous melee comeback, and
+every kill creates the satisfying promise of another loaded chamber.
+
+**Locked design decisions**
+
+- First to 8 opponent kills wins. Every fighter receives exactly one pistol
+  round on match start, respawn, and scored kill; the round has no reserve and
+  cannot reload normally.
+- Pistol and punch hits are lethal only after the existing authoritative
+  lag-comp validation succeeds. Spawn invulnerability remains intact. A missed
+  pistol round swaps to fists; a pistol-triggered barrel kill also scores and
+  earns the chamber because no other enabled action can trigger that hazard.
+- The mode owns the full combat economy: only bandages spawn; grenades and
+  character abilities are disabled; respawn and overtime re-chamber before the
+  next playable snapshot. Existing weapon and ammo fields carry all state, so
+  there is no parallel client timer or new network event.
+- Random rolls exclude Grenades Only, Infinite Ammo, Fists Only, Weapon
+  Roulette, Low Health, Vampire, and Turbo Grenades. The first four conflict
+  with scarcity/loadout ownership; the last three are redundant no-effect
+  rolls. Big Heads, Blackout, Super Speed, and Second Wind remain meaningful.
+  Explicit FORCE pins keep their development safety-bypass semantics.
+- The middle HUD names `CHAMBER LOADED`, `FISTS - EARN A ROUND`, and the
+  countdown/death pending states. Desktop and touch input suppress grenade,
+  reload, and ability actions client-side as well as server-side; touch hides
+  those buttons. Rusty uses ordinary inputs and naturally closes to punch range
+  after spending its shot.
+
+**Acceptance criteria**
+
+- [x] Match start, respawn, scored kill, and tied overtime each provide exactly
+      one pistol round with zero reserve; missing transitions to punch without
+      exposing the generic rifle.
+- [x] Direct pistol and punch hits kill through the normal lag-comp/damage path;
+      spawn protection survives; pistol-triggered barrels score; suicides and
+      disabled/off-rule weapons do not.
+- [x] Grenades, detonation, abilities, reloads, weapon/ammo pickups, and their
+      misleading client controls are unavailable; bandages remain.
+- [x] Rotation, draft cards, countdown briefing, score/results surfaces, Rusty,
+      first-to-8 ending, and sudden-death overtime all recognize the mode.
+- [x] HUD pure tests cover loaded, fists, countdown, and respawn copy; live
+      browser QA renders the briefing, loaded state, missed-shot fists state,
+      meaningful stacked mutators, and results with a clean console.
+- [x] Typecheck, lint, all unit tests, production build, and Playwright pass.
+
+---
+
 ## Session Log
+
+### Session 31 — 2026-07-12 — One in the Chamber
+
+**Shipped:** the sixth mode turns every exchange into a tiny risk story. Each
+fighter begins with one lethal pistol round; landing it scores and reloads,
+while missing immediately leaves only a lethal punch until the fighter earns a
+round back. Pistol-triggered barrel kills count as deliberate bank shots. First
+to eight wins, and the normal clock/tied-overtime machinery remains intact.
+
+The server owns every rule through existing weapon state: it re-chambers match
+start, respawns, kills, and overtime; validates pistol and punch through the
+normal lag-compensated rays; applies the mode's lethal damage only after a real
+hit; leaves spawn protection untouched; and removes every pickup except
+bandages. Grenades, reloads, and character abilities are rejected server-side
+and suppressed in desktop/touch input, including hidden touch buttons. Random
+rolls exclude both conflicting loadout mutators and redundant no-effect rules,
+while Big Heads, Blackout, Super Speed, and Second Wind keep offering useful
+variation. Rusty spends and earns the same chamber through ordinary inputs.
+
+The HUD explicitly distinguishes `ROUND LOADS ON FIGHT`, `CHAMBER LOADED`,
+`FISTS - EARN A ROUND`, and `ROUND LOADS ON RESPAWN`. Those two pending labels
+were added after live QA caught generic countdown/death snapshots otherwise
+looking like misses. The same smoke also exposed Low Health as a redundant
+random announcement, so it joined Vampire and Turbo Grenades in the mode's
+random exclusions rather than consuming a chaos slot without changing play.
+
+**Verified:** deterministic mode tests cover loadout transitions, lethal direct
+hits, barrel credit, wrong-source/self-kill rejection, respawn, overtime,
+pickup/input gates, score target, result identity, and mutator exclusions.
+Integration tests fire the real pistol and punch paths, prove Rusty's ranged-to-
+melee adaptation, and exercise rotation/draft succession. Pure client tests
+cover secondary-action filtering and every HUD state. All 915 unit/integration
+tests pass across 56 files; typecheck, lint, and the production build are clean
+(the existing Vite chunk-size warning remains). The full 21-case Playwright run
+finished with 11 direct passes, 9 intentional project skips, and one mobile
+canvas-setup timeout that passed on retry; an immediate isolated smoke rerun
+then passed all six desktop Chromium, Firefox, and mobile-landscape cases with
+no retry. In-app browser Practice rendered the mode briefing, pending/loaded/
+fists states, useful Big Heads + Blackout stacking, and the final results screen
+with no browser warnings or errors.
+
+**Carry-over:** first-to-eight, lethal fists, and one round per kill are strong
+party-mode defaults, not group-tested balance verdicts. Watch whether punch
+recoveries feel heroic or too easy, and whether ordinary three-minute matches
+reach eight often enough; tune only `ONE_IN_THE_CHAMBER.SCORE_TARGET` after a
+real group night rather than weakening the one-shot identity speculatively.
+
+---
 
 ### Session 30 — 2026-07-12 — Weapon Roulette
 

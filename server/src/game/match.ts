@@ -966,7 +966,10 @@ export class Match implements MatchContext {
 
         // Spacebar / ability button: try to activate before everything else
         // so the Bruce-locked check below picks up the just-activated state.
-        if (input.abilityPressed) {
+        if (
+          input.abilityPressed &&
+          !(this.gameMode.areAbilitiesDisabled?.(this, player) ?? false)
+        ) {
           this.tryActivateAbility(player, input.aimAngle);
         }
 
@@ -1049,6 +1052,7 @@ export class Match implements MatchContext {
         // player and they have at least one grenade in their pouch.
         if (
           !fistsOnly &&
+          !(this.gameMode.areGrenadesDisabled?.(this, player) ?? false) &&
           input.throwPressed &&
           player.grenades > 0 &&
           !this.combatManager.getActiveGrenadeFor(playerId)
@@ -1072,7 +1076,10 @@ export class Match implements MatchContext {
         }
 
         // Manual detonation (press edge), only if a live grenade exists.
-        if (input.detonatePressed) {
+        if (
+          input.detonatePressed &&
+          !(this.gameMode.areGrenadesDisabled?.(this, player) ?? false)
+        ) {
           const active = this.combatManager.getActiveGrenadeFor(playerId);
           if (active) {
             const explosion = this.combatManager.detonateGrenade(active.id, this.players, grid);
@@ -1426,7 +1433,14 @@ export class Match implements MatchContext {
     if (shot.hit && shot.victimId && shot.damage !== undefined) {
       const victim = this.players.get(shot.victimId);
       if (victim) {
-        const result = this.combatManager.applyDamage(victim, shot.damage, playerId);
+        const damage = this.gameMode.damageForWeaponHit?.(
+          this,
+          player,
+          victim,
+          weaponId,
+          shot.damage,
+        ) ?? shot.damage;
+        const result = this.combatManager.applyDamage(victim, damage, playerId);
         shot.trail.hitPlayerId = shot.victimId;
         shot.trail.damageApplied = result.damageApplied;
         this.stats.recordHit(playerId);
@@ -1491,7 +1505,14 @@ export class Match implements MatchContext {
       const victim = this.players.get(shot.victimId);
       if (!victim || victim.isDead) continue;
       struckVictims.add(shot.victimId);
-      const result = this.combatManager.applyDamage(victim, shot.damage, player.id);
+      const damage = this.gameMode.damageForWeaponHit?.(
+        this,
+        player,
+        victim,
+        'punch',
+        shot.damage,
+      ) ?? shot.damage;
+      const result = this.combatManager.applyDamage(victim, damage, player.id);
       // damageApplied, not shot.damage — Iron Hide may have halved it.
       this.stats.recordDamage(player.id, result.damageApplied);
       this.applyVampireHeal(player.id, shot.victimId, result.damageApplied);

@@ -9,6 +9,7 @@ import type {
   KillConfirmedCollection,
   MutatorId,
   PickupType,
+  WeaponId,
 } from '@shared/game';
 import type { StatsTracker } from '../stats-tracker.js';
 
@@ -87,6 +88,21 @@ export interface GameMode {
    * weapon fire; grenade throws stay live.
    */
   areGunsDisabled?(match: MatchContext, player: PlayerState): boolean;
+  /** Mode-level input gates for rulesets that own the whole combat economy. */
+  areGrenadesDisabled?(match: MatchContext, player: PlayerState): boolean;
+  areAbilitiesDisabled?(match: MatchContext, player: PlayerState): boolean;
+  /**
+   * Optional authoritative damage rewrite for a validated direct weapon hit.
+   * Spawn protection and hit detection have already passed; Match still routes
+   * the returned amount through CombatManager's single damage choke point.
+   */
+  damageForWeaponHit?(
+    match: MatchContext,
+    attacker: PlayerState,
+    victim: PlayerState,
+    weaponId: WeaponId,
+    baseDamage: number,
+  ): number;
   /**
    * Whether a dead player may return. Omitted = normal respawns. Last Stand
    * uses this to keep zero-life fighters eliminated in N-player matches and

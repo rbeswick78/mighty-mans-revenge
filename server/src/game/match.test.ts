@@ -18,6 +18,7 @@ import {
   GUN_GAME,
   LAST_STAND,
   KILL_CONFIRMED,
+  ONE_IN_THE_CHAMBER,
   GameModeType,
   TileType,
 } from '@shared/game';
@@ -3800,6 +3801,161 @@ describe('Match', () => {
 
       expect(m.phase).toBe(MatchPhase.ENDED);
       expect(m.getResult().winnerId).toBe(collector.id);
+    });
+  });
+
+  describe('One in the Chamber mode integration', () => {
+    function makeChamberMapData(): MapData {
+      return {
+        ...makeMapData(),
+        pickupSpawns: [
+          { x: 2, y: 2, type: 'weapon_pistol' as const },
+          { x: 3, y: 3, type: 'gun_ammo' as const },
+          { x: 4, y: 4, type: 'grenade' as const },
+          { x: 5, y: 5, type: 'bandage' as const },
+        ],
+      };
+    }
+
+    function startActiveChamberMatch(): Match {
+      const m = new Match(
+        'chamber-1',
+        makeChamberMapData(),
+        [
+          { id: 'player-0', nickname: 'P0' },
+          { id: 'player-1', nickname: 'P1' },
+        ],
+        GameModeType.ONE_IN_THE_CHAMBER,
+        () => 0,
+      );
+      m.startCountdown();
+      m.update(MATCH.COUNTDOWN_DURATION + 0.05);
+      return m;
+    }
+
+    it('starts with one round and a landed pistol shot kills and reloads', () => {
+      const m = startActiveChamberMatch();
+      const shooter = m.players.get('player-0')!;
+      const victim = m.players.get('player-1')!;
+      shooter.position = { x: 100, y: 100 };
+      victim.position = { x: 260, y: 100 };
+      victim.invulnerableTimer = 0;
+
+      expect(shooter.weaponId).toBe('pistol');
+      expect(shooter.specialAmmo).toBe(1);
+      m.queueInput(shooter.id, makeInput(1, { firePressed: true, aimAngle: 0 }));
+      m.update(0.05);
+
+      expect(victim.isDead).toBe(true);
+      expect(victim.health).toBe(0);
+      expect(shooter.score).toBe(1);
+      expect(shooter.weaponId).toBe('pistol');
+      expect(shooter.specialAmmo).toBe(1);
+      expect(m.getTickBulletTrails()[0]).toMatchObject({
+        weaponId: 'pistol',
+        hitPlayerId: victim.id,
+        damageApplied: 100,
+      });
+    });
+
+    it('a missed round becomes lethal fists until a punch earns it back', () => {
+      const m = startActiveChamberMatch();
+      const fighter = m.players.get('player-0')!;
+      const victim = m.players.get('player-1')!;
+      fighter.position = { x: 100, y: 100 };
+      victim.position = { x: 150, y: 100 };
+      victim.invulnerableTimer = 0;
+
+      m.queueInput(fighter.id, makeInput(1, { firePressed: true, aimAngle: Math.PI }));
+      m.update(0.05);
+      expect(fighter.weaponId).toBe('punch');
+      expect(fighter.specialAmmo).toBe(0);
+
+      m.queueInput(fighter.id, makeInput(2, { firePressed: true, aimAngle: 0 }));
+      m.update(WEAPONS.punch.fireCooldown + 0.05);
+      expect(victim.isDead).toBe(true);
+      expect(fighter.score).toBe(1);
+      expect(fighter.weaponId).toBe('pistol');
+      expect(fighter.specialAmmo).toBe(1);
+    });
+
+    it('keeps spawn invulnerability intact and still spends the blocked shot', () => {
+      const m = startActiveChamberMatch();
+      const shooter = m.players.get('player-0')!;
+      const protectedPlayer = m.players.get('player-1')!;
+      shooter.position = { x: 100, y: 100 };
+      protectedPlayer.position = { x: 200, y: 100 };
+      protectedPlayer.invulnerableTimer = 1;
+
+      m.queueInput(shooter.id, makeInput(1, { firePressed: true, aimAngle: 0 }));
+      m.update(0.05);
+
+      expect(protectedPlayer.isDead).toBe(false);
+      expect(protectedPlayer.health).toBe(protectedPlayer.maxHealth);
+      expect(shooter.score).toBe(0);
+      expect(shooter.weaponId).toBe('punch');
+      expect(shooter.specialAmmo).toBe(0);
+    });
+
+    it('gates grenades and character abilities through the real input loop', () => {
+      const m = startActiveChamberMatch();
+      const fighter = m.players.get('player-0')!;
+      fighter.characterId = 'jack';
+      fighter.grenades = GRENADE.MAX_COUNT;
+      m.queueInput(
+        fighter.id,
+        makeInput(1, {
+          throwPressed: true,
+          detonatePressed: true,
+          abilityPressed: true,
+        }),
+      );
+      m.update(0.05);
+
+      expect(fighter.grenades).toBe(0);
+      expect(fighter.abilityCooldownSeconds).toBe(0);
+      expect(m.combatManager.getGrenades()).toHaveLength(0);
+      expect(m.combatManager.getAxes()).toHaveLength(0);
+    });
+
+    it('respawns with one round and leaves only bandages on the map', () => {
+      const m = startActiveChamberMatch();
+      const victim = m.players.get('player-1')!;
+      m.onKill('player-0', victim.id, 'pistol');
+      m.update(RESPAWN.DELAY + 0.1);
+
+      expect(victim.isDead).toBe(false);
+      expect(victim.weaponId).toBe('pistol');
+      expect(victim.specialAmmo).toBe(1);
+      expect(victim.specialReserve).toBe(0);
+      expect(m.pickupManager.getPickups().map((pickup) => pickup.type)).toEqual([
+        'bandage',
+      ]);
+    });
+
+    it('ends at the score target and re-chambers a tied overtime duel', () => {
+      const decisive = startActiveChamberMatch();
+      const winner = decisive.players.get('player-0')!;
+      winner.score = ONE_IN_THE_CHAMBER.SCORE_TARGET - 1;
+      decisive.onKill(winner.id, 'player-1', 'punch');
+      decisive.update(0.05);
+      expect(decisive.phase).toBe(MatchPhase.ENDED);
+      expect(decisive.getResult()).toMatchObject({
+        winnerId: winner.id,
+        gameMode: GameModeType.ONE_IN_THE_CHAMBER,
+      });
+
+      const tied = startActiveChamberMatch();
+      tied.players.get('player-0')!.score = 3;
+      tied.players.get('player-1')!.score = 3;
+      tied.matchTimer = 0.01;
+      tied.update(0.05);
+      expect(tied.isOvertime).toBe(true);
+      tied.update(0.05);
+      for (const player of tied.players.values()) {
+        expect(player.weaponId).toBe('pistol');
+        expect(player.specialAmmo).toBe(1);
+      }
     });
   });
 

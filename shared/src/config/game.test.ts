@@ -28,6 +28,7 @@ import {
   careerRankProgressForContracts,
   CHARACTER_MASTERY_TIERS,
   MUTATORS,
+  ONE_IN_THE_CHAMBER,
   characterMasteryProgressForWins,
   createEmptyCharacterWins,
   selectMatchContract,
@@ -53,7 +54,12 @@ describe('game mode rotation', () => {
     expect(getNextGameMode(GameModeType.KOTH)).toBe(GameModeType.GUN_GAME);
     expect(getNextGameMode(GameModeType.GUN_GAME)).toBe(GameModeType.LAST_STAND);
     expect(getNextGameMode(GameModeType.LAST_STAND)).toBe(GameModeType.KILL_CONFIRMED);
-    expect(getNextGameMode(GameModeType.KILL_CONFIRMED)).toBe(GameModeType.DEATHMATCH);
+    expect(getNextGameMode(GameModeType.KILL_CONFIRMED)).toBe(
+      GameModeType.ONE_IN_THE_CHAMBER,
+    );
+    expect(getNextGameMode(GameModeType.ONE_IN_THE_CHAMBER)).toBe(
+      GameModeType.DEATHMATCH,
+    );
   });
 
   it('restarts the cycle for unknown values instead of throwing', () => {
@@ -69,6 +75,17 @@ describe('game mode rotation', () => {
     expect(gameModeDisplayName(GameModeType.KOTH)).toBe('KING OF THE HILL');
     expect(gameModeDisplayName(GameModeType.LAST_STAND)).toBe('LAST STAND');
     expect(gameModeDisplayName(GameModeType.KILL_CONFIRMED)).toBe('KILL CONFIRMED');
+    expect(gameModeDisplayName(GameModeType.ONE_IN_THE_CHAMBER)).toBe(
+      'ONE IN THE CHAMBER',
+    );
+  });
+});
+
+describe('one in the chamber mode', () => {
+  it('defines one starting round and a positive score target', () => {
+    expect(ONE_IN_THE_CHAMBER.CHAMBERED_ROUNDS).toBe(1);
+    expect(ONE_IN_THE_CHAMBER.SCORE_TARGET).toBeGreaterThan(0);
+    expect(Object.isFrozen(ONE_IN_THE_CHAMBER)).toBe(true);
   });
 });
 

@@ -5,6 +5,7 @@ import { isTouchDevice } from './is-touch-device.js';
 import { KeyboardMouseInput } from './keyboard-mouse-input.js';
 import { TouchInput } from './touch-input.js';
 import type { RawInput } from './types.js';
+import { withoutSecondaryActions } from './combat-input.js';
 
 type InputMode = 'keyboard' | 'touch';
 
@@ -46,13 +47,20 @@ export class InputManager {
     currentTick: number,
     hasActiveGrenade: boolean,
     localFrozen: boolean = false,
+    secondaryActionsDisabled: boolean = false,
   ): PlayerInput {
     let raw: RawInput;
+
+    this.touchInput.setSecondaryActionsEnabled(!secondaryActionsDisabled);
 
     if (this.activeMode === 'touch') {
       raw = this.touchInput.getInput(hasActiveGrenade);
     } else {
       raw = this.keyboardMouseInput.getInput(playerWorldPos, hasActiveGrenade);
+    }
+
+    if (secondaryActionsDisabled) {
+      raw = withoutSecondaryActions(raw);
     }
 
     this.lastRawInput = raw;

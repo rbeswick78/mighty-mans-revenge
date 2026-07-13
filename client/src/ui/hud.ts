@@ -9,6 +9,7 @@ import { HUD_STRIP_HEIGHT, MAP_HEIGHT_PX, MAP_WIDTH_PX } from './layout.js';
 import { gunGameLadderLabel, rifleAmmoRowVisible } from './gun-game-hud.js';
 import { deathOverlayLabel } from './death-overlay.js';
 import { MENU_FONTS } from './menu/fonts.js';
+import { oneInTheChamberStatus } from './one-in-the-chamber-hud.js';
 
 // Press Start 2P is much wider per glyph than Courier, so the final-minute
 // banner size drops to compensate (Courier 40px ≈ PS2P 22-24px in width).
@@ -105,6 +106,9 @@ export class HUD {
   private lastStandText: Phaser.GameObjects.Text;
   /** Kill Confirmed objective label in the mode-exclusive middle band. */
   private killConfirmedText: Phaser.GameObjects.Text;
+  /** One in the Chamber's loaded/fists state in the same exclusive band. */
+  private oneInTheChamberText: Phaser.GameObjects.Text;
+  private oneInTheChamberActive = false;
 
   // Right column: kill feed
   private killFeedEntries: KillFeedItem[] = [];
@@ -399,6 +403,16 @@ export class HUD {
     this.killConfirmedText.setDepth(1000);
     this.killConfirmedText.setVisible(false);
 
+    this.oneInTheChamberText = scene.add.text(middleX, kothBarY - 1, '', {
+      ...HEADER_STYLE,
+      fontSize: '9px',
+      color: cssHex(Wasteland.TEXT_RELOAD_WARNING),
+    });
+    this.oneInTheChamberText.setOrigin(0.5, 0);
+    this.oneInTheChamberText.setScrollFactor(0);
+    this.oneInTheChamberText.setDepth(1000);
+    this.oneInTheChamberText.setVisible(false);
+
     // Persistent active-event label, sits right under the timer. Hidden
     // until an event activates; never moves, just toggles text + visibility.
     this.activeEventLabel = scene.add.text(middleX, stripTop + 84, '', {
@@ -616,6 +630,27 @@ export class HUD {
     this.killConfirmedText.setVisible(active);
   }
 
+  updateOneInTheChamber(
+    active: boolean,
+    weaponId: WeaponId,
+    chamberedRounds: number,
+    isDead: boolean,
+    roundStarted: boolean,
+  ): void {
+    this.oneInTheChamberActive = active;
+    this.oneInTheChamberText.setVisible(active);
+    if (active) {
+      this.oneInTheChamberText.setText(
+        oneInTheChamberStatus(
+          weaponId,
+          chamberedRounds,
+          isDead,
+          roundStarted,
+        ),
+      );
+    }
+  }
+
   /**
    * The rifle ammo row hides while it can only mislead: fists equipped
    * (no ammo exists) or the Gun Game grenade rung (weaponId stays 'rifle'
@@ -648,6 +683,11 @@ export class HUD {
    * otherwise show the player's remaining carry count (right-click will throw).
    */
   updateGrenadeStatus(hasActiveGrenade: boolean, count: number): void {
+    if (this.oneInTheChamberActive) {
+      this.grenadeText.setText('GRN: DISABLED');
+      this.grenadeText.setColor(cssHex(Wasteland.HUD_STRIP_BORDER));
+      return;
+    }
     if (hasActiveGrenade) {
       this.grenadeText.setText('GRN: LIVE');
       this.grenadeText.setColor(cssHex(Wasteland.TEXT_GRENADE_LIVE));
@@ -959,7 +999,7 @@ export class HUD {
     activeSeconds: number,
     cooldownSeconds: number,
   ): void {
-    if (!characterId) {
+    if (!characterId || this.oneInTheChamberActive) {
       this.abilityBg.setVisible(false);
       this.abilityIconGfx.setVisible(false);
       this.abilityCountdownText.setVisible(false);

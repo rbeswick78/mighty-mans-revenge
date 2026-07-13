@@ -491,6 +491,10 @@ export const GAME_MODES = Object.freeze({
     displayName: 'KILL CONFIRMED',
     objective: 'CONFIRM ENEMY TAGS · DENY YOUR OWN',
   }),
+  [GameModeType.ONE_IN_THE_CHAMBER]: Object.freeze({
+    displayName: 'ONE IN THE CHAMBER',
+    objective: 'ONE BULLET · KILLS RELOAD · FIRST TO 8',
+  }),
 }) satisfies Readonly<
   Record<GameModeType, { displayName: string; objective: string }>
 >;
@@ -502,6 +506,7 @@ export const GAME_MODE_ROTATION: readonly GameModeType[] = Object.freeze([
   GameModeType.GUN_GAME,
   GameModeType.LAST_STAND,
   GameModeType.KILL_CONFIRMED,
+  GameModeType.ONE_IN_THE_CHAMBER,
 ]);
 
 /**
@@ -585,6 +590,16 @@ export const GUN_GAME = Object.freeze({
  */
 export const LAST_STAND = Object.freeze({
   STARTING_LIVES: 5,
+});
+
+/**
+ * One in the Chamber: every spawn and opponent kill grants one lethal
+ * pistol round. Missing swaps the fighter to lethal fists until they earn
+ * the chambered round back. The mode owns its complete combat economy.
+ */
+export const ONE_IN_THE_CHAMBER = Object.freeze({
+  SCORE_TARGET: 8,
+  CHAMBERED_ROUNDS: 1,
 });
 
 /** Kill Confirmed: bank enemy tags, or recover your own to deny the point. */

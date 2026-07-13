@@ -24,6 +24,7 @@ export enum GameModeType {
   GUN_GAME = 'gun_game',
   LAST_STAND = 'last_stand',
   KILL_CONFIRMED = 'kill_confirmed',
+  ONE_IN_THE_CHAMBER = 'one_in_the_chamber',
 }
 
 /** A contested token dropped by a death in Kill Confirmed. */

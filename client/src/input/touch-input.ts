@@ -59,6 +59,8 @@ export class TouchInput {
   private abilityButtonText: Phaser.GameObjects.Text;
   /** Set on the frame the ability button is pressed; cleared on read. */
   private abilityButtonPressedFlag = false;
+  /** False when the current mode disables grenades and character abilities. */
+  private secondaryActionsEnabled = true;
   /** Set on the frame the right joystick is released or dropped into deadzone. */
   private rightStickReleasedFlag = false;
   private sprintActive = false;
@@ -139,12 +141,30 @@ export class TouchInput {
 
   private showTouchUI(): void {
     if (this.grenadeButton.visible) return;
-    this.grenadeButton.setVisible(true);
-    this.grenadeButtonText.setVisible(true);
-    this.grenadeButton.setInteractive();
-    this.abilityButton.setVisible(true);
-    this.abilityButtonText.setVisible(true);
-    this.abilityButton.setInteractive();
+    if (this.secondaryActionsEnabled) {
+      this.grenadeButton.setVisible(true);
+      this.grenadeButtonText.setVisible(true);
+      this.grenadeButton.setInteractive();
+      this.abilityButton.setVisible(true);
+      this.abilityButtonText.setVisible(true);
+      this.abilityButton.setInteractive();
+    }
+  }
+
+  setSecondaryActionsEnabled(enabled: boolean): void {
+    if (this.secondaryActionsEnabled === enabled) return;
+    this.secondaryActionsEnabled = enabled;
+    if (enabled) return;
+
+    this.grenadeButtonDown = false;
+    this.grenadeButtonPressedFlag = false;
+    this.grenadeButtonReleasedFlag = false;
+    this.grenadeButtonPressedWhileLive = false;
+    this.abilityButtonPressedFlag = false;
+    this.grenadeButton.setVisible(false).disableInteractive();
+    this.grenadeButtonText.setVisible(false);
+    this.abilityButton.setVisible(false).disableInteractive();
+    this.abilityButtonText.setVisible(false);
   }
 
   private createJoystick(): VirtualJoystick {

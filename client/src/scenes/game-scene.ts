@@ -376,6 +376,7 @@ export class GameScene extends Phaser.Scene {
         this.currentTick,
         hasActiveGrenade,
         localState.frozenTimer > 0,
+        this.matchData?.gameMode === GameModeType.ONE_IN_THE_CHAMBER,
       );
       this.gameService.sendInput(input);
 
@@ -604,6 +605,13 @@ export class GameScene extends Phaser.Scene {
         this.hud.updateLastStand(isLastStand);
         this.hud.updateKillConfirmed(
           this.matchData?.gameMode === GameModeType.KILL_CONFIRMED,
+        );
+        this.hud.updateOneInTheChamber(
+          this.matchData?.gameMode === GameModeType.ONE_IN_THE_CHAMBER,
+          currentLocalState.weaponId,
+          currentLocalState.specialAmmo,
+          currentLocalState.isDead,
+          this.matchPhase === MatchPhase.ACTIVE,
         );
         this.hud.updateAmmo(
           currentLocalState.ammo,
