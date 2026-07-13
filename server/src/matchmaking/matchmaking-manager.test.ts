@@ -715,6 +715,48 @@ describe('MatchmakingManager mode rotation (FORCE-pinned, draft skipped)', () =>
     });
   });
 
+  it('snapshots carry Scrapstorm warnings and transient impact cues', () => {
+    process.env.FORCE_MODE = GameModeType.DEATHMATCH;
+    const dt = 0.05;
+    mgr.handleJoinMatchmaking('A', 'A');
+    mgr.handleJoinMatchmaking('B', 'B');
+    mgr.handleCharacterLock('A', 'mighty_man');
+    mgr.handleCharacterLock('B', 'bruce');
+    const toActive = Math.ceil(MATCH.COUNTDOWN_DURATION / dt) + 5;
+    for (let i = 1; i <= toActive; i++) mgr.tick(dt, i);
+
+    const match = mgr.getActiveMatches()[0];
+    (match as unknown as {
+      startMutator: (mutator: MutatorId, isFinalMinute: boolean) => void;
+    }).startMutator('scrapstorm', false);
+    sent.length = 0;
+    const warningTicks = Math.ceil(MUTATORS.SCRAPSTORM_FIRST_WARNING_DELAY_SECONDS / dt) + 1;
+    for (let i = 1; i <= warningTicks; i++) mgr.tick(dt, 1000 + i);
+
+    const warning = [...sent].reverse().find(
+      (entry) => entry.message.type === 'server:gameState' &&
+        entry.message.scrapstorm?.targetPosition != null,
+    );
+    if (!warning || warning.message.type !== 'server:gameState') {
+      throw new Error('missing Scrapstorm warning snapshot');
+    }
+    expect(warning.message.scrapstorm).toMatchObject({
+      targetPosition: expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }),
+      targetPlayerId: expect.stringMatching(/^[AB]$/),
+      secondsUntilImpact: expect.any(Number),
+      radius: MUTATORS.SCRAPSTORM_RADIUS_PX,
+    });
+
+    sent.length = 0;
+    const impactTicks = Math.ceil(MUTATORS.SCRAPSTORM_WARNING_SECONDS / dt) + 1;
+    for (let i = 1; i <= impactTicks; i++) mgr.tick(dt, 2000 + i);
+    const impact = sent.find(
+      (entry) => entry.message.type === 'server:gameState' &&
+        entry.message.barrelExplosions.length > 0,
+    );
+    expect(impact).toBeDefined();
+  });
+
   it('broadcasts overtimeStart and flags gameState when a tie runs out the clock', () => {
     const dt = 0.05;
     mgr.handleJoinMatchmaking('A', 'A');

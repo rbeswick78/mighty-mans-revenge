@@ -312,6 +312,48 @@ test('solo practice launches against locked Rusty and reaches live play', async 
       )
       .toEqual({ stateActive: true, boundaryDrawn: true });
   }
+
+  if (
+    process.env.FORCE_MIDMATCH_MUTATOR === 'scrapstorm' ||
+    process.env.FORCE_EVENT === 'scrapstorm'
+  ) {
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() => {
+            const w = window as unknown as {
+              game?: { scene: { getScene: (key: string) => unknown } };
+            };
+            const scene = w.game?.scene.getScene('GameScene') as {
+              gameService?: {
+                getNetworkManager: () => {
+                getScrapstormState: () => { targetPosition?: unknown } | null;
+                  getActiveMutators: () => readonly string[];
+                  getMatchTimer: () => number;
+                };
+              };
+              matchPhase?: string;
+              scrapstormRenderer?: {
+                warning?: { commandBuffer?: unknown[] };
+              };
+            } | null;
+            const networkManager = scene?.gameService?.getNetworkManager();
+            const state = networkManager?.getScrapstormState();
+            return JSON.stringify({
+              warningActive: state?.targetPosition != null,
+              warningDrawn:
+                (scene?.scrapstormRenderer?.warning?.commandBuffer?.length ?? 0) > 0,
+              statePresent: state != null,
+              rendererPresent: scene?.scrapstormRenderer != null,
+              activeMutators: networkManager?.getActiveMutators() ?? [],
+              matchTimer: networkManager?.getMatchTimer() ?? -1,
+              matchPhase: scene?.matchPhase ?? 'missing',
+            });
+          }),
+        { timeout: 15000, message: 'expected authoritative Scrapstorm warning rendering' },
+      )
+      .toContain('"warningActive":true,"warningDrawn":true');
+  }
 });
 
 test.describe('Character select (desktop)', () => {

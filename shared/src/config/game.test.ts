@@ -147,6 +147,19 @@ describe('radiation storm mutator', () => {
   });
 });
 
+describe('scrapstorm mutator', () => {
+  it('defines a readable nonlethal strike cadence', () => {
+    expect(MUTATORS.POOL).toContain('scrapstorm');
+    expect(MUTATORS.SCRAPSTORM_FIRST_WARNING_DELAY_SECONDS).toBeGreaterThan(0);
+    expect(MUTATORS.SCRAPSTORM_WARNING_SECONDS).toBeGreaterThan(1);
+    expect(MUTATORS.SCRAPSTORM_INTERVAL_SECONDS).toBeGreaterThan(
+      MUTATORS.SCRAPSTORM_WARNING_SECONDS,
+    );
+    expect(MUTATORS.SCRAPSTORM_RADIUS_PX).toBeGreaterThan(0);
+    expect(MUTATORS.SCRAPSTORM_DAMAGE).toBeGreaterThan(0);
+  });
+});
+
 describe('scavenger cache rewards', () => {
   it('uses a frozen weighted table with every collectible pickup kind', () => {
     expect(Object.isFrozen(SCAVENGER_CACHE)).toBe(true);

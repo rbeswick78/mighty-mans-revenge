@@ -22,6 +22,7 @@ import type {
   PlayerInput,
   PlayerState,
   PickupState,
+  ScrapstormState,
   Vec2,
 } from '@shared/game';
 import type { BotDifficulty } from '@shared/game';
@@ -91,6 +92,48 @@ export function findGridPath(
 function normalized(dx: number, dy: number): Vec2 {
   const length = Math.hypot(dx, dy);
   return length > 0 ? { x: dx / length, y: dy / length } : { x: 0, y: 0 };
+}
+
+/** Pick a valid point beyond a painted Scrapstorm ring. */
+export function scrapstormEscapeGoal(
+  playerId: PlayerId,
+  position: Vec2,
+  state: ScrapstormState | null,
+  grid: CollisionGrid,
+): Vec2 | null {
+  if (!state?.targetPosition) return null;
+  const dx = position.x - state.targetPosition.x;
+  const dy = position.y - state.targetPosition.y;
+  if (Math.hypot(dx, dy) > state.radius) return null;
+
+  const directions: Vec2[] = [];
+  if (Math.hypot(dx, dy) > 0.001) directions.push(normalized(dx, dy));
+  const cardinals: readonly Vec2[] = [
+    { x: 1, y: 0 },
+    { x: 0, y: 1 },
+    { x: -1, y: 0 },
+    { x: 0, y: -1 },
+  ];
+  const offset = [...playerId].reduce((sum, char) => sum + char.charCodeAt(0), 0) % 4;
+  for (let i = 0; i < cardinals.length; i++) {
+    directions.push(cardinals[(offset + i) % cardinals.length]);
+  }
+
+  const distance = state.radius + grid.tileSize;
+  for (const direction of directions) {
+    const candidate = {
+      x: state.targetPosition.x + direction.x * distance,
+      y: state.targetPosition.y + direction.y * distance,
+    };
+    const col = Math.floor(candidate.x / grid.tileSize);
+    const row = Math.floor(candidate.y / grid.tileSize);
+    if (
+      col >= 0 && col < grid.width &&
+      row >= 0 && row < grid.height &&
+      !grid.solid[row][col]
+    ) return candidate;
+  }
+  return null;
 }
 
 function heldSpecialAmmo(player: PlayerState): number {
@@ -411,6 +454,20 @@ export class BotController {
     match: Match,
     grid: CollisionGrid,
   ): { position: Vec2; holdPosition: boolean; isCombatTarget: boolean } {
+    const scrapstormEscape = scrapstormEscapeGoal(
+      bot.id,
+      bot.position,
+      match.getScrapstormState(),
+      grid,
+    );
+    if (scrapstormEscape) {
+      return {
+        position: scrapstormEscape,
+        holdPosition: false,
+        isCombatTarget: false,
+      };
+    }
+
     const storm = match.getRadiationStormState();
     if (storm && isOutsideRadiationStorm(bot.position, storm)) {
       return {

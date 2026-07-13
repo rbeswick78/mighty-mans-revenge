@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–44 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty with Scavenger Instincts, four arenas, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–46 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty with Scavenger Instincts, four arenas, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -76,6 +76,8 @@ Each session below attacks one of these.
 | 42  | Wasteland Bat                                 | Four brutal swings create a scarce close-range map-control prize              | **DONE** (2026-07-13) |
 | 43  | Radiation Storm                               | A shrinking safe zone turns passive corners into urgent closing fights         | **DONE** (2026-07-13) |
 | 44  | Rusty's Scavenger Instincts                   | Practice opponents contest the arena's weapons and supplies like real rivals   | **DONE** (2026-07-13) |
+| 45  | Scrap Armor                                   | A contested shield pickup rewards proactive center control                       | **DONE** (2026-07-13) |
+| 46  | Scrapstorm                                    | Telegraphed debris strikes turn settled positions into urgent dodges              | **DONE** (2026-07-13) |
 
 ---
 
@@ -2277,7 +2279,82 @@ routes before a fighter is already wounded.
 
 ---
 
+## Session 46 — Scrapstorm
+
+**Goal:** add a short, readable burst of localized movement pressure that breaks
+up passive positions without stealing kills or making damage feel arbitrary.
+
+**Locked design decisions**
+
+- Scrapstorm waits 2.5 seconds before its first warning, then starts a warning
+  every 6 seconds. Each warning paints a 96px-radius circle for 1.5 seconds and
+  resolves for 45 raw damage.
+- A stable round-robin selects living fighters. The server captures the chosen
+  fighter's position when the warning begins and never tracks afterward, so a
+  prompt dodge always escapes even if another fighter enters the blast.
+- Impacts fall from above and therefore ignore walls. They respect death,
+  invulnerability, Iron Hide, and Scrap Armor, then clamp health at 1. They
+  never kill, score, record damage stats, progress contracts, heal Vampire, or
+  create kill-feed entries.
+- `ScrapstormState` is authoritative and present during active regulation, with
+  null target/countdown fields during quiet windows. Overtime retires it before
+  fresh spawns. Random schedules prevent pairing it with Low Health or Radiation
+  Storm, while explicit FORCE pins remain available for diagnostics.
+- Rusty gets immediate active-blast safety priority and chooses a deterministic
+  open escape tile. The client renders an orange filled ring, inward ticks,
+  progress arc, decimal countdown, local move warning, persistent mutator label,
+  and environmental impact VFX/SFX entirely from authoritative state.
+
+**Acceptance criteria**
+
+- [x] Pure and integration tests cover cadence, stable capture-not-track
+      targeting, area damage, nonlethal policy, defense order, overtime,
+      conflict scheduling, snapshots, bot escape, and client presentation.
+- [x] A live Practice smoke verifies a readable warning and impact under a
+      compatible Blackout pairing with clean browser logs.
+- [x] Typecheck, lint, all unit tests, production build, and Playwright pass.
+
+---
+
 ## Session Log
+
+### Session 46 — 2026-07-13 — Scrapstorm
+
+**Shipped:** Scrapstorm now punctuates compatible regulation rounds with a
+captured-position debris strike: 1.5 seconds of warning inside a two-tile ring,
+then a 45-damage blast. Stable round-robin targeting spreads pressure across
+living fighters, while capture-not-track behavior guarantees that moving out is
+the right response. Anyone who enters the marked circle can still be caught.
+
+Impacts are nonlethal environmental pressure. They honor invulnerability and
+Iron Hide, consume Scrap Armor before health, clamp at 1 HP, and cannot produce
+scores, kills, stats, contracts, Vampire healing, or kill-feed noise. Overtime
+retires the event. Random scheduling keeps Scrapstorm apart from Low Health and
+Radiation Storm, while Rusty immediately seeks deterministic open ground during
+an active warning.
+
+The client receives a reconnect-safe quiet/warning state and draws an orange
+filled ring, glow, inward ticks, progress arc, decimal countdown, local move
+callout, and active-mutator clock. Impacts reuse the established environmental
+explosion presentation without introducing a second transient wire path.
+
+**Verification:** 1,072 unit tests pass across 69 files, including focused
+config, scheduling, combat, match, bot, matchmaking snapshot, client network,
+renderer, and HUD coverage. TypeScript, ESLint, and the production build are
+clean; Vite retains its existing chunk-size advisory. The clean Playwright
+matrix passes 13 tests with 11 intentional scoped skips across desktop Chromium,
+desktop Firefox, and mobile landscape. A separate pinned live Practice round
+visibly confirmed the full warning/countdown/impact flow under Blackout,
+including the combined mutator label, and produced zero browser warnings or
+errors. All local smoke services were stopped afterward.
+
+**Tuning watch:** the two-tile radius and 1.5-second warning deliberately make
+staying still costly but ordinary movement sufficient. Watch whether six-second
+cadence adds welcome rhythm in crowded rounds or needs slightly more quiet time.
+
+**Deployment:** not run; deployment still requires explicit authorization.
+
+---
 
 ### Session 45 — 2026-07-13 — Scrap Armor
 

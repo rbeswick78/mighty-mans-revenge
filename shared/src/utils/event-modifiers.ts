@@ -105,6 +105,8 @@ export function eventDisplayName(event: MutatorId): string {
       return 'SCAVENGER RUSH';
     case 'radiation_storm':
       return 'RADIATION STORM';
+    case 'scrapstorm':
+      return 'SCRAPSTORM';
   }
 }
 
@@ -117,5 +119,12 @@ export function mutatorsConflict(a: MutatorId, b: MutatorId): boolean {
   const lowHealthStormPair =
     (a === 'low_health' && b === 'radiation_storm') ||
     (a === 'radiation_storm' && b === 'low_health');
-  return a !== b && ((aOwnsLoadout && bOwnsLoadout) || lowHealthStormPair);
+  const scrapstormPressurePair =
+    (a === 'scrapstorm' && (b === 'low_health' || b === 'radiation_storm')) ||
+    (b === 'scrapstorm' && (a === 'low_health' || a === 'radiation_storm'));
+  return a !== b && (
+    (aOwnsLoadout && bOwnsLoadout) ||
+    lowHealthStormPair ||
+    scrapstormPressurePair
+  );
 }

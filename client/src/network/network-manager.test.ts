@@ -243,6 +243,7 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
     expect(manager.getBountyHuntState()).toBeNull();
     expect(manager.getWastelandWarpState()).toBeNull();
     expect(manager.getRadiationStormState()).toBeNull();
+    expect(manager.getScrapstormState()).toBeNull();
     expect(manager.getRemotePlayerIds()).toHaveLength(0);
     expect(manager.getActiveMutators()).toHaveLength(0);
     expect(manager.getContractState()).toBeNull();
@@ -292,6 +293,20 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
 
     deliver(makeGameState([makeSerialized()], { tick: 2 }));
     expect(manager.getRadiationStormState()).toBeNull();
+  });
+
+  it('mirrors and clears the authoritative Scrapstorm warning', () => {
+    const scrapstorm = {
+      targetPosition: { x: 240, y: 144 },
+      targetPlayerId: REMOTE_ID,
+      secondsUntilImpact: 1.1,
+      radius: 96,
+    };
+    deliver(makeGameState([makeSerialized()], { scrapstorm }));
+    expect(manager.getScrapstormState()).toEqual(scrapstorm);
+
+    deliver(makeGameState([makeSerialized()], { tick: 2 }));
+    expect(manager.getScrapstormState()).toBeNull();
   });
 
   it('still emits matchFound to listeners after the reset', () => {

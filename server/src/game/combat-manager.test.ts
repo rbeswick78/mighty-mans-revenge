@@ -501,6 +501,31 @@ describe('CombatManager', () => {
     });
   });
 
+  describe('applyNonlethalEnvironmentalDamage', () => {
+    it('drains armor before health and clamps at a living one-HP floor', () => {
+      const victim = createPlayer({ id: 'victim', health: 20, armor: 15 });
+
+      expect(combat.applyNonlethalEnvironmentalDamage(victim, 45)).toBe(34);
+      expect(victim).toMatchObject({ health: 1, armor: 0, isDead: false, deaths: 0 });
+    });
+
+    it('shares Iron Hide reduction and respects spawn invulnerability', () => {
+      const bubba = createPlayer({
+        id: 'bubba',
+        characterId: 'bubba',
+        health: 150,
+        maxHealth: 150,
+        abilityActiveSeconds: ABILITY.BUBBA_IRON_HIDE.DURATION,
+      });
+      expect(combat.applyNonlethalEnvironmentalDamage(bubba, 40)).toBe(20);
+      expect(bubba.health).toBe(130);
+
+      bubba.invulnerableTimer = 1;
+      expect(combat.applyNonlethalEnvironmentalDamage(bubba, 40)).toBe(0);
+      expect(bubba.health).toBe(130);
+    });
+  });
+
   describe('processShot — per-character hitbox', () => {
     it("a graze that misses a 24px character hits Bubba's 30px box", () => {
       // Ray along y=100; victim center offset 14px below: outside half 12,

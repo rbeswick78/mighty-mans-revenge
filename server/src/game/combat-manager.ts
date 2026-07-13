@@ -498,9 +498,7 @@ export class CombatManager {
     // source flows through (rifle, pellets, grenades, fire breath, axes) —
     // so no source can forget it. Callers must use the returned
     // damageApplied for stats and vampire healing, not their raw number.
-    if (victim.characterId === 'bubba' && victim.abilityActiveSeconds > 0) {
-      damage *= 1 - ABILITY.BUBBA_IRON_HIDE.DAMAGE_REDUCTION;
-    }
+    damage = this.damageAfterReduction(victim, damage);
     // Scrap Armor absorbs the post-reduction hit before HP. Keep
     // damageApplied as the whole landed hit (including shield absorption),
     // preserving damage stats, Vampire healing, and hit feedback semantics.
@@ -527,6 +525,31 @@ export class CombatManager {
     }
 
     return { killed: false, damageApplied: damage };
+  }
+
+  /**
+   * Apply arena pressure that may strip armor and HP but can never earn a
+   * kill. Telegraphed hazards deliberately create no attacker, damage stat,
+   * Vampire heal, or kill-feed entry.
+   */
+  applyNonlethalEnvironmentalDamage(victim: PlayerState, damage: number): number {
+    if (victim.isDead || victim.invulnerableTimer > 0 || damage <= 0) return 0;
+
+    const reducedDamage = this.damageAfterReduction(victim, damage);
+    const armorBefore = victim.armor;
+    const healthBefore = victim.health;
+    const absorbed = Math.min(victim.armor, reducedDamage);
+    victim.armor -= absorbed;
+    victim.health = Math.max(1, victim.health - (reducedDamage - absorbed));
+
+    return (armorBefore - victim.armor) + (healthBefore - victim.health);
+  }
+
+  /** Shared Iron Hide policy for attributed and environmental damage. */
+  private damageAfterReduction(victim: PlayerState, damage: number): number {
+    return victim.characterId === 'bubba' && victim.abilityActiveSeconds > 0
+      ? damage * (1 - ABILITY.BUBBA_IRON_HIDE.DAMAGE_REDUCTION)
+      : damage;
   }
 
   /** Internal: apply explosion damage to all players in range with LOS. */

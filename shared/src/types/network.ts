@@ -14,6 +14,7 @@ import {
   BountyHuntState,
   WastelandWarpState,
   RadiationStormState,
+  ScrapstormState,
 } from './game.js';
 import type {
   BotDifficulty,
@@ -149,7 +150,7 @@ export interface ServerGameStateMessage {
   /** Jack's thrown axes in flight (usually empty — one per Jack per 12s). */
   axes: AxeState[];
   bulletTrails: BulletTrail[];
-  /** Barrel detonations resolved during this snapshot (transient VFX cues). */
+  /** Environmental detonations resolved this snapshot (legacy wire name). */
   barrelExplosions: Vec2[];
   /** This round's shared optional side objective and per-player progress. */
   contract: MatchContractHudState;
@@ -192,6 +193,8 @@ export interface ServerGameStateMessage {
   wastelandWarp?: WastelandWarpState;
   /** Authoritative safe zone for the Radiation Storm mutator. */
   radiationStorm?: RadiationStormState;
+  /** Authoritative warning for the next Scrapstorm impact. */
+  scrapstorm?: ScrapstormState;
 }
 
 /** Per-snapshot King of the Hill HUD state. Tile coords, not pixels. */

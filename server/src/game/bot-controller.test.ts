@@ -21,6 +21,7 @@ import {
   botResourcePriority,
   findGridPath,
   pickBotResource,
+  scrapstormEscapeGoal,
 } from './bot-controller.js';
 import { Match } from './match.js';
 
@@ -32,6 +33,34 @@ function grid(solid: boolean[][]): CollisionGrid {
     solid,
   };
 }
+
+describe('scrapstormEscapeGoal', () => {
+  it('chooses a valid tile beyond the warning ring when caught at its center', () => {
+    const open = grid(Array.from({ length: 8 }, (_, row) =>
+      Array.from({ length: 8 }, (_, col) =>
+        row === 0 || col === 0 || row === 7 || col === 7,
+      ),
+    ));
+    const target = { x: 3.5 * 48, y: 3.5 * 48 };
+    const goal = scrapstormEscapeGoal(
+      'bot:test',
+      target,
+      {
+        targetPosition: target,
+        targetPlayerId: 'bot:test',
+        secondsUntilImpact: 1.5,
+        radius: MUTATORS.SCRAPSTORM_RADIUS_PX,
+      },
+      open,
+    );
+
+    expect(goal).not.toBeNull();
+    expect(Math.hypot(goal!.x - target.x, goal!.y - target.y)).toBeGreaterThan(
+      MUTATORS.SCRAPSTORM_RADIUS_PX,
+    );
+    expect(open.solid[Math.floor(goal!.y / 48)][Math.floor(goal!.x / 48)]).toBe(false);
+  });
+});
 
 const OPEN_MAP: MapData = {
   name: 'Bot Test Range',

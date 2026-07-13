@@ -61,6 +61,17 @@ export interface RadiationStormState {
   shrinkSecondsRemaining: number;
 }
 
+/** Reconnect-safe warning for the next localized Scrapstorm strike. */
+export interface ScrapstormState {
+  /** Captured world position; null during the quiet interval between strikes. */
+  targetPosition: Vec2 | null;
+  /** Fighter whose position seeded the warning; the blast itself hits everyone. */
+  targetPlayerId: PlayerId | null;
+  /** Authoritative warning countdown; null while no warning is painted. */
+  secondsUntilImpact: number | null;
+  radius: number;
+}
+
 /** A contested token dropped by a death in Kill Confirmed. */
 export interface KillConfirmedTagState {
   id: string;

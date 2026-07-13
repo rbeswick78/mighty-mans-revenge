@@ -30,6 +30,8 @@ describe('mutatorsToMovementModifiers', () => {
       'wasteland_warp',
       'last_laugh',
       'scavenger_rush',
+      'radiation_storm',
+      'scrapstorm',
     ];
     for (const mutator of passthrough) {
       expect(mutatorsToMovementModifiers([mutator])).toEqual({});
@@ -129,5 +131,10 @@ describe('eventDisplayName', () => {
     expect(mutatorsConflict('low_health', 'radiation_storm')).toBe(true);
     expect(mutatorsConflict('radiation_storm', 'low_health')).toBe(true);
     expect(mutatorsConflict('radiation_storm', 'blackout')).toBe(false);
+    expect(mutatorsConflict('scrapstorm', 'low_health')).toBe(true);
+    expect(mutatorsConflict('low_health', 'scrapstorm')).toBe(true);
+    expect(mutatorsConflict('scrapstorm', 'radiation_storm')).toBe(true);
+    expect(mutatorsConflict('radiation_storm', 'scrapstorm')).toBe(true);
+    expect(mutatorsConflict('scrapstorm', 'blackout')).toBe(false);
   });
 });

@@ -27,4 +27,21 @@ describe('Wasteland Warp HUD helpers', () => {
     );
     expect(activeMutatorLabel(['radiation_storm'], null, null)).toBeNull();
   });
+
+  it('shows only live Scrapstorm warning clocks and retires in overtime', () => {
+    const quiet = {
+      targetPosition: null,
+      targetPlayerId: null,
+      secondsUntilImpact: null,
+      radius: 96,
+    };
+    expect(activeMutatorLabel(['scrapstorm'], null, null, quiet)).toBe('SCRAPSTORM');
+    expect(activeMutatorLabel(['scrapstorm'], null, null, {
+      ...quiet,
+      targetPosition: { x: 240, y: 144 },
+      targetPlayerId: 'player-0',
+      secondsUntilImpact: 1.1,
+    })).toBe('SCRAPSTORM · 2S');
+    expect(activeMutatorLabel(['scrapstorm'], null, null, null)).toBeNull();
+  });
 });

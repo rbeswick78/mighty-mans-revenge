@@ -1932,6 +1932,77 @@ describe('Match', () => {
       });
     });
 
+    describe('Scrapstorm', () => {
+      it('captures a living fighter position, then leaves the warning fixed', () => {
+        const m = startActiveMatchWithMidMutator('scrapstorm');
+        expect(m.getScrapstormState()).toMatchObject({
+          targetPosition: null,
+          targetPlayerId: null,
+          secondsUntilImpact: null,
+          radius: MUTATORS.SCRAPSTORM_RADIUS_PX,
+        });
+
+        m.update(MUTATORS.SCRAPSTORM_FIRST_WARNING_DELAY_SECONDS);
+        const warning = m.getScrapstormState()!;
+        expect(['player-0', 'player-1']).toContain(warning.targetPlayerId);
+        expect(warning.secondsUntilImpact).toBeGreaterThan(1.4);
+        expect(warning.secondsUntilImpact).toBeLessThanOrEqual(
+          MUTATORS.SCRAPSTORM_WARNING_SECONDS,
+        );
+
+        const target = m.players.get(warning.targetPlayerId!)!;
+        const captured = { ...warning.targetPosition! };
+        target.position = { x: captured.x + 200, y: captured.y };
+        m.update(0.5);
+        expect(m.getScrapstormState()?.targetPosition).toEqual(captured);
+      });
+
+      it('resolves a visible nonlethal blast with armor and no score credit', () => {
+        const m = startActiveMatchWithMidMutator('scrapstorm');
+        m.update(MUTATORS.SCRAPSTORM_FIRST_WARNING_DELAY_SECONDS);
+        const warning = m.getScrapstormState()!;
+        const exposed = m.players.get('player-0')!;
+        exposed.position = { ...warning.targetPosition! };
+        exposed.health = 20;
+        exposed.armor = 15;
+
+        m.update(MUTATORS.SCRAPSTORM_WARNING_SECONDS);
+
+        expect(exposed).toMatchObject({
+          health: 1,
+          armor: 0,
+          isDead: false,
+          deaths: 0,
+          score: 0,
+        });
+        expect(m.getTickBarrelExplosions()).toContainEqual(warning.targetPosition);
+        expect(m.getScrapstormState()).toMatchObject({
+          targetPosition: null,
+          secondsUntilImpact: null,
+        });
+      });
+
+      it('rotates targets and retires warning state in sudden death', () => {
+        const m = startActiveMatchWithMidMutator('scrapstorm');
+        m.update(MUTATORS.SCRAPSTORM_FIRST_WARNING_DELAY_SECONDS);
+        const firstTarget = m.getScrapstormState()?.targetPlayerId;
+        m.update(MUTATORS.SCRAPSTORM_WARNING_SECONDS);
+        m.update(
+          MUTATORS.SCRAPSTORM_INTERVAL_SECONDS -
+          MUTATORS.SCRAPSTORM_WARNING_SECONDS,
+        );
+        expect(m.getScrapstormState()?.targetPlayerId).not.toBe(firstTarget);
+
+        const exposed = m.players.get('player-0')!;
+        exposed.position = { ...m.getScrapstormState()!.targetPosition! };
+        exposed.health = 50;
+        (m as unknown as { isOvertime: boolean }).isOvertime = true;
+        expect(m.getScrapstormState()).toBeNull();
+        m.update(MUTATORS.SCRAPSTORM_WARNING_SECONDS);
+        expect(exposed.health).toBe(50);
+      });
+    });
+
     describe('Scavenger Rush', () => {
       function startRush(mode = GameModeType.DEATHMATCH): Match {
         const map = {

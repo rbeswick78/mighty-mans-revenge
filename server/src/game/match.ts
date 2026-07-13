@@ -55,6 +55,7 @@ import type {
   BountyHuntState,
   WastelandWarpState,
   RadiationStormState,
+  ScrapstormState,
   ServerCharacterSelectStateMessage,
   MatchContractDefinition,
   MatchContractHudState,
@@ -260,6 +261,11 @@ export class Match implements MatchContext {
   private radiationStormInitialRadius = 0;
   private radiationStormElapsed = 0;
   private radiationStormPulseTimer = 0;
+  /** Alternating quiet/warning countdown for localized falling debris. */
+  private scrapstormTimer = 0;
+  private scrapstormTargetPosition: { x: number; y: number } | null = null;
+  private scrapstormTargetPlayerId: PlayerId | null = null;
+  private scrapstormTargetSequence = 0;
   /**
    * Regulation length in seconds — MATCH.TIME_LIMIT unless the
    * FORCE_MATCH_SECONDS env smoke pin overrides it (same family as
@@ -864,6 +870,24 @@ export class Match implements MatchContext {
     };
   }
 
+  getScrapstormState(): ScrapstormState | null {
+    if (
+      !this.mutatorActive('scrapstorm') ||
+      this.isOvertime ||
+      this.phase !== MatchPhase.ACTIVE
+    ) return null;
+    return {
+      targetPosition: this.scrapstormTargetPosition
+        ? { ...this.scrapstormTargetPosition }
+        : null,
+      targetPlayerId: this.scrapstormTargetPlayerId,
+      secondsUntilImpact: this.scrapstormTargetPosition
+        ? Math.max(0, this.scrapstormTimer)
+        : null,
+      radius: MUTATORS.SCRAPSTORM_RADIUS_PX,
+    };
+  }
+
   /**
    * Consume the one-shot overtime announcement generated this tick (if
    * any) for broadcasting. Returns null on subsequent calls.
@@ -899,7 +923,7 @@ export class Match implements MatchContext {
     return this.tickDestroyedTiles;
   }
 
-  /** Barrel blasts created in the most recent tick, for transient VFX. */
+  /** Environmental blasts created in the most recent tick, for transient VFX. */
   getTickBarrelExplosions(): Array<{ x: number; y: number }> {
     return this.tickBarrelExplosions;
   }
@@ -1322,6 +1346,7 @@ export class Match implements MatchContext {
     // downstream rule observes the new authoritative positions this tick.
     this.updateWastelandWarp(dt);
     this.updateRadiationStorm(dt);
+    this.updateScrapstorm(dt);
 
     // Update pickups. Weapon pickups about to land generate one-shot
     // "INCOMING" warnings for the HUD banner.
@@ -2192,6 +2217,12 @@ export class Match implements MatchContext {
       case 'last_laugh':
         // Per-tick behavior only; nothing to mutate at activation.
         return;
+      case 'scrapstorm':
+        this.scrapstormTimer = MUTATORS.SCRAPSTORM_FIRST_WARNING_DELAY_SECONDS;
+        this.scrapstormTargetPosition = null;
+        this.scrapstormTargetPlayerId = null;
+        this.scrapstormTargetSequence = 0;
+        return;
       case 'radiation_storm': {
         const map = this.mapManager.getMapData();
         this.radiationStormCenter = radiationStormCenter(this.matchId, map);
@@ -2320,6 +2351,70 @@ export class Match implements MatchContext {
           player.health - MUTATORS.RADIATION_STORM_DAMAGE_PER_PULSE,
         );
       }
+    }
+  }
+
+  /** Paint captured positions, then resolve fair nonlethal arena blasts. */
+  private updateScrapstorm(dt: number): void {
+    if (!this.mutatorActive('scrapstorm') || this.isOvertime) return;
+
+    let remaining = dt;
+    // Production advances at 20 Hz. The bounded loop also keeps direct
+    // large-dt tests deterministic without risking a pathological stall.
+    for (let transition = 0; transition < 32; transition++) {
+      if (this.scrapstormTimer > remaining) {
+        this.scrapstormTimer -= remaining;
+        return;
+      }
+      remaining -= Math.max(0, this.scrapstormTimer);
+
+      if (this.scrapstormTargetPosition) {
+        this.resolveScrapstormImpact(this.scrapstormTargetPosition);
+        this.scrapstormTargetPosition = null;
+        this.scrapstormTargetPlayerId = null;
+        this.scrapstormTimer = Math.max(
+          0,
+          MUTATORS.SCRAPSTORM_INTERVAL_SECONDS - MUTATORS.SCRAPSTORM_WARNING_SECONDS,
+        );
+      } else if (!this.beginScrapstormWarning()) {
+        // No living fighter to target. Retry cheaply without manufacturing
+        // a warning at a stale spawn or corpse position.
+        this.scrapstormTimer = 1;
+      }
+
+      if (remaining <= 0) return;
+    }
+  }
+
+  /** Capture one living fighter in stable round-robin order. */
+  private beginScrapstormWarning(): boolean {
+    const living = [...this.players.values()]
+      .filter((player) => !player.isDead)
+      .sort((a, b) => a.id.localeCompare(b.id));
+    if (living.length === 0) return false;
+
+    const offset = this.stableIndex(`${this.matchId}:scrapstorm`, living.length);
+    const target = living[(offset + this.scrapstormTargetSequence) % living.length];
+    this.scrapstormTargetSequence += 1;
+    this.scrapstormTargetPosition = { ...target.position };
+    this.scrapstormTargetPlayerId = target.id;
+    this.scrapstormTimer = MUTATORS.SCRAPSTORM_WARNING_SECONDS;
+    return true;
+  }
+
+  private resolveScrapstormImpact(position: { x: number; y: number }): void {
+    this.tickBarrelExplosions.push({ ...position });
+    for (const player of this.players.values()) {
+      if (
+        Math.hypot(
+          player.position.x - position.x,
+          player.position.y - position.y,
+        ) > MUTATORS.SCRAPSTORM_RADIUS_PX
+      ) continue;
+      this.combatManager.applyNonlethalEnvironmentalDamage(
+        player,
+        MUTATORS.SCRAPSTORM_DAMAGE,
+      );
     }
   }
 

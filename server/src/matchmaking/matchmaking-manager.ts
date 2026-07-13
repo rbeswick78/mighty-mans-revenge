@@ -1064,6 +1064,7 @@ export class MatchmakingManager {
           : undefined,
       wastelandWarp: match.getWastelandWarpState() ?? undefined,
       radiationStorm: match.getRadiationStormState() ?? undefined,
+      scrapstorm: match.getScrapstormState() ?? undefined,
     };
 
     // Send only to players in this match

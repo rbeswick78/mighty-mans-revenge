@@ -53,6 +53,7 @@ import { AbilityAura } from '../rendering/ability-aura.js';
 import { DecalRenderer } from '../rendering/decal-renderer.js';
 import { KothHillRenderer } from '../rendering/koth-hill-renderer.js';
 import { RadiationStormRenderer } from '../rendering/radiation-storm-renderer.js';
+import { ScrapstormRenderer } from '../rendering/scrapstorm-renderer.js';
 import { CameraKick } from '../rendering/camera-kick.js';
 import { ZoomPulse } from '../rendering/zoom-pulse.js';
 import { CameraRoll, ROLL_DAMAGE_THRESHOLD } from '../rendering/camera-roll.js';
@@ -124,6 +125,7 @@ export class GameScene extends Phaser.Scene {
   private confirmedTagRenderer: ConfirmedTagRenderer | null = null;
   private coreRunRenderer: CoreRunRenderer | null = null;
   private radiationStormRenderer: RadiationStormRenderer | null = null;
+  private scrapstormRenderer: ScrapstormRenderer | null = null;
   private grenadeRenderer: GrenadeRenderer | null = null;
   private axeRenderer: AxeRenderer | null = null;
   private lightingRenderer: LightingRenderer | null = null;
@@ -313,6 +315,7 @@ export class GameScene extends Phaser.Scene {
     this.confirmedTagRenderer = new ConfirmedTagRenderer(this);
     this.coreRunRenderer = new CoreRunRenderer(this);
     this.radiationStormRenderer = new RadiationStormRenderer(this);
+    this.scrapstormRenderer = new ScrapstormRenderer(this);
     this.grenadeRenderer = new GrenadeRenderer(this);
     this.axeRenderer = new AxeRenderer(this);
     this.lightingRenderer = new LightingRenderer(this);
@@ -772,6 +775,7 @@ export class GameScene extends Phaser.Scene {
           activeMutators,
           warpState,
           networkManager.getRadiationStormState(),
+          networkManager.getScrapstormState(),
         );
         if (mutatorLabel !== this.lastSyncedMutatorLabel) {
           this.lastSyncedMutatorLabel = mutatorLabel;
@@ -849,6 +853,11 @@ export class GameScene extends Phaser.Scene {
     this.radiationStormRenderer?.update(
       networkManager.getRadiationStormState(),
       networkManager.getLocalPlayerState()?.position ?? null,
+      this.time.now,
+    );
+    this.scrapstormRenderer?.update(
+      networkManager.getScrapstormState(),
+      networkManager.getPlayerId(),
       this.time.now,
     );
     const coreRunState = networkManager.getCoreRunState();
@@ -1538,6 +1547,7 @@ export class GameScene extends Phaser.Scene {
       last_laugh: 0xff3b30,
       scavenger_rush: 0x5ce1e6,
       radiation_storm: 0x8cff2f,
+      scrapstorm: 0xff6b35,
     };
 
     this.onEventWarning = (payload: EventWarningPayload) => {
@@ -1796,6 +1806,10 @@ export class GameScene extends Phaser.Scene {
     if (this.radiationStormRenderer) {
       this.radiationStormRenderer.destroy();
       this.radiationStormRenderer = null;
+    }
+    if (this.scrapstormRenderer) {
+      this.scrapstormRenderer.destroy();
+      this.scrapstormRenderer = null;
     }
     if (this.axeRenderer) {
       this.axeRenderer.destroy();

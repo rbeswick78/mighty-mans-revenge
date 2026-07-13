@@ -766,6 +766,7 @@ export const MUTATORS = Object.freeze({
     'last_laugh',
     'scavenger_rush',
     'radiation_storm',
+    'scrapstorm',
   ] as const,
   /** Final-minute slot: warning/activation thresholds in seconds REMAINING. */
   WARNING_AT_REMAINING: 65,
@@ -822,6 +823,16 @@ export const MUTATORS = Object.freeze({
   RADIATION_STORM_DAMAGE_PER_PULSE: 10,
   /** Seconds between authoritative outside-zone radiation pulses. */
   RADIATION_STORM_PULSE_SECONDS: 1,
+  /** Delay before Scrapstorm paints its first strike zone. */
+  SCRAPSTORM_FIRST_WARNING_DELAY_SECONDS: 2.5,
+  /** Seconds from one Scrapstorm warning beginning to the next. */
+  SCRAPSTORM_INTERVAL_SECONDS: 6,
+  /** Readable dodge window after a target position is captured. */
+  SCRAPSTORM_WARNING_SECONDS: 1.5,
+  /** Circular blast radius: exactly two standard map tiles. */
+  SCRAPSTORM_RADIUS_PX: 96,
+  /** Nonlethal blast damage before Iron Hide and Scrap Armor. */
+  SCRAPSTORM_DAMAGE: 45,
 });
 
 /**
