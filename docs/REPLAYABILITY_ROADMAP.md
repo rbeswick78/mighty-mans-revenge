@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–23 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts, solo Practice vs Rusty, streak + payback callouts, selectable Rusty difficulty, Collapsed Overpass, Blackout, fresh-chaos rematches, Last Stand, Kill Confirmed, mode briefings, character death animations, authoritative hit confirmation, blastable cover, chain-reaction barrels). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–24 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts, solo Practice vs Rusty, streak + payback callouts, selectable Rusty difficulty, Collapsed Overpass, Blackout, fresh-chaos rematches, Last Stand, Kill Confirmed, mode briefings, character death animations, authoritative hit confirmation, blastable cover, chain-reaction barrels, Wasteland Contracts). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -55,6 +55,7 @@ Each session below attacks one of these.
 | 21  | Authoritative Hit Confirmation                | Every accurate shot feels crisp, legible, and unquestionably earned  | **DONE** (2026-07-12) |
 | 22  | Blastable Cover                               | Grenades permanently carve new routes through each round's arena     | **DONE** (2026-07-12) |
 | 23  | Chain-Reaction Barrels                        | Every arena gains tactical traps, ambushes, and explosive reversals  | **DONE** (2026-07-12) |
+| 24  | Wasteland Contracts                           | Optional side goals change tactics and build a persistent career chase | **DONE** (2026-07-12) |
 
 ---
 
@@ -1390,7 +1391,87 @@ weapon, character, or grenade tuning.
 
 ---
 
+## Session 24 — Wasteland Contracts
+
+**Goal:** give every round a fresh optional side objective and a persistent
+career chase, encouraging players to change tactics without changing who wins.
+
+**Locked design decisions**
+
+- One shared contract is selected from seven: Hot Shot (8 landed attacks),
+  Heavy Hitter (300 damage), On a Roll (3-kill streak), Road Warrior (25 map
+  tiles traveled), Powder Keg (both barrels), Hill Dweller (20 hill seconds),
+  and Tag Hunter (3 confirmed tags). Hill/Tag contracts only enter compatible
+  mode pools; all other contracts work in every mode.
+- Selection hashes match id + mode and consumes no gameplay RNG. A direct
+  rematch excludes the previous contract; an explicit `FORCE_CONTRACT` smoke
+  pin bypasses recency, matching the existing mutator-pin contract.
+- Progress is server-authoritative and monotonic, derived from StatsTracker,
+  Kill Confirmed score, or credited barrel detonations. It rides every
+  `server:gameState` snapshot for reconnect safety and clamps at the target.
+- Contracts are side bets only: they never modify score, damage, movement,
+  ammo, pickups, awards, mode rules, or match outcome. Both players can finish
+  the same contract independently. Practice shows/celebrates progress but
+  never writes career stats.
+- The HUD uses a compact card over the non-playable top perimeter plus a
+  dedicated completion-callout lane, so it cannot erase mutator/overtime or
+  streak messaging. Results show local completion/progress and the updated
+  career total; lobby leaderboard rows add `C = CONTRACTS` totals.
+- `PersistentStatsStore` keeps `contractsCompleted` in its existing version-1
+  shape and back-fills zero for old files. One completed contract adds exactly
+  one career completion at non-Practice match end.
+
+**Acceptance criteria**
+
+- [x] Every mode receives an achievable contract; objective-specific entries
+      never appear in incompatible modes.
+- [x] Hits, damage, longest streak, distance, barrels, hill time, and confirmed
+      tags update independently per player and complete exactly at target.
+- [x] Direct rematches cannot repeat the previous contract unless explicitly
+      pinned; selection remains deterministic and does not perturb match RNG.
+- [x] Live HUD, completion payoff, results summary, career persistence, old-file
+      migration, and leaderboard totals degrade safely on partial/old payloads.
+- [x] Contracts do not affect match balance or Practice persistence.
+- [x] Typecheck, lint, all unit tests, production build, and Playwright pass.
+
+---
+
 ## Session Log
+
+### Session 24 — 2026-07-12 — Wasteland Contracts
+
+**Shipped:** every round now offers one optional Wasteland Contract. Players
+can chase accuracy, damage, a streak, movement, both explosive barrels, hill
+time, or enemy tag confirms while still pursuing the real mode objective.
+Progress is visible live, completion lands in its own celebratory HUD lane,
+and the results screen banks a career completion that remains visible as `C`
+on the all-time lobby board. Neither player is penalized for ignoring it.
+
+Contract selection is stable for the round without consuming the injected
+gameplay RNG, filters mode-only goals, and carries the previous id through
+Practice, FORCE, and revenge-draft rematches so the next round must change the
+side bet. The explicit smoke pin still wins. Server snapshots own progress;
+old clients safely ignore it, and new clients treat missing partial state as
+no card. Practice exercises the full loop but intentionally never touches the
+friend-group career store.
+
+**Verified:** focused tests cover all seven progress sources, target clamping,
+per-player independence, deterministic/mode-aware selection, forced pins,
+no-repeat rematches through the draft, snapshot transport/reset, match-end
+career enrichment, one-per-match persistence, old-file zero backfill, and
+leaderboard formatting. Live desktop and 844×390 mobile-landscape Practice
+confirmed the Hot Shot card stays readable over the perimeter, does not cover
+playable terrain or HUD controls, and produces no browser warnings/errors.
+Typecheck and lint are clean; all 849 unit tests pass; the production build
+succeeds; and Playwright completes all 21 cases with 12 passes, 9 intentional
+skips, and zero failures across Chromium, Firefox, and mobile landscape.
+
+**Carry-over:** contract targets and the seven-goal pool are first-pass
+engagement tuning, not balance tuning. Watch completion rates at group night:
+goals should pull tactics without distracting players from the actual mode.
+Do not add gameplay rewards or raise/lower targets without that evidence.
+
+---
 
 ### Session 23 — 2026-07-12 — Chain-Reaction Barrels
 

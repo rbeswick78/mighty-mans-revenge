@@ -27,6 +27,7 @@ import type {
   MapData,
   PlayerInput,
   MutatorId,
+  MatchContractId,
 } from '@shared/game';
 
 function makeInput(seq: number, overrides: Partial<PlayerInput> = {}): PlayerInput {
@@ -707,7 +708,7 @@ describe('Match', () => {
       const m = new Match('barrel-lab', map, [
         { id: 'player-0', nickname: 'P0' },
         { id: 'player-1', nickname: 'P1' },
-      ]);
+      ], GameModeType.DEATHMATCH, Math.random, [], 'powder_keg');
       m.startCountdown();
       m.update(MATCH.COUNTDOWN_DURATION + 0.05);
       m.players.get('player-0')!.position = { x: 72, y: 120 };
@@ -826,6 +827,11 @@ describe('Match', () => {
       ]);
       expect(m.mapManager.getCollisionGrid().solid[2][3]).toBe(false);
       expect(m.mapManager.getCollisionGrid().solid[2][5]).toBe(false);
+      expect(m.getContractHudState().players[0]).toMatchObject({
+        playerId: 'player-0',
+        progress: 2,
+        completed: true,
+      });
 
       m.update(0.05);
       expect(m.getTickBarrelExplosions()).toEqual([]);
@@ -887,6 +893,80 @@ describe('Match', () => {
         m.update(0.05);
       }
       expect(m.getActiveGrenades().length).toBe(0);
+    });
+  });
+
+  describe('wasteland contracts', () => {
+    function contractMatch(
+      contract: MatchContractId,
+      mode: GameModeType = GameModeType.DEATHMATCH,
+    ): Match {
+      return new Match(
+        `contract-${contract}`,
+        makeMapData(),
+        [
+          { id: 'player-0', nickname: 'P0' },
+          { id: 'player-1', nickname: 'P1' },
+        ],
+        mode,
+        Math.random,
+        [],
+        contract,
+      );
+    }
+
+    it('tracks attack hits and clamps completed progress to the target', () => {
+      const m = contractMatch('hot_shot');
+      for (let i = 0; i < 10; i++) m.stats.recordHit('player-0');
+      expect(m.getContractHudState().players[0]).toEqual({
+        playerId: 'player-0',
+        progress: 8,
+        completed: true,
+      });
+      expect(m.getContractHudState().players[1].completed).toBe(false);
+    });
+
+    it('tracks damage, longest streak, and movement in their native stats', () => {
+      const damage = contractMatch('heavy_hitter');
+      damage.stats.recordDamage('player-0', 299.9);
+      expect(damage.getContractHudState().players[0].completed).toBe(false);
+      damage.stats.recordDamage('player-0', 0.1);
+      expect(damage.getContractHudState().players[0].completed).toBe(true);
+
+      const streak = contractMatch('on_a_roll');
+      for (let i = 0; i < 3; i++) {
+        streak.stats.recordKill('player-0', 'player-1', 'gun');
+      }
+      expect(streak.getContractHudState().players[0].progress).toBe(3);
+
+      const travel = contractMatch('road_warrior');
+      travel.stats.recordDistance('player-0', 25 * 48 - 1);
+      expect(travel.getContractHudState().players[0].progress).toBe(24);
+      travel.stats.recordDistance('player-0', 1);
+      expect(travel.getContractHudState().players[0].completed).toBe(true);
+    });
+
+    it('uses KOTH hill time and Kill Confirmed score only in compatible modes', () => {
+      const hill = contractMatch('hill_dweller', GameModeType.KOTH);
+      hill.stats.recordHillSeconds('player-0', 20);
+      expect(hill.getContractHudState().players[0].completed).toBe(true);
+
+      const tags = contractMatch('tag_hunter', GameModeType.KILL_CONFIRMED);
+      tags.players.get('player-0')!.score = 3;
+      expect(tags.getContractHudState().players[0].completed).toBe(true);
+    });
+
+    it('attaches final progress to the match result for persistence and UI', () => {
+      const m = contractMatch('hot_shot');
+      for (let i = 0; i < 8; i++) m.stats.recordHit('player-0');
+      expect(m.getResult().contract).toMatchObject({
+        id: 'hot_shot',
+        careerCompletions: {},
+        players: [
+          { playerId: 'player-0', progress: 8, completed: true },
+          { playerId: 'player-1', progress: 0, completed: false },
+        ],
+      });
     });
   });
 

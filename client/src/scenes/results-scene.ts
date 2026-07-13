@@ -37,12 +37,15 @@ const LOSER_TINT = 0x55454f;
 const AWARD_NAME_COLOR = Wasteland.LOADING_BAR_FILL; // hot orange accent
 const RIVALRY_COLOR = Wasteland.HEALTH_WARNING; // amber
 const NEXT_DRAFT_COLOR = Wasteland.LOADING_BAR_FILL; // hot orange accent
+const CONTRACT_COLOR = Wasteland.LOADING_BAR_FILL;
+const CONTRACT_COMPLETE_COLOR = Wasteland.HEALTH_GOOD;
 
 // Awards + rivalry strip sits between the stats panel (ends at y=460) and
 // the rematch status line (camHeight - 130 = 590 on the 960x720 canvas).
-const RIVALRY_Y = 480;
-const AWARDS_START_Y = 512;
-const AWARD_ROW_H = 28;
+const RIVALRY_Y = 476;
+const CONTRACT_Y = 496;
+const AWARDS_START_Y = 522;
+const AWARD_ROW_H = 24;
 
 export class ResultsScene extends Phaser.Scene {
   private gameService!: GameService;
@@ -171,7 +174,7 @@ export class ResultsScene extends Phaser.Scene {
 
     if (this.result) {
       this.renderStats(panel, localPlayerId, isWinner, isDraw);
-      this.renderAwardsAndRivalry(centerX);
+      this.renderAwardsAndRivalry(centerX, localPlayerId);
     } else {
       const noData = this.add
         .text(panel.centerX, panel.centerY, 'No match data available', {
@@ -446,7 +449,10 @@ export class ResultsScene extends Phaser.Scene {
    * record for 1v1 matches; both are absent on old/partial payloads, so
    * everything here degrades to rendering nothing.
    */
-  private renderAwardsAndRivalry(centerX: number): void {
+  private renderAwardsAndRivalry(
+    centerX: number,
+    localPlayerId: PlayerId | null,
+  ): void {
     if (!this.result) return;
 
     const line = formatRivalrySummary(this.result);
@@ -461,6 +467,47 @@ export class ResultsScene extends Phaser.Scene {
         .setAlpha(0)
         .setDepth(WastelandStreet.DEPTH.UI);
       this.tweens.add({ targets: rivalryText, alpha: 1, duration: 400, delay: 300 });
+    }
+
+    const contract = this.result.contract;
+    const localProgress = contract?.players.find(
+      (progress) => progress.playerId === localPlayerId,
+    );
+    if (contract && localProgress) {
+      const career = localPlayerId
+        ? contract.careerCompletions[localPlayerId]
+        : undefined;
+      const suffix = localProgress.completed
+        ? this.result.isPractice
+          ? 'PRACTICE CLEAR'
+          : career === undefined
+            ? 'MATCH CLEAR'
+            : `CAREER ${career}`
+        : `${localProgress.progress}/${contract.target}`;
+      const contractText = this.add
+        .text(
+          centerX,
+          CONTRACT_Y,
+          `${localProgress.completed ? 'CONTRACT COMPLETE' : 'CONTRACT'}: ${contract.title} - ${suffix}`,
+          {
+            fontFamily: MENU_FONTS.HEADER,
+            fontSize: '9px',
+            color: cssHex(
+              localProgress.completed
+                ? CONTRACT_COMPLETE_COLOR
+                : CONTRACT_COLOR,
+            ),
+          },
+        )
+        .setOrigin(0.5)
+        .setAlpha(0)
+        .setDepth(WastelandStreet.DEPTH.UI);
+      this.tweens.add({
+        targets: contractText,
+        alpha: 1,
+        duration: 400,
+        delay: 400,
+      });
     }
 
     const awards = this.result.awards ?? [];

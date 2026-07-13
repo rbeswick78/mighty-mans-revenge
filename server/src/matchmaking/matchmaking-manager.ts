@@ -28,6 +28,7 @@ import type {
   RivalrySetResult,
   BotDifficulty,
   MutatorId,
+  MatchContractId,
 } from '@shared/game';
 import { Match } from '../game/match.js';
 import { BotController } from '../game/bot-controller.js';
@@ -75,6 +76,8 @@ interface PostMatchState {
   practiceDifficulty: BotDifficulty | null;
   /** Both mutators from the completed round; random rematch rolls skip them. */
   previousMutators: MutatorId[];
+  /** Previous round's contract; direct rematches must roll something fresh. */
+  previousContractId: MatchContractId;
 }
 
 /**
@@ -109,6 +112,8 @@ interface DraftState {
   pickTimerSeconds: number;
   /** Previous round's mutators, carried through the draft into Match construction. */
   rematchMutatorExclusions: MutatorId[];
+  /** Previous round's contract, carried through the draft into Match. */
+  previousContractId?: MatchContractId;
 }
 
 interface RivalrySetState {
@@ -630,6 +635,7 @@ export class MatchmakingManager {
     playerEntries: { id: PlayerId; nickname: string }[],
     practiceDifficulty: BotDifficulty | null = null,
     rematchMutatorExclusions: readonly MutatorId[] = [],
+    previousContractId?: MatchContractId,
   ): void {
     const match = new Match(
       matchId,
@@ -638,6 +644,8 @@ export class MatchmakingManager {
       gameMode,
       Math.random,
       rematchMutatorExclusions,
+      undefined,
+      previousContractId,
     );
     match.setRttResolver(this.getPlayerRTT);
     this.activeMatches.set(matchId, match);
@@ -714,6 +722,7 @@ export class MatchmakingManager {
     playerEntries: { id: PlayerId; nickname: string }[],
     revengePickerId: PlayerId | null = null,
     rematchMutatorExclusions: readonly MutatorId[] = [],
+    previousContractId?: MatchContractId,
   ): void {
     const matchId = crypto.randomUUID();
 
@@ -745,6 +754,7 @@ export class MatchmakingManager {
       modePick: null,
       pickTimerSeconds: DRAFT.FIRST_PICK_SECONDS,
       rematchMutatorExclusions: [...rematchMutatorExclusions],
+      previousContractId,
     };
     this.draftStates.set(matchId, draft);
 
@@ -892,6 +902,7 @@ export class MatchmakingManager {
       draft.playerEntries,
       null,
       draft.rematchMutatorExclusions,
+      draft.previousContractId,
     );
   }
 
@@ -1022,6 +1033,7 @@ export class MatchmakingManager {
       axes: match.getActiveAxes(),
       bulletTrails: match.getTickBulletTrails(),
       barrelExplosions: match.getTickBarrelExplosions(),
+      contract: match.getContractHudState(),
       punches: match.getTickPunchEvents(),
       pickups: match.pickupManager.getPickups(),
       activeMutators: [...match.activeMutators],
@@ -1178,11 +1190,20 @@ export class MatchmakingManager {
           kills: stats.kills,
           deaths: stats.deaths,
           killsByWeapon: stats.killsByWeapon,
+          contractCompleted:
+            result.contract?.players.find((progress) => progress.playerId === playerId)
+              ?.completed ?? false,
         });
       }
       const winnerNickname =
         result.winnerId !== null ? (match.players.get(result.winnerId)?.nickname ?? null) : null;
       this.statsStore.recordMatch(entries, winnerNickname);
+      if (result.contract) {
+        for (const [playerId, player] of match.players) {
+          result.contract.careerCompletions[playerId] =
+            this.statsStore.getLifetime(player.nickname)?.contractsCompleted ?? 0;
+        }
+      }
       if (entries.length === 2) {
         result.rivalry = this.statsStore.getRivalry(entries[0].nickname, entries[1].nickname);
       }
@@ -1243,6 +1264,7 @@ export class MatchmakingManager {
       isPractice,
       practiceDifficulty,
       previousMutators: [...match.activeMutators],
+      previousContractId: result.contract?.id ?? match.getContractHudState().id,
     });
 
     // Remove from active matches
@@ -1312,6 +1334,7 @@ export class MatchmakingManager {
         playerEntries,
         postMatch.practiceDifficulty,
         postMatch.previousMutators,
+        postMatch.previousContractId,
       );
       return;
     }
@@ -1329,6 +1352,7 @@ export class MatchmakingManager {
         playerEntries,
         null,
         postMatch.previousMutators,
+        postMatch.previousContractId,
       );
       return;
     }
@@ -1337,6 +1361,7 @@ export class MatchmakingManager {
       playerEntries,
       postMatch.revengePickerId,
       postMatch.previousMutators,
+      postMatch.previousContractId,
     );
   }
 

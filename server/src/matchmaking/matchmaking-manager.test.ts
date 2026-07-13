@@ -215,6 +215,25 @@ describe('MatchmakingManager rematch flow', () => {
     expect([...rematch.rematchMutatorExclusions]).toEqual(previous);
   });
 
+  it('rolls a different contract for a direct rematch', () => {
+    mgr.handleJoinMatchmaking('A', 'Alpha');
+    mgr.handleJoinMatchmaking('B', 'Bravo');
+    walkDraft(mgr, sent);
+    const first = mgr.getActiveMatches()[0];
+    const previousContract = first.getContractHudState().id;
+    first.phase = MatchPhase.ENDED;
+    mgr.tick(0.05, 1);
+
+    sent.length = 0;
+    mgr.handleRematchRequest('A');
+    mgr.handleRematchRequest('B');
+    walkDraft(mgr, sent);
+
+    expect(mgr.getActiveMatches()[0].getContractHudState().id).not.toBe(
+      previousContract,
+    );
+  });
+
   it('resets the post-match timeout when a player requests rematch', () => {
     vi.useFakeTimers();
     try {
@@ -571,6 +590,11 @@ describe('MatchmakingManager mode rotation (FORCE-pinned, draft skipped)', () =>
       expect(message.koth).toBeDefined();
       expect(message.koth!.hill).toBeDefined();
       expect(message.isOvertime).toBe(false);
+      expect(message.contract.target).toBeGreaterThan(0);
+      expect(message.contract.players).toEqual([
+        expect.objectContaining({ playerId: 'A', progress: expect.any(Number) }),
+        expect.objectContaining({ playerId: 'B', progress: expect.any(Number) }),
+      ]);
     }
   });
 
@@ -1008,6 +1032,7 @@ describe('MatchmakingManager persistent stats integration', () => {
     // Drain queued writes before deleting the dir so the background write
     // doesn't race rmSync.
     await store?.flush();
+    vi.unstubAllEnvs();
     rmSync(dataDir, { recursive: true, force: true });
   });
 
@@ -1069,6 +1094,37 @@ describe('MatchmakingManager persistent stats integration', () => {
       expect(message.entries.map((e) => e.nickname)).toEqual(['Ryan', 'Dave']);
       expect(message.entries[0].wins).toBe(1);
     }
+  });
+
+  it('persists completed contracts and returns the updated career total', () => {
+    vi.stubEnv('FORCE_CONTRACT', 'hot_shot');
+    const { fake, sent } = makeFakeServer();
+    store = new PersistentStatsStore(dataDir);
+    const mgr = new MatchmakingManager(fake, () => 0, store);
+
+    mgr.handleJoinMatchmaking('A', 'Ryan');
+    mgr.handleJoinMatchmaking('B', 'Dave');
+    walkDraft(mgr, sent);
+    const match = mgr.getActiveMatches()[0];
+    for (let i = 0; i < 8; i++) match.stats.recordHit('A');
+    match.players.get('A')!.score = 3;
+    match.phase = MatchPhase.ENDED;
+    mgr.tick(0.05, 1);
+
+    expect(store.getLifetime('Ryan')!.contractsCompleted).toBe(1);
+    expect(store.getLifetime('Dave')!.contractsCompleted).toBe(0);
+    const end = sent.find((entry) => entry.message.type === 'server:matchEnd');
+    if (!end || end.message.type !== 'server:matchEnd') {
+      throw new Error('missing matchEnd');
+    }
+    expect(end.message.result.contract).toMatchObject({
+      id: 'hot_shot',
+      careerCompletions: { A: 1, B: 0 },
+      players: [
+        { playerId: 'A', progress: 8, completed: true },
+        { playerId: 'B', progress: 0, completed: false },
+      ],
+    });
   });
 
   it('sends no leaderboard when no store is configured', () => {

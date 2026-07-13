@@ -131,6 +131,52 @@ export interface RivalrySetResult {
   championId: PlayerId | null;
 }
 
+export type MatchContractId =
+  | 'hot_shot'
+  | 'heavy_hitter'
+  | 'on_a_roll'
+  | 'road_warrior'
+  | 'powder_keg'
+  | 'hill_dweller'
+  | 'tag_hunter';
+
+export type MatchContractMetric =
+  | 'hits'
+  | 'damage'
+  | 'streak'
+  | 'distance_tiles'
+  | 'barrels'
+  | 'hill_seconds'
+  | 'confirmed_tags';
+
+export interface MatchContractDefinition {
+  id: MatchContractId;
+  title: string;
+  objective: string;
+  metric: MatchContractMetric;
+  target: number;
+}
+
+export interface MatchContractPlayerProgress {
+  playerId: PlayerId;
+  progress: number;
+  completed: boolean;
+}
+
+/** Live authoritative side-objective state carried by every snapshot. */
+export interface MatchContractHudState {
+  id: MatchContractId;
+  title: string;
+  objective: string;
+  target: number;
+  players: MatchContractPlayerProgress[];
+}
+
+/** End-of-match contract state, enriched with persisted career totals. */
+export interface MatchContractResult extends MatchContractHudState {
+  careerCompletions: Record<PlayerId, number>;
+}
+
 export interface MatchResult {
   matchId: MatchId;
   winnerId: PlayerId | null;
@@ -167,4 +213,6 @@ export interface MatchResult {
    * results screen's overtime callout.
    */
   wentToOvertime: boolean;
+  /** Optional side objective for this round; absent on older payloads. */
+  contract?: MatchContractResult;
 }

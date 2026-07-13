@@ -3,7 +3,10 @@ import type { CollisionGrid } from '@shared/types/map.js';
 import type { PlayerInput, PlayerState } from '@shared/types/player.js';
 import type { AxeState, GrenadeState, PunchEvent } from '@shared/types/projectile.js';
 import type { PickupState } from '@shared/types/pickup.js';
-import type { KillConfirmedTagState } from '@shared/types/game.js';
+import type {
+  KillConfirmedTagState,
+  MatchContractHudState,
+} from '@shared/types/game.js';
 import type {
   DraftCategory,
   ServerMessage,
@@ -127,6 +130,8 @@ export class NetworkManager {
    * each frame like grenades/pickups.
    */
   private _kothState: KothHudState | null = null;
+  /** Shared side objective and progress from the latest snapshot. */
+  private _contractState: MatchContractHudState | null = null;
 
   /**
    * True while the match is in sudden-death overtime. Mirrored from every
@@ -191,6 +196,7 @@ export class NetworkManager {
     this.matchEndsAtLocalMs = null;
     this._activeMutators = [];
     this._kothState = null;
+    this._contractState = null;
     this._isOvertime = false;
     this.lastCountdownEmitted = -1;
   }
@@ -244,6 +250,10 @@ export class NetworkManager {
   /** Join matchmaking with a nickname. */
   joinMatchmaking(nickname: string): void {
     this.connection.send({ type: 'client:joinMatchmaking', nickname });
+  }
+
+  getContractState(): MatchContractHudState | null {
+    return this._contractState;
   }
 
   /** Start an immediate authoritative solo match. */
@@ -600,6 +610,7 @@ export class NetworkManager {
     this._activeMutators = msg.activeMutators;
     // Same contract for KOTH hill state and the overtime flag.
     this._kothState = msg.koth ?? null;
+    this._contractState = msg.contract ?? null;
     this._isOvertime = msg.isOvertime;
 
     // Re-anchor the match clock from every active-phase snapshot. The

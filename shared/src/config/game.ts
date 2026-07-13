@@ -1,5 +1,9 @@
 import type { CharacterDef } from '../types/character.js';
-import type { KillWeapon } from '../types/game.js';
+import type {
+  KillWeapon,
+  MatchContractDefinition,
+  MatchContractId,
+} from '../types/game.js';
 import type { WeaponDef } from '../types/weapon.js';
 import { GameModeType } from '../types/game.js';
 
@@ -12,6 +16,94 @@ export const PLAYER = Object.freeze({
   HITBOX_WIDTH: 24,
   HITBOX_HEIGHT: 24,
 });
+
+export const MATCH_CONTRACTS = Object.freeze({
+  hot_shot: Object.freeze({
+    id: 'hot_shot',
+    title: 'HOT SHOT',
+    objective: 'LAND 8 ATTACKS',
+    metric: 'hits',
+    target: 8,
+  }),
+  heavy_hitter: Object.freeze({
+    id: 'heavy_hitter',
+    title: 'HEAVY HITTER',
+    objective: 'DEAL 300 DAMAGE',
+    metric: 'damage',
+    target: 300,
+  }),
+  on_a_roll: Object.freeze({
+    id: 'on_a_roll',
+    title: 'ON A ROLL',
+    objective: 'REACH A 3-KILL STREAK',
+    metric: 'streak',
+    target: 3,
+  }),
+  road_warrior: Object.freeze({
+    id: 'road_warrior',
+    title: 'ROAD WARRIOR',
+    objective: 'CROSS 25 MAP TILES',
+    metric: 'distance_tiles',
+    target: 25,
+  }),
+  powder_keg: Object.freeze({
+    id: 'powder_keg',
+    title: 'POWDER KEG',
+    objective: 'DETONATE BOTH BARRELS',
+    metric: 'barrels',
+    target: 2,
+  }),
+  hill_dweller: Object.freeze({
+    id: 'hill_dweller',
+    title: 'HILL DWELLER',
+    objective: 'SPEND 20S ON THE HILL',
+    metric: 'hill_seconds',
+    target: 20,
+  }),
+  tag_hunter: Object.freeze({
+    id: 'tag_hunter',
+    title: 'TAG HUNTER',
+    objective: 'CONFIRM 3 ENEMY TAGS',
+    metric: 'confirmed_tags',
+    target: 3,
+  }),
+} as const) satisfies Readonly<Record<MatchContractId, MatchContractDefinition>>;
+
+const BASE_CONTRACT_POOL: readonly MatchContractId[] = Object.freeze([
+  'hot_shot',
+  'heavy_hitter',
+  'on_a_roll',
+  'road_warrior',
+  'powder_keg',
+]);
+
+function contractHash(value: string): number {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < value.length; i++) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return hash >>> 0;
+}
+
+/** Stable per-match selection that consumes none of Match's gameplay RNG. */
+export function selectMatchContract(
+  matchId: string,
+  mode: GameModeType,
+  forced?: string,
+  excluded?: MatchContractId,
+): MatchContractDefinition {
+  if (forced && Object.prototype.hasOwnProperty.call(MATCH_CONTRACTS, forced)) {
+    return MATCH_CONTRACTS[forced as MatchContractId];
+  }
+  const pool = [...BASE_CONTRACT_POOL];
+  if (mode === GameModeType.KOTH) pool.push('hill_dweller');
+  if (mode === GameModeType.KILL_CONFIRMED) pool.push('tag_hunter');
+  const eligible = excluded ? pool.filter((id) => id !== excluded) : pool;
+  return MATCH_CONTRACTS[
+    eligible[contractHash(`${matchId}:${mode}`) % eligible.length]
+  ];
+}
 
 /**
  * Weapon roster. The rifle is the always-carried default (the pre-weapon-

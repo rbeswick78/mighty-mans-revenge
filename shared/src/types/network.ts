@@ -9,6 +9,7 @@ import {
   GameModeType,
   KillConfirmedTagState,
   KillConfirmedCollection,
+  MatchContractHudState,
 } from './game.js';
 import type {
   BotDifficulty,
@@ -146,6 +147,8 @@ export interface ServerGameStateMessage {
   bulletTrails: BulletTrail[];
   /** Barrel detonations resolved during this snapshot (transient VFX cues). */
   barrelExplosions: Vec2[];
+  /** This round's shared optional side objective and per-player progress. */
+  contract: MatchContractHudState;
   /**
    * Punch swings resolved during this snapshot's ticks (usually empty).
    * Transient like bulletTrails — processed per message, never diffed.
@@ -455,6 +458,8 @@ export interface LeaderboardEntry {
   draws: number;
   kills: number;
   matches: number;
+  /** Lifetime number of optional match contracts completed. */
+  contractsCompleted: number;
 }
 
 /**

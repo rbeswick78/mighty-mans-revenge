@@ -22,6 +22,8 @@ import {
   AWARD_IDS,
   AWARDS,
   LEADERBOARD,
+  MATCH_CONTRACTS,
+  selectMatchContract,
   type CharacterId,
   type WeaponId,
 } from './game.js';
@@ -60,6 +62,73 @@ describe('game mode rotation', () => {
     expect(gameModeDisplayName(GameModeType.KOTH)).toBe('KING OF THE HILL');
     expect(gameModeDisplayName(GameModeType.LAST_STAND)).toBe('LAST STAND');
     expect(gameModeDisplayName(GameModeType.KILL_CONFIRMED)).toBe('KILL CONFIRMED');
+  });
+});
+
+describe('wasteland match contracts', () => {
+  it('defines frozen, achievable positive targets', () => {
+    expect(Object.isFrozen(MATCH_CONTRACTS)).toBe(true);
+    for (const contract of Object.values(MATCH_CONTRACTS)) {
+      expect(contract.title.length).toBeGreaterThan(0);
+      expect(contract.objective.length).toBeGreaterThan(0);
+      expect(contract.target).toBeGreaterThan(0);
+      expect(Object.isFrozen(contract)).toBe(true);
+    }
+  });
+
+  it('selects deterministically without consuming gameplay RNG', () => {
+    const first = selectMatchContract('match-24', GameModeType.DEATHMATCH);
+    expect(selectMatchContract('match-24', GameModeType.DEATHMATCH)).toBe(first);
+  });
+
+  it('allows a valid smoke-test pin and ignores an unknown pin', () => {
+    expect(
+      selectMatchContract('anything', GameModeType.DEATHMATCH, 'powder_keg').id,
+    ).toBe('powder_keg');
+    expect(
+      selectMatchContract('anything', GameModeType.DEATHMATCH, 'not-real').id,
+    ).not.toBe('not-real');
+  });
+
+  it('prevents an immediate rematch repeat unless a smoke pin forces it', () => {
+    const previous = selectMatchContract('previous', GameModeType.DEATHMATCH);
+    const next = selectMatchContract(
+      'rematch',
+      GameModeType.DEATHMATCH,
+      undefined,
+      previous.id,
+    );
+    expect(next.id).not.toBe(previous.id);
+    expect(
+      selectMatchContract(
+        'rematch',
+        GameModeType.DEATHMATCH,
+        previous.id,
+        previous.id,
+      ).id,
+    ).toBe(previous.id);
+  });
+
+  it('adds objective-specific contracts only to compatible mode pools', () => {
+    const kothIds = new Set(
+      Array.from({ length: 100 }, (_, i) =>
+        selectMatchContract(`koth-${i}`, GameModeType.KOTH).id,
+      ),
+    );
+    const confirmedIds = new Set(
+      Array.from({ length: 100 }, (_, i) =>
+        selectMatchContract(`confirmed-${i}`, GameModeType.KILL_CONFIRMED).id,
+      ),
+    );
+    const dmIds = new Set(
+      Array.from({ length: 100 }, (_, i) =>
+        selectMatchContract(`dm-${i}`, GameModeType.DEATHMATCH).id,
+      ),
+    );
+    expect(kothIds).toContain('hill_dweller');
+    expect(confirmedIds).toContain('tag_hunter');
+    expect(dmIds).not.toContain('hill_dweller');
+    expect(dmIds).not.toContain('tag_hunter');
   });
 });
 

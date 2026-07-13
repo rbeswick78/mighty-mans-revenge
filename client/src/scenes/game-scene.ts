@@ -641,6 +641,7 @@ export class GameScene extends Phaser.Scene {
           opponentName,
           opponentScore,
         );
+        this.hud.updateContract(networkManager.getContractState(), playerId);
 
         const remainingSeconds = networkManager.getMatchTimer();
         this.hud.updateTimer(remainingSeconds);

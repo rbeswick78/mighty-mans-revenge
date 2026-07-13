@@ -338,10 +338,11 @@ export class LobbyScene extends Phaser.Scene {
       .setDepth(WastelandStreet.DEPTH.UI)
       .setVisible(false);
     this.leaderboardTitleText = this.add
-      .text(36, camHeight - 48, 'ALL-TIME TOP 5', {
+      .text(36, camHeight - 48, 'ALL-TIME TOP 5\nC = CONTRACTS', {
         fontFamily: MENU_FONTS.HEADER,
         fontSize: '10px',
         color: cssHex(LEADERBOARD_TITLE_COLOR),
+        lineSpacing: 3,
       })
       .setOrigin(0, 1)
       .setDepth(WastelandStreet.DEPTH.UI)

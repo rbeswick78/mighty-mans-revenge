@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { WEAPONS, ABILITY, GAME_MODES } from '@shared/config/game.js';
 import type { CharacterId, WeaponId } from '@shared/config/game.js';
-import type { GameModeType } from '@shared/types/game.js';
+import type { GameModeType, MatchContractHudState } from '@shared/types/game.js';
 import type { KothHudState } from '@shared/types/network.js';
 import type { GunGameRung } from '@shared/utils/gun-game.js';
 import { Wasteland, cssHex, healthColor } from '@shared/config/palette.js';
@@ -109,6 +109,14 @@ export class HUD {
   // Right column: kill feed
   private killFeedEntries: KillFeedItem[] = [];
   private killFeedContainer: Phaser.GameObjects.Container;
+
+  // Compact top-center side-objective card, always above the map art.
+  private contractBg: Phaser.GameObjects.Rectangle;
+  private contractTitleText: Phaser.GameObjects.Text;
+  private contractProgressText: Phaser.GameObjects.Text;
+  private contractCalloutText: Phaser.GameObjects.Text;
+  private currentContractId: string | null = null;
+  private previousContractComplete = false;
 
   // Map-centered overlays
   private countdownText: Phaser.GameObjects.Text;
@@ -408,6 +416,36 @@ export class HUD {
     this.killFeedContainer.setScrollFactor(0);
     this.killFeedContainer.setDepth(1000);
 
+    // --- Match contract: compact enough not to hide sightlines, but always
+    // readable against every biome. The completion transition also fires the
+    // established center-screen event banner for a satisfying payoff.
+    this.contractBg = scene.add.rectangle(MAP_WIDTH_PX / 2, 8, 330, 42, Wasteland.HUD_STRIP_BG, 0.84);
+    this.contractBg.setOrigin(0.5, 0);
+    this.contractBg.setStrokeStyle(1, Wasteland.LOADING_BAR_FILL, 0.75);
+    this.contractBg.setScrollFactor(0);
+    this.contractBg.setDepth(1500);
+    this.contractBg.setVisible(false);
+
+    this.contractTitleText = scene.add.text(MAP_WIDTH_PX / 2, 13, '', {
+      ...HEADER_STYLE,
+      fontSize: '9px',
+      color: cssHex(Wasteland.LOADING_BAR_FILL),
+    });
+    this.contractTitleText.setOrigin(0.5, 0);
+    this.contractTitleText.setScrollFactor(0);
+    this.contractTitleText.setDepth(1501);
+    this.contractTitleText.setVisible(false);
+
+    this.contractProgressText = scene.add.text(MAP_WIDTH_PX / 2, 29, '', {
+      ...FONT_STYLE,
+      fontSize: '11px',
+      color: cssHex(Wasteland.TEXT_PRIMARY),
+    });
+    this.contractProgressText.setOrigin(0.5, 0);
+    this.contractProgressText.setScrollFactor(0);
+    this.contractProgressText.setDepth(1501);
+    this.contractProgressText.setVisible(false);
+
     // --- Map-centered overlays ---
     const mapCenterX = MAP_WIDTH_PX / 2;
     const mapCenterY = MAP_HEIGHT_PX / 2;
@@ -475,6 +513,19 @@ export class HUD {
     this.combatCalloutText.setScrollFactor(0);
     this.combatCalloutText.setDepth(2001);
     this.combatCalloutText.setVisible(false);
+
+    // Dedicated lane between event and streak callouts so completing a
+    // contract can never erase a simultaneous mutator/overtime announcement.
+    this.contractCalloutText = scene.add.text(mapCenterX, mapCenterY - 125, '', {
+      fontFamily: MENU_FONTS.HEADER,
+      fontSize: '16px',
+      color: cssHex(Wasteland.HEALTH_GOOD),
+      align: 'center',
+    });
+    this.contractCalloutText.setOrigin(0.5);
+    this.contractCalloutText.setScrollFactor(0);
+    this.contractCalloutText.setDepth(2001);
+    this.contractCalloutText.setVisible(false);
   }
 
   updateHealth(current: number, max: number): void {
@@ -620,6 +671,64 @@ export class HUD {
     this.scoreText.setText(
       `${localName}: ${localScore} | ${opponentName}: ${opponentScore}`,
     );
+  }
+
+  updateContract(
+    state: MatchContractHudState | null,
+    localPlayerId: string | null,
+  ): void {
+    const progress = state?.players.find(
+      (entry) => entry.playerId === localPlayerId,
+    );
+    const visible = !!state && !!progress;
+    this.contractBg.setVisible(visible);
+    this.contractTitleText.setVisible(visible);
+    this.contractProgressText.setVisible(visible);
+    if (!state || !progress) return;
+
+    if (state.id !== this.currentContractId) {
+      this.currentContractId = state.id;
+      this.previousContractComplete = false;
+    }
+
+    if (progress.completed) {
+      this.contractBg.setStrokeStyle(1, Wasteland.HEALTH_GOOD, 0.9);
+      this.contractTitleText
+        .setText('CONTRACT COMPLETE')
+        .setColor(cssHex(Wasteland.HEALTH_GOOD));
+      this.contractProgressText.setText(
+        `${state.title}  ${state.target}/${state.target}`,
+      );
+      if (!this.previousContractComplete) {
+        this.showContractComplete(state.title);
+      }
+    } else {
+      this.contractBg.setStrokeStyle(1, Wasteland.LOADING_BAR_FILL, 0.75);
+      this.contractTitleText
+        .setText(`CONTRACT: ${state.title}`)
+        .setColor(cssHex(Wasteland.LOADING_BAR_FILL));
+      this.contractProgressText.setText(
+        `${state.objective}  ${progress.progress}/${state.target}`,
+      );
+    }
+    this.previousContractComplete = progress.completed;
+  }
+
+  private showContractComplete(title: string): void {
+    this.scene.tweens.killTweensOf(this.contractCalloutText);
+    this.contractCalloutText.setText(`CONTRACT COMPLETE\n${title}`);
+    this.contractCalloutText.setVisible(true);
+    this.contractCalloutText.setScale(1.35);
+    this.contractCalloutText.setAlpha(1);
+    this.scene.tweens.add({
+      targets: this.contractCalloutText,
+      scaleX: 1,
+      scaleY: 1,
+      alpha: 0,
+      duration: 1500,
+      ease: 'Quad.easeIn',
+      onComplete: () => this.contractCalloutText.setVisible(false),
+    });
   }
 
   /**
@@ -1179,5 +1288,9 @@ export class HUD {
     }
     this.killFeedEntries = [];
     this.killFeedContainer.destroy();
+    this.contractBg.destroy();
+    this.contractTitleText.destroy();
+    this.contractProgressText.destroy();
+    this.contractCalloutText.destroy();
   }
 }

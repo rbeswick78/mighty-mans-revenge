@@ -58,8 +58,8 @@ describe('GameManager connection leaderboard', () => {
     store = new PersistentStatsStore(dataDir);
     store.recordMatch(
       [
-        { nickname: 'Ryan', kills: 5, deaths: 2, killsByWeapon: createEmptyKillsByWeapon() },
-        { nickname: 'Dave', kills: 2, deaths: 5, killsByWeapon: createEmptyKillsByWeapon() },
+        { nickname: 'Ryan', kills: 5, deaths: 2, killsByWeapon: createEmptyKillsByWeapon(), contractCompleted: true },
+        { nickname: 'Dave', kills: 2, deaths: 5, killsByWeapon: createEmptyKillsByWeapon(), contractCompleted: false },
       ],
       'Ryan',
     );

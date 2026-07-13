@@ -21,6 +21,7 @@ import {
   rayIntersectsAABB,
   TileType,
   PickupType,
+  selectMatchContract,
 } from '@shared/game';
 import type {
   PlayerId,
@@ -41,6 +42,9 @@ import type {
   KillConfirmedTagState,
   KillConfirmedCollection,
   ServerCharacterSelectStateMessage,
+  MatchContractDefinition,
+  MatchContractHudState,
+  MatchContractId,
 } from '@shared/game';
 import { logger } from '../utils/logger.js';
 import { PickupManager } from './pickup-manager.js';
@@ -121,6 +125,10 @@ export class Match implements MatchContext {
   private tickBarrelExplosions: Array<{ x: number; y: number }> = [];
   /** Unspent explosive barrels in this round, keyed as `col,row`. */
   private readonly activeBarrels = new Set<string>();
+  /** Barrel detonations credited to each player for the Powder Keg contract. */
+  private readonly barrelDetonationsByPlayer = new Map<PlayerId, number>();
+  /** Shared side objective selected once for this match. */
+  private readonly contractDefinition: MatchContractDefinition;
   /** Ordered input queue per player. Inputs are acked only after consumption. */
   private inputQueues: Map<PlayerId, InputQueue> = new Map();
   /** Active 3-shot bursts in flight, keyed by player. */
@@ -226,6 +234,8 @@ export class Match implements MatchContext {
     gameModeType: GameModeType = GameModeType.DEATHMATCH,
     rng: () => number = Math.random,
     rematchMutatorExclusions: readonly MutatorId[] = [],
+    contractOverride?: MatchContractId,
+    previousContractId?: MatchContractId,
   ) {
     this.matchId = matchId;
     this.rng = rng;
@@ -236,6 +246,12 @@ export class Match implements MatchContext {
     this.mapManager = new MapManager();
     this.gameModeType = gameModeType;
     this.gameMode = getGameMode(gameModeType);
+    this.contractDefinition = selectMatchContract(
+      matchId,
+      gameModeType,
+      contractOverride ?? process.env.FORCE_CONTRACT,
+      previousContractId,
+    );
 
     this.mapManager.loadMap(mapData);
     for (const decoration of mapData.decorations ?? []) {
@@ -607,7 +623,57 @@ export class Match implements MatchContext {
     if (this.forfeitWinnerId !== null) {
       result.winnerId = this.forfeitWinnerId;
     }
+    result.contract = {
+      ...this.getContractHudState(),
+      careerCompletions: {},
+    };
     return result;
+  }
+
+  /** Current authoritative progress for the round's shared side objective. */
+  getContractHudState(): MatchContractHudState {
+    const players = [...this.players.keys()].map((playerId) => {
+      const progress = Math.min(
+        this.contractDefinition.target,
+        this.contractProgressFor(playerId),
+      );
+      return {
+        playerId,
+        progress,
+        completed: progress >= this.contractDefinition.target,
+      };
+    });
+    return {
+      id: this.contractDefinition.id,
+      title: this.contractDefinition.title,
+      objective: this.contractDefinition.objective,
+      target: this.contractDefinition.target,
+      players,
+    };
+  }
+
+  private contractProgressFor(playerId: PlayerId): number {
+    const stats = this.stats.getStats(playerId);
+    switch (this.contractDefinition.metric) {
+      case 'hits':
+        return stats.shotsHit;
+      case 'damage':
+        return Math.floor(stats.damageDealt);
+      case 'streak':
+        return stats.longestKillStreak;
+      case 'distance_tiles':
+        return Math.floor(
+          stats.distanceTraveled / this.mapManager.getMapData().tileSize,
+        );
+      case 'barrels':
+        return this.barrelDetonationsByPlayer.get(playerId) ?? 0;
+      case 'hill_seconds':
+        return Math.floor(stats.hillSeconds);
+      case 'confirmed_tags':
+        return this.gameModeType === GameModeType.KILL_CONFIRMED
+          ? (this.players.get(playerId)?.score ?? 0)
+          : 0;
+    }
   }
 
   getKillFeed(): KillFeedEntry[] {
@@ -1591,6 +1657,10 @@ export class Match implements MatchContext {
       x: col * tileSize + tileSize / 2,
       y: row * tileSize + tileSize / 2,
     };
+    this.barrelDetonationsByPlayer.set(
+      instigatorId,
+      (this.barrelDetonationsByPlayer.get(instigatorId) ?? 0) + 1,
+    );
     this.tickBarrelExplosions.push(position);
     const explosion = this.combatManager.explodeAt(
       position,

@@ -12,12 +12,14 @@ function entry(
   kills = 0,
   deaths = 0,
   weaponKills: Partial<Record<KillWeapon, number>> = {},
+  contractCompleted = false,
 ): MatchStatsEntry {
   return {
     nickname,
     kills,
     deaths,
     killsByWeapon: { ...createEmptyKillsByWeapon(), ...weaponKills },
+    contractCompleted,
   };
 }
 
@@ -74,6 +76,7 @@ describe('PersistentStatsStore', () => {
     expect(ryan.losses).toBe(1);
     expect(ryan.draws).toBe(0);
     expect(ryan.matches).toBe(2);
+    expect(ryan.contractsCompleted).toBe(0);
     expect(ryan.weaponKills).toEqual({
       gun: 7,
       grenade: 5,
@@ -96,6 +99,20 @@ describe('PersistentStatsStore', () => {
     expect(ryan.matches).toBe(2);
     expect(ryan.kills).toBe(3);
     expect(ryan.nickname).toBe('Ryan');
+  });
+
+  it('persists one career completion for each finished contract', () => {
+    const store = makeStore();
+    store.recordMatch(
+      [entry('Ryan', 2, 1, {}, true), entry('Dave', 1, 2)],
+      'Ryan',
+    );
+    store.recordMatch(
+      [entry('Ryan', 1, 2), entry('Dave', 2, 1, {}, true)],
+      'Dave',
+    );
+    expect(store.getLifetime('Ryan')!.contractsCompleted).toBe(1);
+    expect(store.getLifetime('Dave')!.contractsCompleted).toBe(1);
   });
 
   it('records head-to-head with alphabetically sorted keys, both directions', () => {
@@ -209,6 +226,7 @@ describe('PersistentStatsStore', () => {
       punch: 0,
       barrel: 0,
     });
+    expect(ryan.contractsCompleted).toBe(0);
 
     // Accumulating a new-era match on top of the migrated record works.
     store.recordMatch(
@@ -241,6 +259,7 @@ describe('PersistentStatsStore', () => {
         draws: 0,
         kills: 9,
         matches: 2,
+        contractsCompleted: 0,
       });
     });
 

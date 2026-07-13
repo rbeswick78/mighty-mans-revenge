@@ -16,6 +16,7 @@ export interface LifetimePlayerStats {
   losses: number;
   draws: number;
   matches: number;
+  contractsCompleted: number;
   weaponKills: Record<KillWeapon, number>;
 }
 
@@ -41,6 +42,7 @@ export interface MatchStatsEntry {
   kills: number;
   deaths: number;
   killsByWeapon: Record<KillWeapon, number>;
+  contractCompleted: boolean;
 }
 
 const FILE_NAME = 'persistent-stats.json';
@@ -69,6 +71,7 @@ function emptyLifetime(nickname: string): LifetimePlayerStats {
     losses: 0,
     draws: 0,
     matches: 0,
+    contractsCompleted: 0,
     weaponKills: createEmptyKillsByWeapon(),
   };
 }
@@ -111,6 +114,7 @@ export class PersistentStatsStore {
       lifetime.kills += entry.kills;
       lifetime.deaths += entry.deaths;
       lifetime.matches += 1;
+      if (entry.contractCompleted) lifetime.contractsCompleted += 1;
       for (const weapon of KILL_WEAPONS) {
         lifetime.weaponKills[weapon] =
           (lifetime.weaponKills[weapon] ?? 0) + (entry.killsByWeapon[weapon] ?? 0);
@@ -192,6 +196,7 @@ export class PersistentStatsStore {
         draws: p.draws,
         kills: p.kills,
         matches: p.matches,
+        contractsCompleted: p.contractsCompleted,
       }));
   }
 
@@ -233,6 +238,7 @@ export class PersistentStatsStore {
       // to 0 so the Record<KillWeapon, number> contract holds for every
       // consumer without per-read null checks.
       for (const lifetime of Object.values(data.players)) {
+        lifetime.contractsCompleted ??= 0;
         lifetime.weaponKills = {
           ...createEmptyKillsByWeapon(),
           ...lifetime.weaponKills,

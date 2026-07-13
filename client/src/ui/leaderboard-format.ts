@@ -9,10 +9,11 @@ import type { LeaderboardEntry } from '@shared/types/network.js';
 export const LEADERBOARD_NAME_MAX_CHARS = 10;
 
 /**
- * One line of the lobby's "ALL-TIME TOP 5" panel, e.g. "1. RYAN  14W 9L".
+ * One line of the lobby's "ALL-TIME TOP 5" panel, e.g.
+ * "1. RYAN  14W 9L 12C" (C = completed contracts).
  * Pure string formatting so it stays unit-testable without Phaser.
  */
 export function formatLeaderboardRow(rank: number, entry: LeaderboardEntry): string {
   const name = entry.nickname.toUpperCase().slice(0, LEADERBOARD_NAME_MAX_CHARS);
-  return `${rank}. ${name}  ${entry.wins}W ${entry.losses}L`;
+  return `${rank}. ${name}  ${entry.wins}W ${entry.losses}L ${entry.contractsCompleted ?? 0}C`;
 }

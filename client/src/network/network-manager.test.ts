@@ -95,6 +95,13 @@ function makeGameState(
     axes: [],
     bulletTrails: [],
     barrelExplosions: [],
+    contract: {
+      id: 'hot_shot',
+      title: 'HOT SHOT',
+      objective: 'LAND 8 ATTACKS',
+      target: 8,
+      players: [],
+    },
     punches: [],
     pickups: [],
     activeMutators: [],
@@ -167,6 +174,15 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
             },
           ],
           activeMutators: ['big_heads'],
+          contract: {
+            id: 'hot_shot',
+            title: 'HOT SHOT',
+            objective: 'LAND 8 ATTACKS',
+            target: 8,
+            players: [
+              { playerId: LOCAL_ID, progress: 5, completed: false },
+            ],
+          },
           confirmedTags: [
             {
               id: 'tag-1',
@@ -182,6 +198,7 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
     expect(manager.getRemotePlayerIds()).toEqual([REMOTE_ID]);
     expect(manager.getActiveMutators()).toEqual(['big_heads']);
     expect(manager.getConfirmedTags()).toHaveLength(1);
+    expect(manager.getContractState()).toMatchObject({ id: 'hot_shot' });
 
     deliver({
       type: 'server:matchFound',
@@ -197,6 +214,7 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
     expect(manager.getConfirmedTags()).toHaveLength(0);
     expect(manager.getRemotePlayerIds()).toHaveLength(0);
     expect(manager.getActiveMutators()).toHaveLength(0);
+    expect(manager.getContractState()).toBeNull();
     expect(manager.getInterpolatedPlayers().size).toBe(0);
     expect(manager.getMatchTimer()).toBe(0);
   });
