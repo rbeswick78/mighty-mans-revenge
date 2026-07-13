@@ -1066,6 +1066,10 @@ describe('MatchmakingManager persistent stats integration', () => {
         winsB: 1,
         draws: 0,
       });
+      expect(message.result.winStreaks).toEqual({
+        A: { previous: 0, current: 1, previousBest: 0, best: 1 },
+        B: { previous: 0, current: 0, previousBest: 0, best: 0 },
+      });
     }
   });
 
@@ -1207,6 +1211,7 @@ describe('MatchmakingManager solo practice flow', () => {
     }
     expect(ended.message.result.isPractice).toBe(true);
     expect(ended.message.result.rivalry).toBeNull();
+    expect(ended.message.result.winStreaks).toBeUndefined();
     expect(ended.message.result.rivalrySet?.players[0].wins).toBe(1);
     expect(store.getLifetime('Alpha')).toBeNull();
     expect(store.getLifetime('Rusty')).toBeNull();

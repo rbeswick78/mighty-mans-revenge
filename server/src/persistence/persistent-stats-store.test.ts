@@ -143,6 +143,32 @@ describe('PersistentStatsStore', () => {
     expect(store.getRivalry('Ryan', 'Dave').draws).toBe(1);
   });
 
+  it('extends wins, resets losses, and lets draws preserve win streaks', () => {
+    const store = makeStore();
+    store.recordMatch([entry('Ryan'), entry('Dave')], 'Ryan');
+    store.recordMatch([entry('Ryan'), entry('Dave')], 'Ryan');
+    store.recordMatch([entry('Ryan'), entry('Dave')], null);
+
+    expect(store.getLifetime('Ryan')).toMatchObject({
+      currentWinStreak: 2,
+      bestWinStreak: 2,
+    });
+    expect(store.getLifetime('Dave')).toMatchObject({
+      currentWinStreak: 0,
+      bestWinStreak: 0,
+    });
+
+    store.recordMatch([entry('Ryan'), entry('Dave')], 'Dave');
+    expect(store.getLifetime('Ryan')).toMatchObject({
+      currentWinStreak: 0,
+      bestWinStreak: 2,
+    });
+    expect(store.getLifetime('Dave')).toMatchObject({
+      currentWinStreak: 1,
+      bestWinStreak: 1,
+    });
+  });
+
   it('skips head-to-head for non-1v1 matches but still counts lifetime totals', () => {
     const store = makeStore();
     store.recordMatch([entry('Ryan', 3), entry('Dave', 2), entry('Pat', 1)], 'Ryan');
@@ -166,6 +192,8 @@ describe('PersistentStatsStore', () => {
     const reloaded = makeStore();
     expect(reloaded.getLifetime('Ryan')!.wins).toBe(1);
     expect(reloaded.getLifetime('Ryan')!.draws).toBe(1);
+    expect(reloaded.getLifetime('Ryan')!.currentWinStreak).toBe(1);
+    expect(reloaded.getLifetime('Ryan')!.bestWinStreak).toBe(1);
     expect(reloaded.getLifetime('Ryan')!.weaponKills.gun).toBe(10);
     expect(reloaded.getRivalry('Ryan', 'Dave')).toEqual({
       nicknameA: 'Dave',
@@ -227,6 +255,8 @@ describe('PersistentStatsStore', () => {
       barrel: 0,
     });
     expect(ryan.contractsCompleted).toBe(0);
+    expect(ryan.currentWinStreak).toBe(0);
+    expect(ryan.bestWinStreak).toBe(0);
 
     // Accumulating a new-era match on top of the migrated record works.
     store.recordMatch(

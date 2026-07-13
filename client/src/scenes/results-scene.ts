@@ -14,6 +14,7 @@ import { TitleLogo } from '../ui/menu/title-logo.js';
 import { MENU_FONTS } from '../ui/menu/fonts.js';
 import { formatRivalrySummary, nextDraftTeaser, rematchButtonLabel } from '../ui/rivalry-set.js';
 import { careerRankPresentation } from '../ui/career-rank.js';
+import { winStreakPresentation, type WinStreakTone } from '../ui/win-streak.js';
 
 interface ResultsSceneData {
   result?: MatchResult;
@@ -42,6 +43,9 @@ const CONTRACT_COLOR = Wasteland.LOADING_BAR_FILL;
 const CONTRACT_COMPLETE_COLOR = Wasteland.HEALTH_GOOD;
 const CAREER_RANK_COLOR = Wasteland.COVER_FILL;
 const CAREER_RANK_UP_COLOR = Wasteland.HEALTH_WARNING;
+const WIN_STREAK_ACTIVE_COLOR = Wasteland.HEALTH_GOOD;
+const WIN_STREAK_RECORD_COLOR = Wasteland.HEALTH_WARNING;
+const WIN_STREAK_ENDED_COLOR = Wasteland.HIT_FLASH;
 
 // Rivalry, contract, reputation, and awards sit between the stats panel
 // (ends at y=460) and the rematch status line at y=604 on the 960x720 canvas.
@@ -388,18 +392,21 @@ export class ResultsScene extends Phaser.Scene {
         .setOrigin(0.5),
     );
 
+    this.renderWinStreakStory(panel, leftId, col1X, isDraw);
+    this.renderWinStreakStory(panel, rightId, col2X, isDraw);
+
     // Header divider
     const headerDivider = this.add.graphics();
     headerDivider.fillStyle(DIVIDER_COLOR, 0.55);
-    headerDivider.fillRect(20, 50, panel.contentWidth - 40, 1);
+    headerDivider.fillRect(20, 58, panel.contentWidth - 40, 1);
     panel.add(headerDivider);
 
     // Stat rows
     const leftStats = leftId ? statsMap.get(leftId) : null;
     const rightStats = rightId ? statsMap.get(rightId) : null;
     const rows = this.buildStatRows(leftStats ?? null, rightStats ?? null);
-    const startY = 70;
-    const rowH = 27;
+    const startY = 78;
+    const rowH = 25;
 
     rows.forEach((row, i) => {
       const localY = startY + i * rowH;
@@ -444,6 +451,57 @@ export class ResultsScene extends Phaser.Scene {
         delay,
         ease: 'Back.easeOut',
       });
+    });
+  }
+
+  private renderWinStreakStory(
+    panel: MenuPanel,
+    playerId: PlayerId | null,
+    x: number,
+    isDraw: boolean,
+  ): void {
+    if (!this.result || !playerId) return;
+    const outcome = isDraw
+      ? 'draw'
+      : this.result.winnerId === playerId
+        ? 'win'
+        : 'loss';
+    const presentation = winStreakPresentation(
+      this.result.winStreaks?.[playerId],
+      outcome,
+    );
+    if (!presentation) return;
+
+    const colorForTone = (tone: WinStreakTone): number => {
+      switch (tone) {
+        case 'active':
+          return WIN_STREAK_ACTIVE_COLOR;
+        case 'new_best':
+          return WIN_STREAK_RECORD_COLOR;
+        case 'ended':
+          return WIN_STREAK_ENDED_COLOR;
+        case 'quiet':
+          return LABEL_COLOR;
+      }
+    };
+    const text = this.add
+      .text(x, 44, presentation.text, {
+        fontFamily: MENU_FONTS.HEADER,
+        fontSize: '7px',
+        color: cssHex(colorForTone(presentation.tone)),
+      })
+      .setOrigin(0.5)
+      .setAlpha(0)
+      .setScale(presentation.tone === 'new_best' ? 1.12 : 1);
+    panel.add(text);
+    this.tweens.add({
+      targets: text,
+      alpha: 1,
+      scaleX: 1,
+      scaleY: 1,
+      duration: 450,
+      delay: 250,
+      ease: presentation.tone === 'new_best' ? 'Back.easeOut' : 'Quad.easeOut',
     });
   }
 

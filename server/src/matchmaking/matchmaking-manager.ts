@@ -1182,9 +1182,18 @@ export class MatchmakingManager {
     // fs.promises — nothing here blocks the tick.
     if (this.statsStore && !isPractice) {
       const entries: MatchStatsEntry[] = [];
+      const previousStreaks = new Map<
+        PlayerId,
+        { current: number; best: number }
+      >();
       for (const [playerId, player] of match.players) {
         const stats = result.playerStats.get(playerId);
         if (!stats) continue;
+        const previousLifetime = this.statsStore.getLifetime(player.nickname);
+        previousStreaks.set(playerId, {
+          current: previousLifetime?.currentWinStreak ?? 0,
+          best: previousLifetime?.bestWinStreak ?? 0,
+        });
         entries.push({
           nickname: player.nickname,
           kills: stats.kills,
@@ -1198,6 +1207,18 @@ export class MatchmakingManager {
       const winnerNickname =
         result.winnerId !== null ? (match.players.get(result.winnerId)?.nickname ?? null) : null;
       this.statsStore.recordMatch(entries, winnerNickname);
+      result.winStreaks = {};
+      for (const [playerId, player] of match.players) {
+        const lifetime = this.statsStore.getLifetime(player.nickname);
+        const previous = previousStreaks.get(playerId);
+        if (!lifetime || !previous) continue;
+        result.winStreaks[playerId] = {
+          current: lifetime.currentWinStreak,
+          best: lifetime.bestWinStreak,
+          previous: previous.current,
+          previousBest: previous.best,
+        };
+      }
       if (result.contract) {
         for (const [playerId, player] of match.players) {
           result.contract.careerCompletions[playerId] =

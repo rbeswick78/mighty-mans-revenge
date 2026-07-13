@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–26 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts, solo Practice vs Rusty, streak + payback callouts, selectable Rusty difficulty, Collapsed Overpass, Blackout, fresh-chaos rematches, Last Stand, Kill Confirmed, mode briefings, character death animations, authoritative hit confirmation, blastable cover, chain-reaction barrels, Wasteland Contracts, Combat Medals, Wasteland Reputation). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–27 complete (weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, characters + stat identities, Gun Game + pistol + punch, polish backlog, first playtest response, Rivalry Sets + Revenge Drafts, solo Practice vs Rusty, streak + payback callouts, selectable Rusty difficulty, Collapsed Overpass, Blackout, fresh-chaos rematches, Last Stand, Kill Confirmed, mode briefings, character death animations, authoritative hit confirmation, blastable cover, chain-reaction barrels, Wasteland Contracts, Combat Medals, Wasteland Reputation, Hot Streaks). **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, Session 6 character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -58,6 +58,7 @@ Each session below attacks one of these.
 | 24  | Wasteland Contracts                           | Optional side goals change tactics and build a persistent career chase | **DONE** (2026-07-12) |
 | 25  | Combat Medals                                 | First Blood, rapid chains, and posthumous kills become stories worth chasing | **DONE** (2026-07-12) |
 | 26  | Wasteland Reputation                          | Contract clears build a visible career ladder and recurring promotion chase | **DONE** (2026-07-12) |
+| 27  | Hot Streaks                                   | Consecutive wins survive restarts, giving every rematch another stake | **DONE** (2026-07-12) |
 
 ---
 
@@ -1515,7 +1516,76 @@ power grind or another persistence migration.
 
 ---
 
+## Session 27 — Hot Streaks
+
+**Goal:** make winning the next real match matter beyond one result screen by
+preserving active and personal-best win streaks across rematches and restarts.
+
+**Locked design decisions**
+
+- Every persisted player owns a current and best win streak. Wins extend both,
+  losses reset only the current run, and draws hold the run rather than erasing
+  it after a double-timeout stalemate.
+- The existing version-1 stats file is extended in place. Older records backfill
+  both fields to zero; writes remain asynchronous and outside the tick loop.
+- Match results carry optional per-player before/after snapshots so the client
+  can distinguish a genuinely new best, a tied old best, and a streak that just
+  ended without guessing from totals.
+- Practice neither advances nor breaks a streak and ships no streak snapshot.
+  Forfeits retain their existing authoritative winner, so leaving cannot protect
+  a run from the recorded loss.
+- Each player's compact streak story sits beneath their nickname inside the
+  stats panel. It does not consume the rivalry/contract/reputation/award lanes.
+- Hot Streaks are bragging rights only. They never alter matchmaking, draft
+  priority, rivalry-set score, combat, rewards, or mode rules.
+
+**Acceptance criteria**
+
+- [x] Consecutive wins, loss reset, draw preservation, restart persistence, and
+      old-file backfill are deterministic and covered by store tests.
+- [x] Match end ships authoritative before/current/previous-best/best snapshots
+      to both real players and omits them from Practice.
+- [x] Pure presentation distinguishes new best, active/tied best, ended, held,
+      first-win, quiet, and old partial-result states.
+- [x] A live seeded match shows winner and loser stories together at desktop and
+      mobile-landscape sizes without colliding with names or stat rows.
+- [x] Typecheck, lint, all unit tests, production build, and Playwright pass.
+
+---
+
 ## Session Log
+
+### Session 27 — 2026-07-12 — Hot Streaks
+
+**Shipped:** real-match wins now carry momentum beyond the current rivalry set.
+Each nickname keeps a restart-safe active run and personal best; the next results
+screen tells both sides whether a run grew, set a new record, survived a draw, or
+ended on the loss. A single win still reads clearly without pretending it is a
+multi-win streak.
+
+The server captures streak state immediately before and after the same synchronous
+in-memory lifetime update that already records wins and losses. That makes the
+wire story authoritative for normal wins, overtime, N-player results, and
+forfeits while keeping file I/O queued in the background. Old stats backfill
+cleanly, old clients ignore the optional field, and Practice remains invisible to
+the career system.
+
+**Verified:** persistence tests cover consecutive wins, draw holds, loss resets,
+restart durability, and version-1 backfill; matchmaking tests prove both players'
+snapshots and Practice omission; pure client tests cover the full copy/tone state
+machine. A live seeded two-client deathmatch advanced STREAKA from 2 to a new best
+of 3 and ended STREAKB's active 4 while retaining its best of 6. Both stories fit
+inside the results panel at 1280×720 and 844×390 beside the existing rivalry,
+contract, rank, controls, and stat rows with zero browser warnings/errors. All
+873 unit tests pass, typecheck and lint are clean, the production build succeeds,
+and Playwright completes all 21 cases with 12 passes, 9 intentional skips, and
+zero failures across Chromium, Firefox, and mobile landscape.
+
+**Carry-over:** draws currently preserve a streak and one win is displayed as
+the start of a run. Both are deliberate first-pass social rules; change them only
+if group play makes either interpretation feel dishonest or confusing.
+
+---
 
 ### Session 26 — 2026-07-12 — Wasteland Reputation
 

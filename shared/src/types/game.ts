@@ -210,6 +210,14 @@ export interface MatchContractResult extends MatchContractHudState {
   careerCompletions: Record<PlayerId, number>;
 }
 
+/** Persisted win-streak state before and after one completed real match. */
+export interface WinStreakResult {
+  current: number;
+  best: number;
+  previous: number;
+  previousBest: number;
+}
+
 export interface MatchResult {
   matchId: MatchId;
   winnerId: PlayerId | null;
@@ -248,4 +256,6 @@ export interface MatchResult {
   wentToOvertime: boolean;
   /** Optional side objective for this round; absent on older payloads. */
   contract?: MatchContractResult;
+  /** Lifetime streak snapshots; absent for Practice and older payloads. */
+  winStreaks?: Record<PlayerId, WinStreakResult>;
 }

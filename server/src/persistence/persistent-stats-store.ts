@@ -17,6 +17,8 @@ export interface LifetimePlayerStats {
   draws: number;
   matches: number;
   contractsCompleted: number;
+  currentWinStreak: number;
+  bestWinStreak: number;
   weaponKills: Record<KillWeapon, number>;
 }
 
@@ -72,6 +74,8 @@ function emptyLifetime(nickname: string): LifetimePlayerStats {
     draws: 0,
     matches: 0,
     contractsCompleted: 0,
+    currentWinStreak: 0,
+    bestWinStreak: 0,
     weaponKills: createEmptyKillsByWeapon(),
   };
 }
@@ -123,8 +127,14 @@ export class PersistentStatsStore {
         lifetime.draws += 1;
       } else if (key === winnerKey) {
         lifetime.wins += 1;
+        lifetime.currentWinStreak += 1;
+        lifetime.bestWinStreak = Math.max(
+          lifetime.bestWinStreak,
+          lifetime.currentWinStreak,
+        );
       } else {
         lifetime.losses += 1;
+        lifetime.currentWinStreak = 0;
       }
     }
 
@@ -239,6 +249,8 @@ export class PersistentStatsStore {
       // consumer without per-read null checks.
       for (const lifetime of Object.values(data.players)) {
         lifetime.contractsCompleted ??= 0;
+        lifetime.currentWinStreak ??= 0;
+        lifetime.bestWinStreak ??= lifetime.currentWinStreak;
         lifetime.weaponKills = {
           ...createEmptyKillsByWeapon(),
           ...lifetime.weaponKills,
