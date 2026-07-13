@@ -80,4 +80,6 @@ export interface GrenadeState {
    * to clients so prediction and rendering match the authoritative path.
    */
   piercing: boolean;
+  /** Stationary victim-owned corpse bomb created by the Last Laugh mutator. */
+  isDeathBomb?: true;
 }

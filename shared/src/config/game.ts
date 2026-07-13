@@ -690,6 +690,7 @@ export const MUTATORS = Object.freeze({
     'fists_only',
     'weapon_roulette',
     'wasteland_warp',
+    'last_laugh',
   ] as const,
   /** Final-minute slot: warning/activation thresholds in seconds REMAINING. */
   WARNING_AT_REMAINING: 65,
@@ -732,6 +733,8 @@ export const MUTATORS = Object.freeze({
   WASTELAND_WARP_FIRST_DELAY_SECONDS: 8,
   /** Seconds between later living-player position rotations. */
   WASTELAND_WARP_INTERVAL_SECONDS: 12,
+  /** Corpse bomb fuse; resolves before the normal three-second respawn. */
+  LAST_LAUGH_FUSE_SECONDS: 1.4,
 });
 
 /**

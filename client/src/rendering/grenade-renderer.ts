@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import type { GrenadeState } from '@shared/types/projectile.js';
+import { MUTATORS } from '@shared/config/game.js';
 
 /**
  * Renders in-flight grenades. Server sends the authoritative list of
@@ -27,6 +28,17 @@ export class GrenadeRenderer {
         sprite.setOrigin(0.5, 0.5);
         sprite.setDepth(50);
         this.sprites.set(g.id, sprite);
+      }
+
+      if (g.isDeathBomb) {
+        const urgency = 1 - Math.min(
+          1,
+          Math.max(0, g.safetyFuseTimer) / MUTATORS.LAST_LAUGH_FUSE_SECONDS,
+        );
+        const pulse = 1.05 + Math.sin(this.scene.time.now * (0.012 + urgency * 0.02)) * 0.22;
+        sprite.setTint(0xff3b30).setScale(pulse).setAlpha(0.85 + urgency * 0.15);
+      } else {
+        sprite.clearTint().setScale(1).setAlpha(1);
       }
 
       sprite.setPosition(g.position.x, g.position.y);

@@ -8,6 +8,7 @@ import {
   PLAYER,
   WEAPONS,
   GRENADE,
+  MUTATORS,
   RESPAWN,
 } from '@shared/game';
 
@@ -246,6 +247,19 @@ describe('CombatManager', () => {
       const expected = GRENADE.THROW_SPEED * Math.cos(angle);
       expect(grenade.velocity.x).toBeCloseTo(expected);
       expect(grenade.velocity.y).toBeCloseTo(expected);
+    });
+
+    it('spawns a stationary victim-owned Last Laugh bomb on its short fuse', () => {
+      const bomb = combat.spawnDeathBomb('victim', { x: 140, y: 180 });
+
+      expect(bomb).toMatchObject({
+        throwerId: 'victim',
+        position: { x: 140, y: 180 },
+        velocity: { x: 0, y: 0 },
+        safetyFuseTimer: MUTATORS.LAST_LAUGH_FUSE_SECONDS,
+        piercing: false,
+        isDeathBomb: true,
+      });
     });
 
     it('explodes after fuse time and damages players in radius', () => {

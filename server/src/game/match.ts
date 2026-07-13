@@ -559,6 +559,7 @@ export class Match implements MatchContext {
       victim.respawnTimer = RESPAWN.DELAY;
       victim.deaths++;
       this.cancelActiveAbility(victim);
+      this.spawnLastLaughBomb(victim);
     }
 
     // Reward the killer with 50% of their max health (no overheal). Skip
@@ -1723,6 +1724,7 @@ export class Match implements MatchContext {
             victim.deaths++;
             this.pendingBursts.delete(dmg.playerId);
             this.cancelActiveAbility(victim);
+            this.spawnLastLaughBomb(victim);
           }
         }
       }
@@ -1731,6 +1733,12 @@ export class Match implements MatchContext {
     for (const barrel of chainedBarrels) {
       this.resolveBarrelExplosion(barrel.col, barrel.row, explosion.throwerId);
     }
+  }
+
+  /** Every regulation death gets one victim-owned bomb, including FFA suicides. */
+  private spawnLastLaughBomb(victim: PlayerState): void {
+    if (!this.mutatorActive('last_laugh') || this.isOvertime) return;
+    this.combatManager.spawnDeathBomb(victim.id, victim.position);
   }
 
   private tileKey(col: number, row: number): string {
@@ -2053,6 +2061,7 @@ export class Match implements MatchContext {
       case 'vampire':
       case 'second_wind':
       case 'blackout':
+      case 'last_laugh':
         // Per-tick behavior only; nothing to mutate at activation.
         return;
       case 'wasteland_warp':

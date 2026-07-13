@@ -19,6 +19,7 @@ const EVENT_COLORS: Record<MutatorId, number> = {
   fists_only: 0xffb347,      // bare-knuckle amber
   weapon_roulette: 0x5ce1e6, // arcade cyan
   wasteland_warp: 0xb56cff,   // dimensional violet
+  last_laugh: 0xff3b30,       // armed corpse red
 };
 
 /**

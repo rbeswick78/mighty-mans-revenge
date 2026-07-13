@@ -99,6 +99,8 @@ export function eventDisplayName(event: MutatorId): string {
       return 'WEAPON ROULETTE';
     case 'wasteland_warp':
       return 'WASTELAND WARP';
+    case 'last_laugh':
+      return 'LAST LAUGH';
   }
 }
 

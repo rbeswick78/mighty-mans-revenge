@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–36 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty, four arenas, seven modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–37 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty, four arenas, seven modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -68,6 +68,7 @@ Each session below attacks one of these.
 | 34  | Scavenger Caches                              | Shooting cover open creates fair loot races and round-to-round surprise | **DONE** (2026-07-13) |
 | 35  | Core Run                                      | A moving objective turns every second of possession into a chase          | **DONE** (2026-07-13) |
 | 36  | Wasteland Warp                                | Synchronized position swaps turn settled fights into instant reversals    | **DONE** (2026-07-13) |
+| 37  | Last Laugh                                    | Every death leaves one final explosive threat and chain-reaction story     | **DONE** (2026-07-13) |
 
 ---
 
@@ -1933,7 +1934,70 @@ objectives instead of settling into one dominant route.
 
 ---
 
+## Session 37 — Last Laugh
+
+**Goal:** make every death leave a brief, readable tactical consequence that
+can punish careless pursuit, create posthumous reversals, and grow into
+memorable chain reactions without adding a separate damage system.
+
+**Locked design decisions**
+
+- Every regulation death spawns one stationary grenade at the victim's final
+  position with a 1.4-second fuse, owned by that victim for kill attribution.
+- Death bombs use the existing explosion pipeline, including line of sight,
+  character modifiers, destructible cover, barrels, posthumous medals, and
+  secondary Last Laugh chains.
+- Spawning a death bomb neither consumes grenade inventory nor records a normal
+  player throw. Uncredited N-player self-grenade deaths still leave one.
+- A red accelerating pulse distinguishes death bombs from thrown grenades, and
+  each becomes a temporary Blackout light beacon so the threat stays readable.
+- Overtime suppresses new death bombs and its normal grenade cleanup retires
+  any live fuse. Random Gun Game and One in the Chamber scheduling excludes the
+  mutator because free explosive kills would corrupt their weapon economies;
+  explicit FORCE pins retain the project's intentional smoke-test override.
+
+**Acceptance criteria**
+
+- [x] Authority tests cover exact bomb state, unchanged inventory, posthumous
+      attribution, chained deaths, overtime suppression, and N-player suicide.
+- [x] Gun Game and One in the Chamber random pools exclude Last Laugh while the
+      shared display and mutator surfaces remain exhaustive.
+- [x] The client renders an authoritative accelerating red fuse pulse and adds
+      death bombs to Blackout's dynamic light beacons.
+- [x] Typecheck, lint, all unit tests, production build, and Playwright pass.
+
+---
+
 ## Session Log
+
+### Session 37 — 2026-07-13 — Last Laugh
+
+**Shipped:** Last Laugh joins the shared mutator pool. Every regulation death
+now plants a stationary, victim-owned grenade at the corpse for 1.4 seconds,
+turning reckless pursuit into a risk and allowing genuine posthumous reversals.
+The bomb enters the same authoritative blast pipeline as every other grenade,
+so cover, Iron Hide, Vampire, destructible scenery, barrels, attribution,
+medals, and multi-death chains stay consistent. It costs no inventory and does
+not masquerade as a player-thrown grenade.
+
+The client gives these bombs an accelerating red pulse and treats them as
+Blackout light beacons. Sudden-death overtime suppresses new bombs and clears
+existing grenades. Random Gun Game and One in the Chamber schedules omit Last
+Laugh to protect their weapon economies, while explicit FORCE pins keep the
+existing developer smoke-test escape hatch.
+
+**Verification:** 977 unit tests pass across 61 files (305 suites), including
+211 Match tests and 42 CombatManager tests covering the corpse bomb, unchanged
+inventory, posthumous kill credit, chained spawns, overtime, and an uncredited
+three-player self-grenade death. TypeScript, ESLint, and the production build
+are clean; Vite reports only its existing chunk-size advisory. The full
+Playwright matrix passes 13 tests with 11 intentional scoped skips across
+desktop Chromium, desktop Firefox, and mobile landscape.
+
+**Tuning watch:** the 1.4-second fuse is deliberately shorter than the
+three-second respawn delay, but it is not yet group-tested. Watch whether it
+creates readable last-second scrambles without making close-range kills feel
+automatically punished, especially near chain barrels and narrow objectives.
 
 ### Session 36 — 2026-07-13 — Wasteland Warp
 

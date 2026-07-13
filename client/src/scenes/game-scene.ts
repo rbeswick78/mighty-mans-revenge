@@ -834,6 +834,9 @@ export class GameScene extends Phaser.Scene {
       if (coreRunState) {
         activePickupPositions.push({ ...coreRunState.position });
       }
+      for (const grenade of networkManager.getActiveGrenades()) {
+        if (grenade.isDeathBomb) activePickupPositions.push({ ...grenade.position });
+      }
       const blackoutActive = networkManager.getActiveMutators().includes('blackout');
       const localLightPosition = !currentLocalState || currentLocalState.isDead
         ? null
@@ -1459,6 +1462,7 @@ export class GameScene extends Phaser.Scene {
       fists_only: 0xffb347,
       weapon_roulette: 0x5ce1e6,
       wasteland_warp: 0xb56cff,
+      last_laugh: 0xff3b30,
     };
 
     this.onEventWarning = (payload: EventWarningPayload) => {

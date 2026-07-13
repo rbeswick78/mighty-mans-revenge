@@ -1646,6 +1646,82 @@ describe('Match', () => {
       });
     });
 
+    describe('Last Laugh', () => {
+      it('drops a stationary corpse bomb that can earn a posthumous chain kill', () => {
+        const m = startActiveMatchWithMidMutator('last_laugh');
+        const killer = m.players.get('player-0')!;
+        const victim = m.players.get('player-1')!;
+        killer.position = { x: 220, y: 220 };
+        victim.position = { x: 225, y: 220 };
+        const victimGrenades = victim.grenades;
+
+        m.onKill(killer.id, victim.id, 'gun');
+        killer.health = 1;
+        const bomb = m.getActiveGrenades().find((grenade) => grenade.isDeathBomb);
+        expect(bomb).toMatchObject({
+          throwerId: victim.id,
+          position: victim.position,
+          velocity: { x: 0, y: 0 },
+          safetyFuseTimer: MUTATORS.LAST_LAUGH_FUSE_SECONDS,
+        });
+        expect(victim.grenades).toBe(victimGrenades);
+
+        m.update(MUTATORS.LAST_LAUGH_FUSE_SECONDS + 0.05);
+
+        expect(killer.isDead).toBe(true);
+        expect(m.getTickKillFeedEntries()).toContainEqual(
+          expect.objectContaining({
+            killerId: victim.id,
+            victimId: killer.id,
+            weapon: 'grenade',
+            isPosthumous: true,
+          }),
+        );
+        // The chain victim leaves their own armed bomb for anyone nearby.
+        expect(m.getActiveGrenades()).toContainEqual(
+          expect.objectContaining({ throwerId: killer.id, isDeathBomb: true }),
+        );
+      });
+
+      it('does not create corpse bombs during sudden-death overtime', () => {
+        const m = startActiveMatchWithMidMutator('last_laugh');
+        (m as unknown as { isOvertime: boolean }).isOvertime = true;
+
+        m.onKill('player-0', 'player-1', 'gun');
+
+        expect(m.getActiveGrenades()).toHaveLength(0);
+      });
+
+      it('drops a bomb for an uncredited self-grenade death in N-player play', () => {
+        const m = new Match(
+          'last-laugh-ffa',
+          makeMapData(),
+          ['a', 'b', 'c'].map((id) => ({ id, nickname: id.toUpperCase() })),
+          GameModeType.DEATHMATCH,
+          () => 0,
+        );
+        m.startCountdown();
+        m.update(MATCH.COUNTDOWN_DURATION + 0.05);
+        (m as unknown as {
+          startMutator: (mutator: MutatorId, isFinalMinute: boolean) => void;
+        }).startMutator('last_laugh', false);
+        const victim = m.players.get('a')!;
+        victim.position = { x: 240, y: 240 };
+        victim.health = 1;
+        const grenade = m.combatManager.spawnGrenade(victim.id, victim.position, 0);
+        grenade.velocity = { x: 0, y: 0 };
+        grenade.safetyFuseTimer = 0.01;
+
+        m.update(0.02);
+
+        expect(victim.isDead).toBe(true);
+        expect(victim.deaths).toBe(1);
+        expect(m.getActiveGrenades()).toContainEqual(
+          expect.objectContaining({ throwerId: victim.id, isDeathBomb: true }),
+        );
+      });
+    });
+
     describe('mid-match slot scheduling', () => {
       it('rolls the activation time inside the 40–70% elapsed window from the injected rng', () => {
         const low = createMatchWithPick(MUTATORS.POOL[0]); // rng ≈ 0

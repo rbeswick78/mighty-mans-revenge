@@ -27,9 +27,11 @@ export class OneInTheChamberMode implements GameMode {
     'weapon_roulette',
     // These do not create an interesting second rule here: direct hits are
     // already lethal, health stealing is moot, and grenades cannot be used.
+    // Last Laugh would reintroduce free explosive kills into that scarcity.
     'low_health',
     'vampire',
     'turbo_grenades',
+    'last_laugh',
   ];
 
   private readonly awaitingRespawn = new Set<PlayerId>();

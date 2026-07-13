@@ -12,6 +12,7 @@ import {
   ABILITY,
   WEAPONS,
   GRENADE,
+  MUTATORS,
   MAP,
   RESPAWN,
   calculateDamage,
@@ -395,6 +396,21 @@ export class CombatManager {
       safetyFuseTimer: GRENADE.SAFETY_FUSE,
       throwerId,
       piercing,
+    };
+    this.grenades.push(grenade);
+    return grenade;
+  }
+
+  /** Spawn a stationary, short-fuse grenade credited to the dead fighter. */
+  spawnDeathBomb(throwerId: PlayerId, position: Vec2): GrenadeState {
+    const grenade: GrenadeState = {
+      id: generateGrenadeId(),
+      position: { ...position },
+      velocity: { x: 0, y: 0 },
+      safetyFuseTimer: MUTATORS.LAST_LAUGH_FUSE_SECONDS,
+      throwerId,
+      piercing: false,
+      isDeathBomb: true,
     };
     this.grenades.push(grenade);
     return grenade;

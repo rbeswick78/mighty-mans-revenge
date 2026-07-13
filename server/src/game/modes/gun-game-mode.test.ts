@@ -357,6 +357,7 @@ describe('GunGameMode', () => {
         'infinite_ammo',
         'fists_only',
         'weapon_roulette',
+        'last_laugh',
       ]);
     });
 
