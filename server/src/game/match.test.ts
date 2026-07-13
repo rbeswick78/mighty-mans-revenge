@@ -21,6 +21,7 @@ import {
   ONE_IN_THE_CHAMBER,
   CORE_RUN,
   BOUNTY_HUNT,
+  COMBAT_MEDALS,
   GameModeType,
   TileType,
   PickupType,
@@ -403,6 +404,7 @@ describe('Match', () => {
       expect(killFeed[0].isFirstBlood).toBe(true);
       expect(killFeed[0].rapidKillCount).toBe(1);
       expect(killFeed[0].isPosthumous).toBe(false);
+      expect(killFeed[0].clutchHealth).toBeUndefined();
     });
 
     it('ignores suicides for First Blood and rapid-kill chains', () => {
@@ -453,6 +455,44 @@ describe('Match', () => {
         victimId: 'player-1',
         isPosthumous: true,
       });
+    });
+
+    it('stamps inclusive critical health before the post-kill heal', () => {
+      match.startCountdown();
+      match.update(MATCH.COUNTDOWN_DURATION + 0.1);
+      const killer = match.players.get('player-0')!;
+      const victim = match.players.get('player-1')!;
+      killer.health = killer.maxHealth * COMBAT_MEDALS.CLUTCH_HEALTH_FRACTION;
+
+      match.onKill(killer.id, victim.id, 'pistol');
+
+      expect(match.getKillFeed()[0].clutchHealth).toBe(
+        killer.maxHealth * COMBAT_MEDALS.CLUTCH_HEALTH_FRACTION,
+      );
+      expect(killer.health).toBeGreaterThan(match.getKillFeed()[0].clutchHealth!);
+    });
+
+    it('does not stamp healthy, suicide, or posthumous kills as clutch', () => {
+      match.startCountdown();
+      match.update(MATCH.COUNTDOWN_DURATION + 0.1);
+      const killer = match.players.get('player-0')!;
+      const victim = match.players.get('player-1')!;
+      killer.health =
+        killer.maxHealth * COMBAT_MEDALS.CLUTCH_HEALTH_FRACTION + 0.01;
+      match.onKill(killer.id, victim.id, 'gun');
+
+      victim.isDead = false;
+      victim.health = 1;
+      match.onKill(victim.id, victim.id, 'grenade');
+
+      victim.isDead = true;
+      match.onKill(victim.id, killer.id, 'grenade');
+
+      expect(match.getKillFeed().map((entry) => entry.clutchHealth)).toEqual([
+        undefined,
+        undefined,
+        undefined,
+      ]);
     });
 
     it('ships streak shutdown and payback context with each kill', () => {

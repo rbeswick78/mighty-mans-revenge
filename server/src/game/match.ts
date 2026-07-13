@@ -525,7 +525,16 @@ export class Match implements MatchContext {
     const isOpponentKill = killerId !== victimId;
     const victimStreakEnded = this.stats.getCurrentStreak(victimId);
     const isRevenge = isOpponentKill && this.lastKillerByVictim.get(killerId) === victimId;
-    const isPosthumous = isOpponentKill && (this.players.get(killerId)?.isDead ?? false);
+    const killerAtKill = this.players.get(killerId);
+    const isPosthumous = isOpponentKill && (killerAtKill?.isDead ?? false);
+    const clutchHealth =
+      isOpponentKill &&
+      !isPosthumous &&
+      killerAtKill &&
+      killerAtKill.health > 0 &&
+      killerAtKill.health <= killerAtKill.maxHealth * COMBAT_MEDALS.CLUTCH_HEALTH_FRACTION
+        ? killerAtKill.health
+        : undefined;
     const isFirstBlood = isOpponentKill && !this.firstBloodClaimed;
     let rapidKillCount = 0;
     if (isOpponentKill) {
@@ -595,6 +604,7 @@ export class Match implements MatchContext {
       isFirstBlood,
       rapidKillCount,
       isPosthumous,
+      clutchHealth,
     };
     this.killFeed.push(entry);
     this.tickKillFeedEntries.push(entry);

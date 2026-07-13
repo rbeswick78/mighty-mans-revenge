@@ -121,6 +121,8 @@ export interface KillFeedEntry {
   rapidKillCount?: number;
   /** True when the killer was already dead as this victim was eliminated. */
   isPosthumous?: boolean;
+  /** Pre-heal HP remaining when a living killer earned a critical-health kill. */
+  clutchHealth?: number;
 }
 
 /**

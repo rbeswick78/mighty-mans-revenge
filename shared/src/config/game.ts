@@ -500,6 +500,8 @@ export const COMBAT_MEDALS = Object.freeze({
   DOUBLE_KILL_COUNT: 2,
   TRIPLE_KILL_COUNT: 3,
   MAYHEM_COUNT: 4,
+  /** Inclusive health fraction that earns a living killer the Clutch medal. */
+  CLUTCH_HEALTH_FRACTION: 0.25,
 });
 
 /**

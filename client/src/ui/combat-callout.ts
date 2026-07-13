@@ -69,6 +69,16 @@ export function combatCalloutFor(
     };
   }
 
+  if (entry.clutchHealth !== undefined) {
+    return {
+      headline: 'CLUTCH!',
+      detail: `${Math.max(1, Math.ceil(entry.clutchHealth))} HP LEFT`,
+      tint: Wasteland.HEALTH_WARNING,
+      killSfx: { rate: 1.24, detune: 400 },
+      pulse: true,
+    };
+  }
+
   if (entry.isFirstBlood) {
     return {
       headline: 'FIRST BLOOD!',

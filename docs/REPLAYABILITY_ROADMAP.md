@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–39 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty, four arenas, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–40 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty, four arenas, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -71,6 +71,7 @@ Each session below attacks one of these.
 | 37  | Last Laugh                                    | Every death leaves one final explosive threat and chain-reaction story     | **DONE** (2026-07-13) |
 | 38  | Bounty Hunt                                   | A rotating marked fighter makes every chase and reversal worth more         | **DONE** (2026-07-13) |
 | 39  | Power Weapon Drops                             | Every armed death creates a brief, ammo-honest scramble at the corpse        | **DONE** (2026-07-13) |
+| 40  | Clutch Kills                                  | Critical-health victories land as memorable, exact-HP highlight moments      | **DONE** (2026-07-13) |
 
 ---
 
@@ -2043,7 +2044,61 @@ creating ammo from nothing or compromising mode-owned loadout economies.
 
 ---
 
+## Session 40 — Clutch Kills
+
+**Goal:** celebrate the game's closest living finishes with authoritative,
+exact-HP feedback so narrow victories become stories players want to repeat.
+
+**Locked design decisions**
+
+- A living fighter earns Clutch for an opponent kill at or below 25% max HP.
+  The threshold is inclusive and centralized in `COMBAT_MEDALS`.
+- Authority captures the killer's health before the existing 50% post-kill
+  heal, then stamps that value onto the reliable `KillFeedEntry`.
+- Suicides, remote presentation, and already-dead posthumous killers cannot
+  earn Clutch. Old kill events remain compatible because the field is optional.
+- The client rounds fractional health up for honest, readable `N HP LEFT`
+  copy and adds the standard medal pulse plus a distinct confirmation pitch.
+- Story priority stays deterministic: shutdown, From the Grave, and rapid
+  chains outrank Clutch; Clutch outranks First Blood, Payback, and streak copy.
+- Clutch changes no damage, healing, score, stats, awards, respawns, mode
+  rules, or persistence.
+
+**Acceptance criteria**
+
+- [x] Authority tests cover the inclusive threshold, pre-heal capture,
+      healthy kills, suicides, and posthumous kills.
+- [x] Client tests cover exact rounded HP copy, presentation emphasis, story
+      priority, old-event compatibility, remote kills, and suicides.
+- [x] Typecheck, lint, all unit tests, production build, and Playwright pass.
+
+---
+
 ## Session Log
+
+### Session 40 — 2026-07-13 — Clutch Kills
+
+**Shipped:** a living fighter who closes an opponent kill at or below 25% max
+health now earns a `CLUTCH!` medal with their exact pre-heal HP. The authority
+captures the moment before the normal kill heal can hide it, while suicides
+and From the Grave kills remain separate stories.
+
+The reliable kill event carries the optional health value, and the client
+turns it into rounded-up `N HP LEFT` copy, a zoom pulse, and a distinct pitched
+confirmation. Shutdowns and rapid multikills retain priority; Clutch now sits
+above First Blood, Payback, and ordinary streak copy without changing balance.
+
+**Verification:** 1,005 unit tests pass across 63 files (313 suites),
+including 220 Match tests and 11 combat-callout tests covering the threshold,
+pre-heal capture, exclusions, exact copy, priority, and compatibility.
+TypeScript, ESLint, and the production build are clean; Vite retains its
+existing chunk-size advisory. The full Playwright matrix passes 13 tests with
+11 intentional scoped skips across desktop Chromium, desktop Firefox, and
+mobile landscape.
+
+**Tuning watch:** 25% is a readable first default across different character
+health pools. Watch whether it fires often enough to feel exciting but rarely
+enough to stay special, especially under Low Health and Vampire combinations.
 
 ### Session 39 — 2026-07-13 — Power Weapon Drops
 

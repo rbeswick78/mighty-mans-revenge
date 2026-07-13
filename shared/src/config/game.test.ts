@@ -244,6 +244,8 @@ describe('combat medals', () => {
     expect(COMBAT_MEDALS.MAYHEM_COUNT).toBeGreaterThan(
       COMBAT_MEDALS.TRIPLE_KILL_COUNT,
     );
+    expect(COMBAT_MEDALS.CLUTCH_HEALTH_FRACTION).toBeGreaterThan(0);
+    expect(COMBAT_MEDALS.CLUTCH_HEALTH_FRACTION).toBeLessThan(1);
   });
 });
 

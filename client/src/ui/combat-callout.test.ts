@@ -15,6 +15,7 @@ function entry(overrides: Partial<KillFeedEntry> = {}): KillFeedEntry {
     isFirstBlood: false,
     rapidKillCount: 1,
     isPosthumous: false,
+    clutchHealth: undefined,
     ...overrides,
   };
 }
@@ -87,6 +88,30 @@ describe('combatCalloutFor', () => {
       headline: 'FROM THE GRAVE!',
       pulse: true,
     });
+  });
+
+  it('celebrates exact critical health above First Blood and streak copy', () => {
+    expect(
+      combatCalloutFor(
+        entry({ clutchHealth: 4.2, isFirstBlood: true, killerStreak: 5 }),
+        'local',
+      ),
+    ).toEqual({
+      headline: 'CLUTCH!',
+      detail: '5 HP LEFT',
+      tint: Wasteland.HEALTH_WARNING,
+      killSfx: { rate: 1.24, detune: 400 },
+      pulse: true,
+    });
+  });
+
+  it('keeps rapid chains and shutdowns above Clutch', () => {
+    expect(
+      combatCalloutFor(entry({ clutchHealth: 2, rapidKillCount: 2 }), 'local'),
+    ).toMatchObject({ headline: 'DOUBLE KILL!' });
+    expect(
+      combatCalloutFor(entry({ clutchHealth: 2, victimStreakEnded: 3 }), 'local'),
+    ).toMatchObject({ headline: 'SHUTDOWN!' });
   });
 
   it('keeps shutdown as the highest-value combat story', () => {
