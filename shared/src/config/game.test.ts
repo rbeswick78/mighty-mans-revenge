@@ -597,6 +597,10 @@ describe('WEAPONS registry', () => {
     expect(PICKUP.WEAPON_ANNOUNCE_LEAD).toBeLessThan(PICKUP.WEAPON_RESPAWN_TIME);
   });
 
+  it('gives dropped power weapons a positive contest window', () => {
+    expect(PICKUP.DROPPED_WEAPON_LIFETIME_SECONDS).toBeGreaterThan(0);
+  });
+
   it('WEAPONS and every entry are frozen', () => {
     expect(Object.isFrozen(WEAPONS)).toBe(true);
     for (const def of Object.values(WEAPONS)) {

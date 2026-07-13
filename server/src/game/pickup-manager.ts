@@ -27,6 +27,14 @@ export interface WeaponIncomingAnnouncement {
   landsInMs: number;
 }
 
+export interface OneShotPickupOptions {
+  /** Exact surviving special ammo carried by a defeated fighter. */
+  weaponAmmo?: number;
+  /** Optional active lifetime; cache rewards intentionally never expire. */
+  expiresInSeconds?: number;
+  isDroppedWeapon?: true;
+}
+
 function respawnTimeFor(type: PickupType): number {
   switch (type) {
     case PickupType.WEAPON_SHOTGUN:
@@ -57,6 +65,8 @@ export class PickupManager {
   private oneShotIds: Set<string> = new Set();
   /** Keep a collected one-shot for one snapshot so collection SFX know its type. */
   private pendingOneShotRemoval: Set<string> = new Set();
+  /** Server-only ammo payload so corpse drops never refill themselves. */
+  private oneShotWeaponAmmo: Map<string, number> = new Map();
   /**
    * Weapon pickups whose landing warning has already been emitted this
    * respawn cycle. Server-internal — deliberately NOT part of the shared
@@ -78,6 +88,7 @@ export class PickupManager {
     this.announced.clear();
     this.oneShotIds.clear();
     this.pendingOneShotRemoval.clear();
+    this.oneShotWeaponAmmo.clear();
     this.nextId = 0;
 
     for (const spawn of mapData.pickupSpawns) {
@@ -113,11 +124,16 @@ export class PickupManager {
     const announcements: WeaponIncomingAnnouncement[] = [];
 
     for (const id of this.pendingOneShotRemoval) {
-      this.pickups.delete(id);
-      this.oneShotIds.delete(id);
-      this.announced.delete(id);
+      this.removeOneShot(id);
     }
     this.pendingOneShotRemoval.clear();
+
+    for (const [id, pickup] of this.pickups) {
+      if (!this.oneShotIds.has(id) || pickup.expiresInSeconds === undefined)
+        continue;
+      pickup.expiresInSeconds -= dt;
+      if (pickup.expiresInSeconds <= 0) this.removeOneShot(id);
+    }
 
     for (const pickup of this.pickups.values()) {
       if (pickup.isActive || pickup.respawnTimer <= 0) continue;
@@ -149,7 +165,11 @@ export class PickupManager {
   }
 
   /** Spawn an immediately active reward that never respawns after collection. */
-  spawnOneShot(type: PickupType, position: Vec2): PickupState {
+  spawnOneShot(
+    type: PickupType,
+    position: Vec2,
+    options: OneShotPickupOptions = {},
+  ): PickupState {
     const id = `pickup-${this.nextId++}`;
     const pickup: PickupState = {
       id,
@@ -157,9 +177,19 @@ export class PickupManager {
       position: { ...position },
       isActive: true,
       respawnTimer: 0,
+      ...(options.isDroppedWeapon ? { isDroppedWeapon: true as const } : {}),
+      ...(options.expiresInSeconds !== undefined
+        ? { expiresInSeconds: options.expiresInSeconds }
+        : {}),
     };
     this.pickups.set(id, pickup);
     this.oneShotIds.add(id);
+    if (options.weaponAmmo !== undefined) {
+      this.oneShotWeaponAmmo.set(
+        id,
+        Math.max(0, Math.floor(options.weaponAmmo)),
+      );
+    }
     return pickup;
   }
 
@@ -208,6 +238,7 @@ export class PickupManager {
       this.announced.delete(id);
       this.oneShotIds.delete(id);
       this.pendingOneShotRemoval.delete(id);
+      this.oneShotWeaponAmmo.delete(id);
     }
   }
 
@@ -232,9 +263,11 @@ export class PickupManager {
         // to full. Any in-progress rifle reload is cancelled (the rifle is
         // stowed as-is and reverts losslessly later).
         const shotgun = WEAPONS.shotgun;
+        const totalAmmo =
+          this.oneShotWeaponAmmo.get(pickup.id) ?? shotgun.pickupAmmo;
         player.weaponId = 'shotgun';
-        player.specialAmmo = shotgun.magazineSize;
-        player.specialReserve = shotgun.pickupAmmo - shotgun.magazineSize;
+        player.specialAmmo = Math.min(totalAmmo, shotgun.magazineSize);
+        player.specialReserve = Math.max(0, totalAmmo - shotgun.magazineSize);
         player.isReloading = false;
         player.reloadTimer = 0;
         return true;
@@ -244,9 +277,11 @@ export class PickupManager {
         // up wins: grabbing a pistol while holding a shotgun replaces it
         // (and vice versa); re-grabbing a pistol refreshes ammo to full.
         const pistol = WEAPONS.pistol;
+        const totalAmmo =
+          this.oneShotWeaponAmmo.get(pickup.id) ?? pistol.pickupAmmo;
         player.weaponId = 'pistol';
-        player.specialAmmo = pistol.magazineSize;
-        player.specialReserve = pistol.pickupAmmo - pistol.magazineSize;
+        player.specialAmmo = Math.min(totalAmmo, pistol.magazineSize);
+        player.specialReserve = Math.max(0, totalAmmo - pistol.magazineSize);
         player.isReloading = false;
         player.reloadTimer = 0;
         return true;
@@ -267,5 +302,13 @@ export class PickupManager {
   /** Return all pickups as an array. */
   getPickups(): PickupState[] {
     return Array.from(this.pickups.values());
+  }
+
+  private removeOneShot(id: string): void {
+    this.pickups.delete(id);
+    this.oneShotIds.delete(id);
+    this.pendingOneShotRemoval.delete(id);
+    this.announced.delete(id);
+    this.oneShotWeaponAmmo.delete(id);
   }
 }

@@ -155,6 +155,62 @@ describe('PickupManager', () => {
     });
   });
 
+  describe('dropped power weapons', () => {
+    it('preserves the exact surviving ammo instead of refilling the weapon', () => {
+      manager.initFromMap(makeMapData());
+      const survivingAmmo = WEAPONS.shotgun.magazineSize + 3;
+      const drop = manager.spawnOneShot(
+        PickupType.WEAPON_SHOTGUN,
+        { x: 120, y: 168 },
+        {
+          weaponAmmo: survivingAmmo,
+          expiresInSeconds: PICKUP.DROPPED_WEAPON_LIFETIME_SECONDS,
+          isDroppedWeapon: true,
+        },
+      );
+      const player = makePlayer();
+
+      expect(manager.applyPickup(drop, player)).toBe(true);
+      expect(player.weaponId).toBe('shotgun');
+      expect(player.specialAmmo).toBe(WEAPONS.shotgun.magazineSize);
+      expect(player.specialReserve).toBe(3);
+      expect(player.specialAmmo + player.specialReserve).toBe(survivingAmmo);
+    });
+
+    it('expires unclaimed drops on their authoritative countdown', () => {
+      manager.initFromMap(makeMapData());
+      const drop = manager.spawnOneShot(
+        PickupType.WEAPON_PISTOL,
+        { x: 120, y: 168 },
+        {
+          weaponAmmo: 4,
+          expiresInSeconds: PICKUP.DROPPED_WEAPON_LIFETIME_SECONDS,
+          isDroppedWeapon: true,
+        },
+      );
+
+      manager.update(PICKUP.DROPPED_WEAPON_LIFETIME_SECONDS - 0.25);
+      expect(manager.getPickups()).toEqual([drop]);
+      expect(drop.expiresInSeconds).toBeCloseTo(0.25, 5);
+
+      manager.update(0.3);
+      expect(manager.getPickups()).toEqual([]);
+    });
+
+    it('leaves cache-style one-shot rewards active until collected', () => {
+      manager.initFromMap(makeMapData());
+      const reward = manager.spawnOneShot(PickupType.WEAPON_PISTOL, {
+        x: 120,
+        y: 168,
+      });
+
+      manager.update(PICKUP.DROPPED_WEAPON_LIFETIME_SECONDS * 10);
+
+      expect(manager.getPickups()).toEqual([reward]);
+      expect(reward.expiresInSeconds).toBeUndefined();
+    });
+  });
+
   describe('removeTypes', () => {
     it('permanently removes only the superseded pickup kinds', () => {
       manager.initFromMap(

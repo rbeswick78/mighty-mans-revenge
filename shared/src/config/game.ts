@@ -363,6 +363,8 @@ export const PICKUP = Object.freeze({
   WEAPON_RESPAWN_TIME: 30,
   /** Seconds before a weapon pickup lands that the warning banner fires. */
   WEAPON_ANNOUNCE_LEAD: 5,
+  /** Seconds a defeated fighter's remaining special weapon stays contestable. */
+  DROPPED_WEAPON_LIFETIME_SECONDS: 14,
 });
 
 export const RESPAWN = Object.freeze({

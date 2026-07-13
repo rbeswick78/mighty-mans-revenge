@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–38 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty, four arenas, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–39 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion, maps + rotation, KOTH + overtime, character identities, Gun Game, Rivalry Sets, Practice vs Rusty, four arenas, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -70,6 +70,7 @@ Each session below attacks one of these.
 | 36  | Wasteland Warp                                | Synchronized position swaps turn settled fights into instant reversals    | **DONE** (2026-07-13) |
 | 37  | Last Laugh                                    | Every death leaves one final explosive threat and chain-reaction story     | **DONE** (2026-07-13) |
 | 38  | Bounty Hunt                                   | A rotating marked fighter makes every chase and reversal worth more         | **DONE** (2026-07-13) |
+| 39  | Power Weapon Drops                             | Every armed death creates a brief, ammo-honest scramble at the corpse        | **DONE** (2026-07-13) |
 
 ---
 
@@ -2005,7 +2006,73 @@ three-point reversals without replacing the game's ordinary combat sandbox.
 
 ---
 
+## Session 39 — Power Weapon Drops
+
+**Goal:** turn deaths with a scarce special weapon into a short, readable
+contest that rewards aggressive recovery and opportunistic steals without
+creating ammo from nothing or compromising mode-owned loadout economies.
+
+**Locked design decisions**
+
+- A regulation death spills a carried shotgun or pistol at the victim's
+  authoritative position for 14 seconds. Dry weapons never create clutter.
+- The server stores the exact surviving magazine plus reserve on the one-shot
+  pickup. Collection splits that same total into the new holder's magazine and
+  reserve; authored map weapons and cache rewards still grant their normal
+  full pickup ammo.
+- The wire exposes only `isDroppedWeapon` and the authoritative expiry
+  countdown. The client uses those fields for a gold pulse that accelerates as
+  the contest window closes; the ammo payload remains server-only.
+- Ordinary credited deaths and uncredited N-player self-grenade deaths both
+  spill weapons. Sudden-death overtime suppresses new drops.
+- Gun Game, One in the Chamber, and Core Run pickup vetoes remain final.
+  Fists Only, Weapon Roulette, and Grenades Only suppress new drops and retire
+  existing special-weapon pickups when their loadout authority begins.
+- Non-expiring cache one-shots retain their existing lifetime, collection
+  snapshot, ammo, and no-respawn behavior.
+
+**Acceptance criteria**
+
+- [x] Authority tests cover exact ammo preservation, collection, expiry, dry
+      weapons, overtime, mode vetoes, loadout mutators, and N-player suicide.
+- [x] Cache rewards remain non-expiring and authored special pickups retain
+      full-ammo behavior.
+- [x] The client renders dropped weapons from authoritative state with a gold,
+      increasingly urgent pulse.
+- [x] Typecheck, lint, all unit tests, production build, and Playwright pass.
+
+---
+
 ## Session Log
+
+### Session 39 — 2026-07-13 — Power Weapon Drops
+
+**Shipped:** every ammo-bearing shotgun or pistol now spills at its carrier's
+death position as a 14-second one-shot pickup. The drop transfers exactly the
+ammo that survived the death rather than refreshing to full, creating a clean
+recover-or-steal decision without turning deaths into an ammo source. Dry guns
+leave nothing, and uncredited self-grenade deaths in larger matches follow the
+same rule.
+
+The authoritative expiry rides with each drop and drives a gold pulse that
+speeds up as it disappears. Overtime and mode pickup vetoes suppress the
+system, while Fists Only, Weapon Roulette, and Grenades Only retire live power
+weapons when their shared loadout takes control. Existing cache loot remains
+non-expiring and keeps its original full-ammo reward contract.
+
+**Verification:** 1,001 unit tests pass across 63 files (313 suites), including
+218 Match tests and 31 PickupManager tests covering the death, collection,
+expiry, ammo-preservation, compatibility, and N-player paths. TypeScript,
+ESLint, and the production build are clean; Vite reports only its existing
+chunk-size advisory. The full Playwright matrix passes 13 tests with 11
+intentional scoped skips across desktop Chromium, desktop Firefox, and mobile
+landscape.
+
+**Tuning watch:** 14 seconds deliberately outlives the three-second respawn,
+so a defeated fighter can attempt a recovery while opponents have time to
+steal or trap the drop. Watch whether that window creates satisfying contests
+without making successful power-weapon kills feel too easy to undo, and
+whether remaining-ammo drops stay enticing late in a magazine.
 
 ### Session 38 — 2026-07-13 — Bounty Hunt
 

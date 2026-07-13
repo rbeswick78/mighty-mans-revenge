@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import type { PickupState } from '@shared/types/pickup.js';
 import { PickupType } from '@shared/types/pickup.js';
+import { PICKUP } from '@shared/config/game.js';
 
 const PICKUP_SCALE = 3;
 
@@ -40,6 +41,21 @@ export class PickupRenderer {
       }
 
       pickup.container.setPosition(state.position.x, state.position.y);
+      if (state.isDroppedWeapon) {
+        const remainingFraction = Math.min(
+          1,
+          Math.max(0, state.expiresInSeconds ?? 0) /
+            PICKUP.DROPPED_WEAPON_LIFETIME_SECONDS,
+        );
+        const urgency = 1 - remainingFraction;
+        const pulse =
+          1 + Math.sin(this.scene.time.now * (0.01 + urgency * 0.018)) * 0.1;
+        pickup.container.setScale(pulse);
+        pickup.sprite.setTint(0xffd166).setAlpha(0.78 + urgency * 0.22);
+      } else {
+        pickup.container.setScale(1);
+        pickup.sprite.clearTint().setAlpha(1);
+      }
 
       if (state.isActive && !pickup.wasActive) {
         // Becoming active: fade in

@@ -1323,6 +1323,143 @@ describe('Match', () => {
     });
   });
 
+  describe('power weapon drops', () => {
+    function startActivePowerDropMatch(
+      mode: GameModeType = GameModeType.DEATHMATCH,
+      playerCount = 2,
+    ): Match {
+      const m = new Match(
+        `power-drop-${mode}`,
+        makeMapData(),
+        Array.from({ length: playerCount }, (_, i) => ({
+          id: `player-${i}`,
+          nickname: `Player ${i}`,
+        })),
+        mode,
+        () => 0,
+      );
+      m.startCountdown();
+      m.update(MATCH.COUNTDOWN_DURATION + 0.05);
+      return m;
+    }
+
+    it('spills the victim weapon at the death site and preserves its ammo on collection', () => {
+      const m = startActivePowerDropMatch();
+      const killer = m.players.get('player-0')!;
+      const victim = m.players.get('player-1')!;
+      killer.position = { x: 700, y: 400 };
+      victim.position = { x: 240, y: 192 };
+      victim.weaponId = 'shotgun';
+      victim.specialAmmo = 1;
+      victim.specialReserve = 4;
+
+      m.onKill(killer.id, victim.id, 'gun');
+
+      const drop = m.pickupManager
+        .getPickups()
+        .find((pickup) => pickup.isDroppedWeapon);
+      expect(drop).toMatchObject({
+        type: PickupType.WEAPON_SHOTGUN,
+        position: { x: 240, y: 192 },
+        isActive: true,
+        isDroppedWeapon: true,
+        expiresInSeconds: PICKUP.DROPPED_WEAPON_LIFETIME_SECONDS,
+      });
+      expect(victim.weaponId).toBe('rifle');
+
+      killer.position = { ...drop!.position };
+      m.update(0.05);
+
+      expect(killer.weaponId).toBe('shotgun');
+      expect(killer.specialAmmo).toBe(WEAPONS.shotgun.magazineSize);
+      expect(killer.specialReserve).toBe(3);
+      expect(m.getTickPickupCollections()).toContainEqual({
+        pickupId: drop!.id,
+        playerId: killer.id,
+      });
+    });
+
+    it('does not drop dry weapons or spill weapons during overtime', () => {
+      const dry = startActivePowerDropMatch();
+      const dryVictim = dry.players.get('player-1')!;
+      dryVictim.weaponId = 'pistol';
+      dryVictim.specialAmmo = 0;
+      dryVictim.specialReserve = 0;
+      dry.onKill('player-0', dryVictim.id, 'gun');
+      expect(dry.pickupManager.getPickups()).not.toContainEqual(
+        expect.objectContaining({ isDroppedWeapon: true }),
+      );
+
+      const overtime = startActivePowerDropMatch();
+      const overtimeVictim = overtime.players.get('player-1')!;
+      overtimeVictim.weaponId = 'pistol';
+      overtimeVictim.specialAmmo = 5;
+      (overtime as unknown as { isOvertime: boolean }).isOvertime = true;
+      overtime.onKill('player-0', overtimeVictim.id, 'gun');
+      expect(overtime.pickupManager.getPickups()).not.toContainEqual(
+        expect.objectContaining({ isDroppedWeapon: true }),
+      );
+    });
+
+    it('respects mode pickup vetoes and retires drops when a loadout mutator takes over', () => {
+      const coreRun = startActivePowerDropMatch(GameModeType.CORE_RUN);
+      const coreVictim = coreRun.players.get('player-1')!;
+      coreVictim.weaponId = 'shotgun';
+      coreVictim.specialAmmo = 2;
+      coreRun.onKill('player-0', coreVictim.id, 'gun');
+      expect(coreRun.pickupManager.getPickups()).not.toContainEqual(
+        expect.objectContaining({ isDroppedWeapon: true }),
+      );
+
+      const grenadesOnly = startActivePowerDropMatch();
+      const firstVictim = grenadesOnly.players.get('player-1')!;
+      firstVictim.weaponId = 'pistol';
+      firstVictim.specialAmmo = 4;
+      grenadesOnly.onKill('player-0', firstVictim.id, 'gun');
+      expect(grenadesOnly.pickupManager.getPickups()).toContainEqual(
+        expect.objectContaining({ isDroppedWeapon: true }),
+      );
+
+      (
+        grenadesOnly as unknown as {
+          startMutator: (mutator: MutatorId, isFinalMinute: boolean) => void;
+        }
+      ).startMutator('grenades_only', false);
+      expect(grenadesOnly.pickupManager.getPickups()).not.toContainEqual(
+        expect.objectContaining({ isDroppedWeapon: true }),
+      );
+    });
+
+    it('spills a weapon for an uncredited self-grenade death in N-player play', () => {
+      const m = startActivePowerDropMatch(GameModeType.DEATHMATCH, 3);
+      const victim = m.players.get('player-0')!;
+      victim.position = { x: 240, y: 240 };
+      victim.health = 1;
+      victim.weaponId = 'pistol';
+      victim.specialAmmo = 3;
+      victim.specialReserve = 2;
+      const grenade = m.combatManager.spawnGrenade(
+        victim.id,
+        victim.position,
+        0,
+      );
+      grenade.velocity = { x: 0, y: 0 };
+      grenade.safetyFuseTimer = 0.01;
+
+      m.update(0.02);
+
+      expect(victim.isDead).toBe(true);
+      expect(victim.weaponId).toBe('rifle');
+      expect(m.pickupManager.getPickups()).toContainEqual(
+        expect.objectContaining({
+          type: PickupType.WEAPON_PISTOL,
+          position: { x: 240, y: 240 },
+          isDroppedWeapon: true,
+        }),
+      );
+    });
+  });
+
   describe('mutators', () => {
     /** Internal fields the mutator tests reach into (same style as matchTimer). */
     type MatchInternals = {
@@ -2700,7 +2837,7 @@ describe('Match', () => {
         expect(player.isReloading).toBe(true);
       });
 
-      it('death drops the shotgun and respawn is back on the rifle', () => {
+      it('death spills the shotgun and immediately restores the rifle slot', () => {
         const m = startActiveWeaponMatch();
         equipShotgun(m, 'player-0');
         const player = m.players.get('player-0')!;
@@ -2708,11 +2845,12 @@ describe('Match', () => {
         m.onKill('player-1', 'player-0', 'gun');
         expect(player.weaponId).toBe('rifle');
         expect(player.specialAmmo).toBe(0);
-
-        advance(m, RESPAWN.DELAY + 0.2, 0.05);
-        expect(player.isDead).toBe(false);
-        expect(player.weaponId).toBe('rifle');
-        expect(player.ammo).toBe(WEAPONS.rifle.magazineSize);
+        expect(m.pickupManager.getPickups()).toContainEqual(
+          expect.objectContaining({
+            type: PickupType.WEAPON_SHOTGUN,
+            isDroppedWeapon: true,
+          }),
+        );
       });
     });
 

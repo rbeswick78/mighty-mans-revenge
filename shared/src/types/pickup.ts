@@ -21,4 +21,8 @@ export interface PickupState {
   position: Vec2;
   isActive: boolean;
   respawnTimer: number;
+  /** Short-lived corpse weapon; omitted for authored and cache pickups. */
+  isDroppedWeapon?: true;
+  /** Authoritative seconds before a dropped weapon disappears unclaimed. */
+  expiresInSeconds?: number;
 }

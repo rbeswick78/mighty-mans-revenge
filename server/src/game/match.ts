@@ -24,6 +24,7 @@ import {
   rayIntersectsAABB,
   TileType,
   PickupType,
+  PICKUP,
   selectMatchContract,
   selectScavengerCacheReward,
 } from '@shared/game';
@@ -561,6 +562,7 @@ export class Match implements MatchContext {
       victim.deaths++;
       this.cancelActiveAbility(victim);
       this.spawnLastLaughBomb(victim);
+      this.dropPowerWeapon(victim);
     }
 
     // Reward the killer with 50% of their max health (no overheal). Skip
@@ -572,8 +574,8 @@ export class Match implements MatchContext {
       }
     }
 
-    // Cancel any in-flight burst / fire-cooldown for the killed player,
-    // and drop their special weapon — death costs you the shotgun.
+    // Cancel any in-flight burst / fire-cooldown for the killed player and
+    // restore the rifle slot after the carried special weapon has spilled.
     this.pendingBursts.delete(victimId);
     this.fireCooldownTimers.delete(victimId);
     if (victim && victim.weaponId !== 'rifle') {
@@ -1732,6 +1734,10 @@ export class Match implements MatchContext {
             this.pendingBursts.delete(dmg.playerId);
             this.cancelActiveAbility(victim);
             this.spawnLastLaughBomb(victim);
+            this.dropPowerWeapon(victim);
+            victim.weaponId = 'rifle';
+            victim.specialAmmo = 0;
+            victim.specialReserve = 0;
           }
         }
       }
@@ -1746,6 +1752,31 @@ export class Match implements MatchContext {
   private spawnLastLaughBomb(victim: PlayerState): void {
     if (!this.mutatorActive('last_laugh') || this.isOvertime) return;
     this.combatManager.spawnDeathBomb(victim.id, victim.position);
+  }
+
+  /** Spill the exact surviving special ammo as a short-lived contested pickup. */
+  private dropPowerWeapon(victim: PlayerState): void {
+    if (this.isOvertime) return;
+    if (victim.weaponId !== 'shotgun' && victim.weaponId !== 'pistol') return;
+    if (
+      this.mutatorActive('fists_only') ||
+      this.mutatorActive('weapon_roulette') ||
+      this.mutatorActive('grenades_only')
+    ) {
+      return;
+    }
+    const type =
+      victim.weaponId === 'shotgun'
+        ? PickupType.WEAPON_SHOTGUN
+        : PickupType.WEAPON_PISTOL;
+    if (this.gameMode.isPickupTypeEnabled?.(type) === false) return;
+    const remainingAmmo = victim.specialAmmo + victim.specialReserve;
+    if (remainingAmmo <= 0) return;
+    this.pickupManager.spawnOneShot(type, victim.position, {
+      weaponAmmo: remainingAmmo,
+      expiresInSeconds: PICKUP.DROPPED_WEAPON_LIFETIME_SECONDS,
+      isDroppedWeapon: true,
+    });
   }
 
   private tileKey(col: number, row: number): string {
@@ -2077,6 +2108,10 @@ export class Match implements MatchContext {
         return;
       case 'fists_only':
         this.combatManager.clearGrenades();
+        this.pickupManager.removeTypes([
+          PickupType.WEAPON_SHOTGUN,
+          PickupType.WEAPON_PISTOL,
+        ]);
         this.enforceFistsOnlyLoadouts();
         return;
       case 'weapon_roulette':
@@ -2100,6 +2135,10 @@ export class Match implements MatchContext {
         }
         return;
       case 'grenades_only':
+        this.pickupManager.removeTypes([
+          PickupType.WEAPON_SHOTGUN,
+          PickupType.WEAPON_PISTOL,
+        ]);
         for (const player of this.players.values()) {
           player.grenades = GRENADE.MAX_COUNT;
           player.grenadeRegenSeconds = 0;
