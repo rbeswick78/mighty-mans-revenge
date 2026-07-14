@@ -297,7 +297,9 @@ export class ResultsScene extends Phaser.Scene {
     // opponent. Roster expansion can later pass character IDs through
     // ResultsSceneData.)
     // ────────────────────────────────────────────────────────────────────
-    this.renderTableau(isWinner, isDraw, camHeight);
+    if (this.result?.matchKind !== 'rumble') {
+      this.renderTableau(isWinner, isDraw, camHeight);
+    }
 
     // ────────────────────────────────────────────────────────────────────
     // Stats panel (center)
@@ -312,7 +314,11 @@ export class ResultsScene extends Phaser.Scene {
     panel.setDepth(WastelandStreet.DEPTH.UI);
 
     if (this.result) {
-      this.renderStats(panel, localPlayerId, isWinner, isDraw);
+      if (this.result.matchKind === 'rumble') {
+        this.renderRumbleStandings(panel, localPlayerId);
+      } else {
+        this.renderStats(panel, localPlayerId, isWinner, isDraw);
+      }
       this.renderAwardsAndRivalry(centerX, localPlayerId);
     } else {
       const noData = this.add
@@ -683,6 +689,95 @@ export class ResultsScene extends Phaser.Scene {
     });
   }
 
+  private renderRumbleStandings(panel: MenuPanel, localPlayerId: PlayerId | null): void {
+    if (!this.result) return;
+    const statsMap =
+      this.result.playerStats instanceof Map
+        ? this.result.playerStats
+        : new Map(
+            Object.entries(this.result.playerStats as unknown as Record<string, PlayerStats>),
+          );
+    const scores = this.result.scores ?? {};
+    const departed = new Set(this.result.departedPlayerIds ?? []);
+    const standings = [...statsMap.entries()].sort(([idA, a], [idB, b]) => {
+      if (idA === this.result?.winnerId) return -1;
+      if (idB === this.result?.winnerId) return 1;
+      const scoreDelta = (scores[idB] ?? 0) - (scores[idA] ?? 0);
+      if (scoreDelta !== 0) return scoreDelta;
+      if (b.kills !== a.kills) return b.kills - a.kills;
+      if (a.deaths !== b.deaths) return a.deaths - b.deaths;
+      return idA.localeCompare(idB);
+    });
+
+    panel.add(
+      this.add
+        .text(panel.centerX, 24, 'WASTELAND RUMBLE STANDINGS', {
+          fontFamily: MENU_FONTS.HEADER,
+          fontSize: '12px',
+          color: cssHex(NEXT_DRAFT_COLOR),
+        })
+        .setOrigin(0.5),
+    );
+    const headings = [
+      { x: 28, text: '#' },
+      { x: 62, text: 'FIGHTER' },
+      { x: 270, text: 'SCORE' },
+      { x: 338, text: 'K/D' },
+    ];
+    for (const heading of headings) {
+      panel.add(
+        this.add.text(heading.x, 54, heading.text, {
+          fontFamily: MENU_FONTS.BODY,
+          fontSize: '10px',
+          color: cssHex(LABEL_COLOR),
+        }),
+      );
+    }
+
+    standings.forEach(([playerId, stats], index) => {
+      const y = 84 + index * 52;
+      const isLocal = playerId === localPlayerId;
+      const isWinner = playerId === this.result?.winnerId;
+      const color = isWinner ? WINNER_NICK_COLOR : isLocal ? VALUE_COLOR : LABEL_COLOR;
+      const nickname =
+        this.result?.playerNicknames?.[playerId]?.toUpperCase() ??
+        (isLocal ? this.nickname.toUpperCase() : 'FIGHTER');
+      const status = departed.has(playerId) ? 'LEFT' : `${scores[playerId] ?? 0}`;
+      panel.add(
+        this.add.text(28, y, `${index + 1}`, {
+          fontFamily: MENU_FONTS.HEADER,
+          fontSize: '13px',
+          color: cssHex(color),
+        }),
+      );
+      panel.add(
+        this.add.text(62, y, `${isWinner ? '★ ' : ''}${nickname}${isLocal ? '  (YOU)' : ''}`, {
+          fontFamily: MENU_FONTS.HEADER,
+          fontSize: '11px',
+          color: cssHex(color),
+        }),
+      );
+      panel.add(
+        this.add
+          .text(292, y, status, {
+            fontFamily: MENU_FONTS.HEADER,
+            fontSize: '12px',
+            color: cssHex(departed.has(playerId) ? OPPONENT_LEFT_COLOR : color),
+          })
+          .setOrigin(1, 0),
+      );
+      panel.add(
+        this.add
+          .text(360, y, `${stats.kills}/${stats.deaths}`, {
+            fontFamily: MENU_FONTS.BODY,
+            fontSize: '12px',
+            color: cssHex(VALUE_COLOR),
+          })
+          .setOrigin(1, 0),
+      );
+    });
+  }
+
   private renderWinStreakStory(
     panel: MenuPanel,
     playerId: PlayerId | null,
@@ -961,7 +1056,13 @@ export class ResultsScene extends Phaser.Scene {
   private wireGameServiceEvents(): void {
     this.onRematchStatus = (opponentWantsRematch: boolean) => {
       if (opponentWantsRematch && this.rematchStatusText) {
-        this.rematchStatusText.setText('Opponent wants a rematch!').setVisible(true);
+        this.rematchStatusText
+          .setText(
+            this.result?.matchKind === 'rumble'
+              ? 'Another fighter wants a rematch!'
+              : 'Opponent wants a rematch!',
+          )
+          .setVisible(true);
       }
     };
 

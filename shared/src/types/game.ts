@@ -351,6 +351,14 @@ export interface MatchResult {
   playerStats: Map<PlayerId, PlayerStats>;
   duration: number;
   gameMode: GameModeType;
+  /** Queue family that created the match; absent on results from older servers. */
+  matchKind?: 'duel' | 'rumble' | 'practice';
+  /** Final authoritative mode score for standings (especially 3-4 player Rumble). */
+  scores?: Record<PlayerId, number>;
+  /** Stable result labels without relying on the local client's opponent cache. */
+  playerNicknames?: Record<PlayerId, string>;
+  /** Fighters who left an active Rumble before it ended. */
+  departedPlayerIds?: PlayerId[];
   /** Top awards in display order; empty when nobody qualified. */
   awards: MatchAward[];
   /**

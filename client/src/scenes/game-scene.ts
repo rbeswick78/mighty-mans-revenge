@@ -216,6 +216,7 @@ export class GameScene extends Phaser.Scene {
   private onMatchStart: (() => void) | null = null;
   private onMatchEnd: ((result: MatchResult) => void) | null = null;
   private onOpponentDisconnected: ((playerId: PlayerId) => void) | null = null;
+  private onPlayerLeft: ((playerId: PlayerId, nickname: string) => void) | null = null;
   private onBulletTrail: ((trail: BulletTrail) => void) | null = null;
   private onPlayerKilled: ((entry: KillFeedEntry) => void) | null = null;
   private onPickupCollected: ((pickupId: string, playerId: PlayerId) => void) | null = null;
@@ -764,21 +765,18 @@ export class GameScene extends Phaser.Scene {
           currentLocalState.abilityCooldownSeconds,
         );
 
-        // Update scores — use actual opponent nickname from the most
-        // recent interpolated state; fall back to matchData for the
-        // frame between match start and the first gameState.
-        let opponentScore = 0;
-        let opponentName = this.matchData?.opponents[0]?.nickname ?? 'OPPONENT';
-        for (const [, interpState] of interpolatedPlayers) {
-          if (interpState.score > opponentScore) opponentScore = interpState.score;
-          if (interpState.nickname) opponentName = interpState.nickname;
-        }
-        this.hud.updateScores(
-          currentLocalState.nickname || this.nickname,
-          currentLocalState.score,
-          opponentName,
-          opponentScore,
-        );
+        // Local fighter first, then every live rival. HUD compacts at 3+
+        // entrants so a four-player Rumble remains readable.
+        this.hud.updateScores([
+          {
+            name: currentLocalState.nickname || this.nickname,
+            score: currentLocalState.score,
+          },
+          ...[...interpolatedPlayers.values()].map((state) => ({
+            name: state.nickname || 'OPPONENT',
+            score: state.score,
+          })),
+        ]);
         this.hud.updateContract(networkManager.getContractState(), playerId);
 
         const remainingSeconds = networkManager.getMatchTimer();
@@ -1218,6 +1216,14 @@ export class GameScene extends Phaser.Scene {
           this.scene.start('LobbyScene');
         });
       });
+    };
+
+    this.onPlayerLeft = (_playerId: PlayerId, nickname: string) => {
+      this.hud?.showEventBanner(
+        'FIGHTER LEFT',
+        `${nickname.toUpperCase()} IS OUT - RUMBLE CONTINUES`,
+        Wasteland.TEXT_DISCONNECT,
+      );
     };
 
     this.onBulletTrail = (trail: BulletTrail) => {
@@ -1699,6 +1705,7 @@ export class GameScene extends Phaser.Scene {
     this.gameService.on('matchStart', this.onMatchStart);
     this.gameService.on('matchEnd', this.onMatchEnd);
     this.gameService.on('opponentDisconnected', this.onOpponentDisconnected);
+    this.gameService.on('playerLeft', this.onPlayerLeft);
     this.gameService.on('bulletTrail', this.onBulletTrail);
     this.gameService.on('playerKilled', this.onPlayerKilled);
     this.gameService.on('pickupCollected', this.onPickupCollected);
@@ -1765,6 +1772,10 @@ export class GameScene extends Phaser.Scene {
     if (this.onOpponentDisconnected) {
       this.gameService.off('opponentDisconnected', this.onOpponentDisconnected);
       this.onOpponentDisconnected = null;
+    }
+    if (this.onPlayerLeft) {
+      this.gameService.off('playerLeft', this.onPlayerLeft);
+      this.onPlayerLeft = null;
     }
     if (this.onBulletTrail) {
       this.gameService.off('bulletTrail', this.onBulletTrail);

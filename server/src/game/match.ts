@@ -196,6 +196,8 @@ export class Match implements MatchContext {
   }
   private _matchStartTimeMs = 0;
   private connectedPlayers: Set<PlayerId> = new Set();
+  /** Active-Rumble leavers stay in results but are removed from competition. */
+  private readonly departedPlayerIds: Set<PlayerId> = new Set();
   /**
    * Set when the match ended because everyone else disconnected/forfeited.
    * Overrides the game mode's scoreboard winner in getResult().
@@ -726,8 +728,27 @@ export class Match implements MatchContext {
   }
 
   /** Record that a player has disconnected. */
-  onPlayerDisconnect(playerId: PlayerId): void {
+  onPlayerDisconnect(playerId: PlayerId, eliminate = false): void {
     this.connectedPlayers.delete(playerId);
+    if (!eliminate || this.phase !== MatchPhase.ACTIVE) return;
+    const player = this.players.get(playerId);
+    if (!player) return;
+    this.departedPlayerIds.add(playerId);
+    player.isDead = true;
+    player.health = 0;
+    player.respawnTimer = 0;
+    // Every mode score starts at zero or above. A leaver can no longer win
+    // a timed Rumble even if they departed while leading.
+    player.score = -1;
+    this.inputQueues.get(playerId)?.drain();
+  }
+
+  getConnectedPlayerIds(): PlayerId[] {
+    return [...this.connectedPlayers];
+  }
+
+  getDepartedPlayerIds(): PlayerId[] {
+    return [...this.departedPlayerIds];
   }
 
   /** Check if the match should end, and if so, transition to ENDED. */
@@ -783,7 +804,12 @@ export class Match implements MatchContext {
     this.isOvertime = true;
     this.regulationElapsedAtOvertime = this.timeLimitSeconds - this.matchTimer;
     this.matchTimer = OVERTIME.DURATION;
-    for (const player of this.players.values()) {
+    for (const [playerId, player] of this.players) {
+      if (!this.connectedPlayers.has(playerId)) {
+        player.isDead = true;
+        player.respawnTimer = 0;
+        continue;
+      }
       if (this.gameMode.canRespawn?.(this, player) ?? true) {
         this.respawnPlayer(player);
       } else {
@@ -1409,9 +1435,11 @@ export class Match implements MatchContext {
     // Update respawn timers for dead players. Sudden-death overtime is
     // single-life: the timer freezes and nobody comes back (in practice
     // the first overtime death ends the match this same tick anyway).
-    for (const player of this.players.values()) {
+    for (const [playerId, player] of this.players) {
       if (player.isDead && !this.isOvertime) {
-        if (!(this.gameMode.canRespawn?.(this, player) ?? true)) {
+        if (!this.connectedPlayers.has(playerId)) {
+          player.respawnTimer = 0;
+        } else if (!(this.gameMode.canRespawn?.(this, player) ?? true)) {
           // Eliminated stock-lives players remain spectators. Zero the timer
           // so snapshots never imply that a respawn is still pending.
           player.respawnTimer = 0;

@@ -103,6 +103,7 @@ export class LobbyScene extends Phaser.Scene {
   private dailyLeaderboardTitleText!: Phaser.GameObjects.Text;
   private dailyLeaderboardRowsText!: Phaser.GameObjects.Text;
   private quickMatchButton!: PixelButton;
+  private rumbleButton!: PixelButton;
   private practiceButton!: PixelButton;
   private gauntletButton!: PixelButton;
   private dailyButton!: PixelButton;
@@ -118,6 +119,7 @@ export class LobbyScene extends Phaser.Scene {
   private practiceMode: GameModeType | null;
   private practiceMutator: MutatorId | null;
   private isSearching = false;
+  private searchKind: 'duel' | 'rumble' = 'duel';
   private searchStartTime = 0;
   private cursorVisible = true;
   private gameService!: GameService;
@@ -273,23 +275,40 @@ export class LobbyScene extends Phaser.Scene {
     // Fresh array each create() — scene restarts rebuild these objects.
     this.nameEntryUi = [callsignLabel, inputBgGfx, this.nicknameText];
 
-    // Quick Match button (primary CTA, centered in lower half of panel)
+    // PvP row: preserve the instant duel and expose the 2-4 player social queue.
     const qmW = 260;
     const qmH = 44;
+    const pvpGap = 8;
+    const pvpW = (qmW - pvpGap) / 2;
     this.quickMatchButton = new PixelButton(
       this,
       panel.centerX - qmW / 2,
       104,
-      qmW,
+      pvpW,
       qmH,
       'QUICK MATCH',
       {
         variant: 'primary',
-        fontSize: 14,
+        fontSize: 9,
         onClick: () => this.onQuickMatch(),
       },
     );
     panel.add(this.quickMatchButton);
+
+    this.rumbleButton = new PixelButton(
+      this,
+      panel.centerX - qmW / 2 + pvpW + pvpGap,
+      104,
+      pvpW,
+      qmH,
+      'RUMBLE 2-4',
+      {
+        variant: 'primary',
+        fontSize: 9,
+        onClick: () => this.onRumble(),
+      },
+    );
+    panel.add(this.rumbleButton);
 
     const soloGap = 8;
     const soloW = (qmW - soloGap * 2) / 3;
@@ -643,6 +662,7 @@ export class LobbyScene extends Phaser.Scene {
   private gamepadButtons(): PixelButton[] {
     return [
       this.quickMatchButton,
+      this.rumbleButton,
       this.practiceButton,
       this.gauntletButton,
       this.dailyButton,
@@ -725,6 +745,16 @@ export class LobbyScene extends Phaser.Scene {
       }
       if (msg.status === 'cancelled') {
         this.stopSearching();
+      }
+      if (msg.status === 'queued' && msg.matchKind === 'rumble') {
+        const size = msg.groupSize ?? 1;
+        const max = msg.maxGroupSize ?? 4;
+        this.searchingText.setText(`GATHERING RUMBLE  ${size}/${max}`);
+        this.searchTimerText.setText(
+          msg.launchInMs === undefined
+            ? 'WAITING FOR 2'
+            : `FIGHT IN ${Math.max(1, Math.ceil(msg.launchInMs / 1000))}`,
+        );
       }
     };
 
@@ -877,10 +907,19 @@ export class LobbyScene extends Phaser.Scene {
   }
 
   private onQuickMatch(): void {
+    this.startMatchmaking('duel');
+  }
+
+  private onRumble(): void {
+    this.startMatchmaking('rumble');
+  }
+
+  private startMatchmaking(kind: 'duel' | 'rumble'): void {
     if (this.isSearching) return;
     if (!this.validateNickname()) return;
 
     this.isSearching = true;
+    this.searchKind = kind;
     this.searchStartTime = Date.now();
 
     // Hide mobile virtual keyboard once matchmaking commits.
@@ -894,10 +933,13 @@ export class LobbyScene extends Phaser.Scene {
     // hide too — the searching text sits in the input box's band, and the
     // invisible HTML <input> would otherwise keep swallowing taps.
     this.setNameEntryVisible(false);
+    this.searchingText.setText(kind === 'rumble' ? 'GATHERING RUMBLE  1/4' : 'SEARCHING FOR OPPONENT');
     this.searchingText.setVisible(true);
+    this.searchTimerText.setText(kind === 'rumble' ? 'WAITING FOR 2' : '0:00');
     this.searchTimerText.setVisible(true);
     this.cancelButton.setVisible(true);
     this.quickMatchButton.setVisible(false);
+    this.rumbleButton.setVisible(false);
     this.practiceButton.setVisible(false);
     this.gauntletButton.setVisible(false);
     this.dailyButton.setVisible(false);
@@ -919,6 +961,7 @@ export class LobbyScene extends Phaser.Scene {
       loop: true,
       callback: () => {
         if (!this.isSearching) return;
+        if (this.searchKind === 'rumble') return;
         const elapsed = Math.floor((Date.now() - this.searchStartTime) / 1000);
         const mins = Math.floor(elapsed / 60);
         const secs = elapsed % 60;
@@ -926,7 +969,8 @@ export class LobbyScene extends Phaser.Scene {
       },
     });
 
-    this.gameService.joinMatchmaking(this.nickname);
+    if (kind === 'rumble') this.gameService.joinRumble(this.nickname);
+    else this.gameService.joinMatchmaking(this.nickname);
   }
 
   private onPractice(kind: PracticeKind): void {
@@ -1038,6 +1082,7 @@ export class LobbyScene extends Phaser.Scene {
     this.searchTimerText.setVisible(false);
     this.cancelButton.setVisible(false);
     this.quickMatchButton.setVisible(true);
+    this.rumbleButton.setVisible(true);
     this.practiceButton.setVisible(true);
     this.gauntletButton.setVisible(true);
     this.dailyButton.setVisible(true);

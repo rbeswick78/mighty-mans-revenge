@@ -180,7 +180,12 @@ export class PersistentStatsStore {
    * path. Head-to-head is only recorded for 1v1 matches (the pairing key
    * has no meaning otherwise). `winnerNickname` null means a draw.
    */
-  recordMatch(entries: MatchStatsEntry[], winnerNickname: string | null, arenaName?: string): void {
+  recordMatch(
+    entries: MatchStatsEntry[],
+    winnerNickname: string | null,
+    arenaName?: string,
+    recordHeadToHead = true,
+  ): void {
     const winnerKey = winnerNickname === null ? null : normalizeKey(winnerNickname);
 
     for (const entry of entries) {
@@ -220,7 +225,7 @@ export class PersistentStatsStore {
       }
     }
 
-    if (entries.length === 2) {
+    if (recordHeadToHead && entries.length === 2) {
       const keyOne = normalizeKey(entries[0].nickname);
       const keyTwo = normalizeKey(entries[1].nickname);
       // Two players with the same nickname would produce a meaningless

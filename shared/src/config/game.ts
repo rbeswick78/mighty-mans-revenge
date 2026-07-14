@@ -438,6 +438,14 @@ export const MATCH = Object.freeze({
   CHARACTER_SELECT_TIMEOUT_SEC: 30,
 });
 
+/** Separate social queue that gathers a small free-for-all before drafting. */
+export const RUMBLE = Object.freeze({
+  MIN_PLAYERS: 2,
+  MAX_PLAYERS: 4,
+  /** Once two fighters are present, leave a short window for friends to pile in. */
+  LAUNCH_DELAY_SECONDS: 6,
+});
+
 /**
  * Pre-match map/mode draft (Session 9). Every real match — fresh AND
  * rematch — opens with a draft instead of the blind rotation: the server

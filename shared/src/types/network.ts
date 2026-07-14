@@ -33,6 +33,7 @@ import type {
 export type ClientMessage =
   | ClientInputMessage
   | ClientJoinMatchmakingMessage
+  | ClientJoinRumbleMessage
   | ClientStartPracticeMessage
   | ClientCancelMatchmakingMessage
   | ClientRematchRequestMessage
@@ -50,6 +51,11 @@ export interface ClientInputMessage {
 
 export interface ClientJoinMatchmakingMessage {
   type: 'client:joinMatchmaking';
+  nickname: string;
+}
+
+export interface ClientJoinRumbleMessage {
+  type: 'client:joinRumble';
   nickname: string;
 }
 
@@ -137,6 +143,7 @@ export type ServerMessage =
   | ServerMatchmakingStatusMessage
   | ServerRematchStatusMessage
   | ServerOpponentDisconnectedMessage
+  | ServerPlayerLeftMessage
   | ServerEventWarningMessage
   | ServerEventStartMessage
   | ServerWeaponIncomingMessage
@@ -311,6 +318,8 @@ export interface ServerMatchFoundMessage {
   mapName: string;
   /** Mode this match will be played in — drives the lobby's "NEXT: X" line. */
   gameMode: GameModeType;
+  /** Queue family; optional so older servers still interoperate. */
+  matchKind?: 'duel' | 'rumble' | 'practice';
   /** Local player's persisted real-match wins per fighter; absent on old servers. */
   characterWins?: Record<CharacterId, number>;
   /** Present only while traversing the three-fight solo Gauntlet. */
@@ -348,6 +357,8 @@ export interface ServerDraftStateMessage {
    * before the animation starts.
    */
   firstPickerId: PlayerId;
+  /** The distinct entrant who receives the remaining category. */
+  secondPickerId?: PlayerId;
   /** Coin toss for a fresh pairing; previous-round loser for a rematch. */
   firstPickerReason: DraftFirstPickerReason;
   /** Whose pick the server is waiting on; null once both picks are in. */
@@ -440,6 +451,12 @@ export interface ServerMatchmakingStatusMessage {
   status: 'queued' | 'matched' | 'cancelled';
   queuePosition?: number;
   playersOnline?: number;
+  /** Queue family for queue-specific lobby presentation. */
+  matchKind?: 'duel' | 'rumble';
+  /** Current Rumble party size while its join window is open. */
+  groupSize?: number;
+  maxGroupSize?: number;
+  launchInMs?: number;
 }
 
 export interface ServerRematchStatusMessage {
@@ -450,6 +467,13 @@ export interface ServerRematchStatusMessage {
 export interface ServerOpponentDisconnectedMessage {
   type: 'server:opponentDisconnected';
   playerId: PlayerId;
+}
+
+/** Non-fatal active-Rumble departure; the remaining fighters keep playing. */
+export interface ServerPlayerLeftMessage {
+  type: 'server:playerLeft';
+  playerId: PlayerId;
+  nickname: string;
 }
 
 export interface ServerEventWarningMessage {

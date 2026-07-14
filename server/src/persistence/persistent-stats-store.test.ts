@@ -242,6 +242,15 @@ describe('PersistentStatsStore', () => {
     });
   });
 
+  it('can count a two-player social match without creating a duel rivalry', () => {
+    const store = makeStore();
+    store.recordMatch([entry('Ryan', 3), entry('Dave', 2)], 'Ryan', undefined, false);
+
+    expect(store.getLifetime('Ryan')!.wins).toBe(1);
+    expect(store.getLifetime('Dave')!.losses).toBe(1);
+    expect(store.getRivalry('Ryan', 'Dave')).toMatchObject({ winsA: 0, winsB: 0, draws: 0 });
+  });
+
   it('persists across a restart (new store instance, same DATA_DIR)', async () => {
     const store = makeStore();
     store.recordMatch([entry('Ryan', 10, 4, { gun: 10 }), entry('Dave', 4, 10)], 'Ryan');

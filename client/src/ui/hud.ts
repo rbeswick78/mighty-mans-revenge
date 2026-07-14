@@ -775,14 +775,16 @@ export class HUD {
     this.staminaBarFg.setSize(200 * ratio, 6);
   }
 
-  updateScores(
-    localName: string,
-    localScore: number,
-    opponentName: string,
-    opponentScore: number,
-  ): void {
+  updateScores(scores: ReadonlyArray<{ name: string; score: number }>): void {
+    const compact = scores.length > 2;
+    this.scoreText.setFontSize(compact ? 10 : 14);
     this.scoreText.setText(
-      `${localName}: ${localScore} | ${opponentName}: ${opponentScore}`,
+      scores
+        .map(({ name, score }, index) => {
+          const label = compact && index === 0 ? 'YOU' : name.slice(0, compact ? 8 : 16);
+          return `${label}: ${score}`;
+        })
+        .join(compact ? '  ·  ' : ' | '),
     );
   }
 

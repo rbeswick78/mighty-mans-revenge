@@ -46,6 +46,7 @@ export interface MatchData {
   mapName: string;
   /** Mode this match will be played in — drives the pre-match mode label. */
   gameMode: GameModeType;
+  matchKind?: 'duel' | 'rumble' | 'practice';
   /** Persisted real-match wins for every selectable fighter. */
   characterWins: Record<CharacterId, number>;
   /** Present only during the escalating three-fight solo run. */
@@ -65,6 +66,7 @@ type GameServiceEvent =
   | 'matchmakingStatus'
   | 'rematchStatus'
   | 'opponentDisconnected'
+  | 'playerLeft'
   | 'characterSelectState'
   | 'playerKilled'
   | 'pickupCollected'
@@ -185,6 +187,11 @@ export class GameService {
     this.networkManager.joinMatchmaking(nickname);
   }
 
+  joinRumble(nickname: string): void {
+    this.localNickname = nickname;
+    this.networkManager.joinRumble(nickname);
+  }
+
   startPractice(
     nickname: string,
     difficulty: BotDifficulty,
@@ -272,6 +279,7 @@ export class GameService {
         opponents: msg.opponents,
         mapName: msg.mapName,
         gameMode: msg.gameMode,
+        matchKind: msg.matchKind ?? (msg.gauntlet ? 'practice' : 'duel'),
         characterWins: {
           ...createEmptyCharacterWins(),
           ...msg.characterWins,
@@ -316,6 +324,10 @@ export class GameService {
       // dissolves it (the server stops broadcasting draftState).
       this.latestDraftState = null;
       this.emit('opponentDisconnected', playerId);
+    });
+
+    this.networkManager.on('playerLeft', (playerId: PlayerId, nickname: string) => {
+      this.emit('playerLeft', playerId, nickname);
     });
 
     this.networkManager.on('characterSelectState', (msg: ServerCharacterSelectStateMessage) => {

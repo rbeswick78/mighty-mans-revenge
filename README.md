@@ -1,6 +1,6 @@
 # Mighty Man's Revenge
 
-Post-apocalyptic 1v1 retro shooter (late-1980s pixel art) — Phaser.js client, Node.js authoritative server, WebRTC/UDP transport via Geckos.io, with full latency compensation (client prediction, server reconciliation, entity interpolation, server-side rewind). Solo hobby project for <10 friends in the NY/NJ area; not seeking external contributors.
+Post-apocalyptic 2–4 player retro shooter (late-1980s pixel art) — Phaser.js client, Node.js authoritative server, WebRTC/UDP transport via Geckos.io, with full latency compensation (client prediction, server reconciliation, entity interpolation, server-side rewind). Solo hobby project for <10 friends in the NY/NJ area; not seeking external contributors.
 
 - **Live client:** https://mighty-mans-revenge.web.app
 - **Server health:** http://34.24.140.207:3001/health
@@ -48,6 +48,15 @@ at any time; no settings toggle is required.
 Repeated knockouts cycle through roster-aware collapse animations instead of
 replaying the same fall every time. The choice comes from the synchronized
 match death counter, so every client sees the same cosmetic beat.
+
+## Group play
+
+`QUICK MATCH` keeps the focused 1v1 rivalry experience. `RUMBLE 2–4` opens a
+short gathering window once two fighters arrive, launches immediately at four,
+and turns every existing arena, mode, character, and shared event into a
+free-for-all. Two server-selected fighters make the map and mode draft picks
+while everyone else watches, then the whole connected group can vote for the
+next round from the final standings.
 
 ## Arena variety
 

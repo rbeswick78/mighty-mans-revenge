@@ -8,6 +8,7 @@ import {
   MUTATORS,
   OVERTIME,
   DRAFT,
+  RUMBLE,
   listMapNames,
   GameModeType,
   GAME_MODE_ROTATION,
@@ -80,7 +81,7 @@ function walkDraft(
   mgr.tick(0.05, 0);
   const snap = latestDraftState(sent);
   const first = snap.currentPickerId!;
-  const second = snap.players.find((p) => p.id !== first)!.id;
+  const second = snap.secondPickerId ?? snap.players.find((p) => p.id !== first)!.id;
   mgr.handleDraftPick(first, 'map', picks.map ?? snap.mapOptions[0]);
   mgr.handleDraftPick(second, 'mode', picks.mode ?? snap.modeOptions[0]);
 }
@@ -159,6 +160,62 @@ describe('MatchmakingManager rematch flow', () => {
 
     mgr.handleTaunt('A', 'still_standing');
     expect(sent).toHaveLength(2);
+  });
+
+  it('gathers 2-4 fighters into a distinct Rumble and exposes both draft roles', () => {
+    mgr.handleJoinRumble('A', 'Alpha');
+    mgr.handleJoinRumble('B', 'Bravo');
+    mgr.handleJoinRumble('C', 'Cora');
+
+    mgr.tick(RUMBLE.LAUNCH_DELAY_SECONDS - 0.1, 0);
+    expect(sent.some((entry) => entry.message.type === 'server:draftState')).toBe(false);
+    mgr.tick(0.1, 1);
+
+    const draft = latestDraftState(sent);
+    expect(draft.players.map((player) => player.id)).toEqual(['A', 'B', 'C']);
+    expect(draft.secondPickerId).toBeDefined();
+    expect(draft.secondPickerId).not.toBe(draft.firstPickerId);
+
+    mgr.handleDraftPick(draft.firstPickerId, 'map', draft.mapOptions[0]);
+    mgr.handleDraftPick(draft.secondPickerId!, 'mode', draft.modeOptions[0]);
+    const found = sent.find(
+      (entry) => entry.playerId === 'A' && entry.message.type === 'server:matchFound',
+    );
+    expect(found?.message.type === 'server:matchFound' && found.message.matchKind).toBe('rumble');
+    expect(mgr.getActiveMatches()[0].players.size).toBe(3);
+  });
+
+  it('eliminates an active Rumble leaver while the remaining fighters continue', () => {
+    for (const [id, nickname] of [
+      ['A', 'Alpha'],
+      ['B', 'Bravo'],
+      ['C', 'Cora'],
+    ] as const) {
+      mgr.handleJoinRumble(id, nickname);
+    }
+    mgr.tick(RUMBLE.LAUNCH_DELAY_SECONDS, 0);
+    const draft = latestDraftState(sent);
+    mgr.handleDraftPick(draft.firstPickerId, 'map', draft.mapOptions[0]);
+    mgr.handleDraftPick(draft.secondPickerId!, 'mode', draft.modeOptions[0]);
+    const match = mgr.getActiveMatches()[0];
+    match.phase = MatchPhase.ACTIVE;
+    sent.length = 0;
+
+    mgr.handlePlayerDisconnect('C');
+
+    expect(match.phase).toBe(MatchPhase.ACTIVE);
+    expect(match.players.get('C')).toMatchObject({ isDead: true, health: 0, score: -1 });
+    const notices = sent.filter((entry) => entry.message.type === 'server:playerLeft');
+    expect(notices.map((entry) => entry.playerId).sort()).toEqual(['A', 'B']);
+    mgr.tick(0.05, 1);
+    const state = [...sent]
+      .reverse()
+      .find((entry) => entry.playerId === 'A' && entry.message.type === 'server:gameState');
+    expect(
+      state?.message.type === 'server:gameState'
+        ? state.message.players.map((player) => player.id).sort()
+        : [],
+    ).toEqual(['A', 'B']);
   });
 
   it('scores a first-to-three set, gives the loser revenge picks, then resets after a clinch', () => {

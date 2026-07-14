@@ -463,4 +463,18 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
     });
     expect(seen).toEqual([{ playerId: REMOTE_ID, tauntId: 'still_standing' }]);
   });
+
+  it('sends Rumble joins and forwards non-fatal fighter departures', () => {
+    const seen: unknown[] = [];
+    manager.on('playerLeft', (playerId, nickname) => seen.push({ playerId, nickname }));
+
+    manager.joinRumble('Alpha');
+    expect(hoisted.sentMessages).toContainEqual({
+      type: 'client:joinRumble',
+      nickname: 'Alpha',
+    });
+
+    deliver({ type: 'server:playerLeft', playerId: REMOTE_ID, nickname: 'Bravo' });
+    expect(seen).toEqual([{ playerId: REMOTE_ID, nickname: 'Bravo' }]);
+  });
 });

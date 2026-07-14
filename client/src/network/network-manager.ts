@@ -53,6 +53,7 @@ type EventName =
   | 'matchmakingStatus'
   | 'rematchStatus'
   | 'opponentDisconnected'
+  | 'playerLeft'
   | 'characterSelectState'
   | 'bulletTrail'
   | 'grenadeThrown'
@@ -297,6 +298,11 @@ export class NetworkManager {
   /** Join matchmaking with a nickname. */
   joinMatchmaking(nickname: string): void {
     this.connection.send({ type: 'client:joinMatchmaking', nickname });
+  }
+
+  /** Join the separate 2-4 player Wasteland Rumble queue. */
+  joinRumble(nickname: string): void {
+    this.connection.send({ type: 'client:joinRumble', nickname });
   }
 
   getContractState(): MatchContractHudState | null {
@@ -610,6 +616,12 @@ export class NetworkManager {
         this.interpolation.removeEntity(msg.playerId);
         this.remotePlayerIds = this.remotePlayerIds.filter((id) => id !== msg.playerId);
         this.emit('opponentDisconnected', msg.playerId);
+        break;
+
+      case 'server:playerLeft':
+        this.interpolation.removeEntity(msg.playerId);
+        this.remotePlayerIds = this.remotePlayerIds.filter((id) => id !== msg.playerId);
+        this.emit('playerLeft', msg.playerId, msg.nickname);
         break;
 
       case 'server:pong':

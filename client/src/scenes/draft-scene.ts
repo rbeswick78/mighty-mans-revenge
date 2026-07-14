@@ -370,8 +370,16 @@ export class DraftScene extends Phaser.Scene {
     this.phase = 'spectacle';
     const centerX = this.cameras.main.width / 2;
 
-    const contenders = draft.players.slice(0, 2);
-    const winnerIndex = draft.players.findIndex((p) => p.id === draft.firstPickerId) === 1 ? 1 : 0;
+    const roleIds = [draft.firstPickerId, draft.secondPickerId].filter(
+      (id): id is PlayerId => id !== undefined,
+    );
+    const contenders = roleIds
+      .map((id) => draft.players.find((player) => player.id === id))
+      .filter((player): player is ServerDraftStateMessage['players'][number] => player !== undefined);
+    const winnerIndex = Math.max(
+      0,
+      contenders.findIndex((player) => player.id === draft.firstPickerId),
+    );
 
     const headline = new TitleLogo(this, centerX, 180, ['WHO PICKS FIRST?'], {
       fontSize: 22,

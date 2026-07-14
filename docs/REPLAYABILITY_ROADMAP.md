@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–75 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–76 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Quick Match 1v1 plus 2–4 player Wasteland Rumble, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -107,6 +107,7 @@ Each session below attacks one of these.
 | 73  | Rusted Refinery                                 | A breachable power vault creates a fresh contest from every route             | **DONE** (2026-07-13) |
 | 74  | Arena Mastery                                   | Every battlefield gains a persistent identity and rivalry chase               | **DONE** (2026-07-14) |
 | 75  | Wasteland Taunts                                | One-button battle cries turn live fights into social rivalry moments           | **DONE** (2026-07-14) |
+| 76  | Wasteland Rumble                                | 2–4 friends turn every arena into a replayable free-for-all                    | **DONE** (2026-07-14) |
 
 ---
 
@@ -3224,6 +3225,53 @@ attempt one attainable friend score to hunt from the first stage onward.
 
 ---
 
+## Session 76 — Wasteland Rumble
+
+**Goal:** let a small friend group turn the entire existing game into a shared
+free-for-all without weakening the focused 1v1 rivalry loop.
+
+**Locked design decisions**
+
+- `RUMBLE 2–4` owns a separate server-authoritative queue. Quick Match remains
+  immediate 1v1; Rumble opens a six-second launch window at two fighters and
+  launches immediately when a fourth arrives.
+- Every Rumble carries an explicit `matchKind` through draft, live play,
+  results, and direct rematch. The server selects exactly two draft roles;
+  additional entrants spectate the picks, then everyone gets an independent
+  unique character lock and joins the same authoritative match.
+- Existing maps, modes, mutators, pickups, character abilities, physics, and
+  score rules are reused unchanged. The live HUD compacts all connected
+  fighters' scores without reinterpreting mode-owned values.
+- A pre-fight disconnect dissolves the incomplete group safely. During live
+  play, a leaver is eliminated with no respawn or input, omitted from later
+  snapshots, announced non-fatally to the survivors, and retained in the
+  authoritative final standings with a `LEFT` marker.
+- Rumble standings rank every entrant by authoritative score with kills and
+  deaths as supporting context. A direct rematch requires consensus from only
+  the connected survivors. Rumble never writes lifetime head-to-head rivalry
+  stats or creates a 1v1 Rivalry Set.
+- Queue countdowns are advanced only by the server tick and reliable status
+  messages are throttled to visible whole-second changes; clients cannot
+  accelerate launch, choose group membership, or author result identity.
+
+**Acceptance criteria**
+
+- [x] Pure queue tests cover waiting below two, delayed launch, immediate
+      four-player launch, stable ordering, and reset when the group shrinks.
+- [x] Matchmaking tests prove three-player draft roles, `matchKind` propagation,
+      active-leaver continuation, snapshot removal, and connected-only rematch
+      authority while preserving ordinary 1v1 behavior.
+- [x] Network tests cover the join request and non-fatal fighter-left event;
+      typecheck and lint protect the complete shared/client/server contract.
+- [x] A real three-client Chromium journey gathers, drafts with two designated
+      pickers, locks three fighters, reaches live combat with all three scores,
+      survives one tab leaving, renders standings, and starts a group rematch.
+- [x] Typecheck, lint, all 1,206 unit tests across 82 files, production build,
+      and the full 25-pass/11-intentional-skip desktop/mobile Playwright matrix
+      pass.
+
+---
+
 ## Session 75 — Wasteland Taunts
 
 **Goal:** give every live fight a tiny, memorable social beat that invites
@@ -3529,6 +3577,43 @@ favorite mid-match event while the final-minute surprise stays fresh.
 ---
 
 ## Session Log
+
+### Session 76 — 2026-07-14 — Wasteland Rumble
+
+**Shipped:** the lobby now offers a separate `RUMBLE 2–4` path alongside the
+unchanged 1v1 Quick Match. The authoritative queue gathers up to four friends,
+starts a short launch countdown once two are ready, and moves the whole group
+through map/mode draft, unique fighter selection, every existing game mode,
+compact live scoring, ranked standings, and consensus rematches. Exactly two
+server-selected entrants make the draft choices while the rest spectate.
+
+The match kind is explicit from matchmaking through results. Active leavers
+are eliminated and removed from later live snapshots without ending the fight,
+remain visible as `LEFT` in the final table, and do not block the connected
+survivors from choosing another round. Rumble deliberately does not create
+Rivalry Sets or write lifetime 1v1 head-to-head records. No weapon, fighter,
+mode, event, pickup, map, physics, scoring, or balance constant changed.
+
+**Verification:** 85 focused tests pass across the Rumble queue, complete
+matchmaking lifecycle, disconnect filtering, and client transport. A real
+three-client Chromium walkthrough covered gathering, both designated draft
+roles, a spectator entrant, three distinct fighter locks, live combat, a
+mid-fight departure, final standings, and a successful three-player rematch.
+That walkthrough caught and drove fixes for the HUD initially showing only one
+rival and for a departed fighter reappearing in later snapshots. Typecheck,
+lint, all 1,206 unit tests across 82 files, and the production build pass; Vite
+retains its existing chunk-size advisory. The full Playwright matrix passes 25
+tests with 11 intentional project-scoped skips across Chromium, Firefox, and
+844×390 mobile landscape.
+
+**Tuning watch:** six seconds should be enough for friends to pile in without
+making a pair wait. Watch whether groups discover the new path, whether four
+scores stay readable in chaotic modes, whether requiring every connected
+fighter for a rematch adds friction, and whether frequent leavers distort
+standings before changing queue time or consensus rules.
+
+**Deployment:** not run; production deployment still requires explicit user
+authorization.
 
 ### Session 75 — 2026-07-14 — Wasteland Taunts
 

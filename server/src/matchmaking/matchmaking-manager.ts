@@ -3,6 +3,7 @@ import {
   GameModeType,
   GAME_MODE_ROTATION,
   DRAFT,
+  RUMBLE,
   RIVALRY_SET,
   BOT,
   BOT_DIFFICULTIES,
@@ -60,6 +61,7 @@ import { BotController } from '../game/bot-controller.js';
 import { getGameMode } from '../game/modes/index.js';
 import { GameServer } from '../network/server.js';
 import { MatchmakingQueue } from './matchmaking-queue.js';
+import { RumbleQueue } from './rumble-queue.js';
 import { logger } from '../utils/logger.js';
 import type {
   PersistentStatsStore,
@@ -123,6 +125,8 @@ interface PostMatchState {
   previousContractId: MatchContractId;
 }
 
+type MatchKind = 'duel' | 'rumble' | 'practice';
+
 /**
  * A pre-match map/mode draft in progress. Lives BEFORE Match construction —
  * Match takes mapData/gameMode in its constructor (map manager, pickups,
@@ -157,6 +161,7 @@ interface DraftState {
   rematchMutatorExclusions: MutatorId[];
   /** Previous round's contract, carried through the draft into Match. */
   previousContractId?: MatchContractId;
+  matchKind: 'duel' | 'rumble';
 }
 
 interface RivalrySetState {
@@ -168,8 +173,11 @@ interface RivalrySetState {
 
 export class MatchmakingManager {
   private readonly queue: MatchmakingQueue;
+  private readonly rumbleQueue: RumbleQueue;
   private readonly server: GameServer;
   private readonly activeMatches: Map<string, Match> = new Map();
+  /** Queue family survives draft, live match, results, and direct rematches. */
+  private readonly matchKinds: Map<string, MatchKind> = new Map();
   /** Maps playerId -> matchId for routing messages. */
   private readonly playerMatchMap: Map<PlayerId, string> = new Map();
   /** Post-match state for rematch handling. */
@@ -229,6 +237,8 @@ export class MatchmakingManager {
   private mapRotationIndex = 0;
   /** Same contract for game modes (FORCE-pinned matches only). */
   private modeRotationIndex = 0;
+  /** Suppress 20Hz reliable queue spam; the lobby only renders whole seconds. */
+  private lastRumbleStatusKey = '';
 
   constructor(
     server: GameServer,
@@ -239,6 +249,7 @@ export class MatchmakingManager {
   ) {
     this.server = server;
     this.queue = new MatchmakingQueue();
+    this.rumbleQueue = new RumbleQueue();
     this.getPlayerRTT = getPlayerRTT;
     this.statsStore = statsStore;
     this.rng = rng;
@@ -247,7 +258,7 @@ export class MatchmakingManager {
 
   handleJoinMatchmaking(playerId: PlayerId, nickname: string): void {
     // If player is already in a match, ignore
-    if (this.playerMatchMap.has(playerId)) {
+    if (this.playerMatchMap.has(playerId) || this.rumbleQueue.isPlayerQueued(playerId)) {
       logger.debug({ playerId }, 'Player already in a match, ignoring matchmaking request');
       return;
     }
@@ -273,6 +284,17 @@ export class MatchmakingManager {
 
     // Try to match immediately
     this.tryCreateMatch();
+  }
+
+  handleJoinRumble(playerId: PlayerId, nickname: string): void {
+    if (this.playerMatchMap.has(playerId) || this.queue.isPlayerQueued(playerId)) return;
+    this.playerNicknames.set(playerId, nickname);
+    if (!this.rumbleQueue.addPlayer(playerId, nickname)) return;
+    logger.info(
+      { playerId, nickname, queueLength: this.rumbleQueue.getQueueLength() },
+      'Player joined Wasteland Rumble',
+    );
+    this.broadcastRumbleStatus();
   }
 
   /** Start a real authoritative match immediately with a synthetic opponent. */
@@ -321,6 +343,7 @@ export class MatchmakingManager {
       }
     }
     this.queue.removePlayer(playerId);
+    this.rumbleQueue.removePlayer(playerId);
     this.playerNicknames.set(playerId, nickname);
 
     const botId = `${BOT.PLAYER_ID_PREFIX}${crypto.randomUUID()}` as PlayerId;
@@ -362,7 +385,7 @@ export class MatchmakingManager {
   }
 
   handleCancelMatchmaking(playerId: PlayerId): void {
-    const removed = this.queue.removePlayer(playerId);
+    const removed = this.queue.removePlayer(playerId) || this.rumbleQueue.removePlayer(playerId);
     if (removed) {
       logger.info({ playerId }, 'Player cancelled matchmaking');
       this.server.sendTo(
@@ -374,12 +397,15 @@ export class MatchmakingManager {
         },
         { reliable: true },
       );
+      this.broadcastRumbleStatus();
     }
   }
 
   handlePlayerDisconnect(playerId: PlayerId): void {
     // Remove from queue if queued
     this.queue.removePlayer(playerId);
+    const leftRumbleQueue = this.rumbleQueue.removePlayer(playerId);
+    if (leftRumbleQueue) this.broadcastRumbleStatus();
     this.playerNicknames.delete(playerId);
 
     // Handle disconnect in active match
@@ -397,17 +423,25 @@ export class MatchmakingManager {
 
       const match = this.activeMatches.get(matchId);
       if (match) {
-        match.onPlayerDisconnect(playerId);
+        const isRumble = this.matchKinds.get(matchId) === 'rumble';
+        if (isRumble && match.phase !== MatchPhase.ACTIVE) {
+          this.teardownRumbleBeforeFight(matchId, match, playerId);
+          return;
+        }
+        match.onPlayerDisconnect(playerId, isRumble);
 
         // Notify other players in the match
         for (const [pid] of match.players) {
           if (pid !== playerId) {
             this.server.sendTo(
               pid,
-              {
-                type: 'server:opponentDisconnected',
-                playerId,
-              },
+              isRumble
+                ? {
+                    type: 'server:playerLeft',
+                    playerId,
+                    nickname: match.players.get(playerId)?.nickname ?? 'A fighter',
+                  }
+                : { type: 'server:opponentDisconnected', playerId },
               { reliable: true },
             );
           }
@@ -434,6 +468,7 @@ export class MatchmakingManager {
         }
         clearTimeout(state.timeoutHandle);
         this.postMatchStates.delete(postMatchId);
+        this.matchKinds.delete(postMatchId);
         this.releaseRivalrySet(state.playerIds);
         this.releasePracticePlayers(state.playerIds);
         // Return remaining players to lobby state
@@ -566,6 +601,7 @@ export class MatchmakingManager {
 
       clearTimeout(postMatch.timeoutHandle);
       this.postMatchStates.delete(matchId);
+      this.matchKinds.delete(matchId);
       this.releaseRivalrySet(postMatch.playerIds);
       this.releasePracticePlayers(postMatch.playerIds);
     } else {
@@ -578,6 +614,7 @@ export class MatchmakingManager {
   tick(dt: number, serverTick: number): void {
     // Try to create matches from queued players
     this.tryCreateMatch();
+    this.tryCreateRumble(dt);
 
     // Drive pre-match draft deadlines + snapshots
     this.tickDrafts(dt);
@@ -642,7 +679,7 @@ export class MatchmakingManager {
   }
 
   getQueueLength(): number {
-    return this.queue.getQueueLength();
+    return this.queue.getQueueLength() + this.rumbleQueue.getQueueLength();
   }
 
   /** Route a player input to the correct match. */
@@ -856,6 +893,69 @@ export class MatchmakingManager {
     this.startDraft(playerEntries);
   }
 
+  private tryCreateRumble(dt: number): void {
+    const group = this.rumbleQueue.tick(dt);
+    if (!group) {
+      if (this.rumbleQueue.getQueueLength() > 0) this.broadcastRumbleStatus();
+      return;
+    }
+    const entries = group.map((entry) => ({ id: entry.playerId, nickname: entry.nickname }));
+    logger.info({ players: entries.map((entry) => entry.id) }, 'Wasteland Rumble group ready');
+    if (this.forcePinsActive()) {
+      const matchId = crypto.randomUUID();
+      this.matchKinds.set(matchId, 'rumble');
+      this.launchMatch(matchId, this.pickRotationMap(), this.pickRotationMode(), entries);
+    } else {
+      this.startDraft(entries, null, [], undefined, 'rumble');
+    }
+    this.broadcastRumbleStatus();
+  }
+
+  private broadcastRumbleStatus(): void {
+    const groupSize = this.rumbleQueue.getQueueLength();
+    const launchInMs = this.rumbleQueue.getLaunchInMs();
+    const statusKey = `${groupSize}:${launchInMs === undefined ? 'waiting' : Math.ceil(launchInMs / 1000)}`;
+    if (statusKey === this.lastRumbleStatusKey) return;
+    this.lastRumbleStatusKey = statusKey;
+    for (const entry of this.rumbleQueue.getEntries()) {
+      this.server.sendTo(
+        entry.playerId,
+        {
+          type: 'server:matchmakingStatus',
+          status: 'queued',
+          matchKind: 'rumble',
+          groupSize,
+          maxGroupSize: RUMBLE.MAX_PLAYERS,
+          ...(launchInMs === undefined ? {} : { launchInMs }),
+          playersOnline: this.getOnlinePlayerCount(),
+        },
+        { reliable: true },
+      );
+    }
+  }
+
+  /** A group that loses someone before FIGHT returns intact to the lobby. */
+  private teardownRumbleBeforeFight(
+    matchId: string,
+    match: Match,
+    leavingPlayerId: PlayerId,
+  ): void {
+    for (const [playerId] of match.players) {
+      this.playerMatchMap.delete(playerId);
+      if (playerId !== leavingPlayerId) {
+        this.server.sendTo(
+          playerId,
+          { type: 'server:opponentDisconnected', playerId: leavingPlayerId },
+          { reliable: true },
+        );
+      }
+    }
+    this.activeMatches.delete(matchId);
+    this.previousPhases.delete(matchId);
+    this.matchKinds.delete(matchId);
+    logger.info({ matchId, leavingPlayerId }, 'Rumble dissolved before fight');
+  }
+
   /**
    * Construct and register the Match and tell every entrant. Shared by
    * the FORCE-pinned fresh path, draft finalization, and pinned rematches
@@ -879,6 +979,9 @@ export class MatchmakingManager {
     practiceRivalPin: CharacterId | null = null,
     practiceMutatorPreference: MutatorId | null = null,
   ): void {
+    const matchKind =
+      this.matchKinds.get(matchId) ?? (practiceDifficulty === null ? 'duel' : 'practice');
+    this.matchKinds.set(matchId, matchKind);
     const dailySeed = gauntlet?.challengeKey
       ? [
           gauntlet.challengeKey,
@@ -978,6 +1081,7 @@ export class MatchmakingManager {
           opponents,
           mapName: mapData.name,
           gameMode,
+          matchKind,
           characterWins,
           gauntlet: gauntlet ?? undefined,
           practiceMutatorId: appliedPracticeMutator ?? undefined,
@@ -1012,6 +1116,7 @@ export class MatchmakingManager {
     revengePickerId: PlayerId | null = null,
     rematchMutatorExclusions: readonly MutatorId[] = [],
     previousContractId?: MatchContractId,
+    matchKind: 'duel' | 'rumble' = 'duel',
   ): void {
     const matchId = crypto.randomUUID();
     const draftEntries = playerEntries.map((entry) => ({
@@ -1051,8 +1156,10 @@ export class MatchmakingManager {
       pickTimerSeconds: DRAFT.FIRST_PICK_SECONDS,
       rematchMutatorExclusions: [...rematchMutatorExclusions],
       previousContractId,
+      matchKind,
     };
     this.draftStates.set(matchId, draft);
+    this.matchKinds.set(matchId, matchKind);
 
     // Register under the future matchId immediately: the queue guard
     // ("already in a match") and disconnect routing must treat drafting
@@ -1103,6 +1210,7 @@ export class MatchmakingManager {
         arenaWins: { ...e.arenaWins },
       })),
       firstPickerId: draft.firstPickerId,
+      secondPickerId: draft.secondPickerId,
       firstPickerReason: draft.firstPickerReason,
       currentPickerId: draft.currentPickerId,
       mapPick: draft.mapPick,
@@ -1224,6 +1332,7 @@ export class MatchmakingManager {
    */
   private teardownDraft(draft: DraftState, leavingPlayerId: PlayerId): void {
     this.draftStates.delete(draft.matchId);
+    this.matchKinds.delete(draft.matchId);
     this.releaseRivalrySet(draft.playerEntries.map((entry) => entry.id));
     for (const entry of draft.playerEntries) {
       this.playerMatchMap.delete(entry.id);
@@ -1314,7 +1423,9 @@ export class MatchmakingManager {
   private broadcastMatchState(match: Match, serverTick: number): void {
     const players: SerializedPlayerState[] = [];
 
-    for (const [, player] of match.players) {
+    const connectedPlayerIds = new Set(match.getConnectedPlayerIds());
+    for (const [playerId, player] of match.players) {
+      if (!connectedPlayerIds.has(playerId)) continue;
       players.push({
         id: player.id,
         // SerializedPlayerState requires characterId non-null. By the time we
@@ -1502,6 +1613,15 @@ export class MatchmakingManager {
 
   private onMatchEnded(matchId: string, match: Match): void {
     const result = match.getResult();
+    const matchKind = this.matchKinds.get(matchId) ?? 'duel';
+    result.matchKind = matchKind;
+    result.scores = Object.fromEntries(
+      [...match.players].map(([playerId, player]) => [playerId, player.score]),
+    );
+    result.playerNicknames = Object.fromEntries(
+      [...match.players].map(([playerId, player]) => [playerId, player.nickname]),
+    );
+    result.departedPlayerIds = match.getDepartedPlayerIds();
     const practiceDifficulty = this.practiceDifficulties.get(matchId) ?? null;
     const practiceModePin = this.practiceModePins.get(matchId) ?? null;
     const practiceRivalPin = this.practiceRivalPins.get(matchId) ?? null;
@@ -1513,7 +1633,8 @@ export class MatchmakingManager {
     };
     const isPractice = practiceDifficulty !== null;
     result.isPractice = isPractice;
-    result.rivalrySet = gauntlet ? null : this.recordRivalrySet(match, result.winnerId);
+    result.rivalrySet =
+      gauntlet || matchKind === 'rumble' ? null : this.recordRivalrySet(match, result.winnerId);
     const humanPlayerId = gauntlet
       ? [...match.players.keys()].find((playerId) => !this.botPlayerIds.has(playerId))
       : undefined;
@@ -1723,7 +1844,7 @@ export class MatchmakingManager {
       }
       const winnerNickname =
         result.winnerId !== null ? (match.players.get(result.winnerId)?.nickname ?? null) : null;
-      this.statsStore.recordMatch(entries, winnerNickname, arenaName);
+      this.statsStore.recordMatch(entries, winnerNickname, arenaName, matchKind !== 'rumble');
       result.winStreaks = {};
       result.arenaMastery = {};
       for (const [playerId, player] of match.players) {
@@ -1748,7 +1869,7 @@ export class MatchmakingManager {
             this.statsStore.getLifetime(player.nickname)?.contractsCompleted ?? 0;
         }
       }
-      if (entries.length === 2) {
+      if (entries.length === 2 && matchKind !== 'rumble') {
         result.rivalry = this.statsStore.getRivalry(entries[0].nickname, entries[1].nickname);
       }
 
@@ -1787,7 +1908,8 @@ export class MatchmakingManager {
     logger.info({ matchId, winnerId: result.winnerId, duration: result.duration }, 'Match ended');
 
     // Move to post-match state for rematch handling
-    const playerIds = [...match.players.keys()];
+    const playerIds =
+      matchKind === 'rumble' ? match.getConnectedPlayerIds() : [...match.players.keys()];
     const timeoutHandle = setTimeout(() => {
       this.onRematchTimeout(matchId);
     }, REMATCH_TIMEOUT_MS);
@@ -1856,6 +1978,7 @@ export class MatchmakingManager {
     }
 
     this.postMatchStates.delete(matchId);
+    this.matchKinds.delete(matchId);
     this.releaseRivalrySet(postMatch.playerIds);
     this.releasePracticePlayers(postMatch.playerIds);
   }
@@ -1880,6 +2003,8 @@ export class MatchmakingManager {
       id: pid,
       nickname: this.playerNicknames.get(pid) ?? `Player_${pid.slice(0, 4)}`,
     }));
+    const rematchKind = this.matchKinds.get(postMatch.matchId) ?? 'duel';
+    this.matchKinds.delete(postMatch.matchId);
 
     if (postMatch.setComplete) {
       this.releaseRivalrySet(postMatch.playerIds);
@@ -1888,8 +2013,10 @@ export class MatchmakingManager {
     logger.info({ players: postMatch.playerIds }, 'Rematch starting');
 
     if (postMatch.isPractice) {
+      const nextMatchId = crypto.randomUUID();
+      this.matchKinds.set(nextMatchId, 'practice');
       this.launchMatch(
-        crypto.randomUUID(),
+        nextMatchId,
         getMap(postMatch.nextMapName),
         postMatch.nextGameMode,
         playerEntries,
@@ -1911,8 +2038,10 @@ export class MatchmakingManager {
     // Either path re-points playerMatchMap at the new id (draft or match)
     // for every entrant, replacing the ended match's mapping.
     if (this.forcePinsActive()) {
+      const nextMatchId = crypto.randomUUID();
+      this.matchKinds.set(nextMatchId, rematchKind);
       this.launchMatch(
-        crypto.randomUUID(),
+        nextMatchId,
         getMap(postMatch.nextMapName),
         postMatch.nextGameMode,
         playerEntries,
@@ -1928,6 +2057,7 @@ export class MatchmakingManager {
       postMatch.revengePickerId,
       postMatch.previousMutators,
       postMatch.previousContractId,
+      rematchKind === 'rumble' ? 'rumble' : 'duel',
     );
   }
 

@@ -119,6 +119,10 @@ export class GameManager {
         this.matchmaking.handleJoinMatchmaking(playerId, message.nickname);
         break;
 
+      case 'client:joinRumble':
+        this.matchmaking.handleJoinRumble(playerId, message.nickname);
+        break;
+
       case 'client:startPractice':
         this.matchmaking.handleStartPractice(
           playerId,

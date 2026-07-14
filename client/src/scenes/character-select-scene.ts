@@ -544,21 +544,21 @@ export class CharacterSelectScene extends Phaser.Scene {
     }
 
     const selfLockedId = self?.lockedCharacterId ?? null;
-    const oppHoveredId = others[0]?.hoveredCharacterId ?? null;
-    const oppLockedId = others[0]?.lockedCharacterId ?? null;
 
     for (const card of this.cards.values()) {
       const id = card.characterId;
+      const otherHover = others.find((selection) => selection.hoveredCharacterId === id);
+      const otherLock = others.find((selection) => selection.lockedCharacterId === id);
       const selfHovers = self && !selfLockedId && self.hoveredCharacterId === id;
-      const oppHovers = oppHoveredId === id;
+      const oppHovers = otherHover !== undefined;
       const isSelfLocked = selfLockedId === id;
-      const isOppLocked = oppLockedId === id;
+      const isOppLocked = otherLock !== undefined;
       const lockedByOther = isOppLocked && !isSelfLocked;
 
       this.drawCardBorder(card, !!selfHovers || isSelfLocked, !!oppHovers || isOppLocked);
 
       if (isSelfLocked || isOppLocked) {
-        const who = isSelfLocked ? 'YOU' : 'OPPONENT';
+        const who = isSelfLocked ? 'YOU' : (otherLock?.nickname.toUpperCase() ?? 'RIVAL');
         card.lockedBadge.setText(`LOCKED · ${who}`);
         card.lockedBadge.setColor(cssHex(isSelfLocked ? LOCKED_BADGE_COLOR : OPPONENT_NICK_COLOR));
         if (!card.pulseTween) {
