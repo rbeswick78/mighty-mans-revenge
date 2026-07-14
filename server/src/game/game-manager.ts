@@ -155,6 +155,10 @@ export class GameManager {
         this.matchmaking.handleDraftPick(playerId, message.category, message.value);
         break;
 
+      case 'client:taunt':
+        this.matchmaking.handleTaunt(playerId, message.tauntId);
+        break;
+
       case 'client:ping': {
         // Cache server-side RTT estimate so lag compensation can rewind
         // opponent positions to this player's render time on shoot. The

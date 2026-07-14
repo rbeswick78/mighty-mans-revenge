@@ -27,6 +27,7 @@ import {
   type PracticeKind,
   type CharacterId,
   type MutatorId,
+  type TauntId,
 } from '@shared/config/game.js';
 import { playerMovementModifiers } from '@shared/utils/event-modifiers.js';
 import { NetworkConnection } from './connection.js';
@@ -65,6 +66,7 @@ type EventName =
   | 'weaponIncoming'
   | 'tilesDestroyed'
   | 'overtimeStart'
+  | 'taunt'
   | 'leaderboard'
   | 'dailyGauntletLeaderboard'
   | 'error';
@@ -285,6 +287,11 @@ export class NetworkManager {
 
     this.prediction.addPrediction(input, predicted);
     this.localPlayerState = predicted;
+  }
+
+  /** Request a shared, server-validated battle cry. */
+  sendTaunt(tauntId: TauntId): void {
+    this.connection.send({ type: 'client:taunt', tauntId });
   }
 
   /** Join matchmaking with a nickname. */
@@ -534,6 +541,10 @@ export class NetworkManager {
         this.matchEndsAtLocalMs = performance.now() + msg.overtimeEndsInMs;
         this._isOvertime = true;
         this.emit('overtimeStart');
+        break;
+
+      case 'server:taunt':
+        this.emit('taunt', msg.playerId, msg.tauntId);
         break;
 
       case 'server:eventWarning':

@@ -617,6 +617,30 @@ export const COMBAT_MEDALS = Object.freeze({
 });
 
 /**
+ * Universal, presentation-only battle cries. The server validates the id and
+ * rate limit; clients decide which line to request and only render accepted
+ * broadcasts. Keeping the copy shared prevents a client from spoofing text.
+ */
+export const TAUNTS = Object.freeze({
+  bring_it: Object.freeze({ text: 'BRING IT!' }),
+  is_that_all: Object.freeze({ text: 'IS THAT ALL?' }),
+  come_get_some: Object.freeze({ text: 'COME GET SOME!' }),
+  still_standing: Object.freeze({ text: 'STILL STANDING!' }),
+});
+
+export type TauntId = keyof typeof TAUNTS;
+export const TAUNT_IDS: readonly TauntId[] = Object.freeze(Object.keys(TAUNTS) as TauntId[]);
+
+export const TAUNT = Object.freeze({
+  COOLDOWN_SECONDS: 4,
+  DISPLAY_MS: 2_000,
+});
+
+export function isTauntId(value: unknown): value is TauntId {
+  return typeof value === 'string' && Object.prototype.hasOwnProperty.call(TAUNTS, value);
+}
+
+/**
  * Game mode metadata + rotation. Rotation order doubles as the cycle fresh
  * matches walk through (mirrors the map registry's rotation contract):
  * fresh matches advance a global cursor, rematches play the mode AFTER the

@@ -70,6 +70,7 @@ const neutralInput = (aimAngle: number): RawInput => ({
   sprint: false,
   reload: false,
   abilityPressed: false,
+  tauntPressed: false,
 });
 
 /** Browser provider kept behind a seam so controller sampling stays deterministic in tests. */
@@ -189,6 +190,7 @@ export class GamepadInput {
         !!currentButtons[STANDARD_GAMEPAD_BUTTON.LEFT_STICK],
       reload: pressed(STANDARD_GAMEPAD_BUTTON.X),
       abilityPressed: pressed(STANDARD_GAMEPAD_BUTTON.RIGHT_BUMPER),
+      tauntPressed: pressed(STANDARD_GAMEPAD_BUTTON.Y),
     };
 
     this.previousButtons = currentButtons;

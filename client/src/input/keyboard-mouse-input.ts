@@ -33,6 +33,9 @@ export class KeyboardMouseInput {
   private rmbPressedFlag = false;
   /** True if a live grenade existed at the moment RMB was pressed. */
   private rmbPressedWhileLive = false;
+  /** Buffered so a quick tap between 20 Hz input samples is never lost. */
+  private tauntPressedFlag = false;
+  private readonly onTauntKeyDown: (event: KeyboardEvent) => void;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -52,6 +55,10 @@ export class KeyboardMouseInput {
     };
     // Don't let the spacebar scroll the page when the canvas has focus.
     scene.input.keyboard.addCapture(Phaser.Input.Keyboard.KeyCodes.SPACE);
+    this.onTauntKeyDown = (event: KeyboardEvent) => {
+      if (!event.repeat) this.tauntPressedFlag = true;
+    };
+    scene.input.keyboard.on('keydown-T', this.onTauntKeyDown);
 
     this.pointer = scene.input.mousePointer ?? scene.input.activePointer;
 
@@ -158,6 +165,7 @@ export class KeyboardMouseInput {
       sprint: this.keys.SHIFT.isDown,
       reload: Phaser.Input.Keyboard.JustDown(this.keys.R),
       abilityPressed: Phaser.Input.Keyboard.JustDown(this.keys.SPACE),
+      tauntPressed: this.consumeTauntPressed(),
     };
   }
 
@@ -173,7 +181,14 @@ export class KeyboardMouseInput {
       this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
       this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.R);
       this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+      this.scene.input.keyboard.off('keydown-T', this.onTauntKeyDown);
       this.scene.input.keyboard.removeCapture(Phaser.Input.Keyboard.KeyCodes.SPACE);
     }
+  }
+
+  private consumeTauntPressed(): boolean {
+    const pressed = this.tauntPressedFlag;
+    this.tauntPressedFlag = false;
+    return pressed;
   }
 }

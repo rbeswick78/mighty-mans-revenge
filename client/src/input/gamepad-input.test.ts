@@ -110,16 +110,19 @@ describe('GamepadInput', () => {
     setButton(pad, STANDARD_GAMEPAD_BUTTON.LEFT_BUMPER, true);
     setButton(pad, STANDARD_GAMEPAD_BUTTON.X, true);
     setButton(pad, STANDARD_GAMEPAD_BUTTON.RIGHT_BUMPER, true);
+    setButton(pad, STANDARD_GAMEPAD_BUTTON.Y, true);
 
     expect(input.poll(false).raw).toMatchObject({
       sprint: true,
       reload: true,
       abilityPressed: true,
+      tauntPressed: true,
     });
     expect(input.poll(false).raw).toMatchObject({
       sprint: true,
       reload: false,
       abilityPressed: false,
+      tauntPressed: false,
     });
   });
 

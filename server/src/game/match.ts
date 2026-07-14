@@ -12,6 +12,7 @@ import {
   SERVER,
   MUTATORS,
   COMBAT_MEDALS,
+  TAUNT,
   KOTH,
   ABILITY,
   CHARACTER_IDS,
@@ -34,6 +35,7 @@ import {
   radiationStormInitialRadius,
   radiationStormRadius,
   isOutsideRadiationStorm,
+  isTauntId,
 } from '@shared/game';
 import type {
   PlayerId,
@@ -63,6 +65,7 @@ import type {
   MatchContractDefinition,
   MatchContractHudState,
   MatchContractId,
+  TauntId,
 } from '@shared/game';
 import { logger } from '../utils/logger.js';
 import { PickupManager } from './pickup-manager.js';
@@ -168,6 +171,8 @@ export class Match implements MatchContext {
   private inputQueues: Map<PlayerId, InputQueue> = new Map();
   /** Active 3-shot bursts in flight, keyed by player. */
   private pendingBursts: Map<PlayerId, PendingBurst> = new Map();
+  /** Simulation-time rate limit for presentation-only battle cries. */
+  private readonly tauntCooldowns = new Map<PlayerId, number>();
   /**
    * Seconds until each player can pull the trigger again — the shotgun's
    * pump-racking, the pistol's semi-auto pacing, and the punch's swing
@@ -414,6 +419,20 @@ export class Match implements MatchContext {
   }
 
   /**
+   * Validate a requested battle cry against authoritative match state.
+   * Returns the narrowed shared id only when the caller may broadcast it.
+   */
+  tryTaunt(playerId: PlayerId, value: unknown): TauntId | null {
+    if (this.phase !== MatchPhase.ACTIVE || !isTauntId(value)) return null;
+    const player = this.players.get(playerId);
+    if (!player || player.isDead || (this.tauntCooldowns.get(playerId) ?? 0) > 0) {
+      return null;
+    }
+    this.tauntCooldowns.set(playerId, TAUNT.COOLDOWN_SECONDS);
+    return value;
+  }
+
+  /**
    * Start the countdown phase. Called by updateCharacterSelect once both
    * players have locked (or the select timer has expired and any
    * unlocked players have been auto-locked). Every player must have a
@@ -445,10 +464,19 @@ export class Match implements MatchContext {
         this.updateCountdown(dt);
         break;
       case MatchPhase.ACTIVE:
+        this.updateTauntCooldowns(dt);
         this.updateActive(dt);
         break;
       default:
         break;
+    }
+  }
+
+  private updateTauntCooldowns(dt: number): void {
+    for (const [playerId, remaining] of this.tauntCooldowns) {
+      const next = remaining - dt;
+      if (next <= 0) this.tauntCooldowns.delete(playerId);
+      else this.tauntCooldowns.set(playerId, next);
     }
   }
 

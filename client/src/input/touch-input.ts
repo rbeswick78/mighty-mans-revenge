@@ -14,6 +14,8 @@ const THUMB_RADIUS = 24;
 const GRENADE_BUTTON_SIZE = 40;
 const GRENADE_BUTTON_MARGIN = 16;
 const ABILITY_BUTTON_SIZE = 40;
+const TAUNT_BUTTON_SIZE = 30;
+const TAUNT_BUTTON_GAP = 22;
 /** Vertical gap between the grenade button (above) and the ability button. */
 const ABILITY_BUTTON_GAP = 12;
 
@@ -59,6 +61,10 @@ export class TouchInput {
   private abilityButtonText: Phaser.GameObjects.Text;
   /** Set on the frame the ability button is pressed; cleared on read. */
   private abilityButtonPressedFlag = false;
+  /** Presentation-only battle cry button, kept available in every mode. */
+  private tauntButton: Phaser.GameObjects.Arc;
+  private tauntButtonText: Phaser.GameObjects.Text;
+  private tauntButtonPressedFlag = false;
   /** False when the current mode disables grenades and character abilities. */
   private secondaryActionsEnabled = true;
   /** Set on the frame the right joystick is released or dropped into deadzone. */
@@ -134,12 +140,40 @@ export class TouchInput {
       this.abilityButtonPressedFlag = true;
     });
 
+    // A smaller third button beside the combat cluster stays clear of the
+    // right virtual stick's usual lower-right thumb area.
+    const tauntX = btnX - GRENADE_BUTTON_SIZE - TAUNT_BUTTON_GAP - TAUNT_BUTTON_SIZE;
+    const tauntY = btnY;
+    this.tauntButton = scene.add.circle(
+      tauntX,
+      tauntY,
+      TAUNT_BUTTON_SIZE,
+      Wasteland.TEXT_LOADING,
+      0.65,
+    );
+    this.tauntButton.setScrollFactor(0).setDepth(3000).setVisible(false);
+
+    this.tauntButtonText = scene.add.text(tauntX, tauntY, 'T', {
+      fontFamily: 'Courier, monospace',
+      fontSize: '16px',
+      color: cssHex(Wasteland.TEXT_PRIMARY),
+      fontStyle: 'bold',
+    });
+    this.tauntButtonText.setOrigin(0.5).setScrollFactor(0).setDepth(3001).setVisible(false);
+    this.tauntButton.on('pointerdown', () => {
+      this.tauntButtonPressedFlag = true;
+    });
+
     scene.input.on('pointerdown', this.onPointerDown, this);
     scene.input.on('pointermove', this.onPointerMove, this);
     scene.input.on('pointerup', this.onPointerUp, this);
   }
 
   private showTouchUI(): void {
+    if (!this.tauntButton.visible) {
+      this.tauntButton.setVisible(true).setInteractive();
+      this.tauntButtonText.setVisible(true);
+    }
     if (this.grenadeButton.visible) return;
     if (this.secondaryActionsEnabled) {
       this.grenadeButton.setVisible(true);
@@ -352,6 +386,8 @@ export class TouchInput {
 
     const abilityPressed = this.abilityButtonPressedFlag;
     this.abilityButtonPressedFlag = false;
+    const tauntPressed = this.tauntButtonPressedFlag;
+    this.tauntButtonPressedFlag = false;
 
     return {
       moveX: moveVec.x,
@@ -365,6 +401,7 @@ export class TouchInput {
       sprint: this.sprintActive,
       reload: false, // Auto-reload on mobile; no explicit button.
       abilityPressed,
+      tauntPressed,
     };
   }
 
@@ -397,5 +434,7 @@ export class TouchInput {
     this.grenadeButtonText.destroy();
     this.abilityButton.destroy();
     this.abilityButtonText.destroy();
+    this.tauntButton.destroy();
+    this.tauntButtonText.destroy();
   }
 }

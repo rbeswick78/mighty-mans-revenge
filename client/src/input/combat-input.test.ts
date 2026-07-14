@@ -16,6 +16,7 @@ describe('withoutSecondaryActions', () => {
       sprint: true,
       reload: true,
       abilityPressed: true,
+      tauntPressed: true,
     };
 
     expect(withoutSecondaryActions(raw)).toEqual({
@@ -25,6 +26,7 @@ describe('withoutSecondaryActions', () => {
       detonatePressed: false,
       reload: false,
       abilityPressed: false,
+      tauntPressed: true,
     });
   });
 });

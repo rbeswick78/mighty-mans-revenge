@@ -48,6 +48,7 @@ import type {
   BotDifficulty,
   GauntletBoonId,
   MutatorId,
+  TauntId,
   MatchContractId,
   PracticeKind,
   PracticeGauntletMatch,
@@ -1268,6 +1269,23 @@ export class MatchmakingManager {
     const match = this.activeMatches.get(matchId);
     if (!match) return;
     match.setLock(playerId, characterId);
+  }
+
+  /** Broadcast an accepted, server-rate-limited battle cry to the whole match. */
+  handleTaunt(playerId: PlayerId, tauntId: TauntId): void {
+    const matchId = this.playerMatchMap.get(playerId);
+    if (!matchId) return;
+    const match = this.activeMatches.get(matchId);
+    const accepted = match?.tryTaunt(playerId, tauntId);
+    if (!match || !accepted) return;
+
+    for (const [recipientId] of match.players) {
+      this.server.sendTo(
+        recipientId,
+        { type: 'server:taunt', playerId, tauntId: accepted },
+        { reliable: true },
+      );
+    }
   }
 
   /**

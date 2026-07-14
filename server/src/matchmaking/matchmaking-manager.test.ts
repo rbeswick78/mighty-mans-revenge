@@ -135,6 +135,32 @@ describe('MatchmakingManager rematch flow', () => {
     mgr.handleDraftPick(other, 'mode', draft.modeOptions[0]);
   }
 
+  it('reliably broadcasts an accepted battle cry to every match participant', () => {
+    mgr.handleJoinMatchmaking('A', 'Alpha');
+    mgr.handleJoinMatchmaking('B', 'Bravo');
+    walkDraft(mgr, sent);
+    const match = mgr.getActiveMatches()[0];
+    match.phase = MatchPhase.ACTIVE;
+    sent.length = 0;
+
+    mgr.handleTaunt('A', 'bring_it');
+    expect(sent).toEqual([
+      {
+        playerId: 'A',
+        message: { type: 'server:taunt', playerId: 'A', tauntId: 'bring_it' },
+        reliable: true,
+      },
+      {
+        playerId: 'B',
+        message: { type: 'server:taunt', playerId: 'A', tauntId: 'bring_it' },
+        reliable: true,
+      },
+    ]);
+
+    mgr.handleTaunt('A', 'still_standing');
+    expect(sent).toHaveLength(2);
+  });
+
   it('scores a first-to-three set, gives the loser revenge picks, then resets after a clinch', () => {
     mgr.handleJoinMatchmaking('A', 'Alpha');
     mgr.handleJoinMatchmaking('B', 'Bravo');

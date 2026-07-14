@@ -36,6 +36,7 @@ See `CLAUDE.md` for the full command list and deploy procedures.
 | Grenade / detonate | Hold / release right mouse | Hold / release LT               | Grenade button                     |
 | Sprint             | Shift                      | LB or left-stick click          | Push left stick to its rim         |
 | Ability            | Space                      | RB                              | Ability button                     |
+| Battle cry         | T                          | Y                               | Taunt button                       |
 | Reload             | R                          | X / Square                      | Automatic                          |
 
 Gamepad menus use the D-pad or left stick, A / Cross to select, and B /

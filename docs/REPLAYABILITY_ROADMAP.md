@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–74 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–75 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -106,6 +106,7 @@ Each session below attacks one of these.
 | 72  | Gauntlet Build Mastery                          | Every discovered build gains its own score chase and trophy                   | **DONE** (2026-07-13) |
 | 73  | Rusted Refinery                                 | A breachable power vault creates a fresh contest from every route             | **DONE** (2026-07-13) |
 | 74  | Arena Mastery                                   | Every battlefield gains a persistent identity and rivalry chase               | **DONE** (2026-07-14) |
+| 75  | Wasteland Taunts                                | One-button battle cries turn live fights into social rivalry moments           | **DONE** (2026-07-14) |
 
 ---
 
@@ -3223,6 +3224,45 @@ attempt one attainable friend score to hunt from the first stage onward.
 
 ---
 
+## Session 75 — Wasteland Taunts
+
+**Goal:** give every live fight a tiny, memorable social beat that invites
+rivalry and rematches without changing combat outcomes.
+
+**Locked design decisions**
+
+- The shared registry owns four approved cries: `BRING IT!`, `IS THAT ALL?`,
+  `COME GET SOME!`, and `STILL STANDING!`. Clients send only a registered ID;
+  arbitrary player text never reaches the arena.
+- The server accepts a taunt only during live play from a living participant,
+  enforces a four-second per-player cooldown on simulation time, and reliably
+  broadcasts the approved cry to every participant in that match.
+- Taunts are presentation only. They do not alter input frames, movement,
+  weapons, abilities, targeting, bots, scoring, physics, matchmaking, or any
+  balance value.
+- Each local press advances through the four lines. Keyboard uses `T`, gamepad
+  uses `Y`, and touch gets a fixed `T` button beside the grenade control. The
+  input edge is buffered so a quick tap cannot disappear between game ticks.
+- A compact speech bubble follows the speaking fighter for two seconds and
+  fades cleanly. Practice allows the human fighter to taunt; Rusty never emits
+  one autonomously.
+
+**Acceptance criteria**
+
+- [x] Shared tests freeze the approved registry and reject unknown IDs.
+- [x] Match tests prove live/alive validation, simulation-time cooldowns, and
+      acceptance after expiry without changing player input.
+- [x] Matchmaking tests prove reliable match-wide broadcast and spam rejection;
+      network and input tests cover transport, gamepad, and combat filtering.
+- [x] A live Chromium match shows consecutive rotating cries anchored above the
+      fighter, rejects a dead-player request, and records no console errors.
+- [x] Desktop and 844×390 mobile-landscape walkthroughs preserve the playfield;
+      the touch control remains outside the lower-right aim-stick zone.
+- [x] Typecheck, lint, all 1,198 unit tests across 81 files, production build,
+      and the full Playwright desktop/mobile matrix pass.
+
+---
+
 ## Session 74 — Arena Mastery
 
 **Goal:** make every arena a persistent friend-group chase, so players return
@@ -3489,6 +3529,37 @@ favorite mid-match event while the final-minute surprise stays fresh.
 ---
 
 ## Session Log
+
+### Session 75 — 2026-07-14 — Wasteland Taunts
+
+**Shipped:** every living fighter can now throw a short battle cry into a live
+fight. `T`, gamepad `Y`, or the touch `T` button cycles through four approved
+lines in a speech bubble that follows the speaker. The client buffers quick
+keyboard taps and gives immediate local cooldown feedback, while the server
+remains authoritative over the registered text, match phase, alive state, and
+four-second rate limit before reliably broadcasting to all participants.
+
+The feature is deliberately social rather than mechanical: no combat input,
+bot behavior, targeting, score, physics, matchmaking, or balance value changes.
+Practice supports human taunts, but Rusty does not taunt on its own. No new
+third-party assets were added.
+
+**Verification:** 401 focused tests pass across shared config, match authority,
+matchmaking broadcast, network transport, gamepad input, and combat filtering.
+A live Chromium match displayed the first two rotating cries above the player,
+rejected a dead-player request, and produced no console errors. Desktop and
+844×390 mobile-landscape walkthroughs confirmed the canvas fit and control
+placement. Typecheck, lint, all 1,198 unit tests across 81 files, and the
+production build pass; Vite retains its existing chunk-size advisory. The full
+Playwright matrix passes 25 tests with 11 intentional project-scoped skips.
+
+**Tuning watch:** four seconds should support playful back-and-forth without
+turning the arena into constant visual noise. Watch line readability during
+crowded fights and whether the fixed copy stays fun after repeated sessions;
+adjust only cooldown, display duration, or approved wording from play evidence.
+
+**Deployment:** not run; production deployment still requires explicit user
+authorization.
 
 ### Session 74 — 2026-07-14 — Arena Mastery
 

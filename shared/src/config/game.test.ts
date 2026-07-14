@@ -25,6 +25,10 @@ import {
   LEADERBOARD,
   MATCH_CONTRACTS,
   COMBAT_MEDALS,
+  TAUNT,
+  TAUNTS,
+  TAUNT_IDS,
+  isTauntId,
   CAREER_RANKS,
   careerRankProgressForContracts,
   CHARACTER_MASTERY_TIERS,
@@ -50,6 +54,25 @@ import {
   type CharacterDef,
 } from '../types/character.js';
 import type { WeaponDef } from '../types/weapon.js';
+
+describe('wasteland taunts', () => {
+  it('keeps a small frozen registry with safe, unique display copy', () => {
+    expect(Object.isFrozen(TAUNTS)).toBe(true);
+    expect(Object.isFrozen(TAUNT_IDS)).toBe(true);
+    expect(TAUNT_IDS).toHaveLength(4);
+    const copy = TAUNT_IDS.map((id) => TAUNTS[id].text);
+    expect(new Set(copy).size).toBe(copy.length);
+    expect(copy.every((line) => line.length > 0 && line.length <= 18)).toBe(true);
+    expect(TAUNT.COOLDOWN_SECONDS).toBeGreaterThan(TAUNT.DISPLAY_MS / 1000);
+  });
+
+  it('narrows only own registry keys', () => {
+    expect(isTauntId('bring_it')).toBe(true);
+    expect(isTauntId('toString')).toBe(false);
+    expect(isTauntId('not-a-taunt')).toBe(false);
+    expect(isTauntId(null)).toBe(false);
+  });
+});
 
 describe('game mode rotation', () => {
   it('rotation covers every GameModeType exactly once', () => {

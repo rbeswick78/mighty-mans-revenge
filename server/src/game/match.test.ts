@@ -107,6 +107,39 @@ describe('Match', () => {
     match = createMatch();
   });
 
+  describe('battle cry authority', () => {
+    function startActiveMatch(): void {
+      match.setLock('player-0', 'mighty_man');
+      match.setLock('player-1', 'bruce');
+      match.update(0.01);
+      match.update(MATCH.COUNTDOWN_DURATION + 0.01);
+      expect(match.phase).toBe(MatchPhase.ACTIVE);
+    }
+
+    it('accepts only registered cries from living players during active play', () => {
+      expect(match.tryTaunt('player-0', 'bring_it')).toBeNull();
+      startActiveMatch();
+      expect(match.tryTaunt('player-0', 'not-a-taunt')).toBeNull();
+      expect(match.tryTaunt('missing-player', 'bring_it')).toBeNull();
+
+      match.players.get('player-1')!.isDead = true;
+      expect(match.tryTaunt('player-1', 'bring_it')).toBeNull();
+      expect(match.tryTaunt('player-0', 'bring_it')).toBe('bring_it');
+    });
+
+    it('enforces a simulation-time cooldown independently per player', () => {
+      startActiveMatch();
+      expect(match.tryTaunt('player-0', 'bring_it')).toBe('bring_it');
+      expect(match.tryTaunt('player-0', 'still_standing')).toBeNull();
+      expect(match.tryTaunt('player-1', 'still_standing')).toBe('still_standing');
+
+      match.update(3.99);
+      expect(match.tryTaunt('player-0', 'come_get_some')).toBeNull();
+      match.update(0.02);
+      expect(match.tryTaunt('player-0', 'come_get_some')).toBe('come_get_some');
+    });
+  });
+
   describe('Gauntlet boon authority', () => {
     function startBoonMatch(boonIds: readonly GauntletBoonId[]): Match {
       const boonMatch = createGauntletBoonMatch(boonIds);

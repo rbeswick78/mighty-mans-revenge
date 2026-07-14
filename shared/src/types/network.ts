@@ -25,6 +25,7 @@ import type {
   CharacterId,
   WeaponId,
   MutatorId,
+  TauntId,
 } from '../config/game.js';
 
 // === Client -> Server Messages ===
@@ -39,6 +40,7 @@ export type ClientMessage =
   | ClientCharacterHoverMessage
   | ClientCharacterLockMessage
   | ClientDraftPickMessage
+  | ClientTauntMessage
   | ClientPingMessage;
 
 export interface ClientInputMessage {
@@ -106,6 +108,13 @@ export interface ClientDraftPickMessage {
   value: string;
 }
 
+/** Request one of the server-owned battle cries during active play. */
+export interface ClientTauntMessage {
+  type: 'client:taunt';
+  /** Untrusted at runtime; Match validates this against the shared registry. */
+  tauntId: TauntId;
+}
+
 export interface ClientPingMessage {
   type: 'client:ping';
   clientTime: number;
@@ -133,6 +142,7 @@ export type ServerMessage =
   | ServerWeaponIncomingMessage
   | ServerTilesDestroyedMessage
   | ServerOvertimeStartMessage
+  | ServerTauntMessage
   | ServerLeaderboardMessage
   | ServerDailyGauntletLeaderboardMessage
   | ServerPongMessage
@@ -495,6 +505,13 @@ export interface ServerOvertimeStartMessage {
   type: 'server:overtimeStart';
   /** Overtime duration from now, in milliseconds. */
   overtimeEndsInMs: number;
+}
+
+/** Reliable accepted battle cry; clients render the shared copy by id. */
+export interface ServerTauntMessage {
+  type: 'server:taunt';
+  playerId: PlayerId;
+  tauntId: TauntId;
 }
 
 /** One row of the all-time lobby leaderboard (lifetime persisted stats). */

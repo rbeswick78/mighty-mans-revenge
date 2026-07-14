@@ -11,6 +11,7 @@ import { GameModeType, MatchPhase } from '@shared/types/game.js';
 import type { BulletTrail, PunchEvent } from '@shared/types/projectile.js';
 import { PickupType } from '@shared/types/pickup.js';
 import { PLAYER, SERVER, WEAPONS } from '@shared/config/game.js';
+import { TAUNT, TAUNT_IDS, type TauntId } from '@shared/config/game.js';
 import { Wasteland, cssHex } from '@shared/config/palette.js';
 import {
   predictBulletRay,
@@ -21,6 +22,7 @@ import { practiceGauntletStylePointsForKill } from '@shared/utils/practice-gaunt
 import type { PlayerState } from '@shared/types/player.js';
 import { MapRenderer } from '../rendering/map-renderer.js';
 import { ClientPlayerManager } from '../rendering/player-manager.js';
+import { TauntRenderer } from '../rendering/taunt-renderer.js';
 import { EffectsRenderer } from '../rendering/effects-renderer.js';
 import {
   hasConfirmedPlayerHit,
@@ -121,6 +123,7 @@ interface GameSceneData {
 export class GameScene extends Phaser.Scene {
   private mapRenderer: MapRenderer | null = null;
   private playerManager: ClientPlayerManager | null = null;
+  private tauntRenderer: TauntRenderer | null = null;
   private effectsRenderer: EffectsRenderer | null = null;
   private pickupRenderer: PickupRenderer | null = null;
   private confirmedTagRenderer: ConfirmedTagRenderer | null = null;
@@ -169,6 +172,8 @@ export class GameScene extends Phaser.Scene {
   private inputManager: InputManager | null = null;
   /** Announce the first meaningful controller input once per round. */
   private controllerAnnounced = false;
+  private nextTauntIndex = 0;
+  private localTauntCooldownUntil = 0;
   private gameService!: GameService;
   private nickname = '';
   private matchData: MatchData | null = null;
@@ -226,6 +231,7 @@ export class GameScene extends Phaser.Scene {
   private onWeaponIncoming: ((payload: WeaponIncomingPayload) => void) | null = null;
   private onTilesDestroyed: ((tiles: Array<{ col: number; row: number }>) => void) | null = null;
   private onOvertimeStart: (() => void) | null = null;
+  private onTaunt: ((playerId: PlayerId, tauntId: TauntId) => void) | null = null;
   private modeBriefingShown = false;
   /**
    * Timestamp of the most recent shotgun blast per shooter. A blast
@@ -266,6 +272,8 @@ export class GameScene extends Phaser.Scene {
     this.lastBountyTargetId = undefined;
     this.lastWastelandWarpSequence = undefined;
     this.controllerAnnounced = false;
+    this.nextTauntIndex = 0;
+    this.localTauntCooldownUntil = 0;
   }
 
   create(): void {
@@ -314,6 +322,7 @@ export class GameScene extends Phaser.Scene {
 
     // Create subsystems
     this.playerManager = new ClientPlayerManager(this);
+    this.tauntRenderer = new TauntRenderer(this);
     this.effectsRenderer = new EffectsRenderer(this);
     this.pickupRenderer = new PickupRenderer(this);
     this.confirmedTagRenderer = new ConfirmedTagRenderer(this);
@@ -406,6 +415,19 @@ export class GameScene extends Phaser.Scene {
         this.matchData?.gameMode === GameModeType.ONE_IN_THE_CHAMBER,
       );
       this.gameService.sendInput(input);
+
+      // Taunts ride a separate reliable message so they never pollute
+      // movement prediction or authoritative combat inputs.
+      if (
+        this.inputManager.consumeTauntPressed() &&
+        !localState.isDead &&
+        this.time.now >= this.localTauntCooldownUntil
+      ) {
+        const tauntId = TAUNT_IDS[this.nextTauntIndex % TAUNT_IDS.length];
+        this.nextTauntIndex++;
+        this.localTauntCooldownUntil = this.time.now + TAUNT.COOLDOWN_SECONDS * 1000;
+        this.gameService.sendTaunt(tauntId);
+      }
 
       // Dry-fire feedback: a small camera shake + click when the player
       // releases the fire/throw button while their corresponding ammo pool
@@ -608,6 +630,7 @@ export class GameScene extends Phaser.Scene {
           playerId,
           bountyHuntState?.targetId ?? null,
         );
+        this.tauntRenderer?.update(this.playerManager, delta);
 
         // Ability VFX. Fire cone for any active Bruce; screen-edge border +
         // tint for the local player while their ability is active; x-ray
@@ -958,7 +981,7 @@ export class GameScene extends Phaser.Scene {
       this.controllerAnnounced = true;
       this.hud.showEventBanner(
         'TWIN-STICK ONLINE',
-        'RT FIRE  •  LT GRENADE  •  RB POWER',
+        'RT FIRE  •  LT GRENADE  •  RB POWER  •  Y TAUNT',
         0x5ce1e6,
       );
     }
@@ -1668,6 +1691,10 @@ export class GameScene extends Phaser.Scene {
       });
     };
 
+    this.onTaunt = (playerId: PlayerId, tauntId: TauntId) => {
+      this.tauntRenderer?.show(playerId, tauntId);
+    };
+
     this.gameService.on('matchCountdown', this.onMatchCountdown);
     this.gameService.on('matchStart', this.onMatchStart);
     this.gameService.on('matchEnd', this.onMatchEnd);
@@ -1687,6 +1714,7 @@ export class GameScene extends Phaser.Scene {
     this.gameService.on('weaponIncoming', this.onWeaponIncoming);
     this.gameService.on('tilesDestroyed', this.onTilesDestroyed);
     this.gameService.on('overtimeStart', this.onOvertimeStart);
+    this.gameService.on('taunt', this.onTaunt);
   }
 
   /**
@@ -1794,6 +1822,10 @@ export class GameScene extends Phaser.Scene {
       this.gameService.off('overtimeStart', this.onOvertimeStart);
       this.onOvertimeStart = null;
     }
+    if (this.onTaunt) {
+      this.gameService.off('taunt', this.onTaunt);
+      this.onTaunt = null;
+    }
   }
 
   private decayLocalCorrectionOffset(deltaMs: number): void {
@@ -1836,6 +1868,10 @@ export class GameScene extends Phaser.Scene {
     if (this.kothHillRenderer) {
       this.kothHillRenderer.destroy();
       this.kothHillRenderer = null;
+    }
+    if (this.tauntRenderer) {
+      this.tauntRenderer.destroy();
+      this.tauntRenderer = null;
     }
     if (this.playerManager) {
       this.playerManager.destroy();

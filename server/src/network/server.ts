@@ -22,6 +22,7 @@ const CLIENT_MESSAGE_TYPE_FLAGS: Record<ClientMessage['type'], true> = {
   'client:characterHover': true,
   'client:characterLock': true,
   'client:draftPick': true,
+  'client:taunt': true,
   'client:ping': true,
 };
 

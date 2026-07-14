@@ -445,4 +445,22 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
       gauntletRouteId: 'route_b',
     });
   });
+
+  it('sends and emits shared battle cry ids without client-authored copy', () => {
+    const seen: unknown[] = [];
+    manager.on('taunt', (playerId, tauntId) => seen.push({ playerId, tauntId }));
+
+    manager.sendTaunt('come_get_some');
+    expect(hoisted.sentMessages).toContainEqual({
+      type: 'client:taunt',
+      tauntId: 'come_get_some',
+    });
+
+    deliver({
+      type: 'server:taunt',
+      playerId: REMOTE_ID,
+      tauntId: 'still_standing',
+    });
+    expect(seen).toEqual([{ playerId: REMOTE_ID, tauntId: 'still_standing' }]);
+  });
 });

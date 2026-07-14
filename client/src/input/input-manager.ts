@@ -24,6 +24,8 @@ export class InputManager {
   private inputBuffer: PlayerInput[] = [];
   private lastAcknowledged = -1;
   private lastRawInput: RawInput | null = null;
+  /** Out-of-band edge; never enters authoritative movement prediction. */
+  private tauntPressed = false;
 
   constructor(scene: Phaser.Scene) {
     this.keyboardMouseInput = new KeyboardMouseInput(scene);
@@ -89,6 +91,7 @@ export class InputManager {
       raw = withoutSecondaryActions(raw);
     }
 
+    if (raw.tauntPressed) this.tauntPressed = true;
     this.lastRawInput = raw;
     this.sequenceNumber++;
 
@@ -139,6 +142,13 @@ export class InputManager {
    */
   getLastRawInput(): RawInput | null {
     return this.lastRawInput;
+  }
+
+  /** Drain the latest battle-cry edge exactly once. */
+  consumeTauntPressed(): boolean {
+    const pressed = this.tauntPressed;
+    this.tauntPressed = false;
+    return pressed;
   }
 
   getUnacknowledgedInputs(lastAck: number): PlayerInput[] {

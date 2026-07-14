@@ -16,4 +16,6 @@ export interface RawInput {
   reload: boolean;
   /** Spacebar / on-screen ability button — pressed-edge for this tick. */
   abilityPressed: boolean;
+  /** T / gamepad Y / on-screen button: presentation-only battle cry. */
+  tauntPressed: boolean;
 }

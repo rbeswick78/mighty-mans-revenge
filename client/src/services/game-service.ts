@@ -19,7 +19,7 @@ import type {
 } from '@shared/types/network.js';
 import { createEmptyCharacterWins } from '@shared/config/game.js';
 import type { BotDifficulty, PracticeKind } from '@shared/config/game.js';
-import type { CharacterId, WeaponId, MutatorId } from '@shared/config/game.js';
+import type { CharacterId, WeaponId, MutatorId, TauntId } from '@shared/config/game.js';
 import { NetworkManager, type LocalCorrection } from '../network/network-manager.js';
 
 export interface EventWarningPayload {
@@ -81,6 +81,7 @@ type GameServiceEvent =
   | 'weaponIncoming'
   | 'tilesDestroyed'
   | 'overtimeStart'
+  | 'taunt'
   | 'leaderboard'
   | 'dailyGauntletLeaderboard';
 
@@ -221,6 +222,10 @@ export class GameService {
 
   sendInput(input: PlayerInput): void {
     this.networkManager.sendInput(input);
+  }
+
+  sendTaunt(tauntId: TauntId): void {
+    this.networkManager.sendTaunt(tauntId);
   }
 
   requestRematch(gauntletRouteId?: PracticeGauntletRouteId): void {
@@ -375,6 +380,10 @@ export class GameService {
 
     this.networkManager.on('overtimeStart', () => {
       this.emit('overtimeStart');
+    });
+
+    this.networkManager.on('taunt', (playerId: PlayerId, tauntId: TauntId) => {
+      this.emit('taunt', playerId, tauntId);
     });
 
     this.networkManager.on('leaderboard', (entries: LeaderboardEntry[]) => {
