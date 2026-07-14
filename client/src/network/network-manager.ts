@@ -38,6 +38,7 @@ import { EntityInterpolation } from './interpolation.js';
 import type { ConnectionState, InterpolatedState } from './types.js';
 
 type EventName =
+  | 'connecting'
   | 'connected'
   | 'disconnected'
   | 'reconnecting'
@@ -174,9 +175,17 @@ export class NetworkManager {
     this.connection.onMessage((msg) => this.handleMessage(msg));
 
     this.connection.onStateChange((state) => {
-      if (state === 'connected') this.emit('connected');
-      else if (state === 'disconnected') this.emit('disconnected');
-      else if (state === 'reconnecting') this.emit('reconnecting');
+      if (state === 'connecting') this.emit('connecting');
+      else if (state === 'connected') this.emit('connected');
+      else if (state === 'disconnected') {
+        this.localPlayerId = null;
+        this.resetMatchState();
+        this.emit('disconnected');
+      } else if (state === 'reconnecting') {
+        this.localPlayerId = null;
+        this.resetMatchState();
+        this.emit('reconnecting');
+      }
     });
   }
 
@@ -188,6 +197,11 @@ export class NetworkManager {
   /** Connect to the game server. */
   async connect(): Promise<void> {
     await this.connection.connect();
+  }
+
+  /** Bypass the current reconnect delay after explicit player input. */
+  retryConnection(): void {
+    this.connection.retryNow();
   }
 
   /** Disconnect from the game server. */

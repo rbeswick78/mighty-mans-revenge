@@ -64,7 +64,9 @@ export interface MatchData {
 }
 
 type GameServiceEvent =
+  | 'connecting'
   | 'connected'
+  | 'reconnecting'
   | 'disconnected'
   | 'matchFound'
   | 'draftState'
@@ -154,6 +156,10 @@ export class GameService {
 
   async connect(): Promise<void> {
     await this.networkManager.connect();
+  }
+
+  retryConnection(): void {
+    this.networkManager.retryConnection();
   }
 
   disconnect(): void {
@@ -272,12 +278,23 @@ export class GameService {
   // ──────────────────────────── Private ────────────────────────────
 
   private wireNetworkEvents(): void {
+    this.networkManager.on('connecting', () => {
+      this.emit('connecting');
+    });
+
     this.networkManager.on('connected', () => {
       this.emit('connected');
     });
 
+    this.networkManager.on('reconnecting', () => {
+      this.currentMatch = null;
+      this.latestDraftState = null;
+      this.emit('reconnecting');
+    });
+
     this.networkManager.on('disconnected', () => {
       // A dropped connection tears down any in-flight draft server-side.
+      this.currentMatch = null;
       this.latestDraftState = null;
       this.emit('disconnected');
     });

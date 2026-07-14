@@ -5,6 +5,7 @@ import type { ConnectionState, ConnectionQuality } from './types.js';
 const RTT_GOOD_THRESHOLD = 80;
 const RTT_FAIR_THRESHOLD = 150;
 const PING_INTERVAL_MS = 2000;
+const CONNECT_TIMEOUT_MS = 5000;
 const MAX_RECONNECT_ATTEMPTS = 5;
 const BASE_RECONNECT_DELAY_MS = 1000;
 
@@ -18,6 +19,7 @@ export class NetworkConnection {
   private state: ConnectionState = 'disconnected';
   private rtt = 0;
   private pingIntervalId: ReturnType<typeof setInterval> | null = null;
+  private connectTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private reconnectAttempts = 0;
   private reconnectTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private messageCallbacks: MessageCallback[] = [];
@@ -27,13 +29,23 @@ export class NetworkConnection {
     const raw = serverUrl ?? import.meta.env.VITE_SERVER_URL ?? 'http://localhost:3000';
     const url = new URL(raw);
     this.serverUrl = `${url.protocol}//${url.hostname}`;
-    this.serverPort = url.port ? Number(url.port) : (url.protocol === 'https:' ? 443 : 80);
+    this.serverPort = url.port ? Number(url.port) : url.protocol === 'https:' ? 443 : 80;
   }
 
   async connect(): Promise<void> {
-    this.setState('connecting');
-    this.reconnectAttempts = 0;
-    await this.createChannel();
+    if (
+      this.state === 'connected' ||
+      this.state === 'connecting' ||
+      this.state === 'reconnecting'
+    ) {
+      return;
+    }
+    this.beginConnectionAttempt();
+  }
+
+  /** Skip a pending backoff and start a fresh connection cycle immediately. */
+  retryNow(): void {
+    this.beginConnectionAttempt();
   }
 
   send(message: ClientMessage): void {
@@ -65,25 +77,37 @@ export class NetworkConnection {
 
   disconnect(): void {
     this.stopPing();
+    this.clearConnectTimeout();
     this.clearReconnectTimeout();
-    if (this.channel) {
-      this.channel.close();
-      this.channel = null;
-    }
+    this.closeCurrentChannel();
     this.setState('disconnected');
     this.reconnectAttempts = 0;
   }
 
-  private async createChannel(): Promise<void> {
-    this.channel = geckos({
+  private beginConnectionAttempt(): void {
+    this.stopPing();
+    this.clearConnectTimeout();
+    this.clearReconnectTimeout();
+    this.closeCurrentChannel();
+    this.reconnectAttempts = 0;
+    this.setState('connecting');
+    this.createChannel();
+  }
+
+  private createChannel(): void {
+    const channel = geckos({
       url: this.serverUrl,
       port: this.serverPort,
     });
+    this.channel = channel;
 
-    this.channel.onConnect((error) => {
+    channel.onConnect((error) => {
+      if (this.channel !== channel) return;
+      if (this.state !== 'connecting') return;
+      this.clearConnectTimeout();
       if (error) {
         console.error('[NetworkConnection] Connection error:', error);
-        this.handleDisconnect();
+        this.handleDisconnect(channel);
         return;
       }
 
@@ -92,11 +116,13 @@ export class NetworkConnection {
       this.startPing();
     });
 
-    this.channel.onDisconnect(() => {
-      this.handleDisconnect();
+    channel.onDisconnect(() => {
+      this.handleDisconnect(channel);
     });
 
-    this.channel.on('message', (data) => {
+    channel.on('message', (data) => {
+      if (this.channel !== channel) return;
+      if (this.state !== 'connected') return;
       if (typeof data !== 'string') return;
       let message: ServerMessage;
       try {
@@ -119,17 +145,27 @@ export class NetworkConnection {
         }
       }
     });
+
+    this.connectTimeoutId = setTimeout(() => {
+      this.connectTimeoutId = null;
+      if (this.channel !== channel || this.state !== 'connecting') return;
+      this.handleDisconnect(channel);
+    }, CONNECT_TIMEOUT_MS);
   }
 
-  private handleDisconnect(): void {
+  private handleDisconnect(channel: ClientChannel): void {
+    if (this.channel !== channel) return;
     this.stopPing();
+    this.clearConnectTimeout();
 
     if (this.state === 'disconnected') return;
+    if (this.reconnectTimeoutId !== null) return;
 
     if (this.reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
       this.setState('reconnecting');
       this.scheduleReconnect();
     } else {
+      this.closeCurrentChannel();
       this.setState('disconnected');
     }
   }
@@ -144,13 +180,27 @@ export class NetworkConnection {
 
     this.reconnectTimeoutId = setTimeout(() => {
       this.reconnectTimeoutId = null;
-      if (this.channel) {
-        this.channel.close();
-        this.channel = null;
-      }
+      this.closeCurrentChannel();
       this.setState('connecting');
       this.createChannel();
     }, delay);
+  }
+
+  /**
+   * Geckos may throw from close() when its WebRTC peer never finished being
+   * created. Teardown must still clear our channel and let the retry state
+   * machine advance; stale callbacks are ignored by channel identity.
+   */
+  private closeCurrentChannel(): void {
+    const channel = this.channel;
+    if (!channel) return;
+    this.clearConnectTimeout();
+    this.channel = null;
+    try {
+      channel.close();
+    } catch {
+      // A half-open transport has nothing else for us to release locally.
+    }
   }
 
   private startPing(): void {
@@ -171,6 +221,13 @@ export class NetworkConnection {
     if (this.reconnectTimeoutId !== null) {
       clearTimeout(this.reconnectTimeoutId);
       this.reconnectTimeoutId = null;
+    }
+  }
+
+  private clearConnectTimeout(): void {
+    if (this.connectTimeoutId !== null) {
+      clearTimeout(this.connectTimeoutId);
+      this.connectTimeoutId = null;
     }
   }
 

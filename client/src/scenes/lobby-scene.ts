@@ -58,6 +58,8 @@ import {
   normalizePracticeMutatorPreference,
   practiceMutatorPreferenceLabel,
 } from '../ui/practice-mutator.js';
+import type { ConnectionState } from '../network/types.js';
+import { lobbyConnectionPresentation } from '../ui/lobby-connection.js';
 
 const STORAGE_KEY_NICKNAME = 'mmr_nickname';
 const STORAGE_KEY_BOT_DIFFICULTY = 'mmr_bot_difficulty';
@@ -112,6 +114,8 @@ export class LobbyScene extends Phaser.Scene {
   private practiceModeButton!: PixelButton;
   private practiceMutatorButton!: PixelButton;
   private buildCodexButton!: PixelButton;
+  private connectionStatusText!: Phaser.GameObjects.Text;
+  private retryConnectionButton!: PixelButton;
   private mightyManSprite!: Phaser.GameObjects.Sprite;
   private nickname: string;
   private practiceDifficulty: BotDifficulty;
@@ -128,11 +132,15 @@ export class LobbyScene extends Phaser.Scene {
   private menuGamepad: MenuGamepadInput | null = null;
   private gamepadFocusActive = false;
   private gamepadFocusIndex = 0;
+  private connectionState: ConnectionState = 'disconnected';
 
   // Event handler references for cleanup
   private onMatchFound: ((matchData: MatchData) => void) | null = null;
   private onDraftState: (() => void) | null = null;
   private onMatchmakingStatus: ((msg: ServerMatchmakingStatusMessage) => void) | null = null;
+  private onConnecting: (() => void) | null = null;
+  private onConnected: (() => void) | null = null;
+  private onReconnecting: (() => void) | null = null;
   private onDisconnected: (() => void) | null = null;
   private onLeaderboard: ((entries: LeaderboardEntry[]) => void) | null = null;
   private onDailyLeaderboard: ((snapshot: ServerDailyGauntletLeaderboardMessage) => void) | null =
@@ -170,6 +178,7 @@ export class LobbyScene extends Phaser.Scene {
     this.gamepadFocusIndex = 0;
 
     this.gameService = GameService.getInstance();
+    this.connectionState = this.gameService.getNetworkManager().getConnectionState();
 
     AudioManager.getInstance()?.playMusic('music-lobby');
 
@@ -209,6 +218,25 @@ export class LobbyScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
       .setDepth(WastelandStreet.DEPTH.UI);
+
+    this.connectionStatusText = this.add
+      .text(centerX, 197, '', {
+        fontFamily: MENU_FONTS.HEADER,
+        fontSize: '9px',
+        color: cssHex(Wasteland.HEALTH_WARNING),
+      })
+      .setOrigin(0.5)
+      .setDepth(WastelandStreet.DEPTH.UI + 1);
+
+    this.retryConnectionButton = new PixelButton(this, centerX - 70, 213, 140, 26, 'RETRY NOW', {
+      variant: 'secondary',
+      fontSize: 8,
+      onClick: () => this.gameService.retryConnection(),
+    });
+    this.retryConnectionButton
+      .setVisible(false)
+      .setDisabled(true)
+      .setDepth(WastelandStreet.DEPTH.UI + 1);
 
     // ────────────────────────────────────────────────────────────────────
     // Main UI panel — holds the callsign + Quick Match button. The
@@ -603,7 +631,7 @@ export class LobbyScene extends Phaser.Scene {
     // Enter = quick match (works whether the nickname input has focus
     // or not, since the keydown bubbles up from the input element).
     this.input.keyboard?.on('keydown-ENTER', () => {
-      if (!this.isSearching) this.onQuickMatch();
+      if (!this.isSearching && this.connectionState === 'connected') this.onQuickMatch();
     });
     // Escape cancels an active search.
     this.input.keyboard?.on('keydown-ESC', () => {
@@ -612,6 +640,7 @@ export class LobbyScene extends Phaser.Scene {
 
     // Wire up network events
     this.wireGameServiceEvents();
+    this.updateConnectionUi(this.connectionState);
 
     // Connect to server if not already connected
     if (this.gameService.getNetworkManager().getConnectionState() !== 'connected') {
@@ -660,6 +689,18 @@ export class LobbyScene extends Phaser.Scene {
   }
 
   private gamepadButtons(): PixelButton[] {
+    const localButtons = [
+      this.difficultyButton,
+      this.practiceRivalButton,
+      this.practiceModeButton,
+      this.practiceMutatorButton,
+      this.buildCodexButton,
+    ];
+    if (this.connectionState !== 'connected') {
+      return this.retryConnectionButton.visible
+        ? [this.retryConnectionButton, ...localButtons]
+        : localButtons;
+    }
     return [
       this.quickMatchButton,
       this.rumbleButton,
@@ -758,8 +799,23 @@ export class LobbyScene extends Phaser.Scene {
       }
     };
 
+    this.onConnecting = () => {
+      this.stopSearching();
+      this.updateConnectionUi('connecting');
+    };
+
+    this.onConnected = () => {
+      this.updateConnectionUi('connected');
+    };
+
+    this.onReconnecting = () => {
+      this.stopSearching();
+      this.updateConnectionUi('reconnecting');
+    };
+
     this.onDisconnected = () => {
       this.stopSearching();
+      this.updateConnectionUi('disconnected');
     };
 
     this.onLeaderboard = (entries: LeaderboardEntry[]) => {
@@ -773,6 +829,9 @@ export class LobbyScene extends Phaser.Scene {
     this.gameService.on('matchFound', this.onMatchFound);
     this.gameService.on('draftState', this.onDraftState);
     this.gameService.on('matchmakingStatus', this.onMatchmakingStatus);
+    this.gameService.on('connecting', this.onConnecting);
+    this.gameService.on('connected', this.onConnected);
+    this.gameService.on('reconnecting', this.onReconnecting);
     this.gameService.on('disconnected', this.onDisconnected);
     this.gameService.on('leaderboard', this.onLeaderboard);
     this.gameService.on('dailyGauntletLeaderboard', this.onDailyLeaderboard);
@@ -790,6 +849,18 @@ export class LobbyScene extends Phaser.Scene {
     if (this.onMatchmakingStatus) {
       this.gameService.off('matchmakingStatus', this.onMatchmakingStatus);
       this.onMatchmakingStatus = null;
+    }
+    if (this.onConnecting) {
+      this.gameService.off('connecting', this.onConnecting);
+      this.onConnecting = null;
+    }
+    if (this.onConnected) {
+      this.gameService.off('connected', this.onConnected);
+      this.onConnected = null;
+    }
+    if (this.onReconnecting) {
+      this.gameService.off('reconnecting', this.onReconnecting);
+      this.onReconnecting = null;
     }
     if (this.onDisconnected) {
       this.gameService.off('disconnected', this.onDisconnected);
@@ -915,7 +986,7 @@ export class LobbyScene extends Phaser.Scene {
   }
 
   private startMatchmaking(kind: 'duel' | 'rumble'): void {
-    if (this.isSearching) return;
+    if (this.isSearching || this.connectionState !== 'connected') return;
     if (!this.validateNickname()) return;
 
     this.isSearching = true;
@@ -933,7 +1004,9 @@ export class LobbyScene extends Phaser.Scene {
     // hide too — the searching text sits in the input box's band, and the
     // invisible HTML <input> would otherwise keep swallowing taps.
     this.setNameEntryVisible(false);
-    this.searchingText.setText(kind === 'rumble' ? 'GATHERING RUMBLE  1/4' : 'SEARCHING FOR OPPONENT');
+    this.searchingText.setText(
+      kind === 'rumble' ? 'GATHERING RUMBLE  1/4' : 'SEARCHING FOR OPPONENT',
+    );
     this.searchingText.setVisible(true);
     this.searchTimerText.setText(kind === 'rumble' ? 'WAITING FOR 2' : '0:00');
     this.searchTimerText.setVisible(true);
@@ -974,7 +1047,9 @@ export class LobbyScene extends Phaser.Scene {
   }
 
   private onPractice(kind: PracticeKind): void {
-    if (this.isSearching || !this.validateNickname()) return;
+    if (this.isSearching || this.connectionState !== 'connected' || !this.validateNickname()) {
+      return;
+    }
     this.nicknameInput?.blur();
     this.tryStartFullscreen();
     this.gameService.startPractice(
@@ -1101,6 +1176,29 @@ export class LobbyScene extends Phaser.Scene {
       this.searchTimerEvent.remove();
       this.searchTimerEvent = null;
     }
+  }
+
+  private updateConnectionUi(state: ConnectionState): void {
+    this.connectionState = state;
+    const presentation = lobbyConnectionPresentation(state);
+    this.connectionStatusText.setText(presentation.label).setColor(cssHex(presentation.color));
+    for (const button of [
+      this.quickMatchButton,
+      this.rumbleButton,
+      this.practiceButton,
+      this.gauntletButton,
+      this.dailyButton,
+    ]) {
+      button.setDisabled(!presentation.playEnabled);
+    }
+    this.retryConnectionButton
+      .setVisible(presentation.retryVisible)
+      .setDisabled(!presentation.retryVisible);
+    this.gamepadFocusIndex = Math.min(
+      this.gamepadFocusIndex,
+      Math.max(0, this.gamepadButtons().length - 1),
+    );
+    this.syncGamepadFocus();
   }
 
   setPlayerCount(count: number): void {

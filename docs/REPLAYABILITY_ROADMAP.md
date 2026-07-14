@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–81 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Quick Match 1v1 plus 2–4 player Wasteland Rumble with all-player group draft rallies, a rematch-chain Rumble Crown, live lead-change drama, personal rematch Grudges, and authoritative Rumble Assists with K/A/D, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–82 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Quick Match 1v1 plus 2–4 player Wasteland Rumble with all-player group draft rallies, a rematch-chain Rumble Crown, live lead-change drama, personal rematch Grudges, authoritative Rumble Assists with K/A/D, and visible bounded Wasteland Signal Recovery, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -113,6 +113,7 @@ Each session below attacks one of these.
 | 79  | Rumble Lead Drama                               | Every takeover and tie becomes a shared live-match story                      | **DONE** (2026-07-14) |
 | 80  | Rumble Grudges                                  | Every group finish leaves each fighter a personal rematch score to settle     | **DONE** (2026-07-14) |
 | 81  | Rumble Assists                                  | Meaningful setup damage earns visible credit in chaotic group fights          | **DONE** (2026-07-14) |
+| 82  | Wasteland Signal Recovery                       | Brief server trouble becomes visible and recoverable instead of a frozen loop | **DONE** (2026-07-14) |
 
 ---
 
@@ -3230,6 +3231,57 @@ attempt one attainable friend score to hunt from the first stage onward.
 
 ---
 
+## Session 82 — Wasteland Signal Recovery
+
+**Goal:** make every return session trustworthy by turning startup stalls and
+mid-flow server interruptions into clear, bounded, player-recoverable states
+instead of silent buttons, frozen scenes, or an uncaught teardown crash.
+
+**Locked design decisions**
+
+- `NetworkConnection` owns exactly one current channel, one five-second
+  handshake deadline, and at most one reconnect timer. Automatic attempts use
+  the existing five-step 1/2/4/8/16-second backoff; Retry Now cancels the wait,
+  safely retires the current channel, resets the cycle, and connects at once.
+- Channel identity gates every callback. Closing clears ownership first and
+  tolerates Geckos throwing when its half-open peer was never created, so a
+  stale connect/disconnect callback cannot disturb a newer channel or abort
+  the retry timer.
+- `NetworkManager` clears the old player id and every match-scoped cache as
+  soon as the transport enters `reconnecting`, not after all retries exhaust.
+  A new welcome/snapshot must seed the new connection from scratch.
+- Lobby signal copy is a pure projection of connecting, connected,
+  reconnecting, or disconnected. Quick Match, Rumble, Spar, Gauntlet, and
+  Daily Run remain disabled until connected; local difficulty/rival/mode/chaos
+  selectors and the Build Codex remain usable. Retry is available during
+  backoff and after exhaustion.
+- Draft and Character Select return to the lobby on the first loss edge. Live
+  play shows `SIGNAL LOST` before returning. Results preserves the completed
+  result but disables a rematch that the retired connection can no longer
+  fulfill.
+- This is transport and presentation recovery only. It adds no session-resume
+  protocol, reconnect-to-live-match authority, server wire message, score,
+  combat, physics, matchmaking priority, persistence, reward, or balance
+  change.
+
+**Acceptance criteria**
+
+- [x] Transport tests cover half-open close throws, silent handshake timeout,
+      duplicate and stale callbacks, manual backoff bypass, bounded exhaustion,
+      and explicit disconnect cleanup.
+- [x] Network-manager and pure presentation tests prove identity/match caches
+      clear on the first loss edge, retry reaches the transport, and only an
+      online signal enables play.
+- [x] Chromium, Firefox, and mobile-landscape browser checks render retry and
+      disabled-play states, exercise Retry Now, render the live-match loss
+      beat, and return safely to the lobby.
+- [x] A local offline/online walkthrough shows the real lobby progress from
+      bounded auto-retry to an online signal with restored boards/actions.
+- [x] Typecheck, lint, all unit tests, production build, and the full
+      Playwright desktop/mobile matrix pass.
+
+---
+
 ## Session 81 — Rumble Assists
 
 **Goal:** make chaotic three- and four-fighter battles feel fairer and more
@@ -3790,6 +3842,47 @@ favorite mid-match event while the final-minute surprise stays fresh.
 ---
 
 ## Session Log
+
+### Session 82 — 2026-07-14 — Wasteland Signal Recovery
+
+**Shipped:** server startup trouble and dropped WebRTC links now have a
+complete player-facing recovery loop. A five-second handshake deadline
+prevents permanent `connecting`; five bounded backoff attempts keep trying;
+and Retry Now immediately starts a fresh cycle. The lobby names every state,
+keeps server-backed play disabled until safe, and leaves local settings and
+the Build Codex available.
+
+The transport clears channel ownership before best-effort teardown, tolerates
+Geckos' half-open `close()` failure, and rejects stale callbacks by channel
+identity. Network state drops the old player id and match caches on the first
+loss edge. Draft and Character Select return immediately, live play gives the
+interruption a readable `SIGNAL LOST` beat before returning, and Results keeps
+the completed story while making the impossible rematch visibly unavailable.
+No wire messages, session-resume claim, combat, physics, score, matchmaking,
+persistence, reward, balance, or assets were added.
+
+**Verification:** 30 focused transport, manager, and presentation tests across
+three files pass, including the new silent-handshake regression. Six focused
+Chromium, Firefox, and 844×390 mobile-landscape checks render the retry state,
+prove disabled play cannot activate, exercise Retry Now, and verify the live
+interruption returns to the lobby. A real local walkthrough with the server
+absent renders bounded auto-retry and Retry Now; bringing the authoritative
+server online renders Signal Online, restores play, and repopulates both live
+boards. Typecheck, lint, scoped Prettier, all 1,258 unit/integration tests
+across 90 files, and the pinned-pnpm production build pass; Vite retains its
+existing chunk-size advisory. The full Playwright matrix passes 57 tests with
+12 intentional project-scoped skips, including the real multiplayer and
+three-client Rumble draft journeys.
+
+**Operational watch:** the five-second handshake deadline is long enough for
+ordinary WebRTC setup but short enough to make a dead outpost legible. Watch
+real hosted reconnect telemetry and friend-session reports before changing
+that deadline or the existing 1/2/4/8/16-second backoff. Live-match resume
+would require a separate server-owned session protocol; never fake it on the
+client.
+
+**Deployment:** not run; production deployment still requires explicit user
+authorization.
 
 ### Session 81 — 2026-07-14 — Rumble Assists
 

@@ -494,6 +494,7 @@ export class CharacterSelectScene extends Phaser.Scene {
     this.gameService.on('characterSelectState', this.onCharacterSelectState);
     this.gameService.on('matchCountdown', this.onMatchCountdown);
     this.gameService.on('opponentDisconnected', this.onOpponentDisconnected);
+    this.gameService.on('reconnecting', this.onDisconnected);
     this.gameService.on('disconnected', this.onDisconnected);
   }
 
@@ -511,6 +512,7 @@ export class CharacterSelectScene extends Phaser.Scene {
       this.onOpponentDisconnected = null;
     }
     if (this.onDisconnected) {
+      this.gameService.off('reconnecting', this.onDisconnected);
       this.gameService.off('disconnected', this.onDisconnected);
       this.onDisconnected = null;
     }

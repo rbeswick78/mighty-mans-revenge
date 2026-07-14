@@ -7,6 +7,7 @@ import type {
   ServerGameStateMessage,
   ServerMessage,
 } from '@shared/types/network.js';
+import type { ConnectionState } from './types.js';
 
 // NetworkManager builds a NetworkConnection in its constructor, which
 // would pull in the geckos.io client (and import.meta.env). Replace it
@@ -15,7 +16,9 @@ import type {
 // imports, so the shared handle must be hoisted too.
 const hoisted = vi.hoisted(() => ({
   messageCb: null as ((msg: unknown) => void) | null,
+  stateCb: null as ((state: ConnectionState) => void) | null,
   sentMessages: [] as ClientMessage[],
+  retryCalls: 0,
 }));
 
 vi.mock('./connection.js', () => ({
@@ -23,7 +26,9 @@ vi.mock('./connection.js', () => ({
     onMessage(cb: (msg: unknown) => void): void {
       hoisted.messageCb = cb;
     }
-    onStateChange(): void {}
+    onStateChange(cb: (state: ConnectionState) => void): void {
+      hoisted.stateCb = cb;
+    }
     send(message: ClientMessage): void {
       hoisted.sentMessages.push(message);
     }
@@ -31,6 +36,9 @@ vi.mock('./connection.js', () => ({
       return Promise.resolve();
     }
     disconnect(): void {}
+    retryNow(): void {
+      hoisted.retryCalls++;
+    }
     handlePong(): void {}
     getRTT(): number {
       return 0;
@@ -116,7 +124,9 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
 
   beforeEach(() => {
     hoisted.messageCb = null;
+    hoisted.stateCb = null;
     hoisted.sentMessages = [];
+    hoisted.retryCalls = 0;
     manager = new NetworkManager('http://localhost:0');
     const cb = hoisted.messageCb as ((msg: ServerMessage) => void) | null;
     if (!cb) throw new Error('NetworkManager never registered onMessage');
@@ -127,6 +137,24 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
   it('seeds localPlayerState.characterId from the first snapshot', () => {
     deliver(makeGameState([makeSerialized({ characterId: 'bubba' })]));
     expect(manager.getLocalPlayerState()?.characterId).toBe('bubba');
+  });
+
+  it('clears stale identity and match state as soon as the transport begins reconnecting', () => {
+    deliver(makeGameState([makeSerialized(), makeSerialized({ id: REMOTE_ID })]));
+    const reconnecting = vi.fn();
+    manager.on('reconnecting', reconnecting);
+
+    hoisted.stateCb?.('reconnecting');
+
+    expect(reconnecting).toHaveBeenCalledOnce();
+    expect(manager.getPlayerId()).toBeNull();
+    expect(manager.getLocalPlayerState()).toBeNull();
+    expect(manager.getRemotePlayerIds()).toHaveLength(0);
+  });
+
+  it('forwards explicit retry input to the transport', () => {
+    manager.retryConnection();
+    expect(hoisted.retryCalls).toBe(1);
   });
 
   it('forwards characterId through the reconciliation spread path', () => {

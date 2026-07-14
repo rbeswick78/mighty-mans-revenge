@@ -120,6 +120,7 @@ export class ResultsScene extends Phaser.Scene {
   private onDraftState: (() => void) | null = null;
   private onOpponentDisconnected: ((playerId: PlayerId) => void) | null = null;
   private onMatchmakingStatus: ((msg: ServerMatchmakingStatusMessage) => void) | null = null;
+  private onConnectionLost: (() => void) | null = null;
 
   constructor() {
     super({ key: 'ResultsScene' });
@@ -1150,11 +1151,17 @@ export class ResultsScene extends Phaser.Scene {
       }
     };
 
+    this.onConnectionLost = () => {
+      this.showRematchUnavailable();
+    };
+
     this.gameService.on('rematchStatus', this.onRematchStatus);
     this.gameService.on('matchFound', this.onMatchFound);
     this.gameService.on('draftState', this.onDraftState);
     this.gameService.on('opponentDisconnected', this.onOpponentDisconnected);
     this.gameService.on('matchmakingStatus', this.onMatchmakingStatus);
+    this.gameService.on('reconnecting', this.onConnectionLost);
+    this.gameService.on('disconnected', this.onConnectionLost);
   }
 
   private cleanupEvents(): void {
@@ -1178,10 +1185,16 @@ export class ResultsScene extends Phaser.Scene {
       this.gameService.off('matchmakingStatus', this.onMatchmakingStatus);
       this.onMatchmakingStatus = null;
     }
+    if (this.onConnectionLost) {
+      this.gameService.off('reconnecting', this.onConnectionLost);
+      this.gameService.off('disconnected', this.onConnectionLost);
+      this.onConnectionLost = null;
+    }
   }
 
   private showRematchUnavailable(): void {
     if (!this.rematchStatusText) return;
+    this.rematchUnavailable = true;
     this.setRematchButtonsDisabled(true);
     this.rematchStatusText.setText('Rematch unavailable - return to lobby.').setVisible(true);
     this.rematchStatusText.setColor(cssHex(OPPONENT_LEFT_COLOR));

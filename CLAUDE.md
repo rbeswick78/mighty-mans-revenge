@@ -115,6 +115,21 @@ The server is the single source of truth. Clients never trust their own state �
 3. **Entity Interpolation** — Other players rendered by interpolating between the two most recent server states (one tick behind real-time). Brief extrapolation on packet loss, capped at 200ms.
 4. **Lag Compensation (Server-Side Rewind)** — "Favor the shooter." Server keeps a circular buffer of past states (~1 second). On shoot commands, rewinds other players' positions to the shooter's estimated render time (current minus half RTT) and validates hits against that past state.
 
+**Connection recovery (Session 82):** `NetworkConnection` owns one channel,
+one five-second handshake timer, and at most one reconnect timer. Automatic
+attempts back off 1/2/4/8/16 seconds; explicit Retry Now safely closes the
+current channel, cancels both timers, resets the cycle, and connects
+immediately. Geckos may throw while closing a channel whose peer was never
+created, so teardown clears ownership before best-effort `close()` and ignores
+all later callbacks from that stale channel. On `reconnecting` or terminal
+`disconnected`, `NetworkManager` immediately clears the old player id and all
+match-scoped state. The lobby is the source of user-facing signal status and
+keeps every server-backed play action disabled until `connected`; local
+selectors and the Codex remain available. Draft/select return to the lobby,
+live play shows the interruption beat before returning, and Results disables
+rematch. Do not invent client-side match recovery without a server-owned
+session-resume protocol.
+
 ### Why This Matters for Agents
 
 Client prediction and server simulation **must use identical physics code** from `/shared`. If you change movement, collision, or physics logic, you must change it in `/shared` and verify both client and server still agree. A mismatch between client prediction and server authority causes visible rubber-banding.

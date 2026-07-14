@@ -72,6 +72,16 @@ also earns one server-authored Assist when somebody else lands the knockout.
 The live HUD celebrates it, Results shows K/A/D, and the best helper can take
 the Wingman award without changing anybody's mode score.
 
+## Connection recovery
+
+The lobby always shows whether its authoritative-server signal is linking,
+online, retrying, or offline. Server-backed play buttons stay disabled until
+the signal is ready, while local settings and the Gauntlet Codex remain
+available. A stalled WebRTC handshake times out after five seconds, automatic
+retries use bounded backoff, and `RETRY NOW` skips the wait. If the signal
+drops during a match, the game shows a clear interruption beat and returns to
+the lobby instead of freezing on stale state.
+
 ## Arena variety
 
 Six arenas now shape matchmaking, rematches, and solo runs. Rusted Refinery is

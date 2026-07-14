@@ -80,6 +80,7 @@ import { GameService, type MatchData } from '../services/game-service.js';
 import { AudioManager } from '../audio/audio-manager.js';
 import type { LocalCorrection, NetworkManager } from '../network/network-manager.js';
 import { getMap, DEFAULT_MAP_NAME } from '@shared/maps/registry.js';
+import { MENU_FONTS } from '../ui/menu/fonts.js';
 
 const LOCAL_CORRECTION_SMOOTH_MS = 120;
 const LOCAL_CORRECTION_EPSILON = 0.01;
@@ -188,6 +189,7 @@ export class GameScene extends Phaser.Scene {
   private endTransitionStarted = false;
   private fadeComplete = false;
   private pendingResult: MatchResult | null = null;
+  private connectionLostTransitionStarted = false;
   /**
    * Local-clock timestamp when the displayed match timer first read 0:00,
    * or null while it's above zero. The local end-of-match fade only fires
@@ -212,6 +214,7 @@ export class GameScene extends Phaser.Scene {
   private onMatchStart: (() => void) | null = null;
   private onMatchEnd: ((result: MatchResult) => void) | null = null;
   private onOpponentDisconnected: ((playerId: PlayerId) => void) | null = null;
+  private onConnectionLost: (() => void) | null = null;
   private onPlayerLeft: ((playerId: PlayerId, nickname: string) => void) | null = null;
   private onBulletTrail: ((trail: BulletTrail) => void) | null = null;
   private onPlayerKilled: ((entry: KillFeedEntry) => void) | null = null;
@@ -265,6 +268,7 @@ export class GameScene extends Phaser.Scene {
     this.endTransitionStarted = false;
     this.fadeComplete = false;
     this.pendingResult = null;
+    this.connectionLostTransitionStarted = false;
     this.modeBriefingShown = false;
     this.prevAbilityActive = false;
     this.prevAbilityCoolingDown = false;
@@ -1692,9 +1696,15 @@ export class GameScene extends Phaser.Scene {
       this.tauntRenderer?.show(playerId, tauntId);
     };
 
+    this.onConnectionLost = () => {
+      this.returnToLobbyAfterConnectionLoss();
+    };
+
     this.gameService.on('matchCountdown', this.onMatchCountdown);
     this.gameService.on('matchStart', this.onMatchStart);
     this.gameService.on('matchEnd', this.onMatchEnd);
+    this.gameService.on('reconnecting', this.onConnectionLost);
+    this.gameService.on('disconnected', this.onConnectionLost);
     this.gameService.on('opponentDisconnected', this.onOpponentDisconnected);
     this.gameService.on('playerLeft', this.onPlayerLeft);
     this.gameService.on('bulletTrail', this.onBulletTrail);
@@ -1748,6 +1758,33 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  private returnToLobbyAfterConnectionLoss(): void {
+    if (this.connectionLostTransitionStarted) return;
+    this.connectionLostTransitionStarted = true;
+    this.add.rectangle(480, 360, 960, 720, Wasteland.CANVAS_BG, 0.82).setDepth(20_000);
+    this.add
+      .text(480, 340, 'SIGNAL LOST', {
+        fontFamily: MENU_FONTS.HEADER,
+        fontSize: '24px',
+        color: cssHex(Wasteland.HIT_FLASH),
+      })
+      .setOrigin(0.5)
+      .setDepth(20_001);
+    this.add
+      .text(480, 382, 'RETURNING TO THE OUTPOST...', {
+        fontFamily: MENU_FONTS.BODY,
+        fontSize: '18px',
+        color: cssHex(Wasteland.COVER_FILL),
+      })
+      .setOrigin(0.5)
+      .setDepth(20_001);
+    AudioManager.getInstance()?.stopMusic();
+    this.time.delayedCall(900, () => {
+      this.cleanup();
+      this.scene.start('LobbyScene');
+    });
+  }
+
   private cleanupEvents(): void {
     if (this.onMatchCountdown) {
       this.gameService.off('matchCountdown', this.onMatchCountdown);
@@ -1760,6 +1797,11 @@ export class GameScene extends Phaser.Scene {
     if (this.onMatchEnd) {
       this.gameService.off('matchEnd', this.onMatchEnd);
       this.onMatchEnd = null;
+    }
+    if (this.onConnectionLost) {
+      this.gameService.off('reconnecting', this.onConnectionLost);
+      this.gameService.off('disconnected', this.onConnectionLost);
+      this.onConnectionLost = null;
     }
     if (this.onOpponentDisconnected) {
       this.gameService.off('opponentDisconnected', this.onOpponentDisconnected);
