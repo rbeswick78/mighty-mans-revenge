@@ -132,6 +132,7 @@ export class AudioManager {
     this.sfxVolume = this.loadNumber(STORAGE_KEY_SFX_VOLUME, 1);
     this.musicVolume = this.loadNumber(STORAGE_KEY_MUSIC_VOLUME, 0.5);
     this.isMuted = localStorage.getItem(STORAGE_KEY_MUTED) === 'true';
+    this.game.sound.mute = this.isMuted;
 
     // Check if audio context is already running (user may have interacted before init)
     this.audioUnlocked = !this.game.sound.locked;

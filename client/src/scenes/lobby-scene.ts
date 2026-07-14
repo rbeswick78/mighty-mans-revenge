@@ -70,6 +70,7 @@ import {
   crewTourButtonLabel,
   normalizeCrewTourRecord,
 } from '../ui/crew-tour.js';
+import { audioToggleLabel } from '../ui/audio-toggle.js';
 
 const STORAGE_KEY_NICKNAME = 'mmr_nickname';
 const STORAGE_KEY_BOT_DIFFICULTY = 'mmr_bot_difficulty';
@@ -126,6 +127,7 @@ export class LobbyScene extends Phaser.Scene {
   private practiceModeButton!: PixelButton;
   private practiceMutatorButton!: PixelButton;
   private buildCodexButton!: PixelButton;
+  private audioButton!: PixelButton;
   private connectionStatusText!: Phaser.GameObjects.Text;
   private retryConnectionButton!: PixelButton;
   private mightyManSprite!: Phaser.GameObjects.Sprite;
@@ -249,6 +251,27 @@ export class LobbyScene extends Phaser.Scene {
       .setVisible(false)
       .setDisabled(true)
       .setDepth(WastelandStreet.DEPTH.UI + 1);
+
+    // AudioManager already persists mute and category volumes; expose the
+    // missing user control in the one scene every route returns to. It stays
+    // outside the dense central panel and remains available while connecting
+    // or searching.
+    this.audioButton = new PixelButton(
+      this,
+      this.cameras.main.width - 186,
+      24,
+      150,
+      30,
+      audioToggleLabel(AudioManager.getInstance()?.getIsMuted() ?? false),
+      {
+        variant: 'secondary',
+        fontSize: 7,
+        hitPaddingY: 12,
+        sound: null,
+        onClick: () => this.toggleAudio(),
+      },
+    );
+    this.audioButton.setDepth(WastelandStreet.DEPTH.UI + 2);
 
     // ────────────────────────────────────────────────────────────────────
     // Main UI panel — holds the callsign + Quick Match button. The
@@ -683,6 +706,8 @@ export class LobbyScene extends Phaser.Scene {
     this.input.keyboard?.on('keydown-ESC', () => {
       if (this.isSearching) this.onCancelSearch();
     });
+    // F2 never collides with callsign entry, unlike an ordinary letter key.
+    this.input.keyboard?.on('keydown-F2', () => this.toggleAudio());
 
     // Wire up network events
     this.wireGameServiceEvents();
@@ -741,6 +766,7 @@ export class LobbyScene extends Phaser.Scene {
       this.practiceModeButton,
       this.practiceMutatorButton,
       this.buildCodexButton,
+      this.audioButton,
     ];
     if (this.connectionState !== 'connected') {
       return this.retryConnectionButton.visible
@@ -760,7 +786,16 @@ export class LobbyScene extends Phaser.Scene {
       this.practiceModeButton,
       this.practiceMutatorButton,
       this.buildCodexButton,
+      this.audioButton,
     ];
+  }
+
+  private toggleAudio(): void {
+    const audio = AudioManager.getInstance();
+    if (!audio) return;
+    audio.toggleMute();
+    this.audioButton.setLabel(audioToggleLabel(audio.getIsMuted()));
+    if (!audio.getIsMuted()) audio.play('menuSelect');
   }
 
   private syncGamepadFocus(): void {
