@@ -728,6 +728,9 @@ describe('session-8 polish backlog config', () => {
     expect(BOT.RUMBLE_NICKNAMES).toEqual(SCRAP_PIT_RIVALS.map((rival) => rival.nickname));
     expect(SCRAP_PIT_RIVALS.map((rival) => rival.tactic)).toEqual([...BOT_TACTICS]);
     expect(new Set(SCRAP_PIT_RIVALS.map((rival) => rival.role)).size).toBe(SCRAP_PIT_RIVALS.length);
+    const signatureTaunts = SCRAP_PIT_RIVALS.map((rival) => rival.signatureTauntId);
+    expect(new Set(signatureTaunts).size).toBe(SCRAP_PIT_RIVALS.length);
+    expect(signatureTaunts.every((tauntId) => TAUNT_IDS.includes(tauntId))).toBe(true);
     expect(Object.isFrozen(BOT.RUMBLE_NICKNAMES)).toBe(true);
     expect(Object.isFrozen(SCRAP_PIT_RIVALS)).toBe(true);
     expect(SCRAP_PIT_RIVALS.every((rival) => Object.isFrozen(rival))).toBe(true);

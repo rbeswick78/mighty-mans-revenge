@@ -8,7 +8,8 @@ describe('scrapPitCrewLabel', () => {
     const label = scrapPitCrewLabel();
 
     expect(label).toBe(
-      'PIT CREW: RUSTY · ALL-ROUNDER  //  SCRAPJAW · LEADER HUNTER  //  CLANK · SCAVENGER',
+      'PIT CREW: RUSTY · ALL-ROUNDER  //  SCRAPJAW · LEADER HUNTER  //  CLANK · SCAVENGER\n' +
+        'PIT BANTER: TAUNT THE CREW  //  THEY ANSWER',
     );
     for (const rival of SCRAP_PIT_RIVALS) {
       expect(label).toContain(rival.nickname);

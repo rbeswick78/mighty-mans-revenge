@@ -1803,9 +1803,67 @@ describe('MatchmakingManager solo practice flow', () => {
     if (!humanCharacter) throw new Error('missing open fighter');
     first.setLock('A', humanCharacter);
     first.updateCharacterSelect(0);
+    first.players.get('A')!.position = { x: 48, y: 48 };
+    botIds.forEach((botId, index) => {
+      first.players.get(botId)!.position = { x: (index + 2) * 48, y: 48 };
+    });
+    first.phase = MatchPhase.ACTIVE;
+    first.matchTimer = 100;
+    sent.length = 0;
+
+    mgr.handleTaunt('A', 'come_get_some');
+
+    const localTaunts = sent.filter(
+      (entry) => entry.playerId === 'A' && entry.message.type === 'server:taunt',
+    );
+    expect(
+      localTaunts.map((entry) =>
+        entry.message.type === 'server:taunt'
+          ? { playerId: entry.message.playerId, tauntId: entry.message.tauntId }
+          : null,
+      ),
+    ).toEqual([
+      { playerId: 'A', tauntId: 'come_get_some' },
+      { playerId: botIds[0], tauntId: SCRAP_PIT_RIVALS[0].signatureTauntId },
+    ]);
+    expect(sent.filter((entry) => entry.message.type === 'server:taunt')).toHaveLength(8);
+    expect(
+      sent
+        .filter((entry) => entry.message.type === 'server:taunt')
+        .every((entry) => entry.reliable),
+    ).toBe(true);
+
+    const update = first.update.bind(first);
+    const updateSpy = vi.spyOn(first, 'update').mockImplementationOnce((dt) => {
+      update(dt);
+      first.onKill(botIds[1], 'A', 'gun');
+    });
+    sent.length = 0;
+    mgr.tick(0.05, 1);
+    updateSpy.mockRestore();
+
+    expect(
+      sent.some(
+        (entry) =>
+          entry.playerId === 'A' &&
+          entry.message.type === 'server:playerKilled' &&
+          entry.message.entry.killerId === botIds[1],
+      ),
+    ).toBe(true);
+    expect(
+      sent.some(
+        (entry) =>
+          entry.playerId === 'A' &&
+          entry.reliable &&
+          entry.message.type === 'server:taunt' &&
+          entry.message.playerId === botIds[1] &&
+          entry.message.tauntId === SCRAP_PIT_RIVALS[1].signatureTauntId,
+      ),
+    ).toBe(true);
+
     first.players.get('A')!.score = 5;
     first.phase = MatchPhase.ENDED;
-    mgr.tick(0.05, 1);
+    mgr.tick(0.05, 2);
 
     const ended = [...sent]
       .reverse()

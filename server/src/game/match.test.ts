@@ -109,8 +109,9 @@ describe('Match', () => {
 
   describe('battle cry authority', () => {
     function startActiveMatch(): void {
-      match.setLock('player-0', 'mighty_man');
-      match.setLock('player-1', 'bruce');
+      [...match.players.keys()].forEach((playerId, index) => {
+        match.setLock(playerId, CHARACTER_IDS[index]!);
+      });
       match.update(0.01);
       match.update(MATCH.COUNTDOWN_DURATION + 0.01);
       expect(match.phase).toBe(MatchPhase.ACTIVE);
@@ -137,6 +138,38 @@ describe('Match', () => {
       expect(match.tryTaunt('player-0', 'come_get_some')).toBeNull();
       match.update(0.02);
       expect(match.tryTaunt('player-0', 'come_get_some')).toBe('come_get_some');
+    });
+
+    it('lets the nearest registered personality answer a living human challenge', () => {
+      match = createMatch(3);
+      startActiveMatch();
+      match.players.get('player-0')!.position = { x: 48, y: 48 };
+      match.players.get('player-1')!.position = { x: 96, y: 48 };
+      match.players.get('player-2')!.position = { x: 144, y: 48 };
+      match.registerAutonomousTaunt('player-1', 'still_standing');
+      match.registerAutonomousTaunt('player-2', 'is_that_all');
+
+      expect(match.tryAutonomousTauntResponse('player-0')).toEqual({
+        playerId: 'player-1',
+        tauntId: 'still_standing',
+      });
+      expect(match.tryAutonomousTauntResponse('player-0')).toEqual({
+        playerId: 'player-2',
+        tauntId: 'is_that_all',
+      });
+      expect(match.tryAutonomousTauntResponse('player-0')).toBeNull();
+      expect(match.tryAutonomousTauntResponse('player-1')).toBeNull();
+    });
+
+    it('queues a living personality cry after it eliminates a human', () => {
+      startActiveMatch();
+      match.registerAutonomousTaunt('player-1', 'is_that_all');
+
+      match.onKill('player-1', 'player-0', 'gun');
+
+      expect(match.getTickAutonomousTaunts()).toEqual([
+        { playerId: 'player-1', tauntId: 'is_that_all' },
+      ]);
     });
   });
 

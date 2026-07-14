@@ -1083,11 +1083,12 @@ export class MatchmakingManager {
         this.botControllers.set(
           matchId,
           botEntries.map((entry) => {
-            const tactic =
+            const rival =
               practiceKind === 'rusty_rumble'
-                ? SCRAP_PIT_RIVALS.find((rival) => rival.nickname === entry.nickname)?.tactic
+                ? SCRAP_PIT_RIVALS.find((candidate) => candidate.nickname === entry.nickname)
                 : undefined;
-            return new BotController(entry.id, practiceDifficulty, tactic);
+            if (rival) match.registerAutonomousTaunt(entry.id, rival.signatureTauntId);
+            return new BotController(entry.id, practiceDifficulty, rival?.tactic);
           }),
         );
         const availableCharacters = [...CHARACTER_IDS];
@@ -1555,10 +1556,17 @@ export class MatchmakingManager {
     const accepted = match?.tryTaunt(playerId, tauntId);
     if (!match || !accepted) return;
 
+    this.broadcastTaunt(match, playerId, accepted);
+    const response = match.tryAutonomousTauntResponse(playerId);
+    if (response) this.broadcastTaunt(match, response.playerId, response.tauntId);
+  }
+
+  /** Send one already-authorized cry reliably to every participant. */
+  private broadcastTaunt(match: Match, playerId: PlayerId, tauntId: TauntId): void {
     for (const [recipientId] of match.players) {
       this.server.sendTo(
         recipientId,
-        { type: 'server:taunt', playerId, tauntId: accepted },
+        { type: 'server:taunt', playerId, tauntId },
         { reliable: true },
       );
     }
@@ -1684,6 +1692,9 @@ export class MatchmakingManager {
       for (const [playerId] of match.players) {
         this.server.sendTo(playerId, { type: 'server:playerKilled', entry });
       }
+    }
+    for (const taunt of match.getTickAutonomousTaunts()) {
+      this.broadcastTaunt(match, taunt.playerId, taunt.tauntId);
     }
 
     // Broadcast each pickup collected this tick (for the pickup SFX).

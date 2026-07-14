@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–84 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Quick Match 1v1 plus 2–4 player Wasteland Rumble with all-player group draft rallies, a rematch-chain Rumble Crown, live lead-change drama, personal rematch Grudges, authoritative Rumble Assists with K/A/D, a solo four-fighter Scrap Pit whose three server-authoritative rivals have distinct readable tactics, and visible bounded Wasteland Signal Recovery, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–85 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Quick Match 1v1 plus 2–4 player Wasteland Rumble with all-player group draft rallies, a rematch-chain Rumble Crown, live lead-change drama, personal rematch Grudges, authoritative Rumble Assists with K/A/D, a solo four-fighter Scrap Pit whose three server-authoritative rivals have distinct readable tactics and answer player taunts with signature banter, and visible bounded Wasteland Signal Recovery, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -116,6 +116,7 @@ Each session below attacks one of these.
 | 82  | Wasteland Signal Recovery                       | Brief server trouble becomes visible and recoverable instead of a frozen loop | **DONE** (2026-07-14) |
 | 83  | Scrap Pit                                       | Solo players can enter the full four-fighter Rumble chaos on demand            | **DONE** (2026-07-14) |
 | 84  | Scrap Pit Rivals                                | Every bot presents a different threat instead of feeling like a renamed clone  | **DONE** (2026-07-14) |
+| 85  | Scrap Pit Banter                                | Talking trash becomes a two-way rivalry beat against the crew                  | **DONE** (2026-07-14) |
 
 ---
 
@@ -3233,6 +3234,48 @@ attempt one attainable friend score to hunt from the first stage onward.
 
 ---
 
+## Session 85 — Scrap Pit Banter
+
+**Goal:** turn the Scrap Pit crew into memorable rivals who answer the player
+instead of fighting in complete silence.
+
+**Locked design decisions**
+
+- Each entry in the frozen shared `SCRAP_PIT_RIVALS` roster owns one unique
+  approved `signatureTauntId`: Rusty says `BRING IT!`, Scrapjaw says
+  `IS THAT ALL?`, and Clank says `STILL STANDING!`. Free-form text remains
+  impossible and the client never chooses speech for a rival.
+- Matchmaking registers those signatures only for the three autonomous
+  fighters in a Scrap Pit. Ordinary Spar and Gauntlet bots remain silent.
+- After the server accepts a living human's taunt, the nearest living crew
+  member who can pass the existing cooldown answers. Distance then stable
+  player id decides order, and a cooling-down rival yields to the next one.
+- A registered rival who knocks out the unregistered human queues its signature
+  in the same authoritative tick. Crew-on-crew knockouts do not create chatter,
+  and a dead or cooling-down speaker is rejected by the ordinary taunt gate.
+- Replies and knockout cries reuse the existing reliable `server:taunt` event,
+  speech bubbles, approved registry, live/alive checks, and four-second
+  simulation-time cooldown. No combat, targeting, score, persistence, balance,
+  physics, reward, or wire-state rule changes.
+- Character Select adds a compact `PIT BANTER` instruction under the existing
+  crew-role briefing so the interaction is discoverable before lock-in.
+
+**Acceptance criteria**
+
+- [x] Shared tests prove every rival signature is unique and approved.
+- [x] Match tests prove nearest deterministic answers, cooldown fallback, and
+      a valid signature queued for a human knockout.
+- [x] Matchmaking tests prove a human challenge and a rival knockout both fan
+      out reliably while unrelated Practice bots remain unregistered.
+- [x] Client tests and a real-server desktop journey prove the discoverability
+      line and visible two-way taunt presentation.
+- [x] Desktop and 844×390 mobile-landscape visual reviews keep all briefing
+      copy clear of fighter cards and report no browser console errors.
+- [x] Typecheck, lint, all unit tests, production build, and the complete
+      Playwright desktop/mobile matrix pass.
+
+---
+
 ## Session 84 — Scrap Pit Rivals
 
 **Goal:** make repeat Scrap Pit rounds feel like fighting a recognizable crew
@@ -3652,8 +3695,9 @@ rivalry and rematches without changing combat outcomes.
   uses `Y`, and touch gets a fixed `T` button beside the grenade control. The
   input edge is buffered so a quick tap cannot disappear between game ticks.
 - A compact speech bubble follows the speaking fighter for two seconds and
-  fades cleanly. Practice allows the human fighter to taunt; Rusty never emits
-  one autonomously.
+  fades cleanly. Practice allows the human fighter to taunt; ordinary Spar and
+  Gauntlet Rusties never emit one autonomously. Only the explicitly registered
+  Scrap Pit crew added in Session 85 may answer or celebrate a knockout.
 
 **Acceptance criteria**
 
@@ -3937,6 +3981,39 @@ favorite mid-match event while the final-minute surprise stays fresh.
 ---
 
 ## Session Log
+
+### Session 85 — 2026-07-14 — Scrap Pit Banter
+
+**Shipped:** the Scrap Pit crew now talks back. Every rival owns a unique
+approved signature cry, the nearest available crew member answers a living
+player's accepted taunt, and the rival who knocks out the human can celebrate
+in the same authoritative tick. Character Select teaches the interaction with
+a `PIT BANTER` line before the player locks in.
+
+The server still owns every word and every decision to speak. Autonomous cries
+pass the existing live, alive, and four-second simulation-time checks and reuse
+the reliable taunt broadcast plus established speech bubbles. Registered crew
+do not taunt one another, and ordinary Spar/Gauntlet Rusties remain silent. No
+combat, targeting, score, physics, balance, persistence, reward, or new wire
+state changed.
+
+**Verification:** 393 focused shared, Match, matchmaking, and client tests prove
+approved unique signatures, nearest deterministic response, cooldown fallback,
+knockout cries, and reliable fan-out. Typecheck, lint, all 1,268 unit/integration
+tests across 91 files, and the production build pass; Vite retains its existing
+chunk-size advisory. The dedicated real-server Scrap Pit journey passes in all
+three projects, and the complete matrix passes 60 tests with 12 intentional
+project-scoped skips. Desktop and 844×390 mobile-landscape visual reviews keep
+the expanded briefing clear; a live round displayed a rival's knockout cry and
+browser logs contained no errors.
+
+**Operational watch:** banter is intentionally sparse because every speaker
+uses the same four-second cooldown as a player. Watch whether real rounds want
+more conversational variety before adding any approved lines; never turn the
+feature into free-form text or a gameplay modifier.
+
+**Deployment:** not run; production deployment still requires explicit user
+authorization.
 
 ### Session 84 — 2026-07-14 — Scrap Pit Rivals
 
@@ -4292,8 +4369,9 @@ four-second rate limit before reliably broadcasting to all participants.
 
 The feature is deliberately social rather than mechanical: no combat input,
 bot behavior, targeting, score, physics, matchmaking, or balance value changes.
-Practice supports human taunts, but Rusty does not taunt on its own. No new
-third-party assets were added.
+Practice supports human taunts, but ordinary Spar and Gauntlet Rusties do not
+taunt on their own. Session 85 later registered only the Scrap Pit crew for
+bounded autonomous replies. No new third-party assets were added.
 
 **Verification:** 401 focused tests pass across shared config, match authority,
 matchmaking broadcast, network transport, gamepad input, and combat filtering.

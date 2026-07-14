@@ -1,10 +1,10 @@
 import { test, expect } from '../fixtures';
 
 test.describe('Scrap Pit solo Rumble', () => {
-  test('exposes the solo route and opens three distinct locked Rusties', async ({
+  test('opens three distinct rivals and makes the crew answer a challenge', async ({
     gamePage,
   }, testInfo) => {
-    test.setTimeout(45000);
+    test.setTimeout(60000);
     await expect
       .poll(() =>
         gamePage.evaluate(() => {
@@ -151,7 +151,8 @@ test.describe('Scrap Pit solo Rumble', () => {
                   (child) =>
                     child.text?.includes('PIT CREW:') &&
                     child.text.includes('LEADER HUNTER') &&
-                    child.text.includes('SCAVENGER'),
+                    child.text.includes('SCAVENGER') &&
+                    child.text.includes('PIT BANTER: TAUNT THE CREW'),
                 ) ?? false,
             };
           }),
@@ -180,5 +181,68 @@ test.describe('Scrap Pit solo Rumble', () => {
     });
     expect(locks.every((lock) => lock !== null)).toBe(true);
     expect(new Set(locks).size).toBe(3);
+
+    await gamePage.keyboard.press('ArrowRight');
+    await gamePage.keyboard.press('Enter');
+    await expect
+      .poll(
+        () =>
+          gamePage.evaluate(() => {
+            const w = window as unknown as {
+              game?: { scene: { getScene: (key: string) => unknown } };
+            };
+            const scene = w.game?.scene.getScene('GameScene') as {
+              sys?: { settings: { active: boolean } };
+              matchPhase?: string;
+            };
+            return {
+              active: scene?.sys?.settings.active ?? false,
+              phase: scene?.matchPhase ?? null,
+            };
+          }),
+        { timeout: 15000, message: 'expected the Scrap Pit to reach live play' },
+      )
+      .toEqual({ active: true, phase: 'active' });
+
+    await gamePage.keyboard.press('t');
+    await expect
+      .poll(
+        () =>
+          gamePage.evaluate(() => {
+            const w = window as unknown as {
+              game?: { scene: { getScene: (key: string) => unknown } };
+            };
+            const scene = w.game?.scene.getScene('GameScene') as {
+              gameService?: {
+                getNetworkManager: () => { getPlayerId: () => string | null };
+              };
+              tauntRenderer?: {
+                active?: Map<string, { container: { list: Array<{ text?: string }> } }>;
+              };
+            };
+            const localPlayerId = scene?.gameService?.getNetworkManager().getPlayerId();
+            const bubbles = [...(scene?.tauntRenderer?.active ?? new Map())].map(
+              ([playerId, active]) => ({
+                playerId,
+                text:
+                  active.container.list.find((child) => typeof child.text === 'string')?.text ??
+                  null,
+              }),
+            );
+            return {
+              localText: bubbles.find((bubble) => bubble.playerId === localPlayerId)?.text ?? null,
+              rivalTexts: bubbles
+                .filter((bubble) => bubble.playerId !== localPlayerId)
+                .map((bubble) => bubble.text),
+            };
+          }),
+        { timeout: 5000, message: 'expected one Scrap Pit rival to answer the local taunt' },
+      )
+      .toMatchObject({
+        localText: 'BRING IT!',
+        rivalTexts: expect.arrayContaining([
+          expect.stringMatching(/^(BRING IT!|IS THAT ALL\?|STILL STANDING!)$/),
+        ]),
+      });
   });
 });

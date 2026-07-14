@@ -500,12 +500,29 @@ export interface ScrapPitRivalDef {
   tactic: BotTactic;
   /** Compact pre-fight copy; behavior still lives entirely on the server. */
   role: string;
+  /** Approved battle cry used for server-authored challenges and knockouts. */
+  signatureTauntId: TauntId;
 }
 
 export const SCRAP_PIT_RIVALS: readonly ScrapPitRivalDef[] = Object.freeze([
-  Object.freeze({ nickname: 'RUSTY', tactic: 'balanced', role: 'ALL-ROUNDER' }),
-  Object.freeze({ nickname: 'SCRAPJAW', tactic: 'hunter', role: 'LEADER HUNTER' }),
-  Object.freeze({ nickname: 'CLANK', tactic: 'scavenger', role: 'SCAVENGER' }),
+  Object.freeze({
+    nickname: 'RUSTY',
+    tactic: 'balanced',
+    role: 'ALL-ROUNDER',
+    signatureTauntId: 'bring_it',
+  }),
+  Object.freeze({
+    nickname: 'SCRAPJAW',
+    tactic: 'hunter',
+    role: 'LEADER HUNTER',
+    signatureTauntId: 'is_that_all',
+  }),
+  Object.freeze({
+    nickname: 'CLANK',
+    tactic: 'scavenger',
+    role: 'SCAVENGER',
+    signatureTauntId: 'still_standing',
+  }),
 ]);
 
 /** Server-authoritative solo practice opponent. All behavior tuning lives here. */

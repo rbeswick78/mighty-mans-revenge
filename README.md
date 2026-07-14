@@ -110,7 +110,9 @@ server-authoritative fighters, so the solo brawl includes the live Rumble
 lead, assists, standings, Crown, and direct-rematch stories without writing
 lifetime PvP records. They also fight differently: Rusty is the all-rounder,
 Scrapjaw pressures whoever leads the board, and Clank ranges farther for arena
-loot. Character Select previews those roles before every fight.
+loot. Character Select previews those roles before every fight. Throw a battle
+cry during the brawl and the nearest available rival answers in character;
+each crew member also has a signature cry when they knock you out.
 `GAUNTLET` starts a three-fight run that
 escalates from Rookie to Scrapper to Warlord; win to advance, while a loss or
 draw restarts the run.

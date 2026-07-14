@@ -88,6 +88,11 @@ interface PendingBurst {
   lockedAngle: number;
 }
 
+export interface AutonomousTauntEvent {
+  playerId: PlayerId;
+  tauntId: TauntId;
+}
+
 export class Match implements MatchContext {
   readonly matchId: string;
   phase: MatchPhase = MatchPhase.CHARACTER_SELECT;
@@ -175,6 +180,10 @@ export class Match implements MatchContext {
   private pendingBursts: Map<PlayerId, PendingBurst> = new Map();
   /** Simulation-time rate limit for presentation-only battle cries. */
   private readonly tauntCooldowns = new Map<PlayerId, number>();
+  /** Server-authored signature cries registered only for personality bots. */
+  private readonly autonomousTaunts = new Map<PlayerId, TauntId>();
+  /** Autonomous cries earned this tick by a bot knockout. */
+  private tickAutonomousTaunts: AutonomousTauntEvent[] = [];
   /**
    * Seconds until each player can pull the trigger again — the shotgun's
    * pump-racking, the pistol's semi-auto pacing, and the punch's swing
@@ -443,6 +452,46 @@ export class Match implements MatchContext {
     }
     this.tauntCooldowns.set(playerId, TAUNT.COOLDOWN_SECONDS);
     return value;
+  }
+
+  /** Install one approved signature cry for a server-controlled personality. */
+  registerAutonomousTaunt(playerId: PlayerId, tauntId: TauntId): void {
+    if (!this.players.has(playerId)) return;
+    this.autonomousTaunts.set(playerId, tauntId);
+  }
+
+  /**
+   * Let the nearest available personality answer a living human challenge.
+   * Distance and player id provide deterministic selection; a responder on
+   * cooldown yields to the next candidate instead of silencing the crew.
+   */
+  tryAutonomousTauntResponse(challengerId: PlayerId): AutonomousTauntEvent | null {
+    const challenger = this.players.get(challengerId);
+    if (!challenger || challenger.isDead || this.autonomousTaunts.has(challengerId)) return null;
+
+    const candidates = [...this.autonomousTaunts.entries()].sort(([leftId], [rightId]) => {
+      const left = this.players.get(leftId);
+      const right = this.players.get(rightId);
+      const leftDistance = left
+        ? Math.hypot(
+            left.position.x - challenger.position.x,
+            left.position.y - challenger.position.y,
+          )
+        : Number.POSITIVE_INFINITY;
+      const rightDistance = right
+        ? Math.hypot(
+            right.position.x - challenger.position.x,
+            right.position.y - challenger.position.y,
+          )
+        : Number.POSITIVE_INFINITY;
+      return leftDistance - rightDistance || leftId.localeCompare(rightId);
+    });
+
+    for (const [playerId, tauntId] of candidates) {
+      const accepted = this.tryTaunt(playerId, tauntId);
+      if (accepted) return { playerId, tauntId: accepted };
+    }
+    return null;
   }
 
   /**
@@ -750,6 +799,12 @@ export class Match implements MatchContext {
     };
     this.killFeed.push(entry);
     this.tickKillFeedEntries.push(entry);
+
+    const autonomousTaunt = this.autonomousTaunts.get(killerId);
+    if (autonomousTaunt && !this.autonomousTaunts.has(victimId)) {
+      const accepted = this.tryTaunt(killerId, autonomousTaunt);
+      if (accepted) this.tickAutonomousTaunts.push({ playerId: killerId, tauntId: accepted });
+    }
   }
 
   /** Record that a player has disconnected. */
@@ -1094,6 +1149,11 @@ export class Match implements MatchContext {
     return this.tickKillFeedEntries;
   }
 
+  /** Personality-bot cries earned during the most recent simulation tick. */
+  getTickAutonomousTaunts(): AutonomousTauntEvent[] {
+    return this.tickAutonomousTaunts;
+  }
+
   /** Pickup collections recorded during the most recent tick, for broadcasting. */
   getTickPickupCollections(): Array<{ pickupId: string; playerId: PlayerId }> {
     return this.tickPickupCollections;
@@ -1205,6 +1265,7 @@ export class Match implements MatchContext {
     this.tickBulletTrails = [];
     this.tickPunchEvents = [];
     this.tickKillFeedEntries = [];
+    this.tickAutonomousTaunts = [];
     this.tickPickupCollections = [];
     this.tickDestroyedTiles = [];
     this.tickBarrelExplosions = [];
