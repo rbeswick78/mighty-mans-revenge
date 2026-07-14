@@ -27,9 +27,9 @@ export class InputManager {
   /** Out-of-band edge; never enters authoritative movement prediction. */
   private tauntPressed = false;
 
-  constructor(scene: Phaser.Scene) {
+  constructor(scene: Phaser.Scene, secondaryActionsDisabled = false) {
     this.keyboardMouseInput = new KeyboardMouseInput(scene);
-    this.touchInput = new TouchInput(scene);
+    this.touchInput = new TouchInput(scene, !secondaryActionsDisabled);
     this.gamepadInput = new GamepadInput();
     this.canvas = scene.game.canvas;
 
@@ -173,6 +173,11 @@ export class InputManager {
 
   getActiveMode(): InputMode {
     return this.activeMode;
+  }
+
+  /** Keep visible touch affordances inert until the authoritative fight starts. */
+  setGameplayEnabled(enabled: boolean): void {
+    this.touchInput.setGameplayEnabled(enabled);
   }
 
   /** Optional tactile feedback; silently ignored on unsupported browsers/pads. */

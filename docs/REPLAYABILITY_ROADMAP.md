@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–91 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, roster-authentic duel/Rumble results, Gun Game, Rivalry Sets, Quick Match 1v1 plus 2–4 player Wasteland Rumble with all-player group draft rallies, a rematch-chain Rumble Crown, live lead-change drama, personal rematch Grudges, authoritative Rumble Assists with K/A/D, a solo four-fighter Scrap Pit whose three server-authoritative rivals have distinct readable tactics, answer player taunts with signature banter, and feed a device-local win/run record chase, a 2v2 Crew Battle with friendly-fire protection and an optional six-second real-friend join window, a four-objective Crew Clash rotation, and a device-local four-patch Crew Tour, and visible bounded Wasteland Signal Recovery, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–92 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, roster-authentic duel/Rumble results, Gun Game, Rivalry Sets, Quick Match 1v1 plus 2–4 player Wasteland Rumble with all-player group draft rallies, a rematch-chain Rumble Crown, live lead-change drama, personal rematch Grudges, authoritative Rumble Assists with K/A/D, a solo four-fighter Scrap Pit whose three server-authoritative rivals have distinct readable tactics, answer player taunts with signature banter, and feed a device-local win/run record chase, a 2v2 Crew Battle with friendly-fire protection and an optional six-second real-friend join window, a four-objective Crew Clash rotation, and a device-local four-patch Crew Tour, visible bounded Wasteland Signal Recovery, device-aware pre-fight control onboarding with early touch affordances, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -4267,6 +4267,45 @@ favorite mid-match event while the final-minute surprise stays fresh.
 ---
 
 ## Session Log
+
+### Session 92 — 2026-07-14 — Combat Control Onboarding
+
+**Shipped:** every pre-fight countdown now pairs the selected mode objective
+with a high-contrast, device-aware control card. Keyboard/mouse, touch, and
+gamepad copy all teach the shooter's unusual but intentional rhythm—hold to aim,
+release to fire—before the first live input. Secondary-action copy follows the
+mode contract, so One in the Chamber never advertises grenades or character
+powers that the server disables. The later twin-stick takeover banner now uses
+the same accurate hold/release language instead of the ambiguous `RT FIRE`.
+
+Touch fighters no longer enter the countdown with invisible actions: `G`, `A`,
+and `T` are present as soon as GameScene opens, while the two dynamic joysticks
+still appear under the player's thumbs. Countdown controls are visible but
+unarmed until `FIGHT`, so an exploratory tap cannot buffer a grenade, power, or
+shot into the opening tick. The taunt target grew from a 30px to a 40px
+canvas-space radius, matching grenade and power without moving the cluster into
+the right-stick lane. No input packets, authoritative rules, timing, combat,
+balance, networking, persistence, or fixed canvas dimensions changed.
+
+**Verification:** three focused copy tests cover all input surfaces and the
+secondary-action-disabled branch. Typecheck and lint pass; all 1,302 unit and
+integration tests pass across 96 files. The production build passes with the
+existing Vite chunk-size advisory (`index-BajaY3Iz.js`, 1,845.63 kB / 441.32
+kB gzip). The focused control journey drives a real GameScene and countdown
+across Chromium, Firefox, and 844×390 mobile
+landscape, checking the rendered copy plus all three 40px touch targets. The
+complete Playwright matrix passes 78 tests with 15 intentional project skips
+across 93 configured cases. Desktop and mobile captures show the card clear of
+the mode objective, HUD strip, and touch cluster; the screenshot checkpoint
+waits out GameScene's intentional 300ms fade so it verifies the finished frame.
+
+**Operational watch:** the card appears on every countdown so rematches remain
+self-explanatory when players swap devices. Watch whether experienced groups
+find that repetition useful or noisy before adding a dismissal preference.
+Also watch real-phone reach: the enlarged `T` target now matches the other
+actions, but the fixed 4:3 canvas still produces expected side bars on wide
+landscape screens and should only be redesigned as a dedicated responsive-HUD
+project.
 
 ### Session 91 — 2026-07-14 — Crew Up
 

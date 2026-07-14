@@ -20,6 +20,8 @@ import { coreRunStatus } from './core-run-hud.js';
 import { bountyHuntStatus } from './bounty-hunt-hud.js';
 import { batDurabilityLabel } from '../rendering/bat-presentation.js';
 import { armorPresentation } from './armor-presentation.js';
+import type { InputMode } from '../input/input-manager.js';
+import { controlBriefingFor } from './control-briefing.js';
 
 // Press Start 2P is much wider per glyph than Courier, so the final-minute
 // banner size drops to compensate (Courier 40px ≈ PS2P 22-24px in width).
@@ -142,6 +144,9 @@ export class HUD {
   private countdownText: Phaser.GameObjects.Text;
   private modeBriefingTitle: Phaser.GameObjects.Text;
   private modeBriefingObjective: Phaser.GameObjects.Text;
+  private controlBriefingBg: Phaser.GameObjects.Rectangle;
+  private controlBriefingTitle: Phaser.GameObjects.Text;
+  private controlBriefingDetail: Phaser.GameObjects.Text;
   private deathOverlay: Phaser.GameObjects.Text;
   private eventBannerText: Phaser.GameObjects.Text;
   private combatCalloutText: Phaser.GameObjects.Text;
@@ -534,6 +539,42 @@ export class HUD {
     this.modeBriefingObjective.setScrollFactor(0);
     this.modeBriefingObjective.setDepth(1999);
     this.modeBriefingObjective.setVisible(false);
+
+    this.controlBriefingBg = scene.add.rectangle(
+      mapCenterX,
+      mapCenterY + 165,
+      820,
+      96,
+      Wasteland.HUD_STRIP_BG,
+      0.86,
+    );
+    this.controlBriefingBg.setStrokeStyle(2, Wasteland.WALL_LINE, 0.9);
+    this.controlBriefingBg.setScrollFactor(0);
+    this.controlBriefingBg.setDepth(1998);
+    this.controlBriefingBg.setVisible(false);
+
+    this.controlBriefingTitle = scene.add.text(mapCenterX, mapCenterY + 135, '', {
+      fontFamily: MENU_FONTS.HEADER,
+      fontSize: '10px',
+      color: cssHex(Wasteland.HEALTH_GOOD),
+      align: 'center',
+    });
+    this.controlBriefingTitle.setOrigin(0.5);
+    this.controlBriefingTitle.setScrollFactor(0);
+    this.controlBriefingTitle.setDepth(1999);
+    this.controlBriefingTitle.setVisible(false);
+
+    this.controlBriefingDetail = scene.add.text(mapCenterX, mapCenterY + 169, '', {
+      fontFamily: MENU_FONTS.BODY,
+      fontSize: '15px',
+      color: cssHex(Wasteland.TEXT_PRIMARY),
+      align: 'center',
+      lineSpacing: 8,
+    });
+    this.controlBriefingDetail.setOrigin(0.5);
+    this.controlBriefingDetail.setScrollFactor(0);
+    this.controlBriefingDetail.setDepth(1999);
+    this.controlBriefingDetail.setVisible(false);
 
     this.deathOverlay = scene.add.text(mapCenterX, mapCenterY, '', {
       ...LARGE_FONT_STYLE,
@@ -1015,26 +1056,47 @@ export class HUD {
     });
   }
 
-  showModeBriefing(mode: GameModeType): void {
+  showModeBriefing(
+    mode: GameModeType,
+    inputMode: InputMode = 'keyboard',
+    secondaryActionsEnabled = true,
+  ): void {
     const briefing = GAME_MODES[mode];
+    const controls = controlBriefingFor(inputMode, secondaryActionsEnabled);
     this.modeBriefingTitle.setText(briefing.displayName);
     this.modeBriefingObjective.setText(briefing.objective);
-    for (const text of [this.modeBriefingTitle, this.modeBriefingObjective]) {
-      this.scene.tweens.killTweensOf(text);
-      text.setAlpha(1);
-      text.setVisible(true);
+    this.controlBriefingTitle.setText(controls.title);
+    this.controlBriefingDetail.setText(controls.detail);
+    const elements = [
+      this.modeBriefingTitle,
+      this.modeBriefingObjective,
+      this.controlBriefingBg,
+      this.controlBriefingTitle,
+      this.controlBriefingDetail,
+    ];
+    for (const element of elements) {
+      this.scene.tweens.killTweensOf(element);
+      element.setAlpha(1);
+      element.setVisible(true);
     }
   }
 
   hideModeBriefing(duration = 700): void {
-    for (const text of [this.modeBriefingTitle, this.modeBriefingObjective]) {
-      this.scene.tweens.killTweensOf(text);
+    const elements = [
+      this.modeBriefingTitle,
+      this.modeBriefingObjective,
+      this.controlBriefingBg,
+      this.controlBriefingTitle,
+      this.controlBriefingDetail,
+    ];
+    for (const element of elements) {
+      this.scene.tweens.killTweensOf(element);
       this.scene.tweens.add({
-        targets: text,
+        targets: element,
         alpha: 0,
         duration,
         ease: 'Quad.easeIn',
-        onComplete: () => text.setVisible(false),
+        onComplete: () => element.setVisible(false),
       });
     }
   }
@@ -1396,6 +1458,9 @@ export class HUD {
     this.countdownText.destroy();
     this.modeBriefingTitle.destroy();
     this.modeBriefingObjective.destroy();
+    this.controlBriefingBg.destroy();
+    this.controlBriefingTitle.destroy();
+    this.controlBriefingDetail.destroy();
     this.deathOverlay.destroy();
     this.eventBannerText.destroy();
     this.combatCalloutText.destroy();

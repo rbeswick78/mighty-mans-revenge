@@ -355,7 +355,10 @@ export class GameScene extends Phaser.Scene {
     if (!isTouchDevice()) {
       this.crosshair = new Crosshair(this);
     }
-    this.inputManager = new InputManager(this);
+    this.inputManager = new InputManager(
+      this,
+      this.matchData?.gameMode === GameModeType.ONE_IN_THE_CHAMBER,
+    );
 
     // Wire up network events
     this.wireGameServiceEvents();
@@ -990,7 +993,7 @@ export class GameScene extends Phaser.Scene {
       this.controllerAnnounced = true;
       this.hud.showEventBanner(
         'TWIN-STICK ONLINE',
-        'RT FIRE  •  LT GRENADE  •  RB POWER  •  Y TAUNT',
+        'HOLD RT TO AIM  •  RELEASE TO FIRE  •  LT GRENADE  •  RB POWER',
         0x5ce1e6,
       );
     }
@@ -1176,7 +1179,11 @@ export class GameScene extends Phaser.Scene {
         this.hud.showCountdown(value);
         if (!this.modeBriefingShown && this.matchData?.gameMode) {
           this.modeBriefingShown = true;
-          this.hud.showModeBriefing(this.matchData.gameMode);
+          this.hud.showModeBriefing(
+            this.matchData.gameMode,
+            this.inputManager?.getActiveMode() ?? (isTouchDevice() ? 'touch' : 'keyboard'),
+            this.matchData.gameMode !== GameModeType.ONE_IN_THE_CHAMBER,
+          );
         }
       }
       this.matchPhase = MatchPhase.COUNTDOWN;
@@ -1184,6 +1191,7 @@ export class GameScene extends Phaser.Scene {
 
     this.onMatchStart = () => {
       this.matchPhase = MatchPhase.ACTIVE;
+      this.inputManager?.setGameplayEnabled(true);
       if (this.hud) {
         this.hud.showCountdown(0); // Shows "FIGHT!"
         this.hud.hideModeBriefing();

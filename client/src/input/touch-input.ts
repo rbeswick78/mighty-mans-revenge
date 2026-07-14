@@ -14,8 +14,8 @@ const THUMB_RADIUS = 24;
 const GRENADE_BUTTON_SIZE = 40;
 const GRENADE_BUTTON_MARGIN = 16;
 const ABILITY_BUTTON_SIZE = 40;
-const TAUNT_BUTTON_SIZE = 30;
-const TAUNT_BUTTON_GAP = 22;
+const TAUNT_BUTTON_SIZE = 40;
+const TAUNT_BUTTON_GAP = 16;
 /** Vertical gap between the grenade button (above) and the ability button. */
 const ABILITY_BUTTON_GAP = 12;
 
@@ -67,14 +67,17 @@ export class TouchInput {
   private tauntButtonPressedFlag = false;
   /** False when the current mode disables grenades and character abilities. */
   private secondaryActionsEnabled = true;
+  /** Visible during COUNTDOWN, but unable to buffer combat input until FIGHT. */
+  private gameplayEnabled = false;
   /** Set on the frame the right joystick is released or dropped into deadzone. */
   private rightStickReleasedFlag = false;
   private sprintActive = false;
   private readonly isTouch: boolean;
 
-  constructor(scene: Phaser.Scene) {
+  constructor(scene: Phaser.Scene, secondaryActionsEnabled = true) {
     this.scene = scene;
     this.isTouch = isTouchDevice();
+    this.secondaryActionsEnabled = secondaryActionsEnabled;
 
     scene.input.addPointer(2);
 
@@ -102,14 +105,17 @@ export class TouchInput {
     this.grenadeButtonText.setVisible(false);
 
     this.grenadeButton.on('pointerdown', () => {
+      if (!this.gameplayEnabled) return;
       if (!this.grenadeButtonDown) this.grenadeButtonPressedFlag = true;
       this.grenadeButtonDown = true;
     });
     this.grenadeButton.on('pointerup', () => {
+      if (!this.gameplayEnabled) return;
       if (this.grenadeButtonDown) this.grenadeButtonReleasedFlag = true;
       this.grenadeButtonDown = false;
     });
     this.grenadeButton.on('pointerout', () => {
+      if (!this.gameplayEnabled) return;
       // If the touch slides off the button, treat it as a release so we don't
       // get stuck in aim mode.
       if (this.grenadeButtonDown) this.grenadeButtonReleasedFlag = true;
@@ -137,6 +143,7 @@ export class TouchInput {
     this.abilityButtonText.setVisible(false);
 
     this.abilityButton.on('pointerdown', () => {
+      if (!this.gameplayEnabled) return;
       this.abilityButtonPressedFlag = true;
     });
 
@@ -161,12 +168,20 @@ export class TouchInput {
     });
     this.tauntButtonText.setOrigin(0.5).setScrollFactor(0).setDepth(3001).setVisible(false);
     this.tauntButton.on('pointerdown', () => {
+      if (!this.gameplayEnabled) return;
       this.tauntButtonPressedFlag = true;
     });
 
     scene.input.on('pointerdown', this.onPointerDown, this);
     scene.input.on('pointermove', this.onPointerMove, this);
     scene.input.on('pointerup', this.onPointerUp, this);
+
+    // Show the action cluster during COUNTDOWN instead of waiting for the
+    // player's first gameplay touch. The pre-fight control card explains the
+    // G/A/T labels, and the larger taunt target now clears a 40px canvas-space
+    // radius like the other actions. Dynamic joysticks still appear only where
+    // the player places their thumbs.
+    if (this.isTouch) this.showTouchUI();
   }
 
   private showTouchUI(): void {
@@ -201,6 +216,22 @@ export class TouchInput {
     this.abilityButtonText.setVisible(false);
   }
 
+  setGameplayEnabled(enabled: boolean): void {
+    this.gameplayEnabled = enabled;
+    if (enabled) return;
+
+    this.grenadeButtonDown = false;
+    this.grenadeButtonPressedFlag = false;
+    this.grenadeButtonReleasedFlag = false;
+    this.grenadeButtonPressedWhileLive = false;
+    this.abilityButtonPressedFlag = false;
+    this.tauntButtonPressedFlag = false;
+    this.rightStickReleasedFlag = false;
+    this.sprintActive = false;
+    this.deactivateJoystick(this.leftJoystick);
+    this.deactivateJoystick(this.rightJoystick);
+  }
+
   private createJoystick(): VirtualJoystick {
     const base = this.scene.add.circle(0, 0, BASE_RADIUS, Wasteland.JOYSTICK, BASE_ALPHA);
     base.setScrollFactor(0);
@@ -228,6 +259,7 @@ export class TouchInput {
 
   private onPointerDown(pointer: Phaser.Input.Pointer): void {
     if (!this.isTouch) return;
+    if (!this.gameplayEnabled) return;
     if (pointer.y >= MAP_HEIGHT_PX) return;
 
     this.showTouchUI();
