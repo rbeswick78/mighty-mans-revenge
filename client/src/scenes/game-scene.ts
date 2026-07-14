@@ -630,6 +630,12 @@ export class GameScene extends Phaser.Scene {
           allPlayers,
           playerId,
           bountyHuntState?.targetId ?? null,
+          this.matchData?.rumbleCrown
+            ? {
+                id: this.matchData.rumbleCrown.holderId,
+                wins: this.matchData.rumbleCrown.wins,
+              }
+            : null,
         );
         this.tauntRenderer?.update(this.playerManager, delta);
 

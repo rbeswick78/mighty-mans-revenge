@@ -195,6 +195,27 @@ export interface RivalrySetResult {
   championId: PlayerId | null;
 }
 
+/**
+ * Short-lived champion of a connected Wasteland Rumble rematch chain.
+ * This is intentionally session-only: returning to the lobby clears it.
+ */
+export interface RumbleCrownState {
+  holderId: PlayerId;
+  holderNickname: string;
+  /** Consecutive decisive rounds won while holding the crown. */
+  wins: number;
+}
+
+export type RumbleCrownOutcome = 'claimed' | 'defended' | 'stolen' | 'held' | 'unclaimed';
+
+/** Server-authored crown story attached to a completed Rumble result. */
+export interface RumbleCrownResult {
+  crown: RumbleCrownState | null;
+  outcome: RumbleCrownOutcome;
+  previousHolderId: PlayerId | null;
+  previousHolderNickname: string | null;
+}
+
 export type MatchContractId =
   | 'hot_shot'
   | 'heavy_hitter'
@@ -369,6 +390,8 @@ export interface MatchResult {
   rivalry: RivalryRecord | null;
   /** Immediate first-to-N score for this consecutive rematch set. */
   rivalrySet: RivalrySetResult | null;
+  /** Ephemeral champion story for connected Wasteland Rumble rematches. */
+  rumbleCrown?: RumbleCrownResult;
   /** True for a solo authoritative match against a server-controlled bot. */
   isPractice: boolean;
   /**

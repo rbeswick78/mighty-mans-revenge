@@ -6,6 +6,7 @@ import type {
   KillConfirmedCollection,
   PracticeGauntletMatch,
   PracticeGauntletRouteId,
+  RumbleCrownState,
 } from '@shared/types/game.js';
 import type {
   DraftCategory,
@@ -47,6 +48,8 @@ export interface MatchData {
   /** Mode this match will be played in — drives the pre-match mode label. */
   gameMode: GameModeType;
   matchKind?: 'duel' | 'rumble' | 'practice';
+  /** Reigning champion in this connected Rumble rematch chain. */
+  rumbleCrown?: RumbleCrownState;
   /** Persisted real-match wins for every selectable fighter. */
   characterWins: Record<CharacterId, number>;
   /** Present only during the escalating three-fight solo run. */
@@ -280,6 +283,7 @@ export class GameService {
         mapName: msg.mapName,
         gameMode: msg.gameMode,
         matchKind: msg.matchKind ?? (msg.gauntlet ? 'practice' : 'duel'),
+        rumbleCrown: msg.rumbleCrown,
         characterWins: {
           ...createEmptyCharacterWins(),
           ...msg.characterWins,

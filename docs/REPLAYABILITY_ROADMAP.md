@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–76 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Quick Match 1v1 plus 2–4 player Wasteland Rumble, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–77 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Quick Match 1v1 plus 2–4 player Wasteland Rumble with a rematch-chain Rumble Crown, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -108,6 +108,7 @@ Each session below attacks one of these.
 | 74  | Arena Mastery                                   | Every battlefield gains a persistent identity and rivalry chase               | **DONE** (2026-07-14) |
 | 75  | Wasteland Taunts                                | One-button battle cries turn live fights into social rivalry moments           | **DONE** (2026-07-14) |
 | 76  | Wasteland Rumble                                | 2–4 friends turn every arena into a replayable free-for-all                    | **DONE** (2026-07-14) |
+| 77  | Rumble Crown                                   | Every direct group rematch gains a champion to defend or dethrone              | **DONE** (2026-07-14) |
 
 ---
 
@@ -3225,6 +3226,47 @@ attempt one attainable friend score to hunt from the first stage onward.
 
 ---
 
+## Session 77 — Rumble Crown
+
+**Goal:** turn consecutive Wasteland Rumble rounds into a social reign that
+makes the connected group want one more rematch without adding grind or
+changing combat balance.
+
+**Locked design decisions**
+
+- The first decisive Rumble winner claims the Crown. Winning again defends it
+  and extends the visible win count; a different winner steals it and starts a
+  new one-win reign.
+- A draw preserves the Crown only while its holder is still connected. A fresh
+  draw remains unclaimed, and a departed holder cannot carry into another
+  round.
+- Crown state is server-authored and exists only across direct rematches by the
+  connected Rumble group. Lobby return, rematch timeout, disconnect teardown,
+  and fresh matchmaking clear it. It never enters persistent stats, Quick
+  Match, Practice, scoring, targeting, or balance.
+- The next `matchFound` payload identifies the reigning champion. Character
+  Select briefs the field, and a compact gold world marker follows the holder
+  during live play without affecting Bounty Hunt or any authoritative state.
+- Results tells the exact claim, defense, steal, held-draw, or unclaimed-draw
+  story above the complete two-to-four-player standings.
+
+**Acceptance criteria**
+
+- [x] Pure resolver tests cover claim, defense, steal, held draw, and clearing
+      a departed holder.
+- [x] Matchmaking integration proves a three-player winner claims the Crown,
+      unanimous direct rematch carries it through `matchFound`, and a second
+      win records a two-win defense.
+- [x] Pure client tests cover pre-fight and every result-story branch.
+- [x] Desktop and mobile-landscape browser tests prove the champion briefing
+      and crown-steal story remain visible without crowding standings.
+- [x] A real two-client Rumble walkthrough reaches live play and verifies the
+      unclaimed overtime-draw branch on desktop and mobile with clean consoles.
+- [x] Typecheck, lint, all 1,215 unit tests across 84 files, production build,
+      and the full 31-pass/11-intentional-skip Playwright matrix pass.
+
+---
+
 ## Session 76 — Wasteland Rumble
 
 **Goal:** let a small friend group turn the entire existing game into a shared
@@ -3577,6 +3619,41 @@ favorite mid-match event while the final-minute surprise stays fresh.
 ---
 
 ## Session Log
+
+### Session 77 — 2026-07-14 — Rumble Crown
+
+**Shipped:** direct Wasteland Rumble rematches now build an ephemeral champion
+story. The first decisive winner claims the Crown, repeat wins extend the
+reign, and a new winner visibly steals it. Draws preserve a connected holder
+without inflating the win count; fresh draws remain unclaimed and departed
+holders are cleared.
+
+The server owns the resolver and carries the Crown only through the existing
+direct-rematch contract. Character Select names the reigning champion, live
+fighters see a compact gold marker above the holder, and Results tells the
+claim/defense/steal/held/unclaimed story above the full Rumble table. The
+feature is deliberately social and session-only: no persistence, score,
+targeting, combat, matchmaking membership, physics, or balance value changed.
+No assets were added.
+
+**Verification:** 70 focused resolver, presentation, and complete matchmaking
+tests pass, including a three-player claim, carried rematch payload, and
+successful defense. A real two-client local Rumble reached Character Select,
+live play, overtime, and the unclaimed-draw Results branch; desktop and
+844×390 mobile inspection found no crowding and both browser consoles stayed
+clean. Repeatable browser coverage stages a reigning champion and a steal
+story across Chromium, Firefox, and mobile landscape. Typecheck, lint, all
+1,215 unit tests across 84 files, and the production build pass; Vite retains
+its existing chunk-size advisory. The full Playwright matrix passes 31 tests
+with 11 intentional project-scoped skips.
+
+**Tuning watch:** watch whether groups understand that the win count is a
+consecutive reign rather than lifetime wins, whether the world marker remains
+readable when Bounty Hunt also marks the holder, and whether the Crown creates
+the intended “one more round” energy before changing copy or presentation.
+
+**Deployment:** not run; production deployment still requires explicit user
+authorization.
 
 ### Session 76 — 2026-07-14 — Wasteland Rumble
 

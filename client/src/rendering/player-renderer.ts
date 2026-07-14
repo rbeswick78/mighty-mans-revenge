@@ -28,6 +28,8 @@ const ARMOR_BAR_OFFSET_Y = -37;
 const NICKNAME_OFFSET_Y = -42;
 const BOUNTY_MARKER_OFFSET_Y = -56;
 const BOUNTY_MARKER_COLOR = '#ffd166';
+const CROWN_MARKER_OFFSET_Y = -68;
+const CROWN_MARKER_COLOR = '#ffe08a';
 
 /**
  * Frost Wizard tint — vertical gradient via Phaser's per-corner setTint.
@@ -122,6 +124,8 @@ export class PlayerRenderer {
   private nicknameText: Phaser.GameObjects.Text;
   private bountyMarkerText: Phaser.GameObjects.Text;
   private bountyMarked = false;
+  private crownMarkerText: Phaser.GameObjects.Text;
+  private crownMarked = false;
   private scene: Phaser.Scene;
   private invulnerableTween: Phaser.Tweens.Tween | null = null;
   private sprintParticles: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
@@ -320,6 +324,17 @@ export class PlayerRenderer {
     this.bountyMarkerText.setOrigin(0.5, 0.5);
     this.bountyMarkerText.setVisible(false);
 
+    this.crownMarkerText = scene.add.text(0, CROWN_MARKER_OFFSET_Y, '[ CROWN ]', {
+      fontFamily: 'Courier, monospace',
+      fontSize: '9px',
+      color: CROWN_MARKER_COLOR,
+      stroke: '#2b1b0e',
+      strokeThickness: 3,
+      align: 'center',
+    });
+    this.crownMarkerText.setOrigin(0.5, 0.5);
+    this.crownMarkerText.setVisible(false);
+
     const children: Phaser.GameObjects.GameObject[] = [];
     // Mist sits under the body so the sprite paints over the puddle's center.
     if (this.frostMistGraphics) children.push(this.frostMistGraphics);
@@ -336,6 +351,7 @@ export class PlayerRenderer {
       this.armorBarFg,
       this.nicknameText,
       this.bountyMarkerText,
+      this.crownMarkerText,
     );
     this.container = scene.add.container(0, 0, children);
     // Position the wand for the initial 'down' direction.
@@ -716,6 +732,7 @@ export class PlayerRenderer {
     this.armorBarFg.setVisible(alive && this.hasArmor);
     this.nicknameText.setVisible(alive);
     this.bountyMarkerText.setVisible(alive && this.bountyMarked);
+    this.crownMarkerText.setVisible(alive && this.crownMarked);
   }
 
   /** Gold, pulsing world marker driven by the authoritative Bounty Hunt id. */
@@ -728,6 +745,19 @@ export class PlayerRenderer {
       this.bountyMarkerText.setAlpha(0.82 + Math.sin(this.scene.time.now * 0.012) * 0.18);
     } else {
       this.bountyMarkerText.setScale(1).setAlpha(1);
+    }
+  }
+
+  /** Crown marker is social-only and driven by the rematch-chain match payload. */
+  setCrownMarked(wins: number | null): void {
+    this.crownMarked = wins !== null;
+    this.crownMarkerText.setText(wins !== null && wins > 1 ? `[ CROWN x${wins} ]` : '[ CROWN ]');
+    this.crownMarkerText.setVisible(this.crownMarked && !this.isDead);
+    if (this.crownMarked) {
+      const pulse = 1 + Math.sin(this.scene.time.now * 0.006) * 0.06;
+      this.crownMarkerText.setScale(pulse);
+    } else {
+      this.crownMarkerText.setScale(1);
     }
   }
 

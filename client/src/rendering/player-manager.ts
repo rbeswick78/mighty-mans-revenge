@@ -21,6 +21,7 @@ export class ClientPlayerManager {
     players: SerializedPlayerState[],
     localPlayerId: string,
     bountyTargetId: string | null = null,
+    crownHolder: { id: string; wins: number } | null = null,
   ): PlayerRenderer | null {
     const currentIds = new Set<string>();
     let localRenderer: PlayerRenderer | null = null;
@@ -71,6 +72,7 @@ export class ClientPlayerManager {
       // restart the one-shot animation.
       renderer.updateLifeState(playerState.isDead, playerState.deaths);
       renderer.setBountyMarked(playerState.id === bountyTargetId);
+      renderer.setCrownMarked(playerState.id === crownHolder?.id ? crownHolder.wins : null);
 
       if (playerState.invulnerableTimer > 0) {
         renderer.setInvulnerable(true);

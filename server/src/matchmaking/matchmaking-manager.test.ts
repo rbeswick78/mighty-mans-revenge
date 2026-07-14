@@ -185,6 +185,62 @@ describe('MatchmakingManager rematch flow', () => {
     expect(mgr.getActiveMatches()[0].players.size).toBe(3);
   });
 
+  it('carries the Rumble Crown through a direct group rematch and records a defense', () => {
+    for (const [id, nickname] of [
+      ['A', 'Alpha'],
+      ['B', 'Bravo'],
+      ['C', 'Cora'],
+    ] as const) {
+      mgr.handleJoinRumble(id, nickname);
+    }
+    mgr.tick(RUMBLE.LAUNCH_DELAY_SECONDS, 0);
+    walkDraft(mgr, sent);
+
+    let match = mgr.getActiveMatches()[0];
+    match.players.get('A')!.score = 3;
+    match.phase = MatchPhase.ENDED;
+    mgr.tick(0.05, 1);
+    const firstEnd = [...sent]
+      .reverse()
+      .find((entry) => entry.playerId === 'A' && entry.message.type === 'server:matchEnd');
+    expect(
+      firstEnd?.message.type === 'server:matchEnd' && firstEnd.message.result.rumbleCrown,
+    ).toEqual({
+      crown: { holderId: 'A', holderNickname: 'Alpha', wins: 1 },
+      outcome: 'claimed',
+      previousHolderId: null,
+      previousHolderNickname: null,
+    });
+
+    sent.length = 0;
+    mgr.handleRematchRequest('A');
+    mgr.handleRematchRequest('B');
+    mgr.handleRematchRequest('C');
+    walkDraft(mgr, sent);
+    const rematchFound = sent.find(
+      (entry) => entry.playerId === 'B' && entry.message.type === 'server:matchFound',
+    );
+    expect(
+      rematchFound?.message.type === 'server:matchFound'
+        ? rematchFound.message.rumbleCrown
+        : undefined,
+    ).toEqual({ holderId: 'A', holderNickname: 'Alpha', wins: 1 });
+
+    match = mgr.getActiveMatches()[0];
+    match.players.get('A')!.score = 3;
+    match.phase = MatchPhase.ENDED;
+    mgr.tick(0.05, 2);
+    const secondEnd = [...sent]
+      .reverse()
+      .find((entry) => entry.playerId === 'A' && entry.message.type === 'server:matchEnd');
+    expect(
+      secondEnd?.message.type === 'server:matchEnd' && secondEnd.message.result.rumbleCrown,
+    ).toMatchObject({
+      crown: { holderId: 'A', holderNickname: 'Alpha', wins: 2 },
+      outcome: 'defended',
+    });
+  });
+
   it('eliminates an active Rumble leaver while the remaining fighters continue', () => {
     for (const [id, nickname] of [
       ['A', 'Alpha'],

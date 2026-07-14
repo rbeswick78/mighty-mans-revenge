@@ -46,6 +46,7 @@ import type {
   DraftCategory,
   DraftFirstPickerReason,
   RivalrySetResult,
+  RumbleCrownState,
   BotDifficulty,
   GauntletBoonId,
   MutatorId,
@@ -62,6 +63,7 @@ import { getGameMode } from '../game/modes/index.js';
 import { GameServer } from '../network/server.js';
 import { MatchmakingQueue } from './matchmaking-queue.js';
 import { RumbleQueue } from './rumble-queue.js';
+import { resolveRumbleCrown } from './rumble-crown.js';
 import { logger } from '../utils/logger.js';
 import type {
   PersistentStatsStore,
@@ -123,6 +125,8 @@ interface PostMatchState {
   previousMutators: MutatorId[];
   /** Previous round's contract; direct rematches must roll something fresh. */
   previousContractId: MatchContractId;
+  /** Crown carried only if this exact connected Rumble group runs it back. */
+  rumbleCrown: RumbleCrownState | null;
 }
 
 type MatchKind = 'duel' | 'rumble' | 'practice';
@@ -178,6 +182,8 @@ export class MatchmakingManager {
   private readonly activeMatches: Map<string, Match> = new Map();
   /** Queue family survives draft, live match, results, and direct rematches. */
   private readonly matchKinds: Map<string, MatchKind> = new Map();
+  /** Crown entering each live/drafting Rumble, keyed by that match id. */
+  private readonly rumbleCrowns: Map<string, RumbleCrownState> = new Map();
   /** Maps playerId -> matchId for routing messages. */
   private readonly playerMatchMap: Map<PlayerId, string> = new Map();
   /** Post-match state for rematch handling. */
@@ -469,6 +475,7 @@ export class MatchmakingManager {
         clearTimeout(state.timeoutHandle);
         this.postMatchStates.delete(postMatchId);
         this.matchKinds.delete(postMatchId);
+        this.rumbleCrowns.delete(postMatchId);
         this.releaseRivalrySet(state.playerIds);
         this.releasePracticePlayers(state.playerIds);
         // Return remaining players to lobby state
@@ -602,6 +609,7 @@ export class MatchmakingManager {
       clearTimeout(postMatch.timeoutHandle);
       this.postMatchStates.delete(matchId);
       this.matchKinds.delete(matchId);
+      this.rumbleCrowns.delete(matchId);
       this.releaseRivalrySet(postMatch.playerIds);
       this.releasePracticePlayers(postMatch.playerIds);
     } else {
@@ -953,6 +961,7 @@ export class MatchmakingManager {
     this.activeMatches.delete(matchId);
     this.previousPhases.delete(matchId);
     this.matchKinds.delete(matchId);
+    this.rumbleCrowns.delete(matchId);
     logger.info({ matchId, leavingPlayerId }, 'Rumble dissolved before fight');
   }
 
@@ -1082,6 +1091,7 @@ export class MatchmakingManager {
           mapName: mapData.name,
           gameMode,
           matchKind,
+          rumbleCrown: this.rumbleCrowns.get(matchId),
           characterWins,
           gauntlet: gauntlet ?? undefined,
           practiceMutatorId: appliedPracticeMutator ?? undefined,
@@ -1117,6 +1127,7 @@ export class MatchmakingManager {
     rematchMutatorExclusions: readonly MutatorId[] = [],
     previousContractId?: MatchContractId,
     matchKind: 'duel' | 'rumble' = 'duel',
+    rumbleCrown: RumbleCrownState | null = null,
   ): void {
     const matchId = crypto.randomUUID();
     const draftEntries = playerEntries.map((entry) => ({
@@ -1160,6 +1171,7 @@ export class MatchmakingManager {
     };
     this.draftStates.set(matchId, draft);
     this.matchKinds.set(matchId, matchKind);
+    if (rumbleCrown) this.rumbleCrowns.set(matchId, rumbleCrown);
 
     // Register under the future matchId immediately: the queue guard
     // ("already in a match") and disconnect routing must treat drafting
@@ -1333,6 +1345,7 @@ export class MatchmakingManager {
   private teardownDraft(draft: DraftState, leavingPlayerId: PlayerId): void {
     this.draftStates.delete(draft.matchId);
     this.matchKinds.delete(draft.matchId);
+    this.rumbleCrowns.delete(draft.matchId);
     this.releaseRivalrySet(draft.playerEntries.map((entry) => entry.id));
     for (const entry of draft.playerEntries) {
       this.playerMatchMap.delete(entry.id);
@@ -1622,6 +1635,19 @@ export class MatchmakingManager {
       [...match.players].map(([playerId, player]) => [playerId, player.nickname]),
     );
     result.departedPlayerIds = match.getDepartedPlayerIds();
+    const rumbleCrownResult =
+      matchKind === 'rumble'
+        ? resolveRumbleCrown(
+            this.rumbleCrowns.get(matchId) ?? null,
+            result.winnerId,
+            [...match.players.values()].map((player) => ({
+              id: player.id,
+              nickname: player.nickname,
+            })),
+            match.getConnectedPlayerIds(),
+          )
+        : null;
+    if (rumbleCrownResult) result.rumbleCrown = rumbleCrownResult;
     const practiceDifficulty = this.practiceDifficulties.get(matchId) ?? null;
     const practiceModePin = this.practiceModePins.get(matchId) ?? null;
     const practiceRivalPin = this.practiceRivalPins.get(matchId) ?? null;
@@ -1943,6 +1969,7 @@ export class MatchmakingManager {
           : { opponentCharacterIds: [], forecastMutatorIds: [] },
       previousMutators: [...match.activeMutators],
       previousContractId: result.contract?.id ?? match.getContractHudState().id,
+      rumbleCrown: rumbleCrownResult?.crown ?? null,
     });
 
     // Remove from active matches
@@ -1955,6 +1982,7 @@ export class MatchmakingManager {
     this.practiceMutatorPreferences.delete(matchId);
     this.practiceGauntlets.delete(matchId);
     this.practiceGauntletRunHistories.delete(matchId);
+    this.rumbleCrowns.delete(matchId);
   }
 
   private onRematchTimeout(matchId: string): void {
@@ -1979,6 +2007,7 @@ export class MatchmakingManager {
 
     this.postMatchStates.delete(matchId);
     this.matchKinds.delete(matchId);
+    this.rumbleCrowns.delete(matchId);
     this.releaseRivalrySet(postMatch.playerIds);
     this.releasePracticePlayers(postMatch.playerIds);
   }
@@ -2005,6 +2034,7 @@ export class MatchmakingManager {
     }));
     const rematchKind = this.matchKinds.get(postMatch.matchId) ?? 'duel';
     this.matchKinds.delete(postMatch.matchId);
+    this.rumbleCrowns.delete(postMatch.matchId);
 
     if (postMatch.setComplete) {
       this.releaseRivalrySet(postMatch.playerIds);
@@ -2040,6 +2070,7 @@ export class MatchmakingManager {
     if (this.forcePinsActive()) {
       const nextMatchId = crypto.randomUUID();
       this.matchKinds.set(nextMatchId, rematchKind);
+      if (postMatch.rumbleCrown) this.rumbleCrowns.set(nextMatchId, postMatch.rumbleCrown);
       this.launchMatch(
         nextMatchId,
         getMap(postMatch.nextMapName),
@@ -2058,6 +2089,7 @@ export class MatchmakingManager {
       postMatch.previousMutators,
       postMatch.previousContractId,
       rematchKind === 'rumble' ? 'rumble' : 'duel',
+      postMatch.rumbleCrown,
     );
   }
 

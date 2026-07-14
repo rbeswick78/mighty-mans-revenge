@@ -17,6 +17,7 @@ import { formatRivalrySummary, nextDraftTeaser, rematchButtonLabel } from '../ui
 import { careerRankPresentation } from '../ui/career-rank.js';
 import { winStreakPresentation, type WinStreakTone } from '../ui/win-streak.js';
 import { arenaMasteryResultPresentation } from '../ui/arena-mastery.js';
+import { rumbleCrownResultPresentation } from '../ui/rumble-crown.js';
 import {
   GAUNTLET_BEST_CLEAR_STORAGE_KEY,
   gauntletBestClearLabel,
@@ -708,6 +709,7 @@ export class ResultsScene extends Phaser.Scene {
       if (a.deaths !== b.deaths) return a.deaths - b.deaths;
       return idA.localeCompare(idB);
     });
+    const crownStory = rumbleCrownResultPresentation(this.result.rumbleCrown, localPlayerId);
 
     panel.add(
       this.add
@@ -718,6 +720,19 @@ export class ResultsScene extends Phaser.Scene {
         })
         .setOrigin(0.5),
     );
+    if (crownStory) {
+      panel.add(
+        this.add
+          .text(panel.centerX, 49, crownStory.text, {
+            fontFamily: MENU_FONTS.HEADER,
+            fontSize: '9px',
+            color: cssHex(crownStory.localOwnsCrown ? WINNER_NICK_COLOR : RIVALRY_COLOR),
+          })
+          .setOrigin(0.5),
+      );
+    }
+    const headingsY = crownStory ? 72 : 54;
+    const rowStartY = crownStory ? 98 : 84;
     const headings = [
       { x: 28, text: '#' },
       { x: 62, text: 'FIGHTER' },
@@ -726,7 +741,7 @@ export class ResultsScene extends Phaser.Scene {
     ];
     for (const heading of headings) {
       panel.add(
-        this.add.text(heading.x, 54, heading.text, {
+        this.add.text(heading.x, headingsY, heading.text, {
           fontFamily: MENU_FONTS.BODY,
           fontSize: '10px',
           color: cssHex(LABEL_COLOR),
@@ -735,7 +750,7 @@ export class ResultsScene extends Phaser.Scene {
     }
 
     standings.forEach(([playerId, stats], index) => {
-      const y = 84 + index * 52;
+      const y = rowStartY + index * 52;
       const isLocal = playerId === localPlayerId;
       const isWinner = playerId === this.result?.winnerId;
       const color = isWinner ? WINNER_NICK_COLOR : isLocal ? VALUE_COLOR : LABEL_COLOR;

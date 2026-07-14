@@ -15,6 +15,7 @@ import {
   PracticeGauntletRouteId,
   CoreRunState,
   BountyHuntState,
+  RumbleCrownState,
   WastelandWarpState,
   RadiationStormState,
   ScrapstormState,
@@ -320,6 +321,8 @@ export interface ServerMatchFoundMessage {
   gameMode: GameModeType;
   /** Queue family; optional so older servers still interoperate. */
   matchKind?: 'duel' | 'rumble' | 'practice';
+  /** Reigning champion carried only into a direct Wasteland Rumble rematch. */
+  rumbleCrown?: RumbleCrownState;
   /** Local player's persisted real-match wins per fighter; absent on old servers. */
   characterWins?: Record<CharacterId, number>;
   /** Present only while traversing the three-fight solo Gauntlet. */

@@ -56,7 +56,10 @@ short gathering window once two fighters arrive, launches immediately at four,
 and turns every existing arena, mode, character, and shared event into a
 free-for-all. Two server-selected fighters make the map and mode draft picks
 while everyone else watches, then the whole connected group can vote for the
-next round from the final standings.
+next round from the final standings. Direct Rumble rematches also carry a
+session-only Crown: the winner claims it, repeat wins extend the reign, and the
+next winner can steal it. The Crown disappears when the group returns to the
+lobby, so it stays a social run-it-back story instead of persistent grind.
 
 ## Arena variety
 
