@@ -1803,6 +1803,9 @@ describe('MatchmakingManager solo practice flow', () => {
     if (!humanCharacter) throw new Error('missing open fighter');
     first.setLock('A', humanCharacter);
     first.updateCharacterSelect(0);
+    const expectedResultCharacters = Object.fromEntries(
+      [...first.players].map(([playerId, player]) => [playerId, player.characterId]),
+    );
     first.players.get('A')!.position = { x: 48, y: 48 };
     botIds.forEach((botId, index) => {
       first.players.get(botId)!.position = { x: (index + 2) * 48, y: 48 };
@@ -1873,6 +1876,7 @@ describe('MatchmakingManager solo practice flow', () => {
     }
     expect(ended.message.result.isPractice).toBe(true);
     expect(ended.message.result.matchKind).toBe('rumble');
+    expect(ended.message.result.playerCharacters).toEqual(expectedResultCharacters);
     expect(ended.message.result.rivalrySet).toBeNull();
     expect(ended.message.result.rumbleCrown?.crown?.holderId).toBe('A');
     expect(store.getLifetime('Alpha')).toBeNull();

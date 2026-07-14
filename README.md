@@ -70,7 +70,10 @@ and a direct rematch carries that target into fighter select for one more score
 to settle. In three- and four-fighter battles, meaningful recent setup damage
 also earns one server-authored Assist when somebody else lands the knockout.
 The live HUD celebrates it, Results shows K/A/D, and the best helper can take
-the Wingman award without changing anybody's mode score.
+the Wingman award without changing anybody's mode score. Results also preserve
+the cast that created the story: Rumble rows pair every callsign with the
+fighter they actually locked, while duel winners and losers enter the final
+tableau as themselves instead of placeholder characters.
 
 ## Connection recovery
 

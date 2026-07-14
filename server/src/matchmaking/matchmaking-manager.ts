@@ -1804,6 +1804,11 @@ export class MatchmakingManager {
     result.playerNicknames = Object.fromEntries(
       [...match.players].map(([playerId, player]) => [playerId, player.nickname]),
     );
+    result.playerCharacters = Object.fromEntries(
+      [...match.players]
+        .filter(([, player]) => player.characterId !== null)
+        .map(([playerId, player]) => [playerId, player.characterId as CharacterId]),
+    );
     result.departedPlayerIds = match.getDepartedPlayerIds();
     const connectedPlayerIds = match.getConnectedPlayerIds();
     const rumbleGrudges =

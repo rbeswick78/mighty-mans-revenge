@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–86 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Quick Match 1v1 plus 2–4 player Wasteland Rumble with all-player group draft rallies, a rematch-chain Rumble Crown, live lead-change drama, personal rematch Grudges, authoritative Rumble Assists with K/A/D, a solo four-fighter Scrap Pit whose three server-authoritative rivals have distinct readable tactics, answer player taunts with signature banter, and feed a device-local win/run record chase, and visible bounded Wasteland Signal Recovery, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–87 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, roster-authentic duel/Rumble results, Gun Game, Rivalry Sets, Quick Match 1v1 plus 2–4 player Wasteland Rumble with all-player group draft rallies, a rematch-chain Rumble Crown, live lead-change drama, personal rematch Grudges, authoritative Rumble Assists with K/A/D, a solo four-fighter Scrap Pit whose three server-authoritative rivals have distinct readable tactics, answer player taunts with signature banter, and feed a device-local win/run record chase, and visible bounded Wasteland Signal Recovery, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -114,10 +114,11 @@ Each session below attacks one of these.
 | 80  | Rumble Grudges                                  | Every group finish leaves each fighter a personal rematch score to settle     | **DONE** (2026-07-14) |
 | 81  | Rumble Assists                                  | Meaningful setup damage earns visible credit in chaotic group fights          | **DONE** (2026-07-14) |
 | 82  | Wasteland Signal Recovery                       | Brief server trouble becomes visible and recoverable instead of a frozen loop | **DONE** (2026-07-14) |
-| 83  | Scrap Pit                                       | Solo players can enter the full four-fighter Rumble chaos on demand            | **DONE** (2026-07-14) |
-| 84  | Scrap Pit Rivals                                | Every bot presents a different threat instead of feeling like a renamed clone  | **DONE** (2026-07-14) |
-| 85  | Scrap Pit Banter                                | Talking trash becomes a two-way rivalry beat against the crew                  | **DONE** (2026-07-14) |
-| 86  | Scrap Pit Records                               | Every solo brawl builds a persistent win-run target worth defending            | **DONE** (2026-07-14) |
+| 83  | Scrap Pit                                       | Solo players can enter the full four-fighter Rumble chaos on demand           | **DONE** (2026-07-14) |
+| 84  | Scrap Pit Rivals                                | Every bot presents a different threat instead of feeling like a renamed clone | **DONE** (2026-07-14) |
+| 85  | Scrap Pit Banter                                | Talking trash becomes a two-way rivalry beat against the crew                 | **DONE** (2026-07-14) |
+| 86  | Scrap Pit Records                               | Every solo brawl builds a persistent win-run target worth defending           | **DONE** (2026-07-14) |
+| 87  | Roster Victory Lineups                          | Every finish preserves the actual cast that made the match memorable          | **DONE** (2026-07-14) |
 
 ---
 
@@ -3235,6 +3236,47 @@ attempt one attainable friend score to hunt from the first stage onward.
 
 ---
 
+## Session 87 — Roster Victory Lineups
+
+**Goal:** make every finished match preserve the actual cast that created its
+story, so a win feels like a character moment instead of a generic scoreboard.
+
+**Locked design decisions**
+
+- Matchmaking attaches optional `playerCharacters` to the authoritative
+  `MatchResult` from each player's locked `PlayerState.characterId` before
+  serialization. The result owns identity; clients do not infer it from a
+  callsign, opponent cache, or the last locally rendered snapshot.
+- Duel tableaux use the real local and opposing fighters while preserving the
+  established winner-standing/loser-slumped composition. Old or partial
+  payloads retain the original Mighty Man/Bruce fallback pair.
+- Every Rumble standings row gains an animated side-idle portrait and a compact
+  fighter-name label without changing winner-first authoritative ordering,
+  score, K/A/D, departure state, Crown, or Grudge copy. The winner receives the
+  larger accented portrait frame.
+- Registry metadata drives animation keys. Frost Wizard keeps his ice gradient
+  and Rook receives the same top-aligned synchronized helmet layer used in live
+  play, so shared base sheets do not erase roster identity.
+- This is result presentation only. It cannot change character selection,
+  matchmaking, rematches, persistence, progression, awards, mode score,
+  Crown/Grudge state, combat, physics, balance, or bot behavior.
+
+**Acceptance criteria**
+
+- [x] A real Matchmaking integration result contains every locked fighter,
+      including the full four-entrant Scrap Pit roster.
+- [x] A dedicated staged browser journey verifies all four Rumble portraits,
+      their labels, and the authoritative two-fighter tableau across Chromium,
+      Firefox, and 844×390 mobile landscape.
+- [x] Desktop and mobile visual reviews confirm all rows, portraits, labels,
+      story lanes, buttons, winner pose, and loser pose remain clear with no
+      browser console errors.
+- [x] Old results without `playerCharacters` retain safe roster fallbacks.
+- [x] Typecheck, lint, all 1,272 unit tests across 92 files, production build,
+      and the full 66-pass/12-intentional-skip Playwright matrix pass.
+
+---
+
 ## Session 86 — Scrap Pit Records
 
 **Goal:** give every completed Scrap Pit round a durable personal target that
@@ -4024,6 +4066,41 @@ favorite mid-match event while the final-minute surprise stays fresh.
 ---
 
 ## Session Log
+
+### Session 87 — 2026-07-14 — Roster Victory Lineups
+
+**Shipped:** every result now remembers who actually fought. Matchmaking sends
+the locked character beside each authoritative callsign, and the client turns
+that truth into two stronger finishes: duel winners and losers appear as their
+real fighters in the established victory tableau, while every Rumble row gains
+an animated portrait plus character label. The winner's larger accented frame
+makes the champion readable at a glance.
+
+The renderer stays registry-driven and preserves the roster's exceptional
+cosmetics: Frost Wizard keeps his vertical ice tint and Rook's helmet remains
+top-aligned over the shared body animation. Old duel payloads degrade to the
+former Mighty Man/Bruce defaults, while old Rumble payloads retain text-only
+rows. No selection, score, standings, matchmaking, rematch, persistence,
+progression, Crown/Grudge, award, combat, physics, balance, mode, or bot rule
+changed.
+
+**Verification:** the focused Matchmaking suite passes 69 tests and proves a
+real four-fighter Scrap Pit result carries every locked identity. The dedicated
+result-roster journey passes in Chromium, Firefox, and mobile landscape,
+covering four portrait identities/labels plus an authoritative Bubba-versus-
+Rook duel tableau with synchronized slumped helmet geometry. Typecheck, lint,
+all 1,272 unit/integration tests across 92 files, and the production build
+pass; Vite retains its existing chunk-size advisory. The clean complete browser
+matrix passes 66 tests with 12 intentional project-scoped skips. Desktop and
+844×390 visual reviews show readable rows and poses with no browser console
+errors.
+
+**Operational watch:** long callsigns still share the same bounded standings
+column as before. Watch real group results for a reason to add explicit text
+clipping, but preserve the portrait width and authoritative identity source.
+
+**Deployment:** not run; production deployment still requires explicit user
+authorization.
 
 ### Session 86 — 2026-07-14 — Scrap Pit Records
 

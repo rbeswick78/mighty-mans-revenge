@@ -3,7 +3,14 @@ import type { PlayerId } from '@shared/types/common.js';
 import type { PlayerStats } from '@shared/types/player.js';
 import type { MatchResult, PracticeGauntletRouteId } from '@shared/types/game.js';
 import type { ServerMatchmakingStatusMessage } from '@shared/types/network.js';
-import { AWARD_DEFS, createEmptyKillsByWeapon, gameModeDisplayName } from '@shared/config/game.js';
+import {
+  AWARD_DEFS,
+  CHARACTERS,
+  createEmptyKillsByWeapon,
+  gameModeDisplayName,
+  type CharacterId,
+} from '@shared/config/game.js';
+import type { CharacterDef } from '@shared/types/character.js';
 import { Wasteland, cssHex } from '@shared/config/palette.js';
 import { AudioManager } from '../audio/audio-manager.js';
 import { MenuGamepadInput } from '../input/menu-gamepad.js';
@@ -75,6 +82,9 @@ const OPPONENT_LEFT_COLOR = Wasteland.HIT_FLASH;
 const FOOTER_COLOR = Wasteland.WALL_LINE;
 const NO_DATA_COLOR = Wasteland.COVER_FILL;
 const LOSER_TINT = 0x55454f;
+const FROST_WIZARD_TINT_TOP = 0xffffff;
+const FROST_WIZARD_TINT_BOTTOM = 0x4aa3ff;
+const RUMBLE_PORTRAIT_BG = Wasteland.CANVAS_BG;
 const AWARD_NAME_COLOR = Wasteland.LOADING_BAR_FILL; // hot orange accent
 const RIVALRY_COLOR = Wasteland.HEALTH_WARNING; // amber
 const NEXT_DRAFT_COLOR = Wasteland.LOADING_BAR_FILL; // hot orange accent
@@ -319,12 +329,11 @@ export class ResultsScene extends Phaser.Scene {
     // Winner / loser sprite tableau. Winner stands tall on the left,
     // loser is tinted darker and rotated forward on the right. For draws,
     // both stand upright at full color.
-    // (We default to mighty_man for the local player and bruce for the
-    // opponent. Roster expansion can later pass character IDs through
-    // ResultsSceneData.)
+    // New results use the authoritative locked roster; old payloads retain
+    // the original Mighty Man/Bruce fallback pair.
     // ────────────────────────────────────────────────────────────────────
     if (this.result?.matchKind !== 'rumble') {
-      this.renderTableau(isWinner, isDraw, camHeight);
+      this.renderTableau(isWinner, isDraw, camHeight, localPlayerId);
     }
 
     // ────────────────────────────────────────────────────────────────────
@@ -524,58 +533,116 @@ export class ResultsScene extends Phaser.Scene {
     this.alternateRouteButton?.setDisabled(disabled);
   }
 
-  private renderTableau(isWinner: boolean, isDraw: boolean, camHeight: number): void {
-    // Local player is assumed to be mighty_man; opponent is assumed to be
-    // bruce. (CharacterId isn't currently threaded through MatchData.)
+  private renderTableau(
+    isWinner: boolean,
+    isDraw: boolean,
+    camHeight: number,
+    localPlayerId: PlayerId | null,
+  ): void {
     const groundY = camHeight - 130;
     const tableauY = groundY - 14;
-
-    const localCharKey = 'mighty_man_side_idle';
-    const opponentCharKey = 'bruce_side_idle';
+    const playerIds = this.result ? this.resultPlayerIds(this.result.playerStats) : [];
+    const opponentId = playerIds.find((playerId) => playerId !== localPlayerId) ?? null;
+    const localCharacter = this.resultCharacter(localPlayerId, 'mighty_man');
+    const opponentCharacter = this.resultCharacter(opponentId, 'bruce');
     const leftX = 130;
     const rightX = this.cameras.main.width - 130;
 
     if (isDraw) {
       // Both stand, both face center
-      this.spawnIdleSprite(leftX, tableauY, localCharKey, false, false);
-      this.spawnIdleSprite(rightX, tableauY, opponentCharKey, true, false);
+      this.spawnResultFighter(leftX, tableauY, localCharacter, false, false, 6);
+      this.spawnResultFighter(rightX, tableauY, opponentCharacter, true, false, 6);
       return;
     }
 
     if (isWinner) {
       // Local on left as winner, opponent on right as loser
-      this.spawnIdleSprite(leftX, tableauY, localCharKey, false, false);
-      this.spawnIdleSprite(rightX, tableauY, opponentCharKey, true, true);
+      this.spawnResultFighter(leftX, tableauY, localCharacter, false, false, 6);
+      this.spawnResultFighter(rightX, tableauY, opponentCharacter, true, true, 6);
     } else {
       // Opponent on left as winner, local on right as loser
-      this.spawnIdleSprite(leftX, tableauY, opponentCharKey, false, false);
-      this.spawnIdleSprite(rightX, tableauY, localCharKey, true, true);
+      this.spawnResultFighter(leftX, tableauY, opponentCharacter, false, false, 6);
+      this.spawnResultFighter(rightX, tableauY, localCharacter, true, true, 6);
     }
   }
 
-  // Single sprite helper. `flipX` mirrors the side-idle anim to face
-  // toward center. `slumped` applies a forward tilt + dark tint + smaller
-  // scale to read as a defeated/fallen pose without bespoke art.
-  private spawnIdleSprite(
+  private resultPlayerIds(playerStats: MatchResult['playerStats']): PlayerId[] {
+    return playerStats instanceof Map
+      ? [...playerStats.keys()]
+      : Object.keys(playerStats as unknown as Record<PlayerId, PlayerStats>);
+  }
+
+  private resultCharacter(playerId: PlayerId | null, fallback: CharacterId): CharacterId {
+    return this.resultCharacterOrNull(playerId) ?? fallback;
+  }
+
+  private resultCharacterOrNull(playerId: PlayerId | null): CharacterId | null {
+    const candidate = playerId ? this.result?.playerCharacters?.[playerId] : undefined;
+    return candidate && candidate in CHARACTERS ? candidate : null;
+  }
+
+  // Registry-aware result fighter. `flipX` faces the sprite inward and
+  // `slumped` creates the defeated pose. Frost tint and Rook's synchronized
+  // helmet keep shared-body roster members identifiable outside live play.
+  private spawnResultFighter(
     x: number,
     y: number,
-    animKey: string,
+    characterId: CharacterId,
     flipX: boolean,
     slumped: boolean,
+    standingScale: number,
+    parent?: MenuPanel,
+    name?: string,
   ): Phaser.GameObjects.Sprite {
-    const scale = slumped ? 5 : 6;
+    const character: CharacterDef = CHARACTERS[characterId];
+    const animKey = `${character.spritePrefix}_side_idle`;
+    const scale = slumped ? standingScale * (5 / 6) : standingScale;
+    const slumpRotation = slumped ? (flipX ? -0.35 : 0.35) : 0;
+    const bodyY = slumped ? y + 14 : y;
     const sprite = this.add
-      .sprite(x, y, animKey)
+      .sprite(x, bodyY, animKey)
       .setOrigin(0.5, 1)
       .setScale(scale)
       .setDepth(WastelandStreet.DEPTH.CHARACTERS)
-      .setFlipX(flipX);
+      .setFlipX(flipX)
+      .setData('resultCharacterId', characterId);
+    if (name) sprite.setName(name);
     sprite.play(animKey);
+    if (characterId === 'frost_wizard') {
+      sprite.setTint(
+        FROST_WIZARD_TINT_TOP,
+        FROST_WIZARD_TINT_TOP,
+        FROST_WIZARD_TINT_BOTTOM,
+        FROST_WIZARD_TINT_BOTTOM,
+      );
+    }
     if (slumped) {
       sprite.setTint(LOSER_TINT);
-      sprite.setRotation(flipX ? -0.35 : 0.35);
-      // Drop the sprite so it reads as collapsed in the dirt.
-      sprite.setY(y + 14);
+      sprite.setRotation(slumpRotation);
+    }
+    if (parent) parent.add(sprite);
+
+    const overlay = character.bodyOverlay;
+    if (overlay) {
+      const overlayKey = `${overlay.spritePrefix}_side_idle`;
+      const overlayOffset = (character.idleFrames.side.h - overlay.idleFrames.side.h) * scale;
+      const overlayX = slumped ? x + overlayOffset * Math.sin(slumpRotation) : x;
+      const overlayY = slumped
+        ? bodyY - overlayOffset * Math.cos(slumpRotation)
+        : bodyY - overlayOffset;
+      const overlaySprite = this.add
+        .sprite(overlayX, overlayY, overlayKey)
+        .setOrigin(0.5, 1)
+        .setScale(scale)
+        .setDepth(WastelandStreet.DEPTH.CHARACTERS + 1)
+        .setFlipX(flipX)
+        .setData('resultCharacterId', characterId);
+      overlaySprite.play(overlayKey);
+      if (slumped) {
+        overlaySprite.setTint(LOSER_TINT);
+        overlaySprite.setRotation(slumpRotation);
+      }
+      if (parent) parent.add(overlaySprite);
     }
     return sprite;
   }
@@ -771,9 +838,12 @@ export class ResultsScene extends Phaser.Scene {
     const storyCount = Number(crownStory !== null) + Number(grudgeStory !== null);
     const headingsY = storyCount === 0 ? 54 : storyCount === 1 ? 72 : 88;
     const rowStartY = storyCount === 0 ? 84 : storyCount === 1 ? 98 : 114;
+    const hasCharacterRows = standings.some(([playerId]) =>
+      Boolean(this.resultCharacterOrNull(playerId)),
+    );
     const headings = [
       { x: 28, text: '#' },
-      { x: 62, text: 'FIGHTER' },
+      { x: hasCharacterRows ? 90 : 62, text: 'FIGHTER' },
       { x: 270, text: 'SCORE' },
       { x: 326, text: 'K/A/D' },
     ];
@@ -795,24 +865,62 @@ export class ResultsScene extends Phaser.Scene {
       const nickname =
         this.result?.playerNicknames?.[playerId]?.toUpperCase() ??
         (isLocal ? this.nickname.toUpperCase() : 'FIGHTER');
+      const characterId = this.resultCharacterOrNull(playerId);
+      const character = characterId ? CHARACTERS[characterId] : null;
       const status = departed.has(playerId) ? 'LEFT' : `${scores[playerId] ?? 0}`;
+      const rowTextY = character ? y + 10 : y;
+      if (character && characterId) {
+        const portraitX = 64;
+        const portraitGroundY = y + 42;
+        const portraitScale = isWinner ? 2.05 : 1.8;
+        const portraitFrame = this.add.graphics();
+        portraitFrame.fillStyle(RUMBLE_PORTRAIT_BG, 0.74);
+        portraitFrame.fillRect(44, y - 4, 40, 48);
+        portraitFrame.lineStyle(1, isWinner ? WINNER_NICK_COLOR : Wasteland.WALL_LINE, 0.9);
+        portraitFrame.strokeRect(44.5, y - 3.5, 39, 47);
+        panel.add(portraitFrame);
+        this.spawnResultFighter(
+          portraitX,
+          portraitGroundY,
+          characterId,
+          false,
+          false,
+          portraitScale,
+          panel,
+          `result-fighter-${playerId}`,
+        );
+      }
       panel.add(
-        this.add.text(28, y, `${index + 1}`, {
+        this.add.text(28, rowTextY, `${index + 1}`, {
           fontFamily: MENU_FONTS.HEADER,
           fontSize: '13px',
           color: cssHex(color),
         }),
       );
       panel.add(
-        this.add.text(62, y, `${isWinner ? '★ ' : ''}${nickname}${isLocal ? '  (YOU)' : ''}`, {
-          fontFamily: MENU_FONTS.HEADER,
-          fontSize: '11px',
-          color: cssHex(color),
-        }),
+        this.add.text(
+          character ? 92 : 62,
+          character ? y + 2 : y,
+          `${isWinner ? '★ ' : ''}${nickname}${isLocal ? '  (YOU)' : ''}`,
+          {
+            fontFamily: MENU_FONTS.HEADER,
+            fontSize: character ? '10px' : '11px',
+            color: cssHex(color),
+          },
+        ),
       );
+      if (character) {
+        panel.add(
+          this.add.text(92, y + 23, character.displayName.toUpperCase(), {
+            fontFamily: MENU_FONTS.BODY,
+            fontSize: '8px',
+            color: cssHex(LABEL_COLOR),
+          }),
+        );
+      }
       panel.add(
         this.add
-          .text(292, y, status, {
+          .text(292, rowTextY, status, {
             fontFamily: MENU_FONTS.HEADER,
             fontSize: '12px',
             color: cssHex(departed.has(playerId) ? OPPONENT_LEFT_COLOR : color),
@@ -821,7 +929,7 @@ export class ResultsScene extends Phaser.Scene {
       );
       panel.add(
         this.add
-          .text(360, y, `${stats.kills}/${stats.assists ?? 0}/${stats.deaths}`, {
+          .text(360, rowTextY, `${stats.kills}/${stats.assists ?? 0}/${stats.deaths}`, {
             fontFamily: MENU_FONTS.BODY,
             fontSize: '12px',
             color: cssHex(VALUE_COLOR),

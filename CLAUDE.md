@@ -142,6 +142,17 @@ The 6-character roster lives in `CHARACTERS` (`shared/src/config/game.ts`) with 
 
 Character presentation is registry-driven for idle, run, attack, and death sheets. The pack only supplies horizontal death facings, so `deathDirectionForAim()` projects the authoritative aim onto side/side-left. `PlayerRenderer.updateLifeState()` owns the alive/dead edge: play the death sheet once, hide living-only cosmetics/name/health, hold the final corpse frame through the server respawn timer, then restore the current body/weapon state on respawn. Never drive visibility directly from every snapshot or the animation will disappear/restart. Jack's alt body declares its own no-axe death sheets; Frost Wizard shares Mighty Man's death art and keeps its tint. `CharacterDef.bodyOverlay` is an optional synchronized cosmetic layer with its own cropped frame dimensions; Rook uses it for the helmet across every body state. Keep the overlay top-aligned, scaled with big-heads, and tint-synchronized with freeze.
 
+**Roster-authentic Results (Session 87):** matchmaking copies every locked
+`PlayerState.characterId` into optional `MatchResult.playerCharacters` before
+wire serialization. Results uses that server-authored map for duel tableaux
+and Rumble portrait rows, including Frost Wizard's gradient and Rook's
+top-aligned helmet overlay. Older/partial duel results deliberately fall back
+to the original Mighty Man/Bruce presentation, while older Rumble results keep
+their prior text-only rows. Keep this field presentation-only: it must not
+affect standings, score, persistence, rematches, combat, physics, or balance,
+and the client must never reconstruct character identity from nickname, sprite
+state, or local selection caches.
+
 **Death Animation Variety (Session 61):** `CharacterDef.deathVariants` declares optional cosmetic-only horizontal strips. `deathVariantPrefix()` cycles the base and alternates from the authoritative per-match `SerializedPlayerState.deaths` count, so first render, reconnect, local prediction, and remote presentation need no RNG or new wire state. BootScene loads and creates only death animations for these prefixes, normalizing every strip to the existing 0.65-second duration. Mighty Man and Frost Wizard share a three-collapse cycle; Bruce and Bubba have two; Jack's complete no-axe body has two. Rook stays on its synchronized body/helmet collapse, and armed Jack stays on its complete first-death facing pair because the source pack lacks compatible complete alternates. Do not apply a body alternate when its overlay or both horizontal facings are missing.
 
 **Weapons** live in `WEAPONS` (`shared/src/config/game.ts`): rifle (always carried), shotgun (announced power-weapon map pickup, special slot), pistol (silent sidegrade map pickup in DM/KOTH — spawns active at match start, never announced — plus a Gun Game rung; shares the special slot, last-picked-up wins), and punch — flat-damage melee validated as `pelletCount` deterministic even-fan rays (`evenFanAngles`, NO jitter) through the same lag-comp rewind as every gun, with `WeaponDef.maxRange` hard-capping ray length (without it rays extend to `falloffRangeMax * 2`). One damage application per victim per swing; a swing can hit multiple victims. Punch swings broadcast as the transient `punches` array on gameState (delivery like `bulletTrails`); the client plays per-character body-level attack animations (`CharacterDef.attackFrames`/`attackFrameCount`, playback normalized to ~350ms regardless of frame count).

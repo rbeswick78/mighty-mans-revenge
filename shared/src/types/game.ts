@@ -404,6 +404,8 @@ export interface MatchResult {
   scores?: Record<PlayerId, number>;
   /** Stable result labels without relying on the local client's opponent cache. */
   playerNicknames?: Record<PlayerId, string>;
+  /** Locked fighter identities for roster-aware result presentation. */
+  playerCharacters?: Record<PlayerId, CharacterId>;
   /** Fighters who left an active Rumble before it ended. */
   departedPlayerIds?: PlayerId[];
   /** Top awards in display order; empty when nobody qualified. */

@@ -157,6 +157,12 @@ test.describe('Rumble Grudge surfaces', () => {
             'rival-b': 'Nomad',
             'rival-c': 'Road Dog',
           },
+          playerCharacters: {
+            'visual-local': 'rook',
+            'rival-a': 'frost_wizard',
+            'rival-b': 'jack',
+            'rival-c': 'bubba',
+          },
           departedPlayerIds: [],
           awards: [],
           rivalry: null,
@@ -215,7 +221,7 @@ test.describe('Rumble Grudge surfaces', () => {
         active: true,
         grudgeText: 'GRUDGE SET: DUST QUEEN GOT YOU 3X',
         grudgeY: 67,
-        fourthRowY: 270,
+        fourthRowY: 280,
         fourthVisible: true,
       });
   });
