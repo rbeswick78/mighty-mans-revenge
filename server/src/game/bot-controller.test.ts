@@ -10,17 +10,13 @@ import {
   TileType,
   WEAPONS,
 } from '@shared/game';
-import type {
-  CollisionGrid,
-  MapData,
-  PickupState,
-  PlayerState,
-} from '@shared/game';
+import type { CollisionGrid, MapData, PickupState, PlayerState } from '@shared/game';
 import {
   BotController,
   botResourcePriority,
   findGridPath,
   pickBotResource,
+  pickBotTarget,
   scrapstormEscapeGoal,
 } from './bot-controller.js';
 import { Match } from './match.js';
@@ -36,11 +32,11 @@ function grid(solid: boolean[][]): CollisionGrid {
 
 describe('scrapstormEscapeGoal', () => {
   it('chooses a valid tile beyond the warning ring when caught at its center', () => {
-    const open = grid(Array.from({ length: 8 }, (_, row) =>
-      Array.from({ length: 8 }, (_, col) =>
-        row === 0 || col === 0 || row === 7 || col === 7,
+    const open = grid(
+      Array.from({ length: 8 }, (_, row) =>
+        Array.from({ length: 8 }, (_, col) => row === 0 || col === 0 || row === 7 || col === 7),
       ),
-    ));
+    );
     const target = { x: 3.5 * 48, y: 3.5 * 48 };
     const goal = scrapstormEscapeGoal(
       'bot:test',
@@ -170,21 +166,13 @@ describe('Rusty resource evaluation', () => {
     expect(botResourcePriority(full, PickupType.BANDAGE)).toBeNull();
     expect(botResourcePriority(full, PickupType.GUN_AMMO)).toBeNull();
     expect(botResourcePriority(full, PickupType.GRENADE)).toBeNull();
-    expect(botResourcePriority(full, PickupType.ARMOR)).toBe(
-      BOT.RESOURCE_PRIORITY.ARMOR,
-    );
+    expect(botResourcePriority(full, PickupType.ARMOR)).toBe(BOT.RESOURCE_PRIORITY.ARMOR);
     expect(
-      botResourcePriority(
-        makeBotState({ armor: PICKUP.ARMOR_MAX }),
-        PickupType.ARMOR,
-      ),
+      botResourcePriority(makeBotState({ armor: PICKUP.ARMOR_MAX }), PickupType.ARMOR),
     ).toBeNull();
     expect(botResourcePriority(full, PickupType.OVERCHARGE)).toBeNull();
     expect(
-      botResourcePriority(
-        makeBotState({ abilityCooldownSeconds: 20 }),
-        PickupType.OVERCHARGE,
-      ),
+      botResourcePriority(makeBotState({ abilityCooldownSeconds: 20 }), PickupType.OVERCHARGE),
     ).toBe(BOT.RESOURCE_PRIORITY.OVERCHARGE);
     expect(
       botResourcePriority(
@@ -193,18 +181,8 @@ describe('Rusty resource evaluation', () => {
       ),
     ).toBeNull();
 
-    expect(
-      botResourcePriority(
-        makeBotState({ health: 76 }),
-        PickupType.BANDAGE,
-      ),
-    ).toBeNull();
-    expect(
-      botResourcePriority(
-        makeBotState({ health: 75 }),
-        PickupType.BANDAGE,
-      ),
-    ).not.toBeNull();
+    expect(botResourcePriority(makeBotState({ health: 76 }), PickupType.BANDAGE)).toBeNull();
+    expect(botResourcePriority(makeBotState({ health: 75 }), PickupType.BANDAGE)).not.toBeNull();
     expect(
       botResourcePriority(
         makeBotState({ ammo: WEAPONS.rifle.magazineSize + 1 }),
@@ -212,16 +190,10 @@ describe('Rusty resource evaluation', () => {
       ),
     ).toBeNull();
     expect(
-      botResourcePriority(
-        makeBotState({ ammo: WEAPONS.rifle.magazineSize }),
-        PickupType.GUN_AMMO,
-      ),
+      botResourcePriority(makeBotState({ ammo: WEAPONS.rifle.magazineSize }), PickupType.GUN_AMMO),
     ).not.toBeNull();
     expect(
-      botResourcePriority(
-        makeBotState({ grenades: GRENADE.MAX_COUNT - 1 }),
-        PickupType.GRENADE,
-      ),
+      botResourcePriority(makeBotState({ grenades: GRENADE.MAX_COUNT - 1 }), PickupType.GRENADE),
     ).not.toBeNull();
   });
 
@@ -275,22 +247,16 @@ describe('Rusty resource evaluation', () => {
       specialAmmo: WEAPONS.shotgun.magazineSize,
       specialReserve: 2,
     });
-    expect(
-      botResourcePriority(loadedShotgun, PickupType.WEAPON_PISTOL),
-    ).toBeNull();
+    expect(botResourcePriority(loadedShotgun, PickupType.WEAPON_PISTOL)).toBeNull();
     expect(botResourcePriority(loadedShotgun, PickupType.WEAPON_BAT)).toBeNull();
-    expect(
-      botResourcePriority(loadedShotgun, PickupType.WEAPON_SHOTGUN),
-    ).toBeNull();
+    expect(botResourcePriority(loadedShotgun, PickupType.WEAPON_SHOTGUN)).toBeNull();
 
     const dryShotgun = makeBotState({
       weaponId: 'shotgun',
       specialAmmo: 1,
       specialReserve: 1,
     });
-    expect(
-      botResourcePriority(dryShotgun, PickupType.WEAPON_SHOTGUN),
-    ).not.toBeNull();
+    expect(botResourcePriority(dryShotgun, PickupType.WEAPON_SHOTGUN)).not.toBeNull();
     expect(botResourcePriority(dryShotgun, PickupType.WEAPON_PISTOL)).toBeNull();
   });
 
@@ -298,9 +264,7 @@ describe('Rusty resource evaluation', () => {
     const bot = makeBotState({ ammo: 0 });
     const maxDistance = BOT.RESOURCE_MAX_DETOUR_TILES * 48;
     expect(
-      pickBotResource(bot, [
-        resource('too-far', PickupType.GUN_AMMO, maxDistance + 1),
-      ]),
+      pickBotResource(bot, [resource('too-far', PickupType.GUN_AMMO, maxDistance + 1)]),
     ).toBeNull();
     expect(
       pickBotResource(bot, [
@@ -325,6 +289,73 @@ describe('Rusty resource evaluation', () => {
       resource('pickup-a', PickupType.GRENADE, -48),
     ]);
     expect(selected?.id).toBe('pickup-a');
+  });
+
+  it('lets a scavenger range farther without changing ordinary detour bounds', () => {
+    const bot = makeBotState({ ammo: 0 });
+    const pickup = resource(
+      'far-ammo',
+      PickupType.GUN_AMMO,
+      (BOT.RESOURCE_MAX_DETOUR_TILES + 1) * 48,
+    );
+
+    expect(pickBotResource(bot, [pickup])).toBeNull();
+    expect(pickBotResource(bot, [pickup], 48, BOT.SCAVENGER_RESOURCE_MAX_DETOUR_TILES)?.id).toBe(
+      'far-ammo',
+    );
+  });
+});
+
+describe('Scrap Pit target tactics', () => {
+  const bot = makeBotState({ position: { x: 0, y: 0 } });
+  const nearby = makeBotState({
+    id: 'nearby',
+    nickname: 'Nearby',
+    position: { x: 48, y: 0 },
+    score: 1,
+  });
+  const leader = makeBotState({
+    id: 'leader',
+    nickname: 'Leader',
+    position: { x: 240, y: 0 },
+    score: 5,
+  });
+
+  it('keeps balanced and scavenger rivals on the nearest living threat', () => {
+    const equallyNear = makeBotState({
+      id: 'a-equally-near',
+      nickname: 'Equally Near',
+      position: { x: -48, y: 0 },
+      score: 4,
+    });
+    const players = new Map([
+      [bot.id, bot],
+      [leader.id, leader],
+      [nearby.id, nearby],
+      [equallyNear.id, equallyNear],
+    ]);
+
+    expect(pickBotTarget(bot, players, 'balanced')?.id).toBe('nearby');
+    expect(pickBotTarget(bot, players, 'scavenger')?.id).toBe('nearby');
+  });
+
+  it('makes the hunter pressure the scoreboard leader with stable ties', () => {
+    const tiedLeader = makeBotState({
+      id: 'a-tied-leader',
+      nickname: 'Tied',
+      position: { x: 240, y: 0 },
+      score: leader.score,
+    });
+    const players = new Map([
+      [bot.id, bot],
+      [leader.id, leader],
+      [nearby.id, nearby],
+      [tiedLeader.id, tiedLeader],
+    ]);
+
+    expect(pickBotTarget(bot, players, 'hunter')?.id).toBe('a-tied-leader');
+    tiedLeader.isDead = true;
+    expect(pickBotTarget(bot, players, 'hunter')?.id).toBe('leader');
   });
 });
 
@@ -360,6 +391,44 @@ describe('BotController', () => {
     expect(Math.hypot(bot.position.x - start.x, bot.position.y - start.y)).toBeGreaterThan(0);
     expect(match.stats.getStats('bot:test').shotsFired).toBeGreaterThan(0);
     expect(human.health).toBeLessThan(human.maxHealth);
+  });
+
+  it('makes a hunter chase the leader instead of peeling off for ordinary loot', () => {
+    const match = new Match(
+      'practice-hunter',
+      OPEN_MAP,
+      [
+        { id: 'leader', nickname: 'Leader' },
+        { id: 'nearby', nickname: 'Nearby' },
+        { id: 'bot:test', nickname: 'Scrapjaw' },
+      ],
+      GameModeType.DEATHMATCH,
+      () => 0,
+    );
+    const leader = match.players.get('leader')!;
+    const nearby = match.players.get('nearby')!;
+    const bot = match.players.get('bot:test')!;
+    leader.position = { x: 6.5 * 48, y: 2.5 * 48 };
+    leader.score = 5;
+    nearby.position = { x: 4.5 * 48, y: 2.5 * 48 };
+    nearby.score = 1;
+    bot.position = { x: 3.5 * 48, y: 2.5 * 48 };
+    bot.weaponId = 'punch';
+    bot.grenades = 0;
+    match.pickupManager.spawnOneShot(PickupType.ARMOR, {
+      x: 2.5 * 48,
+      y: 2.5 * 48,
+    });
+    match.phase = MatchPhase.ACTIVE;
+    match.matchTimer = 100;
+
+    const startX = bot.position.x;
+    const controller = new BotController(bot.id, 'scrapper', 'hunter');
+    controller.update(0.05, match, 1);
+    match.update(0.05);
+
+    expect(bot.position.x).toBeGreaterThan(startX);
+    expect(Math.abs(bot.aimAngle)).toBeLessThan(0.5);
   });
 
   it('retreats into Radiation Storm safety before resuming its ordinary chase', () => {
@@ -413,14 +482,10 @@ describe('BotController', () => {
   });
 
   it('does nothing outside active play or without a living target', () => {
-    const match = new Match(
-      'practice-2',
-      OPEN_MAP,
-      [
-        { id: 'human', nickname: 'Human' },
-        { id: 'bot:test', nickname: 'Rusty' },
-      ],
-    );
+    const match = new Match('practice-2', OPEN_MAP, [
+      { id: 'human', nickname: 'Human' },
+      { id: 'bot:test', nickname: 'Rusty' },
+    ]);
     const bot = match.players.get('bot:test')!;
     const controller = new BotController('bot:test');
     controller.update(0.05, match, 1);
@@ -616,9 +681,8 @@ describe('BotController', () => {
     }
     expect(bot.health).toBe(70);
     expect(
-      match.pickupManager
-        .getPickups()
-        .find((pickup) => pickup.type === PickupType.BANDAGE)?.isActive,
+      match.pickupManager.getPickups().find((pickup) => pickup.type === PickupType.BANDAGE)
+        ?.isActive,
     ).toBe(false);
   });
 
@@ -842,8 +906,9 @@ describe('BotController', () => {
       bot.position = { x: 2.5 * 48, y: 2.5 * 48 };
       match.phase = MatchPhase.ACTIVE;
       match.matchTimer = MUTATORS.ACTIVATION_AT_REMAINING + 0.01;
-      (match as unknown as { midMatchSlot: { activateAtElapsed: number } })
-        .midMatchSlot.activateAtElapsed = Number.POSITIVE_INFINITY;
+      (
+        match as unknown as { midMatchSlot: { activateAtElapsed: number } }
+      ).midMatchSlot.activateAtElapsed = Number.POSITIVE_INFINITY;
 
       match.update(0.05);
       expect(bot.weaponId).toBe('shotgun');

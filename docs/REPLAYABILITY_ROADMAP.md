@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–83 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Quick Match 1v1 plus 2–4 player Wasteland Rumble with all-player group draft rallies, a rematch-chain Rumble Crown, live lead-change drama, personal rematch Grudges, authoritative Rumble Assists with K/A/D, a solo four-fighter Scrap Pit against three server-authoritative Rusties, and visible bounded Wasteland Signal Recovery, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–84 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Quick Match 1v1 plus 2–4 player Wasteland Rumble with all-player group draft rallies, a rematch-chain Rumble Crown, live lead-change drama, personal rematch Grudges, authoritative Rumble Assists with K/A/D, a solo four-fighter Scrap Pit whose three server-authoritative rivals have distinct readable tactics, and visible bounded Wasteland Signal Recovery, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -115,6 +115,7 @@ Each session below attacks one of these.
 | 81  | Rumble Assists                                  | Meaningful setup damage earns visible credit in chaotic group fights          | **DONE** (2026-07-14) |
 | 82  | Wasteland Signal Recovery                       | Brief server trouble becomes visible and recoverable instead of a frozen loop | **DONE** (2026-07-14) |
 | 83  | Scrap Pit                                       | Solo players can enter the full four-fighter Rumble chaos on demand            | **DONE** (2026-07-14) |
+| 84  | Scrap Pit Rivals                                | Every bot presents a different threat instead of feeling like a renamed clone  | **DONE** (2026-07-14) |
 
 ---
 
@@ -3232,6 +3233,53 @@ attempt one attainable friend score to hunt from the first stage onward.
 
 ---
 
+## Session 84 — Scrap Pit Rivals
+
+**Goal:** make repeat Scrap Pit rounds feel like fighting a recognizable crew
+rather than three renamed copies of the same opponent.
+
+**Locked design decisions**
+
+- The shared frozen `SCRAP_PIT_RIVALS` registry owns each rival's callsign,
+  tactic, and compact teaching copy. Fresh matches and direct rematches derive
+  all three controllers from that registry; ordinary Spar and Gauntlet bots
+  keep the balanced default.
+- Rusty is the all-rounder and retains the established nearest-threat plus
+  six-tile resource-detour behavior. This is the compatibility baseline.
+- Scrapjaw is the leader hunter. It targets the highest-scoring living
+  opponent, then uses distance and stable player id to break ties. It ignores
+  optional loot unless a critical bandage is available, but immediate hazard
+  escape, live mode objectives, and an explicit Bounty Hunt mark remain
+  stronger than personality.
+- Clank is the scavenger. It uses the existing server-visible value, expiry,
+  replacement, and reachability rules but may range ten tiles instead of six
+  for a worthwhile ordinary resource. It still fights while moving and never
+  receives client-authored information.
+- Tactics change only authoritative target and detour decisions. The selected
+  Rookie/Scrapper/Warlord profile still owns aim and decision cadence for all
+  three; physics, movement speed, health, damage, ammo, abilities, score,
+  mode rules, persistence, and reward isolation are untouched.
+- Character Select adds one registry-derived `PIT CREW` line that teaches all
+  three roles before lock-in. No wire state is needed because the practice kind
+  already identifies this fixed shared roster.
+
+**Acceptance criteria**
+
+- [x] Shared tests prove a frozen, unique, full-size rival registry whose
+      legacy callsign list and tactical order stay aligned.
+- [x] Pure and integration AI tests prove balanced nearest-target selection,
+      hunter leader/tie behavior and loot discipline, plus the scavenger's
+      wider bounded detour without changing ordinary Rusty reach.
+- [x] Matchmaking tests prove fresh and rematched Scrap Pits assign balanced,
+      hunter, and scavenger controllers in roster order at the selected
+      difficulty.
+- [x] Client tests and the dedicated real-server browser journey prove the
+      complete crew briefing is visible before fighter selection.
+- [x] Typecheck, lint, all unit tests, production build, and the complete
+      Playwright desktop/mobile matrix pass.
+
+---
+
 ## Session 83 — Scrap Pit
 
 **Goal:** unlock the game's richest four-fighter systems for a solo player by
@@ -3889,6 +3937,43 @@ favorite mid-match event while the final-minute surprise stays fresh.
 ---
 
 ## Session Log
+
+### Session 84 — 2026-07-14 — Scrap Pit Rivals
+
+**Shipped:** Rusty, Scrapjaw, and Clank now enter the Scrap Pit with distinct,
+readable tactical identities. Rusty remains the all-rounder. Scrapjaw pressures
+the current scoreboard leader and refuses ordinary loot distractions unless
+critically wounded. Clank evaluates the same honest arena resources as every
+Rusty but is willing to roam farther for a worthwhile prize. Character Select
+names all three roles before the player commits to a fighter.
+
+The frozen shared roster is the single source for names, tactics, and teaching
+copy. Matchmaking rebuilds the same crew on direct rematches, while the selected
+Rookie/Scrapper/Warlord profile still governs every rival's aim and decision
+cadence. Safety reactions, mode objectives, and Bounty Hunt authority stay
+stronger than personality. No physics, movement, health, damage, weapon, ammo,
+ability, score, reward, persistence, network, ordinary Spar/Gauntlet, or PvP
+behavior changed.
+
+**Verification:** 165 focused shared-config, bot-controller, matchmaking, and
+client-presentation tests pass, including fresh/rematch controller assignment,
+leader targeting, stable ties, hunter loot discipline, and the scavenger's
+bounded wider reach. Typecheck, lint, all 1,266 unit/integration tests across
+91 files, and the production build pass; Vite retains its existing chunk-size
+advisory. The dedicated real-server Scrap Pit journey passes in Chromium,
+Firefox, and mobile landscape, and the complete matrix passes 60 tests with 12
+intentional project-scoped skips. The first live visual review caught the
+second briefing line touching the roster; the final card-offset fix leaves the
+complete crew line clear on the desktop canvas, while the mobile matrix keeps
+the fixed logical canvas and four-route lobby readable.
+
+**Operational watch:** the hunter's leader pressure and Clank's wider resource
+range are intentionally tactical, not numerical difficulty buffs. Watch real
+solo rounds for dogpiling or aimless long detours before changing target weights
+or the ten-tile cap; never tune weapon or character balance from bot behavior.
+
+**Deployment:** not run; production deployment still requires explicit user
+authorization.
 
 ### Session 83 — 2026-07-14 — Scrap Pit
 

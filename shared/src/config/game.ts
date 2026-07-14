@@ -491,12 +491,29 @@ export const RIVALRY_SET = Object.freeze({
   WINS_TO_CLINCH: 3,
 });
 
+/** Readable tactical identities used by the three-fighter Scrap Pit crew. */
+export const BOT_TACTICS = ['balanced', 'hunter', 'scavenger'] as const;
+export type BotTactic = (typeof BOT_TACTICS)[number];
+
+export interface ScrapPitRivalDef {
+  nickname: string;
+  tactic: BotTactic;
+  /** Compact pre-fight copy; behavior still lives entirely on the server. */
+  role: string;
+}
+
+export const SCRAP_PIT_RIVALS: readonly ScrapPitRivalDef[] = Object.freeze([
+  Object.freeze({ nickname: 'RUSTY', tactic: 'balanced', role: 'ALL-ROUNDER' }),
+  Object.freeze({ nickname: 'SCRAPJAW', tactic: 'hunter', role: 'LEADER HUNTER' }),
+  Object.freeze({ nickname: 'CLANK', tactic: 'scavenger', role: 'SCAVENGER' }),
+]);
+
 /** Server-authoritative solo practice opponent. All behavior tuning lives here. */
 export const BOT = Object.freeze({
   PLAYER_ID_PREFIX: 'bot:',
   NICKNAME: 'RUSTY',
   /** Distinct callsigns for the three rivals in a solo four-fighter Scrap Pit. */
-  RUMBLE_NICKNAMES: Object.freeze(['RUSTY', 'SCRAPJAW', 'CLANK']),
+  RUMBLE_NICKNAMES: Object.freeze(SCRAP_PIT_RIVALS.map((rival) => rival.nickname)),
   PATH_RECALC_SECONDS: 0.25,
   PREFERRED_DISTANCE: 220,
   RETREAT_DISTANCE: 120,
@@ -510,6 +527,8 @@ export const BOT = Object.freeze({
   ABILITY_OPENING_DELAY_SECONDS: 4,
   /** Furthest ordinary arena pickup worth leaving a fight to contest. */
   RESOURCE_MAX_DETOUR_TILES: 6,
+  /** Clank's scavenger identity reaches beyond an ordinary combat detour. */
+  SCAVENGER_RESOURCE_MAX_DETOUR_TILES: 10,
   /** Health ratio at or below which a bandage outranks every weapon. */
   RESOURCE_CRITICAL_HEALTH_RATIO: 0.5,
   /** Health ratio at or below which Rusty considers an ordinary bandage. */

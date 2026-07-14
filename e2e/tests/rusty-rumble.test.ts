@@ -1,10 +1,9 @@
 import { test, expect } from '../fixtures';
 
 test.describe('Scrap Pit solo Rumble', () => {
-  test('exposes the solo route and opens three distinct locked Rusties', async (
-    { gamePage },
-    testInfo,
-  ) => {
+  test('exposes the solo route and opens three distinct locked Rusties', async ({
+    gamePage,
+  }, testInfo) => {
     test.setTimeout(45000);
     await expect
       .poll(() =>
@@ -49,8 +48,7 @@ test.describe('Scrap Pit solo Rumble', () => {
         ];
         return {
           labels: buttons.map(
-            (button) =>
-              button.list.find((child) => typeof child.text === 'string')?.text ?? null,
+            (button) => button.list.find((child) => typeof child.text === 'string')?.text ?? null,
           ),
           xs: buttons.map((button) => button.x),
         };
@@ -148,6 +146,13 @@ test.describe('Scrap Pit solo Rumble', () => {
               briefing:
                 scene?.children?.list.some((child) => child.text?.startsWith('SCRAP PIT:')) ??
                 false,
+              crewBriefing:
+                scene?.children?.list.some(
+                  (child) =>
+                    child.text?.includes('PIT CREW:') &&
+                    child.text.includes('LEADER HUNTER') &&
+                    child.text.includes('SCAVENGER'),
+                ) ?? false,
             };
           }),
         { timeout: 15000, message: 'expected the authoritative four-fighter Scrap Pit select' },
@@ -159,6 +164,7 @@ test.describe('Scrap Pit solo Rumble', () => {
         opponentCount: 3,
         botNicknames: ['RUSTY', 'SCRAPJAW', 'CLANK'],
         briefing: true,
+        crewBriefing: true,
       });
 
     const locks = await gamePage.evaluate(() => {

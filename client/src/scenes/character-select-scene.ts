@@ -22,6 +22,7 @@ import { gauntletMatchLabel } from '../ui/practice-gauntlet.js';
 import { practiceMutatorBriefingLabel } from '../ui/practice-mutator.js';
 import { rumbleCrownBriefingLabel } from '../ui/rumble-crown.js';
 import { rumbleGrudgeBriefingLabel } from '../ui/rumble-grudge.js';
+import { scrapPitCrewLabel } from '../ui/scrap-pit-crew.js';
 
 // Scene-local color decisions. HEALTH_GOOD (mint) doubles as the "you"
 // highlight — same color the HUD uses for the local player's health bar,
@@ -188,6 +189,7 @@ export class CharacterSelectScene extends Phaser.Scene {
             `${
               this.matchData.practiceKind === 'rusty_rumble' ? 'SCRAP PIT' : 'NEXT'
             }: ${modeName} - ${this.matchData.mapName.toUpperCase()}`,
+            ...(this.matchData.practiceKind === 'rusty_rumble' ? [scrapPitCrewLabel()] : []),
             ...(crownLabel ? [crownLabel] : []),
             ...(grudgeLabel ? [grudgeLabel] : []),
             ...(this.matchData.practiceMutatorId
@@ -211,9 +213,10 @@ export class CharacterSelectScene extends Phaser.Scene {
     // ────────────────────────────────────────────────────────────────────
     const totalWidth = CHARACTER_IDS.length * CARD_WIDTH + (CHARACTER_IDS.length - 1) * CARD_GAP;
     const startX = centerX - totalWidth / 2 + CARD_WIDTH / 2;
-    // Multi-line Gauntlet briefings can include a forecast and Daily chase.
-    // Move the roster down just enough to keep every authored line readable.
-    const cardY = 280 + Math.max(0, matchLabelLineCount - 2) * 22;
+    // Multi-line briefings can include the Pit crew, Crown/Grudge stories, a
+    // Gauntlet forecast, and a Daily chase. Move the roster for every line
+    // after the ordinary one-line baseline so no card border clips the copy.
+    const cardY = 280 + Math.max(0, matchLabelLineCount - 1) * 22;
 
     CHARACTER_IDS.forEach((id, idx) => {
       const x = startX + idx * (CARD_WIDTH + CARD_GAP);

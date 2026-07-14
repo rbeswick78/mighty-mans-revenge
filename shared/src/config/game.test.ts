@@ -11,6 +11,8 @@ import {
   GAME_MODES,
   GAME_MODE_ROTATION,
   BOT,
+  BOT_TACTICS,
+  SCRAP_PIT_RIVALS,
   RUMBLE,
   PRACTICE_KINDS,
   getNextGameMode,
@@ -51,11 +53,7 @@ import {
 } from './game.js';
 import { GameModeType } from '../types/game.js';
 import { PickupType } from '../types/pickup.js';
-import {
-  DEATH_DIRECTIONS,
-  DIRECTIONS,
-  type CharacterDef,
-} from '../types/character.js';
+import { DEATH_DIRECTIONS, DIRECTIONS, type CharacterDef } from '../types/character.js';
 import type { WeaponDef } from '../types/weapon.js';
 
 describe('wasteland taunts', () => {
@@ -88,18 +86,10 @@ describe('game mode rotation', () => {
     expect(getNextGameMode(GameModeType.KOTH)).toBe(GameModeType.GUN_GAME);
     expect(getNextGameMode(GameModeType.GUN_GAME)).toBe(GameModeType.LAST_STAND);
     expect(getNextGameMode(GameModeType.LAST_STAND)).toBe(GameModeType.KILL_CONFIRMED);
-    expect(getNextGameMode(GameModeType.KILL_CONFIRMED)).toBe(
-      GameModeType.ONE_IN_THE_CHAMBER,
-    );
-    expect(getNextGameMode(GameModeType.ONE_IN_THE_CHAMBER)).toBe(
-      GameModeType.CORE_RUN,
-    );
-    expect(getNextGameMode(GameModeType.CORE_RUN)).toBe(
-      GameModeType.BOUNTY_HUNT,
-    );
-    expect(getNextGameMode(GameModeType.BOUNTY_HUNT)).toBe(
-      GameModeType.DEATHMATCH,
-    );
+    expect(getNextGameMode(GameModeType.KILL_CONFIRMED)).toBe(GameModeType.ONE_IN_THE_CHAMBER);
+    expect(getNextGameMode(GameModeType.ONE_IN_THE_CHAMBER)).toBe(GameModeType.CORE_RUN);
+    expect(getNextGameMode(GameModeType.CORE_RUN)).toBe(GameModeType.BOUNTY_HUNT);
+    expect(getNextGameMode(GameModeType.BOUNTY_HUNT)).toBe(GameModeType.DEATHMATCH);
   });
 
   it('restarts the cycle for unknown values instead of throwing', () => {
@@ -115,9 +105,7 @@ describe('game mode rotation', () => {
     expect(gameModeDisplayName(GameModeType.KOTH)).toBe('KING OF THE HILL');
     expect(gameModeDisplayName(GameModeType.LAST_STAND)).toBe('LAST STAND');
     expect(gameModeDisplayName(GameModeType.KILL_CONFIRMED)).toBe('KILL CONFIRMED');
-    expect(gameModeDisplayName(GameModeType.ONE_IN_THE_CHAMBER)).toBe(
-      'ONE IN THE CHAMBER',
-    );
+    expect(gameModeDisplayName(GameModeType.ONE_IN_THE_CHAMBER)).toBe('ONE IN THE CHAMBER');
     expect(gameModeDisplayName(GameModeType.CORE_RUN)).toBe('CORE RUN');
     expect(gameModeDisplayName(GameModeType.BOUNTY_HUNT)).toBe('BOUNTY HUNT');
   });
@@ -153,12 +141,7 @@ describe('bounty hunt mode', () => {
 describe('weapon roulette mutator', () => {
   it('cycles through every core weapon exactly once on a positive cadence', () => {
     expect(MUTATORS.WEAPON_ROULETTE_INTERVAL_SECONDS).toBeGreaterThan(0);
-    expect(MUTATORS.WEAPON_ROULETTE_ORDER).toEqual([
-      'shotgun',
-      'pistol',
-      'punch',
-      'rifle',
-    ]);
+    expect(MUTATORS.WEAPON_ROULETTE_ORDER).toEqual(['shotgun', 'pistol', 'punch', 'rifle']);
     expect(new Set(MUTATORS.WEAPON_ROULETTE_ORDER)).toEqual(
       new Set(WEAPON_IDS.filter((id) => id !== 'bat')),
     );
@@ -207,9 +190,7 @@ describe('ability overdrive mutator', () => {
 describe('overcharge pickup', () => {
   it('defines a meaningful spent-cooldown gate and contested respawn', () => {
     expect(PICKUP.OVERCHARGE_MIN_COOLDOWN_SECONDS).toBeGreaterThan(0);
-    expect(PICKUP.OVERCHARGE_RESPAWN_TIME).toBeGreaterThan(
-      PICKUP.OVERCHARGE_MIN_COOLDOWN_SECONDS,
-    );
+    expect(PICKUP.OVERCHARGE_RESPAWN_TIME).toBeGreaterThan(PICKUP.OVERCHARGE_MIN_COOLDOWN_SECONDS);
   });
 });
 
@@ -217,9 +198,7 @@ describe('scavenger cache rewards', () => {
   it('uses a frozen weighted table with every collectible pickup kind', () => {
     expect(Object.isFrozen(SCAVENGER_CACHE)).toBe(true);
     expect(Object.isFrozen(SCAVENGER_CACHE.LOOT_TABLE)).toBe(true);
-    expect(new Set(SCAVENGER_CACHE.LOOT_TABLE)).toEqual(
-      new Set(Object.values(PickupType)),
-    );
+    expect(new Set(SCAVENGER_CACHE.LOOT_TABLE)).toEqual(new Set(Object.values(PickupType)));
   });
 
   it('selects one deterministic reward from only mode-enabled types', () => {
@@ -227,10 +206,7 @@ describe('scavenger cache rewards', () => {
     expect(selectScavengerCacheReward('cache-match')).toBe(first);
 
     expect(
-      selectScavengerCacheReward(
-        'gun-game-cache',
-        (type) => type === PickupType.BANDAGE,
-      ),
+      selectScavengerCacheReward('gun-game-cache', (type) => type === PickupType.BANDAGE),
     ).toBe(PickupType.BANDAGE);
   });
 });
@@ -252,62 +228,55 @@ describe('wasteland match contracts', () => {
   });
 
   it('allows a valid smoke-test pin and ignores an unknown pin', () => {
-    expect(
-      selectMatchContract('anything', GameModeType.DEATHMATCH, 'powder_keg').id,
-    ).toBe('powder_keg');
-    expect(
-      selectMatchContract('anything', GameModeType.DEATHMATCH, 'not-real').id,
-    ).not.toBe('not-real');
+    expect(selectMatchContract('anything', GameModeType.DEATHMATCH, 'powder_keg').id).toBe(
+      'powder_keg',
+    );
+    expect(selectMatchContract('anything', GameModeType.DEATHMATCH, 'not-real').id).not.toBe(
+      'not-real',
+    );
   });
 
   it('prevents an immediate rematch repeat unless a smoke pin forces it', () => {
     const previous = selectMatchContract('previous', GameModeType.DEATHMATCH);
-    const next = selectMatchContract(
-      'rematch',
-      GameModeType.DEATHMATCH,
-      undefined,
-      previous.id,
-    );
+    const next = selectMatchContract('rematch', GameModeType.DEATHMATCH, undefined, previous.id);
     expect(next.id).not.toBe(previous.id);
     expect(
-      selectMatchContract(
-        'rematch',
-        GameModeType.DEATHMATCH,
-        previous.id,
-        previous.id,
-      ).id,
+      selectMatchContract('rematch', GameModeType.DEATHMATCH, previous.id, previous.id).id,
     ).toBe(previous.id);
   });
 
   it('adds objective-specific contracts only to compatible mode pools', () => {
     const kothIds = new Set(
-      Array.from({ length: 100 }, (_, i) =>
-        selectMatchContract(`koth-${i}`, GameModeType.KOTH).id,
-      ),
+      Array.from({ length: 100 }, (_, i) => selectMatchContract(`koth-${i}`, GameModeType.KOTH).id),
     );
     const confirmedIds = new Set(
-      Array.from({ length: 100 }, (_, i) =>
-        selectMatchContract(`confirmed-${i}`, GameModeType.KILL_CONFIRMED).id,
+      Array.from(
+        { length: 100 },
+        (_, i) => selectMatchContract(`confirmed-${i}`, GameModeType.KILL_CONFIRMED).id,
       ),
     );
     const coreIds = new Set(
-      Array.from({ length: 100 }, (_, i) =>
-        selectMatchContract(`core-${i}`, GameModeType.CORE_RUN).id,
+      Array.from(
+        { length: 100 },
+        (_, i) => selectMatchContract(`core-${i}`, GameModeType.CORE_RUN).id,
       ),
     );
     const dmIds = new Set(
-      Array.from({ length: 100 }, (_, i) =>
-        selectMatchContract(`dm-${i}`, GameModeType.DEATHMATCH).id,
+      Array.from(
+        { length: 100 },
+        (_, i) => selectMatchContract(`dm-${i}`, GameModeType.DEATHMATCH).id,
       ),
     );
     const gunGameIds = new Set(
-      Array.from({ length: 100 }, (_, i) =>
-        selectMatchContract(`gun-game-${i}`, GameModeType.GUN_GAME).id,
+      Array.from(
+        { length: 100 },
+        (_, i) => selectMatchContract(`gun-game-${i}`, GameModeType.GUN_GAME).id,
       ),
     );
     const chamberIds = new Set(
-      Array.from({ length: 100 }, (_, i) =>
-        selectMatchContract(`chamber-${i}`, GameModeType.ONE_IN_THE_CHAMBER).id,
+      Array.from(
+        { length: 100 },
+        (_, i) => selectMatchContract(`chamber-${i}`, GameModeType.ONE_IN_THE_CHAMBER).id,
       ),
     );
     expect(kothIds).toContain('hill_dweller');
@@ -327,12 +296,8 @@ describe('combat medals', () => {
     expect(Object.isFrozen(COMBAT_MEDALS)).toBe(true);
     expect(COMBAT_MEDALS.RAPID_KILL_WINDOW_SECONDS).toBeGreaterThan(0);
     expect(COMBAT_MEDALS.DOUBLE_KILL_COUNT).toBe(2);
-    expect(COMBAT_MEDALS.TRIPLE_KILL_COUNT).toBeGreaterThan(
-      COMBAT_MEDALS.DOUBLE_KILL_COUNT,
-    );
-    expect(COMBAT_MEDALS.MAYHEM_COUNT).toBeGreaterThan(
-      COMBAT_MEDALS.TRIPLE_KILL_COUNT,
-    );
+    expect(COMBAT_MEDALS.TRIPLE_KILL_COUNT).toBeGreaterThan(COMBAT_MEDALS.DOUBLE_KILL_COUNT);
+    expect(COMBAT_MEDALS.MAYHEM_COUNT).toBeGreaterThan(COMBAT_MEDALS.TRIPLE_KILL_COUNT);
     expect(COMBAT_MEDALS.CLUTCH_HEALTH_FRACTION).toBeGreaterThan(0);
     expect(COMBAT_MEDALS.CLUTCH_HEALTH_FRACTION).toBeLessThan(1);
   });
@@ -359,9 +324,7 @@ describe('wasteland reputation', () => {
       expect(Object.isFrozen(CAREER_RANKS[i])).toBe(true);
       expect(CAREER_RANKS[i].badge).toHaveLength(3);
       if (i > 0) {
-        expect(CAREER_RANKS[i].minContracts).toBeGreaterThan(
-          CAREER_RANKS[i - 1].minContracts,
-        );
+        expect(CAREER_RANKS[i].minContracts).toBeGreaterThan(CAREER_RANKS[i - 1].minContracts);
       }
     }
   });
@@ -440,9 +403,7 @@ describe('arena mastery', () => {
     for (let i = 0; i < ARENA_MASTERY_TIERS.length; i++) {
       expect(Object.isFrozen(ARENA_MASTERY_TIERS[i])).toBe(true);
       if (i > 0) {
-        expect(ARENA_MASTERY_TIERS[i].minWins).toBeGreaterThan(
-          ARENA_MASTERY_TIERS[i - 1].minWins,
-        );
+        expect(ARENA_MASTERY_TIERS[i].minWins).toBeGreaterThan(ARENA_MASTERY_TIERS[i - 1].minWins);
       }
     }
   });
@@ -541,14 +502,7 @@ describe('CHARACTERS registry', () => {
   });
 
   it('ships the full six-fighter roster', () => {
-    expect(CHARACTER_IDS).toEqual([
-      'mighty_man',
-      'bruce',
-      'frost_wizard',
-      'bubba',
-      'jack',
-      'rook',
-    ]);
+    expect(CHARACTER_IDS).toEqual(['mighty_man', 'bruce', 'frost_wizard', 'bubba', 'jack', 'rook']);
   });
 
   it('every entry declares positive frame counts', () => {
@@ -652,9 +606,7 @@ describe('character stat accessors', () => {
 describe('session-6 ability tuning', () => {
   it('Iron Hide reduces damage by half for a short window inside its cooldown', () => {
     expect(ABILITY.BUBBA_IRON_HIDE.DAMAGE_REDUCTION).toBe(0.5);
-    expect(ABILITY.BUBBA_IRON_HIDE.DURATION).toBeLessThan(
-      ABILITY.BUBBA_IRON_HIDE.COOLDOWN,
-    );
+    expect(ABILITY.BUBBA_IRON_HIDE.DURATION).toBeLessThan(ABILITY.BUBBA_IRON_HIDE.COOLDOWN);
   });
 
   it('Axe Throw flight tuning is coherent', () => {
@@ -768,11 +720,18 @@ describe('WEAPONS registry', () => {
 });
 
 describe('session-8 polish backlog config', () => {
-  it('defines one distinct Scrap Pit bot callsign per open Rumble slot', () => {
+  it('defines one frozen, distinct tactical rival per open Scrap Pit slot', () => {
     expect(PRACTICE_KINDS).toContain('rusty_rumble');
+    expect(SCRAP_PIT_RIVALS).toHaveLength(RUMBLE.MAX_PLAYERS - 1);
     expect(BOT.RUMBLE_NICKNAMES).toHaveLength(RUMBLE.MAX_PLAYERS - 1);
     expect(new Set(BOT.RUMBLE_NICKNAMES).size).toBe(BOT.RUMBLE_NICKNAMES.length);
+    expect(BOT.RUMBLE_NICKNAMES).toEqual(SCRAP_PIT_RIVALS.map((rival) => rival.nickname));
+    expect(SCRAP_PIT_RIVALS.map((rival) => rival.tactic)).toEqual([...BOT_TACTICS]);
+    expect(new Set(SCRAP_PIT_RIVALS.map((rival) => rival.role)).size).toBe(SCRAP_PIT_RIVALS.length);
     expect(Object.isFrozen(BOT.RUMBLE_NICKNAMES)).toBe(true);
+    expect(Object.isFrozen(SCRAP_PIT_RIVALS)).toBe(true);
+    expect(SCRAP_PIT_RIVALS.every((rival) => Object.isFrozen(rival))).toBe(true);
+    expect(BOT.SCAVENGER_RESOURCE_MAX_DETOUR_TILES).toBeGreaterThan(BOT.RESOURCE_MAX_DETOUR_TILES);
   });
 
   it('a pistol weapon pickup fills the magazine plus a positive reserve', () => {
@@ -784,9 +743,7 @@ describe('session-8 polish backlog config', () => {
 
   it('hill_hog exists and sits right after sharpshooter in priority order', () => {
     expect(AWARD_DEFS.hill_hog.displayName).toBe('Hill Hog');
-    expect(AWARD_IDS.indexOf('hill_hog')).toBe(
-      AWARD_IDS.indexOf('sharpshooter') + 1,
-    );
+    expect(AWARD_IDS.indexOf('hill_hog')).toBe(AWARD_IDS.indexOf('sharpshooter') + 1);
     expect(AWARDS.HILL_HOG_MIN_SECONDS).toBeGreaterThan(0);
   });
 

@@ -25,7 +25,7 @@ import type {
   ScrapstormState,
   Vec2,
 } from '@shared/game';
-import type { BotDifficulty } from '@shared/game';
+import type { BotDifficulty, BotTactic } from '@shared/game';
 import type { Match } from './match.js';
 
 export interface GridPoint {
@@ -34,16 +34,9 @@ export interface GridPoint {
 }
 
 /** Small deterministic BFS over the map's shared collision grid. */
-export function findGridPath(
-  grid: CollisionGrid,
-  start: GridPoint,
-  goal: GridPoint,
-): GridPoint[] {
+export function findGridPath(grid: CollisionGrid, start: GridPoint, goal: GridPoint): GridPoint[] {
   const inBounds = (point: GridPoint): boolean =>
-    point.x >= 0 &&
-    point.x < grid.width &&
-    point.y >= 0 &&
-    point.y < grid.height;
+    point.x >= 0 && point.x < grid.width && point.y >= 0 && point.y < grid.height;
   if (!inBounds(start) || !inBounds(goal)) return [];
   if (grid.solid[start.y][start.x] || grid.solid[goal.y][goal.x]) return [];
 
@@ -67,11 +60,7 @@ export function findGridPath(
         y: current.y + direction.y,
       };
       const nextKey = key(next);
-      if (
-        !inBounds(next) ||
-        grid.solid[next.y][next.x] ||
-        cameFrom.has(nextKey)
-      ) {
+      if (!inBounds(next) || grid.solid[next.y][next.x] || cameFrom.has(nextKey)) {
         continue;
       }
       cameFrom.set(nextKey, current);
@@ -127,11 +116,8 @@ export function scrapstormEscapeGoal(
     };
     const col = Math.floor(candidate.x / grid.tileSize);
     const row = Math.floor(candidate.y / grid.tileSize);
-    if (
-      col >= 0 && col < grid.width &&
-      row >= 0 && row < grid.height &&
-      !grid.solid[row][col]
-    ) return candidate;
+    if (col >= 0 && col < grid.width && row >= 0 && row < grid.height && !grid.solid[row][col])
+      return candidate;
   }
   return null;
 }
@@ -146,10 +132,7 @@ function heldSpecialAmmo(player: PlayerState): number {
  * weapon. Higher values deliberately form broad tiers; distance only breaks
  * ties inside a tier.
  */
-export function botResourcePriority(
-  player: PlayerState,
-  type: PickupType,
-): number | null {
+export function botResourcePriority(player: PlayerState, type: PickupType): number | null {
   const heldAmmo = heldSpecialAmmo(player);
   const hasLivePowerWeapon =
     (player.weaponId === 'bat' || player.weaponId === 'shotgun') && heldAmmo > 0;
@@ -167,9 +150,7 @@ export function botResourcePriority(
     }
     case PickupType.WEAPON_BAT:
       if (hasLivePowerWeapon && player.weaponId !== 'bat') return null;
-      return player.weaponId !== 'bat' || heldAmmo <= 1
-        ? BOT.RESOURCE_PRIORITY.BAT
-        : null;
+      return player.weaponId !== 'bat' || heldAmmo <= 1 ? BOT.RESOURCE_PRIORITY.BAT : null;
     case PickupType.WEAPON_SHOTGUN:
       if (hasLivePowerWeapon && player.weaponId !== 'shotgun') return null;
       return player.weaponId !== 'shotgun' || heldAmmo <= WEAPONS.shotgun.magazineSize
@@ -181,19 +162,15 @@ export function botResourcePriority(
         ? BOT.RESOURCE_PRIORITY.PISTOL
         : null;
     case PickupType.ARMOR:
-      return player.armor < PICKUP.ARMOR_MAX
-        ? BOT.RESOURCE_PRIORITY.ARMOR
-        : null;
+      return player.armor < PICKUP.ARMOR_MAX ? BOT.RESOURCE_PRIORITY.ARMOR : null;
     case PickupType.OVERCHARGE:
-      return (
-        !player.isDead &&
+      return !player.isDead &&
         player.abilityActiveSeconds <= 0 &&
         player.abilityCooldownSeconds >= PICKUP.OVERCHARGE_MIN_COOLDOWN_SECONDS
-      ) ? BOT.RESOURCE_PRIORITY.OVERCHARGE : null;
-    case PickupType.GRENADE:
-      return player.grenades < GRENADE.MAX_COUNT
-        ? BOT.RESOURCE_PRIORITY.GRENADE
+        ? BOT.RESOURCE_PRIORITY.OVERCHARGE
         : null;
+    case PickupType.GRENADE:
+      return player.grenades < GRENADE.MAX_COUNT ? BOT.RESOURCE_PRIORITY.GRENADE : null;
     case PickupType.GUN_AMMO: {
       const maxAmmo = WEAPONS.rifle.magazineSize * 2;
       return player.ammo <= maxAmmo * BOT.RESOURCE_RIFLE_AMMO_RATIO
@@ -210,10 +187,10 @@ export function pickBotResource(
   player: PlayerState,
   pickups: readonly PickupState[],
   tileSize: number = MAP.TILE_SIZE,
+  maxDetourTiles: number = BOT.RESOURCE_MAX_DETOUR_TILES,
 ): PickupState | null {
-  const maxDistance = BOT.RESOURCE_MAX_DETOUR_TILES * tileSize;
-  const travelSpeed =
-    PLAYER.BASE_SPEED * characterSpeedMultiplier(player.characterId);
+  const maxDistance = maxDetourTiles * tileSize;
+  const travelSpeed = PLAYER.BASE_SPEED * characterSpeedMultiplier(player.characterId);
   let best: PickupState | null = null;
   let bestPriority = Number.NEGATIVE_INFINITY;
   let bestDistance = Number.POSITIVE_INFINITY;
@@ -229,8 +206,7 @@ export function pickBotResource(
     if (distance > maxDistance) continue;
     if (
       pickup.expiresInSeconds !== undefined &&
-      pickup.expiresInSeconds <=
-        distance / travelSpeed + BOT.RESOURCE_EXPIRY_BUFFER_SECONDS
+      pickup.expiresInSeconds <= distance / travelSpeed + BOT.RESOURCE_EXPIRY_BUFFER_SECONDS
     ) {
       continue;
     }
@@ -248,6 +224,56 @@ export function pickBotResource(
     }
   }
   return best;
+}
+
+/**
+ * Pick a living combat target using one of the Scrap Pit's readable tactics.
+ * Balanced/scavenger rivals fight the nearest threat. The hunter pressures
+ * the highest-scoring opponent, with distance and id providing deterministic
+ * tie-breaks. If the hunter itself leads, it attacks the best challenger.
+ */
+export function pickBotTarget(
+  bot: PlayerState,
+  players: ReadonlyMap<PlayerId, PlayerState>,
+  tactic: BotTactic = 'balanced',
+): PlayerState | null {
+  if (tactic !== 'hunter') {
+    let nearest: PlayerState | null = null;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    for (const player of players.values()) {
+      if (player.id === bot.id || player.isDead) continue;
+      const distance = Math.hypot(
+        player.position.x - bot.position.x,
+        player.position.y - bot.position.y,
+      );
+      // Preserve the established insertion-order tie behavior for ordinary
+      // Spar/Gauntlet and Rusty's balanced Scrap Pit identity.
+      if (distance < nearestDistance) {
+        nearest = player;
+        nearestDistance = distance;
+      }
+    }
+    return nearest;
+  }
+
+  const candidates = [...players.values()].filter(
+    (player) => player.id !== bot.id && !player.isDead,
+  );
+  candidates.sort((left, right) => {
+    if (left.score !== right.score) {
+      return right.score - left.score;
+    }
+    const leftDistance = Math.hypot(
+      left.position.x - bot.position.x,
+      left.position.y - bot.position.y,
+    );
+    const rightDistance = Math.hypot(
+      right.position.x - bot.position.x,
+      right.position.y - bot.position.y,
+    );
+    return leftDistance - rightDistance || left.id.localeCompare(right.id);
+  });
+  return candidates[0] ?? null;
 }
 
 /**
@@ -272,6 +298,7 @@ export class BotController {
   constructor(
     readonly playerId: PlayerId,
     readonly difficulty: BotDifficulty = DEFAULT_BOT_DIFFICULTY,
+    readonly tactic: BotTactic = 'balanced',
   ) {
     this.profile = BOT_PROFILES[difficulty];
   }
@@ -288,18 +315,18 @@ export class BotController {
     const target =
       bountyTarget && !bountyTarget.isDead
         ? bountyTarget
-        : this.pickTarget(bot, match.players);
+        : pickBotTarget(bot, match.players, this.tactic);
     const objectiveTag = this.pickNearestTag(bot, match.getKillConfirmedTags());
     const coreState = match.getCoreRunState();
     const looseCore = coreState?.carrierId === null ? coreState : null;
-    const supplyDrop = this.pickNearestSupply(
-      bot,
-      match.pickupManager.getPickups(),
-    );
+    const supplyDrop = this.pickNearestSupply(bot, match.pickupManager.getPickups());
     const resource = pickBotResource(
       bot,
       match.pickupManager.getPickups(),
       match.mapManager.getCollisionGrid().tileSize,
+      this.tactic === 'scavenger'
+        ? BOT.SCAVENGER_RESOURCE_MAX_DETOUR_TILES
+        : BOT.RESOURCE_MAX_DETOUR_TILES,
     );
     if (!target && !objectiveTag && !looseCore && !supplyDrop && !resource) return;
 
@@ -325,13 +352,7 @@ export class BotController {
     const distance = Math.hypot(dx, dy);
     const directAngle = Math.atan2(dy, dx);
     const grid = match.mapManager.getCollisionGrid();
-    const ray = raycastAgainstGrid(
-      grid,
-      bot.position.x,
-      bot.position.y,
-      directAngle,
-      distance,
-    );
+    const ray = raycastAgainstGrid(grid, bot.position.x, bot.position.y, directAngle, distance);
     const hasLineOfSight = !ray.hitTile || ray.distance >= distance - 8;
     const movementGoal = this.chooseMovementGoal(
       bot,
@@ -371,8 +392,7 @@ export class BotController {
       directAngle + Math.sin(this.elapsedSeconds * 1.7) * this.profile.aimWobbleRadians;
 
     const activeGrenade = match.combatManager.getActiveGrenadeFor(this.playerId);
-    const chamberRules =
-      match.gameModeType === GameModeType.ONE_IN_THE_CHAMBER;
+    const chamberRules = match.gameModeType === GameModeType.ONE_IN_THE_CHAMBER;
     let throwPressed = false;
     let detonatePressed = false;
     if (activeGrenade) {
@@ -435,9 +455,7 @@ export class BotController {
       aimingGrenade: false,
       throwPressed,
       detonatePressed,
-      sprint:
-        movementDistance > BOT.PREFERRED_DISTANCE * 1.5 &&
-        bot.stamina > 0.35,
+      sprint: movementDistance > BOT.PREFERRED_DISTANCE * 1.5 && bot.stamina > 0.35,
       reload,
       abilityPressed,
       tick,
@@ -455,7 +473,7 @@ export class BotController {
     objectiveTag: { position: Vec2 } | null,
     looseCore: { position: Vec2 } | null,
     supplyDrop: { position: Vec2 } | null,
-    resource: { position: Vec2 } | null,
+    resource: PickupState | null,
     bountyTarget: PlayerState | null,
     match: Match,
     grid: CollisionGrid,
@@ -508,7 +526,15 @@ export class BotController {
           isCombatTarget: true,
         };
       }
-      const detour = supplyDrop ?? resource;
+      const hunterNeedsBandage =
+        resource?.type === PickupType.BANDAGE &&
+        bot.health / bot.maxHealth <= BOT.RESOURCE_CRITICAL_HEALTH_RATIO;
+      const detour =
+        this.tactic === 'hunter'
+          ? hunterNeedsBandage
+            ? resource
+            : null
+          : (supplyDrop ?? resource);
       if (detour) {
         return {
           position: detour.position,
@@ -541,26 +567,6 @@ export class BotController {
     };
   }
 
-  private pickTarget(
-    bot: PlayerState,
-    players: Map<PlayerId, PlayerState>,
-  ): PlayerState | null {
-    let nearest: PlayerState | null = null;
-    let nearestDistance = Number.POSITIVE_INFINITY;
-    for (const player of players.values()) {
-      if (player.id === bot.id || player.isDead) continue;
-      const distance = Math.hypot(
-        player.position.x - bot.position.x,
-        player.position.y - bot.position.y,
-      );
-      if (distance < nearestDistance) {
-        nearest = player;
-        nearestDistance = distance;
-      }
-    }
-    return nearest;
-  }
-
   private pickNearestTag(
     bot: PlayerState,
     tags: readonly { position: Vec2 }[],
@@ -568,10 +574,7 @@ export class BotController {
     let nearest: { position: Vec2 } | null = null;
     let nearestDistance = Number.POSITIVE_INFINITY;
     for (const tag of tags) {
-      const distance = Math.hypot(
-        tag.position.x - bot.position.x,
-        tag.position.y - bot.position.y,
-      );
+      const distance = Math.hypot(tag.position.x - bot.position.x, tag.position.y - bot.position.y);
       if (distance < nearestDistance) {
         nearest = tag;
         nearestDistance = distance;
@@ -621,9 +624,7 @@ export class BotController {
       const heldWeapon = WEAPONS[bot.weaponId];
       const meleeReach = 'maxRange' in heldWeapon ? heldWeapon.maxRange : undefined;
       const isMelee = meleeReach !== undefined;
-      const preferredDistance = isMelee
-        ? meleeReach * 0.65
-        : BOT.PREFERRED_DISTANCE;
+      const preferredDistance = isMelee ? meleeReach * 0.65 : BOT.PREFERRED_DISTANCE;
       if (distance > preferredDistance) return toward;
       if (!isMelee && distance < BOT.RETREAT_DISTANCE) {
         return { x: -toward.x, y: -toward.y };
@@ -649,16 +650,11 @@ export class BotController {
         },
       );
       const next = path[1] ?? path[0];
-      this.waypoint = next
-        ? { x: (next.x + 0.5) * ts, y: (next.y + 0.5) * ts }
-        : null;
+      this.waypoint = next ? { x: (next.x + 0.5) * ts, y: (next.y + 0.5) * ts } : null;
     }
 
     return this.waypoint
-      ? normalized(
-          this.waypoint.x - bot.position.x,
-          this.waypoint.y - bot.position.y,
-        )
+      ? normalized(this.waypoint.x - bot.position.x, this.waypoint.y - bot.position.y)
       : toward;
   }
 

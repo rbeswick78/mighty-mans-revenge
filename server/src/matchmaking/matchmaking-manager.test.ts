@@ -10,6 +10,7 @@ import {
   DRAFT,
   RUMBLE,
   BOT,
+  SCRAP_PIT_RIVALS,
   CHARACTER_IDS,
   listMapNames,
   GameModeType,
@@ -1773,11 +1774,17 @@ describe('MatchmakingManager solo practice flow', () => {
 
     const controllers = (
       mgr as unknown as {
-        botControllers: Map<string, Array<{ playerId: PlayerId; difficulty: string }>>;
+        botControllers: Map<
+          string,
+          Array<{ playerId: PlayerId; difficulty: string; tactic: string }>
+        >;
       }
     ).botControllers.get(first.matchId);
     expect(controllers?.map((controller) => controller.playerId)).toEqual(botIds);
     expect(controllers?.every((controller) => controller.difficulty === 'warlord')).toBe(true);
+    expect(controllers?.map((controller) => controller.tactic)).toEqual(
+      SCRAP_PIT_RIVALS.map((rival) => rival.tactic),
+    );
 
     const opening = sent.find(
       (entry) => entry.playerId === 'A' && entry.message.type === 'server:matchFound',
@@ -1829,6 +1836,14 @@ describe('MatchmakingManager solo practice flow', () => {
     expect(rematchFound.message.matchKind).toBe('rumble');
     expect(rematchFound.message.practiceKind).toBe('rusty_rumble');
     expect(rematchFound.message.rumbleCrown?.holderId).toBe('A');
+    const rematchControllers = (
+      mgr as unknown as {
+        botControllers: Map<string, Array<{ tactic: string }>>;
+      }
+    ).botControllers.get(rematch.matchId);
+    expect(rematchControllers?.map((controller) => controller.tactic)).toEqual(
+      SCRAP_PIT_RIVALS.map((rival) => rival.tactic),
+    );
   });
 
   it('tears down every Scrap Pit bot when its solo player disconnects', () => {

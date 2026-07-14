@@ -8,6 +8,7 @@ import {
   BOT,
   BOT_DIFFICULTIES,
   DEFAULT_BOT_DIFFICULTY,
+  SCRAP_PIT_RIVALS,
   PRACTICE_KINDS,
   CHARACTER_IDS,
   MUTATORS,
@@ -362,7 +363,10 @@ export class MatchmakingManager {
     this.rumbleQueue.removePlayer(playerId);
     this.playerNicknames.set(playerId, nickname);
 
-    const botNicknames = safeKind === 'rusty_rumble' ? BOT.RUMBLE_NICKNAMES : [BOT.NICKNAME];
+    const botNicknames =
+      safeKind === 'rusty_rumble'
+        ? SCRAP_PIT_RIVALS.map((rival) => rival.nickname)
+        : [BOT.NICKNAME];
     const botEntries = botNicknames.map((botNickname) => {
       const id = `${BOT.PLAYER_ID_PREFIX}${crypto.randomUUID()}` as PlayerId;
       this.botPlayerIds.add(id);
@@ -1078,7 +1082,13 @@ export class MatchmakingManager {
       if (botEntries.length > 0) {
         this.botControllers.set(
           matchId,
-          botEntries.map((entry) => new BotController(entry.id, practiceDifficulty)),
+          botEntries.map((entry) => {
+            const tactic =
+              practiceKind === 'rusty_rumble'
+                ? SCRAP_PIT_RIVALS.find((rival) => rival.nickname === entry.nickname)?.tactic
+                : undefined;
+            return new BotController(entry.id, practiceDifficulty, tactic);
+          }),
         );
         const availableCharacters = [...CHARACTER_IDS];
         for (const [botIndex, botEntry] of botEntries.entries()) {
