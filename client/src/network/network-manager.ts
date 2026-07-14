@@ -267,9 +267,9 @@ export class NetworkManager {
 
     // Predict locally using shared physics, applying the active mutators'
     // movement modifiers so prediction matches server authority during
-    // e.g. super_speed, Second Wind, or Blood Rush. The boost timer
-    // comes from the last snapshot — the server consumes the same value
-    // when it processes this input, so the two stay aligned.
+    // e.g. super_speed, Second Wind, Blood Rush, or the Spawn Rush boon.
+    // The boost timers come from the last snapshot — the server consumes
+    // the same values when it processes this input, so the two stay aligned.
     const predicted = this.prediction.predictInput(
       input,
       this.localPlayerState,
@@ -278,6 +278,7 @@ export class NetworkManager {
         this.localPlayerState.characterId,
         this._activeMutators,
         this.localPlayerState.secondWindTimer,
+        this.localPlayerState.spawnRushTimer ?? 0,
       ),
       this.abilitiesEnabled,
     );
@@ -763,6 +764,7 @@ export class NetworkManager {
         serverState.characterId,
         this._activeMutators,
         serverState.secondWindTimer,
+        serverState.spawnRushTimer ?? 0,
       ),
       this.abilitiesEnabled,
     );
@@ -820,9 +822,11 @@ export class NetworkManager {
       // player's prediction next tick respects the lockout via the shared
       // calculateMovement frozen modifier.
       frozenTimer: serverState.frozenTimer,
-      // Temporary mutator boost timer — forwarded so the next predictInput
-      // applies the same Second Wind / Blood Rush multiplier as the server.
+      // Temporary speed-boost timers — forwarded so the next predictInput
+      // applies the same Second Wind / Blood Rush / Spawn Rush multiplier
+      // as the server.
       secondWindTimer: serverState.secondWindTimer,
+      spawnRushTimer: serverState.spawnRushTimer ?? 0,
     };
 
     const dx = result.position.x - previousPosition.x;
@@ -875,6 +879,7 @@ export class NetworkManager {
       abilityLockedAim: 0,
       frozenTimer: s.frozenTimer,
       secondWindTimer: s.secondWindTimer,
+      spawnRushTimer: s.spawnRushTimer ?? 0,
     };
   }
 

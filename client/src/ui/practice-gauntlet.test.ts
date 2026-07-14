@@ -51,6 +51,7 @@ function result(outcome: 'advanced' | 'failed' | 'cleared'): MatchResult {
                 gameMode: 'gun_game' as MatchResult['gameMode'],
                 opponentCharacterId: 'bruce',
                 forecastMutatorId: 'blackout',
+                boonId: 'scrap_plating',
               },
               {
                 id: 'route_b',
@@ -58,6 +59,7 @@ function result(outcome: 'advanced' | 'failed' | 'cleared'): MatchResult {
                 gameMode: 'last_stand' as MatchResult['gameMode'],
                 opponentCharacterId: 'frost_wizard',
                 forecastMutatorId: 'weapon_roulette',
+                boonId: 'quick_charge',
               },
             ]
           : undefined,
@@ -99,6 +101,7 @@ describe('practice gauntlet presentation', () => {
           runScore: 1500,
           opponentCharacterId: 'frost_wizard',
           forecastMutatorId: 'weapon_roulette',
+          boonIds: ['scrap_plating', 'quick_charge'],
         },
         'koth' as MatchResult['gameMode'],
         'Scrapyard',
@@ -106,7 +109,8 @@ describe('practice gauntlet presentation', () => {
     ).toBe(
       'GAUNTLET 2/3 - SCRAPPER  //  RUN 1,500\n' +
         'KING OF THE HILL - SCRAPYARD  //  RUSTY: FROST WIZARD\n' +
-        'MID-MATCH: WEAPON ROULETTE  //  BOUNTY +200',
+        'MID-MATCH: WEAPON ROULETTE  //  BOUNTY +200\n' +
+        'BOONS: SCRAP PLATING + QUICK CHARGE',
     );
   });
 
@@ -116,6 +120,8 @@ describe('practice gauntlet presentation', () => {
     expect(gauntletActionLabel(value)).toBe('NEXT FIGHT');
     expect(gauntletResultSummary(value)).toContain('STAGE CLEAR');
     expect(gauntletResultSummary(value)).toContain('RUN 2,200');
+    value.gauntlet!.boonIds = ['scrap_plating'];
+    expect(gauntletResultSummary(value)).toContain('BOONS: SCRAP PLATING');
     expect(gauntletStageScoreSummary(value)).toBe(
       'STAGE +2,200 = CLEAR 1,000 + CONTRACT 300 + REG 200 + FLAWLESS 400 + PACE 300',
     );
@@ -134,10 +140,12 @@ describe('practice gauntlet presentation', () => {
     expect(gauntletNextTeaser(value)).toBe('CHOOSE: STAGE 2/3 - SCRAPPER');
     expect(gauntletRouteChoices(value)).toHaveLength(2);
     expect(gauntletRouteButtonLabel(gauntletRouteChoices(value)[0])).toBe(
-      'ROUTE A · GUN GAME\nSCRAPYARD\nVS BRUCE\nCHAOS: BLACKOUT +200',
+      'ROUTE A · GUN GAME\nSCRAPYARD\nVS BRUCE\nCHAOS: BLACKOUT +200\n' +
+        'BOON: SCRAP PLATING // +25 ARMOR/LIFE',
     );
     expect(gauntletRouteButtonLabel(gauntletRouteChoices(value)[1])).toBe(
-      'ROUTE B · LAST STAND\nCOLLAPSED OVERPASS\nVS FROST WIZARD\nCHAOS: WEAPON ROULETTE +200',
+      'ROUTE B · LAST STAND\nCOLLAPSED OVERPASS\nVS FROST WIZARD\n' +
+        'CHAOS: WEAPON ROULETTE +200\nBOON: QUICK CHARGE // 1.5X ABILITY',
     );
   });
 
@@ -166,12 +174,10 @@ describe('practice gauntlet presentation', () => {
   });
 
   it('turns every server-authored Daily chase state into an actionable target', () => {
-    expect(dailyGauntletChaseLabel({ kind: 'set_pace' })).toBe(
-      'DAILY CHASE: SET THE FIRST SCORE',
+    expect(dailyGauntletChaseLabel({ kind: 'set_pace' })).toBe('DAILY CHASE: SET THE FIRST SCORE');
+    expect(dailyGauntletChaseLabel({ kind: 'claim_slot', projectedRank: 3 })).toBe(
+      'DAILY CHASE: POST A CLEAR  //  OPEN #3',
     );
-    expect(
-      dailyGauntletChaseLabel({ kind: 'claim_slot', projectedRank: 3 }),
-    ).toBe('DAILY CHASE: POST A CLEAR  //  OPEN #3');
     expect(
       dailyGauntletChaseLabel(
         { kind: 'break_in', targetNickname: 'Erin', targetScore: 4001 },
@@ -191,15 +197,11 @@ describe('practice gauntlet presentation', () => {
         'cleared',
       ),
     ).toBe('DAILY CHASE: CATCH LONGWAST  //  SCORE 7,001  //  TARGET BEATEN');
+    expect(dailyGauntletChaseLabel({ kind: 'defend_lead', targetScore: 8001 }, 7600)).toBe(
+      'DAILY CHASE: DEFEND #1  //  SCORE 8,001  //  401 TO GO',
+    );
     expect(
-      dailyGauntletChaseLabel({ kind: 'defend_lead', targetScore: 8001 }, 7600),
-    ).toBe('DAILY CHASE: DEFEND #1  //  SCORE 8,001  //  401 TO GO');
-    expect(
-      dailyGauntletChaseLabel(
-        { kind: 'defend_lead', targetScore: 8001 },
-        8100,
-        'failed',
-      ),
+      dailyGauntletChaseLabel({ kind: 'defend_lead', targetScore: 8001 }, 8100, 'failed'),
     ).toBe('DAILY CHASE: DEFEND #1  //  SCORE 8,001  //  SCORE MET - RETRY DAILY');
     expect(dailyGauntletChaseLabel({ kind: 'set_pace' }, 6600, 'cleared')).toBe(
       'DAILY CHASE: CLEAR POSTED',
@@ -212,9 +214,9 @@ describe('practice gauntlet presentation', () => {
       targetNickname: 'Amy',
       targetScore: 3000,
     };
-    expect(
-      gauntletMatchLabel(daily.gauntlet!, GameModeType.DEATHMATCH, 'Scrapyard'),
-    ).toContain('DAILY CHASE: CATCH AMY  //  SCORE 3,000  //  800 TO GO');
+    expect(gauntletMatchLabel(daily.gauntlet!, GameModeType.DEATHMATCH, 'Scrapyard')).toContain(
+      'DAILY CHASE: CATCH AMY  //  SCORE 3,000  //  800 TO GO',
+    );
     expect(gauntletResultSummary(daily)).toContain(
       '\nDAILY CHASE: CATCH AMY  //  SCORE 3,000  //  800 TO GO',
     );

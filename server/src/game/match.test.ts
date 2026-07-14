@@ -22,6 +22,7 @@ import {
   CORE_RUN,
   BOUNTY_HUNT,
   COMBAT_MEDALS,
+  PRACTICE_GAUNTLET,
   GameModeType,
   TileType,
   PickupType,
@@ -33,6 +34,7 @@ import type {
   PlayerInput,
   MutatorId,
   MatchContractId,
+  GauntletBoonId,
 } from '@shared/game';
 
 function makeInput(seq: number, overrides: Partial<PlayerInput> = {}): PlayerInput {
@@ -79,11 +81,87 @@ function createMatch(playerCount = 2): Match {
   return new Match('match-1', makeMapData(), players);
 }
 
+function createGauntletBoonMatch(boonIds: readonly GauntletBoonId[]): Match {
+  return new Match(
+    'boon-match',
+    makeMapData(),
+    [
+      { id: 'player-0', nickname: 'Human' },
+      { id: 'player-1', nickname: 'Rusty' },
+    ],
+    GameModeType.DEATHMATCH,
+    () => 0.5,
+    [],
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    new Map([['player-0', boonIds]]),
+  );
+}
+
 describe('Match', () => {
   let match: Match;
 
   beforeEach(() => {
     match = createMatch();
+  });
+
+  describe('Gauntlet boon authority', () => {
+    function startBoonMatch(boonIds: readonly GauntletBoonId[]): Match {
+      const boonMatch = createGauntletBoonMatch(boonIds);
+      boonMatch.setLock('player-0', 'mighty_man');
+      boonMatch.setLock('player-1', 'bruce');
+      boonMatch.update(0.01);
+      boonMatch.update(MATCH.COUNTDOWN_DURATION + 0.01);
+      return boonMatch;
+    }
+
+    it('applies life-scoped armor and prediction-safe spawn speed only to the human', () => {
+      const boonMatch = startBoonMatch(['scrap_plating', 'spawn_rush']);
+      const human = boonMatch.players.get('player-0')!;
+      const rusty = boonMatch.players.get('player-1')!;
+
+      expect(human.armor).toBe(PRACTICE_GAUNTLET.BOON_SCRAP_PLATING_ARMOR);
+      expect(human.spawnRushTimer).toBe(PRACTICE_GAUNTLET.BOON_SPAWN_RUSH_SECONDS);
+      expect(rusty.armor).toBe(0);
+      expect(rusty.spawnRushTimer).toBe(0);
+
+      const startX = human.position.x;
+      boonMatch.queueInput('player-0', makeInput(1, { moveX: 1 }));
+      boonMatch.update(0.05);
+      expect(human.position.x - startX).toBeCloseTo(
+        PLAYER.BASE_SPEED * PRACTICE_GAUNTLET.BOON_SPAWN_RUSH_MULTIPLIER * 0.05,
+        5,
+      );
+
+      human.armor = 0;
+      boonMatch.onKill('player-1', 'player-0', 'gun');
+      const respawnTicks = Math.ceil(RESPAWN.DELAY / 0.05) + 1;
+      for (let i = 0; i < respawnTicks; i++) boonMatch.update(0.05);
+      expect(human.armor).toBe(PRACTICE_GAUNTLET.BOON_SCRAP_PLATING_ARMOR);
+      expect(human.spawnRushTimer ?? 0).toBeGreaterThan(
+        PRACTICE_GAUNTLET.BOON_SPAWN_RUSH_SECONDS - 0.2,
+      );
+    });
+
+    it('stacks kill salvage and Quick Charge without benefiting Rusty', () => {
+      const boonMatch = startBoonMatch(['kill_salvage', 'quick_charge']);
+      const human = boonMatch.players.get('player-0')!;
+      const rusty = boonMatch.players.get('player-1')!;
+      human.health = 10;
+      human.grenades = 0;
+      human.abilityCooldownSeconds = 10;
+      rusty.abilityCooldownSeconds = 10;
+
+      boonMatch.onKill('player-0', 'player-1', 'gun');
+      expect(human.health).toBe(80);
+      expect(human.grenades).toBe(PRACTICE_GAUNTLET.BOON_KILL_SALVAGE_GRENADES);
+
+      boonMatch.update(1);
+      expect(human.abilityCooldownSeconds).toBe(8.5);
+      expect(rusty.abilityCooldownSeconds).toBe(9);
+    });
   });
 
   describe('state transitions', () => {

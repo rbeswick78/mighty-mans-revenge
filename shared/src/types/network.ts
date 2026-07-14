@@ -289,6 +289,8 @@ export interface SerializedPlayerState {
    * multiplier as the server. See PlayerState.secondWindTimer.
    */
   secondWindTimer: number;
+  /** Prediction-safe Gauntlet Spawn Rush timer; absent on older servers. */
+  spawnRushTimer?: number;
 }
 
 export interface ServerMatchFoundMessage {

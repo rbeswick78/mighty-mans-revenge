@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   CHARACTER_IDS,
+  GAUNTLET_BOON_IDS,
   GAME_MODE_ROTATION,
   MUTATORS,
   PRACTICE_GAUNTLET,
@@ -13,6 +14,7 @@ import {
   practiceDailyGauntletOpening,
   practiceDailyGauntletRng,
   practiceGauntletMatch,
+  practiceGauntletBoonChoice,
   practiceGauntletChaosBounty,
   practiceGauntletMutatorChoice,
   practiceGauntletOpponentChoices,
@@ -45,12 +47,7 @@ describe('practice gauntlet', () => {
       CHARACTER_IDS,
     );
     expect(opening).toEqual(
-      practiceDailyGauntletOpening(
-        '2026-07-13',
-        listMapNames(),
-        GAME_MODE_ROTATION,
-        CHARACTER_IDS,
-      ),
+      practiceDailyGauntletOpening('2026-07-13', listMapNames(), GAME_MODE_ROTATION, CHARACTER_IDS),
     );
     expect(listMapNames()).toContain(opening?.mapName);
     expect(GAME_MODE_ROTATION).toContain(opening?.gameMode);
@@ -130,6 +127,34 @@ describe('practice gauntlet', () => {
     ).toHaveLength(2);
   });
 
+  it('keeps otherwise identical routes distinct when they offer different boons', () => {
+    expect(
+      practiceGauntletRoutes(
+        {
+          mapName: 'Scrapyard',
+          gameMode: GameModeType.DEATHMATCH,
+          boonId: 'scrap_plating',
+        },
+        {
+          mapName: 'Scrapyard',
+          gameMode: GameModeType.DEATHMATCH,
+          boonId: 'quick_charge',
+        },
+      ),
+    ).toHaveLength(2);
+  });
+
+  it('drafts stable, non-repeating run boons without consuming match RNG', () => {
+    const first = practiceGauntletBoonChoice([], 'stage-2-route-a');
+    expect(first).toBe(practiceGauntletBoonChoice([], 'stage-2-route-a'));
+    expect(GAUNTLET_BOON_IDS).toContain(first);
+
+    const next = practiceGauntletBoonChoice([first!], 'stage-2-route-a');
+    expect(next).not.toBe(first);
+    expect(GAUNTLET_BOON_IDS).toContain(next);
+    expect(practiceGauntletBoonChoice([...GAUNTLET_BOON_IDS], 'anything')).toBeUndefined();
+  });
+
   it('selects stable forecast events without returning blocked choices', () => {
     const pool = ['blackout', 'scrapstorm', 'vampire'] as const;
     const first = practiceGauntletMutatorChoice(pool, [], 'stage-2-route-a');
@@ -181,10 +206,7 @@ describe('practice gauntlet', () => {
         ],
         'human',
       ),
-    ).toBe(
-      PRACTICE_GAUNTLET.STYLE_POSTHUMOUS_POINTS +
-        PRACTICE_GAUNTLET.STYLE_CLUTCH_POINTS,
-    );
+    ).toBe(PRACTICE_GAUNTLET.STYLE_POSTHUMOUS_POINTS + PRACTICE_GAUNTLET.STYLE_CLUTCH_POINTS);
   });
 
   it('offers deterministic non-repeating rivals after the current matchup', () => {
@@ -227,6 +249,14 @@ describe('practice gauntlet', () => {
       runScore: 1499,
       challengeKey: '2026-07-13',
     });
+    expect(
+      practiceGauntletMatch(3, 1499, undefined, [
+        'scrap_plating',
+        'scrap_plating',
+        'quick_charge',
+        'spawn_rush',
+      ]),
+    ).toMatchObject({ boonIds: ['scrap_plating', 'quick_charge'] });
   });
 
   it('advances only on a human win, then retries after failure or a full clear', () => {

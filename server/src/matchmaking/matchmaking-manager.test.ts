@@ -1605,9 +1605,7 @@ describe('MatchmakingManager solo practice flow', () => {
         (entry) => entry.playerId === 'A' && entry.message.type === 'server:matchFound',
       );
       expect(
-        found?.message.type === 'server:matchFound'
-          ? found.message.practiceMutatorId
-          : undefined,
+        found?.message.type === 'server:matchFound' ? found.message.practiceMutatorId : undefined,
       ).toBeUndefined();
     } finally {
       delete process.env.FORCE_EVENT;
@@ -1983,7 +1981,10 @@ describe('MatchmakingManager solo practice flow', () => {
     expect(firstRoutes).toHaveLength(2);
     expect(firstRoutes.every((route) => route.forecastMutatorId !== undefined)).toBe(true);
     expect(new Set(firstRoutes.map((route) => route.forecastMutatorId)).size).toBe(2);
+    expect(firstRoutes.every((route) => route.boonId !== undefined)).toBe(true);
+    expect(new Set(firstRoutes.map((route) => route.boonId)).size).toBe(2);
     const secondForecast = firstRoutes[1].forecastMutatorId!;
+    const secondBoon = firstRoutes[1].boonId!;
     const secondBounty = practiceGauntletChaosBounty(secondForecast);
     expect(firstEnd.message.result.rivalrySet).toBeNull();
     expect(store.getLifetime('Alpha')).toBeNull();
@@ -2003,6 +2004,7 @@ describe('MatchmakingManager solo practice flow', () => {
       runScore: 1800,
       opponentCharacterId: 'frost_wizard',
       forecastMutatorId: secondForecast,
+      boonIds: [secondBoon],
     });
     expect(secondFound.message.mapName).toBe('Scrapyard');
     expect(secondFound.message.gameMode).toBe(GameModeType.GUN_GAME);
@@ -2056,7 +2058,11 @@ describe('MatchmakingManager solo practice flow', () => {
     expect(secondRoutes.every((route) => route.forecastMutatorId !== undefined)).toBe(true);
     expect(new Set(secondRoutes.map((route) => route.forecastMutatorId)).size).toBe(2);
     expect(secondRoutes.map((route) => route.forecastMutatorId)).not.toContain(secondForecast);
+    expect(secondRoutes.every((route) => route.boonId !== undefined)).toBe(true);
+    expect(new Set(secondRoutes.map((route) => route.boonId)).size).toBe(2);
+    expect(secondRoutes.map((route) => route.boonId)).not.toContain(secondBoon);
     const thirdForecast = secondRoutes[0].forecastMutatorId!;
+    const thirdBoon = secondRoutes[0].boonId!;
     const thirdBounty = practiceGauntletChaosBounty(thirdForecast);
 
     sent.length = 0;
@@ -2077,6 +2083,7 @@ describe('MatchmakingManager solo practice flow', () => {
       runScore: 3094 + secondBounty,
       opponentCharacterId: 'bubba',
       forecastMutatorId: thirdForecast,
+      boonIds: [secondBoon, thirdBoon],
     });
     expect(thirdFound.message.mapName).toBe('Collapsed Overpass');
     expect(thirdFound.message.gameMode).toBe(GameModeType.LAST_STAND);
@@ -2102,6 +2109,7 @@ describe('MatchmakingManager solo practice flow', () => {
       difficulty: 'warlord',
       opponentCharacterId: 'bubba',
       forecastMutatorId: thirdForecast,
+      boonIds: [secondBoon, thirdBoon],
       outcome: 'cleared',
       stageScore: 1600 + thirdBounty,
       runScore: 4694 + secondBounty + thirdBounty,

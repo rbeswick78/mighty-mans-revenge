@@ -5,11 +5,50 @@ import type {
   PracticeGauntletMatch,
   PracticeGauntletRoute,
 } from '@shared/types/game.js';
-import { CHARACTERS, gameModeDisplayName } from '@shared/config/game.js';
+import {
+  CHARACTERS,
+  PRACTICE_GAUNTLET,
+  gameModeDisplayName,
+  type GauntletBoonId,
+} from '@shared/config/game.js';
 import { eventDisplayName } from '@shared/utils/event-modifiers.js';
 import { practiceGauntletChaosBounty } from '@shared/utils/practice-gauntlet.js';
 
 export const GAUNTLET_BEST_CLEAR_STORAGE_KEY = 'mmr_gauntlet_best_clear';
+
+const GAUNTLET_BOON_PRESENTATION = {
+  scrap_plating: {
+    name: 'SCRAP PLATING',
+    rule: `+${PRACTICE_GAUNTLET.BOON_SCRAP_PLATING_ARMOR} ARMOR/LIFE`,
+  },
+  kill_salvage: {
+    name: 'KILL SALVAGE',
+    rule:
+      `+${PRACTICE_GAUNTLET.BOON_KILL_SALVAGE_HEALTH} HP/` +
+      `+${PRACTICE_GAUNTLET.BOON_KILL_SALVAGE_GRENADES} GRENADE`,
+  },
+  quick_charge: {
+    name: 'QUICK CHARGE',
+    rule: `${PRACTICE_GAUNTLET.BOON_QUICK_CHARGE_MULTIPLIER}X ABILITY`,
+  },
+  spawn_rush: {
+    name: 'SPAWN RUSH',
+    rule: `${PRACTICE_GAUNTLET.BOON_SPAWN_RUSH_SECONDS}S SPEED`,
+  },
+} satisfies Readonly<Record<GauntletBoonId, { name: string; rule: string }>>;
+
+export function gauntletBoonDisplayName(boonId: GauntletBoonId): string {
+  return GAUNTLET_BOON_PRESENTATION[boonId].name;
+}
+
+export function gauntletBoonRouteLabel(boonId: GauntletBoonId): string {
+  const boon = GAUNTLET_BOON_PRESENTATION[boonId];
+  return `BOON: ${boon.name} // ${boon.rule}`;
+}
+
+function gauntletBoonInventoryLabel(boonIds: readonly GauntletBoonId[]): string {
+  return `BOONS: ${boonIds.map(gauntletBoonDisplayName).join(' + ')}`;
+}
 
 function safeScore(score: number | undefined): number {
   return Number.isFinite(score) ? Math.max(0, Math.floor(score ?? 0)) : 0;
@@ -55,7 +94,8 @@ export function gauntletMatchLabel(
   if (
     !gauntlet.opponentCharacterId &&
     !gauntlet.forecastMutatorId &&
-    !gauntlet.dailyChase
+    !gauntlet.dailyChase &&
+    !gauntlet.boonIds?.length
   ) {
     return `${summary}  //  ${destination}`;
   }
@@ -69,7 +109,8 @@ export function gauntletMatchLabel(
   const chase = gauntlet.dailyChase
     ? `\n${dailyGauntletChaseLabel(gauntlet.dailyChase, gauntlet.runScore)}`
     : '';
-  return `${summary}\n${destination}${rival}${forecast}${chase}`;
+  const boons = gauntlet.boonIds?.length ? `\n${gauntletBoonInventoryLabel(gauntlet.boonIds)}` : '';
+  return `${summary}\n${destination}${rival}${forecast}${boons}${chase}`;
 }
 
 /** Compact, exhaustive copy for a server-locked Daily Run score objective. */
@@ -82,9 +123,7 @@ export function dailyGauntletChaseLabel(
     const score = safeScore(runScore);
     if (score < targetScore) return `  //  ${formatScore(targetScore - score)} TO GO`;
     if (runState === 'cleared') return '  //  TARGET BEATEN';
-    return runState === 'failed'
-      ? '  //  SCORE MET - RETRY DAILY'
-      : '  //  SCORE MET - CLEAR RUN';
+    return runState === 'failed' ? '  //  SCORE MET - RETRY DAILY' : '  //  SCORE MET - CLEAR RUN';
   };
 
   switch (target.kind) {
@@ -128,9 +167,11 @@ export function gauntletResultSummary(result: MatchResult): string | null {
   const summary =
     `${run.challengeKey ? 'DAILY RUN' : 'GAUNTLET'} ${run.stage}/${run.totalStages}  •  ` +
     `${run.difficulty.toUpperCase()}  •  ${outcome}  •  RUN ${formatScore(run.runScore)}`;
-  return run.dailyChase
-    ? `${summary}\n${dailyGauntletChaseLabel(run.dailyChase, run.runScore, run.outcome === 'advanced' ? 'active' : run.outcome)}`
-    : summary;
+  const boons = run.boonIds?.length ? `\n${gauntletBoonInventoryLabel(run.boonIds)}` : '';
+  const chase = run.dailyChase
+    ? `\n${dailyGauntletChaseLabel(run.dailyChase, run.runScore, run.outcome === 'advanced' ? 'active' : run.outcome)}`
+    : '';
+  return `${summary}${boons}${chase}`;
 }
 
 export function gauntletStageScoreSummary(result: MatchResult): string | null {
@@ -206,9 +247,10 @@ export function gauntletRouteButtonLabel(route: PracticeGauntletRoute): string {
     ? `\nCHAOS: ${eventDisplayName(route.forecastMutatorId)} ` +
       `+${formatScore(practiceGauntletChaosBounty(route.forecastMutatorId))}`
     : '';
+  const boon = route.boonId ? `\n${gauntletBoonRouteLabel(route.boonId)}` : '';
   return (
     `ROUTE ${letter} · ${gameModeDisplayName(route.gameMode)}\n` +
-    `${route.mapName.toUpperCase()}${rival}${forecast}`
+    `${route.mapName.toUpperCase()}${rival}${forecast}${boon}`
   );
 }
 

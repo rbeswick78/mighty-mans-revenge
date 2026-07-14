@@ -75,6 +75,7 @@ function makeSerialized(overrides: Partial<SerializedPlayerState> = {}): Seriali
     abilityCooldownSeconds: 0,
     frozenTimer: 0,
     secondWindTimer: 0,
+    spawnRushTimer: 0,
     ...overrides,
   };
 }
@@ -148,6 +149,14 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
 
     deliver(makeGameState([makeSerialized({ armor: 9 })], { tick: 3 }));
     expect(manager.getLocalPlayerState()?.armor).toBe(9);
+  });
+
+  it('forwards the authoritative Spawn Rush timer through reconciliation', () => {
+    deliver(makeGameState([makeSerialized({ spawnRushTimer: 4 })]));
+    expect(manager.getLocalPlayerState()?.spawnRushTimer).toBe(4);
+
+    deliver(makeGameState([makeSerialized({ spawnRushTimer: 2.5 })], { tick: 2 }));
+    expect(manager.getLocalPlayerState()?.spawnRushTimer).toBe(2.5);
   });
 
   it('resets localPlayerState on matchFound so a rematch re-seeds fresh', () => {

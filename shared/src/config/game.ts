@@ -519,6 +519,15 @@ export const DEFAULT_BOT_DIFFICULTY: BotDifficulty = 'scrapper';
 export const PRACTICE_KINDS = ['sparring', 'gauntlet', 'daily'] as const;
 export type PracticeKind = (typeof PRACTICE_KINDS)[number];
 
+/** Run-long rewards drafted alongside Gauntlet routes. */
+export const GAUNTLET_BOON_IDS = [
+  'scrap_plating',
+  'kill_salvage',
+  'quick_charge',
+  'spawn_rush',
+] as const;
+export type GauntletBoonId = (typeof GAUNTLET_BOON_IDS)[number];
+
 /** Three escalating, otherwise rules-honest solo fights. */
 export const PRACTICE_GAUNTLET = Object.freeze({
   TOTAL_STAGES: 3,
@@ -537,6 +546,16 @@ export const PRACTICE_GAUNTLET = Object.freeze({
   STYLE_MAYHEM_POINTS: 300,
   STYLE_POSTHUMOUS_POINTS: 250,
   STYLE_CLUTCH_POINTS: 150,
+  /** Scrap Plating: armor restored at the opening and every legal respawn. */
+  BOON_SCRAP_PLATING_ARMOR: 25,
+  /** Kill Salvage: immediate sustain after a living opponent kill. */
+  BOON_KILL_SALVAGE_HEALTH: 20,
+  BOON_KILL_SALVAGE_GRENADES: 1,
+  /** Quick Charge: per-player cooldown tick multiplier. */
+  BOON_QUICK_CHARGE_MULTIPLIER: 1.5,
+  /** Spawn Rush: duration of its separate prediction-safe movement timer. */
+  BOON_SPAWN_RUSH_SECONDS: 4,
+  BOON_SPAWN_RUSH_MULTIPLIER: 1.3,
 });
 
 /** Skill profiles change decision cadence, never physics or damage rules. */

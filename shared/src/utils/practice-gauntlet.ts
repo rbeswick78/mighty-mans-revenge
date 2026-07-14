@@ -1,8 +1,10 @@
 import {
   COMBAT_MEDALS,
   GAUNTLET_CHAOS_BOUNTIES,
+  GAUNTLET_BOON_IDS,
   PRACTICE_GAUNTLET,
   type CharacterId,
+  type GauntletBoonId,
   type MutatorId,
 } from '../config/game.js';
 import type {
@@ -27,6 +29,15 @@ function safeScore(score: number): number {
 function safeCount(value: number | undefined): number | null {
   if (!Number.isFinite(value)) return null;
   return Math.max(0, Math.floor(value ?? 0));
+}
+
+function safeBoonIds(values: readonly GauntletBoonId[] | undefined): GauntletBoonId[] {
+  const seen = new Set<GauntletBoonId>();
+  for (const value of values ?? []) {
+    if (!(GAUNTLET_BOON_IDS as readonly string[]).includes(value) || seen.has(value)) continue;
+    seen.add(value);
+  }
+  return [...seen].slice(0, PRACTICE_GAUNTLET.TOTAL_STAGES - 1);
 }
 
 function stableHash(seed: string): number {
@@ -152,11 +163,23 @@ export function practiceGauntletRoutes(
     alternate.mapName !== primary.mapName ||
     alternate.gameMode !== primary.gameMode ||
     alternate.opponentCharacterId !== primary.opponentCharacterId ||
-    alternate.forecastMutatorId !== primary.forecastMutatorId
+    alternate.forecastMutatorId !== primary.forecastMutatorId ||
+    alternate.boonId !== primary.boonId
   ) {
     routes.push({ id: 'route_b', ...alternate });
   }
   return routes;
+}
+
+/** Pick one stable, not-yet-owned run boon without consuming match RNG. */
+export function practiceGauntletBoonChoice(
+  blocked: readonly GauntletBoonId[],
+  seed: string,
+): GauntletBoonId | undefined {
+  const blockedSet = new Set(blocked);
+  const candidates = GAUNTLET_BOON_IDS.filter((boonId) => !blockedSet.has(boonId));
+  if (candidates.length === 0) return undefined;
+  return candidates[stableIndex(seed, candidates.length)];
 }
 
 /**
@@ -219,14 +242,17 @@ export function practiceGauntletMatch(
   stage: number,
   runScore = 0,
   challengeKey?: string,
+  boonIds: readonly GauntletBoonId[] = [],
 ): PracticeGauntletMatch {
   const normalized = safeStage(stage);
+  const safeBoons = safeBoonIds(boonIds);
   return {
     stage: normalized,
     totalStages: PRACTICE_GAUNTLET.TOTAL_STAGES,
     difficulty: PRACTICE_GAUNTLET.DIFFICULTIES[normalized - 1] ?? PRACTICE_GAUNTLET.DIFFICULTIES[0],
     runScore: safeScore(runScore),
     ...(challengeKey ? { challengeKey } : {}),
+    ...(safeBoons.length > 0 ? { boonIds: safeBoons } : {}),
   };
 }
 

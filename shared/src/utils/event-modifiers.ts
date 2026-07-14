@@ -1,5 +1,6 @@
 import {
   MUTATORS,
+  PRACTICE_GAUNTLET,
   characterSpeedMultiplier,
   type CharacterId,
   type MutatorId,
@@ -7,23 +8,25 @@ import {
 import { MovementModifiers } from './physics.js';
 
 /**
- * Fold the active mutators (plus the local player's temporary boost timer)
+ * Fold the active mutators (plus the local player's temporary boost timers)
  * into a single MovementModifiers. Pure and shared so the client
  * (prediction + reconciliation) and server (authority) derive identical
  * movement behavior from the same inputs.
  *
  * Composition rules when mutators stack (mid-match + final-minute):
- *   - speed multipliers MULTIPLY (super_speed 1.6 × second_wind 1.3),
+ *   - speed multipliers MULTIPLY (super_speed 1.6 × spawn_rush 1.3),
  *   - sprint stays disabled / stamina stays frozen if ANY active mutator
  *     says so (today only super_speed does either).
  *
  * `secondWindTimer` is the per-player boost countdown from PlayerState —
  * Second Wind sets this legacy-named timer on respawn; Blood Rush sets it
- * on a qualifying kill. Passing it in keeps this a pure function.
+ * on a qualifying kill. `spawnRushTimer` is independent so the boon works
+ * without either mutator and composes with them. Passing both keeps this pure.
  */
 export function mutatorsToMovementModifiers(
   active: readonly MutatorId[],
   secondWindTimer: number = 0,
+  spawnRushTimer: number = 0,
 ): MovementModifiers {
   let speedMultiplier = 1;
   let sprintEnabled = true;
@@ -42,6 +45,10 @@ export function mutatorsToMovementModifiers(
   }
   if (active.includes('blood_rush') && secondWindTimer > 0) {
     speedMultiplier *= MUTATORS.BLOOD_RUSH_SPEED_MULTIPLIER;
+    any = true;
+  }
+  if (spawnRushTimer > 0) {
+    speedMultiplier *= PRACTICE_GAUNTLET.BOON_SPAWN_RUSH_MULTIPLIER;
     any = true;
   }
 
@@ -66,8 +73,9 @@ export function playerMovementModifiers(
   characterId: CharacterId | null,
   active: readonly MutatorId[],
   secondWindTimer: number = 0,
+  spawnRushTimer: number = 0,
 ): MovementModifiers {
-  const base = mutatorsToMovementModifiers(active, secondWindTimer);
+  const base = mutatorsToMovementModifiers(active, secondWindTimer, spawnRushTimer);
   const charSpeed = characterSpeedMultiplier(characterId);
   if (charSpeed === 1) return base;
   return {
@@ -149,10 +157,8 @@ export function eventStartDetail(event: MutatorId): string {
 
 /** Mutator pairs whose combined rules would be redundant or contradictory. */
 export function mutatorsConflict(a: MutatorId, b: MutatorId): boolean {
-  const aOwnsLoadout =
-    a === 'grenades_only' || a === 'fists_only' || a === 'weapon_roulette';
-  const bOwnsLoadout =
-    b === 'grenades_only' || b === 'fists_only' || b === 'weapon_roulette';
+  const aOwnsLoadout = a === 'grenades_only' || a === 'fists_only' || a === 'weapon_roulette';
+  const bOwnsLoadout = b === 'grenades_only' || b === 'fists_only' || b === 'weapon_roulette';
   const lowHealthStormPair =
     (a === 'low_health' && b === 'radiation_storm') ||
     (a === 'radiation_storm' && b === 'low_health');
@@ -160,12 +166,12 @@ export function mutatorsConflict(a: MutatorId, b: MutatorId): boolean {
     (a === 'scrapstorm' && (b === 'low_health' || b === 'radiation_storm')) ||
     (b === 'scrapstorm' && (a === 'low_health' || a === 'radiation_storm'));
   const speedBoostTimerPair =
-    (a === 'second_wind' && b === 'blood_rush') ||
-    (a === 'blood_rush' && b === 'second_wind');
-  return a !== b && (
-    (aOwnsLoadout && bOwnsLoadout) ||
-    lowHealthStormPair ||
-    scrapstormPressurePair ||
-    speedBoostTimerPair
+    (a === 'second_wind' && b === 'blood_rush') || (a === 'blood_rush' && b === 'second_wind');
+  return (
+    a !== b &&
+    ((aOwnsLoadout && bOwnsLoadout) ||
+      lowHealthStormPair ||
+      scrapstormPressurePair ||
+      speedBoostTimerPair)
   );
 }

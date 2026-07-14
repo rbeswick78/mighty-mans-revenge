@@ -79,6 +79,7 @@ test.describe('Gauntlet route draft', () => {
                 gameMode: 'koth',
                 opponentCharacterId: 'bruce',
                 forecastMutatorId: 'blackout',
+                boonId: 'scrap_plating',
               },
               {
                 id: 'route_b',
@@ -86,6 +87,7 @@ test.describe('Gauntlet route draft', () => {
                 gameMode: 'gun_game',
                 opponentCharacterId: 'frost_wizard',
                 forecastMutatorId: 'weapon_roulette',
+                boonId: 'quick_charge',
               },
             ],
           },
@@ -133,13 +135,15 @@ test.describe('Gauntlet route draft', () => {
           (child) =>
             child.text?.includes('ROUTE A') &&
             child.text.includes('VS BRUCE') &&
-            child.text.includes('CHAOS: BLACKOUT +200'),
+            child.text.includes('CHAOS: BLACKOUT +200') &&
+            child.text.includes('BOON: SCRAP PLATING // +25 ARMOR/LIFE'),
         ),
         routeB: scene.alternateRouteButton.list.some(
           (child) =>
             child.text?.includes('ROUTE B') &&
             child.text.includes('VS FROST WIZARD') &&
-            child.text.includes('CHAOS: WEAPON ROULETTE +200'),
+            child.text.includes('CHAOS: WEAPON ROULETTE +200') &&
+            child.text.includes('BOON: QUICK CHARGE // 1.5X ABILITY'),
         ),
         teaser: scene.children.list.some((child) => child.text === 'CHOOSE: STAGE 2/3 - SCRAPPER'),
       };

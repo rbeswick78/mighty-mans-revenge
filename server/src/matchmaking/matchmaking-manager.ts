@@ -22,6 +22,7 @@ import {
   dailyChallengeKey,
   practiceDailyGauntletOpening,
   practiceDailyGauntletRng,
+  practiceGauntletBoonChoice,
   practiceGauntletMutatorChoice,
   practiceGauntletOpponentChoices,
   practiceGauntletRoutes,
@@ -44,6 +45,7 @@ import type {
   DraftFirstPickerReason,
   RivalrySetResult,
   BotDifficulty,
+  GauntletBoonId,
   MutatorId,
   MatchContractId,
   PracticeKind,
@@ -472,6 +474,12 @@ export class MatchmakingManager {
         if (postMatch.nextGauntlet && route.forecastMutatorId) {
           postMatch.nextGauntlet.forecastMutatorId = route.forecastMutatorId;
         }
+        if (postMatch.nextGauntlet && route.boonId) {
+          const owned = postMatch.nextGauntlet.boonIds ?? [];
+          if (!owned.includes(route.boonId)) {
+            postMatch.nextGauntlet.boonIds = [...owned, route.boonId];
+          }
+        }
       }
     }
 
@@ -801,6 +809,27 @@ export class MatchmakingManager {
     );
   }
 
+  /** Build one stable, distinct run reward for a server-authored route. */
+  private pickPracticeGauntletBoon(
+    routeId: PracticeGauntletRouteId,
+    route: Omit<PracticeGauntletRoute, 'id' | 'forecastMutatorId' | 'boonId'>,
+    nextStage: number,
+    owned: readonly GauntletBoonId[],
+    challengeKey?: string,
+  ): GauntletBoonId | undefined {
+    return practiceGauntletBoonChoice(
+      owned,
+      [
+        challengeKey ?? 'gauntlet',
+        nextStage,
+        routeId,
+        route.mapName,
+        route.gameMode,
+        route.opponentCharacterId ?? 'unknown_rival',
+      ].join('|'),
+    );
+  }
+
   private tryCreateMatch(): void {
     const pair = this.queue.tryMatch();
     if (!pair) return;
@@ -863,6 +892,12 @@ export class MatchmakingManager {
       gameMode,
       practiceMutatorPreference,
     );
+    const boonAssignments = new Map<PlayerId, readonly GauntletBoonId[]>();
+    if (gauntlet?.boonIds?.length) {
+      for (const entry of playerEntries) {
+        if (!this.botPlayerIds.has(entry.id)) boonAssignments.set(entry.id, gauntlet.boonIds);
+      }
+    }
     const match = new Match(
       matchId,
       mapData,
@@ -874,6 +909,7 @@ export class MatchmakingManager {
       dailySeed ? undefined : previousContractId,
       gauntlet?.forecastMutatorId ?? appliedPracticeMutator ?? undefined,
       dailySeed,
+      boonAssignments,
     );
     match.setRttResolver(this.getPlayerRTT);
     this.activeMatches.set(matchId, match);
@@ -1285,6 +1321,7 @@ export class MatchmakingManager {
         abilityCooldownSeconds: player.abilityCooldownSeconds,
         frozenTimer: player.frozenTimer,
         secondWindTimer: player.secondWindTimer,
+        spawnRushTimer: player.spawnRushTimer ?? 0,
       });
     }
 
@@ -1529,6 +1566,7 @@ export class MatchmakingManager {
           result.gauntlet.nextStage,
           result.gauntlet.outcome === 'advanced' ? result.gauntlet.runScore : 0,
           result.gauntlet.challengeKey,
+          result.gauntlet.outcome === 'advanced' ? gauntlet?.boonIds : [],
         )
       : null;
     if (nextGauntlet?.challengeKey && humanPlayerId) {
@@ -1581,16 +1619,39 @@ export class MatchmakingManager {
             primaryForecast ? [...priorForecasts, primaryForecast] : priorForecasts,
           )
         : undefined;
+    const ownedBoons = nextGauntlet?.boonIds ?? [];
+    const primaryBoon =
+      result.gauntlet?.outcome === 'advanced'
+        ? this.pickPracticeGauntletBoon(
+            'route_a',
+            primaryRoute,
+            result.gauntlet.nextStage,
+            ownedBoons,
+            result.gauntlet.challengeKey,
+          )
+        : undefined;
+    const alternateBoon =
+      result.gauntlet?.outcome === 'advanced'
+        ? this.pickPracticeGauntletBoon(
+            'route_b',
+            alternateRoute,
+            result.gauntlet.nextStage,
+            primaryBoon ? [...ownedBoons, primaryBoon] : ownedBoons,
+            result.gauntlet.challengeKey,
+          )
+        : undefined;
     const gauntletRoutes =
       result.gauntlet?.outcome === 'advanced'
         ? practiceGauntletRoutes(
             {
               ...primaryRoute,
               ...(primaryForecast ? { forecastMutatorId: primaryForecast } : {}),
+              ...(primaryBoon ? { boonId: primaryBoon } : {}),
             },
             {
               ...alternateRoute,
               ...(alternateForecast ? { forecastMutatorId: alternateForecast } : {}),
+              ...(alternateBoon ? { boonId: alternateBoon } : {}),
             },
           )
         : [];

@@ -91,6 +91,12 @@ export interface PlayerState {
    * prediction and server authority apply the identical multiplier.
    */
   secondWindTimer: number;
+  /**
+   * Gauntlet Spawn Rush movement timer. Optional for old snapshots/test
+   * fixtures; live server states always send a number. Kept separate from
+   * secondWindTimer so boon and mutator multipliers compose without drift.
+   */
+  spawnRushTimer?: number;
 }
 
 export interface PlayerInput {

@@ -151,9 +151,7 @@ export class ResultsScene extends Phaser.Scene {
       if (this.result.gauntlet.challengeKey) {
         const dailyUpdate = dailyGauntletProgressUpdate(
           this.result,
-          normalizeDailyGauntletProgress(
-            localStorage.getItem(DAILY_GAUNTLET_PROGRESS_STORAGE_KEY),
-          ),
+          normalizeDailyGauntletProgress(localStorage.getItem(DAILY_GAUNTLET_PROGRESS_STORAGE_KEY)),
         );
         this.dailyGauntletProgress = dailyUpdate.progress;
         this.isNewDailyBest = dailyUpdate.isNewBest;
@@ -295,13 +293,11 @@ export class ResultsScene extends Phaser.Scene {
       hasRouteDraft && routeChoices.some((route) => route.opponentCharacterId !== undefined);
     const hasChaosForecast =
       hasRouteDraft && routeChoices.some((route) => route.forecastMutatorId !== undefined);
+    const hasBoonDraft = hasRouteDraft && routeChoices.some((route) => route.boonId !== undefined);
     const btnW = hasRouteDraft ? 250 : 200;
-    const btnH = hasChaosForecast ? 64 : hasRivalPreview ? 54 : 46;
-    const adjustedBtnY = hasChaosForecast
-      ? camHeight - 99
-      : hasRivalPreview
-        ? camHeight - 94
-        : btnY;
+    const btnH = hasBoonDraft || hasChaosForecast ? 64 : hasRivalPreview ? 54 : 46;
+    const adjustedBtnY =
+      hasBoonDraft || hasChaosForecast ? camHeight - 99 : hasRivalPreview ? camHeight - 94 : btnY;
     const btnGap = 14;
     const totalButtons = hasRouteDraft ? 3 : 2;
     const firstBtnX = centerX - (btnW * totalButtons + btnGap * (totalButtons - 1)) / 2;
@@ -334,7 +330,15 @@ export class ResultsScene extends Phaser.Scene {
         : (gauntletActionLabel(this.result) ?? rematchButtonLabel(this.result)),
       {
         variant: 'primary',
-        fontSize: hasChaosForecast ? 8 : hasRivalPreview ? 8 : hasRouteDraft ? 9 : 13,
+        fontSize: hasBoonDraft
+          ? 7
+          : hasChaosForecast
+            ? 8
+            : hasRivalPreview
+              ? 8
+              : hasRouteDraft
+                ? 9
+                : 13,
         onClick: () => requestNextFight(hasRouteDraft ? routeChoices[0].id : undefined),
       },
     );
@@ -350,7 +354,7 @@ export class ResultsScene extends Phaser.Scene {
         gauntletRouteButtonLabel(routeChoices[1]),
         {
           variant: 'primary',
-          fontSize: hasChaosForecast ? 8 : hasRivalPreview ? 8 : 9,
+          fontSize: hasBoonDraft ? 7 : hasChaosForecast ? 8 : hasRivalPreview ? 8 : 9,
           onClick: () => requestNextFight(routeChoices[1].id),
         },
       );
@@ -727,16 +731,11 @@ export class ResultsScene extends Phaser.Scene {
           )
         : gauntletBestClearLabel(this.gauntletBestClear, this.isNewGauntletBest);
       const bestText = this.add
-        .text(
-          centerX,
-          CAREER_RANK_Y,
-          recordLabel,
-          {
-            fontFamily: MENU_FONTS.HEADER,
-            fontSize: isNewRecord ? '10px' : '8px',
-            color: cssHex(isNewRecord ? CAREER_RANK_UP_COLOR : CAREER_RANK_COLOR),
-          },
-        )
+        .text(centerX, CAREER_RANK_Y, recordLabel, {
+          fontFamily: MENU_FONTS.HEADER,
+          fontSize: isNewRecord ? '10px' : '8px',
+          color: cssHex(isNewRecord ? CAREER_RANK_UP_COLOR : CAREER_RANK_COLOR),
+        })
         .setOrigin(0.5)
         .setAlpha(0)
         .setScale(isNewRecord ? 1.3 : 1)

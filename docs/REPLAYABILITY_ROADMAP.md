@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–69 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, five arenas including barricade-focused Checkpoint Zero, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–70 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, five arenas including barricade-focused Checkpoint Zero, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -101,6 +101,7 @@ Each session below attacks one of these.
 | 67  | Daily Scoreboard                                | Every fair daily clear becomes a friend-group score worth chasing             | **DONE** (2026-07-13) |
 | 68  | Daily Rival Chase                               | Every attempt gets one attainable friend score to hunt                        | **DONE** (2026-07-13) |
 | 69  | Custom Chaos Sparring                           | Favorite mid-fight twists become deliberate, remixable solo practice          | **DONE** (2026-07-13) |
+| 70  | Gauntlet Boon Drafts                            | Every route choice builds a different run worth replaying                     | **DONE** (2026-07-13) |
 
 ---
 
@@ -3218,6 +3219,55 @@ attempt one attainable friend score to hunt from the first stage onward.
 
 ---
 
+## Session 70 — Gauntlet Boon Drafts
+
+**Goal:** turn Gauntlet route choices into a run build that changes how the
+next fights feel, creating more reasons to replay the same three-stage climb.
+
+**Locked design decisions**
+
+- Every advanced Gauntlet and Daily result offers two distinct server-authored
+  boons alongside the existing route, rival, forecast, and bounty. Choosing a
+  route acquires its complete offer; missing or malformed input retains Route A.
+- The selected boon carries through later stages. The run normalizes unique
+  boon IDs and caps the build at two because only two drafts exist; a loss,
+  draw, or full clear resets it. Daily offers remain deterministic.
+- `SCRAP PLATING` restores 25 armor at the opening and every legal respawn,
+  except while Low Health owns durability. `KILL SALVAGE` gives a living
+  opponent-killer 20 health and one grenade, with grenade-disabled modes still
+  suppressing grenades. `QUICK CHARGE` recharges abilities at 1.5x and
+  multiplies with Ability Overdrive. `SPAWN RUSH` grants four seconds of 1.3x
+  movement at the opening and every legal respawn.
+- Boons belong only to human Gauntlet entrants; Rusty never receives them.
+  Scores, contracts, base stats, bot tuning, Practice persistence isolation,
+  Spar, and PvP stay unchanged.
+- Spawn Rush uses its own optional snapshot timer through authority, client
+  prediction, and reconciliation. It composes with shared movement mutators
+  without hijacking Second Wind/Blood Rush state. One in the Chamber remains
+  lethal through Scrap Plating by applying current health plus armor damage.
+- Optional route and match metadata preserves old payloads. The client renders
+  compact boon rules on both route buttons plus the active build in pre-fight
+  briefings and results; it never derives or authors gameplay policy.
+
+**Acceptance criteria**
+
+- [x] Shared tests prove deterministic distinct offers, unique maximum-two
+      normalization, route identity, and Spawn Rush/mutator composition.
+- [x] Matchmaking tests prove authoritative route selection, carryover through
+      all three stages, human-only assignments, invalid-route fallback, Daily
+      determinism, and reset after failure or clear.
+- [x] Match/mode tests prove every boon, legal respawns, mode exclusions,
+      combined cooldown and movement multipliers, Rusty isolation, and One in
+      the Chamber lethality through armor.
+- [x] Client network and presentation tests prove timer reconciliation, compact
+      route rules, active-build copy, and old-payload compatibility.
+- [x] Playwright clicks Route B and verifies both complete offers in Chromium,
+      Firefox, and 844×390 mobile landscape.
+- [x] Typecheck, lint, all 1,175 unit tests across 79 files, production build,
+      and the 16-pass/11-intentional-skip Playwright matrix pass.
+
+---
+
 ## Session 69 — Custom Chaos Sparring
 
 **Goal:** let players deliberately remix an ordinary Rusty Spar around a
@@ -3269,6 +3319,43 @@ favorite mid-match event while the final-minute surprise stays fresh.
 ---
 
 ## Session Log
+
+### Session 70 — 2026-07-13 — Gauntlet Boon Drafts
+
+**Shipped:** every Route A/B choice after a Gauntlet or Daily stage now includes
+a distinct boon that joins the run build. Scrap Plating adds armor each life,
+Kill Salvage sustains aggressive streaks, Quick Charge accelerates signature
+powers, and Spawn Rush creates fast openings. The first choice carries into
+stage two, the second creates a two-boon finale, and failed or completed runs
+start fresh. Route labels explain the exact rule before selection, while
+Character Select and Results keep the active build visible.
+
+The server authors, validates, and assigns every offer. Daily routes stay
+deterministic, invalid input falls back to the complete Route A offer, and only
+human entrants receive benefits. Spawn Rush has a dedicated snapshot timer in
+shared movement physics so prediction stays aligned and stacked chaos remains
+safe. Existing mode authority still wins: Low Health suppresses armor,
+grenade-disabled modes suppress salvage grenades, and One in the Chamber stays
+lethal through armor. Spar, PvP, score, contracts, persistence, base balance,
+and Rusty's tuning are unchanged.
+
+**Verification:** 1,175 tests pass across 79 files, including deterministic
+offers, three-stage carryover/reset, all four effects, mode exclusions,
+bot isolation, network reconciliation, and UI copy. TypeScript, ESLint, all
+package builds, and the production Vite bundle are clean; Vite retains its
+existing chunk-size advisory. The full Playwright matrix passes 16 tests with
+11 intentional project-scoped skips, including complete route offers and a
+Route B pointer lock in Chromium, Firefox, and mobile landscape. An additional
+844×390 live-canvas walkthrough confirmed the responsive frame remains clear.
+
+**Tuning watch:** the four boons are intentionally legible and individually
+modest. Watch whether Scrap Plating dominates every route despite its Low
+Health and One in the Chamber safeguards, and whether combined Quick Charge +
+Ability Overdrive creates exciting bursts without making a particular finale
+feel automatic. Adjust boon constants only after real repeated runs.
+
+**Deployment:** not run; production deployment still requires explicit user
+authorization.
 
 ### Session 69 — 2026-07-13 — Custom Chaos Sparring
 

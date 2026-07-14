@@ -6,7 +6,7 @@ import {
   eventStartDetail,
   mutatorsConflict,
 } from './event-modifiers.js';
-import { CHARACTERS, MUTATORS, type MutatorId } from '../config/game.js';
+import { CHARACTERS, MUTATORS, PRACTICE_GAUNTLET, type MutatorId } from '../config/game.js';
 
 describe('mutatorsToMovementModifiers', () => {
   it('returns the super-speed modifier set for super_speed', () => {
@@ -56,6 +56,18 @@ describe('mutatorsToMovementModifiers', () => {
 
   it('second_wind timer alone does nothing without the mutator active', () => {
     expect(mutatorsToMovementModifiers([], 3)).toEqual({});
+  });
+
+  it('Spawn Rush has its own timer and composes with active mutator speed', () => {
+    expect(mutatorsToMovementModifiers([], 0, 3)).toEqual({
+      speedMultiplier: PRACTICE_GAUNTLET.BOON_SPAWN_RUSH_MULTIPLIER,
+      sprintEnabled: true,
+      staminaFrozen: false,
+    });
+    expect(mutatorsToMovementModifiers(['blood_rush'], 2, 3).speedMultiplier).toBeCloseTo(
+      MUTATORS.BLOOD_RUSH_SPEED_MULTIPLIER * PRACTICE_GAUNTLET.BOON_SPAWN_RUSH_MULTIPLIER,
+      10,
+    );
   });
 
   it('blood_rush boosts speed only while its kill timer is running', () => {

@@ -2,7 +2,13 @@ import { PlayerId, MatchId, Tick, Vec2 } from './common.js';
 import { PlayerState, PlayerStats } from './player.js';
 import { AxeState, GrenadeState, BulletTrail, PunchEvent } from './projectile.js';
 import { PickupState } from './pickup.js';
-import type { AwardId, BotDifficulty, CharacterId, MutatorId } from '../config/game.js';
+import type {
+  AwardId,
+  BotDifficulty,
+  CharacterId,
+  GauntletBoonId,
+  MutatorId,
+} from '../config/game.js';
 
 export enum MatchPhase {
   WAITING = 'waiting',
@@ -293,6 +299,8 @@ export interface PracticeGauntletMatch {
   challengeKey?: string;
   /** Server-authored board objective locked for this Daily Run attempt. */
   dailyChase?: DailyGauntletChaseTarget;
+  /** Server-owned run build earned from prior route drafts. */
+  boonIds?: GauntletBoonId[];
 }
 
 export type PracticeGauntletRouteId = 'route_a' | 'route_b';
@@ -306,6 +314,8 @@ export interface PracticeGauntletRoute {
   opponentCharacterId?: CharacterId;
   /** The compatible mid-match chaos event promised by this branch. */
   forecastMutatorId?: MutatorId;
+  /** Run-long reward acquired when this branch is locked. */
+  boonId?: GauntletBoonId;
 }
 
 export interface PracticeGauntletResult extends PracticeGauntletMatch {

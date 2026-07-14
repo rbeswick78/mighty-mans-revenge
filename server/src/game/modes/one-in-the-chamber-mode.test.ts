@@ -63,7 +63,10 @@ function makeMapData(): MapData {
           : TileType.FLOOR,
       ),
     ),
-    spawnPoints: [{ x: 1, y: 1 }, { x: 4, y: 4 }],
+    spawnPoints: [
+      { x: 1, y: 1 },
+      { x: 4, y: 4 },
+    ],
     pickupSpawns: [],
   };
 }
@@ -188,11 +191,13 @@ describe('OneInTheChamberMode', () => {
     const attacker = makePlayer('p1');
     const victim = makePlayer('p2');
     victim.health = 87;
+    victim.armor = 25;
     const ctx = makeContext([attacker, victim]);
-    expect(mode.damageForWeaponHit(ctx, attacker, victim, 'pistol', 10)).toBe(87);
-    expect(mode.damageForWeaponHit(ctx, attacker, victim, 'punch', 35)).toBe(87);
+    expect(mode.damageForWeaponHit(ctx, attacker, victim, 'pistol', 10)).toBe(112);
+    expect(mode.damageForWeaponHit(ctx, attacker, victim, 'punch', 35)).toBe(112);
     expect(mode.damageForWeaponHit(ctx, attacker, victim, 'rifle', 10)).toBe(10);
     victim.health = 12;
+    victim.armor = 0;
     expect(mode.damageForWeaponHit(ctx, attacker, victim, 'punch', 35)).toBe(12);
   });
 

@@ -86,10 +86,13 @@ regulation second left adds pace points up to the stage cap; completing all
 three stages can set the device's `BEST CLEAR` and give the next run a target
 to beat. After the first two wins, both next-fight routes preview a different
 Rusty fighter; the chosen matchup is locked for that stage, and no opponent
-repeats during the run. Each route also forecasts its compatible mid-match
-chaos event. The selected event is locked into the fight, and forecasts do not
-repeat during the same run. Forecasts also advertise a 100, 200, or 300 point
-danger bounty; win that stage to bank it into the run and `BEST CLEAR` chase.
+repeats during the run. Each route also offers a different run-long boon:
+armor on every life, kill salvage, faster ability recharge, or an opening
+speed burst. The chosen build carries into later stages and can hold two boons
+by the finale. Routes also forecast a compatible mid-match chaos event. The
+selected event is locked into the fight, and forecasts do not repeat during
+the same run. Forecasts advertise a 100, 200, or 300 point danger bounty; win
+that stage to bank it into the run and `BEST CLEAR` chase.
 Combat highlights matter too: First Blood, rapid multikills, Clutch finishes,
 and From the Grave kills add a capped style bonus when the stage is won. Their
 live callouts show the points at stake, while the results screen banks them.

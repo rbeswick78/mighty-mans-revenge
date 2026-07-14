@@ -7,6 +7,8 @@ import {
   PLAYER,
   WEAPONS,
   GRENADE,
+  GAUNTLET_BOON_IDS,
+  PRACTICE_GAUNTLET,
   SERVER,
   MUTATORS,
   COMBAT_MEDALS,
@@ -45,6 +47,7 @@ import type {
   PunchEvent,
   AxeState,
   GrenadeState,
+  GauntletBoonId,
   MutatorId,
   CharacterId,
   WeaponId,
@@ -290,6 +293,8 @@ export class Match implements MatchContext {
   private readonly stableSeed: string;
   /** Daily Run targets use semantic player-entry order instead of random UUID order. */
   private readonly usesChallengeSeed: boolean;
+  /** Run-long, per-player Gauntlet benefits. Bots are deliberately absent. */
+  private readonly gauntletBoonsByPlayer = new Map<PlayerId, ReadonlySet<GauntletBoonId>>();
 
   constructor(
     matchId: string,
@@ -302,6 +307,7 @@ export class Match implements MatchContext {
     previousContractId?: MatchContractId,
     plannedMidMatchMutator?: MutatorId,
     stableSeed?: string,
+    gauntletBoonAssignments: ReadonlyMap<PlayerId, readonly GauntletBoonId[]> = new Map(),
   ) {
     this.matchId = matchId;
     this.rng = rng;
@@ -310,6 +316,17 @@ export class Match implements MatchContext {
     this.timeLimitSeconds = resolveTimeLimitSeconds();
     this.stableSeed = stableSeed ?? matchId;
     this.usesChallengeSeed = stableSeed !== undefined;
+    for (const [playerId, boonIds] of gauntletBoonAssignments) {
+      const valid = new Set(
+        boonIds.filter((boonId) => (GAUNTLET_BOON_IDS as readonly string[]).includes(boonId)),
+      );
+      if (valid.size > 0) {
+        this.gauntletBoonsByPlayer.set(
+          playerId,
+          new Set([...valid].slice(0, PRACTICE_GAUNTLET.TOTAL_STAGES - 1)),
+        );
+      }
+    }
     this.stats = new StatsTracker();
     this.pickupManager = new PickupManager();
     this.mapManager = new MapManager();
@@ -478,6 +495,7 @@ export class Match implements MatchContext {
       // can have touched maxHealth yet.
       player.maxHealth = characterMaxHealth(player.characterId);
       player.health = player.maxHealth;
+      this.applyGauntletSpawnBoons(player);
     }
 
     this.startCountdown();
@@ -603,6 +621,27 @@ export class Match implements MatchContext {
     // keeps rapid chains readable and prevents an unbounded speed bank.
     if (isOpponentKill && !isPosthumous && this.mutatorActive('blood_rush') && killerAtKill) {
       killerAtKill.secondWindTimer = MUTATORS.BLOOD_RUSH_DURATION_SECONDS;
+    }
+
+    // Kill Salvage rewards a living, direct follow-through. Posthumous
+    // explosives cannot refill a corpse, and mode-owned grenade bans stay
+    // authoritative even when the run build includes the boon.
+    if (
+      isOpponentKill &&
+      !isPosthumous &&
+      killerAtKill &&
+      this.hasGauntletBoon(killerId, 'kill_salvage')
+    ) {
+      killerAtKill.health = Math.min(
+        killerAtKill.maxHealth,
+        killerAtKill.health + PRACTICE_GAUNTLET.BOON_KILL_SALVAGE_HEALTH,
+      );
+      if (!(this.gameMode.areGrenadesDisabled?.(this, killerAtKill) ?? false)) {
+        killerAtKill.grenades = Math.min(
+          GRENADE.MAX_COUNT,
+          killerAtKill.grenades + PRACTICE_GAUNTLET.BOON_KILL_SALVAGE_GRENADES,
+        );
+      }
     }
 
     // Sudden death: the first kill decides the match. checkMatchEnd ends
@@ -1091,6 +1130,7 @@ export class Match implements MatchContext {
         player.characterId,
         this._activeMutators,
         player.secondWindTimer,
+        player.spawnRushTimer ?? 0,
       );
       const grenadesOnly = this.mutatorActive('grenades_only');
       const infiniteAmmo = this.mutatorActive('infinite_ammo');
@@ -1366,6 +1406,9 @@ export class Match implements MatchContext {
       // which predicts each input with the timer from the last snapshot.
       if (player.secondWindTimer > 0) {
         player.secondWindTimer = Math.max(0, player.secondWindTimer - dt);
+      }
+      if ((player.spawnRushTimer ?? 0) > 0) {
+        player.spawnRushTimer = Math.max(0, (player.spawnRushTimer ?? 0) - dt);
       }
     }
 
@@ -2063,6 +2106,25 @@ export class Match implements MatchContext {
     player.secondWindTimer = this.mutatorActive('second_wind')
       ? MUTATORS.SECOND_WIND_DURATION_SECONDS
       : 0;
+    player.spawnRushTimer = 0;
+    this.applyGauntletSpawnBoons(player);
+  }
+
+  private hasGauntletBoon(playerId: PlayerId, boonId: GauntletBoonId): boolean {
+    return this.gauntletBoonsByPlayer.get(playerId)?.has(boonId) ?? false;
+  }
+
+  /** Restore life-scoped boon benefits without weakening active mode/mutator rules. */
+  private applyGauntletSpawnBoons(player: PlayerState): void {
+    if (this.hasGauntletBoon(player.id, 'scrap_plating') && !this.mutatorActive('low_health')) {
+      player.armor = Math.max(player.armor, PRACTICE_GAUNTLET.BOON_SCRAP_PLATING_ARMOR);
+    }
+    if (this.hasGauntletBoon(player.id, 'spawn_rush')) {
+      player.spawnRushTimer = Math.max(
+        player.spawnRushTimer ?? 0,
+        PRACTICE_GAUNTLET.BOON_SPAWN_RUSH_SECONDS,
+      );
+    }
   }
 
   private createPlayerState(
@@ -2103,6 +2165,7 @@ export class Match implements MatchContext {
       abilityLockedAim: 0,
       frozenTimer: 0,
       secondWindTimer: 0,
+      spawnRushTimer: 0,
     };
   }
 
@@ -2687,11 +2750,9 @@ export class Match implements MatchContext {
 
   /** Decrement active and cooldown timers for every player. */
   private tickAbilities(dt: number): void {
-    const cooldownDt =
-      dt *
-      (this.mutatorActive('ability_overdrive')
-        ? MUTATORS.ABILITY_OVERDRIVE_RECHARGE_MULTIPLIER
-        : 1);
+    const globalRechargeMultiplier = this.mutatorActive('ability_overdrive')
+      ? MUTATORS.ABILITY_OVERDRIVE_RECHARGE_MULTIPLIER
+      : 1;
     for (const player of this.players.values()) {
       if (player.abilityActiveSeconds > 0) {
         player.abilityActiveSeconds = Math.max(0, player.abilityActiveSeconds - dt);
@@ -2702,7 +2763,13 @@ export class Match implements MatchContext {
         }
       }
       if (player.abilityCooldownSeconds > 0) {
-        player.abilityCooldownSeconds = Math.max(0, player.abilityCooldownSeconds - cooldownDt);
+        const boonMultiplier = this.hasGauntletBoon(player.id, 'quick_charge')
+          ? PRACTICE_GAUNTLET.BOON_QUICK_CHARGE_MULTIPLIER
+          : 1;
+        player.abilityCooldownSeconds = Math.max(
+          0,
+          player.abilityCooldownSeconds - dt * globalRechargeMultiplier * boonMultiplier,
+        );
       }
       // Decrement Frost Wizard freeze on every player — anyone can be
       // frozen, not just wizards.

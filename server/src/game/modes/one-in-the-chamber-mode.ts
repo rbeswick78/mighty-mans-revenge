@@ -109,9 +109,9 @@ export class OneInTheChamberMode implements GameMode {
     baseDamage: number,
   ): number {
     if (weaponId !== 'pistol' && weaponId !== 'punch') return baseDamage;
-    // Exact remaining health keeps damage stats/contracts honest: a fighter
-    // softened by a barrel should not award artificial overkill damage.
-    return victim.health;
+    // Exact remaining durability keeps damage stats/contracts honest while
+    // preserving the mode's one-hit promise if a future rule grants armor.
+    return victim.health + victim.armor;
   }
 
   isMatchOver(match: MatchContext): boolean {
