@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–71 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a six-build discovery codex, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, five arenas including barricade-focused Checkpoint Zero, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–72 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, five arenas including barricade-focused Checkpoint Zero, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -103,6 +103,7 @@ Each session below attacks one of these.
 | 69  | Custom Chaos Sparring                           | Favorite mid-fight twists become deliberate, remixable solo practice          | **DONE** (2026-07-13) |
 | 70  | Gauntlet Boon Drafts                            | Every route choice builds a different run worth replaying                     | **DONE** (2026-07-13) |
 | 71  | Gauntlet Build Codex                            | Every two-boon clear can discover one more named build                        | **DONE** (2026-07-13) |
+| 72  | Gauntlet Build Mastery                          | Every discovered build gains its own score chase and trophy                   | **DONE** (2026-07-13) |
 
 ---
 
@@ -3220,6 +3221,47 @@ attempt one attainable friend score to hunt from the first stage onward.
 
 ---
 
+## Session 72 — Gauntlet Build Mastery
+
+**Goal:** turn the Build Codex from a progress counter into a readable trophy
+board with a fresh score chase for every discovered Gauntlet build.
+
+**Locked design decisions**
+
+- The lobby opens a six-card Codex board. Every card exposes its two-boon recipe
+  so players can plan the unlock, while a locked card hides its build name and
+  flavor. Discovered cards reveal both plus that build's best clear score.
+- Each canonical build owns an independent personal best. Only the authoritative
+  `result.runScore` from a fully cleared Gauntlet or Daily finale can set or
+  improve it; failed and merely advanced runs do nothing. The board also sums
+  all recorded build bests into a combined trophy score.
+- The existing `mmr_gauntlet_build_codex` key migrates the discovered-only
+  Session 71 shape in place. Loading allowlists build IDs, removes duplicates,
+  ignores malformed scores, and retains scores only for discovered builds.
+- A compact lobby `VIEW` button preserves the panel layout while using a larger
+  invisible vertical hit target. The board supports pointer/touch and gamepad,
+  with pointer, Escape/Backspace, and gamepad return paths.
+- Results distinguishes first discovery from a repeat `NEW BUILD BEST`. Mastery
+  remains device-local motivation only, with no gameplay, server persistence,
+  lifetime-stat, Daily-ranking, PvP, Spar, bot-tuning, or balance consequence.
+
+**Acceptance criteria**
+
+- [x] Pure client tests cover old-shape migration, malformed and unknown data,
+      independent build records, clear-only improvements, combined best, card
+      states, and discovery/new-best result labels.
+- [x] Playwright proves a first clear and repeat personal best persist exactly in
+      Chromium, Firefox, and 844×390 mobile landscape.
+- [x] Playwright opens the Codex through its real pointer/touch target, verifies
+      discovered and locked cards plus combined score, and returns to the lobby
+      in all three projects.
+- [x] Live visual QA verifies the desktop lobby entry and trophy-board hierarchy;
+      the review increased locked-card contrast against the brick backdrop.
+- [x] Typecheck, lint, all 1,181 unit tests across 80 files, production build,
+      and the 22-pass/11-intentional-skip Playwright matrix pass.
+
+---
+
 ## Session 71 — Gauntlet Build Codex
 
 **Goal:** turn the six possible two-boon finales into a collection chase that
@@ -3227,11 +3269,13 @@ rewards experimenting with every Gauntlet route combination.
 
 **Locked design decisions**
 
-- The six canonical, order-independent builds are `IRON SCAVENGER` (Scrap
-  Plating + Kill Salvage), `ARC PLATING` (Scrap Plating + Quick Charge), `RAM
-RAID` (Scrap Plating + Spawn Rush), `COMBAT ENGINE` (Kill Salvage + Quick
-  Charge), `BLOODHOUND` (Kill Salvage + Spawn Rush), and `REDLINE` (Quick
-  Charge + Spawn Rush).
+- The six canonical, order-independent builds are:
+  - `IRON SCAVENGER`: Scrap Plating and Kill Salvage.
+  - `ARC PLATING`: Scrap Plating and Quick Charge.
+  - `RAM RAID`: Scrap Plating and Spawn Rush.
+  - `COMBAT ENGINE`: Kill Salvage and Quick Charge.
+  - `BLOODHOUND`: Kill Salvage and Spawn Rush.
+  - `REDLINE`: Quick Charge and Spawn Rush.
 - A build is discovered only after clearing stage three with both boons. Stage
   advancement, losses, and draws never unlock it. Ordinary Gauntlet and Daily
   Run clears both count because they share the same authored boon system.
@@ -3362,6 +3406,40 @@ favorite mid-match event while the final-minute surprise stays fresh.
 ---
 
 ## Session Log
+
+### Session 72 — 2026-07-13 — Gauntlet Build Mastery
+
+**Shipped:** the lobby's Build Codex is now an interactive six-card trophy
+board. Every recipe is visible as an invitation to experiment, while locked
+names stay secret and discovered builds reveal their identity, flavor, and best
+clear. Each build has its own score chase, the header totals those records, and
+Results celebrates both first discoveries and repeat personal bests. The board
+opens and returns by pointer, touch, keyboard, or gamepad without rearranging the
+established lobby panel.
+
+The Session 71 storage shape migrates in place to a normalized `bestScores` map.
+Only full clears can improve it; unknown IDs, malformed values, duplicate
+discoveries, and scores for locked builds are discarded. The feature remains
+entirely device-local and has no effect on combat, scoring rules, server state,
+Daily ranking, lifetime records, bots, PvP, Spar, or balance.
+
+**Verification:** 1,181 tests pass across 80 files, including storage migration,
+sanitization, six-card presentation, independent bests, combined best, and both
+Results celebrations. TypeScript, ESLint, all package builds, and the production
+Vite bundle are clean; Vite retains its existing chunk-size advisory. The full
+Playwright matrix passes 22 tests with 11 intentional project-scoped skips.
+Targeted flows prove discovery and repeat-best persistence plus real lobby open,
+card inspection, and return paths in Chromium, Firefox, and 844×390 mobile
+landscape. Desktop visual QA confirmed the layout and prompted a locked-card
+contrast increase against the brick backdrop.
+
+**Tuning watch:** per-build records should create reasons to revisit familiar
+routes after discovery. Watch whether players recognize that recipes remain
+visible on locked cards, whether combined best feels motivating, and whether
+the compact lobby entry is sufficiently noticeable before adding more ceremony.
+
+**Deployment:** not run; production deployment still requires explicit user
+authorization.
 
 ### Session 71 — 2026-07-13 — Gauntlet Build Codex
 

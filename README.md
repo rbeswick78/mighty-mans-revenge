@@ -90,8 +90,10 @@ repeats during the run. Each route also offers a different run-long boon:
 armor on every life, kill salvage, faster ability recharge, or an opening
 speed burst. The chosen build carries into later stages and can hold two boons
 by the finale. Every complete two-boon loadout has a named build, and clearing
-the finale discovers it in the device-local six-build `BUILD CODEX`. Results
-celebrate new discoveries while the lobby keeps the collection chase visible.
+the finale discovers it in the device-local six-build `BUILD CODEX`. Open the
+Codex from the lobby to inspect every recipe, reveal discovered identities, and
+chase a personal best with each build. Results celebrate both new discoveries
+and improved build records while the trophy board totals your best clears.
 Routes also forecast a compatible mid-match chaos event. The
 selected event is locked into the fight, and forecasts do not repeat during
 the same run. Forecasts advertise a 100, 200, or 300 point danger bounty; win

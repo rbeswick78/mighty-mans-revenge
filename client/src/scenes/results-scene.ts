@@ -106,9 +106,10 @@ export class ResultsScene extends Phaser.Scene {
     streak: 0,
   };
   private isNewDailyBest = false;
-  private gauntletBuildCodex: GauntletBuildCodex = { discovered: [] };
+  private gauntletBuildCodex: GauntletBuildCodex = { discovered: [], bestScores: {} };
   private gauntletBuild: GauntletBuildDefinition | null = null;
   private isNewGauntletBuild = false;
+  private isNewGauntletBuildBest = false;
 
   // Event handler references for cleanup
   private onRematchStatus: ((opponentWantsRematch: boolean) => void) | null = null;
@@ -141,9 +142,10 @@ export class ResultsScene extends Phaser.Scene {
       streak: 0,
     };
     this.isNewDailyBest = false;
-    this.gauntletBuildCodex = { discovered: [] };
+    this.gauntletBuildCodex = { discovered: [], bestScores: {} };
     this.gauntletBuild = null;
     this.isNewGauntletBuild = false;
+    this.isNewGauntletBuildBest = false;
   }
 
   create(): void {
@@ -169,7 +171,8 @@ export class ResultsScene extends Phaser.Scene {
       this.gauntletBuildCodex = buildUpdate.codex;
       this.gauntletBuild = buildUpdate.build;
       this.isNewGauntletBuild = buildUpdate.isNewDiscovery;
-      if (buildUpdate.isNewDiscovery) {
+      this.isNewGauntletBuildBest = buildUpdate.isNewBest;
+      if (buildUpdate.isNewDiscovery || buildUpdate.isNewBest) {
         localStorage.setItem(GAUNTLET_BUILD_CODEX_STORAGE_KEY, JSON.stringify(buildUpdate.codex));
       }
 
@@ -747,7 +750,8 @@ export class ResultsScene extends Phaser.Scene {
 
       const isDaily = this.result.gauntlet.challengeKey !== undefined;
       const isNewScoreRecord = isDaily ? this.isNewDailyBest : this.isNewGauntletBest;
-      const isNewRecord = isNewScoreRecord || this.isNewGauntletBuild;
+      const isNewRecord =
+        isNewScoreRecord || this.isNewGauntletBuild || this.isNewGauntletBuildBest;
       const scoreRecordLabel = isDaily
         ? dailyGauntletStandingLabel(
             this.dailyGauntletProgress,
@@ -758,11 +762,10 @@ export class ResultsScene extends Phaser.Scene {
         : gauntletBestClearLabel(this.gauntletBestClear, this.isNewGauntletBest);
       const recordLabel =
         `${scoreRecordLabel}\n` +
-        gauntletBuildCodexLabel(
-          this.gauntletBuildCodex,
-          this.gauntletBuild,
-          this.isNewGauntletBuild,
-        );
+        gauntletBuildCodexLabel(this.gauntletBuildCodex, this.gauntletBuild, {
+          isNewDiscovery: this.isNewGauntletBuild,
+          isNewBest: this.isNewGauntletBuildBest,
+        });
       const bestText = this.add
         .text(centerX, CAREER_RANK_Y, recordLabel, {
           fontFamily: MENU_FONTS.HEADER,

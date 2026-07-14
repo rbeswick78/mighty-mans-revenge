@@ -13,6 +13,8 @@ export interface PixelButtonOpts {
   fontSize?: number;
   onClick?: () => void;
   disabled?: boolean;
+  /** Expand the pointer target vertically without changing visible chrome. */
+  hitPaddingY?: number;
   /** Defaults to 'menuSelect'. Pass null to skip the click SFX. */
   sound?: 'menuSelect' | null;
 }
@@ -56,8 +58,7 @@ export class PixelButton extends Phaser.GameObjects.Container {
     this.sound = opts?.sound === undefined ? 'menuSelect' : opts.sound;
 
     const variant = opts?.variant ?? 'primary';
-    this.baseColor =
-      variant === 'primary' ? Wasteland.LOADING_BAR_FILL : Wasteland.WALL_FILL;
+    this.baseColor = variant === 'primary' ? Wasteland.LOADING_BAR_FILL : Wasteland.WALL_FILL;
     this.hoverColor = lighten(this.baseColor, HOVER_LIGHTEN);
 
     this.chromeOpts = {
@@ -79,8 +80,9 @@ export class PixelButton extends Phaser.GameObjects.Container {
     // Nudge label up by 1px — Press Start 2P's optical center sits low.
     this.label.setY(height / 2 - 1);
 
+    const hitPaddingY = Math.max(0, opts?.hitPaddingY ?? 0);
     this.zone = scene.add
-      .zone(width / 2, height / 2, width, height)
+      .zone(width / 2, height / 2, width, height + hitPaddingY * 2)
       .setInteractive({ useHandCursor: true });
 
     this.add([this.gfx, this.label, this.zone]);
@@ -171,10 +173,7 @@ export class PixelButton extends Phaser.GameObjects.Container {
 
   private redraw(): void {
     this.gfx.clear();
-    const fill =
-      this.btnState === 'hover' || this.focused
-        ? this.hoverColor
-        : this.baseColor;
+    const fill = this.btnState === 'hover' || this.focused ? this.hoverColor : this.baseColor;
     drawBeveledChrome(
       this.gfx,
       0,

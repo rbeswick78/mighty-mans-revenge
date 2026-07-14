@@ -6,6 +6,7 @@ import { DraftScene } from './scenes/draft-scene.js';
 import { CharacterSelectScene } from './scenes/character-select-scene.js';
 import { GameScene } from './scenes/game-scene.js';
 import { ResultsScene } from './scenes/results-scene.js';
+import { GauntletCodexScene } from './scenes/gauntlet-codex-scene.js';
 import { TilePickerScene } from './scenes/tile-picker-scene.js';
 import { CANVAS_HEIGHT, CANVAS_WIDTH } from './ui/layout.js';
 
@@ -38,7 +39,16 @@ const config: Phaser.Types.Core.GameConfig = {
     createContainer: true,
   },
   backgroundColor: cssHex(Wasteland.CANVAS_BG),
-  scene: [BootScene, LobbyScene, DraftScene, CharacterSelectScene, GameScene, ResultsScene, TilePickerScene],
+  scene: [
+    BootScene,
+    LobbyScene,
+    DraftScene,
+    CharacterSelectScene,
+    GameScene,
+    ResultsScene,
+    GauntletCodexScene,
+    TilePickerScene,
+  ],
 };
 
 const game = new Phaser.Game(config);

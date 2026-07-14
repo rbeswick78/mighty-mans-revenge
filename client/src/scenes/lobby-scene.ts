@@ -110,6 +110,7 @@ export class LobbyScene extends Phaser.Scene {
   private practiceRivalButton!: PixelButton;
   private practiceModeButton!: PixelButton;
   private practiceMutatorButton!: PixelButton;
+  private buildCodexButton!: PixelButton;
   private mightyManSprite!: Phaser.GameObjects.Sprite;
   private nickname: string;
   private practiceDifficulty: BotDifficulty;
@@ -429,22 +430,23 @@ export class LobbyScene extends Phaser.Scene {
     panel.add(dailyBestText);
     this.nameEntryUi.push(dailyBestText);
 
-    const buildCodexText = this.add
-      .text(
-        panel.centerX,
-        310,
-        gauntletBuildCodexLabel(
-          normalizeGauntletBuildCodex(localStorage.getItem(GAUNTLET_BUILD_CODEX_STORAGE_KEY)),
-        ),
-        {
-          fontFamily: MENU_FONTS.HEADER,
-          fontSize: '7px',
-          color: cssHex(Wasteland.HEALTH_GOOD),
-        },
-      )
-      .setOrigin(0.5);
-    panel.add(buildCodexText);
-    this.nameEntryUi.push(buildCodexText);
+    this.buildCodexButton = new PixelButton(
+      this,
+      panel.centerX - qmW / 2,
+      302,
+      qmW,
+      16,
+      `${gauntletBuildCodexLabel(
+        normalizeGauntletBuildCodex(localStorage.getItem(GAUNTLET_BUILD_CODEX_STORAGE_KEY)),
+      )}  //  VIEW`,
+      {
+        variant: 'secondary',
+        fontSize: 6,
+        hitPaddingY: 14,
+        onClick: () => this.openBuildCodex(),
+      },
+    );
+    panel.add(this.buildCodexButton);
 
     // ────────────────────────────────────────────────────────────────────
     // Searching state — sits in the same panel real estate, hidden by
@@ -648,6 +650,7 @@ export class LobbyScene extends Phaser.Scene {
       this.practiceRivalButton,
       this.practiceModeButton,
       this.practiceMutatorButton,
+      this.buildCodexButton,
     ];
   }
 
@@ -667,6 +670,7 @@ export class LobbyScene extends Phaser.Scene {
    */
   private setNameEntryVisible(visible: boolean): void {
     for (const obj of this.nameEntryUi) obj.setVisible(visible);
+    this.buildCodexButton.setVisible(visible);
     this.nicknameDom?.setVisible(visible);
   }
 
@@ -937,6 +941,13 @@ export class LobbyScene extends Phaser.Scene {
       kind === 'sparring' ? (this.practiceRival ?? undefined) : undefined,
       kind === 'sparring' ? (this.practiceMutator ?? undefined) : undefined,
     );
+  }
+
+  private openBuildCodex(): void {
+    if (this.isSearching) return;
+    this.nicknameInput?.blur();
+    this.cleanupEvents();
+    this.scene.start('GauntletCodexScene');
   }
 
   private cyclePracticeDifficulty(): void {

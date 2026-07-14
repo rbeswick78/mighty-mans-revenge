@@ -286,7 +286,9 @@ test.describe('Gauntlet route draft', () => {
             active: scene?.sys?.settings.active ?? false,
             summary: texts?.some((text) => text.includes('BUILD: REDLINE')) ?? false,
             discovery:
-              texts?.some((text) => text.includes('NEW BUILD: REDLINE  //  CODEX 1/6')) ?? false,
+              texts?.some((text) =>
+                text.includes('NEW BUILD: REDLINE  //  BEST 6,000  //  CODEX 1/6'),
+              ) ?? false,
             stored: localStorage.getItem('mmr_gauntlet_build_codex'),
           };
         }),
@@ -295,7 +297,81 @@ test.describe('Gauntlet route draft', () => {
         active: true,
         summary: true,
         discovery: true,
-        stored: JSON.stringify({ discovered: ['quick_charge+spawn_rush'] }),
+        stored: JSON.stringify({
+          discovered: ['quick_charge+spawn_rush'],
+          bestScores: { 'quick_charge+spawn_rush': 6000 },
+        }),
+      });
+
+    await gamePage.evaluate(() => {
+      const w = window as unknown as {
+        game?: {
+          scene: {
+            getScene: (key: string) => {
+              scene: { restart: (data: unknown) => void };
+            };
+          };
+        };
+      };
+      w.game?.scene.getScene('ResultsScene').scene.restart({
+        nickname: 'Solo',
+        result: {
+          matchId: 'build-best-smoke',
+          winnerId: null,
+          playerStats: new Map(),
+          duration: 70,
+          gameMode: 'deathmatch',
+          awards: [],
+          rivalry: null,
+          rivalrySet: null,
+          isPractice: true,
+          wentToOvertime: false,
+          gauntlet: {
+            stage: 3,
+            totalStages: 3,
+            difficulty: 'warlord',
+            runScore: 6500,
+            outcome: 'cleared',
+            stageScore: 2500,
+            contractBonus: 0,
+            regulationBonus: 0,
+            flawlessBonus: 0,
+            paceBonus: 0,
+            nextStage: 1,
+            nextDifficulty: 'rookie',
+            boonIds: ['quick_charge', 'spawn_rush'],
+          },
+        },
+      });
+    });
+
+    await expect
+      .poll(() =>
+        gamePage.evaluate(() => {
+          const w = window as unknown as {
+            game?: { scene: { getScene: (key: string) => unknown } };
+          };
+          const scene = w.game?.scene.getScene('ResultsScene') as {
+            children?: { list: Array<{ text?: string }> };
+          };
+          const texts = scene?.children?.list.flatMap((child) =>
+            typeof child.text === 'string' ? [child.text] : [],
+          );
+          return {
+            best:
+              texts?.some((text) =>
+                text.includes('NEW BUILD BEST: REDLINE  //  BEST 6,500  //  CODEX 1/6'),
+              ) ?? false,
+            stored: localStorage.getItem('mmr_gauntlet_build_codex'),
+          };
+        }),
+      )
+      .toEqual({
+        best: true,
+        stored: JSON.stringify({
+          discovered: ['quick_charge+spawn_rush'],
+          bestScores: { 'quick_charge+spawn_rush': 6500 },
+        }),
       });
   });
 });
