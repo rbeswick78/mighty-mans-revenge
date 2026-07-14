@@ -1541,6 +1541,7 @@ describe('MatchmakingManager solo practice flow', () => {
       difficulty: 'rookie',
       runScore: 0,
       challengeKey: dailyChallengeKey(challengeDate),
+      dailyChase: { kind: 'set_pace' },
     });
 
     const first = mgr.getActiveMatches()[0];
@@ -1600,7 +1601,12 @@ describe('MatchmakingManager solo practice flow', () => {
       gameMode: retry.message.gameMode,
       opponentCharacterId: retry.message.gauntlet?.opponentCharacterId,
       challengeKey: retry.message.gauntlet?.challengeKey,
-    }).toEqual({ ...openingSummary, challengeKey: '2026-07-13' });
+      dailyChase: retry.message.gauntlet?.dailyChase,
+    }).toEqual({
+      ...openingSummary,
+      challengeKey: '2026-07-13',
+      dailyChase: { kind: 'set_pace' },
+    });
     const retryMatch = mgr.getActiveMatches()[0];
     expect(retryMatch.getContractHudState().id).toBe(openingContractId);
     expect(retryMatch.players.get('A')?.position).toEqual(openingPlayerPosition);
@@ -1634,6 +1640,13 @@ describe('MatchmakingManager solo practice flow', () => {
           ).toBe(false);
           sent.length = 0;
           mgr.handleRematchRequest('A');
+          const nextStage = sent.find(
+            (entry) => entry.playerId === 'A' && entry.message.type === 'server:matchFound',
+          );
+          if (!nextStage || nextStage.message.type !== 'server:matchFound') {
+            throw new Error('missing next Daily Run stage');
+          }
+          expect(nextStage.message.gauntlet?.dailyChase).toEqual({ kind: 'set_pace' });
         }
       }
 
@@ -1669,6 +1682,19 @@ describe('MatchmakingManager solo practice flow', () => {
         expect(update.message.challengeKey).toBe('2026-07-13');
         expect(update.message.entries[0]).toMatchObject({ nickname: 'Alpha' });
       }
+
+      sent.length = 0;
+      mgr.handleRematchRequest('A');
+      const retry = sent.find(
+        (entry) => entry.playerId === 'A' && entry.message.type === 'server:matchFound',
+      );
+      if (!retry || retry.message.type !== 'server:matchFound') {
+        throw new Error('missing ranked Daily Run retry');
+      }
+      expect(retry.message.gauntlet?.dailyChase).toEqual({
+        kind: 'defend_lead',
+        targetScore: (cleared.message.result.gauntlet?.runScore ?? 0) + 1,
+      });
     } finally {
       delete process.env.FORCE_MODE;
     }

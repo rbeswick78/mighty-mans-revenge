@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–67 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Practice vs Rusty with favorite-mode and choose-your-rival selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, and a shared server-authoritative Daily Top 5, five arenas including barricade-focused Checkpoint Zero, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–68 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Practice vs Rusty with favorite-mode and choose-your-rival selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, five arenas including barricade-focused Checkpoint Zero, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -99,6 +99,7 @@ Each session below attacks one of these.
 | 65  | Daily Gauntlet                                  | One fair shared challenge creates a reason to return and improve every day     | **DONE** (2026-07-13) |
 | 66  | Ability Overdrive                               | Faster signature-power cycles make every fighter identity erupt repeatedly    | **DONE** (2026-07-13) |
 | 67  | Daily Scoreboard                                | Every fair daily clear becomes a friend-group score worth chasing              | **DONE** (2026-07-13) |
+| 68  | Daily Rival Chase                               | Every attempt gets one attainable friend score to hunt                         | **DONE** (2026-07-13) |
 
 ---
 
@@ -3172,7 +3173,84 @@ that makes one more attempt—and tomorrow's challenge—worth playing.
 
 ---
 
+## Session 68 — Daily Rival Chase
+
+**Goal:** turn the Daily Top 5 into a concrete run objective by giving every
+attempt one attainable friend score to hunt from the first stage onward.
+
+**Locked design decisions**
+
+- The server derives one chase from the complete current challenge board when
+  the attempt starts. Empty boards ask for the first score; boards with open
+  top-five slots show the projected next rank; full boards expose the cutoff;
+  ranked callsigns chase the entry immediately ahead; #1 chases a one-point
+  personal improvement. Every score-bearing target is enough to move ahead
+  despite first-achieved tie priority.
+- Matchmaking locks that target across all three stages. A concurrent clear
+  cannot silently move the goalposts mid-run; a failed or completed retry gets
+  a fresh target from the then-current board.
+- `dailyChase` is optional presentation metadata on the existing Daily
+  Gauntlet payload. The client exhaustively renders it before each stage and on
+  results, including points remaining, score-met instructions for active and
+  failed runs, or a completed `TARGET BEATEN`; old payloads and ordinary
+  Gauntlet keep their exact existing copy and behavior.
+- Multi-line Gauntlet briefings shift the fighter cards from their real line
+  count, preserving the forecast and chase lines on desktop and mobile
+  landscape without shrinking the roster.
+- The chase cannot change score calculation, deterministic Daily RNG, combat,
+  persistence writes, lifetime progression, or leaderboard ranking.
+
+**Acceptance criteria**
+
+- [x] Store tests cover set-pace, open-slot, cutoff, nearest-rival tie-break,
+      and leader-defense targets from the complete ranked board.
+- [x] Matchmaking tests prove the target is server-authored, stable across
+      stage advancement, and refreshed to a leader-defense goal after a clear.
+- [x] Pure client tests exhaust every target kind, nickname clipping, remaining
+      gap, target-beaten copy, Character Select briefing, and Results summary.
+- [x] A live Chromium Daily flow observes the target in authoritative match
+      metadata and its visible pre-fight briefing, then reaches live play.
+- [x] Desktop and 844×390 mobile-landscape walkthroughs keep all briefing
+      lines clear of the roster cards, with no browser console errors.
+- [x] Typecheck, lint, all 1,159 unit tests across 77 files, production build,
+      and the full Playwright desktop/mobile matrix pass.
+
+---
+
 ## Session Log
+
+### Session 68 — 2026-07-13 — Daily Rival Chase
+
+**Shipped:** every Daily Run now opens with one server-locked scoreboard goal.
+The first player sets the pace; newcomers claim an open rank or break the top
+five; returning callsigns chase the friend immediately ahead; and the leader
+gets a one-point improvement target. Ties honor the board's established
+first-achieved ordering, so every displayed target score is enough to advance.
+
+The target stays fixed through the three-stage attempt and refreshes only on a
+failed or completed retry. Character Select and Results show the callsign,
+exact score, remaining gap, and a `TARGET BEATEN` payoff. During visual QA the
+new line exposed a latent overlap with multi-line Gauntlet briefings; the
+fighter grid now moves from the authored line count, keeping both chaos
+forecasts and Daily chase copy readable without reducing card size.
+
+**Verification:** 1,159 tests pass across 77 files, including every target
+state, stable tie ranking, stage carryover, post-clear refresh, exhaustive copy,
+and old-payload behavior. TypeScript, ESLint, all package builds, and the Vite
+production bundle are clean; Vite retains its existing chunk-size advisory. A
+focused live Chromium Daily flow verifies the target in match metadata and the
+visible briefing before reaching play. Desktop and 844×390 mobile-landscape
+walkthroughs show the adjusted roster layout with no console errors. The full
+Playwright matrix passes 16 tests with 11 intentional project-scoped skips
+across Chromium, Firefox, and mobile landscape.
+
+**Tuning watch:** nearest-rival targeting should feel more attainable than
+always chasing #1. Watch whether players understand that the target locks for
+one attempt, whether `+1` is satisfying on ties, and whether leaders prefer a
+larger stretch goal after real group play. No balance constants changed.
+
+**Deployment:** not run; production deployment still requires explicit user
+authorization.
 
 ### Session 67 — 2026-07-13 — Daily Scoreboard
 

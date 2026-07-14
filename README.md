@@ -70,9 +70,12 @@ mode, rival, contract, spawn layout, and seeded match events repeat for every
 attempt that day, so improving the clear is about mastery rather than a lucky
 roll. Completed clears join the server-owned `DAILY TOP 5`, where each callsign
 keeps its best score for that UTC date; results show the clear's rank and
-authoritative best. Daily clears also keep a device-local best score and
-consecutive-day streak. Attempts remain unlimited and still never affect
-lifetime PvP records.
+authoritative best. Starting an attempt locks a `DAILY CHASE` from that board:
+set the pace, claim an open rank, break into the top five, catch the callsign
+directly ahead, or push the #1 score higher. The target stays fixed through all
+three fights and progress is shown before each stage and on results. Daily
+clears also keep a device-local best score and consecutive-day streak. Attempts
+remain unlimited and still never affect lifetime PvP records.
 Gauntlet fights rotate maps and modes but never change lifetime PvP records.
 Each stage win banks score, with bonuses for the round contract and a
 regulation finish. Zero-death wins add a flawless bonus, while every whole

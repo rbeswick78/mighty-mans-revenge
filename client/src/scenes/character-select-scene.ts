@@ -170,6 +170,7 @@ export class CharacterSelectScene extends Phaser.Scene {
     // Up-next line: the mode + map this match will be played in (from
     // matchFound via matchData). Mode rotation's pre-match surface — the
     // lobby fades straight into this screen.
+    let matchLabelLineCount = 1;
     if (this.matchData) {
       const modeName = gameModeDisplayName(this.matchData.gameMode);
       const matchLabel = this.matchData.gauntlet
@@ -179,6 +180,7 @@ export class CharacterSelectScene extends Phaser.Scene {
             this.matchData.mapName,
           )
         : `NEXT: ${modeName} - ${this.matchData.mapName.toUpperCase()}`;
+      matchLabelLineCount = matchLabel.split('\n').length;
       this.add
         .text(centerX, 142, matchLabel, {
           fontFamily: MENU_FONTS.HEADER,
@@ -196,7 +198,9 @@ export class CharacterSelectScene extends Phaser.Scene {
     const totalWidth =
       CHARACTER_IDS.length * CARD_WIDTH + (CHARACTER_IDS.length - 1) * CARD_GAP;
     const startX = centerX - totalWidth / 2 + CARD_WIDTH / 2;
-    const cardY = 280;
+    // Multi-line Gauntlet briefings can include a forecast and Daily chase.
+    // Move the roster down just enough to keep every authored line readable.
+    const cardY = 280 + Math.max(0, matchLabelLineCount - 2) * 22;
 
     CHARACTER_IDS.forEach((id, idx) => {
       const x = startX + idx * (CARD_WIDTH + CARD_GAP);

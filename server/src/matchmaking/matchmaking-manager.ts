@@ -306,6 +306,13 @@ export class MatchmakingManager {
         : null;
     if (gauntlet && dailyOpening) {
       gauntlet.opponentCharacterId = dailyOpening.opponentCharacterId;
+      if (this.statsStore && dailyKey) {
+        gauntlet.dailyChase = this.statsStore.getDailyGauntletChaseTarget(
+          dailyKey,
+          nickname,
+          DAILY_GAUNTLET_LEADERBOARD.SIZE,
+        );
+      }
     }
     this.queue.removePlayer(playerId);
     this.playerNicknames.set(playerId, nickname);
@@ -1368,10 +1375,12 @@ export class MatchmakingManager {
     const isPractice = practiceDifficulty !== null;
     result.isPractice = isPractice;
     result.rivalrySet = gauntlet ? null : this.recordRivalrySet(match, result.winnerId);
+    const humanPlayerId = gauntlet
+      ? [...match.players.keys()].find(
+          (playerId) => !this.botPlayerIds.has(playerId),
+        )
+      : undefined;
     if (gauntlet) {
-      const humanPlayerId = [...match.players.keys()].find(
-        (playerId) => !this.botPlayerIds.has(playerId),
-      );
       if (humanPlayerId) {
         const contractCompleted =
           result.contract?.players.find((progress) => progress.playerId === humanPlayerId)
@@ -1448,6 +1457,20 @@ export class MatchmakingManager {
           result.gauntlet.challengeKey,
         )
       : null;
+    if (nextGauntlet?.challengeKey && humanPlayerId) {
+      const humanNickname = match.players.get(humanPlayerId)?.nickname;
+      const chase =
+        result.gauntlet?.outcome === 'advanced'
+          ? gauntlet?.dailyChase
+          : humanNickname
+            ? this.statsStore?.getDailyGauntletChaseTarget(
+                nextGauntlet.challengeKey,
+                humanNickname,
+                DAILY_GAUNTLET_LEADERBOARD.SIZE,
+              )
+            : undefined;
+      if (chase) nextGauntlet.dailyChase = chase;
+    }
     if (nextGauntlet && restartingDaily) {
       nextGauntlet.opponentCharacterId = dailyOpening.opponentCharacterId;
     }

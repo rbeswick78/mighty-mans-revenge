@@ -10,6 +10,7 @@ import {
 } from '@shared/game';
 import type {
   CharacterId,
+  DailyGauntletChaseTarget,
   DailyGauntletLeaderboardEntry,
   KillWeapon,
   LeaderboardEntry,
@@ -336,6 +337,51 @@ export class PersistentStatsStore {
     return this.sortedDailyGauntletRows(challengeKey)
       .slice(0, limit)
       .map(([, record]) => ({ nickname: record.nickname, score: record.score }));
+  }
+
+  /**
+   * Pick the next meaningful score directly ahead of one callsign. The result
+   * is locked into a run by matchmaking so a concurrent clear cannot move the
+   * goalposts between stages.
+   */
+  getDailyGauntletChaseTarget(
+    challengeKey: string,
+    nickname: string,
+    visibleSize: number,
+  ): DailyGauntletChaseTarget {
+    const rows = this.sortedDailyGauntletRows(challengeKey);
+    if (rows.length === 0) return { kind: 'set_pace' };
+
+    const playerKey = normalizeKey(nickname);
+    const playerIndex = rows.findIndex(([key]) => key === playerKey);
+    const nextScore = (score: number): number =>
+      Math.min(Number.MAX_SAFE_INTEGER, Math.max(1, Math.floor(score) + 1));
+
+    if (playerIndex === 0) {
+      return { kind: 'defend_lead', targetScore: nextScore(rows[0][1].score) };
+    }
+    if (playerIndex > 0) {
+      const rival = rows[playerIndex - 1][1];
+      return {
+        kind: 'catch_rival',
+        targetNickname: rival.nickname,
+        targetScore: nextScore(rival.score),
+      };
+    }
+
+    const safeSize = Number.isFinite(visibleSize)
+      ? Math.max(1, Math.floor(visibleSize))
+      : 1;
+    if (rows.length < safeSize) {
+      return { kind: 'claim_slot', projectedRank: rows.length + 1 };
+    }
+
+    const cutoff = rows[Math.min(safeSize, rows.length) - 1][1];
+    return {
+      kind: 'break_in',
+      targetNickname: cutoff.nickname,
+      targetScore: nextScore(cutoff.score),
+    };
   }
 
   /** Wait for every queued file write to land (shutdown / tests). */

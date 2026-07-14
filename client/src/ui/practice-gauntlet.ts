@@ -1,4 +1,5 @@
 import type {
+  DailyGauntletChaseTarget,
   GameModeType,
   MatchResult,
   PracticeGauntletMatch,
@@ -51,7 +52,11 @@ export function gauntletMatchLabel(
     `${gauntlet.challengeKey ? 'DAILY RUN' : 'GAUNTLET'} ${gauntlet.stage}/${gauntlet.totalStages} - ` +
     `${gauntlet.difficulty.toUpperCase()}  //  RUN ${formatScore(gauntlet.runScore)}`;
   const destination = `${gameModeDisplayName(gameMode)} - ${mapName.toUpperCase()}`;
-  if (!gauntlet.opponentCharacterId && !gauntlet.forecastMutatorId) {
+  if (
+    !gauntlet.opponentCharacterId &&
+    !gauntlet.forecastMutatorId &&
+    !gauntlet.dailyChase
+  ) {
     return `${summary}  //  ${destination}`;
   }
   const rival = gauntlet.opponentCharacterId
@@ -61,7 +66,54 @@ export function gauntletMatchLabel(
     ? `\nMID-MATCH: ${eventDisplayName(gauntlet.forecastMutatorId)}` +
       `  //  BOUNTY +${formatScore(practiceGauntletChaosBounty(gauntlet.forecastMutatorId))}`
     : '';
-  return `${summary}\n${destination}${rival}${forecast}`;
+  const chase = gauntlet.dailyChase
+    ? `\n${dailyGauntletChaseLabel(gauntlet.dailyChase, gauntlet.runScore)}`
+    : '';
+  return `${summary}\n${destination}${rival}${forecast}${chase}`;
+}
+
+/** Compact, exhaustive copy for a server-locked Daily Run score objective. */
+export function dailyGauntletChaseLabel(
+  target: DailyGauntletChaseTarget,
+  runScore = 0,
+  runState: 'active' | 'failed' | 'cleared' = 'active',
+): string {
+  const progress = (targetScore: number): string => {
+    const score = safeScore(runScore);
+    if (score < targetScore) return `  //  ${formatScore(targetScore - score)} TO GO`;
+    if (runState === 'cleared') return '  //  TARGET BEATEN';
+    return runState === 'failed'
+      ? '  //  SCORE MET - RETRY DAILY'
+      : '  //  SCORE MET - CLEAR RUN';
+  };
+
+  switch (target.kind) {
+    case 'set_pace':
+      return runState === 'cleared'
+        ? 'DAILY CHASE: CLEAR POSTED'
+        : 'DAILY CHASE: SET THE FIRST SCORE';
+    case 'claim_slot':
+      return runState === 'cleared'
+        ? 'DAILY CHASE: CLEAR POSTED'
+        : `DAILY CHASE: POST A CLEAR  //  OPEN #${target.projectedRank}`;
+    case 'break_in':
+      return (
+        `DAILY CHASE: PASS ${target.targetNickname.toUpperCase().slice(0, 8)}` +
+        `  //  SCORE ${formatScore(target.targetScore)}` +
+        progress(target.targetScore)
+      );
+    case 'catch_rival':
+      return (
+        `DAILY CHASE: CATCH ${target.targetNickname.toUpperCase().slice(0, 8)}` +
+        `  //  SCORE ${formatScore(target.targetScore)}` +
+        progress(target.targetScore)
+      );
+    case 'defend_lead':
+      return (
+        `DAILY CHASE: DEFEND #1  //  SCORE ${formatScore(target.targetScore)}` +
+        progress(target.targetScore)
+      );
+  }
 }
 
 export function gauntletResultSummary(result: MatchResult): string | null {
@@ -73,10 +125,12 @@ export function gauntletResultSummary(result: MatchResult): string | null {
       : run.outcome === 'cleared'
         ? 'ALL THREE CLEARED'
         : 'RUN ENDED';
-  return (
+  const summary =
     `${run.challengeKey ? 'DAILY RUN' : 'GAUNTLET'} ${run.stage}/${run.totalStages}  •  ` +
-    `${run.difficulty.toUpperCase()}  •  ${outcome}  •  RUN ${formatScore(run.runScore)}`
-  );
+    `${run.difficulty.toUpperCase()}  •  ${outcome}  •  RUN ${formatScore(run.runScore)}`;
+  return run.dailyChase
+    ? `${summary}\n${dailyGauntletChaseLabel(run.dailyChase, run.runScore, run.outcome === 'advanced' ? 'active' : run.outcome)}`
+    : summary;
 }
 
 export function gauntletStageScoreSummary(result: MatchResult): string | null {

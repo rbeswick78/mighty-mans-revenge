@@ -271,6 +271,14 @@ export interface WinStreakResult {
   previousBest: number;
 }
 
+/** One server-locked score objective for a Daily Run attempt. */
+export type DailyGauntletChaseTarget =
+  | { kind: 'set_pace' }
+  | { kind: 'claim_slot'; projectedRank: number }
+  | { kind: 'break_in'; targetNickname: string; targetScore: number }
+  | { kind: 'catch_rival'; targetNickname: string; targetScore: number }
+  | { kind: 'defend_lead'; targetScore: number };
+
 export interface PracticeGauntletMatch {
   stage: number;
   totalStages: number;
@@ -283,6 +291,8 @@ export interface PracticeGauntletMatch {
   forecastMutatorId?: MutatorId;
   /** UTC challenge date for a shared Daily Run; absent for ordinary Gauntlet. */
   challengeKey?: string;
+  /** Server-authored board objective locked for this Daily Run attempt. */
+  dailyChase?: DailyGauntletChaseTarget;
 }
 
 export type PracticeGauntletRouteId = 'route_a' | 'route_b';

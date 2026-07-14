@@ -409,6 +409,7 @@ test('solo practice launches against locked Rusty and reaches live play', async 
                 difficulty: string;
                 challengeKey?: string;
                 opponentCharacterId?: string;
+                dailyChase?: { kind: string };
               };
             };
             latestSelections?: Array<{
@@ -434,6 +435,11 @@ test('solo practice launches against locked Rusty and reaches live play', async 
             briefing:
               scene?.children?.list?.some((child) => child.text?.includes('DAILY RUN 1/3')) ??
               false,
+            chaseKind: gauntlet?.dailyChase?.kind ?? null,
+            chaseBriefing:
+              scene?.children?.list?.some((child) =>
+                child.text?.includes('DAILY CHASE: SET THE FIRST SCORE'),
+              ) ?? false,
           };
         }),
       )
@@ -446,6 +452,8 @@ test('solo practice launches against locked Rusty and reaches live play', async 
         destinationReady: true,
         rustyMatchesDaily: true,
         briefing: true,
+        chaseKind: 'set_pace',
+        chaseBriefing: true,
       });
   }
   if (process.env.VERIFY_PRACTICE_MODE === '1') {

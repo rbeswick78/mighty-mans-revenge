@@ -399,6 +399,41 @@ describe('PersistentStatsStore', () => {
       ]);
     });
 
+    it('authors the next attainable chase target from the complete ranked board', () => {
+      const store = makeStore();
+      const key = '2026-07-13';
+      expect(store.getDailyGauntletChaseTarget(key, 'Ryan', 5)).toEqual({
+        kind: 'set_pace',
+      });
+
+      store.recordDailyGauntletClear(key, 'Amy', 8000, 100);
+      store.recordDailyGauntletClear(key, 'Beth', 7000, 200);
+      expect(store.getDailyGauntletChaseTarget(key, 'Ryan', 5)).toEqual({
+        kind: 'claim_slot',
+        projectedRank: 3,
+      });
+
+      store.recordDailyGauntletClear(key, 'Cara', 6000, 300);
+      store.recordDailyGauntletClear(key, 'Dani', 5000, 400);
+      store.recordDailyGauntletClear(key, 'Erin', 4000, 500);
+      expect(store.getDailyGauntletChaseTarget(key, 'Ryan', 5)).toEqual({
+        kind: 'break_in',
+        targetNickname: 'Erin',
+        targetScore: 4001,
+      });
+
+      store.recordDailyGauntletClear(key, 'RYAN', 7000, 600);
+      expect(store.getDailyGauntletChaseTarget(key, 'ryan', 5)).toEqual({
+        kind: 'catch_rival',
+        targetNickname: 'Beth',
+        targetScore: 7001,
+      });
+      expect(store.getDailyGauntletChaseTarget(key, 'Amy', 5)).toEqual({
+        kind: 'defend_lead',
+        targetScore: 8001,
+      });
+    });
+
     it('survives restart without adding Daily clears to lifetime PvP stats', async () => {
       const store = makeStore();
       store.recordDailyGauntletClear('2026-07-13', 'Ryan', 6800, 1234);

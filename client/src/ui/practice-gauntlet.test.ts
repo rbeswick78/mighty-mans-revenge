@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { GameModeType, type MatchResult } from '@shared/types/game.js';
 import {
+  dailyGauntletChaseLabel,
   gauntletBestClearLabel,
   gauntletBestClearUpdate,
   gauntletActionLabel,
@@ -162,6 +163,61 @@ describe('practice gauntlet presentation', () => {
     daily.gauntlet!.outcome = 'advanced';
     expect(gauntletOutcomeTitle(daily)).toBe('DAILY STAGE CLEAR');
     expect(gauntletActionLabel(daily)).toBe('NEXT FIGHT');
+  });
+
+  it('turns every server-authored Daily chase state into an actionable target', () => {
+    expect(dailyGauntletChaseLabel({ kind: 'set_pace' })).toBe(
+      'DAILY CHASE: SET THE FIRST SCORE',
+    );
+    expect(
+      dailyGauntletChaseLabel({ kind: 'claim_slot', projectedRank: 3 }),
+    ).toBe('DAILY CHASE: POST A CLEAR  //  OPEN #3');
+    expect(
+      dailyGauntletChaseLabel(
+        { kind: 'break_in', targetNickname: 'Erin', targetScore: 4001 },
+        1500,
+      ),
+    ).toBe('DAILY CHASE: PASS ERIN  //  SCORE 4,001  //  2,501 TO GO');
+    expect(
+      dailyGauntletChaseLabel(
+        { kind: 'catch_rival', targetNickname: 'LongWastelandName', targetScore: 7001 },
+        7001,
+      ),
+    ).toBe('DAILY CHASE: CATCH LONGWAST  //  SCORE 7,001  //  SCORE MET - CLEAR RUN');
+    expect(
+      dailyGauntletChaseLabel(
+        { kind: 'catch_rival', targetNickname: 'LongWastelandName', targetScore: 7001 },
+        7001,
+        'cleared',
+      ),
+    ).toBe('DAILY CHASE: CATCH LONGWAST  //  SCORE 7,001  //  TARGET BEATEN');
+    expect(
+      dailyGauntletChaseLabel({ kind: 'defend_lead', targetScore: 8001 }, 7600),
+    ).toBe('DAILY CHASE: DEFEND #1  //  SCORE 8,001  //  401 TO GO');
+    expect(
+      dailyGauntletChaseLabel(
+        { kind: 'defend_lead', targetScore: 8001 },
+        8100,
+        'failed',
+      ),
+    ).toBe('DAILY CHASE: DEFEND #1  //  SCORE 8,001  //  SCORE MET - RETRY DAILY');
+    expect(dailyGauntletChaseLabel({ kind: 'set_pace' }, 6600, 'cleared')).toBe(
+      'DAILY CHASE: CLEAR POSTED',
+    );
+
+    const daily = result('advanced');
+    daily.gauntlet!.challengeKey = '2026-07-13';
+    daily.gauntlet!.dailyChase = {
+      kind: 'catch_rival',
+      targetNickname: 'Amy',
+      targetScore: 3000,
+    };
+    expect(
+      gauntletMatchLabel(daily.gauntlet!, GameModeType.DEATHMATCH, 'Scrapyard'),
+    ).toContain('DAILY CHASE: CATCH AMY  //  SCORE 3,000  //  800 TO GO');
+    expect(gauntletResultSummary(daily)).toContain(
+      '\nDAILY CHASE: CATCH AMY  //  SCORE 3,000  //  800 TO GO',
+    );
   });
 
   it('normalizes and updates a browser-local best only for completed clears', () => {
