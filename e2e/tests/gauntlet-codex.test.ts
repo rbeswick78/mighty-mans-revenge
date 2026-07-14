@@ -45,7 +45,25 @@ test.describe('Gauntlet Build Codex', () => {
     const canvas = gamePage.locator('canvas');
     const box = await canvas.boundingBox();
     if (!box) throw new Error('canvas not laid out');
-    const codexPosition = { x: box.width / 2, y: (box.height * 694) / 720 };
+    const codexBounds = await gamePage.evaluate(() => {
+      const game = (
+        window as unknown as { game?: { scene: { getScene: (key: string) => unknown } } }
+      ).game;
+      const scene = game?.scene.getScene('LobbyScene') as {
+        buildCodexButton: {
+          getBounds: () => { x: number; y: number; width: number; height: number };
+        };
+      };
+      return scene.buildCodexButton.getBounds();
+    });
+    const canvasSize = await canvas.evaluate((element) => ({
+      width: (element as HTMLCanvasElement).width,
+      height: (element as HTMLCanvasElement).height,
+    }));
+    const codexPosition = {
+      x: ((codexBounds.x + codexBounds.width / 2) / canvasSize.width) * box.width,
+      y: ((codexBounds.y + codexBounds.height / 2) / canvasSize.height) * box.height,
+    };
     if (testInfo.project.name === 'mobile-landscape') {
       await canvas.tap({ position: codexPosition });
     } else {

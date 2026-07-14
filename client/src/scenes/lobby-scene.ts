@@ -71,6 +71,7 @@ import {
   normalizeCrewTourRecord,
 } from '../ui/crew-tour.js';
 import { audioToggleLabel } from '../ui/audio-toggle.js';
+import { PracticeSetupMenu } from '../ui/practice-setup-menu.js';
 
 const STORAGE_KEY_NICKNAME = 'mmr_nickname';
 const STORAGE_KEY_BOT_DIFFICULTY = 'mmr_bot_difficulty';
@@ -122,10 +123,8 @@ export class LobbyScene extends Phaser.Scene {
   private crewBattleButton!: PixelButton;
   private gauntletButton!: PixelButton;
   private dailyButton!: PixelButton;
-  private difficultyButton!: PixelButton;
-  private practiceRivalButton!: PixelButton;
-  private practiceModeButton!: PixelButton;
-  private practiceMutatorButton!: PixelButton;
+  private practiceSetupButton!: PixelButton;
+  private practiceSetupMenu!: PracticeSetupMenu;
   private buildCodexButton!: PixelButton;
   private audioButton!: PixelButton;
   private connectionStatusText!: Phaser.GameObjects.Text;
@@ -278,9 +277,9 @@ export class LobbyScene extends Phaser.Scene {
     // searching-state UI shares this panel, swapping visibility.
     // ────────────────────────────────────────────────────────────────────
     const panelW = 380;
-    const panelH = 318;
+    const panelH = 300;
     const panelX = centerX - panelW / 2;
-    const panelY = camHeight - 336;
+    const panelY = camHeight - 342;
     const panel = new MenuPanel(this, panelX, panelY, panelW, panelH);
     panel.setDepth(WastelandStreet.DEPTH.UI);
 
@@ -377,7 +376,6 @@ export class LobbyScene extends Phaser.Scene {
     const soloTopW = (qmW - soloGap * 2) / 3;
     const soloBottomW = (qmW - soloGap) / 2;
     const soloH = 28;
-    const selectorW = (qmW - 10) / 2;
     this.practiceButton = new PixelButton(
       this,
       panel.centerX - qmW / 2,
@@ -455,70 +453,39 @@ export class LobbyScene extends Phaser.Scene {
     );
     panel.add(this.dailyButton);
 
-    this.difficultyButton = new PixelButton(
+    this.practiceSetupButton = new PixelButton(
       this,
       panel.centerX - qmW / 2,
       206,
-      selectorW,
-      22,
-      this.difficultyLabel(),
-      {
-        variant: 'secondary',
-        fontSize: 7,
-        onClick: () => this.cyclePracticeDifficulty(),
-      },
-    );
-    panel.add(this.difficultyButton);
-
-    this.practiceRivalButton = new PixelButton(
-      this,
-      panel.centerX - qmW / 2 + selectorW + 10,
-      206,
-      selectorW,
-      22,
-      practiceRivalPreferenceLabel(this.practiceRival),
-      {
-        variant: 'secondary',
-        fontSize: 6,
-        onClick: () => this.cyclePracticeRival(),
-      },
-    );
-    panel.add(this.practiceRivalButton);
-
-    this.practiceModeButton = new PixelButton(
-      this,
-      panel.centerX - qmW / 2,
-      232,
       qmW,
-      22,
-      practiceModePreferenceLabel(this.practiceMode),
+      36,
+      'PRACTICE SETUP',
       {
         variant: 'secondary',
         fontSize: 8,
-        onClick: () => this.cyclePracticeMode(),
+        subtitle: 'TUNE LEVEL  //  RIVAL  //  MODE  //  CHAOS',
+        subtitleFontSize: 5,
+        hitPaddingY: 6,
+        onClick: () => this.openPracticeSetup(),
       },
     );
-    panel.add(this.practiceModeButton);
+    panel.add(this.practiceSetupButton);
 
-    this.practiceMutatorButton = new PixelButton(
-      this,
-      panel.centerX - qmW / 2,
-      258,
-      qmW,
-      22,
-      practiceMutatorPreferenceLabel(this.practiceMutator),
-      {
-        variant: 'secondary',
-        fontSize: 8,
-        onClick: () => this.cyclePracticeMutator(),
-      },
-    );
-    panel.add(this.practiceMutatorButton);
-
+    this.practiceSetupMenu = new PracticeSetupMenu(this, {
+      difficultyLabel: this.difficultyLabel(),
+      rivalLabel: practiceRivalPreferenceLabel(this.practiceRival),
+      modeLabel: practiceModePreferenceLabel(this.practiceMode),
+      mutatorLabel: practiceMutatorPreferenceLabel(this.practiceMutator),
+      onCycleDifficulty: () => this.cyclePracticeDifficulty(),
+      onCycleRival: () => this.cyclePracticeRival(),
+      onCycleMode: () => this.cyclePracticeMode(),
+      onCycleMutator: () => this.cyclePracticeMutator(),
+      onOpenChanged: (open) => this.onPracticeSetupOpenChanged(open),
+    });
     const gauntletBestText = this.add
       .text(
         panel.centerX,
-        286,
+        250,
         gauntletBestClearLabel(
           normalizeGauntletBestClear(localStorage.getItem(GAUNTLET_BEST_CLEAR_STORAGE_KEY)),
         ),
@@ -537,7 +504,7 @@ export class LobbyScene extends Phaser.Scene {
       dailyChallengeKey(),
     );
     const dailyBestText = this.add
-      .text(panel.centerX, 298, dailyGauntletProgressLabel(dailyProgress), {
+      .text(panel.centerX, 264, dailyGauntletProgressLabel(dailyProgress), {
         fontFamily: MENU_FONTS.HEADER,
         fontSize: '7px',
         color: cssHex(Wasteland.LOADING_BAR_FILL),
@@ -549,16 +516,16 @@ export class LobbyScene extends Phaser.Scene {
     this.buildCodexButton = new PixelButton(
       this,
       panel.centerX - qmW / 2,
-      302,
+      274,
       qmW,
-      16,
+      18,
       `${gauntletBuildCodexLabel(
         normalizeGauntletBuildCodex(localStorage.getItem(GAUNTLET_BUILD_CODEX_STORAGE_KEY)),
       )}  //  VIEW`,
       {
         variant: 'secondary',
         fontSize: 6,
-        hitPaddingY: 14,
+        hitPaddingY: 5,
         onClick: () => this.openBuildCodex(),
       },
     );
@@ -700,11 +667,20 @@ export class LobbyScene extends Phaser.Scene {
     // Enter = quick match (works whether the nickname input has focus
     // or not, since the keydown bubbles up from the input element).
     this.input.keyboard?.on('keydown-ENTER', () => {
-      if (!this.isSearching && this.connectionState === 'connected') this.onQuickMatch();
+      if (this.practiceSetupMenu.isOpen()) {
+        this.practiceSetupMenu.activateFocused();
+      } else if (!this.isSearching && this.connectionState === 'connected') {
+        this.onQuickMatch();
+      }
     });
-    // Escape cancels an active search.
+    this.input.keyboard?.on('keydown-UP', () => this.movePracticeSetupFocus(-1));
+    this.input.keyboard?.on('keydown-LEFT', () => this.movePracticeSetupFocus(-1));
+    this.input.keyboard?.on('keydown-DOWN', () => this.movePracticeSetupFocus(1));
+    this.input.keyboard?.on('keydown-RIGHT', () => this.movePracticeSetupFocus(1));
+    // Escape backs out of the setup overlay before cancelling an active search.
     this.input.keyboard?.on('keydown-ESC', () => {
-      if (this.isSearching) this.onCancelSearch();
+      if (this.practiceSetupMenu.isOpen()) this.practiceSetupMenu.back();
+      else if (this.isSearching) this.onCancelSearch();
     });
     // F2 never collides with callsign entry, unlike an ordinary letter key.
     this.input.keyboard?.on('keydown-F2', () => this.toggleAudio());
@@ -749,6 +725,20 @@ export class LobbyScene extends Phaser.Scene {
       return;
     }
 
+    if (this.practiceSetupMenu.isOpen()) {
+      this.syncGamepadFocus();
+      if (actions.back || actions.menu) {
+        this.practiceSetupMenu.back();
+      } else if (actions.up || actions.left) {
+        this.practiceSetupMenu.moveFocus(-1);
+      } else if (actions.down || actions.right) {
+        this.practiceSetupMenu.moveFocus(1);
+      } else if (actions.confirm) {
+        this.practiceSetupMenu.activateFocused();
+      }
+      return;
+    }
+
     const buttons = this.gamepadButtons();
     if (actions.up || actions.left) {
       this.gamepadFocusIndex = (this.gamepadFocusIndex - 1 + buttons.length) % buttons.length;
@@ -760,14 +750,7 @@ export class LobbyScene extends Phaser.Scene {
   }
 
   private gamepadButtons(): PixelButton[] {
-    const localButtons = [
-      this.difficultyButton,
-      this.practiceRivalButton,
-      this.practiceModeButton,
-      this.practiceMutatorButton,
-      this.buildCodexButton,
-      this.audioButton,
-    ];
+    const localButtons = [this.practiceSetupButton, this.buildCodexButton, this.audioButton];
     if (this.connectionState !== 'connected') {
       return this.retryConnectionButton.visible
         ? [this.retryConnectionButton, ...localButtons]
@@ -781,10 +764,7 @@ export class LobbyScene extends Phaser.Scene {
       this.crewBattleButton,
       this.gauntletButton,
       this.dailyButton,
-      this.difficultyButton,
-      this.practiceRivalButton,
-      this.practiceModeButton,
-      this.practiceMutatorButton,
+      this.practiceSetupButton,
       this.buildCodexButton,
       this.audioButton,
     ];
@@ -802,7 +782,10 @@ export class LobbyScene extends Phaser.Scene {
     const buttons = this.gamepadButtons();
     buttons.forEach((button, index) => {
       button.setFocused(
-        this.gamepadFocusActive && !this.isSearching && index === this.gamepadFocusIndex,
+        this.gamepadFocusActive &&
+          !this.isSearching &&
+          !this.practiceSetupMenu.isOpen() &&
+          index === this.gamepadFocusIndex,
       );
     });
     this.cancelButton.setFocused(this.gamepadFocusActive && this.isSearching);
@@ -815,7 +798,7 @@ export class LobbyScene extends Phaser.Scene {
   private setNameEntryVisible(visible: boolean): void {
     for (const obj of this.nameEntryUi) obj.setVisible(visible);
     this.buildCodexButton.setVisible(visible);
-    this.nicknameDom?.setVisible(visible);
+    this.nicknameDom?.setVisible(visible && !this.practiceSetupMenu.isOpen());
   }
 
   private wireGameServiceEvents(): void {
@@ -883,7 +866,9 @@ export class LobbyScene extends Phaser.Scene {
       if (msg.status === 'queued' && msg.matchKind === 'duos') {
         const size = msg.groupSize ?? 1;
         const max = msg.maxGroupSize ?? 2;
-        this.searchingText.setText(size >= max ? `CREW READY  ${size}/${max}` : `CREWING UP  ${size}/${max}`);
+        this.searchingText.setText(
+          size >= max ? `CREW READY  ${size}/${max}` : `CREWING UP  ${size}/${max}`,
+        );
         this.searchTimerText.setText(
           size >= max
             ? 'FIGHTING TOGETHER'
@@ -1121,10 +1106,7 @@ export class LobbyScene extends Phaser.Scene {
     this.crewBattleButton.setVisible(false);
     this.gauntletButton.setVisible(false);
     this.dailyButton.setVisible(false);
-    this.difficultyButton.setVisible(false);
-    this.practiceRivalButton.setVisible(false);
-    this.practiceModeButton.setVisible(false);
-    this.practiceMutatorButton.setVisible(false);
+    this.practiceSetupButton.setVisible(false);
 
     this.searchingTween = this.tweens.add({
       targets: this.searchingText,
@@ -1192,11 +1174,27 @@ export class LobbyScene extends Phaser.Scene {
     this.scene.start('GauntletCodexScene');
   }
 
+  private openPracticeSetup(): void {
+    if (this.isSearching) return;
+    this.nicknameInput?.blur();
+    this.practiceSetupMenu.show();
+    this.syncGamepadFocus();
+  }
+
+  private onPracticeSetupOpenChanged(open: boolean): void {
+    this.nicknameDom?.setVisible(!open && !this.isSearching);
+    if (!open) this.syncGamepadFocus();
+  }
+
+  private movePracticeSetupFocus(direction: -1 | 1): void {
+    if (this.practiceSetupMenu.isOpen()) this.practiceSetupMenu.moveFocus(direction);
+  }
+
   private cyclePracticeDifficulty(): void {
     const current = BOT_DIFFICULTIES.indexOf(this.practiceDifficulty);
     this.practiceDifficulty = BOT_DIFFICULTIES[(current + 1) % BOT_DIFFICULTIES.length];
     localStorage.setItem(STORAGE_KEY_BOT_DIFFICULTY, this.practiceDifficulty);
-    this.difficultyButton.setLabel(this.difficultyLabel());
+    this.practiceSetupMenu.setDifficultyLabel(this.difficultyLabel());
   }
 
   private difficultyLabel(): string {
@@ -1210,7 +1208,7 @@ export class LobbyScene extends Phaser.Scene {
     } else {
       localStorage.setItem(STORAGE_KEY_PRACTICE_RIVAL, this.practiceRival);
     }
-    this.practiceRivalButton.setLabel(practiceRivalPreferenceLabel(this.practiceRival));
+    this.practiceSetupMenu.setRivalLabel(practiceRivalPreferenceLabel(this.practiceRival));
   }
 
   private cyclePracticeMode(): void {
@@ -1220,7 +1218,7 @@ export class LobbyScene extends Phaser.Scene {
     } else {
       localStorage.setItem(STORAGE_KEY_PRACTICE_MODE, this.practiceMode);
     }
-    this.practiceModeButton.setLabel(practiceModePreferenceLabel(this.practiceMode));
+    this.practiceSetupMenu.setModeLabel(practiceModePreferenceLabel(this.practiceMode));
     const compatibleMutator = normalizePracticeMutatorPreference(
       this.practiceMutator,
       this.practiceMode,
@@ -1228,7 +1226,7 @@ export class LobbyScene extends Phaser.Scene {
     if (compatibleMutator !== this.practiceMutator) {
       this.practiceMutator = compatibleMutator;
       localStorage.removeItem(STORAGE_KEY_PRACTICE_MUTATOR);
-      this.practiceMutatorButton.setLabel(practiceMutatorPreferenceLabel(this.practiceMutator));
+      this.practiceSetupMenu.setMutatorLabel(practiceMutatorPreferenceLabel(this.practiceMutator));
     }
   }
 
@@ -1239,7 +1237,7 @@ export class LobbyScene extends Phaser.Scene {
     } else {
       localStorage.setItem(STORAGE_KEY_PRACTICE_MUTATOR, this.practiceMutator);
     }
-    this.practiceMutatorButton.setLabel(practiceMutatorPreferenceLabel(this.practiceMutator));
+    this.practiceSetupMenu.setMutatorLabel(practiceMutatorPreferenceLabel(this.practiceMutator));
   }
 
   /** Fullscreen improves play, but browser policy must never block a match. */
@@ -1286,10 +1284,7 @@ export class LobbyScene extends Phaser.Scene {
     this.crewBattleButton.setVisible(true);
     this.gauntletButton.setVisible(true);
     this.dailyButton.setVisible(true);
-    this.difficultyButton.setVisible(true);
-    this.practiceRivalButton.setVisible(true);
-    this.practiceModeButton.setVisible(true);
-    this.practiceMutatorButton.setVisible(true);
+    this.practiceSetupButton.setVisible(true);
     this.setNameEntryVisible(true);
 
     if (this.searchingTween) {

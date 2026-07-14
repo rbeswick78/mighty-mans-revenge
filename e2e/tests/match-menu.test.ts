@@ -202,6 +202,9 @@ test.describe('Live match menu', () => {
         }),
       )
       .toBe('menu');
+    // A real second press cannot arrive in the same render frame. Give the
+    // touch-emulated browser one frame to settle the first Escape keyup.
+    await gamePage.waitForTimeout(100);
     await gamePage.keyboard.press('Escape');
     await expect
       .poll(() =>

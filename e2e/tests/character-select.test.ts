@@ -1,5 +1,23 @@
 import { test, expect, type Page, type BrowserContext } from '@playwright/test';
 
+type PhaserBounds = { x: number; y: number; width: number; height: number };
+
+async function clickCanvasBounds(page: Page, bounds: PhaserBounds): Promise<void> {
+  const canvas = page.locator('canvas');
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error('game canvas is not laid out');
+  const size = await canvas.evaluate((element) => ({
+    width: (element as HTMLCanvasElement).width,
+    height: (element as HTMLCanvasElement).height,
+  }));
+  await canvas.click({
+    position: {
+      x: ((bounds.x + bounds.width / 2) / size.width) * box.width,
+      y: ((bounds.y + bounds.height / 2) / size.height) * box.height,
+    },
+  });
+}
+
 /**
  * Character-select E2E coverage. This test pairs two real browser contexts
  * via QUICK MATCH, walks the pre-match map/mode draft (Session 9 — every
@@ -292,20 +310,49 @@ test('solo practice launches against locked Rusty and reaches live play', async 
   await expect(input).toHaveCount(1);
   await input.fill('Solo');
 
-  // Desktop canvas is 960x720 at this project viewport. Cycle the persisted
-  // Rusty level once, optionally pin a Spar rival/mode, then launch an
-  // ordinary spar, random Gauntlet, or shared Daily Run in canvas-local coordinates.
+  // Open the focused setup surface and physically cycle its large canvas
+  // controls. Bounds come from Phaser so layout polish cannot silently turn
+  // these clicks into unrelated actions.
   const canvas = page.locator('canvas');
   await expect(canvas).toHaveCount(1);
-  await canvas.click({ position: { x: 410, y: 601 } });
+  const launcherBounds = await page.evaluate(() => {
+    const w = window as unknown as {
+      game?: { scene: { getScene: (key: string) => unknown } };
+    };
+    const scene = w.game?.scene.getScene('LobbyScene') as {
+      practiceSetupButton: { getBounds: () => PhaserBounds };
+    };
+    return scene.practiceSetupButton.getBounds();
+  });
+  await clickCanvasBounds(page, launcherBounds);
+  const setupBounds = await page.evaluate(() => {
+    const w = window as unknown as {
+      game?: { scene: { getScene: (key: string) => unknown } };
+    };
+    const scene = w.game?.scene.getScene('LobbyScene') as {
+      practiceSetupMenu: {
+        difficultyButton: { getBounds: () => PhaserBounds };
+        rivalButton: { getBounds: () => PhaserBounds };
+        modeButton: { getBounds: () => PhaserBounds };
+        mutatorButton: { getBounds: () => PhaserBounds };
+      };
+    };
+    return {
+      difficulty: scene.practiceSetupMenu.difficultyButton.getBounds(),
+      rival: scene.practiceSetupMenu.rivalButton.getBounds(),
+      mode: scene.practiceSetupMenu.modeButton.getBounds(),
+      mutator: scene.practiceSetupMenu.mutatorButton.getBounds(),
+    };
+  });
+  await clickCanvasBounds(page, setupBounds.difficulty);
   await expect
     .poll(() => page.evaluate(() => localStorage.getItem('mmr_bot_difficulty')))
     .toBe('warlord');
   if (process.env.VERIFY_PRACTICE_MODE === '1') {
     // RANDOM -> DEATHMATCH -> KING OF THE HILL. Use two clicks so the
     // browser flow also proves the selector cycles through shared order.
-    await canvas.click({ position: { x: 480, y: 627 } });
-    await canvas.click({ position: { x: 480, y: 627 } });
+    await clickCanvasBounds(page, setupBounds.mode);
+    await clickCanvasBounds(page, setupBounds.mode);
     await expect
       .poll(() => page.evaluate(() => localStorage.getItem('mmr_practice_mode')))
       .toBe('koth');
@@ -313,7 +360,7 @@ test('solo practice launches against locked Rusty and reaches live play', async 
   if (process.env.VERIFY_PRACTICE_RIVAL === '1') {
     // RANDOM -> MIGHTY MAN -> BRUCE -> FROST WIZARD.
     for (let click = 0; click < 3; click++) {
-      await canvas.click({ position: { x: 550, y: 601 } });
+      await clickCanvasBounds(page, setupBounds.rival);
     }
     await expect
       .poll(() => page.evaluate(() => localStorage.getItem('mmr_practice_rival')))
@@ -342,18 +389,19 @@ test('solo practice launches against locked Rusty and reaches live play', async 
           }
           return {
             text: label?.text ?? null,
-            fitsButton: (label?.width ?? Number.POSITIVE_INFINITY) <= 117,
+            fitsButton: (label?.width ?? Number.POSITIVE_INFINITY) <= 380,
           };
         }),
       )
       .toEqual({ text: 'RIVAL: FROST WIZARD', fitsButton: true });
   }
   if (process.env.VERIFY_PRACTICE_MUTATOR === '1') {
-    await canvas.click({ position: { x: 480, y: 653 } });
+    await clickCanvasBounds(page, setupBounds.mutator);
     await expect
       .poll(() => page.evaluate(() => localStorage.getItem('mmr_practice_mutator')))
       .toBe('super_speed');
   }
+  await page.keyboard.press('Escape');
   if (process.env.VERIFY_GAMEPAD === '1') {
     await page.evaluate(() => {
       const state = (window as unknown as { __gamepadTest: { axes: number[] } }).__gamepadTest;
