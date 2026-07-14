@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–87 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, roster-authentic duel/Rumble results, Gun Game, Rivalry Sets, Quick Match 1v1 plus 2–4 player Wasteland Rumble with all-player group draft rallies, a rematch-chain Rumble Crown, live lead-change drama, personal rematch Grudges, authoritative Rumble Assists with K/A/D, a solo four-fighter Scrap Pit whose three server-authoritative rivals have distinct readable tactics, answer player taunts with signature banter, and feed a device-local win/run record chase, and visible bounded Wasteland Signal Recovery, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–89 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, roster-authentic duel/Rumble results, Gun Game, Rivalry Sets, Quick Match 1v1 plus 2–4 player Wasteland Rumble with all-player group draft rallies, a rematch-chain Rumble Crown, live lead-change drama, personal rematch Grudges, authoritative Rumble Assists with K/A/D, a solo four-fighter Scrap Pit whose three server-authoritative rivals have distinct readable tactics, answer player taunts with signature banter, and feed a device-local win/run record chase, a fixed 2v2 Crew Battle with friendly-fire protection and a four-objective Crew Clash rotation, and visible bounded Wasteland Signal Recovery, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -119,6 +119,8 @@ Each session below attacks one of these.
 | 85  | Scrap Pit Banter                                | Talking trash becomes a two-way rivalry beat against the crew                 | **DONE** (2026-07-14) |
 | 86  | Scrap Pit Records                               | Every solo brawl builds a persistent win-run target worth defending           | **DONE** (2026-07-14) |
 | 87  | Roster Victory Lineups                          | Every finish preserves the actual cast that made the match memorable          | **DONE** (2026-07-14) |
+| 88  | Crew Battle 2v2                                 | Protecting an ally creates the game's first true team-play loop               | **DONE** (2026-07-14) |
+| 89  | Crew Clash Rotation                             | Four cooperative objectives keep the same crews changing strategy             | **DONE** (2026-07-14) |
 
 ---
 
@@ -3236,6 +3238,56 @@ attempt one attainable friend score to hunt from the first stage onward.
 
 ---
 
+## Session 89 — Crew Clash Rotation
+
+**Goal:** keep the new 2v2 team-play pillar from collapsing into one repeated
+Deathmatch by making the game's strongest objective modes explicitly understand
+allies, side possession, combined targets, and team results.
+
+**Locked design decisions**
+
+- `CREW_BATTLE_MODES` is the frozen source of truth: Deathmatch, King of the
+  Hill, Kill Confirmed, and Core Run. Favorite Mode pins one compatible rule;
+  Random selects from this list and advances to the next team rule on every
+  direct rematch. Incompatible stored or `FORCE_MODE` values cannot escape the
+  allowlist.
+- Deathmatch keeps its first-to-15 combined knockout target. KOTH treats every
+  living occupant from one side as a valid hold, preserves fractional capture
+  through an allied handoff, and becomes contested only when both sides enter.
+- Kill Confirmed treats either teammate as the owner side: collecting an ally's
+  tag denies it without score, while only an opposing side confirms it. Core
+  Run keeps one physical carrier but combines every teammate's carry seconds.
+- KOTH ends at 60 combined hill points, Kill Confirmed at 8 combined tags, and
+  Core Run at 45 combined carry seconds. Regulation leaders and exact ties use
+  the same server-owned team totals that final `winnerTeamId` and overtime use.
+- Character Select teaches the selected team objective. Live play retains the
+  two-score HUD and every mode's world objective renderer. Results labels team
+  totals with `KOs`, `PTS`, `TAGS`, or `SEC`, and promises both the next mode and
+  arena before a Random rematch.
+- This expands team semantics, not persistence or matchmaking. The fixed crews,
+  friendly-fire policy, bot identities, difficulty, compatible Solo Chaos, and
+  Practice isolation from lifetime PvP remain unchanged.
+
+**Acceptance criteria**
+
+- [x] Focused KOTH tests prove allies hold together, opponents contest the side,
+      and combined points decide the winner; Kill Confirmed tests prove allied
+      denials; Core Run tests prove combined carry targets and team ties.
+- [x] Matchmaking tests prove a compatible favorite remains pinned, Random
+      starts inside the allowlist, the result promises the next team mode, and
+      a direct rematch keeps every immutable assignment.
+- [x] A real Chromium flow selects Crew KOTH, receives two authoritative sides,
+      renders the team-specific hold briefing, reaches live play, and preserves
+      the ally marker plus combined HUD.
+- [x] Desktop and 844×390 mobile result journeys render objective-correct team
+      units, all four roster-authentic fighters, and the next mode/arena promise.
+- [x] In-app visual review keeps the longer KOTH briefing readable on the real
+      canvas with no browser warnings or errors.
+- [x] Typecheck, lint, full unit/integration suite, production build, and the
+      complete Playwright matrix pass.
+
+---
+
 ## Session 88 — Crew Battle 2v2
 
 **Goal:** add an immediately playable team mode that makes protecting an ally
@@ -4120,6 +4172,44 @@ favorite mid-match event while the final-minute surprise stays fresh.
 ---
 
 ## Session Log
+
+### Session 89 — 2026-07-14 — Crew Clash Rotation
+
+**Shipped:** Crew Battle now changes the kind of teamwork it asks for instead
+of replaying only Deathmatch. The frozen `CREW_BATTLE_MODES` allowlist contains
+Deathmatch, King of the Hill, Kill Confirmed, and Core Run. A compatible
+favorite remains pinned; Random advances through those four rules while the
+arena rotates. Incompatible favorite or development-force values cannot launch
+a team match with incomplete objective semantics.
+
+The objective modes now understand sides at their authoritative boundary.
+Multiple allies hold a hill together and can hand off fractional progress;
+only an opposing side contests it. Either teammate can deny an allied dog tag,
+while only enemies confirm. Core carrier seconds and all three objective
+targets combine across the crew, and exact side ties still enter the ordinary
+sudden-death path. Character Select teaches the selected rule, Results uses
+`KOs`, `PTS`, `TAGS`, or `SEC`, and the rematch teaser promises the next mode
+and arena. The existing fixed roster, friendly-fire policy, difficulty, Solo
+Chaos, and Practice-only persistence boundary are unchanged.
+
+**Verification:** 195 focused shared/mode/matchmaking tests pass. Typecheck,
+lint, all 1,286 unit/integration tests across 92 files, and the production build
+pass; Vite retains its existing chunk-size advisory. The complete Playwright
+matrix passes 71 tests with 13 intentional project-scoped skips across Chromium,
+Firefox, and mobile landscape. A real Crew KOTH flow observed two blue/two red
+assignments, the hold-together briefing, ally marker, and team HUD. Dedicated
+desktop/mobile Results coverage verified KOTH point units, all four authentic
+fighters, and the promised Kill Confirmed rematch. In-app visual review kept the
+longer briefing readable and found no browser warnings or errors.
+
+**Operational watch:** the 60-point hill, 8-tag confirmation, and 45-second core
+targets intentionally reuse the learned base modes as combined crew targets.
+Watch whether two allies stacking a hill or alternating core carriers makes a
+round materially shorter than Deathmatch before changing those centralized
+values; do not compensate by scaling bot health or damage.
+
+**Deployment:** not run; production deployment still requires explicit user
+authorization.
 
 ### Session 88 — 2026-07-14 — Crew Battle 2v2
 

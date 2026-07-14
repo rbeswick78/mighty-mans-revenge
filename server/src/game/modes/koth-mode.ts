@@ -1,8 +1,14 @@
 import { GameModeType, KOTH, MAP } from '@shared/game';
-import type { PlayerId, MatchResult, KothHudState, KillWeapon } from '@shared/game';
+import type { PlayerId, MatchResult, KothHudState, KillWeapon, TeamId } from '@shared/game';
 import { computeAwards } from '../awards.js';
 import { logger } from '../../utils/logger.js';
-import type { GameMode, MatchContext } from './game-mode.js';
+import {
+  determineTeamLeader,
+  hasTeamReachedScore,
+  teamScoreRows,
+  type GameMode,
+  type MatchContext,
+} from './game-mode.js';
 
 /**
  * King of the Hill: one square hill zone is live at a time; standing in it
@@ -23,6 +29,8 @@ export class KothMode implements GameMode {
   private hillTimer = KOTH.HILL_MOVE_INTERVAL;
   /** Sole living occupant currently accruing progress, if any. */
   private occupantId: PlayerId | null = null;
+  /** Team holding the hill; lets allied handoffs preserve capture progress. */
+  private occupantTeamId: TeamId | null = null;
   /** True while 2+ living players stand in the zone. */
   private contested = false;
   /**
@@ -86,6 +94,41 @@ export class KothMode implements GameMode {
       match.stats.recordHillSeconds(id, dt);
     }
 
+    const teamRows = teamScoreRows(match);
+    if (teamRows && match.getTeamId) {
+      const occupyingTeams = new Set(
+        occupants.map((id) => match.getTeamId!(id)).filter((id): id is TeamId => id !== null),
+      );
+      if (occupyingTeams.size !== 1) {
+        const wasContested = occupyingTeams.size > 1;
+        this.resetCapture();
+        this.contested = wasContested;
+        return;
+      }
+
+      const teamId = [...occupyingTeams][0];
+      const representative = occupants
+        .filter((id) => match.getTeamId!(id) === teamId)
+        .sort((left, right) => left.localeCompare(right))[0];
+      if (!representative) {
+        this.resetCapture();
+        return;
+      }
+      if (this.occupantTeamId !== teamId) {
+        this.captureSeconds = 0;
+      }
+      this.occupantTeamId = teamId;
+      this.occupantId = representative;
+      this.contested = false;
+      this.captureSeconds += dt;
+      while (this.captureSeconds >= 1) {
+        this.captureSeconds -= 1;
+        const player = match.players.get(representative);
+        if (player) player.score += 1;
+      }
+      return;
+    }
+
     if (occupants.length !== 1) {
       // Empty or contested — either way nobody scores and progress resets.
       const wasContested = occupants.length > 1;
@@ -98,6 +141,7 @@ export class KothMode implements GameMode {
     if (this.occupantId !== sole) {
       // New sole occupant starts from zero.
       this.occupantId = sole;
+      this.occupantTeamId = null;
       this.captureSeconds = 0;
     }
     this.contested = false;
@@ -119,6 +163,9 @@ export class KothMode implements GameMode {
   }
 
   isMatchOver(match: MatchContext): boolean {
+    if (teamScoreRows(match)) {
+      return hasTeamReachedScore(match, KOTH.SCORE_TARGET) || match.matchTimer <= 0;
+    }
     for (const player of match.players.values()) {
       if (player.score >= KOTH.SCORE_TARGET) return true;
     }
@@ -126,6 +173,7 @@ export class KothMode implements GameMode {
   }
 
   determineWinner(match: MatchContext): PlayerId | null {
+    if (teamScoreRows(match)) return determineTeamLeader(match);
     const players = Array.from(match.players.values());
     if (players.length === 0) return null;
 
@@ -173,6 +221,7 @@ export class KothMode implements GameMode {
 
   private resetCapture(): void {
     this.occupantId = null;
+    this.occupantTeamId = null;
     this.contested = false;
     this.captureSeconds = 0;
   }

@@ -1,13 +1,13 @@
 import { CORE_RUN, GameModeType, PickupType } from '@shared/game';
-import type {
-  CoreRunState,
-  KillWeapon,
-  MatchResult,
-  PlayerId,
-  Vec2,
-} from '@shared/game';
+import type { CoreRunState, KillWeapon, MatchResult, PlayerId, Vec2 } from '@shared/game';
 import { computeAwards } from '../awards.js';
-import type { GameMode, MatchContext } from './game-mode.js';
+import {
+  determineTeamLeader,
+  hasTeamReachedScore,
+  teamScoreRows,
+  type GameMode,
+  type MatchContext,
+} from './game-mode.js';
 
 /**
  * Core Run turns the arena's geometric center into a neutral pickup, then
@@ -74,27 +74,24 @@ export class CoreRunMode implements GameMode {
     }
   }
 
-  onKill(
-    match: MatchContext,
-    _killerId: PlayerId,
-    victimId: PlayerId,
-    _weapon: KillWeapon,
-  ): void {
+  onKill(match: MatchContext, _killerId: PlayerId, victimId: PlayerId, _weapon: KillWeapon): void {
     if (match.isOvertime || this.carrierId !== victimId) return;
     const victim = match.players.get(victimId);
     this.dropAt(victim?.position ?? this.position);
   }
 
   isMatchOver(match: MatchContext): boolean {
+    if (teamScoreRows(match)) {
+      return match.matchTimer <= 0 || hasTeamReachedScore(match, CORE_RUN.SCORE_TARGET);
+    }
     return (
       match.matchTimer <= 0 ||
-      [...match.players.values()].some(
-        (player) => player.score >= CORE_RUN.SCORE_TARGET,
-      )
+      [...match.players.values()].some((player) => player.score >= CORE_RUN.SCORE_TARGET)
     );
   }
 
   determineWinner(match: MatchContext): PlayerId | null {
+    if (teamScoreRows(match)) return determineTeamLeader(match);
     const players = [...match.players.values()].sort(
       (a, b) => b.score - a.score || a.id.localeCompare(b.id),
     );
@@ -129,10 +126,7 @@ export class CoreRunMode implements GameMode {
       playerStats,
       duration: match.getElapsedSeconds(),
       gameMode: GameModeType.CORE_RUN,
-      awards: computeAwards(
-        playerStats,
-        (id) => match.players.get(id)?.nickname ?? 'UNKNOWN',
-      ),
+      awards: computeAwards(playerStats, (id) => match.players.get(id)?.nickname ?? 'UNKNOWN'),
       rivalry: null,
       rivalrySet: null,
       isPractice: false,
@@ -154,8 +148,7 @@ export class CoreRunMode implements GameMode {
       if (
         distanceSq <= radiusSq &&
         (distanceSq < nearestDistanceSq ||
-          (distanceSq === nearestDistanceSq &&
-            (collector === null || player.id < collector)))
+          (distanceSq === nearestDistanceSq && (collector === null || player.id < collector)))
       ) {
         collector = player.id;
         nearestDistanceSq = distanceSq;

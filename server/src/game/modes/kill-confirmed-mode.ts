@@ -7,7 +7,13 @@ import type {
   PlayerId,
 } from '@shared/game';
 import { computeAwards } from '../awards.js';
-import type { GameMode, MatchContext } from './game-mode.js';
+import {
+  determineTeamLeader,
+  hasTeamReachedScore,
+  teamScoreRows,
+  type GameMode,
+  type MatchContext,
+} from './game-mode.js';
 
 /**
  * Kills create contested tags. Collecting an opponent's tag banks one point;
@@ -26,12 +32,7 @@ export class KillConfirmedMode implements GameMode {
     for (const player of match.players.values()) player.score = 0;
   }
 
-  onKill(
-    match: MatchContext,
-    _killerId: PlayerId,
-    victimId: PlayerId,
-    _weapon: KillWeapon,
-  ): void {
+  onKill(match: MatchContext, _killerId: PlayerId, victimId: PlayerId, _weapon: KillWeapon): void {
     if (match.isOvertime) return;
     const victim = match.players.get(victimId);
     if (!victim) return;
@@ -66,17 +67,24 @@ export class KillConfirmedMode implements GameMode {
         if (
           distanceSq <= radiusSq &&
           (distanceSq < nearestDistanceSq ||
-            (distanceSq === nearestDistanceSq &&
-              (collector === null || player.id < collector)))
+            (distanceSq === nearestDistanceSq && (collector === null || player.id < collector)))
         ) {
           collector = player.id;
           nearestDistanceSq = distanceSq;
         }
       }
 
+      const collectorTeam = collector === null ? null : (match.getTeamId?.(collector) ?? null);
+      const ownerTeam = match.getTeamId?.(tag.ownerId) ?? null;
+      const confirmed =
+        collector !== null &&
+        (collectorTeam !== null && ownerTeam !== null
+          ? collectorTeam !== ownerTeam
+          : collector !== tag.ownerId);
+
       if (collector === null) {
         remaining.push(tag);
-      } else if (collector !== tag.ownerId) {
+      } else if (confirmed) {
         const player = match.players.get(collector);
         if (player) player.score += 1;
       }
@@ -85,7 +93,7 @@ export class KillConfirmedMode implements GameMode {
           tagId: tag.id,
           collectorId: collector,
           ownerId: tag.ownerId,
-          confirmed: collector !== tag.ownerId,
+          confirmed,
         });
       }
       // Own-tag collection is a denial: remove it without scoring.
@@ -94,15 +102,17 @@ export class KillConfirmedMode implements GameMode {
   }
 
   isMatchOver(match: MatchContext): boolean {
+    if (teamScoreRows(match)) {
+      return match.matchTimer <= 0 || hasTeamReachedScore(match, KILL_CONFIRMED.SCORE_TARGET);
+    }
     return (
       match.matchTimer <= 0 ||
-      [...match.players.values()].some(
-        (player) => player.score >= KILL_CONFIRMED.SCORE_TARGET,
-      )
+      [...match.players.values()].some((player) => player.score >= KILL_CONFIRMED.SCORE_TARGET)
     );
   }
 
   determineWinner(match: MatchContext): PlayerId | null {
+    if (teamScoreRows(match)) return determineTeamLeader(match);
     const players = [...match.players.values()].sort((a, b) => b.score - a.score);
     if (players.length === 0) return null;
     if (players[1] && players[0].score === players[1].score) return null;
@@ -125,10 +135,7 @@ export class KillConfirmedMode implements GameMode {
       playerStats,
       duration: match.getElapsedSeconds(),
       gameMode: GameModeType.KILL_CONFIRMED,
-      awards: computeAwards(
-        playerStats,
-        (id) => match.players.get(id)?.nickname ?? 'UNKNOWN',
-      ),
+      awards: computeAwards(playerStats, (id) => match.players.get(id)?.nickname ?? 'UNKNOWN'),
       rivalry: null,
       rivalrySet: null,
       isPractice: false,

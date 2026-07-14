@@ -14,8 +14,13 @@ import {
   BOT_TACTICS,
   SCRAP_PIT_RIVALS,
   RUMBLE,
+  CREW_BATTLE_MODES,
   PRACTICE_KINDS,
   getNextGameMode,
+  getNextCrewBattleMode,
+  isCrewBattleMode,
+  crewBattleObjective,
+  crewBattleScoreUnit,
   gameModeDisplayName,
   characterMaxHealth,
   characterSpeedMultiplier,
@@ -108,6 +113,31 @@ describe('game mode rotation', () => {
     expect(gameModeDisplayName(GameModeType.ONE_IN_THE_CHAMBER)).toBe('ONE IN THE CHAMBER');
     expect(gameModeDisplayName(GameModeType.CORE_RUN)).toBe('CORE RUN');
     expect(gameModeDisplayName(GameModeType.BOUNTY_HUNT)).toBe('BOUNTY HUNT');
+  });
+});
+
+describe('Crew Battle mode rotation', () => {
+  it('contains only explicitly team-aware objectives and wraps', () => {
+    expect(CREW_BATTLE_MODES).toEqual([
+      GameModeType.DEATHMATCH,
+      GameModeType.KOTH,
+      GameModeType.KILL_CONFIRMED,
+      GameModeType.CORE_RUN,
+    ]);
+    expect(Object.isFrozen(CREW_BATTLE_MODES)).toBe(true);
+    expect(getNextCrewBattleMode(GameModeType.DEATHMATCH)).toBe(GameModeType.KOTH);
+    expect(getNextCrewBattleMode(GameModeType.CORE_RUN)).toBe(GameModeType.DEATHMATCH);
+    expect(getNextCrewBattleMode(GameModeType.GUN_GAME)).toBe(GameModeType.DEATHMATCH);
+  });
+
+  it('provides compact team-specific objective copy for every compatible mode', () => {
+    for (const mode of CREW_BATTLE_MODES) {
+      expect(isCrewBattleMode(mode)).toBe(true);
+      expect(crewBattleObjective(mode)).toMatch(/CREW|ALLIES/);
+      expect(crewBattleObjective(mode).length).toBeLessThanOrEqual(48);
+      expect(crewBattleScoreUnit(mode)).toMatch(/^(KOs|PTS|TAGS|SEC)$/);
+    }
+    expect(isCrewBattleMode(GameModeType.GUN_GAME)).toBe(false);
   });
 });
 

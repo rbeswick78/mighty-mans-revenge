@@ -1101,7 +1101,9 @@ export class LobbyScene extends Phaser.Scene {
       this.nickname,
       this.practiceDifficulty,
       kind,
-      kind === 'sparring' || kind === 'rusty_rumble' ? (this.practiceMode ?? undefined) : undefined,
+      kind === 'sparring' || kind === 'rusty_rumble' || kind === 'crew_battle'
+        ? (this.practiceMode ?? undefined)
+        : undefined,
       kind === 'sparring' || kind === 'rusty_rumble'
         ? (this.practiceRival ?? undefined)
         : undefined,

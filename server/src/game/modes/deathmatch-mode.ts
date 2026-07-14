@@ -1,7 +1,13 @@
 import { GameModeType } from '@shared/game';
 import type { PlayerId, MatchResult, KillWeapon } from '@shared/game';
 import { computeAwards } from '../awards.js';
-import type { GameMode, MatchContext } from './game-mode.js';
+import {
+  determineTeamLeader,
+  hasTeamReachedScore,
+  teamScoreRows,
+  type GameMode,
+  type MatchContext,
+} from './game-mode.js';
 
 export class DeathmatchMode implements GameMode {
   onStart(_match: MatchContext): void {
@@ -22,11 +28,8 @@ export class DeathmatchMode implements GameMode {
   isMatchOver(match: MatchContext): boolean {
     const killTarget = match.getKillTarget();
 
-    const teams = match.getTeamIds?.() ?? [];
-    if (teams.length > 0 && match.getTeamScore) {
-      return (
-        teams.some((teamId) => match.getTeamScore!(teamId) >= killTarget) || match.matchTimer <= 0
-      );
+    if (teamScoreRows(match)) {
+      return hasTeamReachedScore(match, killTarget) || match.matchTimer <= 0;
     }
 
     // Check if any player reached the kill target
@@ -69,18 +72,7 @@ export class DeathmatchMode implements GameMode {
   }
 
   determineWinner(match: MatchContext): PlayerId | null {
-    const teams = match.getTeamIds?.() ?? [];
-    if (teams.length > 0 && match.getTeamScore && match.getTeamId) {
-      const rankedTeams = teams
-        .map((teamId) => ({ teamId, score: match.getTeamScore!(teamId) }))
-        .sort((left, right) => right.score - left.score);
-      if (rankedTeams.length > 1 && rankedTeams[0].score === rankedTeams[1].score) return null;
-      return (
-        [...match.players.values()].find(
-          (player) => match.getTeamId!(player.id) === rankedTeams[0].teamId,
-        )?.id ?? null
-      );
-    }
+    if (teamScoreRows(match)) return determineTeamLeader(match);
 
     const players = Array.from(match.players.values());
     if (players.length === 0) return null;

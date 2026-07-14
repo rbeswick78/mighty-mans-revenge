@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { KothMode } from './koth-mode.js';
 import { MATCH, KOTH, MAP, OVERTIME, TileType, GameModeType } from '@shared/game';
-import type { MapData, PlayerId, PlayerState } from '@shared/game';
+import type { MapData, PlayerId, PlayerState, TeamId } from '@shared/game';
 import { StatsTracker } from '../stats-tracker.js';
 import type { MatchContext } from './game-mode.js';
 
@@ -81,7 +81,11 @@ interface TestContext extends MatchContext {
 
 function makeContext(
   players: PlayerState[],
-  opts: { matchTimer?: number; hills?: { x: number; y: number }[] | undefined } = {},
+  opts: {
+    matchTimer?: number;
+    hills?: { x: number; y: number }[] | undefined;
+    teams?: Record<string, TeamId>;
+  } = {},
 ): TestContext {
   const playerMap = new Map<PlayerId, PlayerState>();
   const stats = new StatsTracker();
@@ -90,6 +94,7 @@ function makeContext(
     stats.initPlayer(p.id);
   }
   const mapData = makeTestMapData(opts.hills);
+  const teams = new Map(Object.entries(opts.teams ?? {}) as Array<[PlayerId, TeamId]>);
 
   const ctx: TestContext = {
     matchId: 'test-match',
@@ -104,6 +109,12 @@ function makeContext(
     clearWeaponTransients: () => {
       // No burst/cooldown state exists in a bare test context.
     },
+    getTeamId: (playerId) => teams.get(playerId) ?? null,
+    getTeamIds: () => [...new Set(teams.values())],
+    getTeamScore: (teamId) =>
+      [...playerMap.values()]
+        .filter((player) => teams.get(player.id) === teamId)
+        .reduce((total, player) => total + player.score, 0),
   };
   return ctx;
 }
@@ -206,6 +217,29 @@ describe('KothMode', () => {
       expect(state.contested).toBe(true);
       expect(state.occupantId).toBeNull();
       expect(state.captureFraction).toBe(0);
+    });
+
+    it('lets allied occupants hold together while an enemy contests the side', () => {
+      const p1 = makePlayer('p1');
+      const p2 = makePlayer('p2');
+      const rival = makePlayer('rival');
+      placeInHill(p1, HILLS[0]);
+      placeInHill(p2, HILLS[0]);
+      placeOutside(rival);
+      const ctx = makeContext([p1, p2, rival], {
+        hills: HILLS,
+        teams: { p1: 'blue', p2: 'blue', rival: 'red' },
+      });
+      mode.onStart(ctx);
+
+      tickSeconds(mode, ctx, 1.1);
+      expect(p1.score + p2.score).toBe(1);
+      expect(mode.getKothState()).toMatchObject({ occupantId: 'p1', contested: false });
+
+      placeInHill(rival, HILLS[0]);
+      tickSeconds(mode, ctx, 1);
+      expect(p1.score + p2.score).toBe(1);
+      expect(mode.getKothState()).toMatchObject({ occupantId: null, contested: true });
     });
 
     it('ignores dead players for occupancy — a corpse neither scores nor contests', () => {
@@ -421,6 +455,23 @@ describe('KothMode', () => {
       expect(mode.determineWinner(ctx)).toBe('p1');
 
       p2.score = 30;
+      expect(mode.determineWinner(ctx)).toBeNull();
+    });
+
+    it('ends and resolves by combined team hill score', () => {
+      const p1 = makePlayer('p1', 30);
+      const p2 = makePlayer('p2', 30);
+      const rivalA = makePlayer('rival-a', 25);
+      const rivalB = makePlayer('rival-b', 25);
+      const ctx = makeContext([p1, p2, rivalA, rivalB], {
+        hills: HILLS,
+        teams: { p1: 'blue', p2: 'blue', 'rival-a': 'red', 'rival-b': 'red' },
+      });
+
+      expect(mode.isMatchOver(ctx)).toBe(true);
+      expect(mode.determineWinner(ctx)).toBe('p1');
+      rivalA.score = 30;
+      rivalB.score = 30;
       expect(mode.determineWinner(ctx)).toBeNull();
     });
 

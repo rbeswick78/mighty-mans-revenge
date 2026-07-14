@@ -1908,7 +1908,7 @@ describe('MatchmakingManager solo practice flow', () => {
     );
   });
 
-  it('launches Crew Battle immediately and preserves its sides through a direct rematch', () => {
+  it('honors a team-aware Crew objective and preserves its sides and mode pin on rematch', () => {
     const { fake, sent, connected } = makeFakeServer();
     connected.push('A');
     const mgr = new MatchmakingManager(fake, () => 0, store, seededRng([0, 0, 0, 0, 0]));
@@ -1924,7 +1924,7 @@ describe('MatchmakingManager solo practice flow', () => {
     );
 
     const first = mgr.getActiveMatches()[0];
-    expect(first.gameModeType).toBe(GameModeType.DEATHMATCH);
+    expect(first.gameModeType).toBe(GameModeType.KOTH);
     expect(first.players).toHaveLength(4);
     const teams = first.getTeamAssignments();
     expect([...teams.values()].filter((teamId) => teamId === 'blue')).toHaveLength(2);
@@ -1943,12 +1943,12 @@ describe('MatchmakingManager solo practice flow', () => {
     expect(found.message).toMatchObject({
       matchKind: 'duos',
       practiceKind: 'crew_battle',
-      gameMode: GameModeType.DEATHMATCH,
+      gameMode: GameModeType.KOTH,
     });
     expect(found.message.playerTeams).toEqual(Object.fromEntries(teams));
 
-    first.players.get('A')!.score = 8;
-    first.players.get(allyId!)!.score = 7;
+    first.players.get('A')!.score = 30;
+    first.players.get(allyId!)!.score = 30;
     first.phase = MatchPhase.ENDED;
     mgr.tick(0.05, 1);
     const ended = [...sent]
@@ -1961,7 +1961,7 @@ describe('MatchmakingManager solo practice flow', () => {
       matchKind: 'duos',
       winnerId: null,
       winnerTeamId: 'blue',
-      teamScores: { blue: 15, red: 0 },
+      teamScores: { blue: 60, red: 0 },
       isPractice: true,
       rivalrySet: null,
     });
@@ -1969,7 +1969,7 @@ describe('MatchmakingManager solo practice flow', () => {
     sent.length = 0;
     mgr.handleRematchRequest('A');
     const rematch = mgr.getActiveMatches()[0];
-    expect(rematch.gameModeType).toBe(GameModeType.DEATHMATCH);
+    expect(rematch.gameModeType).toBe(GameModeType.KOTH);
     expect(Object.fromEntries(rematch.getTeamAssignments())).toEqual(Object.fromEntries(teams));
     const rematchFound = sent.find(
       (entry) => entry.playerId === 'A' && entry.message.type === 'server:matchFound',
@@ -1977,6 +1977,36 @@ describe('MatchmakingManager solo practice flow', () => {
     expect(
       rematchFound?.message.type === 'server:matchFound' ? rematchFound.message.practiceKind : null,
     ).toBe('crew_battle');
+  });
+
+  it('rotates a random Crew Battle through only team-compatible objectives', () => {
+    const { fake, sent, connected } = makeFakeServer();
+    connected.push('A');
+    const mgr = new MatchmakingManager(fake, () => 0, store, seededRng([0, 0, 0, 0, 0]));
+
+    mgr.handleStartPractice('A', 'Alpha', 'scrapper', 'crew_battle');
+    const first = mgr.getActiveMatches()[0];
+    expect(first.gameModeType).toBe(GameModeType.DEATHMATCH);
+    const teams = first.getTeamAssignments();
+    const allyId = [...teams].find(
+      ([playerId, teamId]) => playerId !== 'A' && teamId === 'blue',
+    )?.[0];
+    first.players.get('A')!.score = 8;
+    first.players.get(allyId!)!.score = 7;
+    first.phase = MatchPhase.ENDED;
+    mgr.tick(0.05, 1);
+
+    const ended = [...sent]
+      .reverse()
+      .find((entry) => entry.playerId === 'A' && entry.message.type === 'server:matchEnd');
+    expect(
+      ended?.message.type === 'server:matchEnd' ? ended.message.result.nextGameMode : null,
+    ).toBe(GameModeType.KOTH);
+
+    mgr.handleRematchRequest('A');
+    const rematch = mgr.getActiveMatches()[0];
+    expect(rematch.gameModeType).toBe(GameModeType.KOTH);
+    expect(Object.fromEntries(rematch.getTeamAssignments())).toEqual(Object.fromEntries(teams));
   });
 
   it('tears down every Scrap Pit bot when its solo player disconnects', () => {

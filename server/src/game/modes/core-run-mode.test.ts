@@ -1,13 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import {
-  CORE_RUN,
-  GRENADE,
-  MATCH,
-  GameModeType,
-  PickupType,
-  TileType,
-} from '@shared/game';
-import type { MapData, PlayerId, PlayerState } from '@shared/game';
+import { CORE_RUN, GRENADE, MATCH, GameModeType, PickupType, TileType } from '@shared/game';
+import type { MapData, PlayerId, PlayerState, TeamId } from '@shared/game';
 import { StatsTracker } from '../stats-tracker.js';
 import type { MatchContext } from './game-mode.js';
 import { CoreRunMode } from './core-run-mode.js';
@@ -53,10 +46,11 @@ function mapData(): MapData {
     width: 4,
     height: 4,
     tileSize: 48,
-    tiles: Array.from({ length: 4 }, () =>
-      Array.from({ length: 4 }, () => TileType.FLOOR),
-    ),
-    spawnPoints: [{ x: 0, y: 0 }, { x: 3, y: 3 }],
+    tiles: Array.from({ length: 4 }, () => Array.from({ length: 4 }, () => TileType.FLOOR)),
+    spawnPoints: [
+      { x: 0, y: 0 },
+      { x: 3, y: 3 },
+    ],
     pickupSpawns: [],
   };
 }
@@ -66,13 +60,19 @@ interface TestContext extends MatchContext {
   matchTimer: number;
 }
 
-function context(players: PlayerState[], isOvertime = false): TestContext {
+function context(
+  players: PlayerState[],
+  isOvertime = false,
+  teamAssignments: Record<string, TeamId> = {},
+): TestContext {
   const stats = new StatsTracker();
   for (const p of players) stats.initPlayer(p.id);
+  const playerMap = new Map(players.map((p) => [p.id, p]));
+  const teams = new Map(Object.entries(teamAssignments) as Array<[PlayerId, TeamId]>);
   return {
     matchId: 'core-test',
     matchTimer: MATCH.TIME_LIMIT,
-    players: new Map(players.map((p) => [p.id, p])),
+    players: playerMap,
     stats,
     isOvertime,
     getKillTarget: () => MATCH.KILL_TARGET,
@@ -80,6 +80,12 @@ function context(players: PlayerState[], isOvertime = false): TestContext {
     getMapData: mapData,
     getElapsedSeconds: () => 10,
     clearWeaponTransients: () => {},
+    getTeamId: (playerId) => teams.get(playerId) ?? null,
+    getTeamIds: () => [...new Set(teams.values())],
+    getTeamScore: (teamId) =>
+      [...playerMap.values()]
+        .filter((candidate) => teams.get(candidate.id) === teamId)
+        .reduce((total, candidate) => total + candidate.score, 0),
   };
 }
 
@@ -103,10 +109,7 @@ describe('CoreRunMode', () => {
 
   it('uses nearest distance then player id to resolve simultaneous pickups', () => {
     const mode = new CoreRunMode();
-    const ctx = context([
-      player('b', 96, 96),
-      player('a', 96, 96),
-    ]);
+    const ctx = context([player('b', 96, 96), player('a', 96, 96)]);
     mode.onStart(ctx);
 
     mode.onTick(ctx, 0.05);
@@ -202,6 +205,30 @@ describe('CoreRunMode', () => {
     ctx.matchTimer = 0;
     expect(mode.isMatchOver(ctx)).toBe(true);
     expect(mode.getResults(ctx).gameMode).toBe(GameModeType.CORE_RUN);
+  });
+
+  it('ends and resolves by combined team carry time', () => {
+    const mode = new CoreRunMode();
+    const a = player('a', 0, 0);
+    const b = player('b', 0, 0);
+    const rivalA = player('rival-a', 0, 0);
+    const rivalB = player('rival-b', 0, 0);
+    const ctx = context([a, b, rivalA, rivalB], false, {
+      a: 'blue',
+      b: 'blue',
+      'rival-a': 'red',
+      'rival-b': 'red',
+    });
+    a.score = 23;
+    b.score = 22;
+    rivalA.score = 20;
+    rivalB.score = 20;
+
+    expect(mode.isMatchOver(ctx)).toBe(true);
+    expect(mode.determineWinner(ctx)).toBe('a');
+    rivalA.score = 23;
+    rivalB.score = 22;
+    expect(mode.determineWinner(ctx)).toBeNull();
   });
 
   it('removes special-weapon pickups but keeps sustain and ordnance', () => {

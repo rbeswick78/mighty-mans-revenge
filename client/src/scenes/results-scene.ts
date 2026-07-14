@@ -7,6 +7,8 @@ import {
   AWARD_DEFS,
   CHARACTERS,
   createEmptyKillsByWeapon,
+  crewBattleObjective,
+  crewBattleScoreUnit,
   gameModeDisplayName,
   type CharacterId,
 } from '@shared/config/game.js';
@@ -319,7 +321,7 @@ export class ResultsScene extends Phaser.Scene {
         arenaMastery ? 120 : 112,
         this.result
           ? this.result.matchKind === 'duos'
-            ? `RUN IT BACK: SAME CREWS // NEXT ARENA: ${this.result.nextMapName?.toUpperCase() ?? 'RANDOM'}`
+            ? `SAME CREWS // NEXT: ${gameModeDisplayName(this.result.nextGameMode ?? this.result.gameMode)} @ ${this.result.nextMapName?.toUpperCase() ?? 'RANDOM'}`
             : (gauntletNextTeaser(this.result) ?? nextDraftTeaser(this.result))
           : 'NEXT: COIN TOSS PICKS WHO DRAFTS MAP + MODE',
         {
@@ -819,7 +821,7 @@ export class ResultsScene extends Phaser.Scene {
     );
     panel.add(
       this.add
-        .text(panel.centerX, 48, 'FRIENDLY FIRE OFF  //  COMBINED KNOCKOUTS WIN', {
+        .text(panel.centerX, 48, crewBattleObjective(this.result.gameMode), {
           fontFamily: MENU_FONTS.HEADER,
           fontSize: '8px',
           color: cssHex(LABEL_COLOR),
@@ -832,6 +834,7 @@ export class ResultsScene extends Phaser.Scene {
       const isLocalTeam = teamId === localTeam;
       const isWinner = teamId === this.result.winnerTeamId;
       const color = isWinner ? WINNER_NICK_COLOR : isLocalTeam ? VALUE_COLOR : LABEL_COLOR;
+      const scoreUnit = crewBattleScoreUnit(this.result.gameMode);
       const members = [...statsMap.entries()]
         .filter(([playerId]) => this.result?.playerTeams?.[playerId] === teamId)
         .sort(([, left], [, right]) => right.kills - left.kills || left.deaths - right.deaths);
@@ -849,7 +852,7 @@ export class ResultsScene extends Phaser.Scene {
             this.add.text(
               24,
               y + 4,
-              `${isWinner ? '★ ' : ''}${teamLabel}\n${this.result?.teamScores?.[teamId] ?? 0} KOs`,
+              `${isWinner ? '★ ' : ''}${teamLabel}\n${this.result?.teamScores?.[teamId] ?? 0} ${scoreUnit}`,
               {
                 fontFamily: MENU_FONTS.HEADER,
                 fontSize: '9px',

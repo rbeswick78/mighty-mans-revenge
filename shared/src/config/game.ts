@@ -452,6 +452,51 @@ export const CREW_BATTLE = Object.freeze({
   KILL_TARGET: 15,
 });
 
+/** Objective modes whose scoring and possession rules are explicitly team-aware. */
+export const CREW_BATTLE_MODES: readonly GameModeType[] = Object.freeze([
+  GameModeType.DEATHMATCH,
+  GameModeType.KOTH,
+  GameModeType.KILL_CONFIRMED,
+  GameModeType.CORE_RUN,
+]);
+
+export function isCrewBattleMode(mode: GameModeType): boolean {
+  return CREW_BATTLE_MODES.includes(mode);
+}
+
+/** Crew rematches rotate only through modes with complete team semantics. */
+export function getNextCrewBattleMode(current: GameModeType): GameModeType {
+  const index = CREW_BATTLE_MODES.indexOf(current);
+  return CREW_BATTLE_MODES[(index + 1) % CREW_BATTLE_MODES.length];
+}
+
+/** Compact pre-fight copy for the team version of each supported objective. */
+export function crewBattleObjective(mode: GameModeType): string {
+  switch (mode) {
+    case GameModeType.KOTH:
+      return 'HOLD TOGETHER // FIRST CREW TO 60';
+    case GameModeType.KILL_CONFIRMED:
+      return 'CONFIRM ENEMY TAGS // ALLIES DENY // FIRST TO 8';
+    case GameModeType.CORE_RUN:
+      return 'CARRY THE CORE // FIRST CREW TO 45';
+    default:
+      return `COMBINED KOs // FIRST CREW TO ${CREW_BATTLE.KILL_TARGET}`;
+  }
+}
+
+export function crewBattleScoreUnit(mode: GameModeType): string {
+  switch (mode) {
+    case GameModeType.KOTH:
+      return 'PTS';
+    case GameModeType.KILL_CONFIRMED:
+      return 'TAGS';
+    case GameModeType.CORE_RUN:
+      return 'SEC';
+    default:
+      return 'KOs';
+  }
+}
+
 /** Server-owned credit for meaningful help in three- and four-fighter battles. */
 export const RUMBLE_ASSISTS = Object.freeze({
   /** A contribution must be this recent when the knockout lands. */
@@ -718,7 +763,7 @@ export function isTauntId(value: unknown): value is TauntId {
 export const GAME_MODES = Object.freeze({
   [GameModeType.DEATHMATCH]: Object.freeze({
     displayName: 'DEATHMATCH',
-    objective: 'FIRST TO 20 KILLS',
+    objective: `FIRST TO ${MATCH.KILL_TARGET} KILLS`,
   }),
   [GameModeType.KOTH]: Object.freeze({
     displayName: 'KING OF THE HILL',

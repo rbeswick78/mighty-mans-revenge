@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import {
-  GRENADE,
-  KILL_CONFIRMED,
-  MATCH,
-  GameModeType,
-  TileType,
-} from '@shared/game';
-import type { MapData, PlayerId, PlayerState } from '@shared/game';
+import { GRENADE, KILL_CONFIRMED, MATCH, GameModeType, TileType } from '@shared/game';
+import type { MapData, PlayerId, PlayerState, TeamId } from '@shared/game';
 import { StatsTracker } from '../stats-tracker.js';
 import type { MatchContext } from './game-mode.js';
 import { KillConfirmedMode } from './kill-confirmed-mode.js';
@@ -52,21 +46,28 @@ function mapData(): MapData {
     width: 4,
     height: 4,
     tileSize: 48,
-    tiles: Array.from({ length: 4 }, () =>
-      Array.from({ length: 4 }, () => TileType.FLOOR),
-    ),
-    spawnPoints: [{ x: 1, y: 1 }, { x: 2, y: 2 }],
+    tiles: Array.from({ length: 4 }, () => Array.from({ length: 4 }, () => TileType.FLOOR)),
+    spawnPoints: [
+      { x: 1, y: 1 },
+      { x: 2, y: 2 },
+    ],
     pickupSpawns: [],
   };
 }
 
-function context(players: PlayerState[], isOvertime = false): MatchContext {
+function context(
+  players: PlayerState[],
+  isOvertime = false,
+  teamAssignments: Record<string, TeamId> = {},
+): MatchContext {
   const stats = new StatsTracker();
   for (const p of players) stats.initPlayer(p.id);
+  const playerMap = new Map(players.map((p) => [p.id, p]));
+  const teams = new Map(Object.entries(teamAssignments) as Array<[PlayerId, TeamId]>);
   return {
     matchId: 'kc-test',
     matchTimer: MATCH.TIME_LIMIT,
-    players: new Map(players.map((p) => [p.id, p])),
+    players: playerMap,
     stats,
     isOvertime,
     getKillTarget: () => MATCH.KILL_TARGET,
@@ -74,6 +75,12 @@ function context(players: PlayerState[], isOvertime = false): MatchContext {
     getMapData: mapData,
     getElapsedSeconds: () => 1,
     clearWeaponTransients: () => {},
+    getTeamId: (playerId) => teams.get(playerId) ?? null,
+    getTeamIds: () => [...new Set(teams.values())],
+    getTeamScore: (teamId) =>
+      [...playerMap.values()]
+        .filter((candidate) => teams.get(candidate.id) === teamId)
+        .reduce((total, candidate) => total + candidate.score, 0),
   };
 }
 
@@ -127,6 +134,29 @@ describe('KillConfirmedMode', () => {
     ]);
   });
 
+  it('lets either teammate deny an allied tag without scoring', () => {
+    const mode = new KillConfirmedMode();
+    const owner = player('owner', 100, 120);
+    const ally = player('ally', 20, 20);
+    const rival = player('rival', 180, 180);
+    const ctx = context([owner, ally, rival], false, {
+      owner: 'blue',
+      ally: 'blue',
+      rival: 'red',
+    });
+    mode.onStart(ctx);
+    mode.onKill(ctx, rival.id, owner.id, 'gun');
+    owner.isDead = true;
+    ally.position = { x: 100, y: 120 };
+    mode.onTick(ctx, 0.05);
+
+    expect(ally.score).toBe(0);
+    expect(mode.getKillConfirmedTags()).toEqual([]);
+    expect(mode.getKillConfirmedCollections()).toMatchObject([
+      { collectorId: ally.id, ownerId: owner.id, confirmed: false },
+    ]);
+  });
+
   it('expires abandoned tags', () => {
     const mode = new KillConfirmedMode();
     const a = player('a', 0, 0);
@@ -166,6 +196,29 @@ describe('KillConfirmedMode', () => {
     expect(mode.isMatchOver(ctx)).toBe(true);
     expect(mode.determineWinner(ctx)).toBe(a.id);
     b.score = a.score;
+    expect(mode.determineWinner(ctx)).toBeNull();
+  });
+
+  it('ends and resolves by combined team confirmations', () => {
+    const mode = new KillConfirmedMode();
+    const a = player('a', 0, 0);
+    const b = player('b', 0, 0);
+    const rivalA = player('rival-a', 100, 100);
+    const rivalB = player('rival-b', 100, 100);
+    const ctx = context([a, b, rivalA, rivalB], false, {
+      a: 'blue',
+      b: 'blue',
+      'rival-a': 'red',
+      'rival-b': 'red',
+    });
+    a.score = 4;
+    b.score = 4;
+    rivalA.score = 4;
+    rivalB.score = 3;
+
+    expect(mode.isMatchOver(ctx)).toBe(true);
+    expect(mode.determineWinner(ctx)).toBe('a');
+    rivalB.score = 4;
     expect(mode.determineWinner(ctx)).toBeNull();
   });
 

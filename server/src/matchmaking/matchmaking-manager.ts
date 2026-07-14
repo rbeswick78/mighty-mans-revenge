@@ -4,6 +4,7 @@ import {
   GAME_MODE_ROTATION,
   DRAFT,
   RUMBLE,
+  CREW_BATTLE_MODES,
   RIVALRY_SET,
   BOT,
   BOT_DIFFICULTIES,
@@ -17,6 +18,8 @@ import {
   DAILY_GAUNTLET_LEADERBOARD,
   LEADERBOARD,
   getNextGameMode,
+  getNextCrewBattleMode,
+  isCrewBattleMode,
   getMap,
   getNextMapName,
   listMapNames,
@@ -336,7 +339,9 @@ export class MatchmakingManager {
       safeKind === 'sparring' || safeKind === 'rusty_rumble' || safeKind === 'crew_battle';
     const practiceModePin =
       safeKind === 'crew_battle'
-        ? GameModeType.DEATHMATCH
+        ? gameMode !== undefined && isCrewBattleMode(gameMode)
+          ? gameMode
+          : null
         : usesSparRules && gameMode !== undefined && GAME_MODE_ROTATION.includes(gameMode)
           ? gameMode
           : null;
@@ -384,15 +389,29 @@ export class MatchmakingManager {
     const mapName =
       dailyOpening?.mapName ??
       names[Math.min(Math.floor(this.rng() * names.length), names.length - 1)];
+    const eligibleModePool = safeKind === 'crew_battle' ? CREW_BATTLE_MODES : GAME_MODE_ROTATION;
     const randomModePool = practiceMutatorPreference
-      ? GAME_MODE_ROTATION.filter((mode) =>
+      ? eligibleModePool.filter((mode) =>
           isMutatorCompatibleWithMode(practiceMutatorPreference, mode),
         )
-      : GAME_MODE_ROTATION;
+      : eligibleModePool;
+    const forcedMode = this.forcedMode();
+    const crewForcedMode =
+      safeKind === 'crew_battle' &&
+      forcedMode !== null &&
+      isCrewBattleMode(forcedMode) &&
+      (!practiceMutatorPreference ||
+        isMutatorCompatibleWithMode(practiceMutatorPreference, forcedMode))
+        ? forcedMode
+        : null;
     const selectedMode =
       safeKind === 'crew_battle'
-        ? GameModeType.DEATHMATCH
-        : (this.forcedMode() ??
+        ? (crewForcedMode ??
+          practiceModePin ??
+          randomModePool[
+            Math.min(Math.floor(this.rng() * randomModePool.length), randomModePool.length - 1)
+          ])
+        : (forcedMode ??
           practiceModePin ??
           dailyOpening?.gameMode ??
           randomModePool[
@@ -852,6 +871,21 @@ export class MatchmakingManager {
       next = getNextGameMode(next);
     }
     return getNextGameMode(current);
+  }
+
+  /** Keep Random Crew rematches inside modes with complete team semantics. */
+  private nextCompatibleCrewBattleMode(
+    current: GameModeType,
+    preference: MutatorId | null,
+  ): GameModeType {
+    let next = getNextCrewBattleMode(current);
+    if (preference === null) return next;
+
+    for (let checked = 0; checked < CREW_BATTLE_MODES.length; checked++) {
+      if (isMutatorCompatibleWithMode(preference, next)) return next;
+      next = getNextCrewBattleMode(next);
+    }
+    return getNextCrewBattleMode(current);
   }
 
   /**
@@ -1946,9 +1980,16 @@ export class MatchmakingManager {
       this.forcedMap()?.name ??
       (restartingDaily ? dailyOpening.mapName : getNextMapName(match.mapManager.getMapData().name));
     result.nextMapName = nextMapName;
+    const forcedNextMode = this.forcedMode();
     const nextGameMode =
       matchKind === 'duos'
-        ? GameModeType.DEATHMATCH
+        ? forcedNextMode !== null &&
+          isCrewBattleMode(forcedNextMode) &&
+          (!practiceMutatorPreference ||
+            isMutatorCompatibleWithMode(practiceMutatorPreference, forcedNextMode))
+          ? forcedNextMode
+          : (practiceModePin ??
+            this.nextCompatibleCrewBattleMode(match.gameModeType, practiceMutatorPreference))
         : (this.forcedMode() ??
           practiceModePin ??
           (restartingDaily

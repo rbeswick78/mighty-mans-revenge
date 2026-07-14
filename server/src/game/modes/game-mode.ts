@@ -50,6 +50,36 @@ export interface MatchContext {
   getTeamScore?(teamId: TeamId): number;
 }
 
+/** Team score rows when a match has complete side helpers, otherwise null. */
+export function teamScoreRows(
+  match: MatchContext,
+): Array<{ teamId: TeamId; score: number }> | null {
+  const teamIds = match.getTeamIds?.() ?? [];
+  if (teamIds.length === 0 || !match.getTeamScore) return null;
+  return teamIds.map((teamId) => ({ teamId, score: match.getTeamScore!(teamId) }));
+}
+
+/** Whether any side has collectively reached an objective's score target. */
+export function hasTeamReachedScore(match: MatchContext, target: number): boolean {
+  return teamScoreRows(match)?.some(({ score }) => score >= target) ?? false;
+}
+
+/**
+ * Representative player for the uniquely leading side. Match converts this
+ * back to winnerTeamId in the final result; null deliberately triggers normal
+ * sudden-death handling for an exact team tie.
+ */
+export function determineTeamLeader(match: MatchContext): PlayerId | null {
+  const rows = teamScoreRows(match);
+  if (!rows || !match.getTeamId) return null;
+  rows.sort((left, right) => right.score - left.score || left.teamId.localeCompare(right.teamId));
+  if (rows[1] && rows[0].score === rows[1].score) return null;
+  return (
+    [...match.players.values()].find((player) => match.getTeamId!(player.id) === rows[0].teamId)
+      ?.id ?? null
+  );
+}
+
 export interface GameMode {
   onStart(match: MatchContext): void;
   onTick(match: MatchContext, dt: number): void;

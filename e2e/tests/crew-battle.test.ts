@@ -32,7 +32,9 @@ test.describe('Crew Battle 2v2', () => {
         window as unknown as { game?: { scene: { getScene: (key: string) => unknown } } }
       ).game?.scene.getScene('LobbyScene') as {
         crewBattleButton?: { activate: () => boolean };
+        practiceMode?: string | null;
       };
+      scene.practiceMode = 'koth';
       return scene.crewBattleButton?.activate() ?? false;
     });
     expect(activated).toBe(true);
@@ -48,6 +50,7 @@ test.describe('Crew Battle 2v2', () => {
               matchData?: {
                 matchKind?: string;
                 practiceKind?: string;
+                gameMode?: string;
                 playerTeams?: Record<string, string>;
               };
               latestSelections?: Array<{ nickname: string; lockedCharacterId: string | null }>;
@@ -58,6 +61,7 @@ test.describe('Crew Battle 2v2', () => {
               active: scene?.sys?.settings.active ?? false,
               matchKind: scene?.matchData?.matchKind ?? null,
               practiceKind: scene?.matchData?.practiceKind ?? null,
+              gameMode: scene?.matchData?.gameMode ?? null,
               blue: teams.filter((teamId) => teamId === 'blue').length,
               red: teams.filter((teamId) => teamId === 'red').length,
               bots: (scene?.latestSelections ?? [])
@@ -68,7 +72,8 @@ test.describe('Crew Battle 2v2', () => {
                   (child) =>
                     child.text?.includes('CREW BATTLE 2V2') &&
                     child.text.includes('FRIENDLY FIRE OFF') &&
-                    child.text.includes('FIRST CREW TO 15'),
+                    child.text.includes('HOLD TOGETHER') &&
+                    child.text.includes('FIRST CREW TO 60'),
                 ) ?? false,
             };
           }),
@@ -78,6 +83,7 @@ test.describe('Crew Battle 2v2', () => {
         active: true,
         matchKind: 'duos',
         practiceKind: 'crew_battle',
+        gameMode: 'koth',
         blue: 2,
         red: 2,
         bots: ['RUSTY', 'SCRAPJAW', 'CLANK'],
@@ -193,7 +199,7 @@ test.describe('Crew Battle 2v2', () => {
           winnerId: null,
           winnerTeamId: 'blue',
           playerTeams: { local: 'blue', ally: 'blue', rivalA: 'red', rivalB: 'red' },
-          teamScores: { blue: 15, red: 10 },
+          teamScores: { blue: 60, red: 44 },
           playerStats: new Map([
             ['local', stats],
             ['ally', { ...stats, kills: 8, assists: 1, deaths: 3 }],
@@ -201,7 +207,7 @@ test.describe('Crew Battle 2v2', () => {
             ['rivalB', { ...stats, kills: 4, assists: 4, deaths: 8 }],
           ]),
           duration: 130,
-          gameMode: 'deathmatch',
+          gameMode: 'koth',
           matchKind: 'duos',
           playerNicknames: {
             local: 'Courier',
@@ -220,7 +226,7 @@ test.describe('Crew Battle 2v2', () => {
           rivalrySet: null,
           isPractice: true,
           nextMapName: 'Scrapyard',
-          nextGameMode: 'deathmatch',
+          nextGameMode: 'kill_confirmed',
           wentToOvertime: false,
         },
       });
@@ -253,8 +259,11 @@ test.describe('Crew Battle 2v2', () => {
           ]);
           return {
             victory: all.some((child) => child.text === 'VICTORY'),
-            crewScore: all.some((child) => child.text?.includes('YOUR CREW\n15 KOs')),
-            rivalScore: all.some((child) => child.text?.includes('RIVALS\n10 KOs')),
+            nextObjective: all.some(
+              (child) => child.text === 'SAME CREWS // NEXT: KILL CONFIRMED @ SCRAPYARD',
+            ),
+            crewScore: all.some((child) => child.text?.includes('YOUR CREW\n60 PTS')),
+            rivalScore: all.some((child) => child.text?.includes('RIVALS\n44 PTS')),
             portraits: ['local', 'ally', 'rivalA', 'rivalB'].map((playerId) =>
               Boolean(all.find((child) => child.name === `result-fighter-${playerId}`)?.visible),
             ),
@@ -263,6 +272,7 @@ test.describe('Crew Battle 2v2', () => {
       )
       .toEqual({
         victory: true,
+        nextObjective: true,
         crewScore: true,
         rivalScore: true,
         portraits: [true, true, true, true],
