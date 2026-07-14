@@ -63,6 +63,13 @@ import {
   scrapPitRecordUpdate,
   type ScrapPitRecordUpdate,
 } from '../ui/scrap-pit-record.js';
+import {
+  CREW_TOUR_STORAGE_KEY,
+  crewTourResultLabel,
+  crewTourUpdate,
+  normalizeCrewTourRecord,
+  type CrewTourUpdate,
+} from '../ui/crew-tour.js';
 
 interface ResultsSceneData {
   result?: MatchResult;
@@ -133,6 +140,7 @@ export class ResultsScene extends Phaser.Scene {
   private isNewGauntletBuild = false;
   private isNewGauntletBuildBest = false;
   private scrapPitRecordUpdate: ScrapPitRecordUpdate | null = null;
+  private crewTourUpdate: CrewTourUpdate | null = null;
 
   // Event handler references for cleanup
   private onRematchStatus: ((opponentWantsRematch: boolean) => void) | null = null;
@@ -171,6 +179,7 @@ export class ResultsScene extends Phaser.Scene {
     this.isNewGauntletBuild = false;
     this.isNewGauntletBuildBest = false;
     this.scrapPitRecordUpdate = null;
+    this.crewTourUpdate = null;
   }
 
   create(): void {
@@ -189,6 +198,17 @@ export class ResultsScene extends Phaser.Scene {
           SCRAP_PIT_RECORD_STORAGE_KEY,
           JSON.stringify(this.scrapPitRecordUpdate.record),
         );
+      }
+    }
+
+    if (this.matchData?.practiceKind === 'crew_battle' && this.result) {
+      this.crewTourUpdate = crewTourUpdate(
+        this.result,
+        this.gameService.getPlayerId(),
+        normalizeCrewTourRecord(localStorage.getItem(CREW_TOUR_STORAGE_KEY)),
+      );
+      if (this.crewTourUpdate) {
+        localStorage.setItem(CREW_TOUR_STORAGE_KEY, JSON.stringify(this.crewTourUpdate.record));
       }
     }
 
@@ -1115,15 +1135,24 @@ export class ResultsScene extends Phaser.Scene {
     if (!this.result) return;
 
     const pitRecordLine = scrapPitRecordResultLabel(this.scrapPitRecordUpdate);
+    const crewTourLine = crewTourResultLabel(this.crewTourUpdate);
     const line =
-      gauntletResultSummary(this.result) ?? pitRecordLine ?? formatRivalrySummary(this.result);
+      gauntletResultSummary(this.result) ??
+      crewTourLine ??
+      pitRecordLine ??
+      formatRivalrySummary(this.result);
     if (line) {
       const rivalryText = this.add
         .text(centerX, RIVALRY_Y, line, {
           fontFamily: MENU_FONTS.HEADER,
           fontSize: '9px',
           color: cssHex(
-            this.scrapPitRecordUpdate?.isNewBest ? CAREER_RANK_UP_COLOR : RIVALRY_COLOR,
+            this.scrapPitRecordUpdate?.isNewBest ||
+              this.crewTourUpdate?.completedTour ||
+              this.crewTourUpdate?.earnedPatch ||
+              this.crewTourUpdate?.isNewBest
+              ? CAREER_RANK_UP_COLOR
+              : RIVALRY_COLOR,
           ),
         })
         .setOrigin(0.5)

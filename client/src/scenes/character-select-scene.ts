@@ -24,6 +24,11 @@ import { practiceMutatorBriefingLabel } from '../ui/practice-mutator.js';
 import { rumbleCrownBriefingLabel } from '../ui/rumble-crown.js';
 import { rumbleGrudgeBriefingLabel } from '../ui/rumble-grudge.js';
 import { scrapPitCrewLabel } from '../ui/scrap-pit-crew.js';
+import {
+  CREW_TOUR_STORAGE_KEY,
+  crewTourBriefingLabel,
+  normalizeCrewTourRecord,
+} from '../ui/crew-tour.js';
 
 // Scene-local color decisions. HEALTH_GOOD (mint) doubles as the "you"
 // highlight — same color the HUD uses for the local player's health bar,
@@ -196,7 +201,13 @@ export class CharacterSelectScene extends Phaser.Scene {
             }: ${modeName} - ${this.matchData.mapName.toUpperCase()}`,
             ...(this.matchData.practiceKind === 'rusty_rumble' ? [scrapPitCrewLabel()] : []),
             ...(this.matchData.practiceKind === 'crew_battle'
-              ? [`FRIENDLY FIRE OFF  //  ${crewBattleObjective(this.matchData.gameMode)}`]
+              ? [
+                  `FRIENDLY FIRE OFF  //  ${crewBattleObjective(this.matchData.gameMode)}`,
+                  crewTourBriefingLabel(
+                    normalizeCrewTourRecord(localStorage.getItem(CREW_TOUR_STORAGE_KEY)),
+                    this.matchData.gameMode,
+                  ),
+                ]
               : []),
             ...(crownLabel ? [crownLabel] : []),
             ...(grudgeLabel ? [grudgeLabel] : []),

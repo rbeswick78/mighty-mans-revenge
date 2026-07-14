@@ -59,7 +59,7 @@ test.describe('Scrap Pit solo Rumble', () => {
       expect(mobileLobby.labels).toEqual([
         'RUSTY SPAR',
         'SCRAP PIT\nNO WINS YET',
-        'CREW 2V2',
+        'CREW 2V2\nTOUR 0/4',
         'GAUNTLET',
         'DAILY RUN',
       ]);
@@ -141,7 +141,7 @@ test.describe('Scrap Pit solo Rumble', () => {
     expect(lobby.labels).toEqual([
       'RUSTY SPAR',
       'SCRAP PIT\nNO WINS YET',
-      'CREW 2V2',
+      'CREW 2V2\nTOUR 0/4',
       'GAUNTLET',
       'DAILY RUN',
     ]);

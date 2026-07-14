@@ -28,6 +28,7 @@ test.describe('Crew Battle 2v2', () => {
 
     await gamePage.locator('input[type="text"]').first().fill('Courier');
     const activated = await gamePage.evaluate(() => {
+      localStorage.removeItem('mmr_crew_tour');
       const scene = (
         window as unknown as { game?: { scene: { getScene: (key: string) => unknown } } }
       ).game?.scene.getScene('LobbyScene') as {
@@ -54,9 +55,14 @@ test.describe('Crew Battle 2v2', () => {
                 playerTeams?: Record<string, string>;
               };
               latestSelections?: Array<{ nickname: string; lockedCharacterId: string | null }>;
-              children?: { list: Array<{ text?: string }> };
+              children?: { list: Array<{ text?: string; displayWidth?: number }> };
             };
             const teams = Object.values(scene?.matchData?.playerTeams ?? {});
+            const briefingNode = scene?.children?.list.find(
+              (child) =>
+                child.text?.includes('CREW BATTLE 2V2') &&
+                child.text.includes('CREW TOUR 0/4 // HILL PATCH OPEN'),
+            );
             return {
               active: scene?.sys?.settings.active ?? false,
               matchKind: scene?.matchData?.matchKind ?? null,
@@ -68,13 +74,10 @@ test.describe('Crew Battle 2v2', () => {
                 .filter((selection) => selection.nickname !== 'Courier')
                 .map((selection) => selection.nickname),
               briefing:
-                scene?.children?.list.some(
-                  (child) =>
-                    child.text?.includes('CREW BATTLE 2V2') &&
-                    child.text.includes('FRIENDLY FIRE OFF') &&
-                    child.text.includes('HOLD TOGETHER') &&
-                    child.text.includes('FIRST CREW TO 60'),
-                ) ?? false,
+                Boolean(briefingNode?.text?.includes('FRIENDLY FIRE OFF')) &&
+                Boolean(briefingNode?.text?.includes('HOLD TOGETHER')) &&
+                Boolean(briefingNode?.text?.includes('FIRST CREW TO 60')),
+              briefingFits: (briefingNode?.displayWidth ?? Number.POSITIVE_INFINITY) <= 920,
             };
           }),
         { timeout: 15000, message: 'expected the authoritative Crew Battle select' },
@@ -88,6 +91,7 @@ test.describe('Crew Battle 2v2', () => {
         red: 2,
         bots: ['RUSTY', 'SCRAPJAW', 'CLANK'],
         briefing: true,
+        briefingFits: true,
       });
 
     await gamePage.keyboard.press('Enter');
@@ -150,6 +154,7 @@ test.describe('Crew Battle 2v2', () => {
       .toBe(true);
 
     await gamePage.evaluate(() => {
+      localStorage.removeItem('mmr_crew_tour');
       const w = window as unknown as {
         game?: {
           scene: {
@@ -243,11 +248,15 @@ test.describe('Crew Battle 2v2', () => {
                 name?: string;
                 text?: string;
                 visible?: boolean;
+                x?: number;
+                displayWidth?: number;
                 getData?: (key: string) => unknown;
                 list?: Array<{
                   name?: string;
                   text?: string;
                   visible?: boolean;
+                  x?: number;
+                  displayWidth?: number;
                   getData?: (key: string) => unknown;
                 }>;
               }>;
@@ -257,6 +266,7 @@ test.describe('Crew Battle 2v2', () => {
             child,
             ...(child.list ?? []),
           ]);
+          const tour = all.find((child) => child.text?.startsWith('CREW TOUR'));
           return {
             victory: all.some((child) => child.text === 'VICTORY'),
             nextObjective: all.some(
@@ -264,6 +274,11 @@ test.describe('Crew Battle 2v2', () => {
             ),
             crewScore: all.some((child) => child.text?.includes('YOUR CREW\n60 PTS')),
             rivalScore: all.some((child) => child.text?.includes('RIVALS\n44 PTS')),
+            tour: tour?.text ?? null,
+            tourFits:
+              (tour?.x ?? 0) - (tour?.displayWidth ?? Number.POSITIVE_INFINITY) / 2 >= 16 &&
+              (tour?.x ?? 0) + (tour?.displayWidth ?? Number.POSITIVE_INFINITY) / 2 <= 944,
+            stored: localStorage.getItem('mmr_crew_tour'),
             portraits: ['local', 'ally', 'rivalA', 'rivalB'].map((playerId) =>
               Boolean(all.find((child) => child.name === `result-fighter-${playerId}`)?.visible),
             ),
@@ -275,7 +290,54 @@ test.describe('Crew Battle 2v2', () => {
         nextObjective: true,
         crewScore: true,
         rivalScore: true,
+        tour: 'CREW TOUR 1/4 // HILL PATCH SECURED // RUN 1 - NEW BEST',
+        tourFits: true,
+        stored: expect.stringContaining('"securedModes":["koth"]'),
         portraits: [true, true, true, true],
       });
+
+    await gamePage.evaluate(() => {
+      const game = (
+        window as unknown as {
+          game?: {
+            scene: {
+              scenes: Array<{
+                scene: { start: (key: string) => void };
+                sys: { settings: { active: boolean } };
+              }>;
+            };
+          };
+        }
+      ).game;
+      const active = game?.scene.scenes.find((scene) => scene.sys.settings.active);
+      if (!active) throw new Error('results scene is not ready');
+      active.scene.start('LobbyScene');
+    });
+
+    await expect
+      .poll(() =>
+        gamePage.evaluate(() => {
+          const scene = (
+            window as unknown as {
+              game?: { scene: { getScene: (key: string) => unknown } };
+            }
+          ).game?.scene.getScene('LobbyScene') as {
+            sys?: { settings: { active: boolean } };
+            crewBattleButton?: { list: Array<{ text?: string }> };
+          };
+          const label = scene?.crewBattleButton?.list.find(
+            (child) => typeof child.text === 'string',
+          );
+          return scene?.sys?.settings.active
+            ? {
+                text: label?.text ?? null,
+                fits: (label as { displayWidth?: number } | undefined)?.displayWidth
+                  ? (label as { displayWidth: number }).displayWidth <= 110
+                  : false,
+              }
+            : null;
+        }),
+      )
+      .toEqual({ text: 'CREW 2V2\nTOUR 1/4', fits: true });
   });
 });

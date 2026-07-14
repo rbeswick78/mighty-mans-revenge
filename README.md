@@ -128,6 +128,13 @@ deny an allied tag, and Core Run with shared carry time. A compatible favorite
 mode stays pinned; Random changes the objective and arena on direct rematches.
 A mint `ALLY` marker and the two-score team HUD keep the battlefield readable,
 while Results groups the four real fighters with mode-correct team totals.
+Every authoritative Crew win also secures that objective's device-local patch.
+Collecting Deathmatch, Hill, Tags, and Core patches completes a `CREW TOUR`,
+starts the next four-patch set, and increments a compact lobby tally. Duplicate
+mode wins still extend the separate best win-run chase; draws hold the run,
+losses end it, and neither removes earned patches. Fighter Select shows whether
+the current objective offers an open or final patch, while Results celebrates
+new patches and complete tours.
 Difficulty and compatible Solo Chaos still apply, and the mode remains
 Practice so it never writes lifetime PvP records.
 `GAUNTLET` starts a three-fight run that

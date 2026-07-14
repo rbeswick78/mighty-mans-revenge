@@ -65,6 +65,11 @@ import {
   normalizeScrapPitRecord,
   scrapPitButtonLabel,
 } from '../ui/scrap-pit-record.js';
+import {
+  CREW_TOUR_STORAGE_KEY,
+  crewTourButtonLabel,
+  normalizeCrewTourRecord,
+} from '../ui/crew-tour.js';
 
 const STORAGE_KEY_NICKNAME = 'mmr_nickname';
 const STORAGE_KEY_BOT_DIFFICULTY = 'mmr_bot_difficulty';
@@ -388,7 +393,7 @@ export class LobbyScene extends Phaser.Scene {
       140,
       soloTopW,
       soloH,
-      'CREW 2V2',
+      crewTourButtonLabel(normalizeCrewTourRecord(localStorage.getItem(CREW_TOUR_STORAGE_KEY))),
       {
         variant: 'secondary',
         fontSize: 6,

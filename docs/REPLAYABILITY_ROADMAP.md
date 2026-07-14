@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–89 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, roster-authentic duel/Rumble results, Gun Game, Rivalry Sets, Quick Match 1v1 plus 2–4 player Wasteland Rumble with all-player group draft rallies, a rematch-chain Rumble Crown, live lead-change drama, personal rematch Grudges, authoritative Rumble Assists with K/A/D, a solo four-fighter Scrap Pit whose three server-authoritative rivals have distinct readable tactics, answer player taunts with signature banter, and feed a device-local win/run record chase, a fixed 2v2 Crew Battle with friendly-fire protection and a four-objective Crew Clash rotation, and visible bounded Wasteland Signal Recovery, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–90 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, roster-authentic duel/Rumble results, Gun Game, Rivalry Sets, Quick Match 1v1 plus 2–4 player Wasteland Rumble with all-player group draft rallies, a rematch-chain Rumble Crown, live lead-change drama, personal rematch Grudges, authoritative Rumble Assists with K/A/D, a solo four-fighter Scrap Pit whose three server-authoritative rivals have distinct readable tactics, answer player taunts with signature banter, and feed a device-local win/run record chase, a fixed 2v2 Crew Battle with friendly-fire protection, a four-objective Crew Clash rotation, and a device-local four-patch Crew Tour, and visible bounded Wasteland Signal Recovery, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -121,6 +121,7 @@ Each session below attacks one of these.
 | 87  | Roster Victory Lineups                          | Every finish preserves the actual cast that made the match memorable          | **DONE** (2026-07-14) |
 | 88  | Crew Battle 2v2                                 | Protecting an ally creates the game's first true team-play loop               | **DONE** (2026-07-14) |
 | 89  | Crew Clash Rotation                             | Four cooperative objectives keep the same crews changing strategy             | **DONE** (2026-07-14) |
+| 90  | Crew Tour                                       | Winning every team objective turns the rotation into a repeatable patch chase | **DONE** (2026-07-14) |
 
 ---
 
@@ -3238,6 +3239,54 @@ attempt one attainable friend score to hunt from the first stage onward.
 
 ---
 
+## Session 90 — Crew Tour
+
+**Goal:** turn Crew Clash's four-objective rotation into a repeatable collection
+and win-run chase that gives every direct rematch a visible longer-term stake.
+
+**Locked design decisions**
+
+- `mmr_crew_tour` is a bounded device-local record: completed tours, the
+  unique objective patches held toward the next tour, total Crew wins, current
+  and best win runs, and the last counted match id. It is Practice motivation,
+  parallel to Scrap Pit Records and never server lifetime progression.
+- Results may update the record only when launch metadata says
+  `practiceKind === 'crew_battle'` and an authoritative `duos` result supplies
+  the local side through `playerTeams` plus a present `winnerTeamId`. Rendered
+  scores and nicknames can never decide whether a patch was earned.
+- A win secures the current Deathmatch, Hill, Tags, or Core patch once and
+  extends the win run. A repeat objective win extends the run without inventing
+  a duplicate patch. Draws preserve both patches and the run; losses end only
+  the run, so one bad round never erases collection progress.
+- Four unique patches increment the completed-tour tally and clear the patch
+  board for another set. The completing Results screen retains an explicit
+  four-patch celebration even though the persisted next-tour progress is 0/4.
+- `lastMatchId` makes Results recreation idempotent. Loading rejects unknown
+  modes and duplicate patches, caps counts, repairs streak relationships, and
+  constrains completed tours and patch progress to the stored win total.
+- The lobby's existing narrow Crew button shows tour progress, Character Select
+  calls the current patch held/open/final, and Results pairs patch progress with
+  the best win-run chase. This cannot change mode selection, rematch rotation,
+  teams, bots, difficulty, score, combat, balance, physics, network messages,
+  or any server persistence.
+
+**Acceptance criteria**
+
+- [x] Pure tests cover corrupt/impossible storage, canonical patch ordering,
+      duplicate objectives, four-patch completion, draws, losses, run records,
+      duplicate match ids, missing team authority, and non-Crew rejection.
+- [x] Lobby, fighter-select, and Results presentation tests cover empty, open,
+      held, final, newly secured, completed-tour, held-run, and ended-run copy.
+- [x] The existing real Crew KOTH journey still reaches live play and shows the
+      new open-patch briefing without weakening side or objective assertions.
+- [x] Desktop and 844×390 mobile result journeys bank an authoritative patch,
+      keep the story in bounds, persist it, and return the progress to the
+      lobby button; in-app visual review keeps the narrow empty state readable.
+- [x] Typecheck, lint, full unit/integration suite, production build, and the
+      complete Playwright matrix pass.
+
+---
+
 ## Session 89 — Crew Clash Rotation
 
 **Goal:** keep the new 2v2 team-play pillar from collapsing into one repeated
@@ -4172,6 +4221,47 @@ favorite mid-match event while the final-minute surprise stays fresh.
 ---
 
 ## Session Log
+
+### Session 90 — 2026-07-14 — Crew Tour
+
+**Shipped:** every authoritative Crew victory now contributes to a repeatable
+four-patch tour: `KOs`, `HILL`, `TAGS`, and `CORE`. A first win in each objective
+secures its unique patch, all four complete a tour and open a fresh board, and
+every Crew win extends a visible current/best win run. Repeat-objective wins
+still extend the run without duplicating patches; draws preserve the run and
+patches, while losses reset only the run so collection progress remains fair.
+
+The bounded `mmr_crew_tour` record is device-local Practice motivation. Results
+updates it only from a Crew launch plus authoritative team assignments and
+winner identity, and a stored match id prevents duplicate counting. The lobby
+now fits current tour progress into its narrow Crew button, Character Select
+calls out the selected objective's open/held/final patch, and Results celebrates
+new patches, completed tours, and win-run milestones. No server persistence,
+network message, matchmaking, objective, combat, physics, balance, or lifetime
+PvP progression changed.
+
+**Verification:** five focused Crew Tour tests plus 73 adjacent shared-config
+and Scrap Pit record tests pass. Typecheck, lint, all 1,291 unit/integration
+tests across 93 files, and the production build pass; Vite retains its existing
+chunk-size advisory (`index-DcqSwqos.js`, 1,841.57 kB / 440.42 kB gzip). The
+focused Crew browser journey passes three project cases with one intentional
+mobile live-play skip, and the affected Rusty Rumble contract passes all three
+projects. The final complete Playwright matrix passes 71 tests with 13
+intentional project-scoped skips across 84 configured cases in Chromium,
+Firefox, and mobile landscape. Desktop/mobile result assertions keep the story
+and narrow lobby label in bounds, while in-app visual review confirmed the empty
+`TOUR 0/4` lobby state remains legible. An initial full run correctly caught the
+adjacent Rusty Rumble snapshot's old single-line Crew label; updating that
+intentional contract was the only required follow-up before the green matrix.
+
+**Operational watch:** patch progress intentionally survives losses so the tour
+remains an inviting collection chase. Watch whether the best win-run provides
+enough extra tension for repeat-objective wins without competing with the patch
+board. This record remains device-local and is expected to reset when browser
+storage is cleared.
+
+**Deployment:** not run; production deployment still requires explicit user
+authorization.
 
 ### Session 89 — 2026-07-14 — Crew Clash Rotation
 
