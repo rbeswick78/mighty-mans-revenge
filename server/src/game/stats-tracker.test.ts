@@ -67,6 +67,14 @@ describe('StatsTracker', () => {
     });
   });
 
+  it('records assists independently from kills and streaks', () => {
+    tracker.recordAssist('p1');
+    tracker.recordAssist('p1');
+
+    expect(tracker.getStats('p1')).toMatchObject({ kills: 0, assists: 2 });
+    expect(tracker.getCurrentStreak('p1')).toBe(0);
+  });
+
   describe('kill streak tracking', () => {
     it('tracks current kill streak', () => {
       tracker.recordKill('p1', 'p2', 'gun');
@@ -237,9 +245,7 @@ describe('StatsTracker', () => {
     });
 
     it('throws for non-initialized player', () => {
-      expect(() => tracker.getStats('unknown')).toThrow(
-        'No stats initialized for player unknown',
-      );
+      expect(() => tracker.getStats('unknown')).toThrow('No stats initialized for player unknown');
     });
   });
 

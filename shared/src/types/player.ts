@@ -136,6 +136,8 @@ export interface PlayerInput {
 export interface PlayerStats {
   kills: number;
   deaths: number;
+  /** Match-scoped Rumble assists. Optional so older result payloads remain readable. */
+  assists?: number;
   shotsFired: number;
   shotsHit: number;
   damageDealt: number;

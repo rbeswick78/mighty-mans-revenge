@@ -244,6 +244,31 @@ describe('computeAwards', () => {
     });
   });
 
+  describe('wingman', () => {
+    it('goes to the outright assist leader and remains absent from old stats', () => {
+      const awards = compute({
+        p1: makeStats({ assists: 2 }),
+        p2: makeStats({ assists: 1 }),
+      });
+      expect(awards.find((a) => a.id === 'wingman')).toMatchObject({
+        playerId: 'p1',
+        detail: '2 ASSISTS',
+      });
+
+      expect(
+        compute({ p1: makeStats(), p2: makeStats() }).find((a) => a.id === 'wingman'),
+      ).toBeUndefined();
+    });
+
+    it('awards nobody on an assist tie', () => {
+      const awards = compute({
+        p1: makeStats({ assists: 1 }),
+        p2: makeStats({ assists: 1 }),
+      });
+      expect(awards.find((a) => a.id === 'wingman')).toBeUndefined();
+    });
+  });
+
   describe('pincushion', () => {
     it('goes to the most damage taken, rounded in the detail line', () => {
       const awards = compute({
@@ -311,11 +336,7 @@ describe('computeAwards', () => {
       });
 
       expect(awards).toHaveLength(AWARDS.DISPLAY_COUNT);
-      expect(awards.map((a) => a.id)).toEqual([
-        'sharpshooter',
-        'spray_and_pray',
-        'demolition_man',
-      ]);
+      expect(awards.map((a) => a.id)).toEqual(['sharpshooter', 'spray_and_pray', 'demolition_man']);
     });
 
     it('skips tied awards but still fills remaining slots', () => {

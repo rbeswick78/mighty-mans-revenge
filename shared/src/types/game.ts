@@ -159,6 +159,10 @@ export interface KillFeedEntry {
   isPosthumous?: boolean;
   /** Pre-heal HP remaining when a living killer earned a critical-health kill. */
   clutchHealth?: number;
+  /** Connected non-killer with the strongest recent damage contribution. */
+  assistId?: PlayerId;
+  /** Rounded recent damage credited to assistId. */
+  assistDamage?: number;
 }
 
 /**

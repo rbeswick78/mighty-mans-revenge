@@ -751,7 +751,7 @@ export class ResultsScene extends Phaser.Scene {
       { x: 28, text: '#' },
       { x: 62, text: 'FIGHTER' },
       { x: 270, text: 'SCORE' },
-      { x: 338, text: 'K/D' },
+      { x: 326, text: 'K/A/D' },
     ];
     for (const heading of headings) {
       panel.add(
@@ -797,7 +797,7 @@ export class ResultsScene extends Phaser.Scene {
       );
       panel.add(
         this.add
-          .text(360, y, `${stats.kills}/${stats.deaths}`, {
+          .text(360, y, `${stats.kills}/${stats.assists ?? 0}/${stats.deaths}`, {
             fontFamily: MENU_FONTS.BODY,
             fontSize: '12px',
             color: cssHex(VALUE_COLOR),

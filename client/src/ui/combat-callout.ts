@@ -29,6 +29,23 @@ export function combatCalloutFor(
   entry: KillFeedEntry,
   localPlayerId: PlayerId,
 ): CombatCallout | null {
+  if (
+    entry.assistId === localPlayerId &&
+    entry.killerId !== localPlayerId &&
+    entry.victimId !== localPlayerId
+  ) {
+    const damage =
+      entry.assistDamage !== undefined && Number.isFinite(entry.assistDamage)
+        ? Math.max(1, Math.round(entry.assistDamage))
+        : null;
+    return {
+      headline: 'ASSIST!',
+      detail: damage === null ? 'HELPED LAND THE TAKEDOWN' : `${damage} DAMAGE ON THE TAKEDOWN`,
+      tint: Wasteland.HEALTH_GOOD,
+      pulse: true,
+    };
+  }
+
   if (entry.killerId !== localPlayerId || entry.killerId === entry.victimId) {
     return null;
   }

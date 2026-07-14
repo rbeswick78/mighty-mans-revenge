@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–80 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Quick Match 1v1 plus 2–4 player Wasteland Rumble with all-player group draft rallies, a rematch-chain Rumble Crown, live lead-change drama, and personal rematch Grudges, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–81 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Quick Match 1v1 plus 2–4 player Wasteland Rumble with all-player group draft rallies, a rematch-chain Rumble Crown, live lead-change drama, personal rematch Grudges, and authoritative Rumble Assists with K/A/D, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -112,6 +112,7 @@ Each session below attacks one of these.
 | 78  | Rumble Draft Rally                              | Every fighter helps choose the next group battleground                        | **DONE** (2026-07-14) |
 | 79  | Rumble Lead Drama                               | Every takeover and tie becomes a shared live-match story                      | **DONE** (2026-07-14) |
 | 80  | Rumble Grudges                                  | Every group finish leaves each fighter a personal rematch score to settle     | **DONE** (2026-07-14) |
+| 81  | Rumble Assists                                  | Meaningful setup damage earns visible credit in chaotic group fights          | **DONE** (2026-07-14) |
 
 ---
 
@@ -3229,6 +3230,52 @@ attempt one attainable friend score to hunt from the first stage onward.
 
 ---
 
+## Session 81 — Rumble Assists
+
+**Goal:** make chaotic three- and four-fighter battles feel fairer and more
+cooperative by recognizing the fighter who did meaningful setup damage before
+somebody else landed the final hit.
+
+**Locked design decisions**
+
+- Only matches that begin with at least three fighters author assists. Quick
+  Match, Practice, and fresh two-fighter Rumbles keep their existing combat
+  and result payloads.
+- The server records post-reduction attributed damage on simulated match time.
+  A knockout may credit one connected helper who dealt at least 20 damage to
+  that victim in the previous eight seconds. Killer, victim, self-damage,
+  stale damage, incidental chip damage, and departed fighters are ineligible.
+- Highest qualifying recent damage wins. The latest qualifying hit breaks an
+  exact damage tie, then stable player id provides the final deterministic
+  fallback. A death consumes that victim's ledger; disconnect removes the
+  fighter as both helper and future victim.
+- Optional kill-feed fields carry only the winning helper and rounded damage.
+  The local helper gets one live `ASSIST!` callout and confirmation chirp.
+  Results shows K/A/D, while the outright assist leader may earn Wingman.
+- The single attributed-damage bookkeeping path also records the existing
+  `damageTaken` stat for every weapon source, restoring real Pincushion award
+  eligibility without inventing environmental credit.
+- Assists are recognition-only. They never alter mode score, kill/death
+  credit, streaks, medals, contracts, Crown or Grudge state, persistence,
+  matchmaking, healing, combat, physics, or balance.
+
+**Acceptance criteria**
+
+- [x] Pure tracker tests cover damage totals, the recency window, minimum
+      contribution, latest-hit and stable-id ties, self/killer exclusion,
+      disconnects, and life-ledger consumption.
+- [x] Match integration proves a real helper shotgun hit plus a rival rifle
+      finish produces authoritative assist event/stats and damage-taken data,
+      while two-player knockout events stay unchanged.
+- [x] Award and presentation tests cover Wingman, ties, old result stats,
+      exact assist copy, fallback copy, and malformed self/killer credit.
+- [x] Chromium, Firefox, and mobile-landscape browser tests render the live
+      assist callout plus four-player K/A/D and Wingman result surfaces.
+- [x] Typecheck, lint, all unit tests, production build, and the full
+      Playwright desktop/mobile matrix pass.
+
+---
+
 ## Session 80 — Rumble Grudges
 
 **Goal:** turn a three- or four-fighter finish into several personal reasons
@@ -3743,6 +3790,45 @@ favorite mid-match event while the final-minute surprise stays fresh.
 ---
 
 ## Session Log
+
+### Session 81 — 2026-07-14 — Rumble Assists
+
+**Shipped:** meaningful setup damage now earns visible credit in chaotic
+three- and four-fighter Rumbles. The server keeps a short per-life damage
+ledger, awards one qualifying helper on an opponent knockout, and sends the
+winner plus rounded contribution through the existing kill event. The helper
+gets an immediate `ASSIST!` beat and confirmation chirp; Results now shows
+K/A/D and may name the outright assist leader Wingman.
+
+The tracker uses simulated match time, the post-reduction damage already
+attributed to each weapon source, a 20-damage floor, and an eight-second
+window. Highest damage wins, then latest hit and stable id break exact ties.
+Deaths consume the victim ledger and disconnects remove both sides of a
+possible credit. Matches that begin with two fighters author no assists. The
+shared damage path also now records the existing `damageTaken` stat, restoring
+real Pincushion award eligibility. Assists change no score, kill/death credit,
+streak, medal, contract, Crown, Grudge, persistence, matchmaking, combat,
+physics, or balance behavior. No assets were added.
+
+**Verification:** 325 focused tracker, stats, award, Match, and presentation
+tests across five files pass. Match integration proves a helper shotgun hit
+plus a rival rifle finish produces authoritative assist and damage-taken data,
+while a fresh two-player knockout remains assist-free. Six focused Chromium,
+Firefox, and 844×390 mobile-landscape browser checks render both the live
+callout and four-player K/A/D + Wingman result layout. Typecheck, lint, scoped
+Prettier, all 1,249 unit/integration tests across 88 files, and the pinned-pnpm
+production build pass; Vite retains its existing chunk-size advisory. The
+full Playwright matrix passes 51 tests with 12 intentional project-scoped
+skips, including the real three-client Rumble draft journey.
+
+**Tuning watch:** the 20-damage/eight-second rule is intentionally generous
+enough to recognize a real setup without rewarding stray chip damage. Watch
+whether group players find credit too common or too strict, and whether one
+assist is enough for Wingman to feel earned; do not tune before another real
+three- or four-player session.
+
+**Deployment:** not run; production deployment still requires explicit user
+authorization.
 
 ### Session 80 — 2026-07-14 — Rumble Grudges
 

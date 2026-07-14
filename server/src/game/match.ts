@@ -78,6 +78,7 @@ import { LagCompensator } from './lag-compensator.js';
 import { getGameMode } from './modes/index.js';
 import type { GameMode, MatchContext } from './modes/game-mode.js';
 import { InputQueue } from './input-queue.js';
+import { RumbleAssistTracker } from './rumble-assist-tracker.js';
 
 interface PendingBurst {
   shotsRemaining: number;
@@ -199,6 +200,9 @@ export class Match implements MatchContext {
   private connectedPlayers: Set<PlayerId> = new Set();
   /** Only matches that began with a group field author live lead changes. */
   private readonly tracksRumbleLead: boolean;
+  /** Only matches that began with a group field author assist credit. */
+  private readonly tracksRumbleAssists: boolean;
+  private readonly rumbleAssistTracker = new RumbleAssistTracker();
   /** Persistent snapshot edge; sequence 0 is the silent opening baseline. */
   private rumbleLeadState: RumbleLeadState | null = null;
   /** Active-Rumble leavers stay in results but are removed from competition. */
@@ -323,6 +327,7 @@ export class Match implements MatchContext {
   ) {
     this.matchId = matchId;
     this.tracksRumbleLead = playerEntries.length >= 3;
+    this.tracksRumbleAssists = playerEntries.length >= 3;
     this.rng = rng;
     this.rematchMutatorExclusions = new Set(rematchMutatorExclusions);
     this.plannedMidMatchMutator = plannedMidMatchMutator;
@@ -617,6 +622,18 @@ export class Match implements MatchContext {
   /** Record a kill event. */
   onKill(killerId: PlayerId, victimId: PlayerId, weapon: KillWeapon): void {
     const isOpponentKill = killerId !== victimId;
+    const assist =
+      isOpponentKill && this.tracksRumbleAssists
+        ? this.rumbleAssistTracker.resolveAssist(
+            killerId,
+            victimId,
+            this.connectedPlayers,
+            this.getElapsedSeconds(),
+          )
+        : null;
+    if (!isOpponentKill && this.tracksRumbleAssists) {
+      this.rumbleAssistTracker.clearVictim(victimId);
+    }
     const victimStreakEnded = this.stats.getCurrentStreak(victimId);
     const isRevenge = isOpponentKill && this.lastKillerByVictim.get(killerId) === victimId;
     const killerAtKill = this.players.get(killerId);
@@ -646,6 +663,7 @@ export class Match implements MatchContext {
       });
     }
     this.stats.recordKill(killerId, victimId, weapon);
+    if (assist) this.stats.recordAssist(assist.playerId);
     const killerStreak = isOpponentKill ? this.stats.getCurrentStreak(killerId) : 0;
     this.stats.recordDeath(victimId);
     if (isOpponentKill) this.lastKillerByVictim.set(victimId, killerId);
@@ -728,6 +746,7 @@ export class Match implements MatchContext {
       rapidKillCount,
       isPosthumous,
       clutchHealth,
+      ...(assist ? { assistId: assist.playerId, assistDamage: assist.damage } : {}),
     };
     this.killFeed.push(entry);
     this.tickKillFeedEntries.push(entry);
@@ -736,6 +755,7 @@ export class Match implements MatchContext {
   /** Record that a player has disconnected. */
   onPlayerDisconnect(playerId: PlayerId, eliminate = false): void {
     this.connectedPlayers.delete(playerId);
+    if (this.tracksRumbleAssists) this.rumbleAssistTracker.removePlayer(playerId);
     if (!eliminate || this.phase !== MatchPhase.ACTIVE) return;
     const player = this.players.get(playerId);
     if (!player) return;
@@ -1414,7 +1434,7 @@ export class Match implements MatchContext {
       this.hitValidationScale(),
     );
     for (const hit of axeHits) {
-      this.stats.recordDamage(hit.throwerId, hit.damage);
+      this.recordAttributedDamage(hit.throwerId, hit.victimId, hit.damage);
       this.applyVampireHeal(hit.throwerId, hit.victimId, hit.damage);
       if (hit.killed) {
         this.onKill(hit.throwerId, hit.victimId, 'axe');
@@ -1749,7 +1769,7 @@ export class Match implements MatchContext {
         shot.trail.damageApplied = result.damageApplied;
         this.stats.recordHit(playerId);
         // damageApplied, not shot.damage — Iron Hide may have halved it.
-        this.stats.recordDamage(playerId, result.damageApplied);
+        this.recordAttributedDamage(playerId, shot.victimId, result.damageApplied);
         this.applyVampireHeal(playerId, shot.victimId, result.damageApplied);
         if (result.killed && result.entry) {
           this.onKill(playerId, shot.victimId, weaponId === 'rifle' ? 'gun' : weaponId);
@@ -1822,7 +1842,7 @@ export class Match implements MatchContext {
         shot.damage;
       const result = this.combatManager.applyDamage(victim, damage, player.id);
       // damageApplied, not shot.damage — Iron Hide may have halved it.
-      this.stats.recordDamage(player.id, result.damageApplied);
+      this.recordAttributedDamage(player.id, shot.victimId, result.damageApplied);
       this.applyVampireHeal(player.id, shot.victimId, result.damageApplied);
       if (result.killed) {
         this.onKill(player.id, shot.victimId, weaponId);
@@ -1912,7 +1932,7 @@ export class Match implements MatchContext {
       shot.trail.damageApplied = result.damageApplied;
       anyPelletHit = true;
       // damageApplied, not shot.damage — Iron Hide may have halved it.
-      this.stats.recordDamage(player.id, result.damageApplied);
+      this.recordAttributedDamage(player.id, shot.victimId, result.damageApplied);
       this.applyVampireHeal(player.id, shot.victimId, result.damageApplied);
       if (result.killed) {
         this.onKill(player.id, shot.victimId, 'shotgun');
@@ -1994,7 +2014,7 @@ export class Match implements MatchContext {
     for (const dmg of explosion.damages) {
       // Credit damage to the thrower. Self-damage from your own grenade
       // is real and intentional, but don't award yourself a kill.
-      this.stats.recordDamage(explosion.throwerId, dmg.damage);
+      this.recordAttributedDamage(explosion.throwerId, dmg.playerId, dmg.damage);
       this.applyVampireHeal(explosion.throwerId, dmg.playerId, dmg.damage);
       if (dmg.killed && dmg.playerId !== explosion.throwerId) {
         this.onKill(explosion.throwerId, dmg.playerId, killWeapon);
@@ -2010,6 +2030,9 @@ export class Match implements MatchContext {
         if (opponents.length === 1) {
           this.onKill(opponents[0], dmg.playerId, killWeapon);
         } else {
+          if (this.tracksRumbleAssists) {
+            this.rumbleAssistTracker.clearVictim(dmg.playerId);
+          }
           const victim = this.players.get(dmg.playerId);
           if (victim) {
             victim.isDead = true;
@@ -2397,6 +2420,15 @@ export class Match implements MatchContext {
   /** big_heads hit-validation AABB scale; 1 while inactive. */
   private hitValidationScale(): number {
     return this.mutatorActive('big_heads') ? MUTATORS.BIG_HEADS_HITBOX_SCALE : 1;
+  }
+
+  /** Single bookkeeping path for every authoritative attributed hit. */
+  private recordAttributedDamage(attackerId: PlayerId, victimId: PlayerId, damage: number): void {
+    this.stats.recordDamage(attackerId, damage);
+    this.stats.recordDamageTaken(victimId, damage);
+    if (this.tracksRumbleAssists) {
+      this.rumbleAssistTracker.recordDamage(attackerId, victimId, damage, this.getElapsedSeconds());
+    }
   }
 
   /**
@@ -2968,7 +3000,7 @@ export class Match implements MatchContext {
         if (hitDist === null || hitDist <= 0 || hitDist > range) continue;
 
         const result = this.combatManager.applyDamage(other, damagePerTick, playerId);
-        this.stats.recordDamage(playerId, result.damageApplied);
+        this.recordAttributedDamage(playerId, otherId, result.damageApplied);
         this.applyVampireHeal(playerId, otherId, result.damageApplied);
         if (result.killed) {
           this.onKill(playerId, otherId, 'fire');

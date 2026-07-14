@@ -1345,6 +1345,9 @@ export class GameScene extends Phaser.Scene {
         audio.play('kill', callout?.killSfx);
         this.healFlash?.trigger();
       }
+      if (entry.assistId === localId && entry.killerId !== localId && entry.victimId !== localId) {
+        audio.play('menuSelect', { rate: 1.2, detune: 200 });
+      }
       if (entry.victimId === localId) {
         audio.play('death');
       }

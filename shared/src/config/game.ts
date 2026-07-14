@@ -446,6 +446,14 @@ export const RUMBLE = Object.freeze({
   LAUNCH_DELAY_SECONDS: 6,
 });
 
+/** Server-owned credit for meaningful help in three- and four-fighter battles. */
+export const RUMBLE_ASSISTS = Object.freeze({
+  /** A contribution must be this recent when the knockout lands. */
+  WINDOW_SECONDS: 8,
+  /** Ignore incidental chip damage so every assist reflects meaningful setup. */
+  MIN_DAMAGE: 20,
+});
+
 /**
  * Pre-match map/mode draft (Session 9). Every real match — fresh AND
  * rematch — opens with a draft instead of the blind rotation: the server
@@ -977,6 +985,7 @@ export const AWARD_DEFS = Object.freeze({
   slugger: Object.freeze({ displayName: 'Slugger' }),
   bare_knuckles: Object.freeze({ displayName: 'Bare Knuckles' }),
   untouchable: Object.freeze({ displayName: 'Untouchable' }),
+  wingman: Object.freeze({ displayName: 'Wingman' }),
   pincushion: Object.freeze({ displayName: 'Pincushion' }),
   pin_puller_no_payoff: Object.freeze({ displayName: 'Pin Puller, No Payoff' }),
   tourist: Object.freeze({ displayName: 'Tourist' }),

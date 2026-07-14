@@ -305,6 +305,61 @@ describe('Match', () => {
     });
   });
 
+  describe('Rumble assists', () => {
+    function startGroupMatch(): Match {
+      const group = createMatch(3);
+      group.setLock('player-0', 'mighty_man');
+      group.setLock('player-1', 'bruce');
+      group.setLock('player-2', 'frost_wizard');
+      group.update(0.01);
+      group.update(MATCH.COUNTDOWN_DURATION + 0.01);
+      expect(group.phase).toBe(MatchPhase.ACTIVE);
+      return group;
+    }
+
+    it('credits recent setup damage on the authoritative knockout event and standings stats', () => {
+      const group = startGroupMatch();
+      const helper = group.players.get('player-0')!;
+      const victim = group.players.get('player-1')!;
+      const killer = group.players.get('player-2')!;
+      helper.position = { x: 100, y: 100 };
+      victim.position = { x: 150, y: 100 };
+      killer.position = { x: 100, y: 200 };
+      helper.weaponId = 'shotgun';
+      helper.specialAmmo = 1;
+      helper.specialReserve = 0;
+
+      group.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
+      group.update(0.05);
+      expect(victim.isDead).toBe(false);
+      expect(group.stats.getStats('player-0').damageDealt).toBeGreaterThanOrEqual(20);
+
+      victim.health = 1;
+      const finishingAngle = Math.atan2(
+        victim.position.y - killer.position.y,
+        victim.position.x - killer.position.x,
+      );
+      group.queueInput('player-2', makeInput(1, { firePressed: true, aimAngle: finishingAngle }));
+      group.update(0.05);
+
+      const feed = group.getKillFeed();
+      expect(feed[feed.length - 1]).toMatchObject({
+        killerId: 'player-2',
+        victimId: 'player-1',
+        assistId: 'player-0',
+      });
+      expect(feed[feed.length - 1]?.assistDamage).toBeGreaterThanOrEqual(20);
+      expect(group.stats.getStats('player-0').assists).toBe(1);
+      expect(group.stats.getStats('player-1').damageTaken).toBeGreaterThan(0);
+    });
+
+    it('keeps ordinary two-player knockout events assist-free', () => {
+      match.onKill('player-0', 'player-1', 'gun');
+      expect(match.getKillFeed()[0]).not.toHaveProperty('assistId');
+      expect(match.stats.getStats('player-0').assists).toBe(0);
+    });
+  });
+
   describe('character select', () => {
     it('getSelectStateMessage seeds one entry per player with deterministic default hovers', () => {
       const m = createMatch();

@@ -124,6 +124,11 @@ function evaluate(id: AwardId, playerId: PlayerId, s: PlayerStats): Candidate | 
       if (s.longestKillStreak < AWARDS.UNTOUCHABLE_MIN_STREAK) return null;
       return { playerId, value: s.longestKillStreak, detail: `${s.longestKillStreak} KILL STREAK` };
     }
+    case 'wingman': {
+      const assists = s.assists ?? 0;
+      if (assists < 1) return null;
+      return { playerId, value: assists, detail: countDetail(assists, 'ASSIST') };
+    }
     case 'pincushion': {
       if (s.damageTaken <= 0) return null;
       return {
@@ -140,7 +145,11 @@ function evaluate(id: AwardId, playerId: PlayerId, s: PlayerStats): Candidate | 
     case 'tourist': {
       if (s.distanceTraveled <= 0) return null;
       const tiles = Math.round(s.distanceTraveled / MAP.TILE_SIZE);
-      return { playerId, value: s.distanceTraveled, detail: countDetail(tiles, 'TILE') + ' WANDERED' };
+      return {
+        playerId,
+        value: s.distanceTraveled,
+        detail: countDetail(tiles, 'TILE') + ' WANDERED',
+      };
     }
   }
 }

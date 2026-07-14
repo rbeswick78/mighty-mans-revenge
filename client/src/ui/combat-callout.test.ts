@@ -48,10 +48,7 @@ describe('combatCalloutFor', () => {
 
   it('prioritizes a shutdown over simultaneous revenge and streak copy', () => {
     expect(
-      combatCalloutFor(
-        entry({ killerStreak: 4, victimStreakEnded: 3, isRevenge: true }),
-        'local',
-      ),
+      combatCalloutFor(entry({ killerStreak: 4, victimStreakEnded: 3, isRevenge: true }), 'local'),
     ).toEqual({
       headline: 'SHUTDOWN!',
       detail: 'ENDED A 3 KILL STREAK',
@@ -61,16 +58,13 @@ describe('combatCalloutFor', () => {
 
   it('celebrates First Blood from authoritative kill context', () => {
     expect(
-      combatCalloutFor(
-        entry({ isFirstBlood: true, isRevenge: true, killerStreak: 5 }),
-        'local',
-      ),
+      combatCalloutFor(entry({ isFirstBlood: true, isRevenge: true, killerStreak: 5 }), 'local'),
     ).toMatchObject({
-        headline: 'FIRST BLOOD!',
-        detail: 'OPENING STATEMENT',
-        pulse: true,
-        killSfx: { rate: 0.9, detune: -100 },
-      });
+      headline: 'FIRST BLOOD!',
+      detail: 'OPENING STATEMENT',
+      pulse: true,
+      killSfx: { rate: 0.9, detune: -100 },
+    });
   });
 
   it('escalates rapid chains from Double Kill through Mayhem', () => {
@@ -103,10 +97,7 @@ describe('combatCalloutFor', () => {
 
   it('celebrates exact critical health above First Blood and streak copy', () => {
     expect(
-      combatCalloutFor(
-        entry({ clutchHealth: 4.2, isFirstBlood: true, killerStreak: 5 }),
-        'local',
-      ),
+      combatCalloutFor(entry({ clutchHealth: 4.2, isFirstBlood: true, killerStreak: 5 }), 'local'),
     ).toEqual({
       headline: 'CLUTCH!',
       detail: '5 HP LEFT',
@@ -117,9 +108,9 @@ describe('combatCalloutFor', () => {
   });
 
   it('keeps rapid chains and shutdowns above Clutch', () => {
-    expect(
-      combatCalloutFor(entry({ clutchHealth: 2, rapidKillCount: 2 }), 'local'),
-    ).toMatchObject({ headline: 'DOUBLE KILL!' });
+    expect(combatCalloutFor(entry({ clutchHealth: 2, rapidKillCount: 2 }), 'local')).toMatchObject({
+      headline: 'DOUBLE KILL!',
+    });
     expect(
       combatCalloutFor(entry({ clutchHealth: 2, victimStreakEnded: 3 }), 'local'),
     ).toMatchObject({ headline: 'SHUTDOWN!' });
@@ -135,9 +126,7 @@ describe('combatCalloutFor', () => {
   });
 
   it('celebrates payback when no shutdown takes priority', () => {
-    expect(
-      combatCalloutFor(entry({ isRevenge: true, killerStreak: 5 }), 'local'),
-    ).toMatchObject({
+    expect(combatCalloutFor(entry({ isRevenge: true, killerStreak: 5 }), 'local')).toMatchObject({
       headline: 'PAYBACK!',
       detail: 'SCORE SETTLED',
     });
@@ -161,8 +150,36 @@ describe('combatCalloutFor', () => {
 
   it('stays silent for remote kills and suicides', () => {
     expect(combatCalloutFor(entry(), 'someone-else')).toBeNull();
+    expect(combatCalloutFor(entry({ killerId: 'local', victimId: 'local' }), 'local')).toBeNull();
+  });
+
+  it('celebrates authoritative local assist credit without impersonating the killer', () => {
     expect(
-      combatCalloutFor(entry({ killerId: 'local', victimId: 'local' }), 'local'),
+      combatCalloutFor(
+        entry({ killerId: 'rival-a', victimId: 'rival-b', assistId: 'local', assistDamage: 42.4 }),
+        'local',
+      ),
+    ).toEqual({
+      headline: 'ASSIST!',
+      detail: '42 DAMAGE ON THE TAKEDOWN',
+      tint: Wasteland.HEALTH_GOOD,
+      pulse: true,
+    });
+  });
+
+  it('suppresses malformed self/killer assist credit and tolerates old damage-less credit', () => {
+    expect(combatCalloutFor(entry({ assistId: 'local' }), 'local')).toBeNull();
+    expect(
+      combatCalloutFor(
+        entry({ killerId: 'rival-a', victimId: 'local', assistId: 'local', assistDamage: 30 }),
+        'local',
+      ),
     ).toBeNull();
+    expect(
+      combatCalloutFor(
+        entry({ killerId: 'rival-a', victimId: 'rival-b', assistId: 'local' }),
+        'local',
+      )?.detail,
+    ).toBe('HELPED LAND THE TAKEDOWN');
   });
 });

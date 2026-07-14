@@ -67,7 +67,10 @@ make every sole lead, shared lead, and full-field tie part of the live story.
 At the finish, every connected fighter who was knocked out gets a personal
 Grudge against the rival who got them most; the latest knockout breaks a tie,
 and a direct rematch carries that target into fighter select for one more score
-to settle.
+to settle. In three- and four-fighter battles, meaningful recent setup damage
+also earns one server-authored Assist when somebody else lands the knockout.
+The live HUD celebrates it, Results shows K/A/D, and the best helper can take
+the Wingman award without changing anybody's mode score.
 
 ## Arena variety
 

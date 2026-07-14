@@ -10,6 +10,7 @@ export class StatsTracker {
     this.stats.set(playerId, {
       kills: 0,
       deaths: 0,
+      assists: 0,
       shotsFired: 0,
       shotsHit: 0,
       damageDealt: 0,
@@ -51,6 +52,11 @@ export class StatsTracker {
     s.deaths++;
     // Reset kill streak on death
     this.currentStreaks.set(playerId, 0);
+  }
+
+  recordAssist(playerId: PlayerId): void {
+    const s = this.getStatsOrThrow(playerId);
+    s.assists = (s.assists ?? 0) + 1;
   }
 
   recordGrenade(playerId: PlayerId): void {
