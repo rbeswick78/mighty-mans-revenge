@@ -60,6 +60,11 @@ import {
 } from '../ui/practice-mutator.js';
 import type { ConnectionState } from '../network/types.js';
 import { lobbyConnectionPresentation } from '../ui/lobby-connection.js';
+import {
+  SCRAP_PIT_RECORD_STORAGE_KEY,
+  normalizeScrapPitRecord,
+  scrapPitButtonLabel,
+} from '../ui/scrap-pit-record.js';
 
 const STORAGE_KEY_NICKNAME = 'mmr_nickname';
 const STORAGE_KEY_BOT_DIFFICULTY = 'mmr_bot_difficulty';
@@ -363,7 +368,9 @@ export class LobbyScene extends Phaser.Scene {
       158,
       soloW,
       qmH,
-      'SCRAP PIT',
+      scrapPitButtonLabel(
+        normalizeScrapPitRecord(localStorage.getItem(SCRAP_PIT_RECORD_STORAGE_KEY)),
+      ),
       {
         variant: 'secondary',
         fontSize: 6,

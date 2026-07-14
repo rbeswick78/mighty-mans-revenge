@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–85 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Quick Match 1v1 plus 2–4 player Wasteland Rumble with all-player group draft rallies, a rematch-chain Rumble Crown, live lead-change drama, personal rematch Grudges, authoritative Rumble Assists with K/A/D, a solo four-fighter Scrap Pit whose three server-authoritative rivals have distinct readable tactics and answer player taunts with signature banter, and visible bounded Wasteland Signal Recovery, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–86 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Quick Match 1v1 plus 2–4 player Wasteland Rumble with all-player group draft rallies, a rematch-chain Rumble Crown, live lead-change drama, personal rematch Grudges, authoritative Rumble Assists with K/A/D, a solo four-fighter Scrap Pit whose three server-authoritative rivals have distinct readable tactics, answer player taunts with signature banter, and feed a device-local win/run record chase, and visible bounded Wasteland Signal Recovery, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -117,6 +117,7 @@ Each session below attacks one of these.
 | 83  | Scrap Pit                                       | Solo players can enter the full four-fighter Rumble chaos on demand            | **DONE** (2026-07-14) |
 | 84  | Scrap Pit Rivals                                | Every bot presents a different threat instead of feeling like a renamed clone  | **DONE** (2026-07-14) |
 | 85  | Scrap Pit Banter                                | Talking trash becomes a two-way rivalry beat against the crew                  | **DONE** (2026-07-14) |
+| 86  | Scrap Pit Records                               | Every solo brawl builds a persistent win-run target worth defending            | **DONE** (2026-07-14) |
 
 ---
 
@@ -3234,6 +3235,48 @@ attempt one attainable friend score to hunt from the first stage onward.
 
 ---
 
+## Session 86 — Scrap Pit Records
+
+**Goal:** give every completed Scrap Pit round a durable personal target that
+makes an immediate rematch and a later return feel meaningful.
+
+**Locked design decisions**
+
+- `mmr_scrap_pit_record` stores device-local rounds, wins, current win run,
+  best win run, and the last counted match id. It is cosmetic solo progress,
+  parallel to local Gauntlet bests rather than lifetime PvP persistence.
+- Results may update the record only when the launch metadata identifies
+  `practiceKind === 'rusty_rumble'` and the completed authoritative
+  `MatchResult` names the local player as winner, another fighter as winner,
+  or no winner. Client-rendered scores never decide the outcome.
+- A win extends the current run, a draw preserves it, and a loss ends it. The
+  Results story distinguishes a first win, new best, held run, and ended run;
+  the existing Scrap Pit lobby button carries total wins and the best run back
+  to the next session.
+- The last match id makes a recreated Results scene idempotent. Loading floors
+  fractions, rejects non-finite/negative values, caps counts, restores
+  `wins <= rounds` plus `current <= best <= wins`, and drops invalid ids.
+- No server persistence, network message, match result field, AI, difficulty,
+  matchmaking, score, Crown/Grudge logic, rewards, contracts, combat, physics,
+  or ordinary PvP/Spar/Gauntlet behavior changes.
+
+**Acceptance criteria**
+
+- [x] Pure tests cover malformed storage, impossible totals, first and repeat
+      wins, new bests, draw preservation, loss reset, duplicate match ids,
+      missing local identity, and compact lobby/results copy.
+- [x] A staged authoritative-result browser journey proves one win is banked,
+      the Results celebration occupies its intended story lane, and the same
+      target returns on the recreated lobby button.
+- [x] The existing real-server Scrap Pit journey still reaches live play,
+      proves rival banter, and verifies the new empty-record route label.
+- [x] Desktop and 844×390 mobile-landscape visual reviews keep the two-line
+      route readable in the four-button row with no browser console errors.
+- [x] Typecheck, lint, all 1,272 unit tests across 92 files, production build,
+      and the full 63-pass/12-intentional-skip Playwright matrix pass.
+
+---
+
 ## Session 85 — Scrap Pit Banter
 
 **Goal:** turn the Scrap Pit crew into memorable rivals who answer the player
@@ -3981,6 +4024,36 @@ favorite mid-match event while the final-minute surprise stays fresh.
 ---
 
 ## Session Log
+
+### Session 86 — 2026-07-14 — Scrap Pit Records
+
+**Shipped:** every completed Scrap Pit now advances a device-local record built
+from the authoritative winner. Wins grow a consecutive run, draws hold it,
+losses end it, and the best run survives browser restarts. Results celebrates
+the first win, a new record, a held run, or the end of a run; the Scrap Pit
+button brings career wins and the best target back to the lobby.
+
+The stored shape is bounded and normalized before rendering, and a last-match
+id prevents scene recreation from counting one fight twice. The client never
+infers outcomes from scoreboard presentation. This remains isolated from server
+persistence, lifetime PvP, Crown/Grudge state, matchmaking, bot behavior,
+difficulty, contracts, rewards, score, combat, physics, and wire types.
+
+**Verification:** 5 focused record/crew tests pass, including corrupt storage,
+all outcome transitions, duplicate suppression, and presentation. Typecheck,
+lint, all 1,272 unit/integration tests across 92 files, and the production build
+pass; Vite retains its existing chunk-size advisory. Six dedicated Scrap Pit
+browser journeys pass across Chromium, Firefox, and mobile landscape, while the
+complete matrix passes 63 tests with 12 intentional project-scoped skips. Live
+desktop and 844×390 mobile-landscape reviews keep the expanded route button
+readable and browser logs contain no errors.
+
+**Operational watch:** the lobby keeps the target deliberately compact. Watch
+whether real records make total rounds or a reset control worth surfacing later;
+do not turn this cosmetic chase into a combat advantage or server-owned grind.
+
+**Deployment:** not run; production deployment still requires explicit user
+authorization.
 
 ### Session 85 — 2026-07-14 — Scrap Pit Banter
 

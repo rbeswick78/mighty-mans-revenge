@@ -47,6 +47,13 @@ import {
   type GauntletBuildCodex,
   type GauntletBuildDefinition,
 } from '../ui/gauntlet-build-codex.js';
+import {
+  SCRAP_PIT_RECORD_STORAGE_KEY,
+  normalizeScrapPitRecord,
+  scrapPitRecordResultLabel,
+  scrapPitRecordUpdate,
+  type ScrapPitRecordUpdate,
+} from '../ui/scrap-pit-record.js';
 
 interface ResultsSceneData {
   result?: MatchResult;
@@ -113,6 +120,7 @@ export class ResultsScene extends Phaser.Scene {
   private gauntletBuild: GauntletBuildDefinition | null = null;
   private isNewGauntletBuild = false;
   private isNewGauntletBuildBest = false;
+  private scrapPitRecordUpdate: ScrapPitRecordUpdate | null = null;
 
   // Event handler references for cleanup
   private onRematchStatus: ((opponentWantsRematch: boolean) => void) | null = null;
@@ -150,12 +158,27 @@ export class ResultsScene extends Phaser.Scene {
     this.gauntletBuild = null;
     this.isNewGauntletBuild = false;
     this.isNewGauntletBuildBest = false;
+    this.scrapPitRecordUpdate = null;
   }
 
   create(): void {
     this.cameras.main.fadeIn(300, 0, 0, 0);
     this.gameService = GameService.getInstance();
     this.menuGamepad = new MenuGamepadInput();
+
+    if (this.matchData?.practiceKind === 'rusty_rumble' && this.result) {
+      this.scrapPitRecordUpdate = scrapPitRecordUpdate(
+        this.result,
+        this.gameService.getPlayerId(),
+        normalizeScrapPitRecord(localStorage.getItem(SCRAP_PIT_RECORD_STORAGE_KEY)),
+      );
+      if (this.scrapPitRecordUpdate) {
+        localStorage.setItem(
+          SCRAP_PIT_RECORD_STORAGE_KEY,
+          JSON.stringify(this.scrapPitRecordUpdate.record),
+        );
+      }
+    }
 
     if (this.result?.gauntlet) {
       const previousBest = normalizeGauntletBestClear(
@@ -861,13 +884,17 @@ export class ResultsScene extends Phaser.Scene {
   private renderAwardsAndRivalry(centerX: number, localPlayerId: PlayerId | null): void {
     if (!this.result) return;
 
-    const line = gauntletResultSummary(this.result) ?? formatRivalrySummary(this.result);
+    const pitRecordLine = scrapPitRecordResultLabel(this.scrapPitRecordUpdate);
+    const line =
+      gauntletResultSummary(this.result) ?? pitRecordLine ?? formatRivalrySummary(this.result);
     if (line) {
       const rivalryText = this.add
         .text(centerX, RIVALRY_Y, line, {
           fontFamily: MENU_FONTS.HEADER,
           fontSize: '9px',
-          color: cssHex(RIVALRY_COLOR),
+          color: cssHex(
+            this.scrapPitRecordUpdate?.isNewBest ? CAREER_RANK_UP_COLOR : RIVALRY_COLOR,
+          ),
         })
         .setOrigin(0.5)
         .setAlpha(0)

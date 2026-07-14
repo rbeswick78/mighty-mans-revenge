@@ -112,7 +112,9 @@ lifetime PvP records. They also fight differently: Rusty is the all-rounder,
 Scrapjaw pressures whoever leads the board, and Clank ranges farther for arena
 loot. Character Select previews those roles before every fight. Throw a battle
 cry during the brawl and the nearest available rival answers in character;
-each crew member also has a signature cry when they knock you out.
+each crew member also has a signature cry when they knock you out. Completed
+rounds build a device-local `PIT RECORD`: wins extend a run, draws hold it,
+losses end it, and the best run stays visible on the Scrap Pit button.
 `GAUNTLET` starts a three-fight run that
 escalates from Rookie to Scrapper to Warlord; win to advance, while a loss or
 draw restarts the run.

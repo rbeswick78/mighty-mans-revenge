@@ -53,7 +53,12 @@ test.describe('Scrap Pit solo Rumble', () => {
           xs: buttons.map((button) => button.x),
         };
       });
-      expect(mobileLobby.labels).toEqual(['RUSTY SPAR', 'SCRAP PIT', 'GAUNTLET', 'DAILY RUN']);
+      expect(mobileLobby.labels).toEqual([
+        'RUSTY SPAR',
+        'SCRAP PIT\nNO WINS YET',
+        'GAUNTLET',
+        'DAILY RUN',
+      ]);
       expect(mobileLobby.xs).toEqual([...mobileLobby.xs].sort((a, b) => a - b));
       expect(new Set(mobileLobby.xs).size).toBe(4);
       return;
@@ -113,7 +118,7 @@ test.describe('Scrap Pit solo Rumble', () => {
       return snapshot;
     });
 
-    expect(lobby.labels).toEqual(['RUSTY SPAR', 'SCRAP PIT', 'GAUNTLET', 'DAILY RUN']);
+    expect(lobby.labels).toEqual(['RUSTY SPAR', 'SCRAP PIT\nNO WINS YET', 'GAUNTLET', 'DAILY RUN']);
     expect(lobby.xs).toEqual([...lobby.xs].sort((a, b) => a - b));
     expect(new Set(lobby.xs).size).toBe(4);
     expect(lobby.activated).toBe(true);
