@@ -17,6 +17,7 @@ import {
   BountyHuntState,
   RumbleLeadState,
   RumbleCrownState,
+  RumbleGrudge,
   WastelandWarpState,
   RadiationStormState,
   ScrapstormState,
@@ -326,6 +327,8 @@ export interface ServerMatchFoundMessage {
   matchKind?: 'duel' | 'rumble' | 'practice';
   /** Reigning champion carried only into a direct Wasteland Rumble rematch. */
   rumbleCrown?: RumbleCrownState;
+  /** Local fighter's personal target from the immediately previous Rumble. */
+  rumbleGrudge?: RumbleGrudge;
   /** Local player's persisted real-match wins per fighter; absent on old servers. */
   characterWins?: Record<CharacterId, number>;
   /** Present only while traversing the three-fight solo Gauntlet. */

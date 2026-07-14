@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–79 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Quick Match 1v1 plus 2–4 player Wasteland Rumble with all-player group draft rallies, a rematch-chain Rumble Crown, and live lead-change drama, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–80 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Quick Match 1v1 plus 2–4 player Wasteland Rumble with all-player group draft rallies, a rematch-chain Rumble Crown, live lead-change drama, and personal rematch Grudges, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -111,6 +111,7 @@ Each session below attacks one of these.
 | 77  | Rumble Crown                                    | Every direct group rematch gains a champion to defend or dethrone             | **DONE** (2026-07-14) |
 | 78  | Rumble Draft Rally                              | Every fighter helps choose the next group battleground                        | **DONE** (2026-07-14) |
 | 79  | Rumble Lead Drama                               | Every takeover and tie becomes a shared live-match story                      | **DONE** (2026-07-14) |
+| 80  | Rumble Grudges                                  | Every group finish leaves each fighter a personal rematch score to settle     | **DONE** (2026-07-14) |
 
 ---
 
@@ -3228,6 +3229,49 @@ attempt one attainable friend score to hunt from the first stage onward.
 
 ---
 
+## Session 80 — Rumble Grudges
+
+**Goal:** turn a three- or four-fighter finish into several personal reasons
+to run it back, so players leave Results knowing exactly which rival they want
+to answer in the next round.
+
+**Locked design decisions**
+
+- Grudges are authored only after Rumbles that began with at least three
+  fighters. Quick Match, Practice, and fresh two-fighter Rumbles keep their
+  existing result stories; two connected survivors may carry a valid target
+  from the prior group round into their direct rematch.
+- The server reads the authoritative non-suicide kill feed at match end. For
+  each connected fighter who suffered a knockout, the connected opponent with
+  the highest knockout count becomes their target. The latest knockout breaks
+  a count tie, with stable player id as a final deterministic fallback.
+- Results receives the complete per-fighter map but presents only the local
+  fighter's story. A direct rematch carries only that fighter's target through
+  either the group draft or FORCE path into their `server:matchFound` payload.
+- Returning to the lobby, a disconnect, rematch timeout, or a fresh queue
+  clears the story. A fighter with no opponent deaths receives no invented
+  target, and departed fighters can neither own nor become a carried grudge.
+- Grudges are presentation-only. They add no world marker, reward, bonus,
+  target preference, persistence, lifetime write, Crown interaction, score,
+  combat, physics, matchmaking priority, or balance change.
+
+**Acceptance criteria**
+
+- [x] Pure server tests cover knockout counts, latest-wound tie-breaking,
+      suicides, departed fighters, and no-death fighters.
+- [x] Matchmaking tests prove a three-fighter result authors personalized
+      grudges, a direct group rematch carries only each local target, and the
+      two-fighter Rumble path remains unchanged.
+- [x] Pure client tests cover result and pre-fight copy, singular/plural
+      grammar, nickname clipping, blank names, malformed counts, and self
+      targets.
+- [x] Chromium, Firefox, and mobile-landscape browser tests compose a Grudge
+      alongside a Crown in fighter select and four-player standings.
+- [x] Typecheck, lint, all unit tests, production build, and the full
+      Playwright desktop/mobile matrix pass.
+
+---
+
 ## Session 79 — Rumble Lead Drama
 
 **Goal:** make the shifting stakes of a three- or four-fighter Rumble legible
@@ -3699,6 +3743,44 @@ favorite mid-match event while the final-minute surprise stays fresh.
 ---
 
 ## Session Log
+
+### Session 80 — 2026-07-14 — Rumble Grudges
+
+**Shipped:** every three- or four-fighter Rumble now ends with a personal
+score to settle. For each connected fighter who suffered an opponent
+knockout, the server names the rival who got them most; the latest wound
+breaks a count tie. Results sets that local Grudge, and a direct group rematch
+carries only that fighter's target through the group draft or FORCE path into
+Character Select.
+
+The resolver reads the existing authoritative kill feed once at match end,
+ignores suicides and departed fighters, and invents nothing for a fighter who
+never died to an opponent. Fresh queues and rounds that begin with two
+fighters author no target. Lobby return, disconnect teardown, and rematch
+timeout naturally discard the post-match state. The feature adds no live
+marker, targeting preference, reward, persistence, lifetime write, Crown
+interaction, score, combat, physics, matchmaking priority, or balance change.
+No assets were added.
+
+**Verification:** 72 focused resolver, matchmaking, and presentation tests
+pass. Matchmaking integration proves a three-fighter result authors distinct
+local targets and that the direct rematch carries them through the real Rally
+draft; a separate regression locks the fresh two-fighter path. Chromium,
+Firefox, and 844×390 mobile-landscape compose the three-line Crown + Grudge
+fighter briefing and the Crown + Grudge four-player standings without
+overflow. Typecheck, lint, scoped Prettier, all 1,238 unit/integration tests
+across 87 files, and the pinned-pnpm production build pass; Vite retains its
+existing chunk-size advisory. The full Playwright matrix passes 45 tests with
+12 intentional project-scoped skips, including the real three-client Rumble
+draft journey.
+
+**Tuning watch:** the latest-wound tie-break should make an even split feel
+personal instead of arbitrary. Watch whether one-knockout Grudges are enough
+to provoke a rematch or whether a future group playtest supports a higher
+threshold; do not guess before players try it.
+
+**Deployment:** not run; production deployment still requires explicit user
+authorization.
 
 ### Session 79 — 2026-07-14 — Rumble Lead Drama
 

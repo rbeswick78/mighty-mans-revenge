@@ -47,6 +47,7 @@ import type {
   DraftFirstPickerReason,
   RivalrySetResult,
   RumbleCrownState,
+  RumbleGrudges,
   BotDifficulty,
   GauntletBoonId,
   MutatorId,
@@ -64,6 +65,7 @@ import { GameServer } from '../network/server.js';
 import { MatchmakingQueue } from './matchmaking-queue.js';
 import { RumbleQueue } from './rumble-queue.js';
 import { resolveRumbleCrown } from './rumble-crown.js';
+import { resolveRumbleGrudges } from './rumble-grudges.js';
 import { logger } from '../utils/logger.js';
 import type {
   PersistentStatsStore,
@@ -127,6 +129,8 @@ interface PostMatchState {
   previousContractId: MatchContractId;
   /** Crown carried only if this exact connected Rumble group runs it back. */
   rumbleCrown: RumbleCrownState | null;
+  /** Personal targets carried only into this connected group's direct rematch. */
+  rumbleGrudges: RumbleGrudges;
 }
 
 type MatchKind = 'duel' | 'rumble' | 'practice';
@@ -170,6 +174,8 @@ interface DraftState {
   /** Previous round's contract, carried through the draft into Match. */
   previousContractId?: MatchContractId;
   matchKind: 'duel' | 'rumble';
+  /** Personal targets resolved from the immediately previous Rumble. */
+  rumbleGrudges: RumbleGrudges;
 }
 
 interface RivalrySetState {
@@ -383,6 +389,7 @@ export class MatchmakingManager {
         { id: playerId, nickname },
         { id: botId, nickname: BOT.NICKNAME },
       ],
+      {},
       gauntlet?.difficulty ?? safeDifficulty,
       [],
       undefined,
@@ -980,6 +987,7 @@ export class MatchmakingManager {
     mapData: MapData,
     gameMode: GameModeType,
     playerEntries: { id: PlayerId; nickname: string }[],
+    rumbleGrudges: RumbleGrudges = {},
     practiceDifficulty: BotDifficulty | null = null,
     rematchMutatorExclusions: readonly MutatorId[] = [],
     previousContractId?: MatchContractId,
@@ -1086,6 +1094,11 @@ export class MatchmakingManager {
         ...createEmptyCharacterWins(),
         ...this.statsStore?.getLifetime(entry.nickname)?.characterWins,
       };
+      const grudge = rumbleGrudges[entry.id];
+      const activeGrudge =
+        grudge && playerEntries.some((candidate) => candidate.id === grudge.targetId)
+          ? grudge
+          : undefined;
       this.server.sendTo(
         entry.id,
         {
@@ -1096,6 +1109,7 @@ export class MatchmakingManager {
           gameMode,
           matchKind,
           rumbleCrown: this.rumbleCrowns.get(matchId),
+          rumbleGrudge: activeGrudge,
           characterWins,
           gauntlet: gauntlet ?? undefined,
           practiceMutatorId: appliedPracticeMutator ?? undefined,
@@ -1132,6 +1146,7 @@ export class MatchmakingManager {
     previousContractId?: MatchContractId,
     matchKind: 'duel' | 'rumble' = 'duel',
     rumbleCrown: RumbleCrownState | null = null,
+    rumbleGrudges: RumbleGrudges = {},
   ): void {
     const matchId = crypto.randomUUID();
     const draftEntries = playerEntries.map((entry) => ({
@@ -1175,6 +1190,7 @@ export class MatchmakingManager {
       rematchMutatorExclusions: [...rematchMutatorExclusions],
       previousContractId,
       matchKind,
+      rumbleGrudges: { ...rumbleGrudges },
     };
     this.draftStates.set(matchId, draft);
     this.matchKinds.set(matchId, matchKind);
@@ -1420,6 +1436,7 @@ export class MatchmakingManager {
       getMap(draft.mapPick!),
       draft.modePick!,
       draft.playerEntries,
+      draft.rumbleGrudges,
       null,
       draft.rematchMutatorExclusions,
       draft.previousContractId,
@@ -1729,6 +1746,19 @@ export class MatchmakingManager {
       [...match.players].map(([playerId, player]) => [playerId, player.nickname]),
     );
     result.departedPlayerIds = match.getDepartedPlayerIds();
+    const connectedPlayerIds = match.getConnectedPlayerIds();
+    const rumbleGrudges =
+      matchKind === 'rumble' && match.players.size >= 3
+        ? resolveRumbleGrudges(
+            match.getKillFeed(),
+            [...match.players.values()].map((player) => ({
+              id: player.id,
+              nickname: player.nickname,
+            })),
+            connectedPlayerIds,
+          )
+        : {};
+    if (Object.keys(rumbleGrudges).length > 0) result.rumbleGrudges = rumbleGrudges;
     const rumbleCrownResult =
       matchKind === 'rumble'
         ? resolveRumbleCrown(
@@ -1738,7 +1768,7 @@ export class MatchmakingManager {
               id: player.id,
               nickname: player.nickname,
             })),
-            match.getConnectedPlayerIds(),
+            connectedPlayerIds,
           )
         : null;
     if (rumbleCrownResult) result.rumbleCrown = rumbleCrownResult;
@@ -2028,8 +2058,7 @@ export class MatchmakingManager {
     logger.info({ matchId, winnerId: result.winnerId, duration: result.duration }, 'Match ended');
 
     // Move to post-match state for rematch handling
-    const playerIds =
-      matchKind === 'rumble' ? match.getConnectedPlayerIds() : [...match.players.keys()];
+    const playerIds = matchKind === 'rumble' ? connectedPlayerIds : [...match.players.keys()];
     const timeoutHandle = setTimeout(() => {
       this.onRematchTimeout(matchId);
     }, REMATCH_TIMEOUT_MS);
@@ -2064,6 +2093,7 @@ export class MatchmakingManager {
       previousMutators: [...match.activeMutators],
       previousContractId: result.contract?.id ?? match.getContractHudState().id,
       rumbleCrown: rumbleCrownResult?.crown ?? null,
+      rumbleGrudges,
     });
 
     // Remove from active matches
@@ -2144,6 +2174,7 @@ export class MatchmakingManager {
         getMap(postMatch.nextMapName),
         postMatch.nextGameMode,
         playerEntries,
+        {},
         postMatch.nextGauntlet?.difficulty ?? postMatch.practiceDifficulty,
         postMatch.previousMutators,
         postMatch.previousContractId,
@@ -2170,6 +2201,7 @@ export class MatchmakingManager {
         getMap(postMatch.nextMapName),
         postMatch.nextGameMode,
         playerEntries,
+        postMatch.rumbleGrudges,
         null,
         postMatch.previousMutators,
         postMatch.previousContractId,
@@ -2184,6 +2216,7 @@ export class MatchmakingManager {
       postMatch.previousContractId,
       rematchKind === 'rumble' ? 'rumble' : 'duel',
       postMatch.rumbleCrown,
+      postMatch.rumbleGrudges,
     );
   }
 

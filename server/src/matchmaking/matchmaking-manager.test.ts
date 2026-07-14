@@ -273,6 +273,24 @@ describe('MatchmakingManager rematch flow', () => {
     expect(draft.rallyCategory).toBeNull();
   });
 
+  it('does not author a redundant personal grudge for a two-fighter Rumble', () => {
+    mgr.handleJoinRumble('A', 'Alpha');
+    mgr.handleJoinRumble('B', 'Bravo');
+    mgr.tick(RUMBLE.LAUNCH_DELAY_SECONDS, 0);
+    walkDraft(mgr, sent);
+
+    const match = mgr.getActiveMatches()[0];
+    match.phase = MatchPhase.ACTIVE;
+    match.onKill('B', 'A', 'gun');
+    match.phase = MatchPhase.ENDED;
+    mgr.tick(0.05, 1);
+
+    const end = [...sent]
+      .reverse()
+      .find((entry) => entry.playerId === 'A' && entry.message.type === 'server:matchEnd');
+    expect(end?.message.type === 'server:matchEnd' && end.message.result.rumbleGrudges).toBeFalsy();
+  });
+
   it('carries the Rumble Crown through a direct group rematch and records a defense', () => {
     for (const [id, nickname] of [
       ['A', 'Alpha'],
@@ -327,6 +345,64 @@ describe('MatchmakingManager rematch flow', () => {
       crown: { holderId: 'A', holderNickname: 'Alpha', wins: 2 },
       outcome: 'defended',
     });
+  });
+
+  it('authors personal Rumble grudges and carries them into the direct rematch', () => {
+    for (const [id, nickname] of [
+      ['A', 'Alpha'],
+      ['B', 'Bravo'],
+      ['C', 'Cora'],
+    ] as const) {
+      mgr.handleJoinRumble(id, nickname);
+    }
+    mgr.tick(RUMBLE.LAUNCH_DELAY_SECONDS, 0);
+    walkDraft(mgr, sent);
+
+    const match = mgr.getActiveMatches()[0];
+    match.phase = MatchPhase.ACTIVE;
+    match.onKill('B', 'A', 'gun');
+    match.onKill('C', 'A', 'gun');
+    match.onKill('B', 'A', 'gun');
+    match.onKill('A', 'B', 'gun');
+    match.phase = MatchPhase.ENDED;
+    mgr.tick(0.05, 1);
+
+    const firstEnd = [...sent]
+      .reverse()
+      .find((entry) => entry.playerId === 'A' && entry.message.type === 'server:matchEnd');
+    expect(
+      firstEnd?.message.type === 'server:matchEnd'
+        ? firstEnd.message.result.rumbleGrudges
+        : undefined,
+    ).toEqual({
+      A: { targetId: 'B', targetNickname: 'Bravo', knockouts: 2 },
+      B: { targetId: 'A', targetNickname: 'Alpha', knockouts: 1 },
+    });
+
+    sent.length = 0;
+    mgr.handleRematchRequest('A');
+    mgr.handleRematchRequest('B');
+    mgr.handleRematchRequest('C');
+    walkDraft(mgr, sent);
+
+    const foundFor = (playerId: PlayerId) =>
+      sent.find(
+        (entry) => entry.playerId === playerId && entry.message.type === 'server:matchFound',
+      );
+    const aFound = foundFor('A');
+    const bFound = foundFor('B');
+    const cFound = foundFor('C');
+    expect(aFound?.message.type === 'server:matchFound' && aFound.message.rumbleGrudge).toEqual({
+      targetId: 'B',
+      targetNickname: 'Bravo',
+      knockouts: 2,
+    });
+    expect(bFound?.message.type === 'server:matchFound' && bFound.message.rumbleGrudge).toEqual({
+      targetId: 'A',
+      targetNickname: 'Alpha',
+      knockouts: 1,
+    });
+    expect(cFound?.message.type === 'server:matchFound' && cFound.message.rumbleGrudge).toBeFalsy();
   });
 
   it('eliminates an active Rumble leaver while the remaining fighters continue', () => {

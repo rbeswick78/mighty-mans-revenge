@@ -227,6 +227,17 @@ export interface RumbleCrownResult {
   previousHolderNickname: string | null;
 }
 
+/** One fighter's personal rematch target from the previous Rumble round. */
+export interface RumbleGrudge {
+  targetId: PlayerId;
+  targetNickname: string;
+  /** Opponent knockouts suffered from this target during that round. */
+  knockouts: number;
+}
+
+/** Server-authored personal grudges keyed by the fighter who owns each one. */
+export type RumbleGrudges = Partial<Record<PlayerId, RumbleGrudge>>;
+
 export type MatchContractId =
   | 'hot_shot'
   | 'heavy_hitter'
@@ -403,6 +414,8 @@ export interface MatchResult {
   rivalrySet: RivalrySetResult | null;
   /** Ephemeral champion story for connected Wasteland Rumble rematches. */
   rumbleCrown?: RumbleCrownResult;
+  /** Personal rematch targets earned from this Rumble's knockout history. */
+  rumbleGrudges?: RumbleGrudges;
   /** True for a solo authoritative match against a server-controlled bot. */
   isPractice: boolean;
   /**

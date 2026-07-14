@@ -18,6 +18,7 @@ import { careerRankPresentation } from '../ui/career-rank.js';
 import { winStreakPresentation, type WinStreakTone } from '../ui/win-streak.js';
 import { arenaMasteryResultPresentation } from '../ui/arena-mastery.js';
 import { rumbleCrownResultPresentation } from '../ui/rumble-crown.js';
+import { rumbleGrudgeResultLabel } from '../ui/rumble-grudge.js';
 import {
   GAUNTLET_BEST_CLEAR_STORAGE_KEY,
   gauntletBestClearLabel,
@@ -710,6 +711,7 @@ export class ResultsScene extends Phaser.Scene {
       return idA.localeCompare(idB);
     });
     const crownStory = rumbleCrownResultPresentation(this.result.rumbleCrown, localPlayerId);
+    const grudgeStory = rumbleGrudgeResultLabel(this.result.rumbleGrudges, localPlayerId);
 
     panel.add(
       this.add
@@ -731,8 +733,20 @@ export class ResultsScene extends Phaser.Scene {
           .setOrigin(0.5),
       );
     }
-    const headingsY = crownStory ? 72 : 54;
-    const rowStartY = crownStory ? 98 : 84;
+    if (grudgeStory) {
+      panel.add(
+        this.add
+          .text(panel.centerX, crownStory ? 67 : 49, grudgeStory, {
+            fontFamily: MENU_FONTS.HEADER,
+            fontSize: '8px',
+            color: cssHex(RIVALRY_COLOR),
+          })
+          .setOrigin(0.5),
+      );
+    }
+    const storyCount = Number(crownStory !== null) + Number(grudgeStory !== null);
+    const headingsY = storyCount === 0 ? 54 : storyCount === 1 ? 72 : 88;
+    const rowStartY = storyCount === 0 ? 84 : storyCount === 1 ? 98 : 114;
     const headings = [
       { x: 28, text: '#' },
       { x: 62, text: 'FIGHTER' },

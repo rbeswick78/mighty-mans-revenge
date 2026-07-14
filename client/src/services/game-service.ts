@@ -7,6 +7,7 @@ import type {
   PracticeGauntletMatch,
   PracticeGauntletRouteId,
   RumbleCrownState,
+  RumbleGrudge,
   RumbleLeadState,
 } from '@shared/types/game.js';
 import type {
@@ -52,6 +53,8 @@ export interface MatchData {
   matchKind?: 'duel' | 'rumble' | 'practice';
   /** Reigning champion in this connected Rumble rematch chain. */
   rumbleCrown?: RumbleCrownState;
+  /** Local fighter's personal target from the previous Rumble round. */
+  rumbleGrudge?: RumbleGrudge;
   /** Persisted real-match wins for every selectable fighter. */
   characterWins: Record<CharacterId, number>;
   /** Present only during the escalating three-fight solo run. */
@@ -287,6 +290,7 @@ export class GameService {
         gameMode: msg.gameMode,
         matchKind: msg.matchKind ?? (msg.gauntlet ? 'practice' : 'duel'),
         rumbleCrown: msg.rumbleCrown,
+        rumbleGrudge: msg.rumbleGrudge,
         characterWins: {
           ...createEmptyCharacterWins(),
           ...msg.characterWins,

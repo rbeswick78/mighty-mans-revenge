@@ -64,6 +64,10 @@ next winner can steal it. The Crown disappears when the group returns to the
 lobby, so it stays a social run-it-back story instead of persistent grind.
 During three- and four-fighter rounds, server-authored takeover callouts now
 make every sole lead, shared lead, and full-field tie part of the live story.
+At the finish, every connected fighter who was knocked out gets a personal
+Grudge against the rival who got them most; the latest knockout breaks a tie,
+and a direct rematch carries that target into fighter select for one more score
+to settle.
 
 ## Arena variety
 

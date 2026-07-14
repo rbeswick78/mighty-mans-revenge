@@ -21,6 +21,7 @@ import { characterMasteryLabel } from '../ui/character-mastery.js';
 import { gauntletMatchLabel } from '../ui/practice-gauntlet.js';
 import { practiceMutatorBriefingLabel } from '../ui/practice-mutator.js';
 import { rumbleCrownBriefingLabel } from '../ui/rumble-crown.js';
+import { rumbleGrudgeBriefingLabel } from '../ui/rumble-grudge.js';
 
 // Scene-local color decisions. HEALTH_GOOD (mint) doubles as the "you"
 // highlight — same color the HUD uses for the local player's health bar,
@@ -176,6 +177,7 @@ export class CharacterSelectScene extends Phaser.Scene {
     if (this.matchData) {
       const modeName = gameModeDisplayName(this.matchData.gameMode);
       const crownLabel = rumbleCrownBriefingLabel(this.matchData.rumbleCrown);
+      const grudgeLabel = rumbleGrudgeBriefingLabel(this.matchData.rumbleGrudge);
       const matchLabel = this.matchData.gauntlet
         ? gauntletMatchLabel(
             this.matchData.gauntlet,
@@ -185,6 +187,7 @@ export class CharacterSelectScene extends Phaser.Scene {
         : [
             `NEXT: ${modeName} - ${this.matchData.mapName.toUpperCase()}`,
             ...(crownLabel ? [crownLabel] : []),
+            ...(grudgeLabel ? [grudgeLabel] : []),
             ...(this.matchData.practiceMutatorId
               ? [practiceMutatorBriefingLabel(this.matchData.practiceMutatorId)]
               : []),
