@@ -1480,6 +1480,30 @@ describe('MatchmakingManager pre-match draft', () => {
     expect(sent.some((s) => s.message.type === 'server:draftState')).toBe(true);
   });
 
+  it('releases every entrant when a player leaves character select', () => {
+    const mgr = makeManager([0, 0]);
+    pairUp(mgr);
+    walkDraft(mgr, sent);
+    expect(mgr.getActiveMatches()).toHaveLength(1);
+    expect(mgr.getActiveMatches()[0].phase).toBe(MatchPhase.CHARACTER_SELECT);
+    sent.length = 0;
+
+    mgr.handleReturnToLobby('A');
+
+    expect(mgr.getActiveMatches()).toHaveLength(0);
+    expect(
+      sent.filter((entry) => entry.message.type === 'server:opponentDisconnected'),
+    ).toMatchObject([{ playerId: 'B', reliable: true }]);
+
+    // Neither side remains mapped to the abandoned match: both can queue
+    // again immediately and receive a fresh draft instead of being ignored.
+    mgr.handleJoinMatchmaking('A', 'A');
+    mgr.handleJoinMatchmaking('B', 'B');
+    sent.length = 0;
+    mgr.tick(0.05, 2);
+    expect(sent.some((entry) => entry.message.type === 'server:draftState')).toBe(true);
+  });
+
   it('ignores joinMatchmaking from a player already in a draft', () => {
     const mgr = makeManager([0, 0]);
     pairUp(mgr);

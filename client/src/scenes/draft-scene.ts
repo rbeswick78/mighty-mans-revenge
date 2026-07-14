@@ -102,6 +102,7 @@ export class DraftScene extends Phaser.Scene {
   private statusText: Phaser.GameObjects.Text | null = null;
   private timerText: Phaser.GameObjects.Text | null = null;
   private menuGamepad: MenuGamepadInput | null = null;
+  private backButton!: PixelButton;
   private gamepadFocusActive = false;
   private gamepadFocusedCard: DraftCard | null = null;
 
@@ -151,6 +152,16 @@ export class DraftScene extends Phaser.Scene {
 
     new WastelandStreet(this, { lowDetail: this.isLikelyMobile() });
 
+    this.backButton = new PixelButton(this, 24, 24, 150, 30, 'BACK TO LOBBY', {
+      variant: 'secondary',
+      fontSize: 7,
+      hitPaddingY: 10,
+      onClick: () => this.leavePreFight(),
+    });
+    this.backButton.setDepth(WastelandStreet.DEPTH.UI + 2);
+    this.input.keyboard?.on('keydown-ESC', () => this.leavePreFight());
+    this.input.keyboard?.on('keydown-BACKSPACE', () => this.leavePreFight());
+
     this.wireGameServiceEvents();
 
     // GameService caches the snapshot that routed us here, so the flow
@@ -175,7 +186,12 @@ export class DraftScene extends Phaser.Scene {
 
   update(): void {
     const actions = this.menuGamepad?.poll();
-    if (!actions?.hasAction || this.phase !== 'pick' || this.transitioned) return;
+    if (!actions?.hasAction) return;
+    if (actions.back) {
+      this.leavePreFight();
+      return;
+    }
+    if (this.phase !== 'pick' || this.transitioned) return;
     this.gamepadFocusActive = true;
 
     const enabled = this.enabledGamepadCards();
@@ -287,6 +303,12 @@ export class DraftScene extends Phaser.Scene {
     this.cameras.main.fadeOut(300, 0, 0, 0);
     this.cameras.main.once('camerafadeoutcomplete', go);
     this.time.delayedCall(500, go);
+  }
+
+  private leavePreFight(): void {
+    if (this.transitioned) return;
+    this.gameService.returnToLobby();
+    this.bailToLobby();
   }
 
   private acceptSnapshot(msg: ServerDraftStateMessage): void {

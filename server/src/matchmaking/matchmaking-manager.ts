@@ -512,7 +512,7 @@ export class MatchmakingManager {
           (isRumble && (match.phase !== MatchPhase.ACTIVE || isPracticeRumble)) ||
           isPracticeDuos
         ) {
-          this.teardownPracticeGroupAfterDeparture(matchId, match, playerId);
+          this.teardownActiveGroupAfterDeparture(matchId, match, playerId);
           return;
         }
         match.onPlayerDisconnect(playerId, isRumble);
@@ -694,7 +694,19 @@ export class MatchmakingManager {
       this.releaseRivalrySet(postMatch.playerIds);
       this.releasePracticePlayers(postMatch.playerIds);
     } else {
-      // Player returning to lobby from an active match (forfeit)
+      const match = this.activeMatches.get(matchId);
+      if (match?.phase === MatchPhase.CHARACTER_SELECT) {
+        // The client now exposes an explicit pre-fight back action. Nobody
+        // has entered combat yet, so dissolve the whole pending group and
+        // release every entrant immediately instead of creating a phantom
+        // forfeit/result that leaves the others mapped to a dead match.
+        this.teardownActiveGroupAfterDeparture(matchId, match, playerId);
+        return;
+      }
+
+      // Player returning to lobby from an active match (forfeit). Live-play
+      // UI does not currently expose this path; retain the compatibility
+      // behavior for stale clients.
       this.playerMatchMap.delete(playerId);
     }
   }
@@ -1163,8 +1175,8 @@ export class MatchmakingManager {
     }
   }
 
-  /** Dissolve a pre-fight or bot-backed Practice group without leaving bot state behind. */
-  private teardownPracticeGroupAfterDeparture(
+  /** Dissolve a pre-fight or bot-backed group without leaving match state behind. */
+  private teardownActiveGroupAfterDeparture(
     matchId: string,
     match: Match,
     leavingPlayerId: PlayerId,
@@ -1190,8 +1202,10 @@ export class MatchmakingManager {
     this.practiceGauntletRunHistories.delete(matchId);
     this.matchKinds.delete(matchId);
     this.rumbleCrowns.delete(matchId);
-    this.releasePracticePlayers([...match.players.keys()]);
-    logger.info({ matchId, leavingPlayerId }, 'Practice group dissolved after player departure');
+    const playerIds = [...match.players.keys()];
+    this.releaseRivalrySet(playerIds);
+    this.releasePracticePlayers(playerIds);
+    logger.info({ matchId, leavingPlayerId }, 'Active group dissolved after player departure');
   }
 
   /**

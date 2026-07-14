@@ -119,6 +119,7 @@ export class CharacterSelectScene extends Phaser.Scene {
   private statusText!: Phaser.GameObjects.Text;
   private timerText!: Phaser.GameObjects.Text;
   private lockButton!: PixelButton;
+  private backButton!: PixelButton;
 
   private localHoveredId: CharacterId | null = null;
   private latestSelections: ServerCharacterSelectStateMessage['selections'] = [];
@@ -160,6 +161,14 @@ export class CharacterSelectScene extends Phaser.Scene {
     // menu trio reads as one continuous place.
     // ────────────────────────────────────────────────────────────────────
     new WastelandStreet(this, { lowDetail: this.isLikelyMobile() });
+
+    this.backButton = new PixelButton(this, 24, 24, 150, 30, 'BACK TO LOBBY', {
+      variant: 'secondary',
+      fontSize: 7,
+      hitPaddingY: 10,
+      onClick: () => this.leavePreFight(),
+    });
+    this.backButton.setDepth(WastelandStreet.DEPTH.UI + 2);
 
     // ────────────────────────────────────────────────────────────────────
     // Logo + subtitle
@@ -286,11 +295,16 @@ export class CharacterSelectScene extends Phaser.Scene {
     this.lockButton.setDepth(WastelandStreet.DEPTH.UI);
 
     this.add
-      .text(centerX, camHeight - 24, 'TAP / CLICK OR D-PAD TO PICK  •  ENTER / A TO LOCK IN', {
-        fontFamily: MENU_FONTS.BODY,
-        fontSize: '12px',
-        color: cssHex(FOOTER_COLOR),
-      })
+      .text(
+        centerX,
+        camHeight - 24,
+        'TAP / CLICK OR D-PAD TO PICK  •  ENTER / A LOCK  •  ESC / B BACK',
+        {
+          fontFamily: MENU_FONTS.BODY,
+          fontSize: '12px',
+          color: cssHex(FOOTER_COLOR),
+        },
+      )
       .setOrigin(0.5)
       .setDepth(WastelandStreet.DEPTH.UI);
 
@@ -300,6 +314,8 @@ export class CharacterSelectScene extends Phaser.Scene {
     this.input.keyboard?.on('keydown-D', () => this.cycleHover(1));
     this.input.keyboard?.on('keydown-ENTER', () => this.tryLockCurrent());
     this.input.keyboard?.on('keydown-SPACE', () => this.tryLockCurrent());
+    this.input.keyboard?.on('keydown-ESC', () => this.leavePreFight());
+    this.input.keyboard?.on('keydown-BACKSPACE', () => this.leavePreFight());
 
     this.wireGameServiceEvents();
   }
@@ -315,6 +331,10 @@ export class CharacterSelectScene extends Phaser.Scene {
   update(): void {
     const actions = this.menuGamepad?.poll();
     if (!actions?.hasAction) return;
+    if (actions.back) {
+      this.leavePreFight();
+      return;
+    }
     this.lockButton.setFocused(true);
     if (actions.left || actions.up) this.cycleHover(-1);
     else if (actions.right || actions.down) this.cycleHover(1);
@@ -560,6 +580,12 @@ export class CharacterSelectScene extends Phaser.Scene {
     this.cameras.main.fadeOut(300, 0, 0, 0);
     this.cameras.main.once('camerafadeoutcomplete', fadeAndGo);
     this.time.delayedCall(500, fadeAndGo);
+  }
+
+  private leavePreFight(): void {
+    if (this.transitioned) return;
+    this.gameService.returnToLobby();
+    this.bailToLobby();
   }
 
   private applyServerState(msg: ServerCharacterSelectStateMessage): void {

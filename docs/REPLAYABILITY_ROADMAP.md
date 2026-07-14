@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–93 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, roster-authentic duel/Rumble results, Gun Game, Rivalry Sets, Quick Match 1v1 plus 2–4 player Wasteland Rumble with all-player group draft rallies, a rematch-chain Rumble Crown, live lead-change drama, personal rematch Grudges, authoritative Rumble Assists with K/A/D, a solo four-fighter Scrap Pit whose three server-authoritative rivals have distinct readable tactics, answer player taunts with signature banter, and feed a device-local win/run record chase, a 2v2 Crew Battle with friendly-fire protection and an optional six-second real-friend join window, a four-objective Crew Clash rotation, and a device-local four-patch Crew Tour, visible bounded Wasteland Signal Recovery, device-aware pre-fight control onboarding with early touch affordances, persistent user-controlled lobby audio, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–94 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, roster-authentic duel/Rumble results, Gun Game, Rivalry Sets, Quick Match 1v1 plus 2–4 player Wasteland Rumble with all-player group draft rallies, a rematch-chain Rumble Crown, live lead-change drama, personal rematch Grudges, authoritative Rumble Assists with K/A/D, a solo four-fighter Scrap Pit whose three server-authoritative rivals have distinct readable tactics, answer player taunts with signature banter, and feed a device-local win/run record chase, a 2v2 Crew Battle with friendly-fire protection and an optional six-second real-friend join window, a four-objective Crew Clash rotation, and a device-local four-patch Crew Tour, visible bounded Wasteland Signal Recovery, device-aware pre-fight control onboarding with early touch affordances, persistent user-controlled lobby audio, safe multi-input exits from Draft and Character Select, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -4267,6 +4267,41 @@ favorite mid-match event while the final-minute surprise stays fresh.
 ---
 
 ## Session Log
+
+### Session 94 — 2026-07-14 — Safe Pre-Fight Exits
+
+**Shipped:** Draft and Character Select now provide a consistent visible
+`BACK TO LOBBY` control. Pointer and touch use a 150×30 button with a 50px-high
+interaction target; Escape, Backspace, and standard gamepad B reach the same
+path. Character Select's footer also advertises the keyboard/controller exit
+instead of leaving players to discover it by accident.
+
+The client tells the server it is returning before transitioning locally. A
+Character Select departure now dissolves the full pre-fight group, clears every
+participant's match mapping and associated bot, Practice, rivalry, Rumble, and
+rematch state, and notifies the remaining entrants. Both players can therefore
+queue again immediately instead of waiting in a stale match. Draft teardown
+continues to use its existing equivalent group cleanup, while live-match
+return/forfeit behavior remains unchanged.
+
+**Verification:** focused server coverage proves that both Character Select
+entrants are released and can form a fresh draft after one leaves. The focused
+Playwright journey passes on Chromium, Firefox, and 844×390 mobile landscape,
+covering physical pointer/touch input, keyboard Escape, gamepad B, destination
+scene, and the expanded hit target. Typecheck and lint pass; all 1,304 unit and
+integration tests pass across 97 files. The production build passes with the
+existing Vite chunk-size advisory (`index-BCYrguw2.js`, 1,847.26 kB / 441.65
+kB gzip). Desktop and mobile captures keep the secondary action clear of the
+draft title, cards, fighter roster, and fixed 4:3 safe area. Chromium and
+mobile completed cleanly in the 99-case matrix. Two existing Scrap Pit checks
+timed out late in the first Firefox leg under resource pressure; the complete
+Firefox project then passed cleanly (27 passes, 6 intentional skips). Across
+the clean project results, all 84 executable cases pass with 15 intentional
+cross-project skips.
+
+**Operational watch:** the button is intentionally secondary and exists only
+before combat. A live-match exit should remain a separate confirmed-forfeit
+design so a stray touch or controller press cannot concede a fight.
 
 ### Session 93 — 2026-07-14 — Lobby Audio Control
 
