@@ -1,16 +1,10 @@
 import {
   GameModeType,
+  MODE_MUTATOR_EXCLUSIONS,
   ONE_IN_THE_CHAMBER,
   PickupType,
 } from '@shared/game';
-import type {
-  KillWeapon,
-  MatchResult,
-  MutatorId,
-  PlayerId,
-  PlayerState,
-  WeaponId,
-} from '@shared/game';
+import type { KillWeapon, MatchResult, PlayerId, PlayerState, WeaponId } from '@shared/game';
 import { computeAwards } from '../awards.js';
 import type { GameMode, MatchContext } from './game-mode.js';
 
@@ -20,23 +14,8 @@ import type { GameMode, MatchContext } from './game-mode.js';
  * kill. PlayerState's existing weapon/ammo fields carry the whole state.
  */
 export class OneInTheChamberMode implements GameMode {
-  readonly excludedMutators: readonly MutatorId[] = [
-    'grenades_only',
-    'infinite_ammo',
-    'fists_only',
-    'weapon_roulette',
-    // These do not create an interesting second rule here: direct hits are
-    // already lethal, health stealing is moot, and grenades/abilities cannot
-    // be used.
-    // Last Laugh would reintroduce free explosive kills into that scarcity;
-    // Scavenger Rush can only roll a useless bandage in this lethal mode.
-    'low_health',
-    'vampire',
-    'turbo_grenades',
-    'ability_overdrive',
-    'last_laugh',
-    'scavenger_rush',
-  ];
+  /** Complete weapon economy; shared table also powers Spar option filtering. */
+  readonly excludedMutators = MODE_MUTATOR_EXCLUSIONS[GameModeType.ONE_IN_THE_CHAMBER];
 
   private readonly awaitingRespawn = new Set<PlayerId>();
   private readonly earnedRoundThisTick = new Set<PlayerId>();
@@ -94,12 +73,7 @@ export class OneInTheChamberMode implements GameMode {
     }
   }
 
-  onKill(
-    match: MatchContext,
-    killerId: PlayerId,
-    victimId: PlayerId,
-    weapon: KillWeapon,
-  ): void {
+  onKill(match: MatchContext, killerId: PlayerId, victimId: PlayerId, weapon: KillWeapon): void {
     this.awaitingRespawn.add(victimId);
     if (match.isOvertime || killerId === victimId) return;
     // A barrel kill is necessarily initiated by the chambered pistol in
@@ -164,10 +138,7 @@ export class OneInTheChamberMode implements GameMode {
       playerStats,
       duration: match.getElapsedSeconds(),
       gameMode: GameModeType.ONE_IN_THE_CHAMBER,
-      awards: computeAwards(
-        playerStats,
-        (id) => match.players.get(id)?.nickname ?? 'UNKNOWN',
-      ),
+      awards: computeAwards(playerStats, (id) => match.players.get(id)?.nickname ?? 'UNKNOWN'),
       rivalry: null,
       rivalrySet: null,
       isPractice: false,

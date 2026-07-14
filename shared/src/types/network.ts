@@ -60,6 +60,8 @@ export interface ClientStartPracticeMessage {
   gameMode?: GameModeType;
   /** Optional validated Rusty fighter pin for ordinary Sparring; Gauntlet ignores it. */
   opponentCharacterId?: CharacterId;
+  /** Optional validated mid-match chaos pin for ordinary Sparring; Gauntlet ignores it. */
+  mutatorId?: MutatorId;
 }
 
 export interface ClientCancelMatchmakingMessage {
@@ -300,6 +302,8 @@ export interface ServerMatchFoundMessage {
   characterWins?: Record<CharacterId, number>;
   /** Present only while traversing the three-fight solo Gauntlet. */
   gauntlet?: PracticeGauntletMatch;
+  /** Accepted server-authored mid-match chaos promise for ordinary Sparring. */
+  practiceMutatorId?: MutatorId;
 }
 
 /**

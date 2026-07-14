@@ -46,9 +46,7 @@ import { NetworkManager } from './network-manager.js';
 const LOCAL_ID = 'local-player';
 const REMOTE_ID = 'remote-player';
 
-function makeSerialized(
-  overrides: Partial<SerializedPlayerState> = {},
-): SerializedPlayerState {
+function makeSerialized(overrides: Partial<SerializedPlayerState> = {}): SerializedPlayerState {
   return {
     id: LOCAL_ID,
     characterId: 'mighty_man',
@@ -136,7 +134,9 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
     // explicit forwarding the stale id survives (the pre-fix bug).
     deliver(makeGameState([makeSerialized({ characterId: 'bubba' })]));
     deliver(
-      makeGameState([makeSerialized({ characterId: 'frost_wizard' })], { tick: 2 }),
+      makeGameState([makeSerialized({ characterId: 'frost_wizard' })], {
+        tick: 2,
+      }),
     );
     expect(manager.getLocalPlayerState()?.characterId).toBe('frost_wizard');
   });
@@ -170,52 +170,47 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
 
   it('clears projectiles, pickups, objectives, mutators, and remote buffers on matchFound', () => {
     deliver(
-      makeGameState(
-        [makeSerialized(), makeSerialized({ id: REMOTE_ID, nickname: 'Rival' })],
-        {
-          grenades: [
-            {
-              id: 'g1',
-              throwerId: REMOTE_ID,
-              position: { x: 10, y: 10 },
-              velocity: { x: 0, y: 0 },
-              safetyFuseTimer: 2,
-              piercing: false,
-            },
-          ],
-          activeMutators: ['big_heads'],
-          contract: {
-            id: 'hot_shot',
-            title: 'HOT SHOT',
-            objective: 'LAND 8 ATTACKS',
-            target: 8,
-            players: [
-              { playerId: LOCAL_ID, progress: 5, completed: false },
-            ],
+      makeGameState([makeSerialized(), makeSerialized({ id: REMOTE_ID, nickname: 'Rival' })], {
+        grenades: [
+          {
+            id: 'g1',
+            throwerId: REMOTE_ID,
+            position: { x: 10, y: 10 },
+            velocity: { x: 0, y: 0 },
+            safetyFuseTimer: 2,
+            piercing: false,
           },
-          confirmedTags: [
-            {
-              id: 'tag-1',
-              ownerId: REMOTE_ID,
-              position: { x: 20, y: 30 },
-              expiresInSeconds: 15,
-            },
-          ],
-          coreRun: {
-            position: { x: 480, y: 288 },
-            carrierId: LOCAL_ID,
-            returnInSeconds: null,
-            carryFraction: 0.4,
-          },
-          bountyHunt: { targetId: REMOTE_ID },
-          wastelandWarp: { secondsUntilSwap: 5.5, sequence: 2 },
-          radiationStorm: {
-            center: { x: 480, y: 288 },
-            radius: 240,
-            shrinkSecondsRemaining: 9,
-          },
+        ],
+        activeMutators: ['big_heads'],
+        contract: {
+          id: 'hot_shot',
+          title: 'HOT SHOT',
+          objective: 'LAND 8 ATTACKS',
+          target: 8,
+          players: [{ playerId: LOCAL_ID, progress: 5, completed: false }],
         },
-      ),
+        confirmedTags: [
+          {
+            id: 'tag-1',
+            ownerId: REMOTE_ID,
+            position: { x: 20, y: 30 },
+            expiresInSeconds: 15,
+          },
+        ],
+        coreRun: {
+          position: { x: 480, y: 288 },
+          carrierId: LOCAL_ID,
+          returnInSeconds: null,
+          carryFraction: 0.4,
+        },
+        bountyHunt: { targetId: REMOTE_ID },
+        wastelandWarp: { secondsUntilSwap: 5.5, sequence: 2 },
+        radiationStorm: {
+          center: { x: 480, y: 288 },
+          radius: 240,
+          shrinkSecondsRemaining: 9,
+        },
+      }),
     );
     expect(manager.getActiveGrenades()).toHaveLength(1);
     expect(manager.getRemotePlayerIds()).toEqual([REMOTE_ID]);
@@ -223,7 +218,10 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
     expect(manager.getConfirmedTags()).toHaveLength(1);
     expect(manager.getCoreRunState()?.carrierId).toBe(LOCAL_ID);
     expect(manager.getBountyHuntState()).toEqual({ targetId: REMOTE_ID });
-    expect(manager.getWastelandWarpState()).toEqual({ secondsUntilSwap: 5.5, sequence: 2 });
+    expect(manager.getWastelandWarpState()).toEqual({
+      secondsUntilSwap: 5.5,
+      sequence: 2,
+    });
     expect(manager.getRadiationStormState()?.radius).toBe(240);
     expect(manager.getContractState()).toMatchObject({ id: 'hot_shot' });
 
@@ -266,7 +264,11 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
   });
 
   it('mirrors and clears the authoritative Bounty Hunt target', () => {
-    deliver(makeGameState([makeSerialized()], { bountyHunt: { targetId: REMOTE_ID } }));
+    deliver(
+      makeGameState([makeSerialized()], {
+        bountyHunt: { targetId: REMOTE_ID },
+      }),
+    );
     expect(manager.getBountyHuntState()).toEqual({ targetId: REMOTE_ID });
 
     deliver(makeGameState([makeSerialized()], { tick: 2 }));
@@ -410,6 +412,7 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
       'sparring',
       GameModeType.CORE_RUN,
       'frost_wizard',
+      'blackout',
     );
     expect(hoisted.sentMessages).toContainEqual({
       type: 'client:startPractice',
@@ -418,13 +421,16 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
       kind: 'sparring',
       gameMode: GameModeType.CORE_RUN,
       opponentCharacterId: 'frost_wizard',
+      mutatorId: 'blackout',
     });
   });
 
   it('sends backward-compatible rematches and optional Gauntlet route choices', () => {
     manager.requestRematch();
     manager.requestRematch('route_b');
-    expect(hoisted.sentMessages).toContainEqual({ type: 'client:rematchRequest' });
+    expect(hoisted.sentMessages).toContainEqual({
+      type: 'client:rematchRequest',
+    });
     expect(hoisted.sentMessages).toContainEqual({
       type: 'client:rematchRequest',
       gauntletRouteId: 'route_b',

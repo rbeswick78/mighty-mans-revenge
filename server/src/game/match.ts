@@ -66,10 +66,7 @@ import { PickupManager } from './pickup-manager.js';
 import { StatsTracker } from './stats-tracker.js';
 import { MapManager } from './map-manager.js';
 import { CombatManager, type ExplosionResult } from './combat-manager.js';
-import {
-  findBlastableCoverTiles,
-  findDemolitionWaveTiles,
-} from './destructible-cover.js';
+import { findBlastableCoverTiles, findDemolitionWaveTiles } from './destructible-cover.js';
 import { LagCompensator } from './lag-compensator.js';
 import { getGameMode } from './modes/index.js';
 import type { GameMode, MatchContext } from './modes/game-mode.js';
@@ -142,7 +139,10 @@ export class Match implements MatchContext {
   /** Kills recorded this tick, cleared after broadcast. */
   private tickKillFeedEntries: KillFeedEntry[] = [];
   /** Pickups collected this tick, cleared after broadcast. */
-  private tickPickupCollections: Array<{ pickupId: string; playerId: PlayerId }> = [];
+  private tickPickupCollections: Array<{
+    pickupId: string;
+    playerId: PlayerId;
+  }> = [];
   /** Solid tiles destroyed this tick by fire breath or grenade blasts. */
   private tickDestroyedTiles: Array<{ col: number; row: number }> = [];
   /** Environmental blasts resolved this tick, for client explosion VFX. */
@@ -247,7 +247,10 @@ export class Match implements MatchContext {
     isFinalMinute: boolean;
   }> = [];
   /** One-shot starts to broadcast this tick (consumed by matchmaking-manager). */
-  private _tickMutatorStarts: Array<{ event: MutatorId; isFinalMinute: boolean }> = [];
+  private _tickMutatorStarts: Array<{
+    event: MutatorId;
+    isFinalMinute: boolean;
+  }> = [];
   /** Injected RNG for mutator timing/selection — defaults to Math.random, override in tests. */
   private readonly rng: () => number;
   /** Mutators from the immediately previous round, excluded from random rolls. */
@@ -332,9 +335,7 @@ export class Match implements MatchContext {
         this.activeGates.add(this.tileKey(decoration.x, decoration.y));
       }
       if (decoration.interaction === 'scavenger_cache') {
-        this.activeScavengerCaches.add(
-          this.tileKey(decoration.x, decoration.y),
-        );
+        this.activeScavengerCaches.add(this.tileKey(decoration.x, decoration.y));
       }
     }
     // Modes can veto whole pickup categories (Gun Game: everything but
@@ -360,7 +361,10 @@ export class Match implements MatchContext {
 
       const defaultHover = CHARACTER_IDS.find((c) => !takenDefaults.has(c)) ?? CHARACTER_IDS[0];
       takenDefaults.add(defaultHover);
-      this.selectionState.set(entry.id, { hovered: defaultHover, locked: null });
+      this.selectionState.set(entry.id, {
+        hovered: defaultHover,
+        locked: null,
+      });
     });
   }
 
@@ -869,7 +873,8 @@ export class Match implements MatchContext {
       !this.mutatorActive('wasteland_warp') ||
       this.isOvertime ||
       this.phase !== MatchPhase.ACTIVE
-    ) return null;
+    )
+      return null;
     return {
       secondsUntilSwap: Math.max(0, this.wastelandWarpTimer),
       sequence: this.wastelandWarpSequence,
@@ -881,13 +886,11 @@ export class Match implements MatchContext {
       !this.mutatorActive('radiation_storm') ||
       this.isOvertime ||
       this.phase !== MatchPhase.ACTIVE
-    ) return null;
+    )
+      return null;
     return {
       center: { ...this.radiationStormCenter },
-      radius: radiationStormRadius(
-        this.radiationStormInitialRadius,
-        this.radiationStormElapsed,
-      ),
+      radius: radiationStormRadius(this.radiationStormInitialRadius, this.radiationStormElapsed),
       shrinkSecondsRemaining: Math.max(
         0,
         MUTATORS.RADIATION_STORM_SHRINK_SECONDS - this.radiationStormElapsed,
@@ -896,19 +899,12 @@ export class Match implements MatchContext {
   }
 
   getScrapstormState(): ScrapstormState | null {
-    if (
-      !this.mutatorActive('scrapstorm') ||
-      this.isOvertime ||
-      this.phase !== MatchPhase.ACTIVE
-    ) return null;
+    if (!this.mutatorActive('scrapstorm') || this.isOvertime || this.phase !== MatchPhase.ACTIVE)
+      return null;
     return {
-      targetPosition: this.scrapstormTargetPosition
-        ? { ...this.scrapstormTargetPosition }
-        : null,
+      targetPosition: this.scrapstormTargetPosition ? { ...this.scrapstormTargetPosition } : null,
       targetPlayerId: this.scrapstormTargetPlayerId,
-      secondsUntilImpact: this.scrapstormTargetPosition
-        ? Math.max(0, this.scrapstormTimer)
-        : null,
+      secondsUntilImpact: this.scrapstormTargetPosition ? Math.max(0, this.scrapstormTimer) : null,
       radius: MUTATORS.SCRAPSTORM_RADIUS_PX,
     };
   }
@@ -992,7 +988,10 @@ export class Match implements MatchContext {
    * Consume the mutator starts generated this tick for broadcasting.
    * Returns [] on subsequent calls in the same tick.
    */
-  consumeTickMutatorStarts(): Array<{ event: MutatorId; isFinalMinute: boolean }> {
+  consumeTickMutatorStarts(): Array<{
+    event: MutatorId;
+    isFinalMinute: boolean;
+  }> {
     const s = this._tickMutatorStarts;
     this._tickMutatorStarts = [];
     return s;
@@ -1003,7 +1002,10 @@ export class Match implements MatchContext {
    * broadcasting ("SHOTGUN INCOMING"). Returns [] on subsequent calls in
    * the same tick.
    */
-  consumeTickWeaponIncoming(): Array<{ weaponId: WeaponId; landsInMs: number }> {
+  consumeTickWeaponIncoming(): Array<{
+    weaponId: WeaponId;
+    landsInMs: number;
+  }> {
     const w = this.tickWeaponIncoming;
     this.tickWeaponIncoming = [];
     return w;
@@ -1397,7 +1399,10 @@ export class Match implements MatchContext {
         const applied = this.pickupManager.applyPickup(pickup, player);
         if (applied) {
           this.pickupManager.collectPickup(pickup.id);
-          this.tickPickupCollections.push({ pickupId: pickup.id, playerId: player.id });
+          this.tickPickupCollections.push({
+            pickupId: pickup.id,
+            playerId: player.id,
+          });
           if (pickup.type === PickupType.OVERCHARGE) {
             this.overchargesByPlayer.set(
               player.id,
@@ -1980,25 +1985,17 @@ export class Match implements MatchContext {
       this.mutatorActive('grenades_only')
     ) {
       type = PickupType.BANDAGE;
-    } else if (
-      this.mutatorActive('infinite_ammo') &&
-      type === PickupType.GUN_AMMO
-    ) {
+    } else if (this.mutatorActive('infinite_ammo') && type === PickupType.GUN_AMMO) {
       type = PickupType.GRENADE;
-    } else if (
-      this.mutatorActive('low_health') &&
-      type === PickupType.BANDAGE
-    ) {
+    } else if (this.mutatorActive('low_health') && type === PickupType.BANDAGE) {
       type = PickupType.GRENADE;
     }
     // Mutator substitutions still obey the mode's final economy contract.
     // Gun Game, for example, permits Low Health but owns its grenade rung.
     if (this.gameMode.isPickupTypeEnabled?.(type) === false) {
-      const fallback = [
-        PickupType.BANDAGE,
-        PickupType.GRENADE,
-        PickupType.GUN_AMMO,
-      ].find((candidate) => this.gameMode.isPickupTypeEnabled?.(candidate) ?? true);
+      const fallback = [PickupType.BANDAGE, PickupType.GRENADE, PickupType.GUN_AMMO].find(
+        (candidate) => this.gameMode.isPickupTypeEnabled?.(candidate) ?? true,
+      );
       type = fallback ?? PickupType.BANDAGE;
     }
     return type;
@@ -2166,8 +2163,9 @@ export class Match implements MatchContext {
    * Pick a slot's mutator. Env overrides win first: FORCE_EVENT pins the
    * final-minute slot (its pre-mutator semantics), FORCE_MIDMATCH_MUTATOR
    * the mid-match slot — both test/e2e/smoke hooks, and both bypass the
-   * mode's exclusion list by design. A compatible Gauntlet forecast owns
-   * the ordinary mid-match slot next. Otherwise random picks draw uniformly
+   * mode's exclusion list by design. A compatible server-planned event
+   * (Gauntlet forecast or Spar preference) owns the ordinary mid-match slot
+   * next. Otherwise random picks draw uniformly
    * from POOL minus the mode's excluded mutators, recent rematch events, the
    * other slot's choice, and FORCE_EVENT's reserved value.
    */
@@ -2182,9 +2180,6 @@ export class Match implements MatchContext {
     // Mode-level exclusions (Gun Game bans grenades_only/infinite_ammo).
     for (const modeExcluded of this.gameMode.excludedMutators ?? []) {
       excluded.add(modeExcluded);
-    }
-    for (const recent of this.rematchMutatorExclusions) {
-      excluded.add(recent);
     }
     const other = isFinalMinute ? this.midMatchSlot.mutator : this.finalMinuteSlot.mutator;
     if (other) {
@@ -2204,14 +2199,17 @@ export class Match implements MatchContext {
       }
     }
 
-    const candidates = MUTATORS.POOL.filter((m) => !excluded.has(m));
     if (
       !isFinalMinute &&
       this.plannedMidMatchMutator &&
-      candidates.includes(this.plannedMidMatchMutator)
+      !excluded.has(this.plannedMidMatchMutator)
     ) {
       return this.plannedMidMatchMutator;
     }
+    for (const recent of this.rematchMutatorExclusions) {
+      excluded.add(recent);
+    }
+    const candidates = MUTATORS.POOL.filter((m) => !excluded.has(m));
     const idx = Math.floor(this.rng() * candidates.length);
     return candidates[Math.min(idx, candidates.length - 1)];
   }
@@ -2399,10 +2397,7 @@ export class Match implements MatchContext {
       for (const player of this.players.values()) {
         if (player.isDead || player.invulnerableTimer > 0) continue;
         if (!isOutsideRadiationStorm(player.position, state)) continue;
-        player.health = Math.max(
-          1,
-          player.health - MUTATORS.RADIATION_STORM_DAMAGE_PER_PULSE,
-        );
+        player.health = Math.max(1, player.health - MUTATORS.RADIATION_STORM_DAMAGE_PER_PULSE);
       }
     }
   }
@@ -2458,15 +2453,11 @@ export class Match implements MatchContext {
     this.tickBarrelExplosions.push({ ...position });
     for (const player of this.players.values()) {
       if (
-        Math.hypot(
-          player.position.x - position.x,
-          player.position.y - position.y,
-        ) > MUTATORS.SCRAPSTORM_RADIUS_PX
-      ) continue;
-      this.combatManager.applyNonlethalEnvironmentalDamage(
-        player,
-        MUTATORS.SCRAPSTORM_DAMAGE,
-      );
+        Math.hypot(player.position.x - position.x, player.position.y - position.y) >
+        MUTATORS.SCRAPSTORM_RADIUS_PX
+      )
+        continue;
+      this.combatManager.applyNonlethalEnvironmentalDamage(player, MUTATORS.SCRAPSTORM_DAMAGE);
     }
   }
 
@@ -2517,14 +2508,10 @@ export class Match implements MatchContext {
     );
 
     this.pickupManager.removeScavengerRushDrops();
-    this.pickupManager.spawnOneShot(
-      this.resolveDynamicPickupReward(rolled),
-      position,
-      {
-        expiresInSeconds: MUTATORS.SCAVENGER_RUSH_DROP_LIFETIME_SECONDS,
-        isScavengerRushDrop: true,
-      },
-    );
+    this.pickupManager.spawnOneShot(this.resolveDynamicPickupReward(rolled), position, {
+      expiresInSeconds: MUTATORS.SCAVENGER_RUSH_DROP_LIFETIME_SECONDS,
+      isScavengerRushDrop: true,
+    });
   }
 
   /** Small stable FNV-1a index; consumes none of the match's gameplay RNG. */
@@ -2715,10 +2702,7 @@ export class Match implements MatchContext {
         }
       }
       if (player.abilityCooldownSeconds > 0) {
-        player.abilityCooldownSeconds = Math.max(
-          0,
-          player.abilityCooldownSeconds - cooldownDt,
-        );
+        player.abilityCooldownSeconds = Math.max(0, player.abilityCooldownSeconds - cooldownDt);
       }
       // Decrement Frost Wizard freeze on every player — anyone can be
       // frozen, not just wizards.

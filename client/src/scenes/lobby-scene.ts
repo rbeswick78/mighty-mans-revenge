@@ -34,6 +34,7 @@ import {
   DEFAULT_BOT_DIFFICULTY,
   type BotDifficulty,
   type CharacterId,
+  type MutatorId,
   type PracticeKind,
 } from '@shared/config/game.js';
 import type { GameModeType } from '@shared/types/game.js';
@@ -47,11 +48,17 @@ import {
   normalizePracticeRivalPreference,
   practiceRivalPreferenceLabel,
 } from '../ui/practice-rival.js';
+import {
+  nextPracticeMutatorPreference,
+  normalizePracticeMutatorPreference,
+  practiceMutatorPreferenceLabel,
+} from '../ui/practice-mutator.js';
 
 const STORAGE_KEY_NICKNAME = 'mmr_nickname';
 const STORAGE_KEY_BOT_DIFFICULTY = 'mmr_bot_difficulty';
 const STORAGE_KEY_PRACTICE_MODE = 'mmr_practice_mode';
 const STORAGE_KEY_PRACTICE_RIVAL = 'mmr_practice_rival';
+const STORAGE_KEY_PRACTICE_MUTATOR = 'mmr_practice_mutator';
 
 // Scene-local color decisions. Everything beyond the parallax backdrop is
 // pinned here so a future palette pass can re-tune the lobby in one place.
@@ -97,11 +104,13 @@ export class LobbyScene extends Phaser.Scene {
   private difficultyButton!: PixelButton;
   private practiceRivalButton!: PixelButton;
   private practiceModeButton!: PixelButton;
+  private practiceMutatorButton!: PixelButton;
   private mightyManSprite!: Phaser.GameObjects.Sprite;
   private nickname: string;
   private practiceDifficulty: BotDifficulty;
   private practiceRival: CharacterId | null;
   private practiceMode: GameModeType | null;
+  private practiceMutator: MutatorId | null;
   private isSearching = false;
   private searchStartTime = 0;
   private cursorVisible = true;
@@ -127,6 +136,7 @@ export class LobbyScene extends Phaser.Scene {
     this.practiceDifficulty = DEFAULT_BOT_DIFFICULTY;
     this.practiceRival = null;
     this.practiceMode = null;
+    this.practiceMutator = null;
   }
 
   create(): void {
@@ -141,6 +151,10 @@ export class LobbyScene extends Phaser.Scene {
     );
     this.practiceRival = normalizePracticeRivalPreference(
       localStorage.getItem(STORAGE_KEY_PRACTICE_RIVAL),
+    );
+    this.practiceMutator = normalizePracticeMutatorPreference(
+      localStorage.getItem(STORAGE_KEY_PRACTICE_MUTATOR),
+      this.practiceMode,
     );
     this.isSearching = false;
     this.menuGamepad = new MenuGamepadInput();
@@ -193,9 +207,9 @@ export class LobbyScene extends Phaser.Scene {
     // searching-state UI shares this panel, swapping visibility.
     // ────────────────────────────────────────────────────────────────────
     const panelW = 380;
-    const panelH = 268;
+    const panelH = 306;
     const panelX = centerX - panelW / 2;
-    const panelY = camHeight - 298;
+    const panelY = camHeight - 336;
     const panel = new MenuPanel(this, panelX, panelY, panelW, panelH);
     panel.setDepth(WastelandStreet.DEPTH.UI);
 
@@ -364,10 +378,25 @@ export class LobbyScene extends Phaser.Scene {
     );
     panel.add(this.practiceModeButton);
 
+    this.practiceMutatorButton = new PixelButton(
+      this,
+      panel.centerX - qmW / 2,
+      258,
+      qmW,
+      22,
+      practiceMutatorPreferenceLabel(this.practiceMutator),
+      {
+        variant: 'secondary',
+        fontSize: 8,
+        onClick: () => this.cyclePracticeMutator(),
+      },
+    );
+    panel.add(this.practiceMutatorButton);
+
     const gauntletBestText = this.add
       .text(
         panel.centerX,
-        252,
+        286,
         gauntletBestClearLabel(
           normalizeGauntletBestClear(localStorage.getItem(GAUNTLET_BEST_CLEAR_STORAGE_KEY)),
         ),
@@ -382,13 +411,11 @@ export class LobbyScene extends Phaser.Scene {
     this.nameEntryUi.push(gauntletBestText);
 
     const dailyProgress = dailyGauntletProgressForKey(
-      normalizeDailyGauntletProgress(
-        localStorage.getItem(DAILY_GAUNTLET_PROGRESS_STORAGE_KEY),
-      ),
+      normalizeDailyGauntletProgress(localStorage.getItem(DAILY_GAUNTLET_PROGRESS_STORAGE_KEY)),
       dailyChallengeKey(),
     );
     const dailyBestText = this.add
-      .text(panel.centerX, 263, dailyGauntletProgressLabel(dailyProgress), {
+      .text(panel.centerX, 298, dailyGauntletProgressLabel(dailyProgress), {
         fontFamily: MENU_FONTS.HEADER,
         fontSize: '7px',
         color: cssHex(Wasteland.LOADING_BAR_FILL),
@@ -598,6 +625,7 @@ export class LobbyScene extends Phaser.Scene {
       this.difficultyButton,
       this.practiceRivalButton,
       this.practiceModeButton,
+      this.practiceMutatorButton,
     ];
   }
 
@@ -742,9 +770,7 @@ export class LobbyScene extends Phaser.Scene {
     );
   }
 
-  private updateDailyLeaderboard(
-    snapshot: ServerDailyGauntletLeaderboardMessage | null,
-  ): void {
+  private updateDailyLeaderboard(snapshot: ServerDailyGauntletLeaderboardMessage | null): void {
     const visible = snapshot !== null;
     this.dailyLeaderboardRowsText.setVisible(visible);
     this.dailyLeaderboardTitleText.setVisible(visible);
@@ -757,9 +783,7 @@ export class LobbyScene extends Phaser.Scene {
             .join('\n')
         : 'NO CLEARS YET\nSET THE PACE',
     );
-    this.dailyLeaderboardTitleText.setText(
-      `DAILY TOP 5\n${snapshot.challengeKey} UTC`,
-    );
+    this.dailyLeaderboardTitleText.setText(`DAILY TOP 5\n${snapshot.challengeKey} UTC`);
     this.dailyLeaderboardTitleText.setY(
       this.dailyLeaderboardRowsText.y - this.dailyLeaderboardRowsText.height - 8,
     );
@@ -854,6 +878,7 @@ export class LobbyScene extends Phaser.Scene {
     this.difficultyButton.setVisible(false);
     this.practiceRivalButton.setVisible(false);
     this.practiceModeButton.setVisible(false);
+    this.practiceMutatorButton.setVisible(false);
 
     this.searchingTween = this.tweens.add({
       targets: this.searchingText,
@@ -888,6 +913,7 @@ export class LobbyScene extends Phaser.Scene {
       kind,
       kind === 'sparring' ? (this.practiceMode ?? undefined) : undefined,
       kind === 'sparring' ? (this.practiceRival ?? undefined) : undefined,
+      kind === 'sparring' ? (this.practiceMutator ?? undefined) : undefined,
     );
   }
 
@@ -920,6 +946,25 @@ export class LobbyScene extends Phaser.Scene {
       localStorage.setItem(STORAGE_KEY_PRACTICE_MODE, this.practiceMode);
     }
     this.practiceModeButton.setLabel(practiceModePreferenceLabel(this.practiceMode));
+    const compatibleMutator = normalizePracticeMutatorPreference(
+      this.practiceMutator,
+      this.practiceMode,
+    );
+    if (compatibleMutator !== this.practiceMutator) {
+      this.practiceMutator = compatibleMutator;
+      localStorage.removeItem(STORAGE_KEY_PRACTICE_MUTATOR);
+      this.practiceMutatorButton.setLabel(practiceMutatorPreferenceLabel(this.practiceMutator));
+    }
+  }
+
+  private cyclePracticeMutator(): void {
+    this.practiceMutator = nextPracticeMutatorPreference(this.practiceMutator, this.practiceMode);
+    if (this.practiceMutator === null) {
+      localStorage.removeItem(STORAGE_KEY_PRACTICE_MUTATOR);
+    } else {
+      localStorage.setItem(STORAGE_KEY_PRACTICE_MUTATOR, this.practiceMutator);
+    }
+    this.practiceMutatorButton.setLabel(practiceMutatorPreferenceLabel(this.practiceMutator));
   }
 
   /** Fullscreen improves play, but browser policy must never block a match. */
@@ -966,6 +1011,7 @@ export class LobbyScene extends Phaser.Scene {
     this.difficultyButton.setVisible(true);
     this.practiceRivalButton.setVisible(true);
     this.practiceModeButton.setVisible(true);
+    this.practiceMutatorButton.setVisible(true);
     this.setNameEntryVisible(true);
 
     if (this.searchingTween) {

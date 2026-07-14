@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–68 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Practice vs Rusty with favorite-mode and choose-your-rival selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, five arenas including barricade-focused Checkpoint Zero, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–69 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, five arenas including barricade-focused Checkpoint Zero, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -96,10 +96,11 @@ Each session below attacks one of these.
 | 62  | Favorite Mode Sparring                          | A favorite ruleset becomes deliberately replayable without losing map variety | **DONE** (2026-07-13) |
 | 63  | Choose Your Rival                               | Any roster matchup becomes deliberate practice instead of a lucky random roll | **DONE** (2026-07-13) |
 | 64  | Checkpoint Zero                                 | A fifth arena turns readable barricade lanes into destructible route choices  | **DONE** (2026-07-13) |
-| 65  | Daily Gauntlet                                  | One fair shared challenge creates a reason to return and improve every day     | **DONE** (2026-07-13) |
+| 65  | Daily Gauntlet                                  | One fair shared challenge creates a reason to return and improve every day    | **DONE** (2026-07-13) |
 | 66  | Ability Overdrive                               | Faster signature-power cycles make every fighter identity erupt repeatedly    | **DONE** (2026-07-13) |
-| 67  | Daily Scoreboard                                | Every fair daily clear becomes a friend-group score worth chasing              | **DONE** (2026-07-13) |
-| 68  | Daily Rival Chase                               | Every attempt gets one attainable friend score to hunt                         | **DONE** (2026-07-13) |
+| 67  | Daily Scoreboard                                | Every fair daily clear becomes a friend-group score worth chasing             | **DONE** (2026-07-13) |
+| 68  | Daily Rival Chase                               | Every attempt gets one attainable friend score to hunt                        | **DONE** (2026-07-13) |
+| 69  | Custom Chaos Sparring                           | Favorite mid-fight twists become deliberate, remixable solo practice          | **DONE** (2026-07-13) |
 
 ---
 
@@ -3217,7 +3218,91 @@ attempt one attainable friend score to hunt from the first stage onward.
 
 ---
 
+## Session 69 — Custom Chaos Sparring
+
+**Goal:** let players deliberately remix an ordinary Rusty Spar around a
+favorite mid-match event while the final-minute surprise stays fresh.
+
+**Locked design decisions**
+
+- A persisted `SPAR CHAOS` lobby selector cycles from `RANDOM` through every
+  event compatible with the selected Spar mode. Changing to an incompatible
+  pinned mode clears the preference instead of showing an impossible promise.
+- `client:startPractice.mutatorId` is optional and ordinary-Spar-only. The
+  server validates untrusted values, rechecks mode compatibility, and echoes an
+  accepted choice as optional `server:matchFound.practiceMutatorId`; Character
+  Select renders that exact server truth as `MID-MATCH: ...`.
+- Gun Game and One in the Chamber keep their complete weapon economies. Their
+  exclusions now come from one shared compatibility table used by modes,
+  matchmaking, and client filtering, so those layers cannot drift apart.
+- With `SPAR MODE: RANDOM`, matchmaking chooses only a compatible opening mode
+  and direct rematches skip incompatible modes in rotation order. An explicit
+  mode pin remains stronger and simply rejects a conflicting chaos preference.
+- The selected event owns the ordinary mid-match slot across direct rematches,
+  even if rematch recency contains it. The second/final-minute event remains a
+  compatible random surprise. `FORCE_MIDMATCH_MUTATOR` and `FORCE_EVENT` remain
+  stronger smoke hooks, and the client never advertises a choice they replace
+  or conflict with.
+- Gauntlet, Daily Run, PvP drafts, combat, scoring, physics, bot tuning,
+  persistence, and all balance constants are unchanged.
+
+**Acceptance criteria**
+
+- [x] Shared/client unit tests cover exhaustive frozen mode compatibility,
+      untrusted storage, compatible cycling, and presentation copy.
+- [x] Match and matchmaking tests prove authoritative acceptance, malformed and
+      Gauntlet rejection, incompatible-mode fallback, compatible rotation,
+      planned-event activation despite rematch recency, and direct-rematch
+      carryover.
+- [x] Network tests prove the optional request field is omitted for old/random
+      flows and forwarded for a chosen event.
+- [x] A live Chromium flow selects and persists `SUPER SPEED`, receives it in
+      authoritative match metadata, and shows `MID-MATCH: SUPER SPEED` before
+      fighter lock-in.
+- [x] Desktop and 844×390 mobile-landscape walkthroughs keep the expanded panel
+      readable; the longest `ABILITY OVERDRIVE` label fits and browser logs stay
+      clear. Visual QA raised the new label to match the adjacent mode label.
+- [x] Typecheck, lint, all 1,169 unit tests across 79 files, production build,
+      the 16-pass/11-intentional-skip Playwright matrix, and the opt-in Custom
+      Chaos browser smoke pass.
+
+---
+
 ## Session Log
+
+### Session 69 — 2026-07-13 — Custom Chaos Sparring
+
+**Shipped:** ordinary Rusty Spar now has a persisted `SPAR CHAOS` selector for
+turning any compatible shared event into the match's deliberate mid-fight
+twist. It composes with the existing difficulty, rival, and mode choices, and
+Character Select confirms the server-accepted event before the player locks a
+fighter. The final-minute event remains random, preserving a surprise inside a
+player-authored practice setup.
+
+Compatibility is centralized in shared code and consumed by Gun Game, One in
+the Chamber, matchmaking, and the client. Random-mode openings and rematches
+skip modes that cannot honor the choice; an explicit conflicting mode wins and
+the server omits the chaos promise. Direct rematches retain a valid selection
+even when that same event appeared last round. Gauntlet, Daily Run, PvP,
+combat, scoring, bot tuning, physics, and balance are untouched.
+
+**Verification:** 1,169 tests pass across 79 files. TypeScript, ESLint, all
+package builds, and the production Vite bundle are clean; Vite retains its
+existing chunk-size advisory. The full Playwright matrix passes 16 tests with
+11 intentional project-scoped skips. A dedicated opt-in browser smoke proves
+the selector, wire metadata, and Character Select briefing together. Manual
+desktop and 844×390 mobile-landscape walkthroughs verify persistence, the
+longest option label, and a clean browser console. Browser QA increased the new
+selector font from 7px to 8px for mobile parity with `SPAR MODE`.
+
+**Tuning watch:** a 19-event cycle is intentionally exhaustive for a small
+friend-group sandbox. Watch whether players repeatedly seek only a few events;
+if so, a compact favorites row would be more useful than changing combat
+balance. Also watch whether a fixed mid-match twist plus random final event
+feels authored without becoming too predictable over long rematch chains.
+
+**Deployment:** not run; production deployment still requires explicit user
+authorization.
 
 ### Session 68 — 2026-07-13 — Daily Rival Chase
 

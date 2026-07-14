@@ -28,6 +28,8 @@ import {
   practiceGauntletStyleBonus,
   resolvePracticeGauntlet,
   selectPracticeGauntletRoute,
+  isMutatorCompatibleWithMode,
+  isMutatorId,
   mutatorsConflict,
 } from '@shared/game';
 import type { MapData } from '@shared/game';
@@ -103,6 +105,8 @@ interface PostMatchState {
   practiceModePin: GameModeType | null;
   /** Player-selected Rusty fighter retained across direct Practice rematches. */
   practiceRivalPin: CharacterId | null;
+  /** Player-selected Spar chaos retained across direct Practice rematches. */
+  practiceMutatorPreference: MutatorId | null;
   /** Next Gauntlet fight, or stage one when the completed run must retry. */
   nextGauntlet: PracticeGauntletMatch | null;
   /** Server-authored advancement choices; empty for retries and non-Gauntlet matches. */
@@ -178,6 +182,8 @@ export class MatchmakingManager {
   private readonly practiceModePins: Map<string, GameModeType> = new Map();
   /** Optional validated Rusty fighter choice for ordinary Sparring matches. */
   private readonly practiceRivalPins: Map<string, CharacterId> = new Map();
+  /** Optional validated mid-match chaos choice for ordinary Sparring matches. */
+  private readonly practiceMutatorPreferences: Map<string, MutatorId> = new Map();
   /** Authoritative stage metadata for live Gauntlet matches. */
   private readonly practiceGauntlets: Map<string, PracticeGauntletMatch> = new Map();
   /** Ordered rival/forecast history for each live Gauntlet run. */
@@ -273,6 +279,7 @@ export class MatchmakingManager {
     kind: PracticeKind = 'sparring',
     gameMode?: GameModeType,
     opponentCharacterId?: CharacterId,
+    mutatorId?: MutatorId,
   ): void {
     if (this.playerMatchMap.has(playerId)) return;
     const safeDifficulty = BOT_DIFFICULTIES.includes(difficulty)
@@ -280,9 +287,7 @@ export class MatchmakingManager {
       : DEFAULT_BOT_DIFFICULTY;
     const safeKind = PRACTICE_KINDS.includes(kind) ? kind : 'sparring';
     const practiceModePin =
-      safeKind === 'sparring' &&
-      gameMode !== undefined &&
-      GAME_MODE_ROTATION.includes(gameMode)
+      safeKind === 'sparring' && gameMode !== undefined && GAME_MODE_ROTATION.includes(gameMode)
         ? gameMode
         : null;
     const practiceRivalPin =
@@ -291,14 +296,11 @@ export class MatchmakingManager {
       CHARACTER_IDS.includes(opponentCharacterId)
         ? opponentCharacterId
         : null;
+    const practiceMutatorPreference =
+      safeKind === 'sparring' && isMutatorId(mutatorId) ? mutatorId : null;
     const dailyKey = safeKind === 'daily' ? dailyChallengeKey(this.now()) : undefined;
     const dailyOpening = dailyKey
-      ? practiceDailyGauntletOpening(
-          dailyKey,
-          listMapNames(),
-          GAME_MODE_ROTATION,
-          CHARACTER_IDS,
-        )
+      ? practiceDailyGauntletOpening(dailyKey, listMapNames(), GAME_MODE_ROTATION, CHARACTER_IDS)
       : null;
     const gauntlet =
       safeKind === 'gauntlet' || safeKind === 'daily'
@@ -324,12 +326,17 @@ export class MatchmakingManager {
     const mapName =
       dailyOpening?.mapName ??
       names[Math.min(Math.floor(this.rng() * names.length), names.length - 1)];
+    const randomModePool = practiceMutatorPreference
+      ? GAME_MODE_ROTATION.filter((mode) =>
+          isMutatorCompatibleWithMode(practiceMutatorPreference, mode),
+        )
+      : GAME_MODE_ROTATION;
     const selectedMode =
       this.forcedMode() ??
       practiceModePin ??
       dailyOpening?.gameMode ??
-      GAME_MODE_ROTATION[
-        Math.min(Math.floor(this.rng() * GAME_MODE_ROTATION.length), GAME_MODE_ROTATION.length - 1)
+      randomModePool[
+        Math.min(Math.floor(this.rng() * randomModePool.length), randomModePool.length - 1)
       ];
     this.launchMatch(
       crypto.randomUUID(),
@@ -346,6 +353,7 @@ export class MatchmakingManager {
       undefined,
       practiceModePin,
       practiceRivalPin,
+      practiceMutatorPreference,
     );
   }
 
@@ -710,6 +718,47 @@ export class MatchmakingManager {
   }
 
   /**
+   * Resolve whether an ordinary Spar preference can own this match's
+   * mid-match slot. Smoke pins stay strongest, Gauntlet owns its forecast,
+   * and mode/final-minute conflicts are rejected before we advertise the
+   * preference in matchFound.
+   */
+  private appliedPracticeMutator(
+    practiceDifficulty: BotDifficulty | null,
+    gauntlet: PracticeGauntletMatch | null,
+    gameMode: GameModeType,
+    preference: MutatorId | null,
+  ): MutatorId | null {
+    if (practiceDifficulty === null || gauntlet !== null || preference === null) return null;
+    if (isMutatorId(process.env.FORCE_MIDMATCH_MUTATOR)) return null;
+    if (!isMutatorCompatibleWithMode(preference, gameMode)) return null;
+
+    const forcedFinal = process.env.FORCE_EVENT;
+    if (
+      isMutatorId(forcedFinal) &&
+      (preference === forcedFinal || mutatorsConflict(preference, forcedFinal))
+    ) {
+      return null;
+    }
+    return preference;
+  }
+
+  /** Keep a Random-mode Spar rematch on the next mode that honors its chaos. */
+  private nextCompatiblePracticeMode(
+    current: GameModeType,
+    preference: MutatorId | null,
+  ): GameModeType {
+    let next = getNextGameMode(current);
+    if (preference === null) return next;
+
+    for (let checked = 0; checked < GAME_MODE_ROTATION.length; checked++) {
+      if (isMutatorCompatibleWithMode(preference, next)) return next;
+      next = getNextGameMode(next);
+    }
+    return getNextGameMode(current);
+  }
+
+  /**
    * Build a route's deterministic mid-match forecast before the Match exists.
    * Smoke overrides remain strongest; ordinary offers respect mode vetoes,
    * final-minute pins, recent active events, and this run's prior forecasts.
@@ -797,6 +846,7 @@ export class MatchmakingManager {
     },
     practiceModePin: GameModeType | null = null,
     practiceRivalPin: CharacterId | null = null,
+    practiceMutatorPreference: MutatorId | null = null,
   ): void {
     const dailySeed = gauntlet?.challengeKey
       ? [
@@ -807,6 +857,12 @@ export class MatchmakingManager {
           gauntlet.opponentCharacterId ?? 'unknown_rival',
         ].join('|')
       : undefined;
+    const appliedPracticeMutator = this.appliedPracticeMutator(
+      practiceDifficulty,
+      gauntlet,
+      gameMode,
+      practiceMutatorPreference,
+    );
     const match = new Match(
       matchId,
       mapData,
@@ -816,7 +872,7 @@ export class MatchmakingManager {
       rematchMutatorExclusions,
       undefined,
       dailySeed ? undefined : previousContractId,
-      gauntlet?.forecastMutatorId,
+      gauntlet?.forecastMutatorId ?? appliedPracticeMutator ?? undefined,
       dailySeed,
     );
     match.setRttResolver(this.getPlayerRTT);
@@ -828,6 +884,9 @@ export class MatchmakingManager {
       this.practiceDifficulties.set(matchId, practiceDifficulty);
       if (practiceModePin !== null) this.practiceModePins.set(matchId, practiceModePin);
       if (practiceRivalPin !== null) this.practiceRivalPins.set(matchId, practiceRivalPin);
+      if (practiceMutatorPreference !== null) {
+        this.practiceMutatorPreferences.set(matchId, practiceMutatorPreference);
+      }
       if (gauntlet) this.practiceGauntlets.set(matchId, gauntlet);
       const botEntry = playerEntries.find((entry) => this.botPlayerIds.has(entry.id));
       if (botEntry) {
@@ -883,6 +942,7 @@ export class MatchmakingManager {
           gameMode,
           characterWins,
           gauntlet: gauntlet ?? undefined,
+          practiceMutatorId: appliedPracticeMutator ?? undefined,
         },
         { reliable: true },
       );
@@ -992,7 +1052,10 @@ export class MatchmakingManager {
     const message: ServerDraftStateMessage = {
       type: 'server:draftState',
       matchId: draft.matchId,
-      players: draft.playerEntries.map((e) => ({ id: e.id, nickname: e.nickname })),
+      players: draft.playerEntries.map((e) => ({
+        id: e.id,
+        nickname: e.nickname,
+      })),
       firstPickerId: draft.firstPickerId,
       firstPickerReason: draft.firstPickerReason,
       currentPickerId: draft.currentPickerId,
@@ -1040,7 +1103,13 @@ export class MatchmakingManager {
     }
 
     logger.info(
-      { matchId: draft.matchId, picker: draft.currentPickerId, category, value, source },
+      {
+        matchId: draft.matchId,
+        picker: draft.currentPickerId,
+        category,
+        value,
+        source,
+      },
       'Draft pick recorded',
     );
 
@@ -1075,7 +1144,12 @@ export class MatchmakingManager {
     const options: readonly string[] = category === 'map' ? listMapNames() : GAME_MODE_ROTATION;
     const value = options[Math.min(Math.floor(this.rng() * options.length), options.length - 1)];
     logger.info(
-      { matchId: draft.matchId, picker: draft.currentPickerId, category, value },
+      {
+        matchId: draft.matchId,
+        picker: draft.currentPickerId,
+        category,
+        value,
+      },
       'Draft pick timed out — auto-picking',
     );
     this.applyDraftPick(draft, category, value, 'timeout');
@@ -1367,6 +1441,7 @@ export class MatchmakingManager {
     const practiceDifficulty = this.practiceDifficulties.get(matchId) ?? null;
     const practiceModePin = this.practiceModePins.get(matchId) ?? null;
     const practiceRivalPin = this.practiceRivalPins.get(matchId) ?? null;
+    const practiceMutatorPreference = this.practiceMutatorPreferences.get(matchId) ?? null;
     const gauntlet = this.practiceGauntlets.get(matchId) ?? null;
     const gauntletRunHistory = this.practiceGauntletRunHistories.get(matchId) ?? {
       opponentCharacterIds: [],
@@ -1376,9 +1451,7 @@ export class MatchmakingManager {
     result.isPractice = isPractice;
     result.rivalrySet = gauntlet ? null : this.recordRivalrySet(match, result.winnerId);
     const humanPlayerId = gauntlet
-      ? [...match.players.keys()].find(
-          (playerId) => !this.botPlayerIds.has(playerId),
-        )
+      ? [...match.players.keys()].find((playerId) => !this.botPlayerIds.has(playerId))
       : undefined;
     if (gauntlet) {
       if (humanPlayerId) {
@@ -1439,8 +1512,7 @@ export class MatchmakingManager {
           CHARACTER_IDS,
         )
       : null;
-    const restartingDaily =
-      dailyOpening !== null && result.gauntlet?.outcome !== 'advanced';
+    const restartingDaily = dailyOpening !== null && result.gauntlet?.outcome !== 'advanced';
     const nextMapName =
       this.forcedMap()?.name ??
       (restartingDaily ? dailyOpening.mapName : getNextMapName(match.mapManager.getMapData().name));
@@ -1448,7 +1520,9 @@ export class MatchmakingManager {
     const nextGameMode =
       this.forcedMode() ??
       practiceModePin ??
-      (restartingDaily ? dailyOpening.gameMode : getNextGameMode(match.gameModeType));
+      (restartingDaily
+        ? dailyOpening.gameMode
+        : this.nextCompatiblePracticeMode(match.gameModeType, practiceMutatorPreference));
     result.nextGameMode = nextGameMode;
     const nextGauntlet = result.gauntlet
       ? practiceGauntletMatch(
@@ -1638,6 +1712,7 @@ export class MatchmakingManager {
       practiceDifficulty,
       practiceModePin,
       practiceRivalPin,
+      practiceMutatorPreference,
       nextGauntlet,
       gauntletRoutes,
       gauntletRunHistory:
@@ -1658,6 +1733,7 @@ export class MatchmakingManager {
     this.practiceDifficulties.delete(matchId);
     this.practiceModePins.delete(matchId);
     this.practiceRivalPins.delete(matchId);
+    this.practiceMutatorPreferences.delete(matchId);
     this.practiceGauntlets.delete(matchId);
     this.practiceGauntletRunHistories.delete(matchId);
   }
@@ -1727,6 +1803,7 @@ export class MatchmakingManager {
         postMatch.gauntletRunHistory,
         postMatch.practiceModePin,
         postMatch.practiceRivalPin,
+        postMatch.practiceMutatorPreference,
       );
       return;
     }

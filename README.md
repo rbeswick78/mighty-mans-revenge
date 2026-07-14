@@ -61,8 +61,11 @@ can still be blasted away to rewrite the sightlines during a round.
 `RUSTY SPAR` starts the familiar single Practice match at your selected Rusty
 difficulty. Its `RIVAL` selector can stay on `RANDOM` or pin any roster fighter
 for matchup practice, while `SPAR MODE` can keep the rotating mix or pin any of
-the eight modes. Both choices persist on that device and rematches keep them
-while maps continue to rotate. `GAUNTLET` starts a three-fight run that
+the eight modes. `SPAR CHAOS` can also lock any compatible shared event into
+the mid-match slot while leaving the final-minute twist random. All three
+choices persist on that device and rematches keep them while maps continue to
+rotate; Random mode skips rulesets that cannot honor the chosen event.
+`GAUNTLET` starts a three-fight run that
 escalates from Rookie to Scrapper to Warlord; win to advance, while a loss or
 draw restarts the run.
 `DAILY RUN` serves one shared UTC-dated Gauntlet challenge. Its opening arena,

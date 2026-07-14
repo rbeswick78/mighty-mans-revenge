@@ -241,12 +241,14 @@ test('solo practice launches against locked Rusty and reaches live play', async 
             snapshot !== undefined &&
             scene?.dailyLeaderboardTitleText?.visible === true &&
             scene.dailyLeaderboardRowsText?.visible === true &&
-            scene.dailyLeaderboardTitleText.text ===
-              `DAILY TOP 5\n${snapshot.challengeKey} UTC` &&
+            scene.dailyLeaderboardTitleText.text === `DAILY TOP 5\n${snapshot.challengeKey} UTC` &&
             (scene.dailyLeaderboardRowsText.text?.length ?? 0) > 0
           );
         }),
-      { timeout: 10000, message: 'expected the server-clock Daily Top 5 lobby panel' },
+      {
+        timeout: 10000,
+        message: 'expected the server-clock Daily Top 5 lobby panel',
+      },
     )
     .toBe(true);
   const input = page.locator('input[type="text"]');
@@ -258,15 +260,15 @@ test('solo practice launches against locked Rusty and reaches live play', async 
   // ordinary spar, random Gauntlet, or shared Daily Run in canvas-local coordinates.
   const canvas = page.locator('canvas');
   await expect(canvas).toHaveCount(1);
-  await canvas.click({ position: { x: 410, y: 642 } });
+  await canvas.click({ position: { x: 410, y: 601 } });
   await expect
     .poll(() => page.evaluate(() => localStorage.getItem('mmr_bot_difficulty')))
     .toBe('warlord');
   if (process.env.VERIFY_PRACTICE_MODE === '1') {
     // RANDOM -> DEATHMATCH -> KING OF THE HILL. Use two clicks so the
     // browser flow also proves the selector cycles through shared order.
-    await canvas.click({ position: { x: 480, y: 666 } });
-    await canvas.click({ position: { x: 480, y: 666 } });
+    await canvas.click({ position: { x: 480, y: 627 } });
+    await canvas.click({ position: { x: 480, y: 627 } });
     await expect
       .poll(() => page.evaluate(() => localStorage.getItem('mmr_practice_mode')))
       .toBe('koth');
@@ -274,7 +276,7 @@ test('solo practice launches against locked Rusty and reaches live play', async 
   if (process.env.VERIFY_PRACTICE_RIVAL === '1') {
     // RANDOM -> MIGHTY MAN -> BRUCE -> FROST WIZARD.
     for (let click = 0; click < 3; click++) {
-      await canvas.click({ position: { x: 550, y: 642 } });
+      await canvas.click({ position: { x: 550, y: 601 } });
     }
     await expect
       .poll(() => page.evaluate(() => localStorage.getItem('mmr_practice_rival')))
@@ -309,6 +311,12 @@ test('solo practice launches against locked Rusty and reaches live play', async 
       )
       .toEqual({ text: 'RIVAL: FROST WIZARD', fitsButton: true });
   }
+  if (process.env.VERIFY_PRACTICE_MUTATOR === '1') {
+    await canvas.click({ position: { x: 480, y: 653 } });
+    await expect
+      .poll(() => page.evaluate(() => localStorage.getItem('mmr_practice_mutator')))
+      .toBe('super_speed');
+  }
   if (process.env.VERIFY_GAMEPAD === '1') {
     await page.evaluate(() => {
       const state = (window as unknown as { __gamepadTest: { axes: number[] } }).__gamepadTest;
@@ -332,7 +340,11 @@ test('solo practice launches against locked Rusty and reaches live play', async 
         window as unknown as {
           __gamepadTest: {
             axes: number[];
-            buttons: Array<{ pressed: boolean; touched: boolean; value: number }>;
+            buttons: Array<{
+              pressed: boolean;
+              touched: boolean;
+              value: number;
+            }>;
           };
         }
       ).__gamepadTest;
@@ -348,17 +360,43 @@ test('solo practice launches against locked Rusty and reaches live play', async 
             : process.env.VERIFY_GAUNTLET === '1'
               ? 480
               : 390,
-        y: 614,
+        y: 564,
       },
     });
   }
   await waitForActiveScene(page, 'CharacterSelectScene', 10000);
+  if (process.env.VERIFY_PRACTICE_MUTATOR === '1') {
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const w = window as unknown as {
+            game?: { scene: { getScene: (key: string) => unknown } };
+          };
+          const scene = w.game?.scene.getScene('CharacterSelectScene') as {
+            matchData?: { practiceMutatorId?: string };
+            children?: { list?: Array<{ text?: string }> };
+          } | null;
+          return {
+            mutator: scene?.matchData?.practiceMutatorId ?? null,
+            briefing:
+              scene?.children?.list?.some((child) =>
+                child.text?.includes('MID-MATCH: SUPER SPEED'),
+              ) ?? false,
+          };
+        }),
+      )
+      .toEqual({ mutator: 'super_speed', briefing: true });
+  }
   if (process.env.VERIFY_GAMEPAD === '1') {
     await page.evaluate(() => {
       const state = (
         window as unknown as {
           __gamepadTest: {
-            buttons: Array<{ pressed: boolean; touched: boolean; value: number }>;
+            buttons: Array<{
+              pressed: boolean;
+              touched: boolean;
+              value: number;
+            }>;
           };
         }
       ).__gamepadTest;
@@ -374,7 +412,11 @@ test('solo practice launches against locked Rusty and reaches live play', async 
           };
           const scene = w.game?.scene.getScene('CharacterSelectScene') as {
             matchData?: {
-              gauntlet?: { stage: number; totalStages: number; difficulty: string };
+              gauntlet?: {
+                stage: number;
+                totalStages: number;
+                difficulty: string;
+              };
             };
             children?: { list?: Array<{ text?: string }> };
           } | null;
@@ -534,7 +576,11 @@ test('solo practice launches against locked Rusty and reaches live play', async 
       const state = (
         window as unknown as {
           __gamepadTest: {
-            buttons: Array<{ pressed: boolean; touched: boolean; value: number }>;
+            buttons: Array<{
+              pressed: boolean;
+              touched: boolean;
+              value: number;
+            }>;
           };
         }
       ).__gamepadTest;
@@ -550,7 +596,11 @@ test('solo practice launches against locked Rusty and reaches live play', async 
       const state = (
         window as unknown as {
           __gamepadTest: {
-            buttons: Array<{ pressed: boolean; touched: boolean; value: number }>;
+            buttons: Array<{
+              pressed: boolean;
+              touched: boolean;
+              value: number;
+            }>;
           };
         }
       ).__gamepadTest;
@@ -694,7 +744,11 @@ test('solo practice launches against locked Rusty and reaches live play', async 
           collisionOpened: renderer?.getCollisionGrid()?.solid[row]?.[col] === false,
         };
       }
-      return { spriteRemoved: false, becameFloor: false, collisionOpened: false };
+      return {
+        spriteRemoved: false,
+        becameFloor: false,
+        collisionOpened: false,
+      };
     });
     expect(destruction).toEqual({
       spriteRemoved: true,
@@ -763,7 +817,10 @@ test('solo practice launches against locked Rusty and reaches live play', async 
       const scene = w.game?.scene.getScene('GameScene') as {
         gameService?: {
           getNetworkManager: () => {
-            getLocalPlayerState: () => { position: { x: number }; ammo: number } | null;
+            getLocalPlayerState: () => {
+              position: { x: number };
+              ammo: number;
+            } | null;
           };
         };
       } | null;
@@ -776,7 +833,11 @@ test('solo practice launches against locked Rusty and reaches live play', async 
         window as unknown as {
           __gamepadTest: {
             axes: number[];
-            buttons: Array<{ pressed: boolean; touched: boolean; value: number }>;
+            buttons: Array<{
+              pressed: boolean;
+              touched: boolean;
+              value: number;
+            }>;
           };
         }
       ).__gamepadTest;
@@ -809,7 +870,10 @@ test('solo practice launches against locked Rusty and reaches live play', async 
               banner: scene?.hud?.eventBannerText?.text ?? '',
             };
           }),
-        { timeout: 5000, message: 'expected synthetic twin-stick input to take control' },
+        {
+          timeout: 5000,
+          message: 'expected synthetic twin-stick input to take control',
+        },
       )
       .toEqual({
         mode: 'gamepad',
@@ -824,7 +888,11 @@ test('solo practice launches against locked Rusty and reaches live play', async 
         window as unknown as {
           __gamepadTest: {
             axes: number[];
-            buttons: Array<{ pressed: boolean; touched: boolean; value: number }>;
+            buttons: Array<{
+              pressed: boolean;
+              touched: boolean;
+              value: number;
+            }>;
           };
         }
       ).__gamepadTest;
@@ -930,7 +998,10 @@ test('solo practice launches against locked Rusty and reaches live play', async 
                 (scene?.radiationStormRenderer?.boundary?.commandBuffer?.length ?? 0) > 0,
             };
           }),
-        { timeout: 15000, message: 'expected authoritative Radiation Storm rendering' },
+        {
+          timeout: 15000,
+          message: 'expected authoritative Radiation Storm rendering',
+        },
       )
       .toEqual({ stateActive: true, boundaryDrawn: true });
   }
@@ -971,7 +1042,10 @@ test('solo practice launches against locked Rusty and reaches live play', async 
               matchPhase: scene?.matchPhase ?? 'missing',
             });
           }),
-        { timeout: 15000, message: 'expected authoritative Scrapstorm warning rendering' },
+        {
+          timeout: 15000,
+          message: 'expected authoritative Scrapstorm warning rendering',
+        },
       )
       .toContain('"warningActive":true,"warningDrawn":true');
   }
@@ -1011,7 +1085,10 @@ test('solo practice launches against locked Rusty and reaches live play', async 
               closedGates: scene?.mapRenderer?.gateSpritesByCell?.size ?? -1,
             };
           }),
-        { timeout: 15000, message: 'expected synchronized Demolition Wave arena opening' },
+        {
+          timeout: 15000,
+          message: 'expected synchronized Demolition Wave arena opening',
+        },
       )
       .toEqual({
         active: true,
@@ -1050,7 +1127,10 @@ test('solo practice launches against locked Rusty and reaches live play', async 
               banner: scene?.hud?.eventBannerText?.text ?? '',
             };
           }),
-        { timeout: 15000, message: 'expected synchronized Blood Rush activation' },
+        {
+          timeout: 15000,
+          message: 'expected synchronized Blood Rush activation',
+        },
       )
       .toEqual({
         active: true,
@@ -1075,7 +1155,9 @@ test('solo practice launches against locked Rusty and reaches live play', async 
               gameService?: {
                 getNetworkManager: () => {
                   getActiveMutators: () => readonly string[];
-                  getLocalPlayerState: () => { abilityCooldownSeconds: number } | null;
+                  getLocalPlayerState: () => {
+                    abilityCooldownSeconds: number;
+                  } | null;
                 };
               };
               hud?: {
@@ -1093,7 +1175,10 @@ test('solo practice launches against locked Rusty and reaches live play', async 
               cooldown: network?.getLocalPlayerState()?.abilityCooldownSeconds ?? -1,
             };
           }),
-        { timeout: 15000, message: 'expected synchronized Ability Overdrive activation' },
+        {
+          timeout: 15000,
+          message: 'expected synchronized Ability Overdrive activation',
+        },
       )
       .toMatchObject({
         active: true,
@@ -1114,12 +1199,16 @@ test('solo practice launches against locked Rusty and reaches live play', async 
           const scene = w.game?.scene.getScene('GameScene') as {
             gameService?: {
               getNetworkManager: () => {
-                getLocalPlayerState: () => { abilityCooldownSeconds: number } | null;
+                getLocalPlayerState: () => {
+                  abilityCooldownSeconds: number;
+                } | null;
               };
             };
           } | null;
-          return scene?.gameService?.getNetworkManager().getLocalPlayerState()
-            ?.abilityCooldownSeconds ?? -1;
+          return (
+            scene?.gameService?.getNetworkManager().getLocalPlayerState()?.abilityCooldownSeconds ??
+            -1
+          );
         }),
       )
       .toBeGreaterThan(5);
@@ -1130,12 +1219,15 @@ test('solo practice launches against locked Rusty and reaches live play', async 
       const scene = w.game?.scene.getScene('GameScene') as {
         gameService?: {
           getNetworkManager: () => {
-            getLocalPlayerState: () => { abilityCooldownSeconds: number } | null;
+            getLocalPlayerState: () => {
+              abilityCooldownSeconds: number;
+            } | null;
           };
         };
       } | null;
-      return scene?.gameService?.getNetworkManager().getLocalPlayerState()
-        ?.abilityCooldownSeconds ?? -1;
+      return (
+        scene?.gameService?.getNetworkManager().getLocalPlayerState()?.abilityCooldownSeconds ?? -1
+      );
     });
     await page.waitForTimeout(1000);
     const laterCooldown = await page.evaluate(() => {
@@ -1145,12 +1237,15 @@ test('solo practice launches against locked Rusty and reaches live play', async 
       const scene = w.game?.scene.getScene('GameScene') as {
         gameService?: {
           getNetworkManager: () => {
-            getLocalPlayerState: () => { abilityCooldownSeconds: number } | null;
+            getLocalPlayerState: () => {
+              abilityCooldownSeconds: number;
+            } | null;
           };
         };
       } | null;
-      return scene?.gameService?.getNetworkManager().getLocalPlayerState()
-        ?.abilityCooldownSeconds ?? -1;
+      return (
+        scene?.gameService?.getNetworkManager().getLocalPlayerState()?.abilityCooldownSeconds ?? -1
+      );
     });
     expect(startedCooldown - laterCooldown).toBeGreaterThan(2.2);
   }

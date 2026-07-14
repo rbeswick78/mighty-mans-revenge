@@ -19,6 +19,7 @@ import { MENU_FONTS } from '../ui/menu/fonts.js';
 import { drawBeveledChrome } from '../ui/menu/menu-panel.js';
 import { characterMasteryLabel } from '../ui/character-mastery.js';
 import { gauntletMatchLabel } from '../ui/practice-gauntlet.js';
+import { practiceMutatorBriefingLabel } from '../ui/practice-mutator.js';
 
 // Scene-local color decisions. HEALTH_GOOD (mint) doubles as the "you"
 // highlight — same color the HUD uses for the local player's health bar,
@@ -179,7 +180,12 @@ export class CharacterSelectScene extends Phaser.Scene {
             this.matchData.gameMode,
             this.matchData.mapName,
           )
-        : `NEXT: ${modeName} - ${this.matchData.mapName.toUpperCase()}`;
+        : [
+            `NEXT: ${modeName} - ${this.matchData.mapName.toUpperCase()}`,
+            ...(this.matchData.practiceMutatorId
+              ? [practiceMutatorBriefingLabel(this.matchData.practiceMutatorId)]
+              : []),
+          ].join('\n');
       matchLabelLineCount = matchLabel.split('\n').length;
       this.add
         .text(centerX, 142, matchLabel, {
@@ -195,8 +201,7 @@ export class CharacterSelectScene extends Phaser.Scene {
     // Character cards — laid out horizontally, centered. Spacing scales
     // with card count so a future 3rd character still fits.
     // ────────────────────────────────────────────────────────────────────
-    const totalWidth =
-      CHARACTER_IDS.length * CARD_WIDTH + (CHARACTER_IDS.length - 1) * CARD_GAP;
+    const totalWidth = CHARACTER_IDS.length * CARD_WIDTH + (CHARACTER_IDS.length - 1) * CARD_GAP;
     const startX = centerX - totalWidth / 2 + CARD_WIDTH / 2;
     // Multi-line Gauntlet briefings can include a forecast and Daily chase.
     // Move the roster down just enough to keep every authored line readable.
@@ -249,16 +254,11 @@ export class CharacterSelectScene extends Phaser.Scene {
     this.lockButton.setDepth(WastelandStreet.DEPTH.UI);
 
     this.add
-      .text(
-        centerX,
-        camHeight - 24,
-        'TAP / CLICK OR D-PAD TO PICK  •  ENTER / A TO LOCK IN',
-        {
-          fontFamily: MENU_FONTS.BODY,
-          fontSize: '12px',
-          color: cssHex(FOOTER_COLOR),
-        },
-      )
+      .text(centerX, camHeight - 24, 'TAP / CLICK OR D-PAD TO PICK  •  ENTER / A TO LOCK IN', {
+        fontFamily: MENU_FONTS.BODY,
+        fontSize: '12px',
+        color: cssHex(FOOTER_COLOR),
+      })
       .setOrigin(0.5)
       .setDepth(WastelandStreet.DEPTH.UI);
 
@@ -316,8 +316,7 @@ export class CharacterSelectScene extends Phaser.Scene {
     if (def.bodyOverlay) {
       const key = `${def.bodyOverlay.spritePrefix}_down_idle`;
       const offsetY =
-        ((def.bodyOverlay.idleFrames.down.h - def.idleFrames.down.h) / 2) *
-        SPRITE_SCALE;
+        ((def.bodyOverlay.idleFrames.down.h - def.idleFrames.down.h) / 2) * SPRITE_SCALE;
       bodyOverlay = this.add.sprite(0, -56 + offsetY, key);
       bodyOverlay.setScale(SPRITE_SCALE);
       bodyOverlay.play(key);
@@ -439,7 +438,12 @@ export class CharacterSelectScene extends Phaser.Scene {
     bar.fillStyle(Wasteland.CANVAS_BG, 1);
     bar.fillRect(barX, y - barH / 2, barW, barH);
     bar.fillStyle(color, 1);
-    bar.fillRect(barX + 1, y - barH / 2 + 1, Math.max(2, (barW - 2) * Math.min(1, fraction)), barH - 2);
+    bar.fillRect(
+      barX + 1,
+      y - barH / 2 + 1,
+      Math.max(2, (barW - 2) * Math.min(1, fraction)),
+      barH - 2,
+    );
 
     return [labelText, bar, valueText];
   }
@@ -556,9 +560,7 @@ export class CharacterSelectScene extends Phaser.Scene {
       if (isSelfLocked || isOppLocked) {
         const who = isSelfLocked ? 'YOU' : 'OPPONENT';
         card.lockedBadge.setText(`LOCKED · ${who}`);
-        card.lockedBadge.setColor(
-          cssHex(isSelfLocked ? LOCKED_BADGE_COLOR : OPPONENT_NICK_COLOR),
-        );
+        card.lockedBadge.setColor(cssHex(isSelfLocked ? LOCKED_BADGE_COLOR : OPPONENT_NICK_COLOR));
         if (!card.pulseTween) {
           card.pulseTween = this.tweens.add({
             targets: card.sprite,
@@ -589,11 +591,7 @@ export class CharacterSelectScene extends Phaser.Scene {
     this.updateLockButton(self ?? null);
   }
 
-  private drawCardBorder(
-    card: CardWidgets,
-    selfActive: boolean,
-    oppActive: boolean,
-  ): void {
+  private drawCardBorder(card: CardWidgets, selfActive: boolean, oppActive: boolean): void {
     card.border.clear();
     if (!selfActive && !oppActive) return;
 
@@ -629,9 +627,7 @@ export class CharacterSelectScene extends Phaser.Scene {
         ? `LOCKED · ${CHARACTERS[s.lockedCharacterId].displayName.toUpperCase()}`
         : 'choosing...';
       lines.push(`${prefix}: ${status}`);
-      colors.push(
-        isSelf ? cssHex(LOCAL_NICK_COLOR) : cssHex(OPPONENT_NICK_COLOR),
-      );
+      colors.push(isSelf ? cssHex(LOCAL_NICK_COLOR) : cssHex(OPPONENT_NICK_COLOR));
     }
     if (lines.length === 0) {
       this.statusText.setText('Waiting for players...');
@@ -648,9 +644,7 @@ export class CharacterSelectScene extends Phaser.Scene {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     this.timerText.setText(`AUTO-LOCK IN ${mins}:${secs.toString().padStart(2, '0')}`);
-    this.timerText.setColor(
-      cssHex(seconds <= 5 ? TIMER_URGENT_COLOR : TIMER_COLOR),
-    );
+    this.timerText.setColor(cssHex(seconds <= 5 ? TIMER_URGENT_COLOR : TIMER_COLOR));
   }
 
   private updateLockButton(
@@ -693,9 +687,7 @@ export class CharacterSelectScene extends Phaser.Scene {
   private cycleHover(direction: 1 | -1): void {
     if (this.findSelfLocked()) return;
 
-    const selectable = CHARACTER_IDS.filter(
-      (id) => !this.isCardLockedByOther(id),
-    );
+    const selectable = CHARACTER_IDS.filter((id) => !this.isCardLockedByOther(id));
     if (selectable.length === 0) return;
 
     const current = this.localHoveredId ?? selectable[0];
@@ -722,15 +714,10 @@ export class CharacterSelectScene extends Phaser.Scene {
 
   private isCardLockedByOther(id: CharacterId): boolean {
     const localId = this.gameService.getPlayerId();
-    return this.latestSelections.some(
-      (s) => s.playerId !== localId && s.lockedCharacterId === id,
-    );
+    return this.latestSelections.some((s) => s.playerId !== localId && s.lockedCharacterId === id);
   }
 
   private isLikelyMobile(): boolean {
-    return (
-      'ontouchstart' in window &&
-      Math.min(window.innerWidth, window.innerHeight) < 600
-    );
+    return 'ontouchstart' in window && Math.min(window.innerWidth, window.innerHeight) < 600;
   }
 }

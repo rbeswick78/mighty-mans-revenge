@@ -50,6 +50,8 @@ export interface MatchData {
   characterWins: Record<CharacterId, number>;
   /** Present only during the escalating three-fight solo run. */
   gauntlet?: PracticeGauntletMatch;
+  /** Accepted player-authored mid-match event for an ordinary Spar. */
+  practiceMutatorId?: MutatorId;
 }
 
 type GameServiceEvent =
@@ -103,8 +105,7 @@ export class GameService {
    */
   private latestLeaderboard: LeaderboardEntry[] = [];
   /** Latest server-clock Daily Run board; null until the connect snapshot. */
-  private latestDailyGauntletLeaderboard: ServerDailyGauntletLeaderboardMessage | null =
-    null;
+  private latestDailyGauntletLeaderboard: ServerDailyGauntletLeaderboardMessage | null = null;
   /**
    * Latest pre-match draft snapshot, cached like the leaderboard so the
    * DraftScene — created only AFTER the first draftState routed the lobby
@@ -189,6 +190,7 @@ export class GameService {
     kind: PracticeKind = 'sparring',
     gameMode?: GameModeType,
     opponentCharacterId?: CharacterId,
+    mutatorId?: MutatorId,
   ): void {
     this.localNickname = nickname;
     this.networkManager.startPractice(
@@ -197,6 +199,7 @@ export class GameService {
       kind,
       gameMode,
       opponentCharacterId,
+      mutatorId,
     );
   }
 
@@ -269,6 +272,7 @@ export class GameService {
           ...msg.characterWins,
         },
         gauntlet: msg.gauntlet,
+        practiceMutatorId: msg.practiceMutatorId,
       };
       // matchFound ends any draft (both picks in, or the FORCE/no-draft
       // path) — drop the cache so a later scene can't render a stale one.
@@ -321,12 +325,9 @@ export class GameService {
       this.emit('pickupCollected', pickupId, pid);
     });
 
-    this.networkManager.on(
-      'confirmedTagCollected',
-      (collection: KillConfirmedCollection) => {
-        this.emit('confirmedTagCollected', collection);
-      },
-    );
+    this.networkManager.on('confirmedTagCollected', (collection: KillConfirmedCollection) => {
+      this.emit('confirmedTagCollected', collection);
+    });
 
     this.networkManager.on('bulletTrail', (trail: unknown) => {
       this.emit('bulletTrail', trail);

@@ -302,6 +302,7 @@ export class NetworkManager {
     kind: PracticeKind = 'sparring',
     gameMode?: GameModeType,
     opponentCharacterId?: CharacterId,
+    mutatorId?: MutatorId,
   ): void {
     this.connection.send({
       type: 'client:startPractice',
@@ -310,6 +311,7 @@ export class NetworkManager {
       kind,
       ...(gameMode ? { gameMode } : {}),
       ...(opponentCharacterId ? { opponentCharacterId } : {}),
+      ...(mutatorId ? { mutatorId } : {}),
     });
   }
 
@@ -545,11 +547,17 @@ export class NetworkManager {
         if (!this._activeMutators.includes(msg.event)) {
           this._activeMutators.push(msg.event);
         }
-        this.emit('eventStart', { event: msg.event, isFinalMinute: msg.isFinalMinute });
+        this.emit('eventStart', {
+          event: msg.event,
+          isFinalMinute: msg.isFinalMinute,
+        });
         break;
 
       case 'server:weaponIncoming':
-        this.emit('weaponIncoming', { weaponId: msg.weaponId, landsInMs: msg.landsInMs });
+        this.emit('weaponIncoming', {
+          weaponId: msg.weaponId,
+          landsInMs: msg.landsInMs,
+        });
         break;
 
       case 'server:playerKilled':
@@ -662,7 +670,10 @@ export class NetworkManager {
     }
     for (const [id, last] of this.lastAxeStates) {
       if (!incomingAxeIds.has(id)) {
-        this.emit('axeResolved', { position: last.position, angle: last.angle });
+        this.emit('axeResolved', {
+          position: last.position,
+          angle: last.angle,
+        });
         this.lastAxeStates.delete(id);
       }
     }
@@ -724,9 +735,7 @@ export class NetworkManager {
     this.remotePlayerIds = newRemoteIds;
   }
 
-  private reconcileLocalPlayer(
-    serverState: ServerGameStateMessage['players'][number],
-  ): void {
+  private reconcileLocalPlayer(serverState: ServerGameStateMessage['players'][number]): void {
     if (!this.collisionGrid || !this.localPlayerState) {
       // No grid yet or no local state — just accept server state directly
       this.localPlayerState = this.serverStateToPlayerState(serverState);
@@ -741,10 +750,7 @@ export class NetworkManager {
     if (predictions.length === 0) {
       // No unacknowledged inputs remain. Smooth any residual difference
       // instead of visibly jumping to the authoritative state.
-      const result = this.reconciliation.reconcileAuthoritative(
-        serverState,
-        this.localPlayerState,
-      );
+      const result = this.reconciliation.reconcileAuthoritative(serverState, this.localPlayerState);
       this.applyReconciledLocalState(serverState, result);
       return;
     }
@@ -834,9 +840,7 @@ export class NetworkManager {
     }
   }
 
-  private serverStateToPlayerState(
-    s: ServerGameStateMessage['players'][number],
-  ): PlayerState {
+  private serverStateToPlayerState(s: ServerGameStateMessage['players'][number]): PlayerState {
     return {
       id: s.id,
       // Mirror server: SerializedPlayerState.characterId is non-null in

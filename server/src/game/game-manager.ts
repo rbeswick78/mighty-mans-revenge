@@ -1,13 +1,5 @@
-import {
-  DAILY_GAUNTLET_LEADERBOARD,
-  LEADERBOARD,
-  SERVER,
-  dailyChallengeKey,
-} from '@shared/game';
-import type {
-  PlayerId,
-  ClientMessage,
-} from '@shared/game';
+import { DAILY_GAUNTLET_LEADERBOARD, LEADERBOARD, SERVER, dailyChallengeKey } from '@shared/game';
+import type { PlayerId, ClientMessage } from '@shared/game';
 import { GameLoop } from './game-loop.js';
 import { GameServer } from '../network/server.js';
 import { MatchmakingManager } from '../matchmaking/matchmaking-manager.js';
@@ -135,6 +127,7 @@ export class GameManager {
           message.kind,
           message.gameMode,
           message.opponentCharacterId,
+          message.mutatorId,
         );
         break;
 

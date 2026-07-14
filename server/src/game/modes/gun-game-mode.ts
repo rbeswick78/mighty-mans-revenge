@@ -6,16 +6,10 @@ import {
   WEAPONS,
   gunGameRungForScore,
   gunGameTotalKills,
+  MODE_MUTATOR_EXCLUSIONS,
   rungWeaponToKillWeapon,
 } from '@shared/game';
-import type {
-  KillWeapon,
-  MatchResult,
-  MutatorId,
-  PlayerId,
-  PlayerState,
-  WeaponId,
-} from '@shared/game';
+import type { KillWeapon, MatchResult, PlayerId, PlayerState, WeaponId } from '@shared/game';
 import { computeAwards } from '../awards.js';
 import type { GameMode, MatchContext } from './game-mode.js';
 
@@ -43,14 +37,7 @@ export class GunGameMode implements GameMode {
    * All six stay out of random
    * rolls (FORCE_* env pins still bypass — smoke tools).
    */
-  readonly excludedMutators: readonly MutatorId[] = [
-    'grenades_only',
-    'infinite_ammo',
-    'fists_only',
-    'weapon_roulette',
-    'last_laugh',
-    'scavenger_rush',
-  ];
+  readonly excludedMutators = MODE_MUTATOR_EXCLUSIONS[GameModeType.GUN_GAME];
 
   /**
    * Per-player rung index as of that player's last living tick, for

@@ -630,8 +630,14 @@ describe('MatchmakingManager mode rotation (FORCE-pinned, draft skipped)', () =>
       expect(message.isOvertime).toBe(false);
       expect(message.contract.target).toBeGreaterThan(0);
       expect(message.contract.players).toEqual([
-        expect.objectContaining({ playerId: 'A', progress: expect.any(Number) }),
-        expect.objectContaining({ playerId: 'B', progress: expect.any(Number) }),
+        expect.objectContaining({
+          playerId: 'A',
+          progress: expect.any(Number),
+        }),
+        expect.objectContaining({
+          playerId: 'B',
+          progress: expect.any(Number),
+        }),
       ]);
     }
   });
@@ -761,7 +767,10 @@ describe('MatchmakingManager mode rotation (FORCE-pinned, draft skipped)', () =>
       throw new Error('missing Scrapstorm warning snapshot');
     }
     expect(warning.message.scrapstorm).toMatchObject({
-      targetPosition: expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }),
+      targetPosition: expect.objectContaining({
+        x: expect.any(Number),
+        y: expect.any(Number),
+      }),
       targetPlayerId: expect.stringMatching(/^[AB]$/),
       secondsUntilImpact: expect.any(Number),
       radius: MUTATORS.SCRAPSTORM_RADIUS_PX,
@@ -842,7 +851,11 @@ describe('MatchmakingManager pre-match draft', () => {
       .filter((s) => s.message.type === 'server:matchFound')
       .map((s) => {
         if (s.message.type !== 'server:matchFound') throw new Error('unreachable');
-        return { playerId: s.playerId, message: s.message, reliable: s.reliable };
+        return {
+          playerId: s.playerId,
+          message: s.message,
+          reliable: s.reliable,
+        };
       });
   }
 
@@ -1477,6 +1490,130 @@ describe('MatchmakingManager solo practice flow', () => {
     expect(rematchBot?.[1].locked).toBe('frost_wizard');
   });
 
+  it('pins compatible Spar chaos, confirms it, and carries it through direct rematches', () => {
+    const { fake, sent } = makeFakeServer();
+    const mgr = new MatchmakingManager(fake, () => 0, store, seededRng([0, 0, 0]));
+
+    mgr.handleStartPractice(
+      'A',
+      'Alpha',
+      'scrapper',
+      'sparring',
+      GameModeType.DEATHMATCH,
+      undefined,
+      'blackout',
+    );
+    const first = mgr.getActiveMatches()[0];
+    const firstInternals = first as unknown as {
+      plannedMidMatchMutator?: MutatorId;
+    };
+    expect(firstInternals.plannedMidMatchMutator).toBe('blackout');
+    const found = sent.find(
+      (entry) => entry.playerId === 'A' && entry.message.type === 'server:matchFound',
+    );
+    if (!found || found.message.type !== 'server:matchFound') {
+      throw new Error('missing custom-chaos matchFound');
+    }
+    expect(found.message.practiceMutatorId).toBe('blackout');
+
+    (first.activeMutators as MutatorId[]).push('blackout');
+    first.phase = MatchPhase.ENDED;
+    mgr.tick(0.05, 1);
+    mgr.handleRematchRequest('A');
+
+    const rematch = mgr.getActiveMatches()[0];
+    const rematchInternals = rematch as unknown as {
+      plannedMidMatchMutator?: MutatorId;
+      rematchMutatorExclusions: ReadonlySet<MutatorId>;
+    };
+    expect(rematchInternals.plannedMidMatchMutator).toBe('blackout');
+    expect(rematchInternals.rematchMutatorExclusions.has('blackout')).toBe(true);
+    const rematchFound = [...sent]
+      .reverse()
+      .find((entry) => entry.playerId === 'A' && entry.message.type === 'server:matchFound');
+    expect(
+      rematchFound?.message.type === 'server:matchFound'
+        ? rematchFound.message.practiceMutatorId
+        : undefined,
+    ).toBe('blackout');
+  });
+
+  it('keeps Random-mode custom chaos on compatible modes and rejects a conflicting pin', () => {
+    const random = makeFakeServer();
+    const randomMgr = new MatchmakingManager(random.fake, () => 0, store, seededRng([0, 0.3, 0]));
+    randomMgr.handleStartPractice(
+      'A',
+      'Alpha',
+      'scrapper',
+      'sparring',
+      undefined,
+      undefined,
+      'weapon_roulette',
+    );
+    expect(randomMgr.getActiveMatches()[0].gameModeType).toBe(GameModeType.KOTH);
+    randomMgr.getActiveMatches()[0].phase = MatchPhase.ENDED;
+    randomMgr.tick(0.05, 1);
+    const randomEnded = [...random.sent]
+      .reverse()
+      .find((entry) => entry.playerId === 'A' && entry.message.type === 'server:matchEnd');
+    expect(
+      randomEnded?.message.type === 'server:matchEnd'
+        ? randomEnded.message.result.nextGameMode
+        : undefined,
+    ).toBe(GameModeType.LAST_STAND);
+
+    const pinned = makeFakeServer();
+    const pinnedMgr = new MatchmakingManager(pinned.fake, () => 0, store);
+    pinnedMgr.handleStartPractice(
+      'B',
+      'Bravo',
+      'scrapper',
+      'sparring',
+      GameModeType.GUN_GAME,
+      undefined,
+      'weapon_roulette',
+    );
+    expect(pinnedMgr.getActiveMatches()[0].gameModeType).toBe(GameModeType.GUN_GAME);
+    const found = pinned.sent.find(
+      (entry) => entry.playerId === 'B' && entry.message.type === 'server:matchFound',
+    );
+    expect(
+      found?.message.type === 'server:matchFound' ? found.message.practiceMutatorId : undefined,
+    ).toBeUndefined();
+  });
+
+  it('does not promise Spar chaos already reserved by a forced final event', () => {
+    process.env.FORCE_EVENT = 'blackout';
+    try {
+      const { fake, sent } = makeFakeServer();
+      const mgr = new MatchmakingManager(fake, () => 0, store);
+      mgr.handleStartPractice(
+        'A',
+        'Alpha',
+        'scrapper',
+        'sparring',
+        GameModeType.DEATHMATCH,
+        undefined,
+        'blackout',
+      );
+
+      const match = mgr.getActiveMatches()[0] as unknown as {
+        plannedMidMatchMutator?: MutatorId;
+      };
+      expect(match.plannedMidMatchMutator).toBeUndefined();
+      const found = sent.find(
+        (entry) => entry.playerId === 'A' && entry.message.type === 'server:matchFound',
+      );
+      expect(
+        found?.message.type === 'server:matchFound'
+          ? found.message.practiceMutatorId
+          : undefined,
+      ).toBeUndefined();
+    } finally {
+      delete process.env.FORCE_EVENT;
+    }
+  });
+
   it('rejects malformed Spar pins and ignores pins on Gauntlet requests', () => {
     const invalid = makeFakeServer();
     const invalidMgr = new MatchmakingManager(invalid.fake, () => 0, store, seededRng([0, 0, 0]));
@@ -1487,6 +1624,7 @@ describe('MatchmakingManager solo practice flow', () => {
       'sparring',
       'not-a-mode' as GameModeType,
       'not-a-fighter' as CharacterId,
+      'not-chaos' as MutatorId,
     );
     const invalidMatch = invalidMgr.getActiveMatches()[0];
     expect(invalidMatch.gameModeType).toBe(GameModeType.DEATHMATCH);
@@ -1504,6 +1642,7 @@ describe('MatchmakingManager solo practice flow', () => {
       'gauntlet',
       GameModeType.CORE_RUN,
       'rook',
+      'blackout',
     );
     const gauntletMatch = gauntletMgr.getActiveMatches()[0];
     expect(gauntletMatch.gameModeType).toBe(GameModeType.DEATHMATCH);
@@ -1511,6 +1650,14 @@ describe('MatchmakingManager solo practice flow', () => {
       playerId.startsWith('bot:'),
     );
     expect(gauntletBot?.[1].locked).toBe('mighty_man');
+    const gauntletFound = gauntlet.sent.find(
+      (entry) => entry.playerId === 'B' && entry.message.type === 'server:matchFound',
+    );
+    expect(
+      gauntletFound?.message.type === 'server:matchFound'
+        ? gauntletFound.message.practiceMutatorId
+        : undefined,
+    ).toBeUndefined();
   });
 
   it('pins a shared UTC Daily Run opening and retries the same challenge after failure', () => {
@@ -1561,9 +1708,7 @@ describe('MatchmakingManager solo practice flow', () => {
     );
     secondMgr.handleStartPractice('B', 'Bravo', 'scrapper', 'daily');
     const second = secondMgr.getActiveMatches()[0];
-    const secondBotId = [...second.players.keys()].find((playerId) =>
-      playerId.startsWith('bot:'),
-    )!;
+    const secondBotId = [...second.players.keys()].find((playerId) => playerId.startsWith('bot:'))!;
     expect(second.mapManager.getMapData().name).toBe(openingSummary.mapName);
     expect(second.gameModeType).toBe(openingSummary.gameMode);
     expect(second.getContractHudState().id).toBe(openingContractId);
@@ -1646,7 +1791,9 @@ describe('MatchmakingManager solo practice flow', () => {
           if (!nextStage || nextStage.message.type !== 'server:matchFound') {
             throw new Error('missing next Daily Run stage');
           }
-          expect(nextStage.message.gauntlet?.dailyChase).toEqual({ kind: 'set_pace' });
+          expect(nextStage.message.gauntlet?.dailyChase).toEqual({
+            kind: 'set_pace',
+          });
         }
       }
 

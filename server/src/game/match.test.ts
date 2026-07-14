@@ -490,8 +490,7 @@ describe('Match', () => {
       match.update(MATCH.COUNTDOWN_DURATION + 0.1);
       const killer = match.players.get('player-0')!;
       const victim = match.players.get('player-1')!;
-      killer.health =
-        killer.maxHealth * COMBAT_MEDALS.CLUTCH_HEALTH_FRACTION + 0.01;
+      killer.health = killer.maxHealth * COMBAT_MEDALS.CLUTCH_HEALTH_FRACTION + 0.01;
       match.onKill(killer.id, victim.id, 'gun');
 
       victim.isDead = false;
@@ -864,9 +863,7 @@ describe('Match', () => {
       return m;
     }
 
-    function startScavengerCacheMatch(
-      mode: GameModeType = GameModeType.DEATHMATCH,
-    ): Match {
+    function startScavengerCacheMatch(mode: GameModeType = GameModeType.DEATHMATCH): Match {
       const map: MapData = {
         name: 'Scavenger Cache Lab',
         width: 9,
@@ -1103,10 +1100,7 @@ describe('Match', () => {
 
       m.queueInput('player-0', makeInput(1, { firePressed: true, aimAngle: 0 }));
       m.update(0.05);
-      m.queueInput(
-        'player-1',
-        makeInput(1, { firePressed: true, aimAngle: Math.PI }),
-      );
+      m.queueInput('player-1', makeInput(1, { firePressed: true, aimAngle: Math.PI }));
       m.update(0.05);
 
       const rewards = m.pickupManager.getPickups();
@@ -1445,9 +1439,7 @@ describe('Match', () => {
 
       m.onKill(killer.id, victim.id, 'gun');
 
-      const drop = m.pickupManager
-        .getPickups()
-        .find((pickup) => pickup.isDroppedWeapon);
+      const drop = m.pickupManager.getPickups().find((pickup) => pickup.isDroppedWeapon);
       expect(drop).toMatchObject({
         type: PickupType.WEAPON_SHOTGUN,
         position: { x: 240, y: 192 },
@@ -1481,9 +1473,7 @@ describe('Match', () => {
 
       m.onKill(killer.id, victim.id, 'gun');
 
-      const drop = m.pickupManager
-        .getPickups()
-        .find((pickup) => pickup.isDroppedWeapon);
+      const drop = m.pickupManager.getPickups().find((pickup) => pickup.isDroppedWeapon);
       expect(drop).toMatchObject({
         type: PickupType.WEAPON_BAT,
         position: victim.position,
@@ -1556,11 +1546,7 @@ describe('Match', () => {
       victim.weaponId = 'pistol';
       victim.specialAmmo = 3;
       victim.specialReserve = 2;
-      const grenade = m.combatManager.spawnGrenade(
-        victim.id,
-        victim.position,
-        0,
-      );
+      const grenade = m.combatManager.spawnGrenade(victim.id, victim.position, 0);
       grenade.velocity = { x: 0, y: 0 };
       grenade.safetyFuseTimer = 0.01;
 
@@ -1692,9 +1678,11 @@ describe('Match', () => {
       m.startCountdown();
       m.update(MATCH.COUNTDOWN_DURATION + 0.05);
 
-      (m as unknown as {
-        startMutator: (mutator: MutatorId, isFinalMinute: boolean) => void;
-      }).startMutator('demolition_wave', false);
+      (
+        m as unknown as {
+          startMutator: (mutator: MutatorId, isFinalMinute: boolean) => void;
+        }
+      ).startMutator('demolition_wave', false);
 
       expect(m.getTickDestroyedTiles()).toEqual([
         { col: 2, row: 2 },
@@ -2034,7 +2022,10 @@ describe('Match', () => {
         const state = m.getRadiationStormState()!;
         const exposed = m.players.get('player-0')!;
         const protectedPlayer = m.players.get('player-1')!;
-        const outside = { x: state.center.x + state.radius + 100, y: state.center.y };
+        const outside = {
+          x: state.center.x + state.radius + 100,
+          y: state.center.y,
+        };
         exposed.position = { ...outside };
         protectedPlayer.position = { ...outside };
         exposed.health = 31;
@@ -2057,7 +2048,10 @@ describe('Match', () => {
         const m = startActiveMatchWithMidMutator('radiation_storm');
         const player = m.players.get('player-0')!;
         const state = m.getRadiationStormState()!;
-        player.position = { x: state.center.x + state.radius + 100, y: state.center.y };
+        player.position = {
+          x: state.center.x + state.radius + 100,
+          y: state.center.y,
+        };
         player.health = 50;
         (m as unknown as { isOvertime: boolean }).isOvertime = true;
 
@@ -2081,9 +2075,7 @@ describe('Match', () => {
         const warning = m.getScrapstormState()!;
         expect(['player-0', 'player-1']).toContain(warning.targetPlayerId);
         expect(warning.secondsUntilImpact).toBeGreaterThan(1.4);
-        expect(warning.secondsUntilImpact).toBeLessThanOrEqual(
-          MUTATORS.SCRAPSTORM_WARNING_SECONDS,
-        );
+        expect(warning.secondsUntilImpact).toBeLessThanOrEqual(MUTATORS.SCRAPSTORM_WARNING_SECONDS);
 
         const target = m.players.get(warning.targetPlayerId!)!;
         const captured = { ...warning.targetPosition! };
@@ -2122,10 +2114,7 @@ describe('Match', () => {
         m.update(MUTATORS.SCRAPSTORM_FIRST_WARNING_DELAY_SECONDS);
         const firstTarget = m.getScrapstormState()?.targetPlayerId;
         m.update(MUTATORS.SCRAPSTORM_WARNING_SECONDS);
-        m.update(
-          MUTATORS.SCRAPSTORM_INTERVAL_SECONDS -
-          MUTATORS.SCRAPSTORM_WARNING_SECONDS,
-        );
+        m.update(MUTATORS.SCRAPSTORM_INTERVAL_SECONDS - MUTATORS.SCRAPSTORM_WARNING_SECONDS);
         expect(m.getScrapstormState()?.targetPlayerId).not.toBe(firstTarget);
 
         const exposed = m.players.get('player-0')!;
@@ -2160,22 +2149,20 @@ describe('Match', () => {
         );
         m.startCountdown();
         m.update(MATCH.COUNTDOWN_DURATION + 0.05);
-        (m as unknown as {
-          startMutator: (mutator: MutatorId, isFinalMinute: boolean) => void;
-        }).startMutator('scavenger_rush', false);
+        (
+          m as unknown as {
+            startMutator: (mutator: MutatorId, isFinalMinute: boolean) => void;
+          }
+        ).startMutator('scavenger_rush', false);
         m.update(0.05);
         return m;
       }
 
       it('cycles one expiring supply through deterministic authored anchors', () => {
         const m = startRush();
-        const first = m.pickupManager
-          .getPickups()
-          .find((pickup) => pickup.isScavengerRushDrop)!;
+        const first = m.pickupManager.getPickups().find((pickup) => pickup.isScavengerRushDrop)!;
 
-        expect(first.expiresInSeconds).toBe(
-          MUTATORS.SCAVENGER_RUSH_DROP_LIFETIME_SECONDS,
-        );
+        expect(first.expiresInSeconds).toBe(MUTATORS.SCAVENGER_RUSH_DROP_LIFETIME_SECONDS);
         expect([
           { x: 3 * 48, y: 3 * 48 },
           { x: 7 * 48, y: 7 * 48 },
@@ -2191,21 +2178,15 @@ describe('Match', () => {
           MUTATORS.SCAVENGER_RUSH_DROP_INTERVAL_SECONDS -
             MUTATORS.SCAVENGER_RUSH_DROP_LIFETIME_SECONDS,
         );
-        const second = m.pickupManager
-          .getPickups()
-          .find((pickup) => pickup.isScavengerRushDrop)!;
+        const second = m.pickupManager.getPickups().find((pickup) => pickup.isScavengerRushDrop)!;
         expect(second).toBeDefined();
         expect(second.position).not.toEqual(first.position);
-        expect(second.expiresInSeconds).toBe(
-          MUTATORS.SCAVENGER_RUSH_DROP_LIFETIME_SECONDS,
-        );
+        expect(second.expiresInSeconds).toBe(MUTATORS.SCAVENGER_RUSH_DROP_LIFETIME_SECONDS);
       });
 
       it('obeys mode pickup ownership even when a FORCE pin bypasses exclusion', () => {
         const m = startRush(GameModeType.GUN_GAME);
-        const supply = m.pickupManager
-          .getPickups()
-          .find((pickup) => pickup.isScavengerRushDrop);
+        const supply = m.pickupManager.getPickups().find((pickup) => pickup.isScavengerRushDrop);
 
         expect(supply).toMatchObject({ type: PickupType.BANDAGE });
       });
@@ -2284,9 +2265,11 @@ describe('Match', () => {
         );
         m.startCountdown();
         m.update(MATCH.COUNTDOWN_DURATION + 0.05);
-        (m as unknown as {
-          startMutator: (mutator: MutatorId, isFinalMinute: boolean) => void;
-        }).startMutator('last_laugh', false);
+        (
+          m as unknown as {
+            startMutator: (mutator: MutatorId, isFinalMinute: boolean) => void;
+          }
+        ).startMutator('last_laugh', false);
         const victim = m.players.get('a')!;
         victim.position = { x: 240, y: 240 };
         victim.health = 1;
@@ -2414,7 +2397,7 @@ describe('Match', () => {
         }
       });
 
-      it('uses a compatible server-planned Gauntlet forecast for the mid-match slot', () => {
+      it('uses a compatible server-planned event for the mid-match slot', () => {
         const m = new Match(
           'planned-gauntlet-chaos',
           makeMapData(),
@@ -2442,6 +2425,32 @@ describe('Match', () => {
           activatesInMs: 0,
           isFinalMinute: false,
         });
+        expect(m.activeMutators).toEqual(['blackout']);
+      });
+
+      it('keeps a compatible planned event even when rematch recency includes it', () => {
+        const m = new Match(
+          'planned-rematch-chaos',
+          makeMapData(),
+          [
+            { id: 'player-0', nickname: 'Player 0' },
+            { id: 'player-1', nickname: 'Player 1' },
+          ],
+          GameModeType.DEATHMATCH,
+          () => 0,
+          ['blackout'],
+          undefined,
+          undefined,
+          'blackout',
+        );
+        m.startCountdown();
+        m.update(MATCH.COUNTDOWN_DURATION + 0.05);
+        const internals = m as unknown as MatchInternals;
+        internals.midMatchSlot.activateAtElapsed = 80;
+        internals.matchTimer = MATCH.TIME_LIMIT - 80.1;
+
+        m.update(0.05);
+
         expect(m.activeMutators).toEqual(['blackout']);
       });
 
@@ -4045,15 +4054,9 @@ describe('Match', () => {
         m.queueInput('player-0', makeInput(1, { abilityPressed: true, aimAngle: 0 }));
         m.update(0.001);
 
-        expect(rook.position.x).toBeCloseTo(
-          200 + ABILITY.ROOK_BREACH_DASH.DISTANCE_TILES * 48,
-          5,
-        );
+        expect(rook.position.x).toBeCloseTo(200 + ABILITY.ROOK_BREACH_DASH.DISTANCE_TILES * 48, 5);
         expect(rook.position.y).toBeCloseTo(200, 5);
-        expect(rook.abilityCooldownSeconds).toBeCloseTo(
-          ABILITY.ROOK_BREACH_DASH.COOLDOWN,
-          2,
-        );
+        expect(rook.abilityCooldownSeconds).toBeCloseTo(ABILITY.ROOK_BREACH_DASH.COOLDOWN, 2);
         expect(rook.abilityActiveSeconds).toBe(0);
       });
 
@@ -5268,9 +5271,7 @@ describe('Match', () => {
 
       m.onKill(targetId, victim.id, 'shotgun');
 
-      expect(m.players.get(targetId)!.score).toBe(
-        BOUNTY_HUNT.TARGET_RETALIATION_POINTS,
-      );
+      expect(m.players.get(targetId)!.score).toBe(BOUNTY_HUNT.TARGET_RETALIATION_POINTS);
       expect(m.getBountyHuntState()).toEqual({ targetId });
     });
 
@@ -5284,9 +5285,7 @@ describe('Match', () => {
 
       const decisive = startActiveBountyHunt();
       const targetId = decisive.getBountyHuntState()!.targetId!;
-      const hunter = [...decisive.players.values()].find(
-        (player) => player.id !== targetId,
-      )!;
+      const hunter = [...decisive.players.values()].find((player) => player.id !== targetId)!;
       hunter.score = BOUNTY_HUNT.SCORE_TARGET - BOUNTY_HUNT.BOUNTY_KILL_POINTS;
       decisive.onKill(hunter.id, targetId, 'gun');
       decisive.update(0.05);
