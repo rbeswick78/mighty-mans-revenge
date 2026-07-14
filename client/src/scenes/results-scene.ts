@@ -36,6 +36,14 @@ import {
   normalizeDailyGauntletProgress,
   type DailyGauntletProgress,
 } from '../ui/daily-gauntlet.js';
+import {
+  GAUNTLET_BUILD_CODEX_STORAGE_KEY,
+  gauntletBuildCodexLabel,
+  gauntletBuildCodexUpdate,
+  normalizeGauntletBuildCodex,
+  type GauntletBuildCodex,
+  type GauntletBuildDefinition,
+} from '../ui/gauntlet-build-codex.js';
 
 interface ResultsSceneData {
   result?: MatchResult;
@@ -98,6 +106,9 @@ export class ResultsScene extends Phaser.Scene {
     streak: 0,
   };
   private isNewDailyBest = false;
+  private gauntletBuildCodex: GauntletBuildCodex = { discovered: [] };
+  private gauntletBuild: GauntletBuildDefinition | null = null;
+  private isNewGauntletBuild = false;
 
   // Event handler references for cleanup
   private onRematchStatus: ((opponentWantsRematch: boolean) => void) | null = null;
@@ -130,6 +141,9 @@ export class ResultsScene extends Phaser.Scene {
       streak: 0,
     };
     this.isNewDailyBest = false;
+    this.gauntletBuildCodex = { discovered: [] };
+    this.gauntletBuild = null;
+    this.isNewGauntletBuild = false;
   }
 
   create(): void {
@@ -146,6 +160,17 @@ export class ResultsScene extends Phaser.Scene {
       this.isNewGauntletBest = update.isNewBest;
       if (update.isNewBest) {
         localStorage.setItem(GAUNTLET_BEST_CLEAR_STORAGE_KEY, String(update.bestScore));
+      }
+
+      const buildUpdate = gauntletBuildCodexUpdate(
+        this.result,
+        normalizeGauntletBuildCodex(localStorage.getItem(GAUNTLET_BUILD_CODEX_STORAGE_KEY)),
+      );
+      this.gauntletBuildCodex = buildUpdate.codex;
+      this.gauntletBuild = buildUpdate.build;
+      this.isNewGauntletBuild = buildUpdate.isNewDiscovery;
+      if (buildUpdate.isNewDiscovery) {
+        localStorage.setItem(GAUNTLET_BUILD_CODEX_STORAGE_KEY, JSON.stringify(buildUpdate.codex));
       }
 
       if (this.result.gauntlet.challengeKey) {
@@ -721,8 +746,9 @@ export class ResultsScene extends Phaser.Scene {
       }
 
       const isDaily = this.result.gauntlet.challengeKey !== undefined;
-      const isNewRecord = isDaily ? this.isNewDailyBest : this.isNewGauntletBest;
-      const recordLabel = isDaily
+      const isNewScoreRecord = isDaily ? this.isNewDailyBest : this.isNewGauntletBest;
+      const isNewRecord = isNewScoreRecord || this.isNewGauntletBuild;
+      const scoreRecordLabel = isDaily
         ? dailyGauntletStandingLabel(
             this.dailyGauntletProgress,
             this.isNewDailyBest,
@@ -730,15 +756,22 @@ export class ResultsScene extends Phaser.Scene {
             this.result.gauntlet.dailyBestScore,
           )
         : gauntletBestClearLabel(this.gauntletBestClear, this.isNewGauntletBest);
+      const recordLabel =
+        `${scoreRecordLabel}\n` +
+        gauntletBuildCodexLabel(
+          this.gauntletBuildCodex,
+          this.gauntletBuild,
+          this.isNewGauntletBuild,
+        );
       const bestText = this.add
         .text(centerX, CAREER_RANK_Y, recordLabel, {
           fontFamily: MENU_FONTS.HEADER,
-          fontSize: isNewRecord ? '10px' : '8px',
+          fontSize: isNewRecord ? '9px' : '8px',
           color: cssHex(isNewRecord ? CAREER_RANK_UP_COLOR : CAREER_RANK_COLOR),
         })
         .setOrigin(0.5)
         .setAlpha(0)
-        .setScale(isNewRecord ? 1.3 : 1)
+        .setScale(isNewRecord ? 1.2 : 1)
         .setDepth(WastelandStreet.DEPTH.UI);
       this.tweens.add({
         targets: bestText,

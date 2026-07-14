@@ -13,6 +13,7 @@ import {
 } from '@shared/config/game.js';
 import { eventDisplayName } from '@shared/utils/event-modifiers.js';
 import { practiceGauntletChaosBounty } from '@shared/utils/practice-gauntlet.js';
+import { gauntletBuildForBoons } from './gauntlet-build-codex.js';
 
 export const GAUNTLET_BEST_CLEAR_STORAGE_KEY = 'mmr_gauntlet_best_clear';
 
@@ -47,7 +48,9 @@ export function gauntletBoonRouteLabel(boonId: GauntletBoonId): string {
 }
 
 function gauntletBoonInventoryLabel(boonIds: readonly GauntletBoonId[]): string {
-  return `BOONS: ${boonIds.map(gauntletBoonDisplayName).join(' + ')}`;
+  const boonNames = boonIds.map(gauntletBoonDisplayName).join(' + ');
+  const build = gauntletBuildForBoons(boonIds);
+  return build ? `BUILD: ${build.name}  //  ${boonNames}` : `BOONS: ${boonNames}`;
 }
 
 function safeScore(score: number | undefined): number {

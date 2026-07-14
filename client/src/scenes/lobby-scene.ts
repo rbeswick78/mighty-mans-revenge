@@ -30,6 +30,11 @@ import {
   normalizeDailyGauntletProgress,
 } from '../ui/daily-gauntlet.js';
 import {
+  GAUNTLET_BUILD_CODEX_STORAGE_KEY,
+  gauntletBuildCodexLabel,
+  normalizeGauntletBuildCodex,
+} from '../ui/gauntlet-build-codex.js';
+import {
   BOT_DIFFICULTIES,
   DEFAULT_BOT_DIFFICULTY,
   type BotDifficulty,
@@ -207,7 +212,7 @@ export class LobbyScene extends Phaser.Scene {
     // searching-state UI shares this panel, swapping visibility.
     // ────────────────────────────────────────────────────────────────────
     const panelW = 380;
-    const panelH = 306;
+    const panelH = 318;
     const panelX = centerX - panelW / 2;
     const panelY = camHeight - 336;
     const panel = new MenuPanel(this, panelX, panelY, panelW, panelH);
@@ -423,6 +428,23 @@ export class LobbyScene extends Phaser.Scene {
       .setOrigin(0.5);
     panel.add(dailyBestText);
     this.nameEntryUi.push(dailyBestText);
+
+    const buildCodexText = this.add
+      .text(
+        panel.centerX,
+        310,
+        gauntletBuildCodexLabel(
+          normalizeGauntletBuildCodex(localStorage.getItem(GAUNTLET_BUILD_CODEX_STORAGE_KEY)),
+        ),
+        {
+          fontFamily: MENU_FONTS.HEADER,
+          fontSize: '7px',
+          color: cssHex(Wasteland.HEALTH_GOOD),
+        },
+      )
+      .setOrigin(0.5);
+    panel.add(buildCodexText);
+    this.nameEntryUi.push(buildCodexText);
 
     // ────────────────────────────────────────────────────────────────────
     // Searching state — sits in the same panel real estate, hidden by

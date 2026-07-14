@@ -197,4 +197,105 @@ test.describe('Gauntlet route draft', () => {
         routeBAlpha: 0.5,
       });
   });
+
+  test('discovers a named two-boon build after a full clear', async ({ gamePage }) => {
+    await expect
+      .poll(() =>
+        gamePage.evaluate(() => {
+          const game = (
+            window as unknown as {
+              game?: {
+                scene: {
+                  scenes: Array<{
+                    scene: { key: string };
+                    sys: { settings: { active: boolean } };
+                  }>;
+                };
+              };
+            }
+          ).game;
+          return (
+            game?.scene.scenes.some(
+              (scene) => scene.scene.key === 'LobbyScene' && scene.sys.settings.active,
+            ) ?? false
+          );
+        }),
+      )
+      .toBe(true);
+
+    await gamePage.evaluate(() => {
+      const w = window as unknown as {
+        game?: {
+          scene: {
+            scenes: Array<{
+              scene: { start: (key: string, data: unknown) => void };
+              sys: { settings: { active: boolean } };
+            }>;
+          };
+        };
+      };
+      const active = w.game?.scene.scenes.find((scene) => scene.sys.settings.active);
+      if (!active) throw new Error('no active scene');
+      localStorage.removeItem('mmr_gauntlet_build_codex');
+      active.scene.start('ResultsScene', {
+        nickname: 'Solo',
+        result: {
+          matchId: 'build-codex-smoke',
+          winnerId: null,
+          playerStats: new Map(),
+          duration: 73,
+          gameMode: 'deathmatch',
+          awards: [],
+          rivalry: null,
+          rivalrySet: null,
+          isPractice: true,
+          wentToOvertime: false,
+          gauntlet: {
+            stage: 3,
+            totalStages: 3,
+            difficulty: 'warlord',
+            runScore: 6000,
+            outcome: 'cleared',
+            stageScore: 2000,
+            contractBonus: 0,
+            regulationBonus: 0,
+            flawlessBonus: 0,
+            paceBonus: 0,
+            nextStage: 1,
+            nextDifficulty: 'rookie',
+            boonIds: ['quick_charge', 'spawn_rush'],
+          },
+        },
+      });
+    });
+
+    await expect
+      .poll(() =>
+        gamePage.evaluate(() => {
+          const w = window as unknown as {
+            game?: { scene: { getScene: (key: string) => unknown } };
+          };
+          const scene = w.game?.scene.getScene('ResultsScene') as {
+            sys?: { settings: { active: boolean } };
+            children?: { list: Array<{ text?: string }> };
+          };
+          const texts = scene?.children?.list.flatMap((child) =>
+            typeof child.text === 'string' ? [child.text] : [],
+          );
+          return {
+            active: scene?.sys?.settings.active ?? false,
+            summary: texts?.some((text) => text.includes('BUILD: REDLINE')) ?? false,
+            discovery:
+              texts?.some((text) => text.includes('NEW BUILD: REDLINE  //  CODEX 1/6')) ?? false,
+            stored: localStorage.getItem('mmr_gauntlet_build_codex'),
+          };
+        }),
+      )
+      .toEqual({
+        active: true,
+        summary: true,
+        discovery: true,
+        stored: JSON.stringify({ discovered: ['quick_charge+spawn_rush'] }),
+      });
+  });
 });

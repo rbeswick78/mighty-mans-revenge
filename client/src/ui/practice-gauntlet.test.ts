@@ -110,7 +110,7 @@ describe('practice gauntlet presentation', () => {
       'GAUNTLET 2/3 - SCRAPPER  //  RUN 1,500\n' +
         'KING OF THE HILL - SCRAPYARD  //  RUSTY: FROST WIZARD\n' +
         'MID-MATCH: WEAPON ROULETTE  //  BOUNTY +200\n' +
-        'BOONS: SCRAP PLATING + QUICK CHARGE',
+        'BUILD: ARC PLATING  //  SCRAP PLATING + QUICK CHARGE',
     );
   });
 
@@ -122,6 +122,10 @@ describe('practice gauntlet presentation', () => {
     expect(gauntletResultSummary(value)).toContain('RUN 2,200');
     value.gauntlet!.boonIds = ['scrap_plating'];
     expect(gauntletResultSummary(value)).toContain('BOONS: SCRAP PLATING');
+    value.gauntlet!.boonIds = ['scrap_plating', 'quick_charge'];
+    expect(gauntletResultSummary(value)).toContain(
+      'BUILD: ARC PLATING  //  SCRAP PLATING + QUICK CHARGE',
+    );
     expect(gauntletStageScoreSummary(value)).toBe(
       'STAGE +2,200 = CLEAR 1,000 + CONTRACT 300 + REG 200 + FLAWLESS 400 + PACE 300',
     );

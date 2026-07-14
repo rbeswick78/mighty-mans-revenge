@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–70 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, five arenas including barricade-focused Checkpoint Zero, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–71 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a six-build discovery codex, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, five arenas including barricade-focused Checkpoint Zero, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -102,6 +102,7 @@ Each session below attacks one of these.
 | 68  | Daily Rival Chase                               | Every attempt gets one attainable friend score to hunt                        | **DONE** (2026-07-13) |
 | 69  | Custom Chaos Sparring                           | Favorite mid-fight twists become deliberate, remixable solo practice          | **DONE** (2026-07-13) |
 | 70  | Gauntlet Boon Drafts                            | Every route choice builds a different run worth replaying                     | **DONE** (2026-07-13) |
+| 71  | Gauntlet Build Codex                            | Every two-boon clear can discover one more named build                        | **DONE** (2026-07-13) |
 
 ---
 
@@ -3219,6 +3220,48 @@ attempt one attainable friend score to hunt from the first stage onward.
 
 ---
 
+## Session 71 — Gauntlet Build Codex
+
+**Goal:** turn the six possible two-boon finales into a collection chase that
+rewards experimenting with every Gauntlet route combination.
+
+**Locked design decisions**
+
+- The six canonical, order-independent builds are `IRON SCAVENGER` (Scrap
+  Plating + Kill Salvage), `ARC PLATING` (Scrap Plating + Quick Charge), `RAM
+RAID` (Scrap Plating + Spawn Rush), `COMBAT ENGINE` (Kill Salvage + Quick
+  Charge), `BLOODHOUND` (Kill Salvage + Spawn Rush), and `REDLINE` (Quick
+  Charge + Spawn Rush).
+- A build is discovered only after clearing stage three with both boons. Stage
+  advancement, losses, and draws never unlock it. Ordinary Gauntlet and Daily
+  Run clears both count because they share the same authored boon system.
+- Discovery is a presentation-only, device-local Practice collection stored in
+  `mmr_gauntlet_build_codex`. Loading accepts only the six known IDs, removes
+  duplicates, and safely resets malformed shapes. It never enters server
+  persistence, Daily ranking, lifetime stats, or network gameplay authority.
+- Complete active builds are named in Character Select and Results. The lobby
+  shows `BUILD CODEX: x/6`, and a first clear gets a `NEW BUILD` celebration
+  alongside the existing best-clear or Daily standing line.
+- The codex must not change boon effects, route authorship, combat, scoring,
+  bot tuning, balance constants, PvP, or Spar.
+
+**Acceptance criteria**
+
+- [x] Pure client tests cover all six pairs in both orders, malformed/unknown/
+      duplicate storage, clear-only discovery, repeat clears, and compact copy.
+- [x] Gauntlet presentation tests prove a complete loadout resolves to its
+      named build while a one-boon loadout keeps the ordinary boon label.
+- [x] Playwright proves a full two-boon clear renders `REDLINE`, celebrates the
+      discovery, and persists the exact normalized payload in Chromium,
+      Firefox, and 844×390 mobile landscape.
+- [x] A live desktop browser walkthrough confirms the expanded lobby panel and
+      `BUILD CODEX: 0/6` footer remain readable without moving existing input
+      targets; the affected Warlord Practice journey also passes directly.
+- [x] Typecheck, lint, all 1,179 unit tests across 80 files, production build,
+      and the 19-pass/11-intentional-skip Playwright matrix pass.
+
+---
+
 ## Session 70 — Gauntlet Boon Drafts
 
 **Goal:** turn Gauntlet route choices into a run build that changes how the
@@ -3319,6 +3362,41 @@ favorite mid-match event while the final-minute surprise stays fresh.
 ---
 
 ## Session Log
+
+### Session 71 — 2026-07-13 — Gauntlet Build Codex
+
+**Shipped:** every complete two-boon Gauntlet loadout now has a memorable name,
+and clearing the finale discovers it in a six-entry device-local Build Codex.
+Iron Scavenger, Arc Plating, Ram Raid, Combat Engine, Bloodhound, and Redline
+give each route pairing an identity without adding more power. Character Select
+and Results name the active finale build, Results calls out a first discovery,
+and the lobby keeps `BUILD CODEX: x/6` visible as an invitation to try another
+route combination. Daily clears participate in the same chase.
+
+The storage boundary is intentionally narrow: only full clears unlock builds,
+known IDs are allowlisted and deduplicated, malformed JSON safely resets, and
+the collection never leaves the device or touches lifetime records, Daily
+ranking, gameplay authority, combat, scoring, bot tuning, PvP, or Spar.
+
+**Verification:** 1,179 tests pass across 80 files, including all six
+order-independent pairs, corrupted storage, clear-only discovery, repeat clears,
+and named-build presentation. TypeScript, ESLint, all package builds, and the
+production Vite bundle are clean; Vite retains its existing chunk-size advisory.
+The full Playwright matrix passes 19 tests with 11 intentional project-scoped
+skips. A targeted six-test run proves exact discovery persistence and visible
+Results copy in Chromium, Firefox, and 844×390 mobile landscape. A live desktop
+browser walkthrough verified the lobby footer. The first full matrix caught an
+upward panel shift moving the established difficulty hit target; preserving the
+original panel origin and expanding only its height fixed it, and both the
+affected Warlord journey and complete matrix pass afterward.
+
+**Tuning watch:** the names should make route combinations easier to remember
+without turning one pair into an implied best build. Watch which names players
+repeat and whether `x/6` is enough motivation after the first few discoveries;
+improve celebration or codex presentation before changing boon balance.
+
+**Deployment:** not run; production deployment still requires explicit user
+authorization.
 
 ### Session 70 — 2026-07-13 — Gauntlet Boon Drafts
 
