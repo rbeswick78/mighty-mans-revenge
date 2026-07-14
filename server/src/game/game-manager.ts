@@ -1,6 +1,8 @@
 import {
+  DAILY_GAUNTLET_LEADERBOARD,
   LEADERBOARD,
   SERVER,
+  dailyChallengeKey,
 } from '@shared/game';
 import type {
   PlayerId,
@@ -29,14 +31,26 @@ export class GameManager {
    * welcome. Optional — tests and store-less embeddings just skip it.
    */
   private readonly statsStore: PersistentStatsStore | undefined;
+  /** Shared UTC clock for Daily Run creation and connect-time standings. */
+  private readonly now: () => Date;
+  /** Last board announced to connected clients; advances at UTC rollover. */
+  private currentDailyChallengeKey: string;
 
-  constructor(server: GameServer, statsStore?: PersistentStatsStore) {
+  constructor(
+    server: GameServer,
+    statsStore?: PersistentStatsStore,
+    now: () => Date = () => new Date(),
+  ) {
     this.server = server;
     this.statsStore = statsStore;
+    this.now = now;
+    this.currentDailyChallengeKey = dailyChallengeKey(now());
     this.matchmaking = new MatchmakingManager(
       server,
       (pid) => this.playerRTTs.get(pid) ?? 0,
       statsStore,
+      Math.random,
+      now,
     );
 
     this.gameLoop = new GameLoop((dt, tick) => {
@@ -88,6 +102,8 @@ export class GameManager {
           },
           { reliable: true },
         );
+        this.currentDailyChallengeKey = dailyChallengeKey(this.now());
+        this.sendDailyGauntletLeaderboard(playerId, this.currentDailyChallengeKey);
       }
     });
 
@@ -165,5 +181,28 @@ export class GameManager {
 
   private tick(dt: number, tick: number): void {
     this.matchmaking.tick(dt, tick);
+    if (!this.statsStore || tick % SERVER.TICK_RATE !== 0) return;
+    const challengeKey = dailyChallengeKey(this.now());
+    if (challengeKey === this.currentDailyChallengeKey) return;
+    this.currentDailyChallengeKey = challengeKey;
+    for (const playerId of this.server.getConnectedPlayerIds()) {
+      this.sendDailyGauntletLeaderboard(playerId, challengeKey);
+    }
+  }
+
+  private sendDailyGauntletLeaderboard(playerId: PlayerId, challengeKey: string): void {
+    if (!this.statsStore) return;
+    this.server.sendTo(
+      playerId,
+      {
+        type: 'server:dailyGauntletLeaderboard',
+        challengeKey,
+        entries: this.statsStore.getDailyGauntletLeaderboard(
+          challengeKey,
+          DAILY_GAUNTLET_LEADERBOARD.SIZE,
+        ),
+      },
+      { reliable: true },
+    );
   }
 }

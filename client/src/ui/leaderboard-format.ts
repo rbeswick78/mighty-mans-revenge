@@ -1,5 +1,8 @@
 import { careerRankProgressForContracts } from '@shared/config/game.js';
-import type { LeaderboardEntry } from '@shared/types/network.js';
+import type {
+  DailyGauntletLeaderboardEntry,
+  LeaderboardEntry,
+} from '@shared/types/network.js';
 
 /**
  * Max nickname characters rendered in a lobby leaderboard row. Callsigns
@@ -19,4 +22,13 @@ export function formatLeaderboardRow(rank: number, entry: LeaderboardEntry): str
   const contracts = entry.contractsCompleted ?? 0;
   const badge = careerRankProgressForContracts(contracts).current.badge;
   return `${rank}. ${name} [${badge}] ${entry.wins}W ${entry.losses}L ${contracts}C`;
+}
+
+/** One compact row in the mirrored current-day score panel. */
+export function formatDailyGauntletLeaderboardRow(
+  rank: number,
+  entry: DailyGauntletLeaderboardEntry,
+): string {
+  const name = entry.nickname.toUpperCase().slice(0, LEADERBOARD_NAME_MAX_CHARS);
+  return `${rank}. ${name}  ${entry.score.toLocaleString('en-US')}`;
 }

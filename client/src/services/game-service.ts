@@ -10,6 +10,7 @@ import type {
 import type {
   DraftCategory,
   LeaderboardEntry,
+  ServerDailyGauntletLeaderboardMessage,
   ServerDraftStateMessage,
   ServerMatchFoundMessage,
   ServerMatchmakingStatusMessage,
@@ -78,7 +79,8 @@ type GameServiceEvent =
   | 'weaponIncoming'
   | 'tilesDestroyed'
   | 'overtimeStart'
-  | 'leaderboard';
+  | 'leaderboard'
+  | 'dailyGauntletLeaderboard';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type GameServiceCallback = (...args: any[]) => void;
@@ -100,6 +102,9 @@ export class GameService {
    * after every match — can render it immediately via getLeaderboard().
    */
   private latestLeaderboard: LeaderboardEntry[] = [];
+  /** Latest server-clock Daily Run board; null until the connect snapshot. */
+  private latestDailyGauntletLeaderboard: ServerDailyGauntletLeaderboardMessage | null =
+    null;
   /**
    * Latest pre-match draft snapshot, cached like the leaderboard so the
    * DraftScene — created only AFTER the first draftState routed the lobby
@@ -161,6 +166,11 @@ export class GameService {
   /** Latest cached all-time top players (empty before the first message). */
   getLeaderboard(): LeaderboardEntry[] {
     return this.latestLeaderboard;
+  }
+
+  /** Current server-authored Daily Run board, if the connect snapshot arrived. */
+  getDailyGauntletLeaderboard(): ServerDailyGauntletLeaderboardMessage | null {
+    return this.latestDailyGauntletLeaderboard;
   }
 
   /** Latest cached draft snapshot; null outside an active draft. */
@@ -370,6 +380,14 @@ export class GameService {
       this.latestLeaderboard = entries;
       this.emit('leaderboard', entries);
     });
+
+    this.networkManager.on(
+      'dailyGauntletLeaderboard',
+      (snapshot: ServerDailyGauntletLeaderboardMessage) => {
+        this.latestDailyGauntletLeaderboard = snapshot;
+        this.emit('dailyGauntletLeaderboard', snapshot);
+      },
+    );
   }
 
   private emit(event: GameServiceEvent, ...args: unknown[]): void {

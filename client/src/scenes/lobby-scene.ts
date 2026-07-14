@@ -1,5 +1,9 @@
 import Phaser from 'phaser';
-import type { LeaderboardEntry, ServerMatchmakingStatusMessage } from '@shared/types/network.js';
+import type {
+  LeaderboardEntry,
+  ServerDailyGauntletLeaderboardMessage,
+  ServerMatchmakingStatusMessage,
+} from '@shared/types/network.js';
 import { Wasteland, cssHex } from '@shared/config/palette.js';
 import { AudioManager } from '../audio/audio-manager.js';
 import { MenuGamepadInput } from '../input/menu-gamepad.js';
@@ -9,7 +13,10 @@ import { MenuPanel } from '../ui/menu/menu-panel.js';
 import { PixelButton } from '../ui/menu/pixel-button.js';
 import { TitleLogo } from '../ui/menu/title-logo.js';
 import { MENU_FONTS } from '../ui/menu/fonts.js';
-import { formatLeaderboardRow } from '../ui/leaderboard-format.js';
+import {
+  formatDailyGauntletLeaderboardRow,
+  formatLeaderboardRow,
+} from '../ui/leaderboard-format.js';
 import {
   GAUNTLET_BEST_CLEAR_STORAGE_KEY,
   gauntletBestClearLabel,
@@ -81,6 +88,8 @@ export class LobbyScene extends Phaser.Scene {
   private playerCountText!: Phaser.GameObjects.Text;
   private leaderboardTitleText!: Phaser.GameObjects.Text;
   private leaderboardRowsText!: Phaser.GameObjects.Text;
+  private dailyLeaderboardTitleText!: Phaser.GameObjects.Text;
+  private dailyLeaderboardRowsText!: Phaser.GameObjects.Text;
   private quickMatchButton!: PixelButton;
   private practiceButton!: PixelButton;
   private gauntletButton!: PixelButton;
@@ -109,6 +118,8 @@ export class LobbyScene extends Phaser.Scene {
   private onMatchmakingStatus: ((msg: ServerMatchmakingStatusMessage) => void) | null = null;
   private onDisconnected: (() => void) | null = null;
   private onLeaderboard: ((entries: LeaderboardEntry[]) => void) | null = null;
+  private onDailyLeaderboard: ((snapshot: ServerDailyGauntletLeaderboardMessage) => void) | null =
+    null;
 
   constructor() {
     super({ key: 'LobbyScene' });
@@ -492,6 +503,33 @@ export class LobbyScene extends Phaser.Scene {
     // message (returning from a match, or reconnect) renders immediately.
     this.updateLeaderboard(this.gameService.getLeaderboard());
 
+    // Current UTC Daily Run standings mirror the all-time panel on the
+    // bottom-right. Unlike lifetime stats, an empty board is an invitation:
+    // show "SET THE PACE" after the server snapshot instead of hiding it.
+    this.dailyLeaderboardRowsText = this.add
+      .text(this.cameras.main.width - 36, camHeight - 48, '', {
+        fontFamily: MENU_FONTS.BODY,
+        fontSize: '13px',
+        color: cssHex(LEADERBOARD_ROW_COLOR),
+        lineSpacing: 6,
+        align: 'right',
+      })
+      .setOrigin(1, 1)
+      .setDepth(WastelandStreet.DEPTH.UI)
+      .setVisible(false);
+    this.dailyLeaderboardTitleText = this.add
+      .text(this.cameras.main.width - 36, camHeight - 48, '', {
+        fontFamily: MENU_FONTS.HEADER,
+        fontSize: '10px',
+        color: cssHex(Wasteland.LOADING_BAR_FILL),
+        lineSpacing: 3,
+        align: 'right',
+      })
+      .setOrigin(1, 1)
+      .setDepth(WastelandStreet.DEPTH.UI)
+      .setVisible(false);
+    this.updateDailyLeaderboard(this.gameService.getDailyGauntletLeaderboard());
+
     // Enter = quick match (works whether the nickname input has focus
     // or not, since the keydown bubbles up from the input element).
     this.input.keyboard?.on('keydown-ENTER', () => {
@@ -644,11 +682,16 @@ export class LobbyScene extends Phaser.Scene {
       this.updateLeaderboard(entries);
     };
 
+    this.onDailyLeaderboard = (snapshot: ServerDailyGauntletLeaderboardMessage) => {
+      this.updateDailyLeaderboard(snapshot);
+    };
+
     this.gameService.on('matchFound', this.onMatchFound);
     this.gameService.on('draftState', this.onDraftState);
     this.gameService.on('matchmakingStatus', this.onMatchmakingStatus);
     this.gameService.on('disconnected', this.onDisconnected);
     this.gameService.on('leaderboard', this.onLeaderboard);
+    this.gameService.on('dailyGauntletLeaderboard', this.onDailyLeaderboard);
   }
 
   private cleanupEvents(): void {
@@ -672,6 +715,10 @@ export class LobbyScene extends Phaser.Scene {
       this.gameService.off('leaderboard', this.onLeaderboard);
       this.onLeaderboard = null;
     }
+    if (this.onDailyLeaderboard) {
+      this.gameService.off('dailyGauntletLeaderboard', this.onDailyLeaderboard);
+      this.onDailyLeaderboard = null;
+    }
   }
 
   /**
@@ -692,6 +739,29 @@ export class LobbyScene extends Phaser.Scene {
     // sitting just above however tall the row block currently is.
     this.leaderboardTitleText.setY(
       this.leaderboardRowsText.y - this.leaderboardRowsText.height - 8,
+    );
+  }
+
+  private updateDailyLeaderboard(
+    snapshot: ServerDailyGauntletLeaderboardMessage | null,
+  ): void {
+    const visible = snapshot !== null;
+    this.dailyLeaderboardRowsText.setVisible(visible);
+    this.dailyLeaderboardTitleText.setVisible(visible);
+    if (!snapshot) return;
+
+    this.dailyLeaderboardRowsText.setText(
+      snapshot.entries.length > 0
+        ? snapshot.entries
+            .map((entry, i) => formatDailyGauntletLeaderboardRow(i + 1, entry))
+            .join('\n')
+        : 'NO CLEARS YET\nSET THE PACE',
+    );
+    this.dailyLeaderboardTitleText.setText(
+      `DAILY TOP 5\n${snapshot.challengeKey} UTC`,
+    );
+    this.dailyLeaderboardTitleText.setY(
+      this.dailyLeaderboardRowsText.y - this.dailyLeaderboardRowsText.height - 8,
     );
   }
 

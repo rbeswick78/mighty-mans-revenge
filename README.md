@@ -68,8 +68,11 @@ draw restarts the run.
 `DAILY RUN` serves one shared UTC-dated Gauntlet challenge. Its opening arena,
 mode, rival, contract, spawn layout, and seeded match events repeat for every
 attempt that day, so improving the clear is about mastery rather than a lucky
-roll. Daily clears keep a device-local best score and consecutive-day streak;
-attempts remain unlimited and still never affect lifetime PvP records.
+roll. Completed clears join the server-owned `DAILY TOP 5`, where each callsign
+keeps its best score for that UTC date; results show the clear's rank and
+authoritative best. Daily clears also keep a device-local best score and
+consecutive-day streak. Attempts remain unlimited and still never affect
+lifetime PvP records.
 Gauntlet fights rotate maps and modes but never change lifetime PvP records.
 Each stage win banks score, with bonuses for the round contract and a
 regulation finish. Zero-death wins add a flawless bonus, while every whole

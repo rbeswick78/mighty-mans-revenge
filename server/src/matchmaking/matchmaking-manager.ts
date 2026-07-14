@@ -11,6 +11,7 @@ import {
   CHARACTER_IDS,
   MUTATORS,
   createEmptyCharacterWins,
+  DAILY_GAUNTLET_LEADERBOARD,
   LEADERBOARD,
   getNextGameMode,
   getMap,
@@ -1382,6 +1383,38 @@ export class MatchmakingManager {
           regulationSecondsRemaining: result.wentToOvertime ? 0 : match.matchTimer,
           stylePointsEarned: practiceGauntletStyleBonus(match.getKillFeed(), humanPlayerId),
         });
+        if (
+          this.statsStore &&
+          result.gauntlet.challengeKey &&
+          result.gauntlet.outcome === 'cleared'
+        ) {
+          const human = match.players.get(humanPlayerId);
+          if (human) {
+            const standing = this.statsStore.recordDailyGauntletClear(
+              result.gauntlet.challengeKey,
+              human.nickname,
+              result.gauntlet.runScore,
+              this.now().getTime(),
+            );
+            result.gauntlet.dailyRank = standing.rank;
+            result.gauntlet.dailyBestScore = standing.bestScore;
+            const entries = this.statsStore.getDailyGauntletLeaderboard(
+              result.gauntlet.challengeKey,
+              DAILY_GAUNTLET_LEADERBOARD.SIZE,
+            );
+            for (const connectedId of this.server.getConnectedPlayerIds()) {
+              this.server.sendTo(
+                connectedId,
+                {
+                  type: 'server:dailyGauntletLeaderboard',
+                  challengeKey: result.gauntlet.challengeKey,
+                  entries,
+                },
+                { reliable: true },
+              );
+            }
+          }
+        }
       }
     }
 

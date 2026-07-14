@@ -21,6 +21,7 @@ import {
   AWARD_DEFS,
   AWARD_IDS,
   AWARDS,
+  DAILY_GAUNTLET_LEADERBOARD,
   LEADERBOARD,
   MATCH_CONTRACTS,
   COMBAT_MEDALS,
@@ -727,6 +728,9 @@ describe('session-8 polish backlog config', () => {
     expect(LEADERBOARD.SIZE).toBeGreaterThanOrEqual(1);
     expect(LEADERBOARD.SIZE).toBeLessThanOrEqual(10);
     expect(Object.isFrozen(LEADERBOARD)).toBe(true);
+    expect(DAILY_GAUNTLET_LEADERBOARD.SIZE).toBe(LEADERBOARD.SIZE);
+    expect(DAILY_GAUNTLET_LEADERBOARD.HISTORY_DAYS).toBeGreaterThanOrEqual(7);
+    expect(Object.isFrozen(DAILY_GAUNTLET_LEADERBOARD)).toBe(true);
   });
 
   it('Jack (and only Jack) declares a no-axe alt body with coherent frames', () => {

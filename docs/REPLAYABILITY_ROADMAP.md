@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–66 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Practice vs Rusty with favorite-mode and choose-your-rival selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, style bonuses, live style callouts, and a deterministic Daily Run with local bests and clear streaks, five arenas including barricade-focused Checkpoint Zero, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–67 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Practice vs Rusty with favorite-mode and choose-your-rival selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, and a shared server-authoritative Daily Top 5, five arenas including barricade-focused Checkpoint Zero, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -98,6 +98,7 @@ Each session below attacks one of these.
 | 64  | Checkpoint Zero                                 | A fifth arena turns readable barricade lanes into destructible route choices  | **DONE** (2026-07-13) |
 | 65  | Daily Gauntlet                                  | One fair shared challenge creates a reason to return and improve every day     | **DONE** (2026-07-13) |
 | 66  | Ability Overdrive                               | Faster signature-power cycles make every fighter identity erupt repeatedly    | **DONE** (2026-07-13) |
+| 67  | Daily Scoreboard                                | Every fair daily clear becomes a friend-group score worth chasing              | **DONE** (2026-07-13) |
 
 ---
 
@@ -3129,7 +3130,83 @@ cycle their signature power often enough to build tactics around it.
 
 ---
 
+## Session 67 — Daily Scoreboard
+
+**Goal:** turn every fair Daily Run clear into a shared friend-group target
+that makes one more attempt—and tomorrow's challenge—worth playing.
+
+**Locked design decisions**
+
+- Only a completed Daily Run clear enters the board. The authoritative server
+  records its own final `runScore`; the browser never submits or calculates a
+  score for ranking.
+- Each normalized callsign keeps one best score per UTC challenge. Rankings use
+  score descending, then the first timestamp that best was achieved, then the
+  normalized callsign ascending so every tie is stable and explainable.
+- The clear result carries its authoritative daily rank and best score. The
+  current top five is sent reliably on connect, rebroadcast after every clear,
+  and refreshed after UTC rollover for clients that keep the lobby open.
+- The lobby mirrors the existing all-time board with a date-labeled Daily Top
+  5 panel. An empty board invites the first clear instead of looking broken;
+  results combine server rank/best with the existing device-local streak.
+- Daily boards share the existing version-1 persistent JSON, normalize safely
+  from legacy or malformed data, and retain the newest 14 challenge dates.
+  They never write lifetime PvP, contracts, reputation, mastery, rivalry, or
+  hot-streak progress. Ordinary Gauntlet remains unchanged.
+
+**Acceptance criteria**
+
+- [x] Persistence tests prove best-only callsign normalization, deterministic
+      score/time/name ranking, reload compatibility, legacy normalization,
+      14-board retention, and complete lifetime-stat isolation.
+- [x] Server integration tests prove no entry before a full clear, an
+      authoritative rank/best on completion, reliable player/observer
+      rebroadcasts, connect snapshots, and UTC rollover refreshes.
+- [x] Client tests prove wire forwarding, cached snapshots, clipped scoreboard
+      rows, authoritative result copy, and an explicit empty-board state.
+- [x] Desktop and mobile-landscape Chromium walkthroughs show the mirrored
+      boards without covering the central menu, and the browser console stays
+      clean.
+- [x] Typecheck, lint, all 1,157 unit tests across 77 files, production build,
+      and the full Playwright desktop/mobile matrix pass.
+
+---
+
 ## Session Log
+
+### Session 67 — 2026-07-13 — Daily Scoreboard
+
+**Shipped:** completed Daily Run clears now become a shared daily challenge
+instead of staying private to one browser. The server records its own final run
+score, keeps each normalized callsign's best for that UTC date, and returns the
+clear's exact rank and authoritative best. Stable score, first-achieved-time,
+and callsign tie-breaks make the order deterministic without client policy.
+
+The lobby mirrors the lifetime board with a live `DAILY TOP 5` panel, including
+the challenge date and a first-clear invitation when it is empty. The current
+board arrives on connection, updates for every connected player after a clear,
+and rolls over even in a long-open client. Recent boards persist for 14 dates
+in the existing store, while ordinary Gauntlet and every lifetime progression
+path remain isolated.
+
+**Verification:** 1,157 tests pass across 77 files, covering persistence,
+ranking, retention, legacy data, authoritative completion, observer delivery,
+rollover, wire/cache handling, formatting, and results copy. TypeScript,
+ESLint, all package builds, and the Vite production bundle are clean; Vite
+retains its existing chunk-size advisory. Desktop and mobile-landscape
+Chromium walkthroughs show both boards without obstructing the menu, with no
+console errors. A focused live solo smoke verifies that the server snapshot is
+cached and rendered in the lobby, and the full Playwright matrix passes 16
+tests with 11 intentional project-scoped skips across Chromium, Firefox, and
+mobile landscape.
+
+**Tuning watch:** watch whether the visible top five creates friendly daily
+competition and repeat attempts, whether first-achieved tie priority feels
+fair, and whether five slots are enough for the actual group. No balance
+constants changed.
+
+**Deployment:** not run; production deployment still requires explicit user
+authorization.
 
 ### Session 66 — 2026-07-13 — Ability Overdrive
 

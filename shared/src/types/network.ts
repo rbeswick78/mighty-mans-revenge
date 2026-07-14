@@ -131,6 +131,7 @@ export type ServerMessage =
   | ServerTilesDestroyedMessage
   | ServerOvertimeStartMessage
   | ServerLeaderboardMessage
+  | ServerDailyGauntletLeaderboardMessage
   | ServerPongMessage
   | ServerErrorMessage;
 
@@ -504,6 +505,23 @@ export interface LeaderboardEntry {
 export interface ServerLeaderboardMessage {
   type: 'server:leaderboard';
   entries: LeaderboardEntry[];
+}
+
+/** One server-authored completed-clear score on a UTC Daily Run board. */
+export interface DailyGauntletLeaderboardEntry {
+  nickname: string;
+  score: number;
+}
+
+/**
+ * Current UTC Daily Run standings. Sent reliably on connect and rebroadcast
+ * after a clear improves or joins the board. The challenge key comes from
+ * the server clock; clients never select which board receives a score.
+ */
+export interface ServerDailyGauntletLeaderboardMessage {
+  type: 'server:dailyGauntletLeaderboard';
+  challengeKey: string;
+  entries: DailyGauntletLeaderboardEntry[];
 }
 
 export interface ServerPongMessage {

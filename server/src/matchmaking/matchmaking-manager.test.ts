@@ -1607,6 +1607,73 @@ describe('MatchmakingManager solo practice flow', () => {
     expect(retryMatch.players.get(botId)?.position).toEqual(openingBotPosition);
   });
 
+  it('records a completed Daily Run, returns its rank, and rebroadcasts standings', () => {
+    process.env.FORCE_MODE = GameModeType.DEATHMATCH;
+    try {
+      const { fake, sent, connected } = makeFakeServer();
+      connected.push('A', 'OBSERVER');
+      const challengeDate = new Date('2026-07-13T18:00:00Z');
+      const mgr = new MatchmakingManager(
+        fake,
+        () => 0,
+        store,
+        seededRng([0, 0, 0, 0]),
+        () => challengeDate,
+      );
+
+      mgr.handleStartPractice('A', 'Alpha', 'rookie', 'daily');
+      for (let stage = 1; stage <= 3; stage += 1) {
+        const match = mgr.getActiveMatches()[0];
+        match.players.get('A')!.score = 3;
+        match.matchTimer = 60;
+        match.phase = MatchPhase.ENDED;
+        mgr.tick(0.05, stage);
+        if (stage < 3) {
+          expect(
+            sent.some((entry) => entry.message.type === 'server:dailyGauntletLeaderboard'),
+          ).toBe(false);
+          sent.length = 0;
+          mgr.handleRematchRequest('A');
+        }
+      }
+
+      const cleared = [...sent]
+        .reverse()
+        .find((entry) => entry.playerId === 'A' && entry.message.type === 'server:matchEnd');
+      if (!cleared || cleared.message.type !== 'server:matchEnd') {
+        throw new Error('missing ranked Daily Run clear');
+      }
+      expect(cleared.message.result.gauntlet).toMatchObject({
+        challengeKey: '2026-07-13',
+        outcome: 'cleared',
+        dailyRank: 1,
+      });
+      expect(cleared.message.result.gauntlet?.dailyBestScore).toBe(
+        cleared.message.result.gauntlet?.runScore,
+      );
+      expect(store.getLifetime('Alpha')).toBeNull();
+      expect(store.getDailyGauntletLeaderboard('2026-07-13', 5)).toEqual([
+        {
+          nickname: 'Alpha',
+          score: cleared.message.result.gauntlet?.runScore,
+        },
+      ]);
+
+      const updates = sent.filter(
+        (entry) => entry.message.type === 'server:dailyGauntletLeaderboard',
+      );
+      expect(updates.map((entry) => entry.playerId)).toEqual(['A', 'OBSERVER']);
+      for (const update of updates) {
+        if (update.message.type !== 'server:dailyGauntletLeaderboard') continue;
+        expect(update.reliable).toBe(true);
+        expect(update.message.challengeKey).toBe('2026-07-13');
+        expect(update.message.entries[0]).toMatchObject({ nickname: 'Alpha' });
+      }
+    } finally {
+      delete process.env.FORCE_MODE;
+    }
+  });
+
   it('removes a queued player before opening practice', () => {
     const { fake } = makeFakeServer();
     const mgr = new MatchmakingManager(fake, () => 0, store, seededRng([0, 0, 0]));

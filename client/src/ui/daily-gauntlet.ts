@@ -100,3 +100,18 @@ export function dailyGauntletProgressLabel(
   const best = progress.bestScore > 0 ? progress.bestScore.toLocaleString('en-US') : 'NONE';
   return `${isNewBest ? 'NEW DAILY BEST' : 'DAILY BEST'}: ${best}  //  STREAK: ${progress.streak}`;
 }
+
+/** Results-line variant enriched by the server-persisted friend-group rank. */
+export function dailyGauntletStandingLabel(
+  progress: DailyGauntletProgress,
+  isNewBest: boolean,
+  rank: number | undefined,
+  serverBestScore: number | undefined,
+): string {
+  const safeRank = safeScore(rank);
+  const safeServerBest = safeScore(serverBestScore);
+  if (safeRank === 0 || safeServerBest === 0) {
+    return dailyGauntletProgressLabel(progress, isNewBest);
+  }
+  return `${isNewBest ? 'NEW DAILY BEST' : 'DAILY BEST'}: ${safeServerBest.toLocaleString('en-US')}  //  RANK #${safeRank}  //  STREAK: ${progress.streak}`;
+}

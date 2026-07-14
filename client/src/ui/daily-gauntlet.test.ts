@@ -3,6 +3,7 @@ import { GameModeType, type MatchResult } from '@shared/types/game.js';
 import {
   dailyGauntletProgressForKey,
   dailyGauntletProgressLabel,
+  dailyGauntletStandingLabel,
   dailyGauntletProgressUpdate,
   normalizeDailyGauntletProgress,
   type DailyGauntletProgress,
@@ -119,6 +120,12 @@ describe('daily Gauntlet progress', () => {
     });
     expect(update.progress.streak).toBe(1);
     expect(dailyGauntletProgressLabel(update.progress, true)).toBe(
+      'NEW DAILY BEST: 7,000  //  STREAK: 1',
+    );
+    expect(dailyGauntletStandingLabel(update.progress, true, 2, 7000)).toBe(
+      'NEW DAILY BEST: 7,000  //  RANK #2  //  STREAK: 1',
+    );
+    expect(dailyGauntletStandingLabel(update.progress, true, undefined, undefined)).toBe(
       'NEW DAILY BEST: 7,000  //  STREAK: 1',
     );
   });

@@ -372,6 +372,23 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
     ]);
   });
 
+  it('forwards server-authored Daily Run standings intact', () => {
+    const seen: unknown[] = [];
+    manager.on('dailyGauntletLeaderboard', (snapshot) => seen.push(snapshot));
+    const snapshot = {
+      type: 'server:dailyGauntletLeaderboard' as const,
+      challengeKey: '2026-07-13',
+      entries: [
+        { nickname: 'Alpha', score: 7200 },
+        { nickname: 'Bravo', score: 6800 },
+      ],
+    };
+
+    deliver(snapshot);
+
+    expect(seen).toEqual([snapshot]);
+  });
+
   it('sends an explicit authoritative practice request', () => {
     manager.startPractice('Alpha', 'warlord');
     expect(hoisted.sentMessages).toContainEqual({

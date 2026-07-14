@@ -218,6 +218,37 @@ test('solo practice launches against locked Rusty and reaches live play', async 
 
   await page.goto('/');
   await waitForLobby(page);
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const w = window as unknown as {
+            game?: { scene: { getScene: (key: string) => unknown } };
+          };
+          const scene = w.game?.scene.getScene('LobbyScene') as {
+            gameService?: {
+              getDailyGauntletLeaderboard: () => {
+                challengeKey: string;
+                entries: unknown[];
+              } | null;
+            };
+            dailyLeaderboardTitleText?: { text?: string; visible?: boolean };
+            dailyLeaderboardRowsText?: { text?: string; visible?: boolean };
+          } | null;
+          const snapshot = scene?.gameService?.getDailyGauntletLeaderboard();
+          return (
+            snapshot !== null &&
+            snapshot !== undefined &&
+            scene?.dailyLeaderboardTitleText?.visible === true &&
+            scene.dailyLeaderboardRowsText?.visible === true &&
+            scene.dailyLeaderboardTitleText.text ===
+              `DAILY TOP 5\n${snapshot.challengeKey} UTC` &&
+            (scene.dailyLeaderboardRowsText.text?.length ?? 0) > 0
+          );
+        }),
+      { timeout: 10000, message: 'expected the server-clock Daily Top 5 lobby panel' },
+    )
+    .toBe(true);
   const input = page.locator('input[type="text"]');
   await expect(input).toHaveCount(1);
   await input.fill('Solo');

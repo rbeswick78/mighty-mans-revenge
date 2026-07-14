@@ -3,12 +3,14 @@ import { mkdir, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  DAILY_GAUNTLET_LEADERBOARD,
   KILL_WEAPONS,
   createEmptyCharacterWins,
   createEmptyKillsByWeapon,
 } from '@shared/game';
 import type {
   CharacterId,
+  DailyGauntletLeaderboardEntry,
   KillWeapon,
   LeaderboardEntry,
   RivalryRecord,
@@ -38,6 +40,15 @@ interface HeadToHeadRecord {
   draws: number;
 }
 
+interface DailyGauntletScoreRecord {
+  /** Last-seen display casing of the callsign. */
+  nickname: string;
+  /** Best completed-clear score for this UTC challenge. */
+  score: number;
+  /** First wall-clock time this exact best was achieved; tie-breaks earlier. */
+  achievedAtMs: number;
+}
+
 export interface PersistentStatsData {
   version: 1;
   players: Record<string, LifetimePlayerStats>;
@@ -46,6 +57,8 @@ export interface PersistentStatsData {
    * alphabetically; winsA belongs to the alphabetically-first player.
    */
   headToHead: Record<string, HeadToHeadRecord>;
+  /** UTC challenge key -> lowercased callsign -> best completed clear. */
+  dailyGauntlet: Record<string, Record<string, DailyGauntletScoreRecord>>;
 }
 
 /** One player's contribution to a finished match. */
@@ -72,7 +85,48 @@ function defaultDataDir(): string {
 }
 
 function emptyData(): PersistentStatsData {
-  return { version: 1, players: {}, headToHead: {} };
+  return { version: 1, players: {}, headToHead: {}, dailyGauntlet: {} };
+}
+
+function isChallengeKey(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
+
+function normalizeDailyGauntletData(
+  value: unknown,
+): Record<string, Record<string, DailyGauntletScoreRecord>> {
+  if (typeof value !== 'object' || value === null) return {};
+  const normalized: Record<string, Record<string, DailyGauntletScoreRecord>> = {};
+  for (const [challengeKey, rawBoard] of Object.entries(value)) {
+    if (!isChallengeKey(challengeKey) || typeof rawBoard !== 'object' || rawBoard === null) {
+      continue;
+    }
+    const board: Record<string, DailyGauntletScoreRecord> = {};
+    for (const rawRecord of Object.values(rawBoard)) {
+      if (typeof rawRecord !== 'object' || rawRecord === null) continue;
+      const record = rawRecord as Partial<DailyGauntletScoreRecord>;
+      if (
+        typeof record.nickname !== 'string' ||
+        normalizeKey(record.nickname) === '' ||
+        typeof record.score !== 'number' ||
+        !Number.isFinite(record.score) ||
+        record.score <= 0 ||
+        typeof record.achievedAtMs !== 'number' ||
+        !Number.isFinite(record.achievedAtMs)
+      ) {
+        continue;
+      }
+      board[normalizeKey(record.nickname)] = {
+        nickname: record.nickname,
+        score: Math.floor(record.score),
+        achievedAtMs: Math.max(0, Math.floor(record.achievedAtMs)),
+      };
+    }
+    if (Object.keys(board).length > 0) normalized[challengeKey] = board;
+  }
+  return normalized;
 }
 
 function emptyLifetime(nickname: string): LifetimePlayerStats {
@@ -226,6 +280,64 @@ export class PersistentStatsStore {
       }));
   }
 
+  /**
+   * Persist one server-calculated Daily Run clear and return the callsign's
+   * current standing. A lower/equal replay never replaces its best or the
+   * original tie-break time. This stays separate from lifetime PvP stats.
+   */
+  recordDailyGauntletClear(
+    challengeKey: string,
+    nickname: string,
+    score: number,
+    achievedAtMs: number,
+  ): { rank: number; bestScore: number; improved: boolean } {
+    const key = normalizeKey(nickname);
+    const safeScore = Number.isFinite(score) ? Math.max(0, Math.floor(score)) : 0;
+    if (!isChallengeKey(challengeKey) || key === '' || safeScore === 0) {
+      return { rank: 0, bestScore: 0, improved: false };
+    }
+
+    const board = (this.data.dailyGauntlet[challengeKey] ??= {});
+    const previous = board[key];
+    const improved = previous === undefined || safeScore > previous.score;
+    const casingChanged = previous !== undefined && previous.nickname !== nickname;
+    if (improved) {
+      board[key] = {
+        nickname,
+        score: safeScore,
+        achievedAtMs: Number.isFinite(achievedAtMs)
+          ? Math.max(0, Math.floor(achievedAtMs))
+          : 0,
+      };
+    } else if (casingChanged) {
+      previous.nickname = nickname;
+    }
+
+    if (improved || casingChanged) {
+      this.pruneDailyGauntletHistory();
+      this.scheduleWrite();
+    }
+
+    const rows = this.sortedDailyGauntletRows(challengeKey);
+    const rank = rows.findIndex(([playerKey]) => playerKey === key) + 1;
+    return {
+      rank,
+      bestScore: board[key]?.score ?? 0,
+      improved,
+    };
+  }
+
+  /** Today's top completed Daily Run clears, ranked score then first-achieved. */
+  getDailyGauntletLeaderboard(
+    challengeKey: string,
+    n: number,
+  ): DailyGauntletLeaderboardEntry[] {
+    const limit = Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
+    return this.sortedDailyGauntletRows(challengeKey)
+      .slice(0, limit)
+      .map(([, record]) => ({ nickname: record.nickname, score: record.score }));
+  }
+
   /** Wait for every queued file write to land (shutdown / tests). */
   async flush(): Promise<void> {
     let current: Promise<void>;
@@ -276,6 +388,9 @@ export class PersistentStatsStore {
           ...lifetime.weaponKills,
         };
       }
+      data.dailyGauntlet = normalizeDailyGauntletData(
+        (parsed as { dailyGauntlet?: unknown }).dailyGauntlet,
+      );
       return data;
     } catch (err) {
       logger.warn(
@@ -290,6 +405,25 @@ export class PersistentStatsStore {
     // Chain onto the previous write so writes serialize. writeNow never
     // rejects (it logs failures), so the chain cannot break.
     this.pendingWrite = this.pendingWrite.then(() => this.writeNow());
+  }
+
+  private sortedDailyGauntletRows(
+    challengeKey: string,
+  ): Array<[string, DailyGauntletScoreRecord]> {
+    return Object.entries(this.data.dailyGauntlet[challengeKey] ?? {}).sort(
+      ([keyA, a], [keyB, b]) => {
+        if (b.score !== a.score) return b.score - a.score;
+        if (a.achievedAtMs !== b.achievedAtMs) return a.achievedAtMs - b.achievedAtMs;
+        return keyA < keyB ? -1 : keyA > keyB ? 1 : 0;
+      },
+    );
+  }
+
+  private pruneDailyGauntletHistory(): void {
+    const retainedKeys = Object.keys(this.data.dailyGauntlet).sort().reverse();
+    for (const expired of retainedKeys.slice(DAILY_GAUNTLET_LEADERBOARD.HISTORY_DAYS)) {
+      delete this.data.dailyGauntlet[expired];
+    }
   }
 
   private async writeNow(): Promise<void> {

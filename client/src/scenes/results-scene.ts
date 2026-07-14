@@ -31,7 +31,7 @@ import {
 } from '../ui/practice-gauntlet.js';
 import {
   DAILY_GAUNTLET_PROGRESS_STORAGE_KEY,
-  dailyGauntletProgressLabel,
+  dailyGauntletStandingLabel,
   dailyGauntletProgressUpdate,
   normalizeDailyGauntletProgress,
   type DailyGauntletProgress,
@@ -719,7 +719,12 @@ export class ResultsScene extends Phaser.Scene {
       const isDaily = this.result.gauntlet.challengeKey !== undefined;
       const isNewRecord = isDaily ? this.isNewDailyBest : this.isNewGauntletBest;
       const recordLabel = isDaily
-        ? dailyGauntletProgressLabel(this.dailyGauntletProgress, this.isNewDailyBest)
+        ? dailyGauntletStandingLabel(
+            this.dailyGauntletProgress,
+            this.isNewDailyBest,
+            this.result.gauntlet.dailyRank,
+            this.result.gauntlet.dailyBestScore,
+          )
         : gauntletBestClearLabel(this.gauntletBestClear, this.isNewGauntletBest);
       const bestText = this.add
         .text(

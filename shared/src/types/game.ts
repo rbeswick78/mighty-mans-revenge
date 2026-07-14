@@ -319,6 +319,10 @@ export interface PracticeGauntletResult extends PracticeGauntletMatch {
   nextDifficulty: BotDifficulty;
   /** Present only after advancement; missing clients take the first route. */
   routeOptions?: PracticeGauntletRoute[];
+  /** Server-owned placement after a completed Daily Run clear. */
+  dailyRank?: number;
+  /** Best server-persisted score for this callsign on the challenge date. */
+  dailyBestScore?: number;
 }
 
 export interface MatchResult {

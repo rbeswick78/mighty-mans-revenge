@@ -2,8 +2,11 @@
 import { mkdtempSync, rmSync, readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createEmptyKillsByWeapon } from '@shared/game';
-import { createEmptyCharacterWins } from '@shared/game';
+import {
+  DAILY_GAUNTLET_LEADERBOARD,
+  createEmptyCharacterWins,
+  createEmptyKillsByWeapon,
+} from '@shared/game';
 import type { CharacterId, KillWeapon } from '@shared/game';
 import { PersistentStatsStore } from './persistent-stats-store.js';
 import type { MatchStatsEntry } from './persistent-stats-store.js';
@@ -298,6 +301,7 @@ describe('PersistentStatsStore', () => {
     expect(ryan.bestWinStreak).toBe(0);
     expect(ryan.characterWins).toEqual(createEmptyCharacterWins());
     expect(ryan.characterWins.rook).toBe(0);
+    expect(store.getDailyGauntletLeaderboard('2026-07-13', 5)).toEqual([]);
 
     // Accumulating a new-era match on top of the migrated record works.
     store.recordMatch(
@@ -356,6 +360,73 @@ describe('PersistentStatsStore', () => {
     it('returns an empty array on an empty store', () => {
       const store = makeStore();
       expect(store.getTopPlayers(5)).toEqual([]);
+    });
+  });
+
+  describe('Daily Gauntlet leaderboard', () => {
+    it('ranks best clears by score, first-achieved time, then callsign', () => {
+      const store = makeStore();
+      expect(store.recordDailyGauntletClear('2026-07-13', 'Ryan', 5000, 200)).toEqual({
+        rank: 1,
+        bestScore: 5000,
+        improved: true,
+      });
+      store.recordDailyGauntletClear('2026-07-13', 'Dave', 6000, 300);
+      store.recordDailyGauntletClear('2026-07-13', 'Amy', 6000, 100);
+
+      expect(store.getDailyGauntletLeaderboard('2026-07-13', 5)).toEqual([
+        { nickname: 'Amy', score: 6000 },
+        { nickname: 'Dave', score: 6000 },
+        { nickname: 'Ryan', score: 5000 },
+      ]);
+    });
+
+    it('keeps only a callsign best and preserves when that score was first achieved', () => {
+      const store = makeStore();
+      store.recordDailyGauntletClear('2026-07-13', 'Ryan', 5000, 100);
+      const lower = store.recordDailyGauntletClear('2026-07-13', 'RYAN', 4500, 50);
+      expect(lower).toEqual({ rank: 1, bestScore: 5000, improved: false });
+      store.recordDailyGauntletClear('2026-07-13', 'Amy', 5000, 75);
+      expect(store.getDailyGauntletLeaderboard('2026-07-13', 5)).toEqual([
+        { nickname: 'Amy', score: 5000 },
+        { nickname: 'RYAN', score: 5000 },
+      ]);
+
+      const improved = store.recordDailyGauntletClear('2026-07-13', 'Ryan', 7000, 300);
+      expect(improved).toEqual({ rank: 1, bestScore: 7000, improved: true });
+      expect(store.getDailyGauntletLeaderboard('2026-07-13', 1)).toEqual([
+        { nickname: 'Ryan', score: 7000 },
+      ]);
+    });
+
+    it('survives restart without adding Daily clears to lifetime PvP stats', async () => {
+      const store = makeStore();
+      store.recordDailyGauntletClear('2026-07-13', 'Ryan', 6800, 1234);
+      await store.flush();
+
+      const reloaded = makeStore();
+      expect(reloaded.getDailyGauntletLeaderboard('2026-07-13', 5)).toEqual([
+        { nickname: 'Ryan', score: 6800 },
+      ]);
+      expect(reloaded.getLifetime('Ryan')).toBeNull();
+    });
+
+    it('retains only the newest configured number of challenge boards', async () => {
+      const store = makeStore();
+      const total = DAILY_GAUNTLET_LEADERBOARD.HISTORY_DAYS + 2;
+      for (let day = 0; day < total; day += 1) {
+        const key = new Date(Date.UTC(2026, 0, 1 + day)).toISOString().slice(0, 10);
+        store.recordDailyGauntletClear(key, 'Ryan', 5000 + day, day);
+      }
+      await store.flush();
+
+      const file = JSON.parse(
+        readFileSync(path.join(dataDir, 'persistent-stats.json'), 'utf8'),
+      ) as { dailyGauntlet: Record<string, unknown> };
+      const keys = Object.keys(file.dailyGauntlet).sort();
+      expect(keys).toHaveLength(DAILY_GAUNTLET_LEADERBOARD.HISTORY_DAYS);
+      expect(keys[0]).toBe('2026-01-03');
+      expect(keys.at(-1)).toBe('2026-01-16');
     });
   });
 

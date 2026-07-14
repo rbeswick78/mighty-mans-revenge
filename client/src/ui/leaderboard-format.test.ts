@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { LeaderboardEntry } from '@shared/types/network.js';
 import {
   LEADERBOARD_NAME_MAX_CHARS,
+  formatDailyGauntletLeaderboardRow,
   formatLeaderboardRow,
 } from './leaderboard-format.js';
 
@@ -40,5 +41,16 @@ describe('formatLeaderboardRow', () => {
     expect(formatLeaderboardRow(2, entry({ contractsCompleted: undefined }))).toContain(
       '[DRF]',
     );
+  });
+});
+
+describe('formatDailyGauntletLeaderboardRow', () => {
+  it('renders a clipped callsign and readable server score', () => {
+    expect(
+      formatDailyGauntletLeaderboardRow(2, {
+        nickname: 'LongWastelandName',
+        score: 7250,
+      }),
+    ).toBe('2. LONGWAST  7,250');
   });
 });

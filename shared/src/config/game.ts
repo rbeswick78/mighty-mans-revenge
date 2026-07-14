@@ -959,6 +959,13 @@ export const LEADERBOARD = Object.freeze({
   SIZE: 5,
 });
 
+export const DAILY_GAUNTLET_LEADERBOARD = Object.freeze({
+  /** Friend-group scores shown in the lobby for the current UTC challenge. */
+  SIZE: 5,
+  /** Keep enough completed challenge boards for a two-week rivalry window. */
+  HISTORY_DAYS: 14,
+});
+
 export const SERVER = Object.freeze({
   TICK_RATE: 20,
   TICK_INTERVAL: 50,

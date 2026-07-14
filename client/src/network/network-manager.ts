@@ -66,6 +66,7 @@ type EventName =
   | 'tilesDestroyed'
   | 'overtimeStart'
   | 'leaderboard'
+  | 'dailyGauntletLeaderboard'
   | 'error';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -575,6 +576,10 @@ export class NetworkManager {
         // All-time top players — sent on connection open and rebroadcast
         // after each match's stats are recorded.
         this.emit('leaderboard', msg.entries);
+        break;
+
+      case 'server:dailyGauntletLeaderboard':
+        this.emit('dailyGauntletLeaderboard', msg);
         break;
 
       case 'server:rematchStatus':
