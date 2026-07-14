@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { MUTATORS, PRACTICE_GAUNTLET, type CharacterId } from '../config/game.js';
+import {
+  CHARACTER_IDS,
+  GAME_MODE_ROTATION,
+  MUTATORS,
+  PRACTICE_GAUNTLET,
+  type CharacterId,
+} from '../config/game.js';
+import { listMapNames } from '../maps/registry.js';
 import { GameModeType, type KillFeedEntry } from '../types/game.js';
 import {
+  dailyChallengeKey,
+  practiceDailyGauntletOpening,
+  practiceDailyGauntletRng,
   practiceGauntletMatch,
   practiceGauntletChaosBounty,
   practiceGauntletMutatorChoice,
@@ -24,6 +34,42 @@ function kill(overrides: Partial<KillFeedEntry> = {}): KillFeedEntry {
 }
 
 describe('practice gauntlet', () => {
+  it('derives one stable shared opening from each UTC challenge day', () => {
+    expect(dailyChallengeKey(new Date('2026-07-13T23:59:59Z'))).toBe('2026-07-13');
+    expect(dailyChallengeKey('not-a-date')).toBe('1970-01-01');
+
+    const opening = practiceDailyGauntletOpening(
+      '2026-07-13',
+      listMapNames(),
+      GAME_MODE_ROTATION,
+      CHARACTER_IDS,
+    );
+    expect(opening).toEqual(
+      practiceDailyGauntletOpening(
+        '2026-07-13',
+        listMapNames(),
+        GAME_MODE_ROTATION,
+        CHARACTER_IDS,
+      ),
+    );
+    expect(listMapNames()).toContain(opening?.mapName);
+    expect(GAME_MODE_ROTATION).toContain(opening?.gameMode);
+    expect(CHARACTER_IDS).toContain(opening?.opponentCharacterId);
+    expect(
+      practiceDailyGauntletOpening('2026-07-13', [], GAME_MODE_ROTATION, CHARACTER_IDS),
+    ).toBeNull();
+  });
+
+  it('provides a stable per-fight random stream for fair repeat attempts', () => {
+    const first = practiceDailyGauntletRng('2026-07-13|1|Scrapyard|koth|rook');
+    const replay = practiceDailyGauntletRng('2026-07-13|1|Scrapyard|koth|rook');
+    const nextDay = practiceDailyGauntletRng('2026-07-14|1|Scrapyard|koth|rook');
+    const firstSequence = [first(), first(), first(), first()];
+    expect([replay(), replay(), replay(), replay()]).toEqual(firstSequence);
+    expect([nextDay(), nextDay(), nextDay(), nextDay()]).not.toEqual(firstSequence);
+    expect(firstSequence.every((value) => value >= 0 && value < 1)).toBe(true);
+  });
+
   it('offers two distinct routes and safely defaults invalid selections', () => {
     const routes = practiceGauntletRoutes(
       { mapName: 'Overgrown Suburb', gameMode: GameModeType.KOTH },
@@ -176,6 +222,11 @@ describe('practice gauntlet', () => {
     expect(practiceGauntletMatch(99)).toMatchObject({ stage: 3, difficulty: 'warlord' });
     expect(practiceGauntletMatch(2, Number.POSITIVE_INFINITY).runScore).toBe(0);
     expect(practiceGauntletMatch(2, 1499.9).runScore).toBe(1499);
+    expect(practiceGauntletMatch(2, 1499, '2026-07-13')).toMatchObject({
+      stage: 2,
+      runScore: 1499,
+      challengeKey: '2026-07-13',
+    });
   });
 
   it('advances only on a human win, then retries after failure or a full clear', () => {

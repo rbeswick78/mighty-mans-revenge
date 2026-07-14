@@ -13,6 +13,7 @@ import {
   GAME_MODE_ROTATION,
   createEmptyCharacterWins,
   practiceGauntletChaosBounty,
+  dailyChallengeKey,
 } from '@shared/game';
 import type {
   CharacterId,
@@ -1510,6 +1511,100 @@ describe('MatchmakingManager solo practice flow', () => {
       playerId.startsWith('bot:'),
     );
     expect(gauntletBot?.[1].locked).toBe('mighty_man');
+  });
+
+  it('pins a shared UTC Daily Run opening and retries the same challenge after failure', () => {
+    const { fake, sent } = makeFakeServer();
+    const challengeDate = new Date('2026-07-13T23:30:00Z');
+    const mgr = new MatchmakingManager(
+      fake,
+      () => 0,
+      store,
+      seededRng([0.99, 0.99, 0.99]),
+      () => challengeDate,
+    );
+
+    mgr.handleStartPractice('A', 'Alpha', 'warlord', 'daily');
+    const opening = sent.find(
+      (entry) => entry.playerId === 'A' && entry.message.type === 'server:matchFound',
+    );
+    if (!opening || opening.message.type !== 'server:matchFound' || !opening.message.gauntlet) {
+      throw new Error('missing Daily Run matchFound');
+    }
+    const openingSummary = {
+      mapName: opening.message.mapName,
+      gameMode: opening.message.gameMode,
+      opponentCharacterId: opening.message.gauntlet.opponentCharacterId,
+    };
+    expect(opening.message.gauntlet).toMatchObject({
+      stage: 1,
+      difficulty: 'rookie',
+      runScore: 0,
+      challengeKey: dailyChallengeKey(challengeDate),
+    });
+
+    const first = mgr.getActiveMatches()[0];
+    const botId = [...first.players.keys()].find((playerId) => playerId.startsWith('bot:'))!;
+    const openingContractId = first.getContractHudState().id;
+    const openingPlayerPosition = { ...first.players.get('A')!.position };
+    const openingBotPosition = { ...first.players.get(botId)!.position };
+    expect(first.selectionState.get(botId)?.locked).toBe(openingSummary.opponentCharacterId);
+
+    const { fake: secondFake } = makeFakeServer();
+    const secondMgr = new MatchmakingManager(
+      secondFake,
+      () => 0,
+      store,
+      seededRng([0.01, 0.01, 0.01]),
+      () => challengeDate,
+    );
+    secondMgr.handleStartPractice('B', 'Bravo', 'scrapper', 'daily');
+    const second = secondMgr.getActiveMatches()[0];
+    const secondBotId = [...second.players.keys()].find((playerId) =>
+      playerId.startsWith('bot:'),
+    )!;
+    expect(second.mapManager.getMapData().name).toBe(openingSummary.mapName);
+    expect(second.gameModeType).toBe(openingSummary.gameMode);
+    expect(second.getContractHudState().id).toBe(openingContractId);
+    expect(second.players.get('B')?.position).toEqual(openingPlayerPosition);
+    expect(second.players.get(secondBotId)?.position).toEqual(openingBotPosition);
+
+    first.players.get(botId)!.score = 3;
+    first.phase = MatchPhase.ENDED;
+    mgr.tick(0.05, 1);
+
+    const ended = [...sent]
+      .reverse()
+      .find((entry) => entry.playerId === 'A' && entry.message.type === 'server:matchEnd');
+    if (!ended || ended.message.type !== 'server:matchEnd') {
+      throw new Error('missing Daily Run result');
+    }
+    expect(ended.message.result.gauntlet).toMatchObject({
+      outcome: 'failed',
+      challengeKey: '2026-07-13',
+      nextStage: 1,
+    });
+    expect(ended.message.result.nextMapName).toBe(openingSummary.mapName);
+    expect(ended.message.result.nextGameMode).toBe(openingSummary.gameMode);
+
+    sent.length = 0;
+    mgr.handleRematchRequest('A');
+    const retry = sent.find(
+      (entry) => entry.playerId === 'A' && entry.message.type === 'server:matchFound',
+    );
+    if (!retry || retry.message.type !== 'server:matchFound') {
+      throw new Error('missing Daily Run retry');
+    }
+    expect({
+      mapName: retry.message.mapName,
+      gameMode: retry.message.gameMode,
+      opponentCharacterId: retry.message.gauntlet?.opponentCharacterId,
+      challengeKey: retry.message.gauntlet?.challengeKey,
+    }).toEqual({ ...openingSummary, challengeKey: '2026-07-13' });
+    const retryMatch = mgr.getActiveMatches()[0];
+    expect(retryMatch.getContractHudState().id).toBe(openingContractId);
+    expect(retryMatch.players.get('A')?.position).toEqual(openingPlayerPosition);
+    expect(retryMatch.players.get(botId)?.position).toEqual(openingBotPosition);
   });
 
   it('removes a queued player before opening practice', () => {

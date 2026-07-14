@@ -29,6 +29,13 @@ import {
   gauntletStageScoreSummary,
   normalizeGauntletBestClear,
 } from '../ui/practice-gauntlet.js';
+import {
+  DAILY_GAUNTLET_PROGRESS_STORAGE_KEY,
+  dailyGauntletProgressLabel,
+  dailyGauntletProgressUpdate,
+  normalizeDailyGauntletProgress,
+  type DailyGauntletProgress,
+} from '../ui/daily-gauntlet.js';
 
 interface ResultsSceneData {
   result?: MatchResult;
@@ -84,6 +91,13 @@ export class ResultsScene extends Phaser.Scene {
   private gamepadFocusIndex = 0;
   private gauntletBestClear = 0;
   private isNewGauntletBest = false;
+  private dailyGauntletProgress: DailyGauntletProgress = {
+    challengeKey: '',
+    bestScore: 0,
+    lastClearKey: null,
+    streak: 0,
+  };
+  private isNewDailyBest = false;
 
   // Event handler references for cleanup
   private onRematchStatus: ((opponentWantsRematch: boolean) => void) | null = null;
@@ -109,6 +123,13 @@ export class ResultsScene extends Phaser.Scene {
     this.gamepadFocusIndex = 0;
     this.gauntletBestClear = 0;
     this.isNewGauntletBest = false;
+    this.dailyGauntletProgress = {
+      challengeKey: '',
+      bestScore: 0,
+      lastClearKey: null,
+      streak: 0,
+    };
+    this.isNewDailyBest = false;
   }
 
   create(): void {
@@ -125,6 +146,21 @@ export class ResultsScene extends Phaser.Scene {
       this.isNewGauntletBest = update.isNewBest;
       if (update.isNewBest) {
         localStorage.setItem(GAUNTLET_BEST_CLEAR_STORAGE_KEY, String(update.bestScore));
+      }
+
+      if (this.result.gauntlet.challengeKey) {
+        const dailyUpdate = dailyGauntletProgressUpdate(
+          this.result,
+          normalizeDailyGauntletProgress(
+            localStorage.getItem(DAILY_GAUNTLET_PROGRESS_STORAGE_KEY),
+          ),
+        );
+        this.dailyGauntletProgress = dailyUpdate.progress;
+        this.isNewDailyBest = dailyUpdate.isNewBest;
+        localStorage.setItem(
+          DAILY_GAUNTLET_PROGRESS_STORAGE_KEY,
+          JSON.stringify(dailyUpdate.progress),
+        );
       }
     }
 
@@ -680,20 +716,25 @@ export class ResultsScene extends Phaser.Scene {
         });
       }
 
+      const isDaily = this.result.gauntlet.challengeKey !== undefined;
+      const isNewRecord = isDaily ? this.isNewDailyBest : this.isNewGauntletBest;
+      const recordLabel = isDaily
+        ? dailyGauntletProgressLabel(this.dailyGauntletProgress, this.isNewDailyBest)
+        : gauntletBestClearLabel(this.gauntletBestClear, this.isNewGauntletBest);
       const bestText = this.add
         .text(
           centerX,
           CAREER_RANK_Y,
-          gauntletBestClearLabel(this.gauntletBestClear, this.isNewGauntletBest),
+          recordLabel,
           {
             fontFamily: MENU_FONTS.HEADER,
-            fontSize: this.isNewGauntletBest ? '10px' : '8px',
-            color: cssHex(this.isNewGauntletBest ? CAREER_RANK_UP_COLOR : CAREER_RANK_COLOR),
+            fontSize: isNewRecord ? '10px' : '8px',
+            color: cssHex(isNewRecord ? CAREER_RANK_UP_COLOR : CAREER_RANK_COLOR),
           },
         )
         .setOrigin(0.5)
         .setAlpha(0)
-        .setScale(this.isNewGauntletBest ? 1.3 : 1)
+        .setScale(isNewRecord ? 1.3 : 1)
         .setDepth(WastelandStreet.DEPTH.UI);
       this.tweens.add({
         targets: bestText,
@@ -702,7 +743,7 @@ export class ResultsScene extends Phaser.Scene {
         scaleY: 1,
         duration: 500,
         delay: 520,
-        ease: this.isNewGauntletBest ? 'Back.easeOut' : 'Quad.easeOut',
+        ease: isNewRecord ? 'Back.easeOut' : 'Quad.easeOut',
       });
     }
 

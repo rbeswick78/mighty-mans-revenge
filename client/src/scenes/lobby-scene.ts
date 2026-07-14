@@ -15,6 +15,13 @@ import {
   gauntletBestClearLabel,
   normalizeGauntletBestClear,
 } from '../ui/practice-gauntlet.js';
+import { dailyChallengeKey } from '@shared/utils/practice-gauntlet.js';
+import {
+  DAILY_GAUNTLET_PROGRESS_STORAGE_KEY,
+  dailyGauntletProgressForKey,
+  dailyGauntletProgressLabel,
+  normalizeDailyGauntletProgress,
+} from '../ui/daily-gauntlet.js';
 import {
   BOT_DIFFICULTIES,
   DEFAULT_BOT_DIFFICULTY,
@@ -77,6 +84,7 @@ export class LobbyScene extends Phaser.Scene {
   private quickMatchButton!: PixelButton;
   private practiceButton!: PixelButton;
   private gauntletButton!: PixelButton;
+  private dailyButton!: PixelButton;
   private difficultyButton!: PixelButton;
   private practiceRivalButton!: PixelButton;
   private practiceModeButton!: PixelButton;
@@ -252,7 +260,9 @@ export class LobbyScene extends Phaser.Scene {
     );
     panel.add(this.quickMatchButton);
 
-    const soloW = (qmW - 10) / 2;
+    const soloGap = 8;
+    const soloW = (qmW - soloGap * 2) / 3;
+    const selectorW = (qmW - 10) / 2;
     this.practiceButton = new PixelButton(
       this,
       panel.centerX - qmW / 2,
@@ -262,7 +272,7 @@ export class LobbyScene extends Phaser.Scene {
       'RUSTY SPAR',
       {
         variant: 'secondary',
-        fontSize: 10,
+        fontSize: 7,
         onClick: () => this.onPractice('sparring'),
       },
     );
@@ -270,24 +280,39 @@ export class LobbyScene extends Phaser.Scene {
 
     this.gauntletButton = new PixelButton(
       this,
-      panel.centerX - qmW / 2 + soloW + 10,
+      panel.centerX - qmW / 2 + soloW + soloGap,
       158,
       soloW,
       qmH,
       'GAUNTLET',
       {
         variant: 'secondary',
-        fontSize: 10,
+        fontSize: 7,
         onClick: () => this.onPractice('gauntlet'),
       },
     );
     panel.add(this.gauntletButton);
 
+    this.dailyButton = new PixelButton(
+      this,
+      panel.centerX - qmW / 2 + (soloW + soloGap) * 2,
+      158,
+      soloW,
+      qmH,
+      'DAILY RUN',
+      {
+        variant: 'secondary',
+        fontSize: 7,
+        onClick: () => this.onPractice('daily'),
+      },
+    );
+    panel.add(this.dailyButton);
+
     this.difficultyButton = new PixelButton(
       this,
       panel.centerX - qmW / 2,
       206,
-      soloW,
+      selectorW,
       22,
       this.difficultyLabel(),
       {
@@ -300,9 +325,9 @@ export class LobbyScene extends Phaser.Scene {
 
     this.practiceRivalButton = new PixelButton(
       this,
-      panel.centerX - qmW / 2 + soloW + 10,
+      panel.centerX - qmW / 2 + selectorW + 10,
       206,
-      soloW,
+      selectorW,
       22,
       practiceRivalPreferenceLabel(this.practiceRival),
       {
@@ -331,7 +356,7 @@ export class LobbyScene extends Phaser.Scene {
     const gauntletBestText = this.add
       .text(
         panel.centerX,
-        260,
+        252,
         gauntletBestClearLabel(
           normalizeGauntletBestClear(localStorage.getItem(GAUNTLET_BEST_CLEAR_STORAGE_KEY)),
         ),
@@ -344,6 +369,22 @@ export class LobbyScene extends Phaser.Scene {
       .setOrigin(0.5);
     panel.add(gauntletBestText);
     this.nameEntryUi.push(gauntletBestText);
+
+    const dailyProgress = dailyGauntletProgressForKey(
+      normalizeDailyGauntletProgress(
+        localStorage.getItem(DAILY_GAUNTLET_PROGRESS_STORAGE_KEY),
+      ),
+      dailyChallengeKey(),
+    );
+    const dailyBestText = this.add
+      .text(panel.centerX, 263, dailyGauntletProgressLabel(dailyProgress), {
+        fontFamily: MENU_FONTS.HEADER,
+        fontSize: '7px',
+        color: cssHex(Wasteland.LOADING_BAR_FILL),
+      })
+      .setOrigin(0.5);
+    panel.add(dailyBestText);
+    this.nameEntryUi.push(dailyBestText);
 
     // ────────────────────────────────────────────────────────────────────
     // Searching state — sits in the same panel real estate, hidden by
@@ -515,6 +556,7 @@ export class LobbyScene extends Phaser.Scene {
       this.quickMatchButton,
       this.practiceButton,
       this.gauntletButton,
+      this.dailyButton,
       this.difficultyButton,
       this.practiceRivalButton,
       this.practiceModeButton,
@@ -738,6 +780,7 @@ export class LobbyScene extends Phaser.Scene {
     this.quickMatchButton.setVisible(false);
     this.practiceButton.setVisible(false);
     this.gauntletButton.setVisible(false);
+    this.dailyButton.setVisible(false);
     this.difficultyButton.setVisible(false);
     this.practiceRivalButton.setVisible(false);
     this.practiceModeButton.setVisible(false);
@@ -849,6 +892,7 @@ export class LobbyScene extends Phaser.Scene {
     this.quickMatchButton.setVisible(true);
     this.practiceButton.setVisible(true);
     this.gauntletButton.setVisible(true);
+    this.dailyButton.setVisible(true);
     this.difficultyButton.setVisible(true);
     this.practiceRivalButton.setVisible(true);
     this.practiceModeButton.setVisible(true);

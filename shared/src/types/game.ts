@@ -281,6 +281,8 @@ export interface PracticeGauntletMatch {
   opponentCharacterId?: CharacterId;
   /** Server-pinned mid-match chaos event selected with this stage. */
   forecastMutatorId?: MutatorId;
+  /** UTC challenge date for a shared Daily Run; absent for ordinary Gauntlet. */
+  challengeKey?: string;
 }
 
 export type PracticeGauntletRouteId = 'route_a' | 'route_b';

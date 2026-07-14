@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–64 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Practice vs Rusty with favorite-mode and choose-your-rival selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, style bonuses, and live style callouts, five arenas including barricade-focused Checkpoint Zero, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–65 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Practice vs Rusty with favorite-mode and choose-your-rival selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, style bonuses, live style callouts, and a deterministic Daily Run with local bests and clear streaks, five arenas including barricade-focused Checkpoint Zero, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -96,6 +96,7 @@ Each session below attacks one of these.
 | 62  | Favorite Mode Sparring                          | A favorite ruleset becomes deliberately replayable without losing map variety | **DONE** (2026-07-13) |
 | 63  | Choose Your Rival                               | Any roster matchup becomes deliberate practice instead of a lucky random roll | **DONE** (2026-07-13) |
 | 64  | Checkpoint Zero                                 | A fifth arena turns readable barricade lanes into destructible route choices  | **DONE** (2026-07-13) |
+| 65  | Daily Gauntlet                                  | One fair shared challenge creates a reason to return and improve every day     | **DONE** (2026-07-13) |
 
 ---
 
@@ -3045,7 +3046,88 @@ fresh route decisions and make opening the battlefield feel intentional.
 
 ---
 
+## Session 65 — Daily Gauntlet
+
+**Goal:** turn the Gauntlet into a fair daily ritual with one shared challenge,
+one score to improve, and a streak that rewards coming back tomorrow.
+
+**Locked design decisions**
+
+- `DAILY RUN` is a third explicit solo choice beside Rusty Spar and ordinary
+  Gauntlet. It uses the same three-stage Rookie-to-Warlord structure, scoring,
+  route decisions, combat rules, and Practice stat isolation.
+- The server's UTC date is authoritative. A stable shared hash authors the
+  opening arena, mode, and Rusty rival; each fight seeds Match randomness and
+  stable contract/cache/hazard selection from its date, stage, arena, mode,
+  and rival. Replaying a failed or cleared challenge reproduces its opening,
+  spawns, contract, and event timing instead of rerolling for an advantage.
+- Daily attempts are unlimited. Only a completed three-stage clear can set the
+  device-local daily best or advance the consecutive UTC-day clear streak;
+  repeating a clear on the same date never inflates the streak, and missing a
+  date resets it on the next clear.
+- Daily progress is presentation-only local storage. The browser never authors
+  the challenge, and Daily Run remains Practice: no lifetime PvP, leaderboard,
+  Rivalry Set, reputation, mastery, or hot-streak writes.
+- Existing `FORCE_*` smoke pins remain strongest. Ordinary Gauntlet, Spar,
+  PvP, shared physics, frozen balance constants, and old payloads without the
+  optional challenge key are unchanged.
+
+**Acceptance criteria**
+
+- [x] Shared tests prove UTC keys, deterministic daily openings and RNG, valid
+      roster/map/mode output, empty-pool safety, and optional-key wire behavior.
+- [x] Server tests prove a fixed date authors the opening, ignores client Spar
+      choices, carries the key, and retries the same arena, mode, rival,
+      contract, and spawn layout after failure.
+- [x] Client tests prove day rollover, clear-only bests, once-per-date streak
+      advancement, missed-day reset, Daily-specific briefing/results copy, and
+      ordinary Gauntlet compatibility.
+- [x] A real Chromium smoke chooses Daily Run, observes the current server UTC
+      key and authored rival lock, verifies Daily briefing copy, and reaches
+      live play through pointer input.
+- [x] Typecheck, lint, all 1,146 unit tests across 77 files, production build,
+      and the full Playwright desktop/mobile matrix pass.
+
+---
+
 ## Session Log
+
+### Session 65 — 2026-07-13 — Daily Gauntlet
+
+**Shipped:** the lobby now offers `DAILY RUN`, a server-dated three-fight
+Gauntlet designed for repeatable mastery. The server derives each day's opening
+arena, mode, and Rusty rival from its UTC date. Every fight then receives a
+stable seed covering its spawn layout, contract, cache reward, hazard choices,
+and RNG-driven event timing. A loss or completed clear can be retried without
+quietly rerolling the challenge; normal route advancement still follows the
+existing authoritative Gauntlet rules.
+
+The lobby displays today's local daily target, and Daily-specific briefings,
+stage-clear copy, and retry actions make the mode legible through the whole
+flow. Completed clears can set a device-local daily best and extend a streak
+across consecutive UTC dates. Partial runs do not bank a score, and repeat
+clears on the same date cannot inflate the streak. All full Gauntlet clears
+still share the overall all-time `BEST CLEAR`, so any full clear can improve
+that broader score target while Daily Run adds its date-specific record.
+
+**Verification:** 1,146 tests pass across 77 files, including deterministic
+opening/RNG helpers, server-owned retries, contract and spawn repeatability,
+storage normalization, UTC rollover, best/streak progression, and Daily copy.
+TypeScript, ESLint, all package builds, and the Vite production bundle are
+clean; Vite retains its existing chunk-size advisory. A dedicated live
+Chromium smoke selected Daily Run, observed the current server UTC key and
+authored Rusty lock, verified the briefing, and reached live play. The full
+Playwright matrix passes 16 tests with 11 intentional project-scoped skips
+across Chromium, Firefox, and mobile landscape.
+
+**Tuning watch:** unlimited attempts make the challenge welcoming and preserve
+the score-attack loop. Watch whether the streak feels motivating without an
+in-game calendar, and whether sharing the date plus score is enough social
+friction before adding any network leaderboard or reward system.
+
+**Deployment:** not run; deployment still requires explicit authorization.
+
+---
 
 ### Session 64 — 2026-07-13 — Checkpoint Zero
 

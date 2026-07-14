@@ -224,7 +224,7 @@ test('solo practice launches against locked Rusty and reaches live play', async 
 
   // Desktop canvas is 960x720 at this project viewport. Cycle the persisted
   // Rusty level once, optionally pin a Spar rival/mode, then launch an
-  // ordinary spar or the pinned Gauntlet journey in canvas-local coordinates.
+  // ordinary spar, random Gauntlet, or shared Daily Run in canvas-local coordinates.
   const canvas = page.locator('canvas');
   await expect(canvas).toHaveCount(1);
   await canvas.click({ position: { x: 410, y: 642 } });
@@ -311,7 +311,12 @@ test('solo practice launches against locked Rusty and reaches live play', async 
   } else {
     await canvas.click({
       position: {
-        x: process.env.VERIFY_GAUNTLET === '1' ? 550 : 410,
+        x:
+          process.env.VERIFY_DAILY_GAUNTLET === '1'
+            ? 570
+            : process.env.VERIFY_GAUNTLET === '1'
+              ? 480
+              : 390,
         y: 614,
       },
     });
@@ -353,6 +358,62 @@ test('solo practice launches against locked Rusty and reaches live play', async 
       )
       .toEqual({
         gauntlet: { stage: 1, totalStages: 3, difficulty: 'rookie' },
+        briefing: true,
+      });
+  }
+  if (process.env.VERIFY_DAILY_GAUNTLET === '1') {
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const w = window as unknown as {
+            game?: { scene: { getScene: (key: string) => unknown } };
+          };
+          const scene = w.game?.scene.getScene('CharacterSelectScene') as {
+            matchData?: {
+              mapName?: string;
+              gameMode?: string;
+              gauntlet?: {
+                stage: number;
+                totalStages: number;
+                difficulty: string;
+                challengeKey?: string;
+                opponentCharacterId?: string;
+              };
+            };
+            latestSelections?: Array<{
+              nickname: string;
+              lockedCharacterId: string | null;
+            }>;
+            children?: { list?: Array<{ text?: string }> };
+          } | null;
+          const gauntlet = scene?.matchData?.gauntlet;
+          const rusty = scene?.latestSelections?.find(
+            (selection) => selection.nickname === 'RUSTY',
+          );
+          return {
+            stage: gauntlet?.stage ?? null,
+            totalStages: gauntlet?.totalStages ?? null,
+            difficulty: gauntlet?.difficulty ?? null,
+            challengeKey: gauntlet?.challengeKey ?? null,
+            currentUtcKey: new Date().toISOString().slice(0, 10),
+            destinationReady:
+              typeof scene?.matchData?.mapName === 'string' &&
+              typeof scene?.matchData?.gameMode === 'string',
+            rustyMatchesDaily: rusty?.lockedCharacterId === gauntlet?.opponentCharacterId,
+            briefing:
+              scene?.children?.list?.some((child) => child.text?.includes('DAILY RUN 1/3')) ??
+              false,
+          };
+        }),
+      )
+      .toEqual({
+        stage: 1,
+        totalStages: 3,
+        difficulty: 'rookie',
+        challengeKey: new Date().toISOString().slice(0, 10),
+        currentUtcKey: new Date().toISOString().slice(0, 10),
+        destinationReady: true,
+        rustyMatchesDaily: true,
         briefing: true,
       });
   }

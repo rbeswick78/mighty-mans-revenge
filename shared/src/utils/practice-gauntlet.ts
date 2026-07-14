@@ -6,6 +6,7 @@ import {
   type MutatorId,
 } from '../config/game.js';
 import type {
+  GameModeType,
   KillFeedEntry,
   PracticeGauntletMatch,
   PracticeGauntletResult,
@@ -26,6 +27,63 @@ function safeScore(score: number): number {
 function safeCount(value: number | undefined): number | null {
   if (!Number.isFinite(value)) return null;
   return Math.max(0, Math.floor(value ?? 0));
+}
+
+function stableHash(seed: string): number {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < seed.length; i++) {
+    hash ^= seed.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return hash >>> 0;
+}
+
+function stableIndex(seed: string, length: number): number {
+  if (length <= 0) return -1;
+  return stableHash(seed) % length;
+}
+
+/** Bit-identical seeded RNG used by the server for one Daily Run fight. */
+export function practiceDailyGauntletRng(seed: string): () => number {
+  let state = stableHash(seed);
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let value = state;
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** Server/client-shared UTC day id used to name one Daily Run challenge. */
+export function dailyChallengeKey(value: Date | string | number = new Date()): string {
+  const date = value instanceof Date ? value : new Date(value);
+  const safeDate = Number.isFinite(date.getTime()) ? date : new Date(0);
+  return safeDate.toISOString().slice(0, 10);
+}
+
+export interface DailyGauntletOpening {
+  mapName: string;
+  gameMode: GameModeType;
+  opponentCharacterId: CharacterId;
+}
+
+/**
+ * Derive the shared stage-one challenge without consuming matchmaking or
+ * gameplay RNG. Every server on the same UTC day produces the same opening.
+ */
+export function practiceDailyGauntletOpening(
+  challengeKey: string,
+  maps: readonly string[],
+  modes: readonly GameModeType[],
+  roster: readonly CharacterId[],
+): DailyGauntletOpening | null {
+  if (maps.length === 0 || modes.length === 0 || roster.length === 0) return null;
+  return {
+    mapName: maps[stableIndex(`${challengeKey}|map`, maps.length)],
+    gameMode: modes[stableIndex(`${challengeKey}|mode`, modes.length)],
+    opponentCharacterId: roster[stableIndex(`${challengeKey}|rival`, roster.length)],
+  };
 }
 
 export interface PracticeGauntletPerformance {
@@ -157,13 +215,18 @@ export function selectPracticeGauntletRoute(
   return routes.find((route) => route.id === routeId) ?? routes[0] ?? null;
 }
 
-export function practiceGauntletMatch(stage: number, runScore = 0): PracticeGauntletMatch {
+export function practiceGauntletMatch(
+  stage: number,
+  runScore = 0,
+  challengeKey?: string,
+): PracticeGauntletMatch {
   const normalized = safeStage(stage);
   return {
     stage: normalized,
     totalStages: PRACTICE_GAUNTLET.TOTAL_STAGES,
     difficulty: PRACTICE_GAUNTLET.DIFFICULTIES[normalized - 1] ?? PRACTICE_GAUNTLET.DIFFICULTIES[0],
     runScore: safeScore(runScore),
+    ...(challengeKey ? { challengeKey } : {}),
   };
 }
 

@@ -516,7 +516,7 @@ export const BOT_DIFFICULTIES = ['rookie', 'scrapper', 'warlord'] as const;
 export type BotDifficulty = (typeof BOT_DIFFICULTIES)[number];
 export const DEFAULT_BOT_DIFFICULTY: BotDifficulty = 'scrapper';
 
-export const PRACTICE_KINDS = ['sparring', 'gauntlet'] as const;
+export const PRACTICE_KINDS = ['sparring', 'gauntlet', 'daily'] as const;
 export type PracticeKind = (typeof PRACTICE_KINDS)[number];
 
 /** Three escalating, otherwise rules-honest solo fights. */

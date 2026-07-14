@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { MatchResult } from '@shared/types/game.js';
+import { GameModeType, type MatchResult } from '@shared/types/game.js';
 import {
   gauntletBestClearLabel,
   gauntletBestClearUpdate,
@@ -147,6 +147,21 @@ describe('practice gauntlet presentation', () => {
     expect(gauntletNextTeaser(result('cleared'))).toContain('RETRY: STAGE 1/3 - ROOKIE');
     expect(gauntletStageScoreSummary(result('failed'))).toContain('NO POINTS BANKED');
     expect(gauntletRouteChoices(result('failed'))).toEqual([]);
+  });
+
+  it('brands shared daily challenges without changing ordinary Gauntlet copy', () => {
+    const daily = result('cleared');
+    daily.gauntlet!.challengeKey = '2026-07-13';
+    expect(
+      gauntletMatchLabel(daily.gauntlet!, GameModeType.DEATHMATCH, 'Checkpoint Zero'),
+    ).toContain('DAILY RUN 3/3');
+    expect(gauntletResultSummary(daily)).toContain('DAILY RUN 3/3');
+    expect(gauntletOutcomeTitle(daily)).toBe('DAILY CLEAR');
+    expect(gauntletActionLabel(daily)).toBe('RETRY DAILY');
+
+    daily.gauntlet!.outcome = 'advanced';
+    expect(gauntletOutcomeTitle(daily)).toBe('DAILY STAGE CLEAR');
+    expect(gauntletActionLabel(daily)).toBe('NEXT FIGHT');
   });
 
   it('normalizes and updates a browser-local best only for completed clears', () => {

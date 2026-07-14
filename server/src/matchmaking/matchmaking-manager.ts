@@ -18,6 +18,9 @@ import {
   listMapNames,
   MAP_REGISTRY,
   practiceGauntletMatch,
+  dailyChallengeKey,
+  practiceDailyGauntletOpening,
+  practiceDailyGauntletRng,
   practiceGauntletMutatorChoice,
   practiceGauntletOpponentChoices,
   practiceGauntletRoutes,
@@ -204,6 +207,8 @@ export class MatchmakingManager {
    * deterministically; production uses Math.random. Contract: [0, 1).
    */
   private readonly rng: () => number;
+  /** UTC wall clock used only to name the shared Daily Run challenge. */
+  private readonly now: () => Date;
   /**
    * Round-robin cursor over registry order, consulted ONLY when a FORCE
    * pin skips the draft (the pinned category is forced; the other one
@@ -219,12 +224,14 @@ export class MatchmakingManager {
     getPlayerRTT: (playerId: PlayerId) => number = () => 0,
     statsStore?: PersistentStatsStore,
     rng: () => number = Math.random,
+    now: () => Date = () => new Date(),
   ) {
     this.server = server;
     this.queue = new MatchmakingQueue();
     this.getPlayerRTT = getPlayerRTT;
     this.statsStore = statsStore;
     this.rng = rng;
+    this.now = now;
   }
 
   handleJoinMatchmaking(playerId: PlayerId, nickname: string): void {
@@ -283,7 +290,22 @@ export class MatchmakingManager {
       CHARACTER_IDS.includes(opponentCharacterId)
         ? opponentCharacterId
         : null;
-    const gauntlet = safeKind === 'gauntlet' ? practiceGauntletMatch(1) : null;
+    const dailyKey = safeKind === 'daily' ? dailyChallengeKey(this.now()) : undefined;
+    const dailyOpening = dailyKey
+      ? practiceDailyGauntletOpening(
+          dailyKey,
+          listMapNames(),
+          GAME_MODE_ROTATION,
+          CHARACTER_IDS,
+        )
+      : null;
+    const gauntlet =
+      safeKind === 'gauntlet' || safeKind === 'daily'
+        ? practiceGauntletMatch(1, 0, dailyKey)
+        : null;
+    if (gauntlet && dailyOpening) {
+      gauntlet.opponentCharacterId = dailyOpening.opponentCharacterId;
+    }
     this.queue.removePlayer(playerId);
     this.playerNicknames.set(playerId, nickname);
 
@@ -291,10 +313,13 @@ export class MatchmakingManager {
     this.botPlayerIds.add(botId);
     this.playerNicknames.set(botId, BOT.NICKNAME);
     const names = listMapNames();
-    const mapName = names[Math.min(Math.floor(this.rng() * names.length), names.length - 1)];
+    const mapName =
+      dailyOpening?.mapName ??
+      names[Math.min(Math.floor(this.rng() * names.length), names.length - 1)];
     const selectedMode =
       this.forcedMode() ??
       practiceModePin ??
+      dailyOpening?.gameMode ??
       GAME_MODE_ROTATION[
         Math.min(Math.floor(this.rng() * GAME_MODE_ROTATION.length), GAME_MODE_ROTATION.length - 1)
       ];
@@ -765,16 +790,26 @@ export class MatchmakingManager {
     practiceModePin: GameModeType | null = null,
     practiceRivalPin: CharacterId | null = null,
   ): void {
+    const dailySeed = gauntlet?.challengeKey
+      ? [
+          gauntlet.challengeKey,
+          gauntlet.stage,
+          mapData.name,
+          gameMode,
+          gauntlet.opponentCharacterId ?? 'unknown_rival',
+        ].join('|')
+      : undefined;
     const match = new Match(
       matchId,
       mapData,
       playerEntries,
       gameMode,
-      Math.random,
+      dailySeed ? practiceDailyGauntletRng(dailySeed) : Math.random,
       rematchMutatorExclusions,
       undefined,
-      previousContractId,
+      dailySeed ? undefined : previousContractId,
       gauntlet?.forecastMutatorId,
+      dailySeed,
     );
     match.setRttResolver(this.getPlayerRTT);
     this.activeMatches.set(matchId, match);
@@ -1354,18 +1389,35 @@ export class MatchmakingManager {
     // rotation order). Attached to the result so the results screen's
     // "NEXT: X" promises and what the rematch actually starts can never
     // disagree.
+    const dailyOpening = gauntlet?.challengeKey
+      ? practiceDailyGauntletOpening(
+          gauntlet.challengeKey,
+          listMapNames(),
+          GAME_MODE_ROTATION,
+          CHARACTER_IDS,
+        )
+      : null;
+    const restartingDaily =
+      dailyOpening !== null && result.gauntlet?.outcome !== 'advanced';
     const nextMapName =
-      this.forcedMap()?.name ?? getNextMapName(match.mapManager.getMapData().name);
+      this.forcedMap()?.name ??
+      (restartingDaily ? dailyOpening.mapName : getNextMapName(match.mapManager.getMapData().name));
     result.nextMapName = nextMapName;
     const nextGameMode =
-      this.forcedMode() ?? practiceModePin ?? getNextGameMode(match.gameModeType);
+      this.forcedMode() ??
+      practiceModePin ??
+      (restartingDaily ? dailyOpening.gameMode : getNextGameMode(match.gameModeType));
     result.nextGameMode = nextGameMode;
     const nextGauntlet = result.gauntlet
       ? practiceGauntletMatch(
           result.gauntlet.nextStage,
           result.gauntlet.outcome === 'advanced' ? result.gauntlet.runScore : 0,
+          result.gauntlet.challengeKey,
         )
       : null;
+    if (nextGauntlet && restartingDaily) {
+      nextGauntlet.opponentCharacterId = dailyOpening.opponentCharacterId;
+    }
     const rivalChoices =
       result.gauntlet?.outcome === 'advanced'
         ? practiceGauntletOpponentChoices(CHARACTER_IDS, gauntletRunHistory.opponentCharacterIds)

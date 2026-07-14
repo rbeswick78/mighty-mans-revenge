@@ -48,7 +48,7 @@ export function gauntletMatchLabel(
   mapName: string,
 ): string {
   const summary =
-    `GAUNTLET ${gauntlet.stage}/${gauntlet.totalStages} - ` +
+    `${gauntlet.challengeKey ? 'DAILY RUN' : 'GAUNTLET'} ${gauntlet.stage}/${gauntlet.totalStages} - ` +
     `${gauntlet.difficulty.toUpperCase()}  //  RUN ${formatScore(gauntlet.runScore)}`;
   const destination = `${gameModeDisplayName(gameMode)} - ${mapName.toUpperCase()}`;
   if (!gauntlet.opponentCharacterId && !gauntlet.forecastMutatorId) {
@@ -74,7 +74,7 @@ export function gauntletResultSummary(result: MatchResult): string | null {
         ? 'ALL THREE CLEARED'
         : 'RUN ENDED';
   return (
-    `GAUNTLET ${run.stage}/${run.totalStages}  •  ` +
+    `${run.challengeKey ? 'DAILY RUN' : 'GAUNTLET'} ${run.stage}/${run.totalStages}  •  ` +
     `${run.difficulty.toUpperCase()}  •  ${outcome}  •  RUN ${formatScore(run.runScore)}`
   );
 }
@@ -160,12 +160,17 @@ export function gauntletRouteButtonLabel(route: PracticeGauntletRoute): string {
 
 export function gauntletActionLabel(result: MatchResult | null): string | null {
   if (!result?.gauntlet) return null;
-  return result.gauntlet.outcome === 'advanced' ? 'NEXT FIGHT' : 'RETRY RUN';
+  if (result.gauntlet.outcome === 'advanced') return 'NEXT FIGHT';
+  return result.gauntlet.challengeKey ? 'RETRY DAILY' : 'RETRY RUN';
 }
 
 export function gauntletOutcomeTitle(result: MatchResult | null): string | null {
   if (!result?.gauntlet) return null;
-  if (result.gauntlet.outcome === 'advanced') return 'STAGE CLEAR';
-  if (result.gauntlet.outcome === 'cleared') return 'GAUNTLET CLEAR';
-  return 'RUN ENDED';
+  if (result.gauntlet.outcome === 'advanced') {
+    return result.gauntlet.challengeKey ? 'DAILY STAGE CLEAR' : 'STAGE CLEAR';
+  }
+  if (result.gauntlet.outcome === 'cleared') {
+    return result.gauntlet.challengeKey ? 'DAILY CLEAR' : 'GAUNTLET CLEAR';
+  }
+  return result.gauntlet.challengeKey ? 'DAILY RUN ENDED' : 'RUN ENDED';
 }

@@ -283,6 +283,10 @@ export class Match implements MatchContext {
    * Music/timer sync is knowingly off while pinned.
    */
   private readonly timeLimitSeconds: number;
+  /** Stable hash namespace for Daily Run contracts, hazards, and strikes. */
+  private readonly stableSeed: string;
+  /** Daily Run targets use semantic player-entry order instead of random UUID order. */
+  private readonly usesChallengeSeed: boolean;
 
   constructor(
     matchId: string,
@@ -294,23 +298,26 @@ export class Match implements MatchContext {
     contractOverride?: MatchContractId,
     previousContractId?: MatchContractId,
     plannedMidMatchMutator?: MutatorId,
+    stableSeed?: string,
   ) {
     this.matchId = matchId;
     this.rng = rng;
     this.rematchMutatorExclusions = new Set(rematchMutatorExclusions);
     this.plannedMidMatchMutator = plannedMidMatchMutator;
     this.timeLimitSeconds = resolveTimeLimitSeconds();
+    this.stableSeed = stableSeed ?? matchId;
+    this.usesChallengeSeed = stableSeed !== undefined;
     this.stats = new StatsTracker();
     this.pickupManager = new PickupManager();
     this.mapManager = new MapManager();
     this.gameModeType = gameModeType;
     this.gameMode = getGameMode(gameModeType);
     this.scavengerCacheReward = selectScavengerCacheReward(
-      matchId,
+      this.stableSeed,
       (type) => this.gameMode.isPickupTypeEnabled?.(type) ?? true,
     );
     this.contractDefinition = selectMatchContract(
-      matchId,
+      this.stableSeed,
       gameModeType,
       contractOverride ?? process.env.FORCE_CONTRACT,
       previousContractId,
@@ -2260,7 +2267,7 @@ export class Match implements MatchContext {
         return;
       case 'radiation_storm': {
         const map = this.mapManager.getMapData();
-        this.radiationStormCenter = radiationStormCenter(this.matchId, map);
+        this.radiationStormCenter = radiationStormCenter(this.stableSeed, map);
         this.radiationStormInitialRadius = radiationStormInitialRadius(
           map,
           this.radiationStormCenter,
@@ -2365,9 +2372,8 @@ export class Match implements MatchContext {
       this.wastelandWarpTimer += MUTATORS.WASTELAND_WARP_INTERVAL_SECONDS;
     }
 
-    const living = [...this.players.values()]
-      .filter((player) => !player.isDead)
-      .sort((a, b) => a.id.localeCompare(b.id));
+    const living = [...this.players.values()].filter((player) => !player.isDead);
+    if (!this.usesChallengeSeed) living.sort((a, b) => a.id.localeCompare(b.id));
     if (living.length < 2) return;
     const positions = living.map((player) => ({ ...player.position }));
     for (let i = 0; i < living.length; i++) {
@@ -2434,12 +2440,11 @@ export class Match implements MatchContext {
 
   /** Capture one living fighter in stable round-robin order. */
   private beginScrapstormWarning(): boolean {
-    const living = [...this.players.values()]
-      .filter((player) => !player.isDead)
-      .sort((a, b) => a.id.localeCompare(b.id));
+    const living = [...this.players.values()].filter((player) => !player.isDead);
+    if (!this.usesChallengeSeed) living.sort((a, b) => a.id.localeCompare(b.id));
     if (living.length === 0) return false;
 
-    const offset = this.stableIndex(`${this.matchId}:scrapstorm`, living.length);
+    const offset = this.stableIndex(`${this.stableSeed}:scrapstorm`, living.length);
     const target = living[(offset + this.scrapstormTargetSequence) % living.length];
     this.scrapstormTargetSequence += 1;
     this.scrapstormTargetPosition = { ...target.position };
@@ -2503,10 +2508,10 @@ export class Match implements MatchContext {
     if (anchors.length === 0) return;
 
     const sequence = this.scavengerRushSequence++;
-    const offset = this.stableIndex(`${this.matchId}:scavenger-rush`, anchors.length);
+    const offset = this.stableIndex(`${this.stableSeed}:scavenger-rush`, anchors.length);
     const position = anchors[(offset + sequence) % anchors.length];
     const rolled = selectScavengerCacheReward(
-      `${this.matchId}:scavenger-rush:${sequence}`,
+      `${this.stableSeed}:scavenger-rush:${sequence}`,
       (type) => this.gameMode.isPickupTypeEnabled?.(type) ?? true,
     );
 
