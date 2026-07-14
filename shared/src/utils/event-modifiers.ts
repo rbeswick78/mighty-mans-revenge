@@ -97,6 +97,8 @@ export function eventDisplayName(event: MutatorId): string {
       return 'SECOND WIND';
     case 'blood_rush':
       return 'BLOOD RUSH';
+    case 'ability_overdrive':
+      return 'ABILITY OVERDRIVE';
     case 'blackout':
       return 'BLACKOUT';
     case 'fists_only':
@@ -129,6 +131,7 @@ const EVENT_START_DETAILS: Readonly<Record<MutatorId, string>> = Object.freeze({
   turbo_grenades: 'FASTER THROWS + RECHARGE',
   second_wind: 'RESPAWN WITH 3 SEC SPEED',
   blood_rush: `KILLS GRANT ${MUTATORS.BLOOD_RUSH_DURATION_SECONDS} SEC SPEED`,
+  ability_overdrive: `${MUTATORS.ABILITY_OVERDRIVE_RECHARGE_MULTIPLIER}X ABILITY RECHARGE`,
   blackout: 'STAY CLOSE OR LOSE SIGHT',
   fists_only: 'GUNS OFF - THROW HANDS',
   weapon_roulette: 'LOADOUT SWAPS EVERY 10 SEC',

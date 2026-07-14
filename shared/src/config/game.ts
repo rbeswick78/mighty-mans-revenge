@@ -795,6 +795,7 @@ export const MUTATORS = Object.freeze({
     'turbo_grenades',
     'second_wind',
     'blood_rush',
+    'ability_overdrive',
     'blackout',
     'fists_only',
     'weapon_roulette',
@@ -837,6 +838,8 @@ export const MUTATORS = Object.freeze({
   BLOOD_RUSH_SPEED_MULTIPLIER: 1.35,
   /** Seconds each qualifying kill keeps the Blood Rush boost active. */
   BLOOD_RUSH_DURATION_SECONDS: 4,
+  /** Multiplier applied only while an ability cooldown is counting down. */
+  ABILITY_OVERDRIVE_RECHARGE_MULTIPLIER: 3,
   /** Fair shared loadout sequence used by weapon_roulette; scarce bat excluded. */
   WEAPON_ROULETTE_ORDER: Object.freeze(['shotgun', 'pistol', 'punch', 'rifle'] as const),
   /** Seconds each shared roulette loadout stays active. */
@@ -893,6 +896,7 @@ export const GAUNTLET_CHAOS_BOUNTIES: Readonly<Record<MutatorId, number>> = Obje
   turbo_grenades: 200,
   second_wind: 100,
   blood_rush: 200,
+  ability_overdrive: 100,
   blackout: 200,
   fists_only: 300,
   weapon_roulette: 200,

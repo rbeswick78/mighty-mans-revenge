@@ -1947,6 +1947,27 @@ describe('Match', () => {
         expect(p0.ammo).toBe(startingMag);
         expect(m.activeMutators).toEqual(['super_speed']);
       });
+
+      it('ability_overdrive recharges every fighter at 3x without shortening active casts', () => {
+        const m = startActiveMatchWithMidMutator('ability_overdrive');
+        const p0 = m.players.get('player-0')!;
+        const p1 = m.players.get('player-1')!;
+        p0.abilityCooldownSeconds = 30;
+        p0.abilityActiveSeconds = 1;
+        p1.abilityCooldownSeconds = 6;
+
+        m.update(0.5);
+
+        expect(p0.abilityCooldownSeconds).toBeCloseTo(
+          30 - 0.5 * MUTATORS.ABILITY_OVERDRIVE_RECHARGE_MULTIPLIER,
+          5,
+        );
+        expect(p0.abilityActiveSeconds).toBeCloseTo(0.5, 5);
+        expect(p1.abilityCooldownSeconds).toBeCloseTo(4.5, 5);
+
+        m.update(1.5);
+        expect(p1.abilityCooldownSeconds).toBe(0);
+      });
     });
 
     describe('Wasteland Warp', () => {

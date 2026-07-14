@@ -215,6 +215,7 @@ describe('OneInTheChamberMode', () => {
       'low_health',
       'vampire',
       'turbo_grenades',
+      'ability_overdrive',
       'last_laugh',
       'scavenger_rush',
     ]);

@@ -168,6 +168,13 @@ describe('blood rush mutator', () => {
   });
 });
 
+describe('ability overdrive mutator', () => {
+  it('defines a noticeable shared cooldown acceleration', () => {
+    expect(MUTATORS.POOL).toContain('ability_overdrive');
+    expect(MUTATORS.ABILITY_OVERDRIVE_RECHARGE_MULTIPLIER).toBe(3);
+  });
+});
+
 describe('overcharge pickup', () => {
   it('defines a meaningful spent-cooldown gate and contested respawn', () => {
     expect(PICKUP.OVERCHARGE_MIN_COOLDOWN_SECONDS).toBeGreaterThan(0);

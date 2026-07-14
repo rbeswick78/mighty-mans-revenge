@@ -25,6 +25,7 @@ describe('mutatorsToMovementModifiers', () => {
       'big_heads',
       'vampire',
       'turbo_grenades',
+      'ability_overdrive',
       'blackout',
       'fists_only',
       'weapon_roulette',
@@ -140,6 +141,9 @@ describe('eventDisplayName', () => {
       `KILLS GRANT ${MUTATORS.BLOOD_RUSH_DURATION_SECONDS} SEC SPEED`,
     );
     expect(eventStartDetail('blackout')).toBe('STAY CLOSE OR LOSE SIGHT');
+    expect(eventStartDetail('ability_overdrive')).toBe(
+      `${MUTATORS.ABILITY_OVERDRIVE_RECHARGE_MULTIPLIER}X ABILITY RECHARGE`,
+    );
   });
 
   it('identifies symmetric ownership conflicts between forced loadouts', () => {

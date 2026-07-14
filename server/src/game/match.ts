@@ -2252,6 +2252,7 @@ export class Match implements MatchContext {
       case 'vampire':
       case 'second_wind':
       case 'blood_rush':
+      case 'ability_overdrive':
       case 'blackout':
       case 'last_laugh':
         // Per-tick behavior only; nothing to mutate at activation.
@@ -2699,6 +2700,11 @@ export class Match implements MatchContext {
 
   /** Decrement active and cooldown timers for every player. */
   private tickAbilities(dt: number): void {
+    const cooldownDt =
+      dt *
+      (this.mutatorActive('ability_overdrive')
+        ? MUTATORS.ABILITY_OVERDRIVE_RECHARGE_MULTIPLIER
+        : 1);
     for (const player of this.players.values()) {
       if (player.abilityActiveSeconds > 0) {
         player.abilityActiveSeconds = Math.max(0, player.abilityActiveSeconds - dt);
@@ -2709,7 +2715,10 @@ export class Match implements MatchContext {
         }
       }
       if (player.abilityCooldownSeconds > 0) {
-        player.abilityCooldownSeconds = Math.max(0, player.abilityCooldownSeconds - dt);
+        player.abilityCooldownSeconds = Math.max(
+          0,
+          player.abilityCooldownSeconds - cooldownDt,
+        );
       }
       // Decrement Frost Wizard freeze on every player — anyone can be
       // frozen, not just wizards.

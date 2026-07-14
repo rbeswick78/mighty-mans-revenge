@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–65 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Practice vs Rusty with favorite-mode and choose-your-rival selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, style bonuses, live style callouts, and a deterministic Daily Run with local bests and clear streaks, five arenas including barricade-focused Checkpoint Zero, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–66 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Practice vs Rusty with favorite-mode and choose-your-rival selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, style bonuses, live style callouts, and a deterministic Daily Run with local bests and clear streaks, five arenas including barricade-focused Checkpoint Zero, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -97,6 +97,7 @@ Each session below attacks one of these.
 | 63  | Choose Your Rival                               | Any roster matchup becomes deliberate practice instead of a lucky random roll | **DONE** (2026-07-13) |
 | 64  | Checkpoint Zero                                 | A fifth arena turns readable barricade lanes into destructible route choices  | **DONE** (2026-07-13) |
 | 65  | Daily Gauntlet                                  | One fair shared challenge creates a reason to return and improve every day     | **DONE** (2026-07-13) |
+| 66  | Ability Overdrive                               | Faster signature-power cycles make every fighter identity erupt repeatedly    | **DONE** (2026-07-13) |
 
 ---
 
@@ -3090,7 +3091,79 @@ one score to improve, and a streak that rewards coming back tomorrow.
 
 ---
 
+## Session 66 — Ability Overdrive
+
+**Goal:** make character identity take over a match by letting every fighter
+cycle their signature power often enough to build tactics around it.
+
+**Locked design decisions**
+
+- `ability_overdrive` is a shared match-wide boon. While active, only the
+  authoritative ability cooldown countdown advances at the frozen 3x rate.
+  Active ability durations, freeze timers, damage, movement, and input retain
+  their ordinary timing and values.
+- The existing cooldown snapshot remains the complete source of truth for HUD,
+  local reconciliation, reconnects, and Rusty's readiness decisions. No new
+  wire state, client-side gameplay policy, or parallel timer is introduced.
+- The mutator is valid in ordinary modes and composes with other chaos events.
+  One in the Chamber excludes its random roll because that mode disables
+  abilities; explicit FORCE pins continue to bypass scheduling safeguards.
+- Overcharge Cells remain an immediate full refresh and compose naturally.
+  The shared advantage pays a conservative 100-point Gauntlet danger bounty.
+- Violet feedback and the exact `3X ABILITY RECHARGE` activation rule make the
+  change legible without adding permanent HUD clutter.
+
+**Acceptance criteria**
+
+- [x] Shared configuration and exhaustive presentation helpers recognize the
+      mutator, its 3x recharge constant, exact label/rule copy, and bounty.
+- [x] Server tests prove both players recharge at exactly 3x while active
+      ability duration remains real-time and cooldowns still clamp to zero.
+- [x] One in the Chamber excludes the ordinary random roll, while all other
+      mode, forecast, and forced-event paths retain established behavior.
+- [x] A real Chromium match activates Ability Overdrive, verifies its violet
+      banner and persistent label, casts the local fighter's real ability, and
+      observes the authoritative cooldown fall by more than two seconds in one.
+- [x] Typecheck, lint, all 1,148 unit tests across 77 files, production build,
+      and the full Playwright desktop/mobile matrix pass.
+
+---
+
 ## Session Log
+
+### Session 66 — 2026-07-13 — Ability Overdrive
+
+**Shipped:** match chaos can now roll `ABILITY OVERDRIVE`, a shared window where
+every fighter's signature power recharges three times as fast. Authority
+accelerates only the existing cooldown field, so Bruce's Iron Hide, Frost
+Wizard's freeze, Jack's overdrive, and every other active effect keep their
+ordinary duration. The same snapshot path drives players, HUDs, reconnects,
+and Rusty without adding client-authored policy or new wire state.
+
+The violet activation banner teaches `3X ABILITY RECHARGE`; advance forecasts
+and persistent labels use the shared exhaustive display name. One in the
+Chamber omits the random roll because abilities are disabled there, Overcharge
+Cells remain an instant refresh, and the event adds a 100-point Gauntlet chaos
+bounty. Other modes and mutator combinations remain available.
+
+**Verification:** 1,148 tests pass across 77 files, including exact cooldown
+acceleration, real-time active duration, zero clamping, exhaustive copy, pool,
+bounty, and One in the Chamber compatibility coverage. TypeScript, ESLint, all
+package builds, and the Vite production bundle are clean; Vite retains its
+existing chunk-size advisory. A dedicated live Chromium smoke activated the
+event, verified its exact banner and HUD label, cast a real local ability, and
+observed the server cooldown falling at the accelerated rate. The full
+Playwright matrix passes 16 tests with 11 intentional project-scoped skips
+across Chromium, Firefox, and mobile landscape.
+
+**Tuning watch:** 3x should create repeated signature-power decisions without
+turning them into constant spam. Watch late-round Bruce, Frost Wizard, and Jack
+control loops during the next group session, plus whether a shared benefit is
+still worth the current 100-point Gauntlet bounty. Frozen character constants
+remain untouched pending real group evidence.
+
+**Deployment:** not run; production deployment still requires explicit user
+authorization.
 
 ### Session 65 — 2026-07-13 — Daily Gauntlet
 

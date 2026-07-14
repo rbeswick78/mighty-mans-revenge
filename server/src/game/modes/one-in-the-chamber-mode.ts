@@ -26,12 +26,14 @@ export class OneInTheChamberMode implements GameMode {
     'fists_only',
     'weapon_roulette',
     // These do not create an interesting second rule here: direct hits are
-    // already lethal, health stealing is moot, and grenades cannot be used.
+    // already lethal, health stealing is moot, and grenades/abilities cannot
+    // be used.
     // Last Laugh would reintroduce free explosive kills into that scarcity;
     // Scavenger Rush can only roll a useless bandage in this lethal mode.
     'low_health',
     'vampire',
     'turbo_grenades',
+    'ability_overdrive',
     'last_laugh',
     'scavenger_rush',
   ];

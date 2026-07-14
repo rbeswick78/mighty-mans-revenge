@@ -1020,6 +1020,101 @@ test('solo practice launches against locked Rusty and reaches live play', async 
         banner: 'BLOOD RUSH!\nKILLS GRANT 4 SEC SPEED',
       });
   }
+
+  if (
+    process.env.FORCE_MIDMATCH_MUTATOR === 'ability_overdrive' ||
+    process.env.FORCE_EVENT === 'ability_overdrive'
+  ) {
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() => {
+            const w = window as unknown as {
+              game?: { scene: { getScene: (key: string) => unknown } };
+            };
+            const scene = w.game?.scene.getScene('GameScene') as {
+              gameService?: {
+                getNetworkManager: () => {
+                  getActiveMutators: () => readonly string[];
+                  getLocalPlayerState: () => { abilityCooldownSeconds: number } | null;
+                };
+              };
+              hud?: {
+                activeEventLabel?: { text?: string; visible?: boolean };
+                eventBannerText?: { text?: string; style?: { color?: string } };
+              };
+            } | null;
+            const network = scene?.gameService?.getNetworkManager();
+            return {
+              active: network?.getActiveMutators().includes('ability_overdrive') ?? false,
+              label: scene?.hud?.activeEventLabel?.text ?? '',
+              labelVisible: scene?.hud?.activeEventLabel?.visible ?? false,
+              banner: scene?.hud?.eventBannerText?.text ?? '',
+              bannerColor: scene?.hud?.eventBannerText?.style?.color ?? '',
+              cooldown: network?.getLocalPlayerState()?.abilityCooldownSeconds ?? -1,
+            };
+          }),
+        { timeout: 15000, message: 'expected synchronized Ability Overdrive activation' },
+      )
+      .toMatchObject({
+        active: true,
+        label: 'ABILITY OVERDRIVE',
+        labelVisible: true,
+        banner: 'ABILITY OVERDRIVE!\n3X ABILITY RECHARGE',
+        bannerColor: '#c77dff',
+        cooldown: 0,
+      });
+
+    await page.keyboard.press('Space');
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const w = window as unknown as {
+            game?: { scene: { getScene: (key: string) => unknown } };
+          };
+          const scene = w.game?.scene.getScene('GameScene') as {
+            gameService?: {
+              getNetworkManager: () => {
+                getLocalPlayerState: () => { abilityCooldownSeconds: number } | null;
+              };
+            };
+          } | null;
+          return scene?.gameService?.getNetworkManager().getLocalPlayerState()
+            ?.abilityCooldownSeconds ?? -1;
+        }),
+      )
+      .toBeGreaterThan(5);
+    const startedCooldown = await page.evaluate(() => {
+      const w = window as unknown as {
+        game?: { scene: { getScene: (key: string) => unknown } };
+      };
+      const scene = w.game?.scene.getScene('GameScene') as {
+        gameService?: {
+          getNetworkManager: () => {
+            getLocalPlayerState: () => { abilityCooldownSeconds: number } | null;
+          };
+        };
+      } | null;
+      return scene?.gameService?.getNetworkManager().getLocalPlayerState()
+        ?.abilityCooldownSeconds ?? -1;
+    });
+    await page.waitForTimeout(1000);
+    const laterCooldown = await page.evaluate(() => {
+      const w = window as unknown as {
+        game?: { scene: { getScene: (key: string) => unknown } };
+      };
+      const scene = w.game?.scene.getScene('GameScene') as {
+        gameService?: {
+          getNetworkManager: () => {
+            getLocalPlayerState: () => { abilityCooldownSeconds: number } | null;
+          };
+        };
+      } | null;
+      return scene?.gameService?.getNetworkManager().getLocalPlayerState()
+        ?.abilityCooldownSeconds ?? -1;
+    });
+    expect(startedCooldown - laterCooldown).toBeGreaterThan(2.2);
+  }
 });
 
 test.describe('Character select (desktop)', () => {
