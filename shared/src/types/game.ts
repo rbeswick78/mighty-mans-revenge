@@ -35,6 +35,9 @@ export enum GameModeType {
   BOUNTY_HUNT = 'bounty_hunt',
 }
 
+/** Stable server-authored sides for Crew Battle. */
+export type TeamId = 'blue' | 'red';
+
 /** Persistent moving target for Bounty Hunt snapshots and bot routing. */
 export interface BountyHuntState {
   /** Living fighter currently worth the bounty bonus; null during overtime. */
@@ -399,7 +402,13 @@ export interface MatchResult {
   duration: number;
   gameMode: GameModeType;
   /** Queue family that created the match; absent on results from older servers. */
-  matchKind?: 'duel' | 'rumble' | 'practice';
+  matchKind?: 'duel' | 'rumble' | 'duos' | 'practice';
+  /** Winning side for a team match; null is a genuine team draw. */
+  winnerTeamId?: TeamId | null;
+  /** Immutable side assignment for every fighter in a team match. */
+  playerTeams?: Record<PlayerId, TeamId>;
+  /** Final authoritative combined score for each side. */
+  teamScores?: Record<TeamId, number>;
   /** Final authoritative mode score for standings (especially 3-4 player Rumble). */
   scores?: Record<PlayerId, number>;
   /** Stable result labels without relying on the local client's opponent cache. */

@@ -22,6 +22,7 @@ export class ClientPlayerManager {
     localPlayerId: string,
     bountyTargetId: string | null = null,
     crownHolder: { id: string; wins: number } | null = null,
+    teammateIds: ReadonlySet<string> = new Set(),
   ): PlayerRenderer | null {
     const currentIds = new Set<string>();
     let localRenderer: PlayerRenderer | null = null;
@@ -73,6 +74,9 @@ export class ClientPlayerManager {
       renderer.updateLifeState(playerState.isDead, playerState.deaths);
       renderer.setBountyMarked(playerState.id === bountyTargetId);
       renderer.setCrownMarked(playerState.id === crownHolder?.id ? crownHolder.wins : null);
+      renderer.setTeammateMarked(
+        playerState.id !== localPlayerId && teammateIds.has(playerState.id),
+      );
 
       if (playerState.invulnerableTimer > 0) {
         renderer.setInvulnerable(true);

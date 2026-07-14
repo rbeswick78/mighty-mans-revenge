@@ -3236,6 +3236,60 @@ attempt one attainable friend score to hunt from the first stage onward.
 
 ---
 
+## Session 88 — Crew Battle 2v2
+
+**Goal:** add an immediately playable team mode that makes protecting an ally
+and combining strengths a new reason to return, without fragmenting the small
+online matchmaking pool.
+
+**Locked design decisions**
+
+- `CREW 2V2` is an instant Practice launch: the human and Rusty face Scrapjaw
+  and Clank. It reuses the real four-fighter Match/BotController stack instead
+  of creating scripted encounters or client-owned teammates.
+- The server authors immutable blue/red assignments, combined Deathmatch
+  scores, a first-to-15 crew target, overtime winner, and the complete result
+  contract. The client only presents `playerTeams`, `winnerTeamId`, and
+  `teamScores`.
+- Friendly fire is off across every attributed source. Hitscan, melee fans,
+  pellets, and axes skip allies during target acquisition so Rusty never acts
+  as a projectile shield; grenades, barrels, fire breath, and delayed
+  explosives reject allied damage at the central authority boundary. Legal
+  self-damage is unchanged.
+- Every Rusty controller filters teammates before its personality tactics.
+  Difficulty still changes decision quality only; Rusty remains balanced,
+  Scrapjaw hunts leaders, and Clank scavenges farther.
+- Live play marks the local ally in mint and replaces individual Rumble-style
+  scores with `YOUR CREW | RIVALS`. Results group the actual locked roster by
+  side, show combined KOs and individual K/A/D, and derive victory music/banner
+  from the authoritative winning team.
+- Direct rematches retain the exact crews, bot identities, Deathmatch rule,
+  difficulty, and compatible Solo Chaos while rotating maps. Crew Battle stays
+  Practice and cannot write lifetime PvP, rivalry, mastery, leaderboard,
+  Crown, or Grudge state.
+- The lobby uses a readable 3-over-2 solo-mode layout. This was selected after
+  visual review caught label collisions in an initial five-across pass.
+
+**Acceptance criteria**
+
+- [x] Match and Deathmatch tests prove two teammates can combine to reach 15,
+      the result names the winning crew while keeping `winnerId` null, and
+      assignments survive a direct rematch.
+- [x] Combat tests prove protected allies are skipped by hitscan and explosions
+      while enemies behind them remain targetable; bot tests prove every
+      personality ignores teammates.
+- [x] A real Chromium flow launches the authoritative 2v2 roster, reaches live
+      play, and observes the ally marker plus combined HUD scores.
+- [x] Dedicated desktop and mobile result journeys render the winning side,
+      both team totals, all four roster-authentic portraits, and individual
+      K/A/D rows.
+- [x] Desktop and 844×390 mobile lobby reviews keep all five solo actions
+      readable in the 3-over-2 layout with no overlap.
+- [x] Typecheck, lint, full unit/integration suite, production build, and the
+      complete Playwright matrix pass.
+
+---
+
 ## Session 87 — Roster Victory Lineups
 
 **Goal:** make every finished match preserve the actual cast that created its
@@ -4066,6 +4120,42 @@ favorite mid-match event while the final-minute surprise stays fresh.
 ---
 
 ## Session Log
+
+### Session 88 — 2026-07-14 — Crew Battle 2v2
+
+**Shipped:** the first true team-play ruleset. `CREW 2V2` launches immediately
+with the player and Rusty against Scrapjaw and Clank, then asks each crew for
+15 combined knockouts. The server owns every side assignment, score, overtime
+decision, and result. Every attributed combat path now understands protected
+teammates, including pass-through hitscan/melee/axes and ally-safe explosions,
+while self-damage and all ordinary enemy interactions remain intact. Bots use
+their existing personalities but never target their partner.
+
+The live client turns that authority into a mint `ALLY` marker and a compact
+team scoreboard. Results groups all four actual locked fighters under `YOUR
+CREW` and `RIVALS`, preserves individual K/A/D, and celebrates the winning
+side. Direct rematches keep the same crew and Deathmatch pin while rotating the
+arena. Difficulty and compatible Solo Chaos remain available; all lifetime PvP
+progression stays untouched because Crew Battle is Practice.
+
+**Verification:** focused authority, combat, bot, and matchmaking coverage is
+green. A real local Chromium journey reached live Crew Battle and observed two
+server-authored sides, the Rusty ally marker, and combined 0–0 HUD. Dedicated
+desktop and mobile result journeys rendered all four authoritative portraits
+and the 15–10 victory card. Visual review caught an unreadable initial
+five-across lobby row; the final 3-over-2 layout was re-reviewed and its
+desktop/mobile regression coverage passes. Typecheck, lint, all 1,278
+unit/integration tests across 92 files, and the production build pass; Vite
+retains its existing chunk-size advisory. The complete browser matrix passes
+71 tests with 13 intentional project-scoped skips across Chromium, Firefox,
+and mobile landscape.
+
+**Operational watch:** first-to-15 is intentionally a fresh balance value.
+Playtest whether Warlord matches run too long when Rusty trails the player, but
+keep tuning centralized in `CREW_BATTLE` and do not raise bot damage or health.
+
+**Deployment:** not run; production deployment still requires explicit user
+authorization.
 
 ### Session 87 — 2026-07-14 — Roster Victory Lineups
 

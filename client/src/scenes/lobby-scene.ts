@@ -113,6 +113,7 @@ export class LobbyScene extends Phaser.Scene {
   private rumbleButton!: PixelButton;
   private practiceButton!: PixelButton;
   private rustyRumbleButton!: PixelButton;
+  private crewBattleButton!: PixelButton;
   private gauntletButton!: PixelButton;
   private dailyButton!: PixelButton;
   private difficultyButton!: PixelButton;
@@ -311,13 +312,13 @@ export class LobbyScene extends Phaser.Scene {
 
     // PvP row: preserve the instant duel and expose the 2-4 player social queue.
     const qmW = 260;
-    const qmH = 44;
+    const qmH = 38;
     const pvpGap = 8;
     const pvpW = (qmW - pvpGap) / 2;
     this.quickMatchButton = new PixelButton(
       this,
       panel.centerX - qmW / 2,
-      104,
+      94,
       pvpW,
       qmH,
       'QUICK MATCH',
@@ -332,7 +333,7 @@ export class LobbyScene extends Phaser.Scene {
     this.rumbleButton = new PixelButton(
       this,
       panel.centerX - qmW / 2 + pvpW + pvpGap,
-      104,
+      94,
       pvpW,
       qmH,
       'RUMBLE 2-4',
@@ -345,14 +346,16 @@ export class LobbyScene extends Phaser.Scene {
     panel.add(this.rumbleButton);
 
     const soloGap = 6;
-    const soloW = (qmW - soloGap * 3) / 4;
+    const soloTopW = (qmW - soloGap * 2) / 3;
+    const soloBottomW = (qmW - soloGap) / 2;
+    const soloH = 28;
     const selectorW = (qmW - 10) / 2;
     this.practiceButton = new PixelButton(
       this,
       panel.centerX - qmW / 2,
-      158,
-      soloW,
-      qmH,
+      140,
+      soloTopW,
+      soloH,
       'RUSTY SPAR',
       {
         variant: 'secondary',
@@ -364,10 +367,10 @@ export class LobbyScene extends Phaser.Scene {
 
     this.rustyRumbleButton = new PixelButton(
       this,
-      panel.centerX - qmW / 2 + soloW + soloGap,
-      158,
-      soloW,
-      qmH,
+      panel.centerX - qmW / 2 + soloTopW + soloGap,
+      140,
+      soloTopW,
+      soloH,
       scrapPitButtonLabel(
         normalizeScrapPitRecord(localStorage.getItem(SCRAP_PIT_RECORD_STORAGE_KEY)),
       ),
@@ -379,12 +382,27 @@ export class LobbyScene extends Phaser.Scene {
     );
     panel.add(this.rustyRumbleButton);
 
+    this.crewBattleButton = new PixelButton(
+      this,
+      panel.centerX - qmW / 2 + (soloTopW + soloGap) * 2,
+      140,
+      soloTopW,
+      soloH,
+      'CREW 2V2',
+      {
+        variant: 'secondary',
+        fontSize: 6,
+        onClick: () => this.onPractice('crew_battle'),
+      },
+    );
+    panel.add(this.crewBattleButton);
+
     this.gauntletButton = new PixelButton(
       this,
-      panel.centerX - qmW / 2 + (soloW + soloGap) * 2,
-      158,
-      soloW,
-      qmH,
+      panel.centerX - qmW / 2,
+      172,
+      soloBottomW,
+      soloH,
       'GAUNTLET',
       {
         variant: 'secondary',
@@ -396,10 +414,10 @@ export class LobbyScene extends Phaser.Scene {
 
     this.dailyButton = new PixelButton(
       this,
-      panel.centerX - qmW / 2 + (soloW + soloGap) * 3,
-      158,
-      soloW,
-      qmH,
+      panel.centerX - qmW / 2 + soloBottomW + soloGap,
+      172,
+      soloBottomW,
+      soloH,
       'DAILY RUN',
       {
         variant: 'secondary',
@@ -729,6 +747,7 @@ export class LobbyScene extends Phaser.Scene {
       this.rumbleButton,
       this.practiceButton,
       this.rustyRumbleButton,
+      this.crewBattleButton,
       this.gauntletButton,
       this.dailyButton,
       this.difficultyButton,
@@ -1039,6 +1058,7 @@ export class LobbyScene extends Phaser.Scene {
     this.rumbleButton.setVisible(false);
     this.practiceButton.setVisible(false);
     this.rustyRumbleButton.setVisible(false);
+    this.crewBattleButton.setVisible(false);
     this.gauntletButton.setVisible(false);
     this.dailyButton.setVisible(false);
     this.difficultyButton.setVisible(false);
@@ -1085,7 +1105,7 @@ export class LobbyScene extends Phaser.Scene {
       kind === 'sparring' || kind === 'rusty_rumble'
         ? (this.practiceRival ?? undefined)
         : undefined,
-      kind === 'sparring' || kind === 'rusty_rumble'
+      kind === 'sparring' || kind === 'rusty_rumble' || kind === 'crew_battle'
         ? (this.practiceMutator ?? undefined)
         : undefined,
     );
@@ -1189,6 +1209,7 @@ export class LobbyScene extends Phaser.Scene {
     this.rumbleButton.setVisible(true);
     this.practiceButton.setVisible(true);
     this.rustyRumbleButton.setVisible(true);
+    this.crewBattleButton.setVisible(true);
     this.gauntletButton.setVisible(true);
     this.dailyButton.setVisible(true);
     this.difficultyButton.setVisible(true);
@@ -1217,6 +1238,7 @@ export class LobbyScene extends Phaser.Scene {
       this.rumbleButton,
       this.practiceButton,
       this.rustyRumbleButton,
+      this.crewBattleButton,
       this.gauntletButton,
       this.dailyButton,
     ]) {

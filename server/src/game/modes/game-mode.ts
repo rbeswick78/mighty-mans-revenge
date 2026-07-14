@@ -12,6 +12,7 @@ import type {
   MutatorId,
   PickupType,
   WeaponId,
+  TeamId,
 } from '@shared/game';
 import type { StatsTracker } from '../stats-tracker.js';
 
@@ -43,17 +44,16 @@ export interface MatchContext {
    * stale rifle burst or shotgun rack can't leak onto the new weapon.
    */
   clearWeaponTransients(playerId: PlayerId): void;
+  /** Optional side helpers used by team-compatible modes. */
+  getTeamId?(playerId: PlayerId): TeamId | null;
+  getTeamIds?(): TeamId[];
+  getTeamScore?(teamId: TeamId): number;
 }
 
 export interface GameMode {
   onStart(match: MatchContext): void;
   onTick(match: MatchContext, dt: number): void;
-  onKill(
-    match: MatchContext,
-    killerId: PlayerId,
-    victimId: PlayerId,
-    weapon: KillWeapon,
-  ): void;
+  onKill(match: MatchContext, killerId: PlayerId, victimId: PlayerId, weapon: KillWeapon): void;
   isMatchOver(match: MatchContext): boolean;
   getResults(match: MatchContext): MatchResult;
   /**

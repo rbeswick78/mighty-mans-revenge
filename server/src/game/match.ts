@@ -2,6 +2,7 @@ import {
   MatchPhase,
   GameModeType,
   MATCH,
+  CREW_BATTLE,
   OVERTIME,
   RESPAWN,
   PLAYER,
@@ -67,6 +68,7 @@ import type {
   MatchContractHudState,
   MatchContractId,
   TauntId,
+  TeamId,
 } from '@shared/game';
 import { logger } from '../utils/logger.js';
 import { PickupManager } from './pickup-manager.js';
@@ -211,6 +213,10 @@ export class Match implements MatchContext {
   private readonly tracksRumbleLead: boolean;
   /** Only matches that began with a group field author assist credit. */
   private readonly tracksRumbleAssists: boolean;
+  /** Immutable server-authored sides; empty for every non-team match. */
+  private readonly playerTeams: ReadonlyMap<PlayerId, TeamId>;
+  private readonly canDamagePlayer = (attackerId: PlayerId, victimId: PlayerId): boolean =>
+    attackerId === victimId || !this.areTeammates(attackerId, victimId);
   private readonly rumbleAssistTracker = new RumbleAssistTracker();
   /** Persistent snapshot edge; sequence 0 is the silent opening baseline. */
   private rumbleLeadState: RumbleLeadState | null = null;
@@ -232,6 +238,8 @@ export class Match implements MatchContext {
    * scoreboard winner in getResult() (forfeit still outranks it).
    */
   private overtimeWinnerId: PlayerId | null = null;
+  /** Side whose knockout decided a Crew Battle overtime. */
+  private overtimeWinnerTeamId: TeamId | null = null;
   /** One-shot overtime announcement to broadcast this tick. */
   private _tickOvertimeStart: { overtimeEndsInMs: number } | null = null;
   /**
@@ -333,9 +341,11 @@ export class Match implements MatchContext {
     plannedMidMatchMutator?: MutatorId,
     stableSeed?: string,
     gauntletBoonAssignments: ReadonlyMap<PlayerId, readonly GauntletBoonId[]> = new Map(),
+    playerTeams: ReadonlyMap<PlayerId, TeamId> = new Map(),
   ) {
     this.matchId = matchId;
-    this.tracksRumbleLead = playerEntries.length >= 3;
+    this.playerTeams = new Map(playerTeams);
+    this.tracksRumbleLead = playerEntries.length >= 3 && this.playerTeams.size === 0;
     this.tracksRumbleAssists = playerEntries.length >= 3;
     this.rng = rng;
     this.rematchMutatorExclusions = new Set(rematchMutatorExclusions);
@@ -752,6 +762,7 @@ export class Match implements MatchContext {
     // for more than one tick.
     if (this.isOvertime && this.overtimeWinnerId === null && killerId !== victimId) {
       this.overtimeWinnerId = killerId;
+      this.overtimeWinnerTeamId = this.getTeamId(killerId);
     }
 
     const victim = this.players.get(victimId);
@@ -918,6 +929,16 @@ export class Match implements MatchContext {
     if (this.forfeitWinnerId !== null) {
       result.winnerId = this.forfeitWinnerId;
     }
+    if (this.playerTeams.size > 0) {
+      result.winnerId = null;
+      result.winnerTeamId =
+        this.overtimeWinnerTeamId ??
+        (this.forfeitWinnerId ? this.getTeamId(this.forfeitWinnerId) : this.determineWinningTeam());
+      result.playerTeams = Object.fromEntries(this.playerTeams) as Record<PlayerId, TeamId>;
+      result.teamScores = Object.fromEntries(
+        this.getTeamIds().map((teamId) => [teamId, this.getTeamScore(teamId)]),
+      ) as Record<TeamId, number>;
+    }
     result.contract = {
       ...this.getContractHudState(),
       careerCompletions: {},
@@ -977,7 +998,41 @@ export class Match implements MatchContext {
   }
 
   getKillTarget(): number {
-    return MATCH.KILL_TARGET;
+    return this.playerTeams.size > 0 ? CREW_BATTLE.KILL_TARGET : MATCH.KILL_TARGET;
+  }
+
+  getTeamId(playerId: PlayerId): TeamId | null {
+    return this.playerTeams.get(playerId) ?? null;
+  }
+
+  getTeamIds(): TeamId[] {
+    return [...new Set(this.playerTeams.values())];
+  }
+
+  getTeamAssignments(): ReadonlyMap<PlayerId, TeamId> {
+    return new Map(this.playerTeams);
+  }
+
+  getTeamScore(teamId: TeamId): number {
+    let score = 0;
+    for (const [playerId, player] of this.players) {
+      if (this.playerTeams.get(playerId) === teamId) score += player.score;
+    }
+    return score;
+  }
+
+  areTeammates(leftId: PlayerId, rightId: PlayerId): boolean {
+    if (leftId === rightId) return false;
+    const leftTeam = this.playerTeams.get(leftId);
+    return leftTeam !== undefined && leftTeam === this.playerTeams.get(rightId);
+  }
+
+  private determineWinningTeam(): TeamId | null {
+    const ranked = this.getTeamIds()
+      .map((teamId) => ({ teamId, score: this.getTeamScore(teamId) }))
+      .sort((left, right) => right.score - left.score);
+    if (ranked.length === 0) return null;
+    return ranked.length > 1 && ranked[0].score === ranked[1].score ? null : ranked[0].teamId;
   }
 
   getTimeLimit(): number {
@@ -1444,7 +1499,12 @@ export class Match implements MatchContext {
         ) {
           const active = this.combatManager.getActiveGrenadeFor(playerId);
           if (active) {
-            const explosion = this.combatManager.detonateGrenade(active.id, this.players, grid);
+            const explosion = this.combatManager.detonateGrenade(
+              active.id,
+              this.players,
+              grid,
+              this.canDamagePlayer,
+            );
             if (explosion) {
               this.recordExplosion(explosion);
             }
@@ -1478,7 +1538,12 @@ export class Match implements MatchContext {
     this.tickAbilities(dt);
 
     // Update grenades (movement + safety fuse + explosions)
-    const { explosions } = this.combatManager.updateGrenades(dt, this.players, grid);
+    const { explosions } = this.combatManager.updateGrenades(
+      dt,
+      this.players,
+      grid,
+      this.canDamagePlayer,
+    );
     for (const explosion of explosions) {
       this.recordExplosion(explosion);
     }
@@ -1493,6 +1558,7 @@ export class Match implements MatchContext {
       this.players,
       grid,
       this.hitValidationScale(),
+      this.canDamagePlayer,
     );
     for (const hit of axeHits) {
       this.recordAttributedDamage(hit.throwerId, hit.victimId, hit.damage);
@@ -1808,6 +1874,7 @@ export class Match implements MatchContext {
       piercing,
       weaponId,
       this.hitValidationScale(),
+      this.canDamagePlayer,
     );
     this.tickBulletTrails.push(shot.trail);
     if (!this.mutatorActive('infinite_ammo')) {
@@ -1825,7 +1892,12 @@ export class Match implements MatchContext {
         const damage =
           this.gameMode.damageForWeaponHit?.(this, player, victim, weaponId, shot.damage) ??
           shot.damage;
-        const result = this.combatManager.applyDamage(victim, damage, playerId);
+        const result = this.combatManager.applyDamage(
+          victim,
+          damage,
+          playerId,
+          this.canDamagePlayer,
+        );
         shot.trail.hitPlayerId = shot.victimId;
         shot.trail.damageApplied = result.damageApplied;
         this.stats.recordHit(playerId);
@@ -1885,6 +1957,7 @@ export class Match implements MatchContext {
       false, // walls always block melee
       weaponId,
       this.hitValidationScale(),
+      this.canDamagePlayer,
     );
 
     this.stats.recordShot(player.id);
@@ -1901,7 +1974,12 @@ export class Match implements MatchContext {
       const damage =
         this.gameMode.damageForWeaponHit?.(this, player, victim, weaponId, shot.damage) ??
         shot.damage;
-      const result = this.combatManager.applyDamage(victim, damage, player.id);
+      const result = this.combatManager.applyDamage(
+        victim,
+        damage,
+        player.id,
+        this.canDamagePlayer,
+      );
       // damageApplied, not shot.damage — Iron Hide may have halved it.
       this.recordAttributedDamage(player.id, shot.victimId, result.damageApplied);
       this.applyVampireHeal(player.id, shot.victimId, result.damageApplied);
@@ -1971,6 +2049,7 @@ export class Match implements MatchContext {
       piercing,
       'shotgun',
       this.hitValidationScale(),
+      this.canDamagePlayer,
     );
 
     this.stats.recordShot(player.id);
@@ -1988,7 +2067,12 @@ export class Match implements MatchContext {
       // further pellets — without this guard each extra pellet would
       // re-trigger the death path and inflate the death counter.
       if (!victim || victim.isDead) continue;
-      const result = this.combatManager.applyDamage(victim, shot.damage, player.id);
+      const result = this.combatManager.applyDamage(
+        victim,
+        shot.damage,
+        player.id,
+        this.canDamagePlayer,
+      );
       shot.trail.hitPlayerId = shot.victimId;
       shot.trail.damageApplied = result.damageApplied;
       anyPelletHit = true;
@@ -2255,6 +2339,7 @@ export class Match implements MatchContext {
       instigatorId,
       this.players,
       this.mapManager.getCollisionGrid(),
+      this.canDamagePlayer,
     );
     this.recordExplosion(explosion, 'barrel');
   }
@@ -3060,7 +3145,12 @@ export class Match implements MatchContext {
         );
         if (hitDist === null || hitDist <= 0 || hitDist > range) continue;
 
-        const result = this.combatManager.applyDamage(other, damagePerTick, playerId);
+        const result = this.combatManager.applyDamage(
+          other,
+          damagePerTick,
+          playerId,
+          this.canDamagePlayer,
+        );
         this.recordAttributedDamage(playerId, otherId, result.damageApplied);
         this.applyVampireHeal(playerId, otherId, result.damageApplied);
         if (result.killed) {

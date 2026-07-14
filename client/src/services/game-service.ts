@@ -9,6 +9,7 @@ import type {
   RumbleCrownState,
   RumbleGrudge,
   RumbleLeadState,
+  TeamId,
 } from '@shared/types/game.js';
 import type {
   DraftCategory,
@@ -50,7 +51,9 @@ export interface MatchData {
   mapName: string;
   /** Mode this match will be played in — drives the pre-match mode label. */
   gameMode: GameModeType;
-  matchKind?: 'duel' | 'rumble' | 'practice';
+  matchKind?: 'duel' | 'rumble' | 'duos' | 'practice';
+  /** Immutable server-authored sides for Crew Battle. */
+  playerTeams?: Record<PlayerId, TeamId>;
   practiceKind?: PracticeKind;
   /** Reigning champion in this connected Rumble rematch chain. */
   rumbleCrown?: RumbleCrownState;
@@ -307,6 +310,7 @@ export class GameService {
         mapName: msg.mapName,
         gameMode: msg.gameMode,
         matchKind: msg.matchKind ?? (msg.gauntlet ? 'practice' : 'duel'),
+        playerTeams: msg.playerTeams,
         practiceKind: msg.practiceKind,
         rumbleCrown: msg.rumbleCrown,
         rumbleGrudge: msg.rumbleGrudge,

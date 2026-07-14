@@ -624,6 +624,12 @@ export class GameScene extends Phaser.Scene {
         // the aim-line preview).
         this.playerManager.setBigHeads(networkManager.getActiveMutators().includes('big_heads'));
         const bountyHuntState = networkManager.getBountyHuntState();
+        const localTeam = this.matchData?.playerTeams?.[playerId];
+        const teammateIds = new Set(
+          Object.entries(this.matchData?.playerTeams ?? {})
+            .filter(([candidateId, teamId]) => candidateId !== playerId && teamId === localTeam)
+            .map(([candidateId]) => candidateId),
+        );
         this.playerManager.updatePlayers(
           allPlayers,
           playerId,
@@ -634,6 +640,7 @@ export class GameScene extends Phaser.Scene {
                 wins: this.matchData.rumbleCrown.wins,
               }
             : null,
+          teammateIds,
         );
         this.tauntRenderer?.update(this.playerManager, delta);
 
@@ -758,18 +765,33 @@ export class GameScene extends Phaser.Scene {
           currentLocalState.abilityCooldownSeconds,
         );
 
-        // Local fighter first, then every live rival. HUD compacts at 3+
-        // entrants so a four-player Rumble remains readable.
-        this.hud.updateScores([
-          {
-            name: currentLocalState.nickname || this.nickname,
-            score: currentLocalState.score,
-          },
-          ...[...interpolatedPlayers.values()].map((state) => ({
-            name: state.nickname || 'OPPONENT',
-            score: state.score,
-          })),
-        ]);
+        if (localTeam && this.matchData?.playerTeams) {
+          const teamScores = new Map<string, number>();
+          for (const fighter of allPlayers) {
+            const teamId = this.matchData.playerTeams[fighter.id];
+            if (teamId) teamScores.set(teamId, (teamScores.get(teamId) ?? 0) + fighter.score);
+          }
+          const rivalTeam = Object.values(this.matchData.playerTeams).find(
+            (teamId) => teamId !== localTeam,
+          );
+          this.hud.updateScores([
+            { name: 'YOUR CREW', score: teamScores.get(localTeam) ?? 0 },
+            { name: 'RIVALS', score: rivalTeam ? (teamScores.get(rivalTeam) ?? 0) : 0 },
+          ]);
+        } else {
+          // Local fighter first, then every live rival. HUD compacts at 3+
+          // entrants so a four-player Rumble remains readable.
+          this.hud.updateScores([
+            {
+              name: currentLocalState.nickname || this.nickname,
+              score: currentLocalState.score,
+            },
+            ...[...interpolatedPlayers.values()].map((state) => ({
+              name: state.nickname || 'OPPONENT',
+              score: state.score,
+            })),
+          ]);
+        }
         this.hud.updateContract(networkManager.getContractState(), playerId);
 
         const remainingSeconds = networkManager.getMatchTimer();

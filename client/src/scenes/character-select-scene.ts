@@ -5,6 +5,7 @@ import type { ServerCharacterSelectStateMessage } from '@shared/types/network.js
 import {
   CHARACTERS,
   CHARACTER_IDS,
+  CREW_BATTLE,
   gameModeDisplayName,
   type CharacterId,
 } from '@shared/config/game.js';
@@ -187,9 +188,16 @@ export class CharacterSelectScene extends Phaser.Scene {
           )
         : [
             `${
-              this.matchData.practiceKind === 'rusty_rumble' ? 'SCRAP PIT' : 'NEXT'
+              this.matchData.practiceKind === 'rusty_rumble'
+                ? 'SCRAP PIT'
+                : this.matchData.practiceKind === 'crew_battle'
+                  ? 'CREW BATTLE 2V2'
+                  : 'NEXT'
             }: ${modeName} - ${this.matchData.mapName.toUpperCase()}`,
             ...(this.matchData.practiceKind === 'rusty_rumble' ? [scrapPitCrewLabel()] : []),
+            ...(this.matchData.practiceKind === 'crew_battle'
+              ? [`FRIENDLY FIRE OFF  //  FIRST CREW TO ${CREW_BATTLE.KILL_TARGET}`]
+              : []),
             ...(crownLabel ? [crownLabel] : []),
             ...(grudgeLabel ? [grudgeLabel] : []),
             ...(this.matchData.practiceMutatorId

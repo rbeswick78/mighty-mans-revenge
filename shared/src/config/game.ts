@@ -446,6 +446,12 @@ export const RUMBLE = Object.freeze({
   LAUNCH_DELAY_SECONDS: 6,
 });
 
+/** Instant 2v2 practice battle: one human + one Rusty versus two Rusties. */
+export const CREW_BATTLE = Object.freeze({
+  TEAM_SIZE: 2,
+  KILL_TARGET: 15,
+});
+
 /** Server-owned credit for meaningful help in three- and four-fighter battles. */
 export const RUMBLE_ASSISTS = Object.freeze({
   /** A contribution must be this recent when the knockout lands. */
@@ -572,7 +578,13 @@ export const BOT_DIFFICULTIES = ['rookie', 'scrapper', 'warlord'] as const;
 export type BotDifficulty = (typeof BOT_DIFFICULTIES)[number];
 export const DEFAULT_BOT_DIFFICULTY: BotDifficulty = 'scrapper';
 
-export const PRACTICE_KINDS = ['sparring', 'rusty_rumble', 'gauntlet', 'daily'] as const;
+export const PRACTICE_KINDS = [
+  'sparring',
+  'rusty_rumble',
+  'crew_battle',
+  'gauntlet',
+  'daily',
+] as const;
 export type PracticeKind = (typeof PRACTICE_KINDS)[number];
 
 /** Run-long rewards drafted alongside Gauntlet routes. */

@@ -1,12 +1,7 @@
-import {
-  type PlayerId,
-  type PlayerState,
-  type CollisionGrid,
-  type WeaponId,
-} from '@shared/game';
+import { type PlayerId, type PlayerState, type CollisionGrid, type WeaponId } from '@shared/game';
 
 import { RewindBuffer } from './rewind-buffer.js';
-import { CombatManager, type ShotResult } from './combat-manager.js';
+import { CombatManager, type CanDamagePlayer, type ShotResult } from './combat-manager.js';
 
 export class LagCompensator {
   private readonly rewindBuffer: RewindBuffer;
@@ -18,11 +13,7 @@ export class LagCompensator {
     this.rewindBuffer = new RewindBuffer(bufferSize);
   }
 
-  saveCurrentState(
-    tick: number,
-    timestamp: number,
-    players: Map<PlayerId, PlayerState>,
-  ): void {
+  saveCurrentState(tick: number, timestamp: number, players: Map<PlayerId, PlayerState>): void {
     this.rewindBuffer.saveState(tick, timestamp, players);
   }
 
@@ -35,6 +26,7 @@ export class LagCompensator {
     piercing: boolean = false,
     weaponId: WeaponId = 'rifle',
     hitboxScale: number = 1,
+    canDamage: CanDamagePlayer = () => true,
   ): ShotResult {
     return this.processMultiShotWithRewind(
       shooterId,
@@ -45,6 +37,7 @@ export class LagCompensator {
       piercing,
       weaponId,
       hitboxScale,
+      canDamage,
     )[0];
   }
 
@@ -63,6 +56,7 @@ export class LagCompensator {
     piercing: boolean = false,
     weaponId: WeaponId = 'rifle',
     hitboxScale: number = 1,
+    canDamage: CanDamagePlayer = () => true,
   ): ShotResult[] {
     const currentTime = Date.now();
     const renderTime = currentTime - rtt / 2;
@@ -110,6 +104,7 @@ export class LagCompensator {
         piercing,
         weaponId,
         hitboxScale,
+        canDamage,
       ),
     );
   }

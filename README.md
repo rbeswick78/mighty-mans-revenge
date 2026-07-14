@@ -118,6 +118,15 @@ cry during the brawl and the nearest available rival answers in character;
 each crew member also has a signature cry when they knock you out. Completed
 rounds build a device-local `PIT RECORD`: wins extend a run, draws hold it,
 losses end it, and the best run stays visible on the Scrap Pit button.
+`CREW 2V2` turns the same four-fighter foundation into an instant team fight:
+you and Rusty face Scrapjaw and Clank in Deathmatch, and the first crew to 15
+combined knockouts wins. Friendly fire is off across bullets, melee, axes,
+fire, grenades, barrels, and delayed explosives; shots and thrown weapons pass
+through Rusty instead of treating him as cover. A mint `ALLY` marker and the
+two-score team HUD keep the battlefield readable, while Results groups the
+four real fighters under their crew score. Difficulty and compatible Solo
+Chaos still apply, direct rematches keep the same sides while rotating maps,
+and the mode remains Practice so it never writes lifetime PvP records.
 `GAUNTLET` starts a three-fight run that
 escalates from Rookie to Scrapper to Warlord; win to advance, while a loss or
 draw restarts the run.

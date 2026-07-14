@@ -54,6 +54,9 @@ export interface AxeHit {
   killed: boolean;
 }
 
+/** Match-owned relationship policy used to make teammates non-targetable. */
+export type CanDamagePlayer = (attackerId: PlayerId, victimId: PlayerId) => boolean;
+
 let nextGrenadeId = 0;
 
 function generateGrenadeId(): string {
@@ -70,11 +73,7 @@ function generateAxeId(): string {
  * Check line-of-sight between two points using the collision grid.
  * Returns true if there is a clear line of sight (no walls blocking).
  */
-function hasLineOfSight(
-  from: Vec2,
-  to: Vec2,
-  grid: CollisionGrid,
-): boolean {
+function hasLineOfSight(from: Vec2, to: Vec2, grid: CollisionGrid): boolean {
   const dx = to.x - from.x;
   const dy = to.y - from.y;
   const dist = Math.sqrt(dx * dx + dy * dy);
@@ -161,6 +160,7 @@ export class CombatManager {
     players: Map<PlayerId, PlayerState>,
     grid: CollisionGrid,
     hitboxScale: number = 1,
+    canDamage: CanDamagePlayer = () => true,
   ): { hits: AxeHit[] } {
     const hits: AxeHit[] = [];
     if (this.axes.length === 0) return { hits };
@@ -177,26 +177,18 @@ export class CombatManager {
       }
 
       const remaining = maxRange - axe.distanceTraveled;
-      const stepLen = Math.min(
-        Math.hypot(axe.velocity.x, axe.velocity.y) * dt,
-        remaining,
-      );
+      const stepLen = Math.min(Math.hypot(axe.velocity.x, axe.velocity.y) * dt, remaining);
       const dir = vecFromAngle(axe.angle);
 
       // Walls first: the axe can't reach anything standing behind one.
-      const wallHit = raycastAgainstGrid(
-        grid,
-        axe.position.x,
-        axe.position.y,
-        axe.angle,
-        stepLen,
-      );
+      const wallHit = raycastAgainstGrid(grid, axe.position.x, axe.position.y, axe.angle, stepLen);
       const travelCap = wallHit.hitTile ? wallHit.distance : stepLen;
 
       // Nearest victim whose AABB the step segment crosses within the cap.
       let closest: { player: PlayerState; distance: number } | null = null;
       for (const [playerId, player] of players) {
         if (playerId === axe.throwerId) continue;
+        if (!canDamage(axe.throwerId, playerId)) continue;
         if (player.isDead) continue;
         if (player.invulnerableTimer > 0) continue;
 
@@ -222,6 +214,7 @@ export class CombatManager {
           closest.player,
           ABILITY.JACK_AXE_THROW.DAMAGE,
           axe.throwerId,
+          canDamage,
         );
         hits.push({
           axeId: axe.id,
@@ -256,6 +249,7 @@ export class CombatManager {
     piercing: boolean = false,
     weaponId: WeaponId = 'rifle',
     hitboxScale: number = 1,
+    canDamage: CanDamagePlayer = () => true,
   ): ShotResult {
     // Widen to the interface type: the frozen WEAPONS literals only carry
     // maxRange on the weapons that declare it (punch).
@@ -302,6 +296,7 @@ export class CombatManager {
 
     for (const [playerId, playerState] of targetPlayers) {
       if (playerId === shooterId) continue;
+      if (!canDamage(shooterId, playerId)) continue;
 
       // Use current state for isDead/invulnerableTimer checks
       const currentState = players.get(playerId);
@@ -385,10 +380,7 @@ export class CombatManager {
     piercing: boolean = false,
     speedMultiplier: number = 1,
   ): GrenadeState {
-    const velocity = vecScale(
-      vecFromAngle(aimAngle),
-      GRENADE.THROW_SPEED * speedMultiplier,
-    );
+    const velocity = vecScale(vecFromAngle(aimAngle), GRENADE.THROW_SPEED * speedMultiplier);
     const grenade: GrenadeState = {
       id: generateGrenadeId(),
       position: { x: position.x, y: position.y },
@@ -426,18 +418,20 @@ export class CombatManager {
     grenadeId: string,
     players: Map<PlayerId, PlayerState>,
     grid: CollisionGrid,
+    canDamage: CanDamagePlayer = () => true,
   ): ExplosionResult | null {
     const idx = this.grenades.findIndex((g) => g.id === grenadeId);
     if (idx === -1) return null;
     const grenade = this.grenades[idx];
     this.grenades.splice(idx, 1);
-    return this.applyExplosion(grenade, players, grid);
+    return this.applyExplosion(grenade, players, grid, canDamage);
   }
 
   updateGrenades(
     dt: number,
     players: Map<PlayerId, PlayerState>,
     grid: CollisionGrid,
+    canDamage: CanDamagePlayer = () => true,
   ): { explosions: ExplosionResult[] } {
     const explosions: ExplosionResult[] = [];
 
@@ -461,7 +455,7 @@ export class CombatManager {
     this.grenades = remaining;
 
     for (const grenade of exploded) {
-      explosions.push(this.applyExplosion(grenade, players, grid));
+      explosions.push(this.applyExplosion(grenade, players, grid, canDamage));
     }
 
     return { explosions };
@@ -473,6 +467,7 @@ export class CombatManager {
     instigatorId: PlayerId,
     players: Map<PlayerId, PlayerState>,
     grid: CollisionGrid,
+    canDamage: CanDamagePlayer = () => true,
   ): ExplosionResult {
     return this.applyExplosion(
       {
@@ -485,6 +480,7 @@ export class CombatManager {
       },
       players,
       grid,
+      canDamage,
     );
   }
 
@@ -492,7 +488,9 @@ export class CombatManager {
     victim: PlayerState,
     damage: number,
     attackerId: PlayerId,
+    canDamage: CanDamagePlayer = () => true,
   ): { killed: boolean; entry?: KillFeedEntry; damageApplied: number } {
+    if (!canDamage(attackerId, victim.id)) return { killed: false, damageApplied: 0 };
     // Bubba's Iron Hide: all incoming damage is halved while his ability
     // window runs. Applied HERE — the single choke point every damage
     // source flows through (rifle, pellets, grenades, fire breath, axes) —
@@ -542,7 +540,7 @@ export class CombatManager {
     victim.armor -= absorbed;
     victim.health = Math.max(1, victim.health - (reducedDamage - absorbed));
 
-    return (armorBefore - victim.armor) + (healthBefore - victim.health);
+    return armorBefore - victim.armor + (healthBefore - victim.health);
   }
 
   /** Shared Iron Hide policy for attributed and environmental damage. */
@@ -557,21 +555,24 @@ export class CombatManager {
     grenade: GrenadeState,
     players: Map<PlayerId, PlayerState>,
     grid: CollisionGrid,
+    canDamage: CanDamagePlayer,
   ): ExplosionResult {
     const damages: ExplosionResult['damages'] = [];
 
     for (const [playerId, playerState] of players) {
       if (playerState.isDead) continue;
+      if (!canDamage(grenade.throwerId, playerId)) continue;
       if (!isInBlastRadius(grenade.position, playerState.position)) continue;
       // Piercing grenades (thrown during Mighty Man's x-ray) damage through
       // walls — skip the LOS check.
-      if (!grenade.piercing && !hasLineOfSight(grenade.position, playerState.position, grid)) continue;
+      if (!grenade.piercing && !hasLineOfSight(grenade.position, playerState.position, grid))
+        continue;
 
       const dist = vecDistance(grenade.position, playerState.position);
       const damage = calculateGrenadeDamage(dist);
 
       if (damage > 0) {
-        const result = this.applyDamage(playerState, damage, grenade.throwerId);
+        const result = this.applyDamage(playerState, damage, grenade.throwerId, canDamage);
         damages.push({
           playerId,
           // Post-Iron-Hide value, so stats/vampire credit what actually landed.

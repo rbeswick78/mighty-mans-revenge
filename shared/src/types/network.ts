@@ -324,7 +324,9 @@ export interface ServerMatchFoundMessage {
   /** Mode this match will be played in — drives the lobby's "NEXT: X" line. */
   gameMode: GameModeType;
   /** Queue family; optional so older servers still interoperate. */
-  matchKind?: 'duel' | 'rumble' | 'practice';
+  matchKind?: 'duel' | 'rumble' | 'duos' | 'practice';
+  /** Immutable server-authored sides for Crew Battle. */
+  playerTeams?: Record<PlayerId, import('./game.js').TeamId>;
   /** Solo route that created this match; lets pre-match UI name the experience truthfully. */
   practiceKind?: PracticeKind;
   /** Reigning champion carried only into a direct Wasteland Rumble rematch. */

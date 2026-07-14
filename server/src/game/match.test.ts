@@ -22,6 +22,7 @@ import {
   CORE_RUN,
   BOUNTY_HUNT,
   COMBAT_MEDALS,
+  CREW_BATTLE,
   PRACTICE_GAUNTLET,
   GameModeType,
   TileType,
@@ -35,6 +36,7 @@ import type {
   MutatorId,
   MatchContractId,
   GauntletBoonId,
+  TeamId,
 } from '@shared/game';
 
 function makeInput(seq: number, overrides: Partial<PlayerInput> = {}): PlayerInput {
@@ -5594,6 +5596,66 @@ describe('Match', () => {
           delete process.env.FORCE_MATCH_SECONDS;
         }
       }
+    });
+  });
+
+  describe('Crew Battle teams', () => {
+    function createCrewBattle(): Match {
+      const teams = new Map<string, TeamId>([
+        ['player-0', 'blue'],
+        ['player-1', 'blue'],
+        ['player-2', 'red'],
+        ['player-3', 'red'],
+      ]);
+      return new Match(
+        'crew-battle',
+        makeMapData(),
+        Array.from({ length: 4 }, (_, index) => ({
+          id: `player-${index}`,
+          nickname: `Player ${index}`,
+        })),
+        GameModeType.DEATHMATCH,
+        () => 0.5,
+        [],
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        new Map(),
+        teams,
+      );
+    }
+
+    it('combines teammate knockouts into the server-owned win target', () => {
+      const crew = createCrewBattle();
+      crew.phase = MatchPhase.ACTIVE;
+      crew.matchTimer = 100;
+
+      for (let index = 0; index < 8; index++) crew.onKill('player-0', 'player-2', 'gun');
+      for (let index = 0; index < 7; index++) crew.onKill('player-1', 'player-3', 'gun');
+
+      expect(crew.players.get('player-0')?.score).toBe(8);
+      expect(crew.players.get('player-1')?.score).toBe(7);
+      expect(crew.getTeamScore('blue')).toBe(CREW_BATTLE.KILL_TARGET);
+      expect(crew.checkMatchEnd()).toBe(true);
+      expect(crew.getResult()).toMatchObject({
+        winnerId: null,
+        winnerTeamId: 'blue',
+        teamScores: { blue: 15, red: 0 },
+        playerTeams: {
+          'player-0': 'blue',
+          'player-1': 'blue',
+          'player-2': 'red',
+          'player-3': 'red',
+        },
+      });
+    });
+
+    it('recognizes teammates without treating self-damage as friendly fire', () => {
+      const crew = createCrewBattle();
+      expect(crew.areTeammates('player-0', 'player-1')).toBe(true);
+      expect(crew.areTeammates('player-0', 'player-2')).toBe(false);
+      expect(crew.areTeammates('player-0', 'player-0')).toBe(false);
     });
   });
 });

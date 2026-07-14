@@ -1908,6 +1908,77 @@ describe('MatchmakingManager solo practice flow', () => {
     );
   });
 
+  it('launches Crew Battle immediately and preserves its sides through a direct rematch', () => {
+    const { fake, sent, connected } = makeFakeServer();
+    connected.push('A');
+    const mgr = new MatchmakingManager(fake, () => 0, store, seededRng([0, 0, 0, 0, 0]));
+
+    mgr.handleStartPractice(
+      'A',
+      'Alpha',
+      'warlord',
+      'crew_battle',
+      GameModeType.KOTH,
+      undefined,
+      'blackout',
+    );
+
+    const first = mgr.getActiveMatches()[0];
+    expect(first.gameModeType).toBe(GameModeType.DEATHMATCH);
+    expect(first.players).toHaveLength(4);
+    const teams = first.getTeamAssignments();
+    expect([...teams.values()].filter((teamId) => teamId === 'blue')).toHaveLength(2);
+    expect([...teams.values()].filter((teamId) => teamId === 'red')).toHaveLength(2);
+    const allyId = [...teams].find(
+      ([playerId, teamId]) => playerId !== 'A' && teamId === 'blue',
+    )?.[0];
+    expect(allyId?.startsWith('bot:')).toBe(true);
+
+    const found = sent.find(
+      (entry) => entry.playerId === 'A' && entry.message.type === 'server:matchFound',
+    );
+    if (!found || found.message.type !== 'server:matchFound') {
+      throw new Error('missing Crew Battle matchFound');
+    }
+    expect(found.message).toMatchObject({
+      matchKind: 'duos',
+      practiceKind: 'crew_battle',
+      gameMode: GameModeType.DEATHMATCH,
+    });
+    expect(found.message.playerTeams).toEqual(Object.fromEntries(teams));
+
+    first.players.get('A')!.score = 8;
+    first.players.get(allyId!)!.score = 7;
+    first.phase = MatchPhase.ENDED;
+    mgr.tick(0.05, 1);
+    const ended = [...sent]
+      .reverse()
+      .find((entry) => entry.playerId === 'A' && entry.message.type === 'server:matchEnd');
+    if (!ended || ended.message.type !== 'server:matchEnd') {
+      throw new Error('missing Crew Battle matchEnd');
+    }
+    expect(ended.message.result).toMatchObject({
+      matchKind: 'duos',
+      winnerId: null,
+      winnerTeamId: 'blue',
+      teamScores: { blue: 15, red: 0 },
+      isPractice: true,
+      rivalrySet: null,
+    });
+
+    sent.length = 0;
+    mgr.handleRematchRequest('A');
+    const rematch = mgr.getActiveMatches()[0];
+    expect(rematch.gameModeType).toBe(GameModeType.DEATHMATCH);
+    expect(Object.fromEntries(rematch.getTeamAssignments())).toEqual(Object.fromEntries(teams));
+    const rematchFound = sent.find(
+      (entry) => entry.playerId === 'A' && entry.message.type === 'server:matchFound',
+    );
+    expect(
+      rematchFound?.message.type === 'server:matchFound' ? rematchFound.message.practiceKind : null,
+    ).toBe('crew_battle');
+  });
+
   it('tears down every Scrap Pit bot when its solo player disconnects', () => {
     const { fake } = makeFakeServer();
     const mgr = new MatchmakingManager(fake, () => 0, store, seededRng([0, 0, 0, 0, 0]));

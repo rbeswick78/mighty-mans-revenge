@@ -22,6 +22,13 @@ export class DeathmatchMode implements GameMode {
   isMatchOver(match: MatchContext): boolean {
     const killTarget = match.getKillTarget();
 
+    const teams = match.getTeamIds?.() ?? [];
+    if (teams.length > 0 && match.getTeamScore) {
+      return (
+        teams.some((teamId) => match.getTeamScore!(teamId) >= killTarget) || match.matchTimer <= 0
+      );
+    }
+
     // Check if any player reached the kill target
     for (const player of match.players.values()) {
       if (player.score >= killTarget) {
@@ -62,6 +69,19 @@ export class DeathmatchMode implements GameMode {
   }
 
   determineWinner(match: MatchContext): PlayerId | null {
+    const teams = match.getTeamIds?.() ?? [];
+    if (teams.length > 0 && match.getTeamScore && match.getTeamId) {
+      const rankedTeams = teams
+        .map((teamId) => ({ teamId, score: match.getTeamScore!(teamId) }))
+        .sort((left, right) => right.score - left.score);
+      if (rankedTeams.length > 1 && rankedTeams[0].score === rankedTeams[1].score) return null;
+      return (
+        [...match.players.values()].find(
+          (player) => match.getTeamId!(player.id) === rankedTeams[0].teamId,
+        )?.id ?? null
+      );
+    }
+
     const players = Array.from(match.players.values());
     if (players.length === 0) return null;
 

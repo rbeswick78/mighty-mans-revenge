@@ -10,7 +10,7 @@ import {
   TileType,
   WEAPONS,
 } from '@shared/game';
-import type { CollisionGrid, MapData, PickupState, PlayerState } from '@shared/game';
+import type { CollisionGrid, MapData, PickupState, PlayerId, PlayerState } from '@shared/game';
 import {
   BotController,
   botResourcePriority,
@@ -356,6 +356,18 @@ describe('Scrap Pit target tactics', () => {
     expect(pickBotTarget(bot, players, 'hunter')?.id).toBe('a-tied-leader');
     tiedLeader.isDead = true;
     expect(pickBotTarget(bot, players, 'hunter')?.id).toBe('leader');
+  });
+
+  it('ignores protected teammates for every target personality', () => {
+    const players = new Map([
+      [bot.id, bot],
+      [nearby.id, nearby],
+      [leader.id, leader],
+    ]);
+    const canTarget = (playerId: PlayerId) => playerId !== nearby.id;
+
+    expect(pickBotTarget(bot, players, 'balanced', canTarget)?.id).toBe('leader');
+    expect(pickBotTarget(bot, players, 'hunter', canTarget)?.id).toBe('leader');
   });
 });
 

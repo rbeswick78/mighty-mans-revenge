@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import type { PlayerId } from '@shared/types/common.js';
 import type { PlayerStats } from '@shared/types/player.js';
-import type { MatchResult, PracticeGauntletRouteId } from '@shared/types/game.js';
+import type { MatchResult, PracticeGauntletRouteId, TeamId } from '@shared/types/game.js';
 import type { ServerMatchmakingStatusMessage } from '@shared/types/network.js';
 import {
   AWARD_DEFS,
@@ -231,8 +231,14 @@ export class ResultsScene extends Phaser.Scene {
     const camHeight = this.cameras.main.height;
     const localPlayerId = this.gameService.getPlayerId();
 
-    const isWinner = this.result?.winnerId === localPlayerId;
-    const isDraw = this.result?.winnerId === null || this.result?.winnerId === undefined;
+    const localTeam = localPlayerId ? this.result?.playerTeams?.[localPlayerId] : undefined;
+    const isTeamMatch = this.result?.matchKind === 'duos';
+    const isWinner = isTeamMatch
+      ? localTeam !== undefined && this.result?.winnerTeamId === localTeam
+      : this.result?.winnerId === localPlayerId;
+    const isDraw = isTeamMatch
+      ? this.result?.winnerTeamId === null || this.result?.winnerTeamId === undefined
+      : this.result?.winnerId === null || this.result?.winnerId === undefined;
     const outcome: Outcome = isDraw ? 'draw' : isWinner ? 'victory' : 'defeat';
 
     // ────────────────────────────────────────────────────────────────────
@@ -312,7 +318,9 @@ export class ResultsScene extends Phaser.Scene {
         centerX,
         arenaMastery ? 120 : 112,
         this.result
-          ? (gauntletNextTeaser(this.result) ?? nextDraftTeaser(this.result))
+          ? this.result.matchKind === 'duos'
+            ? `RUN IT BACK: SAME CREWS // NEXT ARENA: ${this.result.nextMapName?.toUpperCase() ?? 'RANDOM'}`
+            : (gauntletNextTeaser(this.result) ?? nextDraftTeaser(this.result))
           : 'NEXT: COIN TOSS PICKS WHO DRAFTS MAP + MODE',
         {
           fontFamily: MENU_FONTS.HEADER,
@@ -332,7 +340,7 @@ export class ResultsScene extends Phaser.Scene {
     // New results use the authoritative locked roster; old payloads retain
     // the original Mighty Man/Bruce fallback pair.
     // ────────────────────────────────────────────────────────────────────
-    if (this.result?.matchKind !== 'rumble') {
+    if (this.result?.matchKind !== 'rumble' && this.result?.matchKind !== 'duos') {
       this.renderTableau(isWinner, isDraw, camHeight, localPlayerId);
     }
 
@@ -351,6 +359,8 @@ export class ResultsScene extends Phaser.Scene {
     if (this.result) {
       if (this.result.matchKind === 'rumble') {
         this.renderRumbleStandings(panel, localPlayerId);
+      } else if (this.result.matchKind === 'duos') {
+        this.renderCrewBattleStandings(panel, localPlayerId);
       } else {
         this.renderStats(panel, localPlayerId, isWinner, isDraw);
       }
@@ -780,6 +790,115 @@ export class ResultsScene extends Phaser.Scene {
         ease: 'Back.easeOut',
       });
     });
+  }
+
+  private renderCrewBattleStandings(panel: MenuPanel, localPlayerId: PlayerId | null): void {
+    if (!this.result?.playerTeams) return;
+    const statsMap =
+      this.result.playerStats instanceof Map
+        ? this.result.playerStats
+        : new Map(
+            Object.entries(this.result.playerStats as unknown as Record<string, PlayerStats>),
+          );
+    const localTeam = localPlayerId ? this.result.playerTeams[localPlayerId] : undefined;
+    const teamIds = [...new Set(Object.values(this.result.playerTeams))] as TeamId[];
+    teamIds.sort((left, right) => {
+      if (left === localTeam) return -1;
+      if (right === localTeam) return 1;
+      return left.localeCompare(right);
+    });
+
+    panel.add(
+      this.add
+        .text(panel.centerX, 22, 'CREW BATTLE // 2V2', {
+          fontFamily: MENU_FONTS.HEADER,
+          fontSize: '13px',
+          color: cssHex(NEXT_DRAFT_COLOR),
+        })
+        .setOrigin(0.5),
+    );
+    panel.add(
+      this.add
+        .text(panel.centerX, 48, 'FRIENDLY FIRE OFF  //  COMBINED KNOCKOUTS WIN', {
+          fontFamily: MENU_FONTS.HEADER,
+          fontSize: '8px',
+          color: cssHex(LABEL_COLOR),
+        })
+        .setOrigin(0.5),
+    );
+
+    let rowIndex = 0;
+    for (const teamId of teamIds) {
+      const isLocalTeam = teamId === localTeam;
+      const isWinner = teamId === this.result.winnerTeamId;
+      const color = isWinner ? WINNER_NICK_COLOR : isLocalTeam ? VALUE_COLOR : LABEL_COLOR;
+      const members = [...statsMap.entries()]
+        .filter(([playerId]) => this.result?.playerTeams?.[playerId] === teamId)
+        .sort(([, left], [, right]) => right.kills - left.kills || left.deaths - right.deaths);
+
+      members.forEach(([playerId, stats], memberIndex) => {
+        const y = 78 + rowIndex * 58;
+        const isLocal = playerId === localPlayerId;
+        const characterId = this.resultCharacterOrNull(playerId);
+        const nickname =
+          this.result?.playerNicknames?.[playerId]?.toUpperCase() ??
+          (isLocal ? this.nickname.toUpperCase() : 'FIGHTER');
+        if (memberIndex === 0) {
+          const teamLabel = isLocalTeam ? 'YOUR CREW' : 'RIVALS';
+          panel.add(
+            this.add.text(
+              24,
+              y + 4,
+              `${isWinner ? '★ ' : ''}${teamLabel}\n${this.result?.teamScores?.[teamId] ?? 0} KOs`,
+              {
+                fontFamily: MENU_FONTS.HEADER,
+                fontSize: '9px',
+                color: cssHex(color),
+                align: 'center',
+              },
+            ),
+          );
+        }
+        if (characterId) {
+          const frame = this.add.graphics();
+          frame.fillStyle(RUMBLE_PORTRAIT_BG, 0.74);
+          frame.fillRect(94, y - 7, 40, 50);
+          frame.lineStyle(1, color, 0.9);
+          frame.strokeRect(94.5, y - 6.5, 39, 49);
+          panel.add(frame);
+          this.spawnResultFighter(
+            114,
+            y + 40,
+            characterId,
+            false,
+            false,
+            1.8,
+            panel,
+            `result-fighter-${playerId}`,
+          );
+        }
+        panel.add(
+          this.add.text(144, y, `${nickname}${isLocal ? '  (YOU)' : ''}`, {
+            fontFamily: MENU_FONTS.HEADER,
+            fontSize: '10px',
+            color: cssHex(isLocal ? VALUE_COLOR : color),
+          }),
+        );
+        panel.add(
+          this.add.text(
+            144,
+            y + 22,
+            `${stats.kills} K  //  ${stats.assists} A  //  ${stats.deaths} D`,
+            {
+              fontFamily: MENU_FONTS.BODY,
+              fontSize: '10px',
+              color: cssHex(LABEL_COLOR),
+            },
+          ),
+        );
+        rowIndex++;
+      });
+    }
   }
 
   private renderRumbleStandings(panel: MenuPanel, localPlayerId: PlayerId | null): void {

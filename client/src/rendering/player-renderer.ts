@@ -30,6 +30,8 @@ const BOUNTY_MARKER_OFFSET_Y = -56;
 const BOUNTY_MARKER_COLOR = '#ffd166';
 const CROWN_MARKER_OFFSET_Y = -68;
 const CROWN_MARKER_COLOR = '#ffe08a';
+const TEAMMATE_MARKER_OFFSET_Y = -56;
+const TEAMMATE_MARKER_COLOR = '#76f7c4';
 
 /**
  * Frost Wizard tint — vertical gradient via Phaser's per-corner setTint.
@@ -59,10 +61,7 @@ const FROZEN_CRYSTAL_OUTLINE = 0x6fa9c8;
  * outward and up, like a held wand — small, off-center, never centered
  * on the body like a two-handed gun.
  */
-const WAND_DIR_OFFSETS: Record<
-  Direction4,
-  { x: number; y: number; rot: number }
-> = {
+const WAND_DIR_OFFSETS: Record<Direction4, { x: number; y: number; rot: number }> = {
   down: { x: -3, y: 1, rot: (-3 * Math.PI) / 4 },
   up: { x: 3, y: 1, rot: -Math.PI / 4 },
   side: { x: 4, y: 1, rot: -Math.PI / 4 },
@@ -126,6 +125,8 @@ export class PlayerRenderer {
   private bountyMarked = false;
   private crownMarkerText: Phaser.GameObjects.Text;
   private crownMarked = false;
+  private teammateMarkerText: Phaser.GameObjects.Text;
+  private teammateMarked = false;
   private scene: Phaser.Scene;
   private invulnerableTween: Phaser.Tweens.Tween | null = null;
   private sprintParticles: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
@@ -335,6 +336,16 @@ export class PlayerRenderer {
     this.crownMarkerText.setOrigin(0.5, 0.5);
     this.crownMarkerText.setVisible(false);
 
+    this.teammateMarkerText = scene.add.text(0, TEAMMATE_MARKER_OFFSET_Y, '[ ALLY ]', {
+      fontFamily: 'Courier, monospace',
+      fontSize: '9px',
+      color: TEAMMATE_MARKER_COLOR,
+      stroke: '#153027',
+      strokeThickness: 3,
+      align: 'center',
+    });
+    this.teammateMarkerText.setOrigin(0.5, 0.5).setVisible(false);
+
     const children: Phaser.GameObjects.GameObject[] = [];
     // Mist sits under the body so the sprite paints over the puddle's center.
     if (this.frostMistGraphics) children.push(this.frostMistGraphics);
@@ -352,6 +363,7 @@ export class PlayerRenderer {
       this.nicknameText,
       this.bountyMarkerText,
       this.crownMarkerText,
+      this.teammateMarkerText,
     );
     this.container = scene.add.container(0, 0, children);
     // Position the wand for the initial 'down' direction.
@@ -675,11 +687,7 @@ export class PlayerRenderer {
     if (dead === this.isDead) return;
     this.isDead = dead;
     if (dead) {
-      this.currentDeathPrefix = deathVariantPrefix(
-        this.characterDef,
-        this.isAxeless,
-        deathCount,
-      );
+      this.currentDeathPrefix = deathVariantPrefix(this.characterDef, this.isAxeless, deathCount);
       this.playDeathAnimation();
     } else {
       this.playRespawnAnimation();
@@ -733,6 +741,13 @@ export class PlayerRenderer {
     this.nicknameText.setVisible(alive);
     this.bountyMarkerText.setVisible(alive && this.bountyMarked);
     this.crownMarkerText.setVisible(alive && this.crownMarked);
+    this.teammateMarkerText.setVisible(alive && this.teammateMarked);
+  }
+
+  /** Mint world marker for the local player's server-authored teammate. */
+  setTeammateMarked(active: boolean): void {
+    this.teammateMarked = active;
+    this.teammateMarkerText.setVisible(active && !this.isDead);
   }
 
   /** Gold, pulsing world marker driven by the authoritative Bounty Hunt id. */
@@ -853,9 +868,7 @@ export class PlayerRenderer {
 
   /** Body anim prefix — the alt-body set while axeless, base otherwise. */
   private bodyPrefix(): string {
-    return this.isAxeless && this.altBodyPrefix !== null
-      ? this.altBodyPrefix
-      : this.texturePrefix;
+    return this.isAxeless && this.altBodyPrefix !== null ? this.altBodyPrefix : this.texturePrefix;
   }
 
   private animKey(direction: Direction4, state: AnimState): string {

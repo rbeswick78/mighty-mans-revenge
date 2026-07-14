@@ -58,6 +58,7 @@ import type {
   PracticeGauntletMatch,
   PracticeGauntletRoute,
   PracticeGauntletRouteId,
+  TeamId,
 } from '@shared/game';
 import { Match } from '../game/match.js';
 import { BotController } from '../game/bot-controller.js';
@@ -132,9 +133,11 @@ interface PostMatchState {
   rumbleCrown: RumbleCrownState | null;
   /** Personal targets carried only into this connected group's direct rematch. */
   rumbleGrudges: RumbleGrudges;
+  /** Crew Battle sides retained unchanged through direct rematches. */
+  playerTeams: ReadonlyMap<PlayerId, TeamId>;
 }
 
-type MatchKind = 'duel' | 'rumble' | 'practice';
+type MatchKind = 'duel' | 'rumble' | 'duos' | 'practice';
 
 /**
  * A pre-match map/mode draft in progress. Lives BEFORE Match construction —
@@ -329,12 +332,16 @@ export class MatchmakingManager {
       ? difficulty
       : DEFAULT_BOT_DIFFICULTY;
     const safeKind = PRACTICE_KINDS.includes(kind) ? kind : 'sparring';
-    const usesSparRules = safeKind === 'sparring' || safeKind === 'rusty_rumble';
+    const usesSparRules =
+      safeKind === 'sparring' || safeKind === 'rusty_rumble' || safeKind === 'crew_battle';
     const practiceModePin =
-      usesSparRules && gameMode !== undefined && GAME_MODE_ROTATION.includes(gameMode)
-        ? gameMode
-        : null;
+      safeKind === 'crew_battle'
+        ? GameModeType.DEATHMATCH
+        : usesSparRules && gameMode !== undefined && GAME_MODE_ROTATION.includes(gameMode)
+          ? gameMode
+          : null;
     const practiceRivalPin =
+      safeKind !== 'crew_battle' &&
       usesSparRules &&
       opponentCharacterId !== undefined &&
       CHARACTER_IDS.includes(opponentCharacterId)
@@ -364,7 +371,7 @@ export class MatchmakingManager {
     this.playerNicknames.set(playerId, nickname);
 
     const botNicknames =
-      safeKind === 'rusty_rumble'
+      safeKind === 'rusty_rumble' || safeKind === 'crew_battle'
         ? SCRAP_PIT_RIVALS.map((rival) => rival.nickname)
         : [BOT.NICKNAME];
     const botEntries = botNicknames.map((botNickname) => {
@@ -383,14 +390,26 @@ export class MatchmakingManager {
         )
       : GAME_MODE_ROTATION;
     const selectedMode =
-      this.forcedMode() ??
-      practiceModePin ??
-      dailyOpening?.gameMode ??
-      randomModePool[
-        Math.min(Math.floor(this.rng() * randomModePool.length), randomModePool.length - 1)
-      ];
+      safeKind === 'crew_battle'
+        ? GameModeType.DEATHMATCH
+        : (this.forcedMode() ??
+          practiceModePin ??
+          dailyOpening?.gameMode ??
+          randomModePool[
+            Math.min(Math.floor(this.rng() * randomModePool.length), randomModePool.length - 1)
+          ]);
     const matchId = crypto.randomUUID();
     if (safeKind === 'rusty_rumble') this.matchKinds.set(matchId, 'rumble');
+    if (safeKind === 'crew_battle') this.matchKinds.set(matchId, 'duos');
+    const playerTeams =
+      safeKind === 'crew_battle'
+        ? new Map<PlayerId, TeamId>([
+            [playerId, 'blue'],
+            [botEntries[0].id, 'blue'],
+            [botEntries[1].id, 'red'],
+            [botEntries[2].id, 'red'],
+          ])
+        : new Map<PlayerId, TeamId>();
     this.launchMatch(
       matchId,
       this.forcedMap() ?? getMap(mapName),
@@ -405,6 +424,7 @@ export class MatchmakingManager {
       practiceModePin,
       practiceRivalPin,
       practiceMutatorPreference,
+      playerTeams,
     );
   }
 
@@ -1017,6 +1037,7 @@ export class MatchmakingManager {
     practiceModePin: GameModeType | null = null,
     practiceRivalPin: CharacterId | null = null,
     practiceMutatorPreference: MutatorId | null = null,
+    playerTeams: ReadonlyMap<PlayerId, TeamId> = new Map(),
   ): void {
     const matchKind =
       this.matchKinds.get(matchId) ?? (practiceDifficulty === null ? 'duel' : 'practice');
@@ -1030,7 +1051,9 @@ export class MatchmakingManager {
             ? 'gauntlet'
             : matchKind === 'rumble'
               ? 'rusty_rumble'
-              : 'sparring';
+              : matchKind === 'duos'
+                ? 'crew_battle'
+                : 'sparring';
     const dailySeed = gauntlet?.challengeKey
       ? [
           gauntlet.challengeKey,
@@ -1064,6 +1087,7 @@ export class MatchmakingManager {
       gauntlet?.forecastMutatorId ?? appliedPracticeMutator ?? undefined,
       dailySeed,
       boonAssignments,
+      playerTeams,
     );
     match.setRttResolver(this.getPlayerRTT);
     this.activeMatches.set(matchId, match);
@@ -1084,7 +1108,7 @@ export class MatchmakingManager {
           matchId,
           botEntries.map((entry) => {
             const rival =
-              practiceKind === 'rusty_rumble'
+              practiceKind === 'rusty_rumble' || practiceKind === 'crew_battle'
                 ? SCRAP_PIT_RIVALS.find((candidate) => candidate.nickname === entry.nickname)
                 : undefined;
             if (rival) match.registerAutonomousTaunt(entry.id, rival.signatureTauntId);
@@ -1156,6 +1180,10 @@ export class MatchmakingManager {
           mapName: mapData.name,
           gameMode,
           matchKind,
+          playerTeams:
+            playerTeams.size > 0
+              ? (Object.fromEntries(playerTeams) as Record<PlayerId, TeamId>)
+              : undefined,
           practiceKind,
           rumbleCrown: this.rumbleCrowns.get(matchId),
           rumbleGrudge: activeGrudge,
@@ -1848,7 +1876,9 @@ export class MatchmakingManager {
     const isPractice = practiceDifficulty !== null;
     result.isPractice = isPractice;
     result.rivalrySet =
-      gauntlet || matchKind === 'rumble' ? null : this.recordRivalrySet(match, result.winnerId);
+      gauntlet || matchKind === 'rumble' || matchKind === 'duos'
+        ? null
+        : this.recordRivalrySet(match, result.winnerId);
     const humanPlayerId = gauntlet
       ? [...match.players.keys()].find((playerId) => !this.botPlayerIds.has(playerId))
       : undefined;
@@ -1917,11 +1947,13 @@ export class MatchmakingManager {
       (restartingDaily ? dailyOpening.mapName : getNextMapName(match.mapManager.getMapData().name));
     result.nextMapName = nextMapName;
     const nextGameMode =
-      this.forcedMode() ??
-      practiceModePin ??
-      (restartingDaily
-        ? dailyOpening.gameMode
-        : this.nextCompatiblePracticeMode(match.gameModeType, practiceMutatorPreference));
+      matchKind === 'duos'
+        ? GameModeType.DEATHMATCH
+        : (this.forcedMode() ??
+          practiceModePin ??
+          (restartingDaily
+            ? dailyOpening.gameMode
+            : this.nextCompatiblePracticeMode(match.gameModeType, practiceMutatorPreference)));
     result.nextGameMode = nextGameMode;
     const nextGauntlet = result.gauntlet
       ? practiceGauntletMatch(
@@ -2158,6 +2190,7 @@ export class MatchmakingManager {
       previousContractId: result.contract?.id ?? match.getContractHudState().id,
       rumbleCrown: rumbleCrownResult?.crown ?? null,
       rumbleGrudges,
+      playerTeams: match.getTeamAssignments(),
     });
 
     // Remove from active matches
@@ -2232,7 +2265,10 @@ export class MatchmakingManager {
 
     if (postMatch.isPractice) {
       const nextMatchId = crypto.randomUUID();
-      this.matchKinds.set(nextMatchId, rematchKind === 'rumble' ? 'rumble' : 'practice');
+      this.matchKinds.set(
+        nextMatchId,
+        rematchKind === 'rumble' ? 'rumble' : rematchKind === 'duos' ? 'duos' : 'practice',
+      );
       if (rematchKind === 'rumble' && postMatch.rumbleCrown) {
         this.rumbleCrowns.set(nextMatchId, postMatch.rumbleCrown);
       }
@@ -2250,6 +2286,7 @@ export class MatchmakingManager {
         postMatch.practiceModePin,
         postMatch.practiceRivalPin,
         postMatch.practiceMutatorPreference,
+        postMatch.playerTeams,
       );
       return;
     }

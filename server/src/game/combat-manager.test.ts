@@ -102,6 +102,32 @@ describe('CombatManager', () => {
       expect(result.trail.damageApplied).toBe(0);
     });
 
+    it('passes through a protected teammate and hits the enemy behind them', () => {
+      const shooter = createPlayer({ id: 'shooter', position: { x: 100, y: 100 } });
+      const ally = createPlayer({ id: 'ally', position: { x: 160, y: 100 } });
+      const enemy = createPlayer({ id: 'enemy', position: { x: 230, y: 100 } });
+      const players = new Map<PlayerId, PlayerState>([
+        ['shooter', shooter],
+        ['ally', ally],
+        ['enemy', enemy],
+      ]);
+
+      const result = combat.processShot(
+        'shooter',
+        0,
+        players,
+        createOpenGrid(),
+        undefined,
+        false,
+        'rifle',
+        1,
+        (_attackerId, victimId) => victimId !== 'ally',
+      );
+
+      expect(result.hit).toBe(true);
+      expect(result.victimId).toBe('enemy');
+    });
+
     it('misses when no player is in the line of fire', () => {
       const shooter = createPlayer({ id: 'shooter', position: { x: 100, y: 100 } });
       const target = createPlayer({ id: 'target', position: { x: 100, y: 300 } });
@@ -350,6 +376,29 @@ describe('CombatManager', () => {
       expect(explosion!.damages[0].playerId).toBe('victim');
       expect(combat.getActiveGrenadeFor('attacker')).toBeUndefined();
       expect(combat.getGrenades().length).toBe(0);
+    });
+
+    it('keeps protected teammates out of attributed explosions', () => {
+      const thrower = createPlayer({ id: 'thrower', position: { x: 100, y: 100 } });
+      const ally = createPlayer({ id: 'ally', position: { x: 120, y: 100 } });
+      const enemy = createPlayer({ id: 'enemy', position: { x: 140, y: 100 } });
+      const players = new Map<PlayerId, PlayerState>([
+        [thrower.id, thrower],
+        [ally.id, ally],
+        [enemy.id, enemy],
+      ]);
+      const grenade = combat.spawnGrenade(thrower.id, thrower.position, 0);
+
+      const explosion = combat.detonateGrenade(
+        grenade.id,
+        players,
+        createOpenGrid(),
+        (attackerId, victimId) => attackerId === victimId || victimId !== ally.id,
+      );
+
+      expect(explosion?.damages.map((damage) => damage.playerId)).toEqual(['thrower', 'enemy']);
+      expect(ally.health).toBe(ally.maxHealth);
+      expect(enemy.health).toBeLessThan(enemy.maxHealth);
     });
 
     it('detonateGrenade returns null for an unknown id', () => {
@@ -603,15 +652,8 @@ describe('CombatManager', () => {
         ['shooter', shooter],
         ['victim', victim],
       ]);
-      return combat.processShot(
-        'shooter',
-        0,
-        players,
-        createOpenGrid(),
-        undefined,
-        false,
-        'punch',
-      ).hit;
+      return combat.processShot('shooter', 0, players, createOpenGrid(), undefined, false, 'punch')
+        .hit;
     }
 
     it('a punch ray connects at or inside maxRange (56px)', () => {
@@ -701,9 +743,7 @@ describe('CombatManager', () => {
 
       let allHits: ReturnType<CombatManager['updateAxes']>['hits'] = [];
       for (let i = 0; i < 10; i++) {
-        allHits = allHits.concat(
-          combat.updateAxes(0.05, players, createOpenGrid()).hits,
-        );
+        allHits = allHits.concat(combat.updateAxes(0.05, players, createOpenGrid()).hits);
       }
 
       expect(allHits).toHaveLength(1);
@@ -793,9 +833,7 @@ describe('CombatManager', () => {
       normie.health = PLAYER.MAX_HEALTH;
       hits = [];
       for (let i = 0; i < 10; i++) {
-        hits = hits.concat(
-          scaledCombat.updateAxes(0.05, players, createOpenGrid(), 1.5).hits,
-        );
+        hits = hits.concat(scaledCombat.updateAxes(0.05, players, createOpenGrid(), 1.5).hits);
       }
       expect(hits).toHaveLength(1);
     });

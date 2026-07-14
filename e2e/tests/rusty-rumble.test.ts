@@ -35,14 +35,16 @@ test.describe('Scrap Pit solo Rumble', () => {
           game?: { scene: { getScene: (key: string) => unknown } };
         };
         const scene = w.game?.scene.getScene('LobbyScene') as {
-          practiceButton: { x: number; list: Array<{ text?: string }> };
-          rustyRumbleButton: { x: number; list: Array<{ text?: string }> };
-          gauntletButton: { x: number; list: Array<{ text?: string }> };
-          dailyButton: { x: number; list: Array<{ text?: string }> };
+          practiceButton: { x: number; y: number; list: Array<{ text?: string }> };
+          rustyRumbleButton: { x: number; y: number; list: Array<{ text?: string }> };
+          crewBattleButton: { x: number; y: number; list: Array<{ text?: string }> };
+          gauntletButton: { x: number; y: number; list: Array<{ text?: string }> };
+          dailyButton: { x: number; y: number; list: Array<{ text?: string }> };
         };
         const buttons = [
           scene.practiceButton,
           scene.rustyRumbleButton,
+          scene.crewBattleButton,
           scene.gauntletButton,
           scene.dailyButton,
         ];
@@ -51,16 +53,23 @@ test.describe('Scrap Pit solo Rumble', () => {
             (button) => button.list.find((child) => typeof child.text === 'string')?.text ?? null,
           ),
           xs: buttons.map((button) => button.x),
+          ys: buttons.map((button) => button.y),
         };
       });
       expect(mobileLobby.labels).toEqual([
         'RUSTY SPAR',
         'SCRAP PIT\nNO WINS YET',
+        'CREW 2V2',
         'GAUNTLET',
         'DAILY RUN',
       ]);
-      expect(mobileLobby.xs).toEqual([...mobileLobby.xs].sort((a, b) => a - b));
-      expect(new Set(mobileLobby.xs).size).toBe(4);
+      expect(mobileLobby.xs.slice(0, 3)).toEqual(
+        [...mobileLobby.xs.slice(0, 3)].sort((a, b) => a - b),
+      );
+      expect(mobileLobby.xs.slice(3)).toEqual([...mobileLobby.xs.slice(3)].sort((a, b) => a - b));
+      expect(new Set(mobileLobby.ys.slice(0, 3)).size).toBe(1);
+      expect(new Set(mobileLobby.ys.slice(3)).size).toBe(1);
+      expect(mobileLobby.ys[3]).toBeGreaterThan(mobileLobby.ys[0]);
       return;
     }
 
@@ -88,15 +97,17 @@ test.describe('Scrap Pit solo Rumble', () => {
         game?: { scene: { getScene: (key: string) => unknown } };
       };
       const scene = w.game?.scene.getScene('LobbyScene') as {
-        practiceButton: { x: number; list: Array<{ text?: string }> };
+        practiceButton: { x: number; y: number; list: Array<{ text?: string }> };
         rustyRumbleButton: {
           x: number;
+          y: number;
           active: boolean;
           activate: () => boolean;
           list: Array<{ text?: string }>;
         };
-        gauntletButton: { x: number; list: Array<{ text?: string }> };
-        dailyButton: { x: number; list: Array<{ text?: string }> };
+        crewBattleButton: { x: number; y: number; list: Array<{ text?: string }> };
+        gauntletButton: { x: number; y: number; list: Array<{ text?: string }> };
+        dailyButton: { x: number; y: number; list: Array<{ text?: string }> };
       };
       const label = (button: { list: Array<{ text?: string }> }) =>
         button.list.find((child) => typeof child.text === 'string')?.text ?? null;
@@ -104,23 +115,41 @@ test.describe('Scrap Pit solo Rumble', () => {
         labels: [
           label(scene.practiceButton),
           label(scene.rustyRumbleButton),
+          label(scene.crewBattleButton),
           label(scene.gauntletButton),
           label(scene.dailyButton),
         ],
         xs: [
           scene.practiceButton.x,
           scene.rustyRumbleButton.x,
+          scene.crewBattleButton.x,
           scene.gauntletButton.x,
           scene.dailyButton.x,
+        ],
+        ys: [
+          scene.practiceButton.y,
+          scene.rustyRumbleButton.y,
+          scene.crewBattleButton.y,
+          scene.gauntletButton.y,
+          scene.dailyButton.y,
         ],
         activated: scene.rustyRumbleButton.activate(),
       };
       return snapshot;
     });
 
-    expect(lobby.labels).toEqual(['RUSTY SPAR', 'SCRAP PIT\nNO WINS YET', 'GAUNTLET', 'DAILY RUN']);
-    expect(lobby.xs).toEqual([...lobby.xs].sort((a, b) => a - b));
-    expect(new Set(lobby.xs).size).toBe(4);
+    expect(lobby.labels).toEqual([
+      'RUSTY SPAR',
+      'SCRAP PIT\nNO WINS YET',
+      'CREW 2V2',
+      'GAUNTLET',
+      'DAILY RUN',
+    ]);
+    expect(lobby.xs.slice(0, 3)).toEqual([...lobby.xs.slice(0, 3)].sort((a, b) => a - b));
+    expect(lobby.xs.slice(3)).toEqual([...lobby.xs.slice(3)].sort((a, b) => a - b));
+    expect(new Set(lobby.ys.slice(0, 3)).size).toBe(1);
+    expect(new Set(lobby.ys.slice(3)).size).toBe(1);
+    expect(lobby.ys[3]).toBeGreaterThan(lobby.ys[0]);
     expect(lobby.activated).toBe(true);
 
     await expect

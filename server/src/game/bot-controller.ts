@@ -236,12 +236,13 @@ export function pickBotTarget(
   bot: PlayerState,
   players: ReadonlyMap<PlayerId, PlayerState>,
   tactic: BotTactic = 'balanced',
+  canTarget: (candidateId: PlayerId) => boolean = () => true,
 ): PlayerState | null {
   if (tactic !== 'hunter') {
     let nearest: PlayerState | null = null;
     let nearestDistance = Number.POSITIVE_INFINITY;
     for (const player of players.values()) {
-      if (player.id === bot.id || player.isDead) continue;
+      if (player.id === bot.id || player.isDead || !canTarget(player.id)) continue;
       const distance = Math.hypot(
         player.position.x - bot.position.x,
         player.position.y - bot.position.y,
@@ -257,7 +258,7 @@ export function pickBotTarget(
   }
 
   const candidates = [...players.values()].filter(
-    (player) => player.id !== bot.id && !player.isDead,
+    (player) => player.id !== bot.id && !player.isDead && canTarget(player.id),
   );
   candidates.sort((left, right) => {
     if (left.score !== right.score) {
@@ -309,13 +310,20 @@ export class BotController {
     if (!bot || bot.isDead) return;
     const bountyTargetId = match.getBountyHuntState()?.targetId ?? null;
     const bountyTarget =
-      bountyTargetId !== null && bountyTargetId !== bot.id
+      bountyTargetId !== null &&
+      bountyTargetId !== bot.id &&
+      !match.areTeammates(bot.id, bountyTargetId)
         ? (match.players.get(bountyTargetId) ?? null)
         : null;
     const target =
       bountyTarget && !bountyTarget.isDead
         ? bountyTarget
-        : pickBotTarget(bot, match.players, this.tactic);
+        : pickBotTarget(
+            bot,
+            match.players,
+            this.tactic,
+            (candidateId) => !match.areTeammates(bot.id, candidateId),
+          );
     const objectiveTag = this.pickNearestTag(bot, match.getKillConfirmedTags());
     const coreState = match.getCoreRunState();
     const looseCore = coreState?.carrierId === null ? coreState : null;
