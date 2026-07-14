@@ -1602,6 +1602,7 @@ export class MatchmakingManager {
         match.gameModeType === GameModeType.BOUNTY_HUNT
           ? (match.getBountyHuntState() ?? undefined)
           : undefined,
+      rumbleLead: match.getRumbleLeadState() ?? undefined,
       wastelandWarp: match.getWastelandWarpState() ?? undefined,
       radiationStorm: match.getRadiationStormState() ?? undefined,
       scrapstorm: match.getScrapstormState() ?? undefined,

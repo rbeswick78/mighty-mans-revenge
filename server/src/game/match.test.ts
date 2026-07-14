@@ -228,6 +228,83 @@ describe('Match', () => {
     });
   });
 
+  describe('Rumble lead story', () => {
+    function startGroupMatch(gameMode: GameModeType = GameModeType.DEATHMATCH): Match {
+      const group = new Match(
+        'rumble-lead',
+        makeMapData(),
+        [
+          { id: 'player-0', nickname: 'Player 0' },
+          { id: 'player-1', nickname: 'Player 1' },
+          { id: 'player-2', nickname: 'Player 2' },
+        ],
+        gameMode,
+      );
+      group.setLock('player-0', 'mighty_man');
+      group.setLock('player-1', 'bruce');
+      group.setLock('player-2', 'frost_wizard');
+      group.update(0.01);
+      group.update(MATCH.COUNTDOWN_DURATION + 0.01);
+      expect(group.phase).toBe(MatchPhase.ACTIVE);
+      return group;
+    }
+
+    it('omits lead state from ordinary two-player matches', () => {
+      match.setLock('player-0', 'mighty_man');
+      match.setLock('player-1', 'bruce');
+      match.update(0.01);
+      match.update(MATCH.COUNTDOWN_DURATION + 0.01);
+      expect(match.getRumbleLeadState()).toBeNull();
+    });
+
+    it('seeds a silent baseline and increments only when the leader set changes', () => {
+      const group = startGroupMatch();
+      expect(group.getRumbleLeadState()).toEqual({
+        leaderIds: ['player-0', 'player-1', 'player-2'],
+        sequence: 0,
+      });
+
+      group.players.get('player-2')!.score = 1;
+      group.update(0);
+      expect(group.getRumbleLeadState()).toEqual({
+        leaderIds: ['player-2'],
+        sequence: 1,
+      });
+
+      group.update(0);
+      expect(group.getRumbleLeadState()?.sequence).toBe(1);
+
+      group.players.get('player-0')!.score = 1;
+      group.update(0);
+      expect(group.getRumbleLeadState()).toEqual({
+        leaderIds: ['player-0', 'player-2'],
+        sequence: 2,
+      });
+    });
+
+    it('reads mode-authored opening scores and removes departed leaders', () => {
+      const group = startGroupMatch(GameModeType.LAST_STAND);
+      expect(group.getRumbleLeadState()).toEqual({
+        leaderIds: ['player-0', 'player-1', 'player-2'],
+        sequence: 0,
+      });
+
+      group.onKill('player-0', 'player-2', 'gun');
+      group.update(0);
+      expect(group.getRumbleLeadState()).toEqual({
+        leaderIds: ['player-0', 'player-1'],
+        sequence: 1,
+      });
+
+      group.onPlayerDisconnect('player-0', true);
+      group.update(0);
+      expect(group.getRumbleLeadState()).toEqual({
+        leaderIds: ['player-1'],
+        sequence: 2,
+      });
+    });
+  });
+
   describe('character select', () => {
     it('getSelectStateMessage seeds one entry per player with deterministic default hovers', () => {
       const m = createMatch();

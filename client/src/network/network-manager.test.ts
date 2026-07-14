@@ -284,6 +284,72 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
     expect(manager.getBountyHuntState()).toBeNull();
   });
 
+  it('emits only forward Rumble lead edges and suppresses snapshot seeding', () => {
+    const seen: unknown[] = [];
+    manager.on('rumbleLeadChanged', (state, players) => {
+      seen.push({ state, playerIds: players.map((player: SerializedPlayerState) => player.id) });
+    });
+    const group = [
+      makeSerialized(),
+      makeSerialized({ id: REMOTE_ID, nickname: 'Rival' }),
+      makeSerialized({ id: 'remote-two', nickname: 'Nomad' }),
+    ];
+
+    deliver(
+      makeGameState(group, {
+        rumbleLead: { leaderIds: group.map((player) => player.id), sequence: 0 },
+      }),
+    );
+    expect(seen).toEqual([]);
+
+    deliver(
+      makeGameState(group, {
+        tick: 2,
+        rumbleLead: { leaderIds: [REMOTE_ID], sequence: 1 },
+      }),
+    );
+    expect(seen).toEqual([
+      {
+        state: { leaderIds: [REMOTE_ID], sequence: 1 },
+        playerIds: [LOCAL_ID, REMOTE_ID, 'remote-two'],
+      },
+    ]);
+
+    // Duplicate and out-of-order unreliable snapshots cannot replay a beat.
+    deliver(
+      makeGameState(group, {
+        tick: 3,
+        rumbleLead: { leaderIds: [REMOTE_ID], sequence: 1 },
+      }),
+    );
+    deliver(
+      makeGameState(group, {
+        tick: 2,
+        rumbleLead: { leaderIds: group.map((player) => player.id), sequence: 0 },
+      }),
+    );
+    expect(seen).toHaveLength(1);
+
+    deliver({
+      type: 'server:matchFound',
+      matchId: 'next-rumble',
+      opponents: group.slice(1).map((player) => ({
+        id: player.id,
+        nickname: player.nickname,
+      })),
+      mapName: 'Scrapyard',
+      gameMode: GameModeType.KOTH,
+      matchKind: 'rumble',
+    });
+    deliver(
+      makeGameState(group, {
+        tick: 4,
+        rumbleLead: { leaderIds: [LOCAL_ID], sequence: 7 },
+      }),
+    );
+    expect(seen).toHaveLength(1);
+  });
+
   it('mirrors and clears the persistent Wasteland Warp countdown', () => {
     const wastelandWarp = { secondsUntilSwap: 6.25, sequence: 4 };
     deliver(makeGameState([makeSerialized()], { wastelandWarp }));

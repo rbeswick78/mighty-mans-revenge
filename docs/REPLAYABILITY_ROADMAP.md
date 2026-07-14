@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–78 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Quick Match 1v1 plus 2–4 player Wasteland Rumble with all-player group draft rallies and a rematch-chain Rumble Crown, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–79 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Quick Match 1v1 plus 2–4 player Wasteland Rumble with all-player group draft rallies, a rematch-chain Rumble Crown, and live lead-change drama, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -110,6 +110,7 @@ Each session below attacks one of these.
 | 76  | Wasteland Rumble                                | 2–4 friends turn every arena into a replayable free-for-all                   | **DONE** (2026-07-14) |
 | 77  | Rumble Crown                                    | Every direct group rematch gains a champion to defend or dethrone             | **DONE** (2026-07-14) |
 | 78  | Rumble Draft Rally                              | Every fighter helps choose the next group battleground                        | **DONE** (2026-07-14) |
+| 79  | Rumble Lead Drama                               | Every takeover and tie becomes a shared live-match story                      | **DONE** (2026-07-14) |
 
 ---
 
@@ -3227,6 +3228,46 @@ attempt one attainable friend score to hunt from the first stage onward.
 
 ---
 
+## Session 79 — Rumble Lead Drama
+
+**Goal:** make the shifting stakes of a three- or four-fighter Rumble legible
+mid-fight, so a score change feels like a challenge to the entire group instead
+of only a number moving in the HUD strip.
+
+**Locked design decisions**
+
+- Only matches that begin with at least three fighters author lead state.
+  Quick Match, two-fighter Rumbles, and Practice keep their existing live HUD.
+- The server reads the highest existing mode score after mode initialization
+  and every mode tick. It excludes disconnected fighters and sends the complete
+  sorted tied-leader set, so Deathmatch, KOTH, Last Stand, and every objective
+  mode share one rule without duplicating their scoring logic.
+- Sequence 0 is a silent opening baseline. The sequence advances only when the
+  leader set changes; the client ignores initial/reconnect seeding, duplicates,
+  and out-of-order snapshots, then presents only a forward edge.
+- Copy distinguishes taking the lead, a rival takeover, joining a lead tie, a
+  rival-only tie, and the full field drawing level. The existing combat-callout
+  lane and a small pitch-shaped UI tick keep the beat readable without adding
+  another HUD layer; same-tick kill medals retain presentation priority.
+- This feature cannot alter score, combat, mode rules, persistence, Crown
+  state, rematch behavior, matchmaking, physics, or balance.
+
+**Acceptance criteria**
+
+- [x] Match tests cover the silent group baseline, unchanged leader sets,
+      takeovers, shared leads, Last Stand opening lives, departures, and the
+      unchanged two-player path.
+- [x] Network tests cover first-snapshot suppression, one forward edge,
+      duplicate and out-of-order rejection, and fresh-match reseeding.
+- [x] Pure presentation tests cover every local/rival/tie copy branch, compact
+      long names, and defensive malformed-state handling.
+- [x] Chromium, Firefox, and 844×390 mobile-landscape browser walkthroughs
+      compose the real live HUD callout inside the gameplay bounds.
+- [x] Typecheck, lint, all unit tests, production build, and the full
+      Playwright desktop/mobile matrix pass.
+
+---
+
 ## Session 78 — Rumble Draft Rally
 
 **Goal:** remove spectator-only downtime from larger Rumble drafts and turn
@@ -3658,6 +3699,40 @@ favorite mid-match event while the final-minute surprise stays fresh.
 ---
 
 ## Session Log
+
+### Session 79 — 2026-07-14 — Rumble Lead Drama
+
+**Shipped:** three- and four-fighter rounds now turn every change in the live
+leader set into a shared takeover beat. The local fighter sees when they take
+or tie for first; the rest of the field gets a named target; rival-only ties
+name the front-runners; and a full reset announces that anyone can take it.
+
+The server derives this story from each mode's existing authoritative score
+after mode initialization and every tick. A persistent monotonic snapshot
+tracks the complete connected leader set, while the client suppresses the
+silent opening baseline, reconnect seeding, duplicates, and stale packets.
+Presentation reuses the compact combat-callout lane and deliberately runs
+before same-tick kill events so earned medals remain the stronger personal
+beat. Two-player matches, score, combat, mode rules, Crown state, persistence,
+matchmaking, physics, and balance are unchanged. No assets were added.
+
+**Verification:** focused Match, network, and presentation coverage passes 277
+assertions. Typecheck and lint pass. Desktop Chromium, desktop Firefox, and
+844×390 mobile landscape compose the real GameScene/HUD takeover callout
+inside the gameplay bounds; the desktop paths reach live play through the
+authoritative local server, while mobile isolates composition from its known
+emulated WebRTC startup limitation. All 1,230 unit tests across 85 files and
+the pinned-pnpm production build pass; Vite retains its existing chunk-size
+advisory. The full Playwright matrix passes 39 tests with 12 intentional
+project-scoped skips.
+
+**Tuning watch:** watch whether takeover frequency feels exciting across
+objective modes, whether full-field ties are rare enough to stay special, and
+whether named rival copy produces useful table talk. Do not change mode scores
+or callout cadence without a real three- or four-player session.
+
+**Deployment:** not run; production deployment still requires explicit user
+authorization.
 
 ### Session 78 — 2026-07-14 — Rumble Draft Rally
 

@@ -15,6 +15,7 @@ import {
   PracticeGauntletRouteId,
   CoreRunState,
   BountyHuntState,
+  RumbleLeadState,
   RumbleCrownState,
   WastelandWarpState,
   RadiationStormState,
@@ -222,6 +223,8 @@ export interface ServerGameStateMessage {
   coreRun?: CoreRunState;
   /** Living marked fighter; present only in active Bounty Hunt regulation. */
   bountyHunt?: BountyHuntState;
+  /** Persistent leader edge for matches that started with 3+ fighters. */
+  rumbleLead?: RumbleLeadState;
   /** Reconnect-safe countdown and edge for the Wasteland Warp mutator. */
   wastelandWarp?: WastelandWarpState;
   /** Authoritative safe zone for the Radiation Storm mutator. */

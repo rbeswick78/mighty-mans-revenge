@@ -6,6 +6,7 @@ import type {
   MatchResult,
   KillFeedEntry,
   KillConfirmedCollection,
+  RumbleLeadState,
 } from '@shared/types/game.js';
 import { GameModeType, MatchPhase } from '@shared/types/game.js';
 import type { BulletTrail, PunchEvent } from '@shared/types/projectile.js';
@@ -13,10 +14,7 @@ import { PickupType } from '@shared/types/pickup.js';
 import { PLAYER, SERVER, WEAPONS } from '@shared/config/game.js';
 import { TAUNT, TAUNT_IDS, type TauntId } from '@shared/config/game.js';
 import { Wasteland, cssHex } from '@shared/config/palette.js';
-import {
-  predictBulletRay,
-  predictGrenadePath,
-} from '@shared/utils/trajectory-prediction.js';
+import { predictBulletRay, predictGrenadePath } from '@shared/utils/trajectory-prediction.js';
 import { gunGameRungForScore } from '@shared/utils/gun-game.js';
 import { practiceGauntletStylePointsForKill } from '@shared/utils/practice-gauntlet.js';
 import type { PlayerState } from '@shared/types/player.js';
@@ -24,10 +22,7 @@ import { MapRenderer } from '../rendering/map-renderer.js';
 import { ClientPlayerManager } from '../rendering/player-manager.js';
 import { TauntRenderer } from '../rendering/taunt-renderer.js';
 import { EffectsRenderer } from '../rendering/effects-renderer.js';
-import {
-  hasConfirmedPlayerHit,
-  isSameShotgunBlast,
-} from '../rendering/hit-feedback.js';
+import { hasConfirmedPlayerHit, isSameShotgunBlast } from '../rendering/hit-feedback.js';
 import { PickupRenderer } from '../rendering/pickup-renderer.js';
 import { ConfirmedTagRenderer } from '../rendering/confirmed-tag-renderer.js';
 import { CoreRunRenderer } from '../rendering/core-run-renderer.js';
@@ -77,6 +72,7 @@ import {
 import { Crosshair } from '../rendering/crosshair.js';
 import { combatCalloutFor, withGauntletStyle } from '../ui/combat-callout.js';
 import { confirmedTagCallout } from '../ui/confirmed-tag.js';
+import { rumbleLeadCallout } from '../ui/rumble-lead.js';
 import { HUD } from '../ui/hud.js';
 import { InputManager } from '../input/input-manager.js';
 import { isTouchDevice } from '../input/is-touch-device.js';
@@ -221,6 +217,9 @@ export class GameScene extends Phaser.Scene {
   private onPlayerKilled: ((entry: KillFeedEntry) => void) | null = null;
   private onPickupCollected: ((pickupId: string, playerId: PlayerId) => void) | null = null;
   private onConfirmedTagCollected: ((event: KillConfirmedCollection) => void) | null = null;
+  private onRumbleLeadChanged:
+    | ((state: RumbleLeadState, players: SerializedPlayerState[]) => void)
+    | null = null;
   private onGrenadeThrown: ((pos: Vec2) => void) | null = null;
   private onGrenadeExploded: ((pos: Vec2) => void) | null = null;
   private onAxeThrown: ((pos: Vec2) => void) | null = null;
@@ -402,12 +401,13 @@ export class GameScene extends Phaser.Scene {
       // Capture the position as it was going into this tick for render
       // interpolation. The most recent predicted position after sendInput
       // becomes the new "current" target.
-      this.prevLocalPos = this.currLocalPos ?? { x: localState.position.x, y: localState.position.y };
+      this.prevLocalPos = this.currLocalPos ?? {
+        x: localState.position.x,
+        y: localState.position.y,
+      };
 
       const playerId = networkManager.getPlayerId();
-      const hasActiveGrenade = playerId
-        ? networkManager.hasActiveGrenadeFor(playerId)
-        : false;
+      const hasActiveGrenade = playerId ? networkManager.hasActiveGrenadeFor(playerId) : false;
       const input = this.inputManager.update(
         localState.position,
         this.currentTick,
@@ -449,10 +449,7 @@ export class GameScene extends Phaser.Scene {
       if (input.firePressed && !heldMagEmpty) {
         this.inputManager.rumble(0.14, 45);
       }
-      if (
-        input.detonatePressed ||
-        (input.throwPressed && localState.grenades > 0)
-      ) {
+      if (input.detonatePressed || (input.throwPressed && localState.grenades > 0)) {
         this.inputManager.rumble(0.28, 80);
       }
       if (
@@ -520,35 +517,37 @@ export class GameScene extends Phaser.Scene {
         // ClientPlayerManager rebuilds the renderer the moment the real
         // characterId disagrees, so a placeholder can't stick.
         const localCharacterId = currentLocalState.characterId ?? 'mighty_man';
-        const allPlayers: SerializedPlayerState[] = [{
-          id: currentLocalState.id,
-          characterId: localCharacterId,
-          position: renderPos,
-          velocity: currentLocalState.velocity,
-          aimAngle: currentLocalState.aimAngle,
-          health: currentLocalState.health,
-          maxHealth: currentLocalState.maxHealth,
-          armor: currentLocalState.armor,
-          ammo: currentLocalState.ammo,
-          weaponId: currentLocalState.weaponId,
-          specialAmmo: currentLocalState.specialAmmo,
-          specialReserve: currentLocalState.specialReserve,
-          grenades: currentLocalState.grenades,
-          isReloading: currentLocalState.isReloading,
-          isSprinting: currentLocalState.isSprinting,
-          stamina: currentLocalState.stamina,
-          isDead: currentLocalState.isDead,
-          respawnTimer: currentLocalState.respawnTimer,
-          invulnerableTimer: currentLocalState.invulnerableTimer,
-          lastProcessedInput: currentLocalState.lastProcessedInput,
-          score: currentLocalState.score,
-          deaths: currentLocalState.deaths,
-          nickname: currentLocalState.nickname,
-          abilityActiveSeconds: currentLocalState.abilityActiveSeconds,
-          abilityCooldownSeconds: currentLocalState.abilityCooldownSeconds,
-          frozenTimer: currentLocalState.frozenTimer,
-          secondWindTimer: currentLocalState.secondWindTimer,
-        }];
+        const allPlayers: SerializedPlayerState[] = [
+          {
+            id: currentLocalState.id,
+            characterId: localCharacterId,
+            position: renderPos,
+            velocity: currentLocalState.velocity,
+            aimAngle: currentLocalState.aimAngle,
+            health: currentLocalState.health,
+            maxHealth: currentLocalState.maxHealth,
+            armor: currentLocalState.armor,
+            ammo: currentLocalState.ammo,
+            weaponId: currentLocalState.weaponId,
+            specialAmmo: currentLocalState.specialAmmo,
+            specialReserve: currentLocalState.specialReserve,
+            grenades: currentLocalState.grenades,
+            isReloading: currentLocalState.isReloading,
+            isSprinting: currentLocalState.isSprinting,
+            stamina: currentLocalState.stamina,
+            isDead: currentLocalState.isDead,
+            respawnTimer: currentLocalState.respawnTimer,
+            invulnerableTimer: currentLocalState.invulnerableTimer,
+            lastProcessedInput: currentLocalState.lastProcessedInput,
+            score: currentLocalState.score,
+            deaths: currentLocalState.deaths,
+            nickname: currentLocalState.nickname,
+            abilityActiveSeconds: currentLocalState.abilityActiveSeconds,
+            abilityCooldownSeconds: currentLocalState.abilityCooldownSeconds,
+            frozenTimer: currentLocalState.frozenTimer,
+            secondWindTimer: currentLocalState.secondWindTimer,
+          },
+        ];
 
         // Add interpolated remote players
         const interpolatedPlayers = networkManager.getInterpolatedPlayers();
@@ -588,10 +587,7 @@ export class GameScene extends Phaser.Scene {
         // and kick chromatic aberration to peak. Respawns (0 → MAX) are
         // increases so they don't trigger here. Heavy hits also roll the
         // camera; chip damage skips the roll and gets only the aberration.
-        if (
-          this.prevLocalHealth !== null &&
-          currentLocalState.health < this.prevLocalHealth
-        ) {
+        if (this.prevLocalHealth !== null && currentLocalState.health < this.prevLocalHealth) {
           this.aberrationPixels = CHROMATIC_INITIAL_PIXELS;
           const damage = this.prevLocalHealth - currentLocalState.health;
           this.inputManager?.rumble(
@@ -622,9 +618,7 @@ export class GameScene extends Phaser.Scene {
         // big_heads: scale every player sprite up while active (visual
         // only — the matching hitbox scale lives in server validation and
         // the aim-line preview).
-        this.playerManager.setBigHeads(
-          networkManager.getActiveMutators().includes('big_heads'),
-        );
+        this.playerManager.setBigHeads(networkManager.getActiveMutators().includes('big_heads'));
         const bountyHuntState = networkManager.getBountyHuntState();
         this.playerManager.updatePlayers(
           allPlayers,
@@ -643,8 +637,7 @@ export class GameScene extends Phaser.Scene {
         // tint for the local player while their ability is active; x-ray
         // silhouettes only for the local Mighty Man; floor aura for any
         // active player so opponents also visibly telegraph their cast.
-        const localSerialized =
-          allPlayers.find((p) => p.id === playerId) ?? null;
+        const localSerialized = allPlayers.find((p) => p.id === playerId) ?? null;
         const collisionGrid = this.mapRenderer?.getCollisionGrid() ?? null;
         this.abilityAura?.update(allPlayers, delta);
         this.fireBreathFx?.update(allPlayers, delta);
@@ -701,12 +694,9 @@ export class GameScene extends Phaser.Scene {
             ? gunGameRungForScore(currentLocalState.score)
             : null,
         );
-        const isLastStand =
-          this.matchData?.gameMode === GameModeType.LAST_STAND;
+        const isLastStand = this.matchData?.gameMode === GameModeType.LAST_STAND;
         this.hud.updateLastStand(isLastStand);
-        this.hud.updateKillConfirmed(
-          this.matchData?.gameMode === GameModeType.KILL_CONFIRMED,
-        );
+        this.hud.updateKillConfirmed(this.matchData?.gameMode === GameModeType.KILL_CONFIRMED);
         this.hud.updateOneInTheChamber(
           this.matchData?.gameMode === GameModeType.ONE_IN_THE_CHAMBER,
           currentLocalState.weaponId,
@@ -714,18 +704,11 @@ export class GameScene extends Phaser.Scene {
           currentLocalState.isDead,
           this.matchPhase === MatchPhase.ACTIVE,
         );
-        this.hud.updateCoreRun(
-          networkManager.getCoreRunState(),
-          playerId,
-        );
+        this.hud.updateCoreRun(networkManager.getCoreRunState(), playerId);
         const bountyTarget = bountyHuntState?.targetId
           ? allPlayers.find((player) => player.id === bountyHuntState.targetId)
           : null;
-        this.hud.updateBountyHunt(
-          bountyHuntState,
-          playerId,
-          bountyTarget?.nickname ?? null,
-        );
+        this.hud.updateBountyHunt(bountyHuntState, playerId, bountyTarget?.nickname ?? null);
         if (
           bountyHuntState &&
           bountyHuntState.targetId !== null &&
@@ -862,9 +845,7 @@ export class GameScene extends Phaser.Scene {
             AudioManager.getInstance()?.play('pickupCollect', { rate: 1.25 });
             this.zoomPulse?.trigger();
           }
-          this.lastRouletteWeapon = rouletteActive
-            ? currentLocalState.weaponId
-            : null;
+          this.lastRouletteWeapon = rouletteActive ? currentLocalState.weaponId : null;
         }
         if (!rouletteActive) {
           this.lastRouletteWeapon = null;
@@ -915,10 +896,7 @@ export class GameScene extends Phaser.Scene {
     this.coreRunRenderer?.update(coreRunState, networkManager.getPlayerId());
     if (coreRunState) {
       const carrierId = coreRunState.carrierId;
-      if (
-        this.lastCoreCarrierId !== undefined &&
-        carrierId !== this.lastCoreCarrierId
-      ) {
+      if (this.lastCoreCarrierId !== undefined && carrierId !== this.lastCoreCarrierId) {
         if (carrierId === networkManager.getPlayerId()) {
           this.hud?.showCombatCallout('CORE SECURED', 'KEEP MOVING', 0x7dffb2);
           AudioManager.getInstance()?.play('pickupCollect', { rate: 1.2 });
@@ -960,9 +938,10 @@ export class GameScene extends Phaser.Scene {
         if (grenade.isDeathBomb) activePickupPositions.push({ ...grenade.position });
       }
       const blackoutActive = networkManager.getActiveMutators().includes('blackout');
-      const localLightPosition = !currentLocalState || currentLocalState.isDead
-        ? null
-        : (this.lastRenderedLocalPos ?? currentLocalState.position);
+      const localLightPosition =
+        !currentLocalState || currentLocalState.isDead
+          ? null
+          : (this.lastRenderedLocalPos ?? currentLocalState.position);
       this.lightingRenderer.update(
         activePickupPositions,
         delta,
@@ -1015,8 +994,7 @@ export class GameScene extends Phaser.Scene {
     // X-ray vision pierces walls for shots and grenades thrown right now.
     // Stickiness for already-fired projectiles is server-authoritative; we
     // only use this for live aim-line/aim-arc previews.
-    const piercing =
-      localState.characterId === 'mighty_man' && localState.abilityActiveSeconds > 0;
+    const piercing = localState.characterId === 'mighty_man' && localState.abilityActiveSeconds > 0;
 
     // Melee draws no aim line — a short "ray" would read as a broken gun
     // preview, and the arc is validated server-side anyway. The
@@ -1063,9 +1041,7 @@ export class GameScene extends Phaser.Scene {
     } else if (raw.aimingGrenade) {
       // turbo_grenades: preview at the boosted throw speed so the arc
       // matches the server's actual flight.
-      const grenadeSpeedMultiplier = networkManager
-        .getActiveMutators()
-        .includes('turbo_grenades')
+      const grenadeSpeedMultiplier = networkManager.getActiveMutators().includes('turbo_grenades')
         ? MUTATORS.TURBO_GRENADES_SPEED_MULTIPLIER
         : 1;
       const path = predictGrenadePath(
@@ -1201,18 +1177,17 @@ export class GameScene extends Phaser.Scene {
 
     this.onOpponentDisconnected = (_playerId: PlayerId) => {
       // Show disconnect message
-      const msg = this.add.text(
-        this.cameras.main.width / 2,
-        this.cameras.main.height / 2,
-        'OPPONENT DISCONNECTED',
-        {
+      const msg = this.add
+        .text(this.cameras.main.width / 2, this.cameras.main.height / 2, 'OPPONENT DISCONNECTED', {
           fontFamily: '"Courier New", Courier, monospace',
           fontSize: '24px',
           color: cssHex(Wasteland.TEXT_DISCONNECT),
           stroke: '#000000',
           strokeThickness: 4,
-        },
-      ).setOrigin(0.5).setScrollFactor(0).setDepth(2000);
+        })
+        .setOrigin(0.5)
+        .setScrollFactor(0)
+        .setDepth(2000);
 
       this.time.delayedCall(3000, () => {
         msg.destroy();
@@ -1329,12 +1304,7 @@ export class GameScene extends Phaser.Scene {
               if (playHitConfirm) audio.play('hitConfirm');
             }
           } else {
-            this.impactFx?.spawnBulletImpact(
-              trail.endPos.x,
-              trail.endPos.y,
-              bulletAngle,
-              grid,
-            );
+            this.impactFx?.spawnBulletImpact(trail.endPos.x, trail.endPos.y, bulletAngle, grid);
             this.decalRenderer?.addBulletHoleIfWall(
               trail.endPos.x,
               trail.endPos.y,
@@ -1366,11 +1336,7 @@ export class GameScene extends Phaser.Scene {
         : 0;
       const callout = withGauntletStyle(baseCallout, stylePoints);
       if (callout) {
-        this.hud?.showCombatCallout(
-          callout.headline,
-          callout.detail,
-          callout.tint,
-        );
+        this.hud?.showCombatCallout(callout.headline, callout.detail, callout.tint);
         if (callout.pulse) this.zoomPulse?.trigger();
       }
       const audio = AudioManager.getInstance();
@@ -1404,9 +1370,7 @@ export class GameScene extends Phaser.Scene {
       // Rate variants distinguish pickups without new audio files: the
       // shotgun lands as a heavier clunk, the pistol as a lighter clack,
       // the bandage as a lighter snip.
-      const pickupType = networkManager
-        .getPickups()
-        .find((p) => p.id === pickupId)?.type;
+      const pickupType = networkManager.getPickups().find((p) => p.id === pickupId)?.type;
       let sfxOptions: { rate: number } | undefined;
       if (pickupType === PickupType.WEAPON_SHOTGUN) {
         sfxOptions = { rate: 0.6 };
@@ -1446,13 +1410,21 @@ export class GameScene extends Phaser.Scene {
       const localId = this.gameService.getNetworkManager().getPlayerId();
       if (!localId) return;
       const callout = confirmedTagCallout(event, localId);
-      this.hud?.showCombatCallout(
-        callout.headline,
-        callout.detail,
-        callout.color,
-      );
+      this.hud?.showCombatCallout(callout.headline, callout.detail, callout.color);
       AudioManager.getInstance()?.play('pickupCollect', {
         rate: event.confirmed ? 1.15 : 0.8,
+      });
+    };
+
+    this.onRumbleLeadChanged = (state: RumbleLeadState, players: SerializedPlayerState[]) => {
+      const localId = this.gameService.getNetworkManager().getPlayerId();
+      if (!localId) return;
+      const callout = rumbleLeadCallout(state, players, localId);
+      if (!callout) return;
+      this.hud?.showCombatCallout(callout.headline, callout.detail, callout.tint);
+      if (callout.pulse) this.zoomPulse?.trigger();
+      AudioManager.getInstance()?.play('menuSelect', {
+        rate: state.leaderIds.includes(localId) ? 1.2 : 0.82,
       });
     };
 
@@ -1461,7 +1433,13 @@ export class GameScene extends Phaser.Scene {
       if (!audio) return;
       const localState = this.gameService.getNetworkManager().getLocalPlayerState();
       if (localState) {
-        audio.playAtPosition('grenadeThrow', pos.x, pos.y, localState.position.x, localState.position.y);
+        audio.playAtPosition(
+          'grenadeThrow',
+          pos.x,
+          pos.y,
+          localState.position.x,
+          localState.position.y,
+        );
       } else {
         audio.play('grenadeThrow');
       }
@@ -1567,7 +1545,13 @@ export class GameScene extends Phaser.Scene {
       if (audio) {
         const localState = this.gameService.getNetworkManager().getLocalPlayerState();
         if (localState) {
-          audio.playAtPosition('explosion', pos.x, pos.y, localState.position.x, localState.position.y);
+          audio.playAtPosition(
+            'explosion',
+            pos.x,
+            pos.y,
+            localState.position.x,
+            localState.position.y,
+          );
         } else {
           audio.play('explosion');
         }
@@ -1637,9 +1621,7 @@ export class GameScene extends Phaser.Scene {
 
     this.onEventWarning = (payload: EventWarningPayload) => {
       const name = eventDisplayName(payload.event);
-      const headline = payload.isFinalMinute
-        ? 'FINAL MINUTE INCOMING'
-        : 'MUTATOR INCOMING';
+      const headline = payload.isFinalMinute ? 'FINAL MINUTE INCOMING' : 'MUTATOR INCOMING';
       this.hud?.showEventBanner(headline, name, EVENT_BANNER_COLORS[payload.event]);
       AudioManager.getInstance()?.play('matchStartHorn');
     };
@@ -1716,6 +1698,7 @@ export class GameScene extends Phaser.Scene {
     this.gameService.on('playerKilled', this.onPlayerKilled);
     this.gameService.on('pickupCollected', this.onPickupCollected);
     this.gameService.on('confirmedTagCollected', this.onConfirmedTagCollected);
+    this.gameService.on('rumbleLeadChanged', this.onRumbleLeadChanged);
     this.gameService.on('grenadeThrown', this.onGrenadeThrown);
     this.gameService.on('grenadeExploded', this.onGrenadeExploded);
     this.gameService.on('axeThrown', this.onAxeThrown);
@@ -1794,6 +1777,14 @@ export class GameScene extends Phaser.Scene {
     if (this.onPickupCollected) {
       this.gameService.off('pickupCollected', this.onPickupCollected);
       this.onPickupCollected = null;
+    }
+    if (this.onConfirmedTagCollected) {
+      this.gameService.off('confirmedTagCollected', this.onConfirmedTagCollected);
+      this.onConfirmedTagCollected = null;
+    }
+    if (this.onRumbleLeadChanged) {
+      this.gameService.off('rumbleLeadChanged', this.onRumbleLeadChanged);
+      this.onRumbleLeadChanged = null;
     }
     if (this.onGrenadeThrown) {
       this.gameService.off('grenadeThrown', this.onGrenadeThrown);

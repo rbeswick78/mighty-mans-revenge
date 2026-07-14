@@ -13,6 +13,7 @@ import type {
   WastelandWarpState,
   RadiationStormState,
   ScrapstormState,
+  RumbleLeadState,
 } from '@shared/types/game.js';
 import type {
   DraftCategory,
@@ -50,6 +51,7 @@ type EventName =
   | 'playerRespawned'
   | 'pickupCollected'
   | 'confirmedTagCollected'
+  | 'rumbleLeadChanged'
   | 'matchmakingStatus'
   | 'rematchStatus'
   | 'opponentDisconnected'
@@ -123,6 +125,8 @@ export class NetworkManager {
   private _wastelandWarpState: WastelandWarpState | null = null;
   private _radiationStormState: RadiationStormState | null = null;
   private _scrapstormState: ScrapstormState | null = null;
+  /** Undefined until the first group snapshot; monotonic within one match. */
+  private lastRumbleLeadSequence: number | undefined = undefined;
 
   /**
    * Local-clock timestamp (performance.now() ms) at which the current
@@ -217,6 +221,7 @@ export class NetworkManager {
     this._wastelandWarpState = null;
     this._radiationStormState = null;
     this._scrapstormState = null;
+    this.lastRumbleLeadSequence = undefined;
     this.matchEndsAtLocalMs = null;
     this._activeMutators = [];
     this._kothState = null;
@@ -709,6 +714,18 @@ export class NetworkManager {
     this._wastelandWarpState = msg.wastelandWarp ?? null;
     this._radiationStormState = msg.radiationStorm ?? null;
     this._scrapstormState = msg.scrapstorm ?? null;
+    if (msg.rumbleLead) {
+      if (
+        this.lastRumbleLeadSequence !== undefined &&
+        msg.rumbleLead.sequence > this.lastRumbleLeadSequence
+      ) {
+        this.emit('rumbleLeadChanged', msg.rumbleLead satisfies RumbleLeadState, msg.players);
+      }
+      this.lastRumbleLeadSequence = Math.max(
+        this.lastRumbleLeadSequence ?? msg.rumbleLead.sequence,
+        msg.rumbleLead.sequence,
+      );
+    }
     for (const collection of msg.confirmedTagCollections ?? []) {
       this.emit('confirmedTagCollected', collection);
     }

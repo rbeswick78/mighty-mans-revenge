@@ -7,6 +7,7 @@ import type {
   PracticeGauntletMatch,
   PracticeGauntletRouteId,
   RumbleCrownState,
+  RumbleLeadState,
 } from '@shared/types/game.js';
 import type {
   DraftCategory,
@@ -17,6 +18,7 @@ import type {
   ServerMatchmakingStatusMessage,
   ServerPlayerKilledMessage,
   ServerCharacterSelectStateMessage,
+  SerializedPlayerState,
 } from '@shared/types/network.js';
 import { createEmptyCharacterWins } from '@shared/config/game.js';
 import type { BotDifficulty, PracticeKind } from '@shared/config/game.js';
@@ -74,6 +76,7 @@ type GameServiceEvent =
   | 'playerKilled'
   | 'pickupCollected'
   | 'confirmedTagCollected'
+  | 'rumbleLeadChanged'
   | 'bulletTrail'
   | 'grenadeThrown'
   | 'grenadeExploded'
@@ -349,6 +352,13 @@ export class GameService {
     this.networkManager.on('confirmedTagCollected', (collection: KillConfirmedCollection) => {
       this.emit('confirmedTagCollected', collection);
     });
+
+    this.networkManager.on(
+      'rumbleLeadChanged',
+      (state: RumbleLeadState, players: SerializedPlayerState[]) => {
+        this.emit('rumbleLeadChanged', state, players);
+      },
+    );
 
     this.networkManager.on('bulletTrail', (trail: unknown) => {
       this.emit('bulletTrail', trail);

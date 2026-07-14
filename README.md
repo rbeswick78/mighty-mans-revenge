@@ -62,6 +62,8 @@ final standings. Direct Rumble rematches also carry a
 session-only Crown: the winner claims it, repeat wins extend the reign, and the
 next winner can steal it. The Crown disappears when the group returns to the
 lobby, so it stays a social run-it-back story instead of persistent grind.
+During three- and four-fighter rounds, server-authored takeover callouts now
+make every sole lead, shared lead, and full-field tie part of the live story.
 
 ## Arena variety
 

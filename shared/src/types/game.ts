@@ -41,6 +41,17 @@ export interface BountyHuntState {
   targetId: PlayerId | null;
 }
 
+/**
+ * Reconnect-safe leader edge for matches that began with a Rumble-sized
+ * field. The server owns score interpretation; clients only present changes.
+ */
+export interface RumbleLeadState {
+  /** Every connected fighter currently tied for the highest mode score. */
+  leaderIds: PlayerId[];
+  /** Increments only when the complete leader set changes. */
+  sequence: number;
+}
+
 /** Persistent moving-objective state for Core Run snapshots. */
 export interface CoreRunState {
   /** Current authoritative world position; follows the carrier while held. */

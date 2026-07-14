@@ -58,6 +58,7 @@ import type {
   KillConfirmedCollection,
   CoreRunState,
   BountyHuntState,
+  RumbleLeadState,
   WastelandWarpState,
   RadiationStormState,
   ScrapstormState,
@@ -196,6 +197,10 @@ export class Match implements MatchContext {
   }
   private _matchStartTimeMs = 0;
   private connectedPlayers: Set<PlayerId> = new Set();
+  /** Only matches that began with a group field author live lead changes. */
+  private readonly tracksRumbleLead: boolean;
+  /** Persistent snapshot edge; sequence 0 is the silent opening baseline. */
+  private rumbleLeadState: RumbleLeadState | null = null;
   /** Active-Rumble leavers stay in results but are removed from competition. */
   private readonly departedPlayerIds: Set<PlayerId> = new Set();
   /**
@@ -317,6 +322,7 @@ export class Match implements MatchContext {
     gauntletBoonAssignments: ReadonlyMap<PlayerId, readonly GauntletBoonId[]> = new Map(),
   ) {
     this.matchId = matchId;
+    this.tracksRumbleLead = playerEntries.length >= 3;
     this.rng = rng;
     this.rematchMutatorExclusions = new Set(rematchMutatorExclusions);
     this.plannedMidMatchMutator = plannedMidMatchMutator;
@@ -961,6 +967,47 @@ export class Match implements MatchContext {
     return this.gameMode.getBountyHuntState?.(this) ?? null;
   }
 
+  /** Current group-match leaders; omitted for duels and outside live play. */
+  getRumbleLeadState(): RumbleLeadState | null {
+    if (!this.tracksRumbleLead || this.phase !== MatchPhase.ACTIVE || !this.rumbleLeadState) {
+      return null;
+    }
+    return {
+      leaderIds: [...this.rumbleLeadState.leaderIds],
+      sequence: this.rumbleLeadState.sequence,
+    };
+  }
+
+  private updateRumbleLeadState(): void {
+    if (!this.tracksRumbleLead) return;
+
+    const contenders = [...this.connectedPlayers]
+      .map((playerId) => this.players.get(playerId))
+      .filter((player): player is PlayerState => player !== undefined);
+    if (contenders.length < 2) return;
+
+    const highScore = Math.max(...contenders.map((player) => player.score));
+    const leaderIds = contenders
+      .filter((player) => player.score === highScore)
+      .map((player) => player.id)
+      .sort();
+    const previous = this.rumbleLeadState;
+    if (!previous) {
+      this.rumbleLeadState = { leaderIds, sequence: 0 };
+      return;
+    }
+    if (
+      previous.leaderIds.length === leaderIds.length &&
+      previous.leaderIds.every((playerId, index) => playerId === leaderIds[index])
+    ) {
+      return;
+    }
+    this.rumbleLeadState = {
+      leaderIds,
+      sequence: previous.sequence + 1,
+    };
+  }
+
   getWastelandWarpState(): WastelandWarpState | null {
     if (
       !this.mutatorActive('wasteland_warp') ||
@@ -1121,6 +1168,9 @@ export class Match implements MatchContext {
       this.midMatchSlot.activateAtElapsed =
         this.timeLimitSeconds * (MUTATORS.MIDMATCH_MIN_ELAPSED_FRACTION + this.rng() * windowSpan);
       this.gameMode.onStart(this);
+      // Mode initialization owns opening scores (notably Last Stand lives),
+      // so seed the silent baseline only after onStart has finished.
+      this.updateRumbleLeadState();
     }
   }
 
@@ -1524,6 +1574,10 @@ export class Match implements MatchContext {
 
     // Game mode tick
     this.gameMode.onTick(this, dt);
+
+    // One mode-agnostic score read gives every 3+ player match the same live
+    // takeover story without teaching the client any scoring rules.
+    this.updateRumbleLeadState();
 
     // Weapon Roulette owns the shared weapon slot after respawns, pickups,
     // and compatible mode hooks. It rotates everyone on the same timer.
