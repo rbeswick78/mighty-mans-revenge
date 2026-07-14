@@ -4,6 +4,7 @@ import wastelandOutpost from '../../maps/wasteland-outpost.json' with { type: 'j
 import overgrownSuburb from '../../maps/overgrown-suburb.json' with { type: 'json' };
 import scrapyard from '../../maps/scrapyard.json' with { type: 'json' };
 import collapsedOverpass from '../../maps/collapsed-overpass.json' with { type: 'json' };
+import checkpointZero from '../../maps/checkpoint-zero.json' with { type: 'json' };
 
 /** Registry order doubles as the rotation order (see getNextMapName). */
 const ALL: readonly MapData[] = [
@@ -11,6 +12,7 @@ const ALL: readonly MapData[] = [
   overgrownSuburb as MapData,
   scrapyard as MapData,
   collapsedOverpass as MapData,
+  checkpointZero as MapData,
 ];
 
 for (const m of ALL) {

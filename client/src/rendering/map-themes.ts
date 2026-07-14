@@ -15,6 +15,7 @@ import { TileType } from '@shared/types/map.js';
  *  - tiles_roof:       16×5 = 80 frames — corrugated roof/container walls.
  *    Columns 0-2 are the dark set, columns 8-10 the red set (+8 offset).
  *  - tiles_garbage:    8×4 = 32 frames — garbage-pile cover accents.
+ *  - cover_*:          16×14 single-frame barricades — readable low cover.
  */
 
 // ────────────────────────── variant picking ──────────────────────────
@@ -34,16 +35,46 @@ export function pickVariant(variants: readonly number[], row: number, col: numbe
 
 export type TileGrid = readonly (readonly number[])[];
 
+/**
+ * Orient a barricade along the strongest neighboring COVER_LOW axis.
+ * Corners, blocks, and isolated cells use the stable cell hash so repeated
+ * renders agree without making every ambiguous prop face the same way.
+ */
+export function coverBarricadeAngle(
+  tiles: TileGrid,
+  h: number,
+  w: number,
+  row: number,
+  col: number,
+): 0 | 90 {
+  const isCover = (r: number, c: number): boolean =>
+    r >= 0 && r < h && c >= 0 && c < w && tiles[r][c] === TileType.COVER_LOW;
+  const horizontal = Number(isCover(row, col - 1)) + Number(isCover(row, col + 1));
+  const vertical = Number(isCover(row - 1, col)) + Number(isCover(row + 1, col));
+  if (horizontal > vertical) return 0;
+  if (vertical > horizontal) return 90;
+  return pickVariant([0, 90], row, col) as 0 | 90;
+}
+
 // ────────────────────────── wall auto-tiling ──────────────────────────
 
 // 4-neighbor wall mask bits.
-const N = 1, E = 2, S = 4, W = 8;
+const N = 1,
+  E = 2,
+  S = 4,
+  W = 8;
 
 export function isWall(tiles: TileGrid, h: number, w: number, r: number, c: number): boolean {
   return r >= 0 && r < h && c >= 0 && c < w && tiles[r][c] === TileType.WALL;
 }
 
-export function neighborMask(tiles: TileGrid, h: number, w: number, row: number, col: number): number {
+export function neighborMask(
+  tiles: TileGrid,
+  h: number,
+  w: number,
+  row: number,
+  col: number,
+): number {
   return (
     (isWall(tiles, h, w, row - 1, col) ? N : 0) |
     (isWall(tiles, h, w, row, col + 1) ? E : 0) |
@@ -61,38 +92,44 @@ export function isOuterWall(row: number, col: number, h: number, w: number): boo
  * perimeter only). Auto-tiled by 4-neighbor pattern; OOB neighbors count
  * as non-walls so the perimeter resolves to corners + edges.
  */
-const BRICK_TL = 0;     // top-left corner: walls below (S) + right (E)
-const BRICK_TR = 5;     // top-right corner: walls below (S) + left (W)
-const BRICK_BL = 15;    // bottom-left corner: walls above (N) + right (E)
-const BRICK_BR = 17;    // bottom-right corner: walls above (N) + left (W)
-const BRICK_VERT = 6;   // vertical run: walls above + below
-const BRICK_HORZ = 16;  // horizontal run: walls left + right
+const BRICK_TL = 0; // top-left corner: walls below (S) + right (E)
+const BRICK_TR = 5; // top-right corner: walls below (S) + left (W)
+const BRICK_BL = 15; // bottom-left corner: walls above (N) + right (E)
+const BRICK_BR = 17; // bottom-right corner: walls above (N) + left (W)
+const BRICK_VERT = 6; // vertical run: walls above + below
+const BRICK_HORZ = 16; // horizontal run: walls left + right
 
 const BRICK_FRAMES_BY_MASK: Record<number, number> = {
   // 2-neighbor outer-wall patterns:
-  [S | E]: BRICK_TL,                     // 6
-  [S | W]: BRICK_TR,                     // 12
-  [N | E]: BRICK_BL,                     // 3
-  [N | W]: BRICK_BR,                     // 9
-  [N | S]: BRICK_VERT,                   // 5
-  [E | W]: BRICK_HORZ,                   // 10
+  [S | E]: BRICK_TL, // 6
+  [S | W]: BRICK_TR, // 12
+  [N | E]: BRICK_BL, // 3
+  [N | W]: BRICK_BR, // 9
+  [N | S]: BRICK_VERT, // 5
+  [E | W]: BRICK_HORZ, // 10
   // T-junctions — pick the axis running through the cell:
-  [N | E | S]: BRICK_VERT,               // 7
-  [N | E | W]: BRICK_HORZ,               // 11
-  [N | S | W]: BRICK_VERT,               // 13
-  [E | S | W]: BRICK_HORZ,               // 14
+  [N | E | S]: BRICK_VERT, // 7
+  [N | E | W]: BRICK_HORZ, // 11
+  [N | S | W]: BRICK_VERT, // 13
+  [E | S | W]: BRICK_HORZ, // 14
   // Cross / interior:
-  [N | E | S | W]: BRICK_HORZ,           // 15
+  [N | E | S | W]: BRICK_HORZ, // 15
   // End-caps:
-  [N]: BRICK_VERT,                       // 1
-  [E]: BRICK_HORZ,                       // 2
-  [S]: BRICK_VERT,                       // 4
-  [W]: BRICK_HORZ,                       // 8
+  [N]: BRICK_VERT, // 1
+  [E]: BRICK_HORZ, // 2
+  [S]: BRICK_VERT, // 4
+  [W]: BRICK_HORZ, // 8
   // Isolated:
   0: BRICK_HORZ,
 };
 
-export function pickBrickFrame(tiles: TileGrid, h: number, w: number, row: number, col: number): number {
+export function pickBrickFrame(
+  tiles: TileGrid,
+  h: number,
+  w: number,
+  row: number,
+  col: number,
+): number {
   const mask = neighborMask(tiles, h, w, row, col);
   return BRICK_FRAMES_BY_MASK[mask] ?? BRICK_HORZ;
 }
@@ -104,21 +141,21 @@ export function pickBrickFrame(tiles: TileGrid, h: number, w: number, row: numbe
  * That's decided by either an adjacent corner (propagation) or by tracing
  * the contiguous wall run for a corner at either end.
  */
-const IRON_TL = 0;      // top-left corner (S+E walls)
-const IRON_TOP = 1;     // top edge
-const IRON_TR = 2;      // top-right corner (S+W)
-const IRON_LEFT = 3;    // left edge
-const IRON_RIGHT = 5;   // right edge
-const IRON_BL = 9;      // bottom-left corner (N+E)
+const IRON_TL = 0; // top-left corner (S+E walls)
+const IRON_TOP = 1; // top edge
+const IRON_TR = 2; // top-right corner (S+W)
+const IRON_LEFT = 3; // left edge
+const IRON_RIGHT = 5; // right edge
+const IRON_BL = 9; // bottom-left corner (N+E)
 const IRON_BOTTOM = 10; // bottom edge
-const IRON_BR = 11;     // bottom-right corner (N+W)
+const IRON_BR = 11; // bottom-right corner (N+W)
 
 // 2-neighbor masks that name a corner (used by both brick + iron tilers,
 // and by the iron-trace logic to identify where a wall run terminates).
-const MASK_TL = S | E;  // 6
-const MASK_TR = S | W;  // 12
-const MASK_BL = N | E;  // 3
-const MASK_BR = N | W;  // 9
+const MASK_TL = S | E; // 6
+const MASK_TR = S | W; // 12
+const MASK_BL = N | E; // 3
+const MASK_BR = N | W; // 9
 const TOP_CORNER_MASKS: ReadonlySet<number> = new Set([MASK_TL, MASK_TR]);
 const BOTTOM_CORNER_MASKS: ReadonlySet<number> = new Set([MASK_BL, MASK_BR]);
 
@@ -164,7 +201,13 @@ function traceForCorner(
  *     if tracing up hits top-right OR down hits bottom-right; else use
  *     the col-vs-mid fallback.
  */
-export function pickIronFrame(tiles: TileGrid, h: number, w: number, row: number, col: number): number {
+export function pickIronFrame(
+  tiles: TileGrid,
+  h: number,
+  w: number,
+  row: number,
+  col: number,
+): number {
   const mask = neighborMask(tiles, h, w, row, col);
 
   // 1. Direct corner match.
@@ -203,10 +246,8 @@ export function pickIronFrame(tiles: TileGrid, h: number, w: number, row: number
   if (hasVertical) {
     const upCorner = traceForCorner(tiles, h, w, row, col, -1, 0);
     const downCorner = traceForCorner(tiles, h, w, row, col, 1, 0);
-    const isLeft =
-      upCorner === MASK_TL || downCorner === MASK_BL;
-    const isRight =
-      upCorner === MASK_TR || downCorner === MASK_BR;
+    const isLeft = upCorner === MASK_TL || downCorner === MASK_BL;
+    const isRight = upCorner === MASK_TR || downCorner === MASK_BR;
     if (isLeft) return IRON_LEFT;
     if (isRight) return IRON_RIGHT;
     // Straight U-D wall, no terminating corners: most-of-board fallback.
@@ -282,6 +323,8 @@ export interface MapTheme {
   floorVariants: readonly number[];
   coverTexture: string;
   coverVariants: readonly number[];
+  /** Barricades preserve their 16×14 aspect and rotate along cover runs. */
+  coverStyle: 'tile' | 'barricade';
   /** Frame in floorTexture swapped in where a grenade detonated. */
   scorchFrame: number;
   outerWall: WallStyleId;
@@ -289,9 +332,8 @@ export interface MapTheme {
 }
 
 /**
- * The background sheets share one layout, so the floor/cover variant
- * indices picked for the bleak sheet (via the tile-picker scene) carry
- * over to its green/dark-green palette swaps unchanged.
+ * The background sheets share one layout, so floor variant indices picked
+ * for the bleak sheet carry over to its green/dark-green palette swaps.
  */
 const FLOOR_VARIANTS: readonly number[] = [50, 51, 52, 28];
 const COVER_VARIANTS: readonly number[] = [100, 99, 101];
@@ -303,6 +345,7 @@ export const MAP_THEMES: Record<string, MapTheme> = {
     floorVariants: FLOOR_VARIANTS,
     coverTexture: 'tiles_bleak',
     coverVariants: COVER_VARIANTS,
+    coverStyle: 'tile',
     scorchFrame: SCORCH_FRAME,
     outerWall: 'brick',
     innerWall: 'iron',
@@ -310,8 +353,9 @@ export const MAP_THEMES: Record<string, MapTheme> = {
   suburb: {
     floorTexture: 'tiles_green',
     floorVariants: FLOOR_VARIANTS,
-    coverTexture: 'tiles_green',
-    coverVariants: COVER_VARIANTS,
+    coverTexture: 'cover_wooden',
+    coverVariants: [0],
+    coverStyle: 'barricade',
     scorchFrame: SCORCH_FRAME,
     outerWall: 'brick',
     innerWall: 'roofDark',
@@ -322,6 +366,7 @@ export const MAP_THEMES: Record<string, MapTheme> = {
     coverTexture: 'tiles_garbage',
     // Garbage-pile interior frames: plain, crate, tarp, tire, cart.
     coverVariants: [9, 10, 18, 19, 26],
+    coverStyle: 'tile',
     scorchFrame: SCORCH_FRAME,
     outerWall: 'brick',
     innerWall: 'roofRed',
@@ -331,9 +376,20 @@ export const MAP_THEMES: Record<string, MapTheme> = {
     floorVariants: FLOOR_VARIANTS,
     coverTexture: 'tiles_garbage',
     coverVariants: [9, 18, 19, 26],
+    coverStyle: 'tile',
     scorchFrame: SCORCH_FRAME,
     outerWall: 'brick',
     innerWall: 'roofDark',
+  },
+  checkpoint: {
+    floorTexture: 'tiles_dark_green',
+    floorVariants: FLOOR_VARIANTS,
+    coverTexture: 'cover_reinforced',
+    coverVariants: [0],
+    coverStyle: 'barricade',
+    scorchFrame: SCORCH_FRAME,
+    outerWall: 'brick',
+    innerWall: 'iron',
   },
 };
 

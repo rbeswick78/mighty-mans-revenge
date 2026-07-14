@@ -36,6 +36,8 @@ This game uses pixel art assets from third-party packs. Source archives are
 - `tiles/background_dark-green.png` — Tiles/Background_Dark-Green_TileSet
 - `tiles/garbage.png` — Tiles/Garbage_TileSet
 - `tiles/roof.png` — Tiles/Roof_TileSet
+- `tiles/cover-reinforced.png` — Objects/Buildable/Reinforced/Reinforced_wooden-wall_Horizontal
+- `tiles/cover-wooden.png` — Objects/Buildable/Wooden/Wooden-wall_Horizontal
 - `decor/car-overgrown_red.png` (+ `_blue`) — Objects/Vehicles/Overgrown/Car_1_Overgrown/Green
 - `decor/car-scrap_gray.png` (+ `_red`) — Objects/Vehicles/Normal/Car_6_Scrap
 - `decor/container-overgrown_gray.png` — Objects/Container/Container_4_Gray_Horizontal_Overgrown_Dark-Green

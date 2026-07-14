@@ -354,6 +354,7 @@ describe('MatchmakingManager map rotation (FORCE-pinned, draft skipped)', () => 
       ['E', 'F'],
       ['G', 'H'],
       ['I', 'J'],
+      ['K', 'L'],
     ];
     pairs.forEach(([p1, p2], i) => {
       sent.length = 0;
@@ -362,7 +363,7 @@ describe('MatchmakingManager map rotation (FORCE-pinned, draft skipped)', () => 
       expect(matchFoundMapName(p1)).toBe(names[i % names.length]);
       expect(matchFoundMapName(p2)).toBe(names[i % names.length]);
     });
-    expect(matchFoundMapName('I')).toBe(names[0]); // wrapped
+    expect(matchFoundMapName('K')).toBe(names[0]); // wrapped
   });
 
   it('matchEnd promises the next map and the pinned rematch delivers it', () => {
@@ -379,7 +380,7 @@ describe('MatchmakingManager map rotation (FORCE-pinned, draft skipped)', () => 
     mgr.handleRematchRequest('B');
     expect(matchFoundMapName('A')).toBe(names[1]);
 
-    // Chain continues through maps #3 and #4, then wraps to #1.
+    // Chain continues through maps #3, #4, and #5, then wraps to #1.
     endActiveMatch();
     expect(lastMatchEndNextMap()).toBe(names[2]);
     sent.length = 0;
@@ -393,6 +394,13 @@ describe('MatchmakingManager map rotation (FORCE-pinned, draft skipped)', () => 
     mgr.handleRematchRequest('A');
     mgr.handleRematchRequest('B');
     expect(matchFoundMapName('A')).toBe(names[3]);
+
+    endActiveMatch();
+    expect(lastMatchEndNextMap()).toBe(names[4]);
+    sent.length = 0;
+    mgr.handleRematchRequest('A');
+    mgr.handleRematchRequest('B');
+    expect(matchFoundMapName('A')).toBe(names[4]);
 
     endActiveMatch();
     expect(lastMatchEndNextMap()).toBe(names[0]);
@@ -1428,13 +1436,7 @@ describe('MatchmakingManager solo practice flow', () => {
     const { fake, sent } = makeFakeServer();
     const mgr = new MatchmakingManager(fake, () => 0, store, seededRng([0, 0, 0]));
 
-    mgr.handleStartPractice(
-      'A',
-      'Alpha',
-      'scrapper',
-      'sparring',
-      GameModeType.CORE_RUN,
-    );
+    mgr.handleStartPractice('A', 'Alpha', 'scrapper', 'sparring', GameModeType.CORE_RUN);
     const first = mgr.getActiveMatches()[0];
     expect(first.gameModeType).toBe(GameModeType.CORE_RUN);
 
@@ -1476,12 +1478,7 @@ describe('MatchmakingManager solo practice flow', () => {
 
   it('rejects malformed Spar pins and ignores pins on Gauntlet requests', () => {
     const invalid = makeFakeServer();
-    const invalidMgr = new MatchmakingManager(
-      invalid.fake,
-      () => 0,
-      store,
-      seededRng([0, 0, 0]),
-    );
+    const invalidMgr = new MatchmakingManager(invalid.fake, () => 0, store, seededRng([0, 0, 0]));
     invalidMgr.handleStartPractice(
       'A',
       'Alpha',
@@ -1498,12 +1495,7 @@ describe('MatchmakingManager solo practice flow', () => {
     expect(invalidBot?.[1].locked).toBe('mighty_man');
 
     const gauntlet = makeFakeServer();
-    const gauntletMgr = new MatchmakingManager(
-      gauntlet.fake,
-      () => 0,
-      store,
-      seededRng([0, 0, 0]),
-    );
+    const gauntletMgr = new MatchmakingManager(gauntlet.fake, () => 0, store, seededRng([0, 0, 0]));
     gauntletMgr.handleStartPractice(
       'B',
       'Bravo',
@@ -1718,7 +1710,7 @@ describe('MatchmakingManager solo practice flow', () => {
         },
         {
           id: 'route_b',
-          mapName: 'Wasteland Outpost',
+          mapName: 'Checkpoint Zero',
           gameMode: GameModeType.KILL_CONFIRMED,
           opponentCharacterId: 'jack',
         },

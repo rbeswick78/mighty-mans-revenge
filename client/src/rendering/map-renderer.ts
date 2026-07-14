@@ -4,7 +4,14 @@ import type { MapData, CollisionGrid } from '@shared/types/map.js';
 import { TileType } from '@shared/types/map.js';
 import { createCollisionGrid } from '@shared/utils/collision.js';
 import { Wasteland } from '@shared/config/palette.js';
-import { getTheme, isOuterWall, pickVariant, WALL_STYLES, type MapTheme } from './map-themes.js';
+import {
+  coverBarricadeAngle,
+  getTheme,
+  isOuterWall,
+  pickVariant,
+  WALL_STYLES,
+  type MapTheme,
+} from './map-themes.js';
 import {
   WIRE_GATE_CLOSED_FRAME,
   WIRE_GATE_OPEN_ANIMATION_KEY,
@@ -126,6 +133,15 @@ export class MapRenderer {
         );
         const sprite = this.scene.add.sprite(x, y, texture, frame);
         sprite.setScale(scale);
+        if (
+          isCover &&
+          !decoCovered.has(row * mapData.width + col) &&
+          theme.coverStyle === 'barricade'
+        ) {
+          sprite.setAngle(
+            coverBarricadeAngle(mapData.tiles, mapData.height, mapData.width, row, col),
+          );
+        }
         this.container.add(sprite);
         this.tileSprites[row][col] = sprite;
       }
@@ -314,9 +330,7 @@ export class MapRenderer {
   }
 
   /** Gold pop + crushed-crate flicker driven by authoritative destruction. */
-  private animateScavengerCacheOpen(
-    sprite: Phaser.GameObjects.Sprite,
-  ): void {
+  private animateScavengerCacheOpen(sprite: Phaser.GameObjects.Sprite): void {
     const burst = this.scene.add.circle(sprite.x, sprite.y, 8, 0xffc857, 0.25);
     burst.setStrokeStyle(2, 0xffe29a, 0.9);
     this.container?.add(burst);

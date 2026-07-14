@@ -34,12 +34,13 @@ describe('MAP_REGISTRY', () => {
     }
   });
 
-  it('contains all four rotation maps in order', () => {
+  it('contains all five rotation maps in order', () => {
     expect(listMapNames()).toEqual([
       'Wasteland Outpost',
       'Overgrown Suburb',
       'Scrapyard',
       'Collapsed Overpass',
+      'Checkpoint Zero',
     ]);
   });
 
@@ -146,6 +147,36 @@ describe('MAP_REGISTRY', () => {
     expect(overpass.kothHills).toHaveLength(6);
     expect(overpass.decorations).toHaveLength(12);
   });
+
+  it('Checkpoint Zero centers its identity on visible two-axis barricade lanes', () => {
+    const checkpoint = getMap('Checkpoint Zero');
+    const decorated = new Set(
+      (checkpoint.decorations ?? []).flatMap((decoration) =>
+        Array.from({ length: decoration.h }, (_, dy) =>
+          Array.from(
+            { length: decoration.w },
+            (_, dx) => `${decoration.x + dx},${decoration.y + dy}`,
+          ),
+        ).flat(),
+      ),
+    );
+    const visibleCover = checkpoint.tiles.flatMap((row, y) =>
+      row.flatMap((tile, x) => (tile === 2 && !decorated.has(`${x},${y}`) ? [{ x, y }] : [])),
+    );
+
+    expect(checkpoint.theme).toBe('checkpoint');
+    expect(visibleCover.length).toBeGreaterThanOrEqual(24);
+    expect(
+      visibleCover.some(
+        ({ x, y }) => checkpoint.tiles[y][x - 1] === 2 || checkpoint.tiles[y][x + 1] === 2,
+      ),
+    ).toBe(true);
+    expect(
+      visibleCover.some(
+        ({ x, y }) => checkpoint.tiles[y - 1]?.[x] === 2 || checkpoint.tiles[y + 1]?.[x] === 2,
+      ),
+    ).toBe(true);
+  });
 });
 
 describe('getNextMapName', () => {
@@ -154,7 +185,8 @@ describe('getNextMapName', () => {
     expect(getNextMapName(names[0])).toBe(names[1]);
     expect(getNextMapName(names[1])).toBe(names[2]);
     expect(getNextMapName(names[2])).toBe(names[3]);
-    expect(getNextMapName(names[3])).toBe(names[0]);
+    expect(getNextMapName(names[3])).toBe(names[4]);
+    expect(getNextMapName(names[4])).toBe(names[0]);
   });
 
   it('restarts the cycle for unknown names instead of throwing', () => {

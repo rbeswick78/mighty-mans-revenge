@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–63 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Practice vs Rusty with favorite-mode and choose-your-rival selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, style bonuses, and live style callouts, four arenas, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–64 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Practice vs Rusty with favorite-mode and choose-your-rival selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, style bonuses, and live style callouts, five arenas including barricade-focused Checkpoint Zero, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -30,71 +30,72 @@ Each session below attacks one of these.
 
 ## Session overview
 
-| #   | Title                                           | Fun payoff                                                                   | Status                |
-| --- | ----------------------------------------------- | ---------------------------------------------------------------------------- | --------------------- |
-| 1   | Weapon system + Shotgun + health pickups        | Fights stop being identical; map control begins                              | **DONE** (2026-07-04) |
-| 2   | Match awards + persistent rivalry stats         | Bragging rights: the friend-group replay engine                              | **DONE** (2026-07-04) |
-| 3   | Mutator expansion                               | Matches stop repeating; chaos moments                                        | **DONE** (2026-07-04) |
-| 4   | Two new maps + rotation                         | New spaces to master                                                         | **DONE** (2026-07-04) |
-| 5   | King of the Hill + overtime                     | A second way to play; no more anticlimactic ties                             | **DONE** (2026-07-04) |
-| 6   | New characters + stat identities                | Counterpicks and mains                                                       | **DONE** (2026-07-04) |
-| 7   | (Stretch) Gun Game + Pistol + melee             | The party mode                                                               | **DONE** (2026-07-04) |
-| 8   | Playtest response + polish backlog              | The accumulated small stuff, cleared before group night                      | **DONE** (2026-07-04) |
-| 9   | Playtest response #1: two bugs + map/mode draft | The game respects your pick — and lets you pick the arena                    | **DONE** (2026-07-05) |
-| 10  | Rivalry Sets + Revenge Drafts                   | Every rematch becomes a round with stakes and comeback control               | **DONE** (2026-07-11) |
-| 11  | Practice vs Rusty                               | The game is playable on demand, even when no friend is online                | **DONE** (2026-07-11) |
-| 12  | Streaks, Payback + Shutdowns                    | Every kill builds a story and a reason to settle the score                   | **DONE** (2026-07-11) |
-| 13  | Rusty Difficulty                                | Solo practice stays welcoming, challenging, and worth mastering              | **DONE** (2026-07-11) |
-| 14  | Collapsed Overpass                              | A fourth arena adds fresh routes and riskier objective fights                | **DONE** (2026-07-11) |
-| 15  | Blackout                                        | Darkness turns familiar fights into close-range cat-and-mouse                | **DONE** (2026-07-11) |
-| 16  | Fresh-Chaos Rematches                           | Back-to-back rounds cannot repeat the same two mutators                      | **DONE** (2026-07-11) |
-| 17  | Last Stand                                      | Every death spends a life, building pressure toward elimination              | **DONE** (2026-07-11) |
-| 18  | Kill Confirmed                                  | Every kill creates a risky confirm-or-deny scramble                          | **DONE** (2026-07-11) |
-| 19  | Mode Briefings                                  | Every mode teaches its win condition before the fight begins                 | **DONE** (2026-07-11) |
-| 20  | Character Death Animations                      | Every elimination lands with a readable, satisfying corpse pose              | **DONE** (2026-07-11) |
-| 21  | Authoritative Hit Confirmation                  | Every accurate shot feels crisp, legible, and unquestionably earned          | **DONE** (2026-07-12) |
-| 22  | Blastable Cover                                 | Grenades permanently carve new routes through each round's arena             | **DONE** (2026-07-12) |
-| 23  | Chain-Reaction Barrels                          | Every arena gains tactical traps, ambushes, and explosive reversals          | **DONE** (2026-07-12) |
-| 24  | Wasteland Contracts                             | Optional side goals change tactics and build a persistent career chase       | **DONE** (2026-07-12) |
-| 25  | Combat Medals                                   | First Blood, rapid chains, and posthumous kills become stories worth chasing | **DONE** (2026-07-12) |
-| 26  | Wasteland Reputation                            | Contract clears build a visible career ladder and recurring promotion chase  | **DONE** (2026-07-12) |
-| 27  | Hot Streaks                                     | Consecutive wins survive restarts, giving every rematch another stake        | **DONE** (2026-07-12) |
-| 28  | Fighter Mastery                                 | Every roster pick gains its own persistent goal and identity                 | **DONE** (2026-07-12) |
-| 29  | Fists Only                                      | Mid-round gunfights collapse into frantic close-range brawls                 | **DONE** (2026-07-12) |
-| 30  | Weapon Roulette                                 | Every ten seconds demands a fresh fighting style and new positioning         | **DONE** (2026-07-12) |
-| 31  | One in the Chamber                              | One precious shot turns every aim, miss, and recovery punch into drama       | **DONE** (2026-07-12) |
-| 32  | Shootable Arena Gates                           | Every firefight can permanently reveal a shortcut or surprise sightline      | **DONE** (2026-07-12) |
-| 33  | Rook + Breach Dash                              | A sixth main turns every fight into a positioning puzzle                     | **DONE** (2026-07-13) |
-| 34  | Scavenger Caches                                | Shooting cover open creates fair loot races and round-to-round surprise      | **DONE** (2026-07-13) |
-| 35  | Core Run                                        | A moving objective turns every second of possession into a chase             | **DONE** (2026-07-13) |
-| 36  | Wasteland Warp                                  | Synchronized position swaps turn settled fights into instant reversals       | **DONE** (2026-07-13) |
-| 37  | Last Laugh                                      | Every death leaves one final explosive threat and chain-reaction story       | **DONE** (2026-07-13) |
-| 38  | Bounty Hunt                                     | A rotating marked fighter makes every chase and reversal worth more          | **DONE** (2026-07-13) |
-| 39  | Power Weapon Drops                              | Every armed death creates a brief, ammo-honest scramble at the corpse        | **DONE** (2026-07-13) |
-| 40  | Clutch Kills                                    | Critical-health victories land as memorable, exact-HP highlight moments      | **DONE** (2026-07-13) |
-| 41  | Scavenger Rush                                  | Rotating short-lived supplies repeatedly pull fighters into fresh contests   | **DONE** (2026-07-13) |
-| 42  | Wasteland Bat                                   | Four brutal swings create a scarce close-range map-control prize             | **DONE** (2026-07-13) |
-| 43  | Radiation Storm                                 | A shrinking safe zone turns passive corners into urgent closing fights       | **DONE** (2026-07-13) |
-| 44  | Rusty's Scavenger Instincts                     | Practice opponents contest the arena's weapons and supplies like real rivals | **DONE** (2026-07-13) |
-| 45  | Scrap Armor                                     | A contested shield pickup rewards proactive center control                   | **DONE** (2026-07-13) |
-| 46  | Scrapstorm                                      | Telegraphed debris strikes turn settled positions into urgent dodges         | **DONE** (2026-07-13) |
-| 47  | Overcharge Cells                                | Ability refreshes turn signature powers into repeatable center-map contests  | **DONE** (2026-07-13) |
-| 48  | Twin-Stick Controller Support                   | Console-style controls make every fight and rematch easier to settle into    | **DONE** (2026-07-13) |
-| 49  | Wasteland Gauntlet                              | A three-fight solo climb turns Practice into a run with escalating stakes    | **DONE** (2026-07-13) |
-| 50  | Gauntlet Score Attack                           | Every solo clear leaves a personal target worth one more run                 | **DONE** (2026-07-13) |
-| 51  | Gauntlet Performance Bonuses                    | Cleaner, faster victories keep even strong personal bests worth chasing      | **DONE** (2026-07-13) |
-| 52  | Gauntlet Route Draft                            | Every cleared stage offers a meaningful next-fight choice                    | **DONE** (2026-07-13) |
-| 53  | Gauntlet Rival Drafts                           | Route previews turn each branch into a readable matchup decision             | **DONE** (2026-07-13) |
-| 54  | Gauntlet Chaos Forecasts                        | Every branch reveals a different mid-fight twist worth planning around       | **DONE** (2026-07-13) |
-| 55  | Gauntlet Chaos Bounties                         | Dangerous route choices become explicit high-score gambles                   | **DONE** (2026-07-13) |
-| 56  | Demolition Wave                                | Familiar lanes erupt into exposed, permanently rewritten battlefields        | **DONE** (2026-07-13) |
-| 57  | Gauntlet Style Bonuses                         | Combat highlights become capped score-chase rewards worth mastering           | **DONE** (2026-07-13) |
-| 58  | Live Gauntlet Style Callouts                   | Every highlight immediately teaches the score chase it can bank                | **DONE** (2026-07-13) |
-| 59  | Blood Rush                                     | Every kill can ignite a fast, aggressive chase for the next                     | **DONE** (2026-07-13) |
-| 60  | Mutator Rule Callouts                          | Every surprise teaches its rule before players must react                       | **DONE** (2026-07-13) |
-| 61  | Death Animation Variety                       | Repeated eliminations stop replaying the same canned fall                        | **DONE** (2026-07-13) |
-| 62  | Favorite Mode Sparring                       | A favorite ruleset becomes deliberately replayable without losing map variety   | **DONE** (2026-07-13) |
-| 63  | Choose Your Rival                           | Any roster matchup becomes deliberate practice instead of a lucky random roll   | **DONE** (2026-07-13) |
+| #   | Title                                           | Fun payoff                                                                    | Status                |
+| --- | ----------------------------------------------- | ----------------------------------------------------------------------------- | --------------------- |
+| 1   | Weapon system + Shotgun + health pickups        | Fights stop being identical; map control begins                               | **DONE** (2026-07-04) |
+| 2   | Match awards + persistent rivalry stats         | Bragging rights: the friend-group replay engine                               | **DONE** (2026-07-04) |
+| 3   | Mutator expansion                               | Matches stop repeating; chaos moments                                         | **DONE** (2026-07-04) |
+| 4   | Two new maps + rotation                         | New spaces to master                                                          | **DONE** (2026-07-04) |
+| 5   | King of the Hill + overtime                     | A second way to play; no more anticlimactic ties                              | **DONE** (2026-07-04) |
+| 6   | New characters + stat identities                | Counterpicks and mains                                                        | **DONE** (2026-07-04) |
+| 7   | (Stretch) Gun Game + Pistol + melee             | The party mode                                                                | **DONE** (2026-07-04) |
+| 8   | Playtest response + polish backlog              | The accumulated small stuff, cleared before group night                       | **DONE** (2026-07-04) |
+| 9   | Playtest response #1: two bugs + map/mode draft | The game respects your pick — and lets you pick the arena                     | **DONE** (2026-07-05) |
+| 10  | Rivalry Sets + Revenge Drafts                   | Every rematch becomes a round with stakes and comeback control                | **DONE** (2026-07-11) |
+| 11  | Practice vs Rusty                               | The game is playable on demand, even when no friend is online                 | **DONE** (2026-07-11) |
+| 12  | Streaks, Payback + Shutdowns                    | Every kill builds a story and a reason to settle the score                    | **DONE** (2026-07-11) |
+| 13  | Rusty Difficulty                                | Solo practice stays welcoming, challenging, and worth mastering               | **DONE** (2026-07-11) |
+| 14  | Collapsed Overpass                              | A fourth arena adds fresh routes and riskier objective fights                 | **DONE** (2026-07-11) |
+| 15  | Blackout                                        | Darkness turns familiar fights into close-range cat-and-mouse                 | **DONE** (2026-07-11) |
+| 16  | Fresh-Chaos Rematches                           | Back-to-back rounds cannot repeat the same two mutators                       | **DONE** (2026-07-11) |
+| 17  | Last Stand                                      | Every death spends a life, building pressure toward elimination               | **DONE** (2026-07-11) |
+| 18  | Kill Confirmed                                  | Every kill creates a risky confirm-or-deny scramble                           | **DONE** (2026-07-11) |
+| 19  | Mode Briefings                                  | Every mode teaches its win condition before the fight begins                  | **DONE** (2026-07-11) |
+| 20  | Character Death Animations                      | Every elimination lands with a readable, satisfying corpse pose               | **DONE** (2026-07-11) |
+| 21  | Authoritative Hit Confirmation                  | Every accurate shot feels crisp, legible, and unquestionably earned           | **DONE** (2026-07-12) |
+| 22  | Blastable Cover                                 | Grenades permanently carve new routes through each round's arena              | **DONE** (2026-07-12) |
+| 23  | Chain-Reaction Barrels                          | Every arena gains tactical traps, ambushes, and explosive reversals           | **DONE** (2026-07-12) |
+| 24  | Wasteland Contracts                             | Optional side goals change tactics and build a persistent career chase        | **DONE** (2026-07-12) |
+| 25  | Combat Medals                                   | First Blood, rapid chains, and posthumous kills become stories worth chasing  | **DONE** (2026-07-12) |
+| 26  | Wasteland Reputation                            | Contract clears build a visible career ladder and recurring promotion chase   | **DONE** (2026-07-12) |
+| 27  | Hot Streaks                                     | Consecutive wins survive restarts, giving every rematch another stake         | **DONE** (2026-07-12) |
+| 28  | Fighter Mastery                                 | Every roster pick gains its own persistent goal and identity                  | **DONE** (2026-07-12) |
+| 29  | Fists Only                                      | Mid-round gunfights collapse into frantic close-range brawls                  | **DONE** (2026-07-12) |
+| 30  | Weapon Roulette                                 | Every ten seconds demands a fresh fighting style and new positioning          | **DONE** (2026-07-12) |
+| 31  | One in the Chamber                              | One precious shot turns every aim, miss, and recovery punch into drama        | **DONE** (2026-07-12) |
+| 32  | Shootable Arena Gates                           | Every firefight can permanently reveal a shortcut or surprise sightline       | **DONE** (2026-07-12) |
+| 33  | Rook + Breach Dash                              | A sixth main turns every fight into a positioning puzzle                      | **DONE** (2026-07-13) |
+| 34  | Scavenger Caches                                | Shooting cover open creates fair loot races and round-to-round surprise       | **DONE** (2026-07-13) |
+| 35  | Core Run                                        | A moving objective turns every second of possession into a chase              | **DONE** (2026-07-13) |
+| 36  | Wasteland Warp                                  | Synchronized position swaps turn settled fights into instant reversals        | **DONE** (2026-07-13) |
+| 37  | Last Laugh                                      | Every death leaves one final explosive threat and chain-reaction story        | **DONE** (2026-07-13) |
+| 38  | Bounty Hunt                                     | A rotating marked fighter makes every chase and reversal worth more           | **DONE** (2026-07-13) |
+| 39  | Power Weapon Drops                              | Every armed death creates a brief, ammo-honest scramble at the corpse         | **DONE** (2026-07-13) |
+| 40  | Clutch Kills                                    | Critical-health victories land as memorable, exact-HP highlight moments       | **DONE** (2026-07-13) |
+| 41  | Scavenger Rush                                  | Rotating short-lived supplies repeatedly pull fighters into fresh contests    | **DONE** (2026-07-13) |
+| 42  | Wasteland Bat                                   | Four brutal swings create a scarce close-range map-control prize              | **DONE** (2026-07-13) |
+| 43  | Radiation Storm                                 | A shrinking safe zone turns passive corners into urgent closing fights        | **DONE** (2026-07-13) |
+| 44  | Rusty's Scavenger Instincts                     | Practice opponents contest the arena's weapons and supplies like real rivals  | **DONE** (2026-07-13) |
+| 45  | Scrap Armor                                     | A contested shield pickup rewards proactive center control                    | **DONE** (2026-07-13) |
+| 46  | Scrapstorm                                      | Telegraphed debris strikes turn settled positions into urgent dodges          | **DONE** (2026-07-13) |
+| 47  | Overcharge Cells                                | Ability refreshes turn signature powers into repeatable center-map contests   | **DONE** (2026-07-13) |
+| 48  | Twin-Stick Controller Support                   | Console-style controls make every fight and rematch easier to settle into     | **DONE** (2026-07-13) |
+| 49  | Wasteland Gauntlet                              | A three-fight solo climb turns Practice into a run with escalating stakes     | **DONE** (2026-07-13) |
+| 50  | Gauntlet Score Attack                           | Every solo clear leaves a personal target worth one more run                  | **DONE** (2026-07-13) |
+| 51  | Gauntlet Performance Bonuses                    | Cleaner, faster victories keep even strong personal bests worth chasing       | **DONE** (2026-07-13) |
+| 52  | Gauntlet Route Draft                            | Every cleared stage offers a meaningful next-fight choice                     | **DONE** (2026-07-13) |
+| 53  | Gauntlet Rival Drafts                           | Route previews turn each branch into a readable matchup decision              | **DONE** (2026-07-13) |
+| 54  | Gauntlet Chaos Forecasts                        | Every branch reveals a different mid-fight twist worth planning around        | **DONE** (2026-07-13) |
+| 55  | Gauntlet Chaos Bounties                         | Dangerous route choices become explicit high-score gambles                    | **DONE** (2026-07-13) |
+| 56  | Demolition Wave                                 | Familiar lanes erupt into exposed, permanently rewritten battlefields         | **DONE** (2026-07-13) |
+| 57  | Gauntlet Style Bonuses                          | Combat highlights become capped score-chase rewards worth mastering           | **DONE** (2026-07-13) |
+| 58  | Live Gauntlet Style Callouts                    | Every highlight immediately teaches the score chase it can bank               | **DONE** (2026-07-13) |
+| 59  | Blood Rush                                      | Every kill can ignite a fast, aggressive chase for the next                   | **DONE** (2026-07-13) |
+| 60  | Mutator Rule Callouts                           | Every surprise teaches its rule before players must react                     | **DONE** (2026-07-13) |
+| 61  | Death Animation Variety                         | Repeated eliminations stop replaying the same canned fall                     | **DONE** (2026-07-13) |
+| 62  | Favorite Mode Sparring                          | A favorite ruleset becomes deliberately replayable without losing map variety | **DONE** (2026-07-13) |
+| 63  | Choose Your Rival                               | Any roster matchup becomes deliberate practice instead of a lucky random roll | **DONE** (2026-07-13) |
+| 64  | Checkpoint Zero                                 | A fifth arena turns readable barricade lanes into destructible route choices  | **DONE** (2026-07-13) |
 
 ---
 
@@ -2845,7 +2846,7 @@ multikill attempts, and aggressive reversals instead of a reset to neutral.
   share that timer. Super Speed remains compatible and multiplies normally;
   explicit FORCE pins retain their established override semantics.
 - Activation uses a crimson flash and explicitly teaches `KILLS GRANT 4 SEC
-  SPEED`. Boosted fighters reuse the snapshot-driven sprint dust. No new wire
+SPEED`. Boosted fighters reuse the snapshot-driven sprint dust. No new wire
   field, damage rule, score rule, or client-authored movement state is added.
 - Its Gauntlet danger bounty is 200: the rule can create a meaningful snowball,
   but every player has equal access and the boost must be earned.
@@ -3005,7 +3006,82 @@ Rusty without removing the quick variety of random Sparring.
 
 ---
 
+## Session 64 — Checkpoint Zero
+
+**Goal:** add a fifth arena whose readable, destructible barricade lanes create
+fresh route decisions and make opening the battlefield feel intentional.
+
+**Locked design decisions**
+
+- Checkpoint Zero is a 20×12 rotationally balanced arena with four spawns,
+  paired barrels/caches/gates, five legal KOTH hills, and the same contested
+  pickup contract as every shipped map. It joins the end of registry order so
+  normal drafting, FORCE verification, rematches, and Gauntlet routes get it
+  without map-specific matchmaking logic.
+- Twenty-eight unobscured `COVER_LOW` cells form long horizontal and vertical
+  reinforced lanes. The center remains open enough for the shotgun,
+  overcharge, armor, and ammo fight; shootable gates create two alternative
+  shortcuts and explosions can permanently open the barricades.
+- Barricade art preserves the pack's 16×14 aspect at 48×42 world size and
+  rotates from neighboring cover cells. This is client presentation only:
+  authoritative collision, tile destruction, blast logic, and shared physics
+  are unchanged.
+- Existing arena layouts and balance are untouched. Overgrown Suburb may use
+  the wooden sibling for its undecorated low cover; Scrapyard, Overpass, and
+  Wasteland retain their established tile-cover looks.
+
+**Acceptance criteria**
+
+- [x] Registry and matchmaking tests cover all five maps, wrap correctly, and
+      accept Checkpoint Zero in deterministic Gauntlet routes.
+- [x] Pure tests prove both barricade orientations, barricade theme metadata,
+      deterministic fallback orientation, and at least 24 visible
+      two-axis cover cells in the new arena.
+- [x] A forced live Chromium match renders both orientations, verifies both
+      curated textures loaded, and destroys a real reinforced barricade while
+      proving its sprite, backing tile, and collision all open.
+- [x] Typecheck, lint, all 1,139 unit tests across 76 files, production build,
+      and the full Playwright desktop/mobile matrix pass.
+
+---
+
 ## Session Log
+
+### Session 64 — 2026-07-13 — Checkpoint Zero
+
+**Shipped:** a fifth arena built around changing routes rather than just a new
+palette. Checkpoint Zero's rotational layout puts 28 visible reinforced
+barricades into long horizontal and vertical lanes, surrounds a contested
+four-pickup center, and adds paired shoot-open shortcuts, explosive barrels,
+scavenger caches, spawn points, and five KOTH positions. It participates in
+the ordinary draft, no-draft rotation, rematches, FORCE pin, every mode, and
+Gauntlet route generation through the shared registry.
+
+The client now supports aspect-correct barricade cover as a theme capability.
+The 16×14 reinforced and wooden sources render at 48×42 and deterministically
+rotate along the strongest neighboring cover axis. This remains cosmetic over
+the existing tile grid: server authority, explosion exposure, reliable tile
+destruction, prediction collision, and frozen movement/combat values did not
+change. Existing arena layouts remain intact.
+
+**Verification:** 1,139 tests pass across 76 files, including map validation,
+five-map rotation/wrap, Gauntlet route expectations, theme resolution, and
+orientation logic. TypeScript, ESLint, all package builds, and the Vite
+production bundle are clean; Vite retains its existing chunk-size advisory.
+The forced live Chromium smoke loaded Checkpoint Zero, visually exercised both
+barricade directions at the correct dimensions, and destroyed one while
+proving the sprite, tile, and collision opened. The full Playwright matrix
+passes 16 tests with 11 intentional scoped skips across Chromium, Firefox,
+and mobile landscape.
+
+**Tuning watch:** the arena deliberately starts cover-dense so demolition and
+gate opening create a noticeable second layout. Watch whether the long side
+walls make early ranged fights too predictable or whether the central pickup
+cluster needs one more approach after friend-group play.
+
+**Deployment:** not run; deployment still requires explicit authorization.
+
+---
 
 ### Session 63 — 2026-07-13 — Choose Your Rival
 

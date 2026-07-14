@@ -488,6 +488,16 @@ export class BootScene extends Phaser.Scene {
       frameWidth: 16,
       frameHeight: 16,
     });
+    // Aspect-correct low-cover barricades. MapRenderer rotates the horizontal
+    // source at runtime for vertical runs, avoiding a stretched narrow prop.
+    this.load.spritesheet('cover_reinforced', '/assets/tiles/cover-reinforced.png', {
+      frameWidth: 16,
+      frameHeight: 14,
+    });
+    this.load.spritesheet('cover_wooden', '/assets/tiles/cover-wooden.png', {
+      frameWidth: 16,
+      frameHeight: 14,
+    });
 
     // Map decorations — free-placed cosmetic sprites referenced by
     // texture key from map JSON `decorations` (see MapRenderer).
@@ -637,11 +647,7 @@ export class BootScene extends Phaser.Scene {
       const overlay = char.bodyOverlay;
       if (overlay && !animatedPrefixes.has(overlay.spritePrefix)) {
         animatedPrefixes.add(overlay.spritePrefix);
-        this.createBodyAnimationSet(
-          overlay.spritePrefix,
-          char,
-          char.deathFrameCount,
-        );
+        this.createBodyAnimationSet(overlay.spritePrefix, char, char.deathFrameCount);
       }
     }
 

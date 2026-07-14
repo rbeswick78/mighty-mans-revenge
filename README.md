@@ -48,6 +48,14 @@ Repeated knockouts cycle through roster-aware collapse animations instead of
 replaying the same fall every time. The choice comes from the synchronized
 match death counter, so every client sees the same cosmetic beat.
 
+## Arena variety
+
+Five arenas now shape matchmaking, rematches, and solo runs. Checkpoint Zero is
+the newest: a fortified, rotationally balanced crossing built around long
+reinforced-barricade lanes, shoot-open shortcuts, and a dangerous central
+pickup fight. Its low cover is deliberately readable in both directions and
+can still be blasted away to rewrite the sightlines during a round.
+
 ## Solo play
 
 `RUSTY SPAR` starts the familiar single Practice match at your selected Rusty

@@ -50,18 +50,12 @@ async function getSceneInfo(page: Page): Promise<SceneInfo> {
     const scenes = w.game?.scene.scenes ?? [];
     return {
       keys: scenes.map((s) => s.scene.key),
-      activeKeys: scenes
-        .filter((s) => s.sys.settings.active)
-        .map((s) => s.scene.key),
+      activeKeys: scenes.filter((s) => s.sys.settings.active).map((s) => s.scene.key),
     };
   });
 }
 
-async function waitForActiveScene(
-  page: Page,
-  key: string,
-  timeoutMs = 15000,
-): Promise<void> {
+async function waitForActiveScene(page: Page, key: string, timeoutMs = 15000): Promise<void> {
   await expect
     .poll(async () => (await getSceneInfo(page)).activeKeys, {
       timeout: timeoutMs,
@@ -128,13 +122,13 @@ async function completeDraft(pageA: Page, pageB: Page): Promise<void> {
   await Promise.all(
     [pageA, pageB].map((page) =>
       expect
-        .poll(async () => {
-          const active = (await getSceneInfo(page)).activeKeys;
-          return (
-            active.includes('DraftScene') ||
-            active.includes('CharacterSelectScene')
-          );
-        }, { timeout: 15000, message: 'expected draft or character select' })
+        .poll(
+          async () => {
+            const active = (await getSceneInfo(page)).activeKeys;
+            return active.includes('DraftScene') || active.includes('CharacterSelectScene');
+          },
+          { timeout: 15000, message: 'expected draft or character select' },
+        )
         .toBe(true),
     ),
   );
@@ -145,10 +139,7 @@ async function completeDraft(pageA: Page, pageB: Page): Promise<void> {
         await draftPickIfMyTurn(pageB);
         const a = (await getSceneInfo(pageA)).activeKeys;
         const b = (await getSceneInfo(pageB)).activeKeys;
-        return (
-          a.includes('CharacterSelectScene') &&
-          b.includes('CharacterSelectScene')
-        );
+        return a.includes('CharacterSelectScene') && b.includes('CharacterSelectScene');
       },
       {
         timeout: 20000,
@@ -178,7 +169,9 @@ async function startQuickMatch(page: Page, nickname: string): Promise<void> {
 // Desktop projects: full pair-up + lock-and-go.
 // ─────────────────────────────────────────────────────────────────────
 
-test('solo practice launches against locked Rusty and reaches live play', async ({ page }, testInfo) => {
+test('solo practice launches against locked Rusty and reaches live play', async ({
+  page,
+}, testInfo) => {
   test.skip(
     testInfo.project.name !== 'desktop-chromium',
     'One authoritative browser flow is sufficient; mobile rendering has separate coverage',
@@ -287,8 +280,7 @@ test('solo practice launches against locked Rusty and reaches live play', async 
   }
   if (process.env.VERIFY_GAMEPAD === '1') {
     await page.evaluate(() => {
-      const state = (window as unknown as { __gamepadTest: { axes: number[] } })
-        .__gamepadTest;
+      const state = (window as unknown as { __gamepadTest: { axes: number[] } }).__gamepadTest;
       state.axes = [0, 1, 0, 0];
     });
     await expect
@@ -305,12 +297,14 @@ test('solo practice launches against locked Rusty and reaches live play', async 
       )
       .toBe(1);
     await page.evaluate(() => {
-      const state = (window as unknown as {
-        __gamepadTest: {
-          axes: number[];
-          buttons: Array<{ pressed: boolean; touched: boolean; value: number }>;
-        };
-      }).__gamepadTest;
+      const state = (
+        window as unknown as {
+          __gamepadTest: {
+            axes: number[];
+            buttons: Array<{ pressed: boolean; touched: boolean; value: number }>;
+          };
+        }
+      ).__gamepadTest;
       state.axes = [0, 0, 0, 0];
       state.buttons[0] = { pressed: true, touched: true, value: 1 };
     });
@@ -325,11 +319,13 @@ test('solo practice launches against locked Rusty and reaches live play', async 
   await waitForActiveScene(page, 'CharacterSelectScene', 10000);
   if (process.env.VERIFY_GAMEPAD === '1') {
     await page.evaluate(() => {
-      const state = (window as unknown as {
-        __gamepadTest: {
-          buttons: Array<{ pressed: boolean; touched: boolean; value: number }>;
-        };
-      }).__gamepadTest;
+      const state = (
+        window as unknown as {
+          __gamepadTest: {
+            buttons: Array<{ pressed: boolean; touched: boolean; value: number }>;
+          };
+        }
+      ).__gamepadTest;
       state.buttons[0] = { pressed: false, touched: false, value: 0 };
     });
   }
@@ -374,9 +370,8 @@ test('solo practice launches against locked Rusty and reaches live play', async 
           return {
             gameMode: scene?.matchData?.gameMode ?? null,
             briefing:
-              scene?.children?.list?.some((child) =>
-                child.text?.includes('KING OF THE HILL'),
-              ) ?? false,
+              scene?.children?.list?.some((child) => child.text?.includes('KING OF THE HILL')) ??
+              false,
           };
         }),
       )
@@ -425,9 +420,7 @@ test('solo practice launches against locked Rusty and reaches live play', async 
           } | null;
           return (
             scene?.latestSelections?.some(
-              (selection) =>
-                selection.nickname === 'RUSTY' &&
-                selection.lockedCharacterId !== null,
+              (selection) => selection.nickname === 'RUSTY' && selection.lockedCharacterId !== null,
             ) ?? false
           );
         }),
@@ -438,11 +431,13 @@ test('solo practice launches against locked Rusty and reaches live play', async 
   if (process.env.VERIFY_GAMEPAD === '1') {
     await page.waitForTimeout(100);
     await page.evaluate(() => {
-      const state = (window as unknown as {
-        __gamepadTest: {
-          buttons: Array<{ pressed: boolean; touched: boolean; value: number }>;
-        };
-      }).__gamepadTest;
+      const state = (
+        window as unknown as {
+          __gamepadTest: {
+            buttons: Array<{ pressed: boolean; touched: boolean; value: number }>;
+          };
+        }
+      ).__gamepadTest;
       state.buttons[0] = { pressed: true, touched: true, value: 1 };
     });
   } else {
@@ -452,11 +447,13 @@ test('solo practice launches against locked Rusty and reaches live play', async 
   await waitForActiveScene(page, 'GameScene', 10000);
   if (process.env.VERIFY_GAMEPAD === '1') {
     await page.evaluate(() => {
-      const state = (window as unknown as {
-        __gamepadTest: {
-          buttons: Array<{ pressed: boolean; touched: boolean; value: number }>;
-        };
-      }).__gamepadTest;
+      const state = (
+        window as unknown as {
+          __gamepadTest: {
+            buttons: Array<{ pressed: boolean; touched: boolean; value: number }>;
+          };
+        }
+      ).__gamepadTest;
       state.buttons[0] = { pressed: false, touched: false, value: 0 };
     });
   }
@@ -481,9 +478,11 @@ test('solo practice launches against locked Rusty and reaches live play', async 
               };
             };
             playerManager?: {
-              getRenderer: (playerId: string) => {
-                batSprite?: { texture?: { key?: string } };
-              } | undefined;
+              getRenderer: (playerId: string) =>
+                | {
+                    batSprite?: { texture?: { key?: string } };
+                  }
+                | undefined;
             };
           } | null;
           const networkManager = scene?.gameService?.getNetworkManager();
@@ -492,8 +491,7 @@ test('solo practice launches against locked Rusty and reaches live play', async 
             ? scene?.playerManager?.getRenderer(localPlayerId)
             : undefined;
           return {
-            textureLoaded:
-              w.game?.textures.exists('deco_scavenger_cache') ?? false,
+            textureLoaded: w.game?.textures.exists('deco_scavenger_cache') ?? false,
             cacheCount: scene?.mapRenderer?.cacheSpritesByCell?.size ?? 0,
             batTextureLoaded: w.game?.textures.exists('pickup_bat') ?? false,
             batIconLoaded: w.game?.textures.exists('bat_icon') ?? false,
@@ -526,6 +524,85 @@ test('solo practice launches against locked Rusty and reaches live play', async 
       deathVariantsLoaded: true,
     });
 
+  if (process.env.VERIFY_COVER_BARRICADES === '1') {
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const w = window as unknown as {
+            game?: {
+              textures: { exists: (key: string) => boolean };
+              scene: { getScene: (key: string) => unknown };
+            };
+          };
+          type CellSprite = {
+            angle?: number;
+            displayWidth?: number;
+            displayHeight?: number;
+            texture?: { key?: string };
+          };
+          const scene = w.game?.scene.getScene('GameScene') as {
+            mapRenderer?: { tileSprites?: Array<Array<CellSprite | null>> };
+          } | null;
+          const barricades = (scene?.mapRenderer?.tileSprites ?? [])
+            .flat()
+            .filter((sprite): sprite is CellSprite => sprite?.texture?.key === 'cover_reinforced');
+          return {
+            texturesLoaded:
+              w.game?.textures.exists('cover_reinforced') === true &&
+              w.game?.textures.exists('cover_wooden') === true,
+            rendered: barricades.length > 0,
+            angles: [...new Set(barricades.map((sprite) => sprite.angle ?? -1))].sort(
+              (a, b) => a - b,
+            ),
+            aspectCorrect: barricades.every(
+              (sprite) =>
+                Math.abs((sprite.displayWidth ?? 0) - 48) < 0.01 &&
+                Math.abs((sprite.displayHeight ?? 0) - 42) < 0.01,
+            ),
+          };
+        }),
+      )
+      .toEqual({
+        texturesLoaded: true,
+        rendered: true,
+        angles: [0, 90],
+        aspectCorrect: true,
+      });
+
+    const destruction = await page.evaluate(() => {
+      const w = window as unknown as {
+        game?: { scene: { getScene: (key: string) => unknown } };
+      };
+      type CellSprite = { texture?: { key?: string } };
+      const scene = w.game?.scene.getScene('GameScene') as {
+        mapRenderer?: {
+          tileSprites?: Array<Array<CellSprite | null>>;
+          tileTypes?: number[][];
+          destroyTileAt: (col: number, row: number) => void;
+          getCollisionGrid: () => { solid: boolean[][] } | null;
+        };
+      } | null;
+      const renderer = scene?.mapRenderer;
+      const rows = renderer?.tileSprites ?? [];
+      for (let row = 0; row < rows.length; row++) {
+        const col = rows[row].findIndex((sprite) => sprite?.texture?.key === 'cover_reinforced');
+        if (col < 0) continue;
+        renderer?.destroyTileAt(col, row);
+        return {
+          spriteRemoved: renderer?.tileSprites?.[row]?.[col] === null,
+          becameFloor: renderer?.tileTypes?.[row]?.[col] === 0,
+          collisionOpened: renderer?.getCollisionGrid()?.solid[row]?.[col] === false,
+        };
+      }
+      return { spriteRemoved: false, becameFloor: false, collisionOpened: false };
+    });
+    expect(destruction).toEqual({
+      spriteRemoved: true,
+      becameFloor: true,
+      collisionOpened: true,
+    });
+  }
+
   if (process.env.VERIFY_DEATH_VARIANTS === '1') {
     const collapse = await page.evaluate(() => {
       const w = window as unknown as {
@@ -539,21 +616,21 @@ test('solo practice launches against locked Rusty and reaches live play', async 
           };
         };
         playerManager?: {
-          getRenderer: (playerId: string) => {
-            setAimAngle: (angle: number) => void;
-            updateLifeState: (dead: boolean, deathCount: number) => void;
-            sprite?: {
-              texture?: { key?: string };
-              anims?: { currentAnim?: { key?: string } };
-            };
-          } | undefined;
+          getRenderer: (playerId: string) =>
+            | {
+                setAimAngle: (angle: number) => void;
+                updateLifeState: (dead: boolean, deathCount: number) => void;
+                sprite?: {
+                  texture?: { key?: string };
+                  anims?: { currentAnim?: { key?: string } };
+                };
+              }
+            | undefined;
         };
       } | null;
       const network = scene?.gameService?.getNetworkManager();
       const playerId = network?.getPlayerId();
-      const renderer = playerId
-        ? scene?.playerManager?.getRenderer(playerId)
-        : undefined;
+      const renderer = playerId ? scene?.playerManager?.getRenderer(playerId) : undefined;
       renderer?.setAimAngle(0);
       renderer?.updateLifeState(true, 2);
       const result = {
@@ -595,12 +672,14 @@ test('solo practice launches against locked Rusty and reaches live play', async 
     });
 
     await page.evaluate(() => {
-      const state = (window as unknown as {
-        __gamepadTest: {
-          axes: number[];
-          buttons: Array<{ pressed: boolean; touched: boolean; value: number }>;
-        };
-      }).__gamepadTest;
+      const state = (
+        window as unknown as {
+          __gamepadTest: {
+            axes: number[];
+            buttons: Array<{ pressed: boolean; touched: boolean; value: number }>;
+          };
+        }
+      ).__gamepadTest;
       state.axes = [1, 0, 1, 0];
       state.buttons[7] = { pressed: true, touched: true, value: 1 };
     });
@@ -626,8 +705,7 @@ test('solo practice launches against locked Rusty and reaches live play', async 
             return {
               mode: scene?.inputManager?.getActiveMode() ?? null,
               movingRight: (raw?.moveX ?? 0) > 0.9,
-              aimingRight:
-                raw?.aimingGun === true && Math.abs(raw.aimAngle) < 0.01,
+              aimingRight: raw?.aimingGun === true && Math.abs(raw.aimAngle) < 0.01,
               banner: scene?.hud?.eventBannerText?.text ?? '',
             };
           }),
@@ -642,12 +720,14 @@ test('solo practice launches against locked Rusty and reaches live play', async 
 
     await page.waitForTimeout(300);
     await page.evaluate(() => {
-      const state = (window as unknown as {
-        __gamepadTest: {
-          axes: number[];
-          buttons: Array<{ pressed: boolean; touched: boolean; value: number }>;
-        };
-      }).__gamepadTest;
+      const state = (
+        window as unknown as {
+          __gamepadTest: {
+            axes: number[];
+            buttons: Array<{ pressed: boolean; touched: boolean; value: number }>;
+          };
+        }
+      ).__gamepadTest;
       state.axes = [0, 0, 1, 0];
       state.buttons[7] = { pressed: false, touched: false, value: 0 };
     });
@@ -676,7 +756,10 @@ test('solo practice launches against locked Rusty and reaches live play', async 
               rumbled: w.__gamepadTest.rumbleCount > 0,
             };
           }, opening),
-        { timeout: 5000, message: 'expected controller movement, trigger-release fire, and rumble' },
+        {
+          timeout: 5000,
+          message: 'expected controller movement, trigger-release fire, and rumble',
+        },
       )
       .toEqual({ moved: true, fired: true, rumbled: true });
   }
@@ -707,11 +790,8 @@ test('solo practice launches against locked Rusty and reaches live play', async 
             } | null;
             const pickups = scene?.gameService?.getNetworkManager().getPickups() ?? [];
             const authoredCell = pickups.find((pickup) => pickup.type === 'overcharge');
-            const renderedCell = [
-              ...(scene?.pickupRenderer?.pickups?.values() ?? []),
-            ].some(
-              (pickup) =>
-                pickup.container?.visible === true && pickup.auraLabel?.text === 'CHARGE',
+            const renderedCell = [...(scene?.pickupRenderer?.pickups?.values() ?? [])].some(
+              (pickup) => pickup.container?.visible === true && pickup.auraLabel?.text === 'CHARGE',
             );
             return {
               stateActive: authoredCell?.isActive === true,
@@ -745,8 +825,7 @@ test('solo practice launches against locked Rusty and reaches live play', async 
               };
             } | null;
             return {
-              stateActive:
-                scene?.gameService?.getNetworkManager().getRadiationStormState() != null,
+              stateActive: scene?.gameService?.getNetworkManager().getRadiationStormState() != null,
               boundaryDrawn:
                 (scene?.radiationStormRenderer?.boundary?.commandBuffer?.length ?? 0) > 0,
             };
@@ -770,7 +849,7 @@ test('solo practice launches against locked Rusty and reaches live play', async 
             const scene = w.game?.scene.getScene('GameScene') as {
               gameService?: {
                 getNetworkManager: () => {
-                getScrapstormState: () => { targetPosition?: unknown } | null;
+                  getScrapstormState: () => { targetPosition?: unknown } | null;
                   getActiveMutators: () => readonly string[];
                   getMatchTimer: () => number;
                 };
@@ -784,8 +863,7 @@ test('solo practice launches against locked Rusty and reaches live play', async 
             const state = networkManager?.getScrapstormState();
             return JSON.stringify({
               warningActive: state?.targetPosition != null,
-              warningDrawn:
-                (scene?.scrapstormRenderer?.warning?.commandBuffer?.length ?? 0) > 0,
+              warningDrawn: (scene?.scrapstormRenderer?.warning?.commandBuffer?.length ?? 0) > 0,
               statePresent: state != null,
               rendererPresent: scene?.scrapstormRenderer != null,
               activeMutators: networkManager?.getActiveMutators() ?? [],
@@ -863,10 +941,8 @@ test('solo practice launches against locked Rusty and reaches live play', async 
               hud?: { activeEventLabel?: { text?: string; visible?: boolean } };
             } | null;
             const active =
-              scene?.gameService
-                ?.getNetworkManager()
-                .getActiveMutators()
-                .includes('blood_rush') ?? false;
+              scene?.gameService?.getNetworkManager().getActiveMutators().includes('blood_rush') ??
+              false;
             return {
               active,
               label: scene?.hud?.activeEventLabel?.text ?? '',
@@ -974,9 +1050,11 @@ test.describe('Character select (desktop)', () => {
             const scene = w.game?.scene.getScene('GameScene') as {
               matchData?: { gameMode?: string } | null;
               playerManager?: {
-                getRenderer: (id: string) => {
-                  bountyMarkerText?: { visible?: boolean };
-                } | undefined;
+                getRenderer: (id: string) =>
+                  | {
+                      bountyMarkerText?: { visible?: boolean };
+                    }
+                  | undefined;
               } | null;
               hud?: { bountyHuntText?: { visible?: boolean } } | null;
               gameService?: {
@@ -985,9 +1063,7 @@ test.describe('Character select (desktop)', () => {
                 };
               };
             } | null;
-            const state = scene?.gameService
-              ?.getNetworkManager()
-              .getBountyHuntState();
+            const state = scene?.gameService?.getNetworkManager().getBountyHuntState();
             const targetRenderer = state?.targetId
               ? scene?.playerManager?.getRenderer(state.targetId)
               : undefined;
@@ -1029,9 +1105,7 @@ test.describe('Character select (desktop)', () => {
                   };
                 };
               } | null;
-              const state = scene?.gameService
-                ?.getNetworkManager()
-                .getWastelandWarpState();
+              const state = scene?.gameService?.getNetworkManager().getWastelandWarpState();
               return {
                 sequence: state?.sequence ?? -1,
                 presentedSequence: scene?.lastWastelandWarpSequence ?? -1,
@@ -1078,9 +1152,7 @@ test.describe('Character select (desktop)', () => {
                 ?.getNetworkManager()
                 .getPickups()
                 .find((pickup) => pickup.isScavengerRushDrop);
-              const rendered = supply
-                ? scene?.pickupRenderer?.pickups?.get(supply.id)
-                : undefined;
+              const rendered = supply ? scene?.pickupRenderer?.pickups?.get(supply.id) : undefined;
               return {
                 stateActive: supply?.isActive ?? false,
                 containerVisible: rendered?.container?.visible ?? false,
@@ -1174,16 +1246,12 @@ test.describe('Character select (desktop)', () => {
             const network = scene?.gameService?.getNetworkManager();
             const playerId = network?.getPlayerId();
             const renderer =
-              playerId && scene?.playerManager
-                ? scene.playerManager.getRenderer(playerId)
-                : null;
+              playerId && scene?.playerManager ? scene.playerManager.getRenderer(playerId) : null;
             const hasOverlay = Boolean(
-              (renderer as { bodyOverlaySprite?: unknown } | null)
-                ?.bodyOverlaySprite,
+              (renderer as { bodyOverlaySprite?: unknown } | null)?.bodyOverlaySprite,
             );
             return {
-              characterId:
-                network?.getLocalPlayerState()?.characterId ?? null,
+              characterId: network?.getLocalPlayerState()?.characterId ?? null,
               hasOverlay,
             };
           }),
