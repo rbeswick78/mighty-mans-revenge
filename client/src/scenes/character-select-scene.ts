@@ -30,6 +30,7 @@ import {
   crewTourBriefingLabel,
   normalizeCrewTourRecord,
 } from '../ui/crew-tour.js';
+import { fighterBriefing } from '../ui/fighter-briefing.js';
 
 // Scene-local color decisions. HEALTH_GOOD (mint) doubles as the "you"
 // highlight — same color the HUD uses for the local player's health bar,
@@ -57,10 +58,11 @@ const COMPACT = CARD_COUNT > 3;
 const DENSE = CARD_COUNT > 5;
 const SPRITE_SCALE = DENSE ? 3.5 : COMPACT ? 4 : 6;
 const CARD_WIDTH = DENSE ? 142 : COMPACT ? 172 : 240;
-const CARD_HEIGHT = 260;
+const CARD_HEIGHT = 210;
 const CARD_GAP = DENSE ? 12 : COMPACT ? 16 : 48;
-const NAME_FONT_PX = DENSE ? 10 : COMPACT ? 12 : 14;
-const BLURB_FONT_PX = DENSE ? 8 : COMPACT ? 10 : 13;
+const NAME_FONT_PX = DENSE ? 11 : COMPACT ? 12 : 14;
+const DETAIL_PANEL_WIDTH = 680;
+const DETAIL_PANEL_HEIGHT = 62;
 const DOUBLE_TAP_MS = 400;
 
 // Stat-bar normalization for the HP/SPD pips: HP fills relative to the
@@ -99,16 +101,6 @@ interface CardWidgets {
   pulseTween: Phaser.Tweens.Tween | null;
 }
 
-function abilityBlurb(id: CharacterId): string {
-  if (id === 'bruce') return 'FIRE BREATH\nthrough walls (45s)';
-  if (id === 'mighty_man') return 'X-RAY VISION\nshoot thru walls (30s)';
-  if (id === 'frost_wizard') return 'FROST LOCK\nfreeze enemy 2s (30s)';
-  if (id === 'bubba') return 'IRON HIDE\nhalf damage 4s (30s)';
-  if (id === 'jack') return 'AXE THROW\n60 dmg axe (12s)';
-  if (id === 'rook') return 'BREACH DASH\n3 tiles, wall-safe (8s)';
-  return '';
-}
-
 export class CharacterSelectScene extends Phaser.Scene {
   private gameService!: GameService;
   private nickname = '';
@@ -118,6 +110,9 @@ export class CharacterSelectScene extends Phaser.Scene {
   private menuGamepad: MenuGamepadInput | null = null;
   private statusText!: Phaser.GameObjects.Text;
   private timerText!: Phaser.GameObjects.Text;
+  private fighterDetailPanel!: Phaser.GameObjects.Graphics;
+  private fighterDetailTitle!: Phaser.GameObjects.Text;
+  private fighterDetailText!: Phaser.GameObjects.Text;
   private lockButton!: PixelButton;
   private backButton!: PixelButton;
 
@@ -253,10 +248,45 @@ export class CharacterSelectScene extends Phaser.Scene {
       this.cards.set(id, this.createCard(id, x, cardY));
     });
 
+    const detailTop = cardY + CARD_HEIGHT / 2 + 10;
+    this.fighterDetailPanel = this.add.graphics();
+    drawBeveledChrome(
+      this.fighterDetailPanel,
+      centerX - DETAIL_PANEL_WIDTH / 2,
+      detailTop,
+      DETAIL_PANEL_WIDTH,
+      DETAIL_PANEL_HEIGHT,
+      {
+        fillColor: Wasteland.HUD_STRIP_BG,
+        fillAlpha: 0.96,
+        strokeColor: Wasteland.CANVAS_BG,
+        highlightColor: Wasteland.COVER_FILL,
+        shadowColor: Wasteland.WALL_LINE,
+      },
+    );
+    this.fighterDetailPanel.setDepth(WastelandStreet.DEPTH.UI);
+    this.fighterDetailTitle = this.add
+      .text(centerX, detailTop + 17, '', {
+        fontFamily: MENU_FONTS.HEADER,
+        fontSize: '11px',
+        color: cssHex(VALUE_COLOR),
+      })
+      .setOrigin(0.5)
+      .setDepth(WastelandStreet.DEPTH.UI + 1);
+    this.fighterDetailText = this.add
+      .text(centerX, detailTop + 43, '', {
+        fontFamily: MENU_FONTS.BODY,
+        fontSize: '13px',
+        color: cssHex(LABEL_COLOR),
+      })
+      .setOrigin(0.5)
+      .setDepth(WastelandStreet.DEPTH.UI + 1);
+    this.updateFighterDetail(CHARACTER_IDS[0]);
+
     // ────────────────────────────────────────────────────────────────────
     // Status, timer, lock button
     // ────────────────────────────────────────────────────────────────────
-    const statusY = cardY + CARD_HEIGHT / 2 + 26;
+    const statusY = detailTop + DETAIL_PANEL_HEIGHT + 16;
     this.statusText = this.add
       .text(centerX, statusY, '', {
         fontFamily: MENU_FONTS.BODY,
@@ -359,8 +389,7 @@ export class CharacterSelectScene extends Phaser.Scene {
     const border = this.add.graphics();
 
     // Character preview sprite — same animation key style as elsewhere.
-    // Raised to make room for the stat identity rows underneath.
-    const sprite = this.add.sprite(0, -56, `${def.spritePrefix}_down_idle`);
+    const sprite = this.add.sprite(0, -44, `${def.spritePrefix}_down_idle`);
     sprite.setScale(SPRITE_SCALE);
     sprite.play(`${def.spritePrefix}_down_idle`);
 
@@ -369,7 +398,7 @@ export class CharacterSelectScene extends Phaser.Scene {
       const key = `${def.bodyOverlay.spritePrefix}_down_idle`;
       const offsetY =
         ((def.bodyOverlay.idleFrames.down.h - def.idleFrames.down.h) / 2) * SPRITE_SCALE;
-      bodyOverlay = this.add.sprite(0, -56 + offsetY, key);
+      bodyOverlay = this.add.sprite(0, -44 + offsetY, key);
       bodyOverlay.setScale(SPRITE_SCALE);
       bodyOverlay.play(key);
     }
@@ -403,18 +432,8 @@ export class CharacterSelectScene extends Phaser.Scene {
       ),
     ];
 
-    const abilityText = this.add
-      .text(0, 78, abilityBlurb(id), {
-        fontFamily: MENU_FONTS.BODY,
-        fontSize: `${BLURB_FONT_PX}px`,
-        color: cssHex(LABEL_COLOR),
-        align: 'center',
-        lineSpacing: 4,
-      })
-      .setOrigin(0.5);
-
     const lockedBadge = this.add
-      .text(0, CARD_HEIGHT / 2 - 22, '', {
+      .text(0, CARD_HEIGHT / 2 - 16, '', {
         fontFamily: MENU_FONTS.HEADER,
         fontSize: COMPACT ? '9px' : '10px',
         color: cssHex(LOCKED_BADGE_COLOR),
@@ -435,7 +454,6 @@ export class CharacterSelectScene extends Phaser.Scene {
       nameText,
       masteryText,
       ...statWidgets,
-      abilityText,
       lockedBadge,
       hitZone,
     ]);
@@ -647,6 +665,7 @@ export class CharacterSelectScene extends Phaser.Scene {
     }
 
     this.updateStatusLine(msg.selections, localId);
+    this.updateFighterDetail(selfLockedId ?? this.localHoveredId ?? CHARACTER_IDS[0]);
     this.updateTimer(msg.timeRemainingMs);
     this.updateLockButton(self ?? null);
   }
@@ -730,6 +749,7 @@ export class CharacterSelectScene extends Phaser.Scene {
       this.lastTapId = id;
       this.lastTapMs = now;
       this.localHoveredId = id;
+      this.updateFighterDetail(id);
       this.gameService.sendCharacterHover(id);
       return;
     }
@@ -740,6 +760,7 @@ export class CharacterSelectScene extends Phaser.Scene {
       this.gameService.sendCharacterLock(id);
     } else {
       this.localHoveredId = id;
+      this.updateFighterDetail(id);
       this.gameService.sendCharacterHover(id);
     }
   }
@@ -755,7 +776,14 @@ export class CharacterSelectScene extends Phaser.Scene {
     const nextIdx = (idx + direction + selectable.length) % selectable.length;
     const next = selectable[nextIdx];
     this.localHoveredId = next;
+    this.updateFighterDetail(next);
     this.gameService.sendCharacterHover(next);
+  }
+
+  private updateFighterDetail(id: CharacterId): void {
+    const briefing = fighterBriefing(id);
+    this.fighterDetailTitle.setText(briefing.headline);
+    this.fighterDetailText.setText(briefing.detail);
   }
 
   private tryLockCurrent(): void {

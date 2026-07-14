@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–96 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, roster-authentic duel/Rumble results, Gun Game, Rivalry Sets, Quick Match 1v1 plus 2–4 player Wasteland Rumble with all-player group draft rallies, a rematch-chain Rumble Crown, live lead-change drama, personal rematch Grudges, authoritative Rumble Assists with K/A/D, a solo four-fighter Scrap Pit whose three server-authoritative rivals have distinct readable tactics, answer player taunts with signature banter, and feed a device-local win/run record chase, a 2v2 Crew Battle with friendly-fire protection and an optional six-second real-friend join window, a four-objective Crew Clash rotation, and a device-local four-patch Crew Tour, visible bounded Wasteland Signal Recovery, device-aware pre-fight control onboarding with early touch affordances, persistent user-controlled lobby audio, safe multi-input exits before and during fights with confirmed authoritative forfeits, a focused cross-device Practice Setup overlay, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–97 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, readable selected-fighter ability/stat briefings, roster-authentic duel/Rumble results, Gun Game, Rivalry Sets, Quick Match 1v1 plus 2–4 player Wasteland Rumble with all-player group draft rallies, a rematch-chain Rumble Crown, live lead-change drama, personal rematch Grudges, authoritative Rumble Assists with K/A/D, a solo four-fighter Scrap Pit whose three server-authoritative rivals have distinct readable tactics, answer player taunts with signature banter, and feed a device-local win/run record chase, a 2v2 Crew Battle with friendly-fire protection and an optional six-second real-friend join window, a four-objective Crew Clash rotation, and a device-local four-patch Crew Tour, visible bounded Wasteland Signal Recovery, device-aware pre-fight control onboarding with early touch affordances, persistent user-controlled lobby audio, safe multi-input exits before and during fights with confirmed authoritative forfeits, a focused cross-device Practice Setup overlay, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -128,6 +128,7 @@ Each session below attacks one of these.
 | 94  | Safe Pre-Fight Exits                            | Nobody gets trapped before a fight or stranded in phantom state               | **DONE** (2026-07-14) |
 | 95  | Confirmed Live-Match Exits                      | Every fight has an intentional, safe way back to the lobby                    | **DONE** (2026-07-14) |
 | 96  | Focused Practice Setup                          | Solo tuning stays readable, touchable, and clear of lobby play choices        | **DONE** (2026-07-14) |
+| 97  | Readable Fighter Briefings                      | Every roster choice becomes one clear matchup decision                        | **DONE** (2026-07-14) |
 
 ---
 
@@ -4272,6 +4273,39 @@ favorite mid-match event while the final-minute surprise stays fresh.
 ---
 
 ## Session Log
+
+### Session 97 — 2026-07-14 — Readable Fighter Briefings
+
+**Shipped:** Character Select no longer asks players to decode six miniature
+ability paragraphs at once. The roster cards are shorter and keep the identity
+scan to portrait, name, mastery, health, and speed. A dedicated full-width
+briefing now follows the active fighter with a readable ability name, exact HP
+and speed, and one plain-language rule/cooldown line. Pointer and touch update
+the briefing on the first selection; keyboard and gamepad cycling update it
+immediately; authoritative server hover/lock state remains the final source of
+truth.
+
+The briefing copy lives in a small typed presentation module backed by the
+shared character definitions, so health and speed cannot drift from gameplay
+configuration. Its six concise ability rules are deliberately decision-oriented
+(`SHOOT THROUGH WALLS`, `HALF DAMAGE`, `DASH 3 TILES`) rather than repeating
+flavor text players cannot comfortably read before the auto-lock timer expires.
+
+**Verification:** typecheck and lint pass; all 1,312 unit and integration tests
+pass across 99 files. Unit coverage checks every fighter's exact presentation
+and keeps detail copy bounded. The production build passes with the existing
+Vite chunk-size advisory (`index-X2mEW897.js`, 1,858.90 kB / 444.75 kB gzip).
+The focused Chromium and 844×390 mobile journeys physically click/tap Jack,
+cycle to Rook by keyboard, verify readable 11/13px typography, prove the old
+miniature cooldown copy is gone, and keep the lock action clear of the footer.
+The complete 108-case Playwright matrix passes cleanly with 93 executable
+passes and 15 intentional cross-project skips, including this briefing journey
+on Chromium, Firefox, and mobile landscape.
+
+**Operational watch:** ability rules are intentionally short enough for the
+fixed 960×720 canvas and phone-scale rendering. Keep future fighter copy within
+the same one-line budget; if a power genuinely needs more explanation, teach
+its edge case in live HUD feedback instead of shrinking this decision surface.
 
 ### Session 96 — 2026-07-14 — Focused Practice Setup
 
