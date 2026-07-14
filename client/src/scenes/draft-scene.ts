@@ -16,6 +16,7 @@ import {
   deriveDraftView,
   firstPickedCategory,
   formatDraftCountdown,
+  formatRallyCountdown,
   shouldSkipSpectacle,
 } from './draft-logic.js';
 
@@ -59,6 +60,7 @@ interface DraftSceneData {
 interface DraftCard {
   category: DraftCategory;
   value: string;
+  baseLabel: string;
   button: PixelButton;
   x: number;
   y: number;
@@ -375,7 +377,9 @@ export class DraftScene extends Phaser.Scene {
     );
     const contenders = roleIds
       .map((id) => draft.players.find((player) => player.id === id))
-      .filter((player): player is ServerDraftStateMessage['players'][number] => player !== undefined);
+      .filter(
+        (player): player is ServerDraftStateMessage['players'][number] => player !== undefined,
+      );
     const winnerIndex = Math.max(
       0,
       contenders.findIndex((player) => player.id === draft.firstPickerId),
@@ -477,14 +481,16 @@ export class DraftScene extends Phaser.Scene {
 
     const centerX = this.cameras.main.width / 2;
     const camHeight = this.cameras.main.height;
+    const isRally = draft.draftKind === 'rally';
 
-    new TitleLogo(this, centerX, 64, ['PRE-MATCH DRAFT'], {
+    new TitleLogo(this, centerX, 64, [isRally ? 'RUMBLE DRAFT RALLY' : 'PRE-MATCH DRAFT'], {
       fontSize: 20,
       strokeThickness: 3,
     }).setDepth(WastelandStreet.DEPTH.UI);
 
-    const subtitle =
-      draft.firstPickerReason === 'revenge'
+    const subtitle = isRally
+      ? 'EVERY FIGHTER VOTES - MAP FIRST, THEN MODE'
+      : draft.firstPickerReason === 'revenge'
         ? 'REVENGE PICK CLAIMS A COLUMN'
         : 'FIRST PICK CLAIMS A COLUMN';
     this.add
@@ -555,19 +561,28 @@ export class DraftScene extends Phaser.Scene {
       .setDepth(WastelandStreet.DEPTH.UI);
 
     this.timerText = this.add
-      .text(centerX, TIMER_Y, formatDraftCountdown(draft.pickDeadlineMs), {
-        fontFamily: MENU_FONTS.HEADER,
-        fontSize: '11px',
-        color: cssHex(TIMER_COLOR),
-      })
+      .text(
+        centerX,
+        TIMER_Y,
+        isRally
+          ? formatRallyCountdown(draft.pickDeadlineMs)
+          : formatDraftCountdown(draft.pickDeadlineMs),
+        {
+          fontFamily: MENU_FONTS.HEADER,
+          fontSize: '11px',
+          color: cssHex(TIMER_COLOR),
+        },
+      )
       .setOrigin(0.5)
       .setDepth(WastelandStreet.DEPTH.UI);
 
     this.add
       .text(
         centerX,
-        camHeight - 24,
-        'TAP A CARD OR USE D-PAD + A  •  OTHER COLUMN GOES TO YOUR RIVAL',
+        camHeight - 34,
+        isRally
+          ? 'EVERY FIGHTER GETS ONE VOTE  •  TIES BREAK RANDOMLY'
+          : 'TAP A CARD OR USE D-PAD + A  •  OTHER COLUMN GOES TO YOUR RIVAL',
         {
           fontFamily: MENU_FONTS.BODY,
           fontSize: '12px',
@@ -618,7 +633,7 @@ export class DraftScene extends Phaser.Scene {
       onClick: () => this.onCardClick(category, value),
     });
     button.setDepth(WastelandStreet.DEPTH.UI);
-    this.cards.push({ category, value, button, x, y, w: CARD_WIDTH, h: cardH });
+    this.cards.push({ category, value, baseLabel: label, button, x, y, w: CARD_WIDTH, h: cardH });
   }
 
   private onCardClick(category: DraftCategory, value: string): void {
@@ -652,12 +667,24 @@ export class DraftScene extends Phaser.Scene {
       const pickedValue = card.category === 'map' ? draft.mapPick : draft.modePick;
       const isPicked = pickedValue !== null && pickedValue === card.value;
       const enabled = view.enabledCategories.includes(card.category);
+      const isLocalVote = view.isRally && view.localVote === card.value;
+      const voteCount = view.voteCounts[card.value] ?? 0;
+      card.button.setLabel(
+        view.isRally && draft.rallyCategory === card.category && voteCount > 0
+          ? `${card.baseLabel} · ${voteCount}`
+          : card.baseLabel,
+      );
       card.button.setDisabled(!enabled);
       // Alpha managed here, not by setDisabled: the picked card stays
       // full-bright while its column's losers dim harder than the mere
       // not-your-turn dim.
-      card.button.setAlpha(isPicked || enabled ? 1 : pickedValue !== null ? 0.35 : 0.55);
+      card.button.setAlpha(
+        isPicked || enabled || isLocalVote ? 1 : pickedValue !== null ? 0.35 : 0.55,
+      );
       if (isPicked) this.drawCardHighlight(card);
+      else if (isLocalVote) {
+        this.drawCardHighlight(card, SPECTACLE_ACTIVE_COLOR);
+      }
     }
 
     this.deadlineAtLocalMs = view.complete ? null : performance.now() + draft.pickDeadlineMs;
@@ -669,14 +696,8 @@ export class DraftScene extends Phaser.Scene {
   private enabledGamepadCards(): DraftCard[] {
     const draft = this.latestDraft;
     if (!draft || this.phase !== 'pick') return [];
-    const view = deriveDraftView(
-      draft,
-      this.gameService.getPlayerId(),
-      this.firstPicked,
-    );
-    return this.cards.filter((card) =>
-      view.enabledCategories.includes(card.category),
-    );
+    const view = deriveDraftView(draft, this.gameService.getPlayerId(), this.firstPicked);
+    return this.cards.filter((card) => view.enabledCategories.includes(card.category));
   }
 
   private syncGamepadCardFocus(enabled: DraftCard[]): void {
@@ -684,9 +705,7 @@ export class DraftScene extends Phaser.Scene {
       this.gamepadFocusedCard = enabled[0] ?? null;
     }
     for (const card of this.cards) {
-      card.button.setFocused(
-        this.gamepadFocusActive && card === this.gamepadFocusedCard,
-      );
+      card.button.setFocused(this.gamepadFocusActive && card === this.gamepadFocusedCard);
     }
   }
 
@@ -730,22 +749,27 @@ export class DraftScene extends Phaser.Scene {
     for (const card of this.cards) {
       const finalValue = card.category === 'map' ? matchData.mapName : matchData.gameMode;
       const isFinal = card.value === finalValue;
+      card.button.setLabel(card.baseLabel);
       card.button.setDisabled(true);
       card.button.setAlpha(isFinal ? 1 : 0.35);
       if (isFinal) this.drawCardHighlight(card);
     }
   }
 
-  private drawCardHighlight(card: DraftCard): void {
+  private drawCardHighlight(card: DraftCard, color: number = PICKED_BORDER_COLOR): void {
     if (!this.pickHighlight) return;
-    this.pickHighlight.lineStyle(3, PICKED_BORDER_COLOR, 1);
+    this.pickHighlight.lineStyle(3, color, 1);
     this.pickHighlight.strokeRect(card.x - 4, card.y - 4, card.w + 8, card.h + 8);
   }
 
   private updateCountdownLabel(): void {
     if (!this.timerText || this.deadlineAtLocalMs === null) return;
     const remainingMs = this.deadlineAtLocalMs - performance.now();
-    this.timerText.setText(formatDraftCountdown(remainingMs));
+    this.timerText.setText(
+      this.latestDraft?.draftKind === 'rally'
+        ? formatRallyCountdown(remainingMs)
+        : formatDraftCountdown(remainingMs),
+    );
     this.timerText.setColor(
       cssHex(Math.ceil(remainingMs / 1000) <= 5 ? TIMER_URGENT_COLOR : TIMER_COLOR),
     );

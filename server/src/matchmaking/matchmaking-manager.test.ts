@@ -80,6 +80,17 @@ function walkDraft(
 ): void {
   mgr.tick(0.05, 0);
   const snap = latestDraftState(sent);
+  if (snap.draftKind === 'rally') {
+    for (const player of snap.players) {
+      mgr.handleDraftPick(player.id, 'map', picks.map ?? snap.mapOptions[0]);
+    }
+    mgr.tick(0.05, 0);
+    const modeSnap = latestDraftState(sent);
+    for (const player of modeSnap.players) {
+      mgr.handleDraftPick(player.id, 'mode', picks.mode ?? modeSnap.modeOptions[0]);
+    }
+    return;
+  }
   const first = snap.currentPickerId!;
   const second = snap.secondPickerId ?? snap.players.find((p) => p.id !== first)!.id;
   mgr.handleDraftPick(first, 'map', picks.map ?? snap.mapOptions[0]);
@@ -162,7 +173,7 @@ describe('MatchmakingManager rematch flow', () => {
     expect(sent).toHaveLength(2);
   });
 
-  it('gathers 2-4 fighters into a distinct Rumble and exposes both draft roles', () => {
+  it('gathers 3-4 fighters into a distinct Rumble and gives everyone a rally vote', () => {
     mgr.handleJoinRumble('A', 'Alpha');
     mgr.handleJoinRumble('B', 'Bravo');
     mgr.handleJoinRumble('C', 'Cora');
@@ -173,16 +184,93 @@ describe('MatchmakingManager rematch flow', () => {
 
     const draft = latestDraftState(sent);
     expect(draft.players.map((player) => player.id)).toEqual(['A', 'B', 'C']);
-    expect(draft.secondPickerId).toBeDefined();
-    expect(draft.secondPickerId).not.toBe(draft.firstPickerId);
+    expect(draft.draftKind).toBe('rally');
+    expect(draft.currentPickerId).toBeNull();
+    expect(draft.rallyCategory).toBe('map');
+    expect(draft.rallyVotes).toEqual([]);
 
-    mgr.handleDraftPick(draft.firstPickerId, 'map', draft.mapOptions[0]);
-    mgr.handleDraftPick(draft.secondPickerId!, 'mode', draft.modeOptions[0]);
+    for (const player of draft.players) {
+      mgr.handleDraftPick(player.id, 'map', draft.mapOptions[0]);
+    }
+    mgr.tick(0.05, 2);
+    const modeVote = latestDraftState(sent);
+    expect(modeVote.mapPick).toBe(draft.mapOptions[0]);
+    expect(modeVote.rallyCategory).toBe('mode');
+    for (const player of modeVote.players) {
+      mgr.handleDraftPick(player.id, 'mode', modeVote.modeOptions[0]);
+    }
     const found = sent.find(
       (entry) => entry.playerId === 'A' && entry.message.type === 'server:matchFound',
     );
     expect(found?.message.type === 'server:matchFound' && found.message.matchKind).toBe('rumble');
     expect(mgr.getActiveMatches()[0].players.size).toBe(3);
+  });
+
+  it('resolves each rally phase by plurality and ignores duplicate or off-category ballots', () => {
+    for (const [id, nickname] of [
+      ['A', 'Alpha'],
+      ['B', 'Bravo'],
+      ['C', 'Cora'],
+      ['D', 'Delta'],
+    ] as const) {
+      mgr.handleJoinRumble(id, nickname);
+    }
+    mgr.tick(0.05, 0);
+    const draft = latestDraftState(sent);
+    const [mapA, mapB] = draft.mapOptions;
+
+    mgr.handleDraftPick('A', 'mode', draft.modeOptions[0]);
+    mgr.handleDraftPick('A', 'map', mapA);
+    mgr.handleDraftPick('A', 'map', mapB);
+    mgr.handleDraftPick('B', 'map', mapA);
+    mgr.handleDraftPick('C', 'map', mapA);
+    mgr.handleDraftPick('D', 'map', mapB);
+    mgr.tick(0.05, 1);
+
+    const modeVote = latestDraftState(sent);
+    expect(modeVote.mapPick).toBe(mapA);
+    expect(modeVote.rallyCategory).toBe('mode');
+    expect(modeVote.rallyVotes).toEqual([]);
+
+    const [modeA, modeB] = modeVote.modeOptions;
+    mgr.handleDraftPick('A', 'mode', modeB);
+    mgr.handleDraftPick('B', 'mode', modeB);
+    mgr.handleDraftPick('C', 'mode', modeB);
+    mgr.handleDraftPick('D', 'mode', modeA);
+    const match = mgr.getActiveMatches()[0];
+    expect(match.mapManager.getMapData().name).toBe(mapA);
+    expect(match.gameModeType).toBe(modeB);
+  });
+
+  it('breaks a submitted-vote tie authoritatively on timeout without inventing AFK ballots', () => {
+    const made = makeFakeServer();
+    const tied = new MatchmakingManager(made.fake, () => 0, undefined, seededRng([0, 0, 0.99]));
+    tied.handleJoinRumble('A', 'Alpha');
+    tied.handleJoinRumble('B', 'Bravo');
+    tied.handleJoinRumble('C', 'Cora');
+    tied.tick(RUMBLE.LAUNCH_DELAY_SECONDS, 0);
+    const draft = latestDraftState(made.sent);
+
+    tied.handleDraftPick('A', 'map', draft.mapOptions[0]);
+    tied.handleDraftPick('B', 'map', draft.mapOptions[1]);
+    tied.tick(draft.pickDeadlineMs / 1000 + 0.01, 1);
+
+    const resolved = latestDraftState(made.sent);
+    expect(resolved.mapPick).toBe(draft.mapOptions[1]);
+    expect(resolved.rallyCategory).toBe('mode');
+    expect(resolved.pickDeadlineMs).toBe(DRAFT.RALLY_VOTE_SECONDS * 1000);
+  });
+
+  it('keeps the two-role draft for a two-fighter Rumble', () => {
+    mgr.handleJoinRumble('A', 'Alpha');
+    mgr.handleJoinRumble('B', 'Bravo');
+    mgr.tick(RUMBLE.LAUNCH_DELAY_SECONDS, 0);
+    const draft = latestDraftState(sent);
+
+    expect(draft.draftKind).toBe('turn');
+    expect(draft.currentPickerId).toBe(draft.firstPickerId);
+    expect(draft.secondPickerId).toBeDefined();
+    expect(draft.rallyCategory).toBeNull();
   });
 
   it('carries the Rumble Crown through a direct group rematch and records a defense', () => {
@@ -250,9 +338,7 @@ describe('MatchmakingManager rematch flow', () => {
       mgr.handleJoinRumble(id, nickname);
     }
     mgr.tick(RUMBLE.LAUNCH_DELAY_SECONDS, 0);
-    const draft = latestDraftState(sent);
-    mgr.handleDraftPick(draft.firstPickerId, 'map', draft.mapOptions[0]);
-    mgr.handleDraftPick(draft.secondPickerId!, 'mode', draft.modeOptions[0]);
+    walkDraft(mgr, sent);
     const match = mgr.getActiveMatches()[0];
     match.phase = MatchPhase.ACTIVE;
     sent.length = 0;

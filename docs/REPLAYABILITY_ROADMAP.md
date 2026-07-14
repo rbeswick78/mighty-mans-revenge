@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–77 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Quick Match 1v1 plus 2–4 player Wasteland Rumble with a rematch-chain Rumble Crown, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–78 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Quick Match 1v1 plus 2–4 player Wasteland Rumble with all-player group draft rallies and a rematch-chain Rumble Crown, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -106,9 +106,10 @@ Each session below attacks one of these.
 | 72  | Gauntlet Build Mastery                          | Every discovered build gains its own score chase and trophy                   | **DONE** (2026-07-13) |
 | 73  | Rusted Refinery                                 | A breachable power vault creates a fresh contest from every route             | **DONE** (2026-07-13) |
 | 74  | Arena Mastery                                   | Every battlefield gains a persistent identity and rivalry chase               | **DONE** (2026-07-14) |
-| 75  | Wasteland Taunts                                | One-button battle cries turn live fights into social rivalry moments           | **DONE** (2026-07-14) |
-| 76  | Wasteland Rumble                                | 2–4 friends turn every arena into a replayable free-for-all                    | **DONE** (2026-07-14) |
-| 77  | Rumble Crown                                   | Every direct group rematch gains a champion to defend or dethrone              | **DONE** (2026-07-14) |
+| 75  | Wasteland Taunts                                | One-button battle cries turn live fights into social rivalry moments          | **DONE** (2026-07-14) |
+| 76  | Wasteland Rumble                                | 2–4 friends turn every arena into a replayable free-for-all                   | **DONE** (2026-07-14) |
+| 77  | Rumble Crown                                    | Every direct group rematch gains a champion to defend or dethrone             | **DONE** (2026-07-14) |
+| 78  | Rumble Draft Rally                              | Every fighter helps choose the next group battleground                        | **DONE** (2026-07-14) |
 
 ---
 
@@ -3226,6 +3227,44 @@ attempt one attainable friend score to hunt from the first stage onward.
 
 ---
 
+## Session 78 — Rumble Draft Rally
+
+**Goal:** remove spectator-only downtime from larger Rumble drafts and turn
+the map/mode decision into the group's first social contest of each round.
+
+**Locked design decisions**
+
+- Three- and four-fighter Rumbles vote together; Quick Match and two-fighter
+  Rumbles keep the established two-role draft and all revenge semantics.
+- The server runs a map ballot first and a mode ballot second. Every entrant
+  gets one immutable vote per phase, the phase resolves immediately when all
+  ballots arrive, and a 15-second deadline prevents an absent player from
+  holding the group.
+- Submitted-vote plurality wins. Registry order stabilizes the tied candidate
+  list and the server's injected RNG breaks the tie once for every client.
+  Abstainers receive no synthetic ballot; a completely empty phase still
+  chooses a legal option.
+- Draft snapshots expose the active rally phase and accepted ballots so the
+  client can show live counts, the local locked choice, remaining voters, and
+  the final group pick. Combat, scoring, Crown state, rematch consensus,
+  persistence, and every 1v1 path remain unchanged.
+
+**Acceptance criteria**
+
+- [x] Matchmaking tests cover 3-player participation, 4-player plurality,
+      immutable/off-category rejection, deterministic timeout ties, legal
+      match construction, and the unchanged 2-player Rumble draft.
+- [x] Pure client tests cover vote eligibility, live counts, locked-ballot
+      waiting copy, group-pick badges, and the vote deadline.
+- [x] Desktop Chromium, desktop Firefox, and mobile-landscape browser tests
+      render both rally phases, live counts, the local vote, and group pick.
+- [x] A real three-client local Rumble completes both ballots and reaches
+      Character Select with the authoritative winning map and mode.
+- [x] Typecheck, lint, all unit tests, production build, and the full
+      Playwright desktop/mobile matrix pass.
+
+---
+
 ## Session 77 — Rumble Crown
 
 **Goal:** turn consecutive Wasteland Rumble rounds into a social reign that
@@ -3619,6 +3658,46 @@ favorite mid-match event while the final-minute surprise stays fresh.
 ---
 
 ## Session Log
+
+### Session 78 — 2026-07-14 — Rumble Draft Rally
+
+**Shipped:** three- and four-fighter Rumbles now open with a group Draft Rally
+instead of assigning two pickers and leaving everyone else to watch. Every
+fighter casts one map ballot followed by one mode ballot, sees live totals and
+their locked choice, and reaches the same authoritative `matchFound` path once
+both group decisions resolve. Quick Match and two-fighter Rumbles retain the
+original two-role flow.
+
+The server owns ballot validation, immutable participation, early all-voted
+resolution, 15-second deadlines, plurality, and one injected-RNG tie break.
+AFK fighters abstain rather than receiving a fake vote, while a completely
+empty phase still selects a legal option. The scene labels the group pick,
+counts current ballots on each card, and keeps mouse, touch, and gamepad card
+navigation on the existing button path. No combat, physics, scoring, Crown,
+rematch-consensus, persistence, map, mode, or balance behavior changed. No
+assets were added.
+
+**Verification:** 91 focused matchmaking and client-draft tests pass, covering
+three- and four-player participation, plurality, immutable/off-category
+rejection, timeout ties, unchanged two-player drafting, live counts, and
+locked-vote presentation. Real three-client Chromium and Firefox journeys
+voted Scrapyard and King of the Hill through the local server and reached
+Character Select with those exact authoritative choices. The composed rally
+screen passes on desktop Chromium, desktop Firefox, and 844×390 mobile
+landscape; screenshot review also moved the footer clear of the mobile crop.
+Typecheck, lint, all 1,222 unit tests across 84 files, and the production build
+pass; Vite retains its existing chunk-size advisory. The full Playwright matrix
+passes 36 tests with 12 intentional project-scoped skips, including the
+synthetic three-background-mobile-tab WebRTC journey (the mobile screen itself
+passes).
+
+**Tuning watch:** watch whether visible totals create fun table talk or merely
+encourage late dogpiling, whether 15 seconds per phase feels brisk with real
+friends, and whether the map-first order should alternate in long rematch
+chains. Do not tune from synthetic tests.
+
+**Deployment:** not run; production deployment still requires explicit user
+authorization.
 
 ### Session 77 — 2026-07-14 — Rumble Crown
 

@@ -352,20 +352,26 @@ export interface DraftPlayer {
 export interface ServerDraftStateMessage {
   type: 'server:draftState';
   matchId: MatchId;
+  /** Two-role duel draft, or an all-fighter vote in 3-4 player Rumbles. */
+  draftKind?: 'turn' | 'rally';
   /** Everyone in the pending match, draft roles included. */
   players: DraftPlayer[];
   /**
    * Winner of the server-side who-picks-first roll. The client plays
    * its spectacle to land on this player — the outcome is decided
-   * before the animation starts.
+   * before the animation starts. Compatibility-only during a rally.
    */
   firstPickerId: PlayerId;
-  /** The distinct entrant who receives the remaining category. */
+  /** The distinct entrant who receives the remaining category; compatibility-only in a rally. */
   secondPickerId?: PlayerId;
   /** Coin toss for a fresh pairing; previous-round loser for a rematch. */
   firstPickerReason: DraftFirstPickerReason;
   /** Whose pick the server is waiting on; null once both picks are in. */
   currentPickerId: PlayerId | null;
+  /** Category currently accepting votes in a Rumble rally. */
+  rallyCategory?: DraftCategory | null;
+  /** Accepted votes for the current rally phase; empty outside a rally. */
+  rallyVotes?: Array<{ playerId: PlayerId; value: string }>;
   /** Chosen map name, or null while unpicked. */
   mapPick: string | null;
   /** Chosen mode, or null while unpicked. */

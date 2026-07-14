@@ -11,6 +11,8 @@ import type { DraftCategory, ServerDraftStateMessage } from '@shared/types/netwo
 
 /** Everything the pick UI renders for one draftState snapshot. */
 export interface DraftView {
+  /** Group ballot rather than the classic two-role draft. */
+  isRally: boolean;
   /** True when the server is waiting on the local player's pick. */
   yourTurn: boolean;
   /** Categories the local player may pick right now (empty otherwise). */
@@ -23,6 +25,10 @@ export interface DraftView {
   modeBadge: string | null;
   /** Both picks in — the draft is settled, matchFound is imminent. */
   complete: boolean;
+  /** Accepted ballots by option for the active rally phase. */
+  voteCounts: Record<string, number>;
+  /** Local player's immutable ballot in the active phase. */
+  localVote: string | null;
 }
 
 /**
@@ -32,9 +38,7 @@ export interface DraftView {
  * deriveDraftView so completed drafts keep correct badge attribution).
  * Null before any pick and — deliberately — once both picks are in.
  */
-export function firstPickedCategory(
-  snapshot: ServerDraftStateMessage,
-): DraftCategory | null {
+export function firstPickedCategory(snapshot: ServerDraftStateMessage): DraftCategory | null {
   if (snapshot.mapPick !== null && snapshot.modePick === null) return 'map';
   if (snapshot.modePick !== null && snapshot.mapPick === null) return 'mode';
   return null;
@@ -46,7 +50,7 @@ export function firstPickedCategory(
  * replaying the theater would eat into the real pick window.
  */
 export function shouldSkipSpectacle(snapshot: ServerDraftStateMessage): boolean {
-  return snapshot.mapPick !== null || snapshot.modePick !== null;
+  return snapshot.draftKind === 'rally' || snapshot.mapPick !== null || snapshot.modePick !== null;
 }
 
 /**
@@ -60,6 +64,38 @@ export function deriveDraftView(
   localPlayerId: PlayerId | null,
   firstPicked: DraftCategory | null,
 ): DraftView {
+  if (snapshot.draftKind === 'rally') {
+    const complete = snapshot.mapPick !== null && snapshot.modePick !== null;
+    const category = snapshot.rallyCategory ?? null;
+    const votes = snapshot.rallyVotes ?? [];
+    const localVote = votes.find((vote) => vote.playerId === localPlayerId)?.value ?? null;
+    const voteCounts: Record<string, number> = {};
+    for (const vote of votes) voteCounts[vote.value] = (voteCounts[vote.value] ?? 0) + 1;
+    const yourTurn = !complete && category !== null && localPlayerId !== null && localVote === null;
+    const remaining = Math.max(0, snapshot.players.length - votes.length);
+    let statusLine: string;
+    if (complete) {
+      statusLine = 'GROUP PICKS LOCKED IN';
+    } else if (yourTurn) {
+      statusLine = `YOUR VOTE - CHOOSE A ${category === 'map' ? 'MAP' : 'MODE'}`;
+    } else if (localVote !== null) {
+      statusLine = `VOTE CAST - WAITING FOR ${remaining} FIGHTER${remaining === 1 ? '' : 'S'}`;
+    } else {
+      statusLine = `GROUP IS VOTING FOR A ${category === 'map' ? 'MAP' : 'MODE'}...`;
+    }
+    return {
+      isRally: true,
+      yourTurn,
+      enabledCategories: yourTurn && category !== null ? [category] : [],
+      statusLine,
+      mapBadge: snapshot.mapPick === null ? null : 'GROUP PICK',
+      modeBadge: snapshot.modePick === null ? null : 'GROUP PICK',
+      complete,
+      voteCounts,
+      localVote,
+    };
+  }
+
   const nickOf = (id: PlayerId | null): string => {
     const player = snapshot.players.find((p) => p.id === id);
     return (player?.nickname ?? 'OPPONENT').toUpperCase();
@@ -67,9 +103,7 @@ export function deriveDraftView(
 
   const complete = snapshot.mapPick !== null && snapshot.modePick !== null;
   const yourTurn =
-    !complete &&
-    localPlayerId !== null &&
-    snapshot.currentPickerId === localPlayerId;
+    !complete && localPlayerId !== null && snapshot.currentPickerId === localPlayerId;
 
   const enabledCategories: DraftCategory[] = [];
   if (yourTurn) {
@@ -81,8 +115,7 @@ export function deriveDraftView(
   // made by the first picker. Once both are in, the cached firstPicked
   // hint splits the two columns between first and second picker.
   const firstNick = nickOf(snapshot.firstPickerId);
-  const secondPicker =
-    snapshot.players.find((p) => p.id !== snapshot.firstPickerId) ?? null;
+  const secondPicker = snapshot.players.find((p) => p.id !== snapshot.firstPickerId) ?? null;
   const secondNick = (secondPicker?.nickname ?? 'OPPONENT').toUpperCase();
 
   let mapBadge: string | null = null;
@@ -119,7 +152,17 @@ export function deriveDraftView(
     statusLine = `${nickOf(snapshot.currentPickerId)} IS CHOOSING...`;
   }
 
-  return { yourTurn, enabledCategories, statusLine, mapBadge, modeBadge, complete };
+  return {
+    isRally: false,
+    yourTurn,
+    enabledCategories,
+    statusLine,
+    mapBadge,
+    modeBadge,
+    complete,
+    voteCounts: {},
+    localVote: null,
+  };
 }
 
 /** One highlight move of the who-picks-first spectacle. */
@@ -155,10 +198,7 @@ export interface HopScheduleOpts {
  * ends on the winner, and the longer final hold reads as the wheel
  * settling.
  */
-export function buildHopSchedule(
-  winnerIndex: number,
-  opts: HopScheduleOpts = {},
-): HopSchedule {
+export function buildHopSchedule(winnerIndex: number, opts: HopScheduleOpts = {}): HopSchedule {
   const initialHopMs = opts.initialHopMs ?? 80;
   const stretch = opts.stretch ?? 1.28;
   const budgetMs = opts.budgetMs ?? 1900;
@@ -192,4 +232,9 @@ export function formatDraftCountdown(remainingMs: number): string {
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
   return `AUTO-PICK IN ${mins}:${String(secs).padStart(2, '0')}`;
+}
+
+/** Rally equivalent of the draft timer; the deadline resolves the current ballot. */
+export function formatRallyCountdown(remainingMs: number): string {
+  return formatDraftCountdown(remainingMs).replace('AUTO-PICK', 'VOTE CLOSES');
 }

@@ -143,17 +143,21 @@ type MatchKind = 'duel' | 'rumble' | 'practice';
 interface DraftState {
   matchId: string;
   playerEntries: { id: PlayerId; nickname: string; arenaWins: ArenaWins }[];
+  /** Three-plus-player Rumbles vote together; every other draft uses two roles. */
+  draftKind: 'turn' | 'rally';
   /** Winner of the who-picks-first roll — claims a category by picking. */
   firstPickerId: PlayerId;
   firstPickerReason: DraftFirstPickerReason;
   /** The entrant who picks whatever category the first picker leaves. */
   secondPickerId: PlayerId;
   /**
-   * Whose pick the server is waiting on. Never null while the draft is
-   * stored: the second pick finalizes (and deletes) the draft immediately,
-   * so the wire's "complete" state is never broadcast.
+   * Whose pick the server is waiting on in a turn draft. Rally drafts keep
+   * this null because every entrant acts during the same ballot phase.
    */
-  currentPickerId: PlayerId;
+  currentPickerId: PlayerId | null;
+  /** Active category and one immutable vote per entrant during a rally. */
+  rallyCategory: DraftCategory | null;
+  rallyVotes: Map<PlayerId, string>;
   mapPick: string | null;
   modePick: GameModeType | null;
   /**
@@ -1138,9 +1142,9 @@ export class MatchmakingManager {
       },
     }));
 
-    // Roll two DISTINCT picker roles (N-player safe: any extra entrants
-    // just spectate the draft). Decided here, once — the client's
-    // who-picks-first spectacle only animates toward this outcome.
+    // Three-plus-player Rumbles use a group vote. Duels and two-player
+    // Rumbles keep the fast two-role draft (including revenge priority).
+    const draftKind = matchKind === 'rumble' && playerEntries.length >= 3 ? 'rally' : 'turn';
     const revengeIdx =
       revengePickerId === null
         ? -1
@@ -1158,13 +1162,16 @@ export class MatchmakingManager {
     const draft: DraftState = {
       matchId,
       playerEntries: draftEntries,
+      draftKind,
       firstPickerId: playerEntries[firstIdx].id,
       firstPickerReason: revengeIdx >= 0 ? 'revenge' : 'coin_toss',
       secondPickerId: playerEntries[secondIdx].id,
-      currentPickerId: playerEntries[firstIdx].id,
+      currentPickerId: draftKind === 'turn' ? playerEntries[firstIdx].id : null,
+      rallyCategory: draftKind === 'rally' ? 'map' : null,
+      rallyVotes: new Map(),
       mapPick: null,
       modePick: null,
-      pickTimerSeconds: DRAFT.FIRST_PICK_SECONDS,
+      pickTimerSeconds: draftKind === 'rally' ? DRAFT.RALLY_VOTE_SECONDS : DRAFT.FIRST_PICK_SECONDS,
       rematchMutatorExclusions: [...rematchMutatorExclusions],
       previousContractId,
       matchKind,
@@ -1186,6 +1193,7 @@ export class MatchmakingManager {
         players: playerEntries.map((e) => e.id),
         firstPicker: draft.firstPickerId,
         firstPickerReason: draft.firstPickerReason,
+        draftKind,
       },
       'Draft started',
     );
@@ -1202,7 +1210,11 @@ export class MatchmakingManager {
     for (const draft of [...this.draftStates.values()]) {
       draft.pickTimerSeconds -= dt;
       if (draft.pickTimerSeconds <= 0) {
-        this.autoDraftPick(draft);
+        if (draft.draftKind === 'rally') {
+          this.resolveRallyVote(draft, 'timeout');
+        } else {
+          this.autoDraftPick(draft);
+        }
       }
       // An auto-picked SECOND pick finalizes the draft immediately; only
       // still-live drafts keep broadcasting.
@@ -1216,6 +1228,7 @@ export class MatchmakingManager {
     const message: ServerDraftStateMessage = {
       type: 'server:draftState',
       matchId: draft.matchId,
+      draftKind: draft.draftKind,
       players: draft.playerEntries.map((e) => ({
         id: e.id,
         nickname: e.nickname,
@@ -1225,6 +1238,8 @@ export class MatchmakingManager {
       secondPickerId: draft.secondPickerId,
       firstPickerReason: draft.firstPickerReason,
       currentPickerId: draft.currentPickerId,
+      rallyCategory: draft.rallyCategory,
+      rallyVotes: [...draft.rallyVotes].map(([playerId, value]) => ({ playerId, value })),
       mapPick: draft.mapPick,
       modePick: draft.modePick,
       mapOptions: [...listMapNames()],
@@ -1289,6 +1304,80 @@ export class MatchmakingManager {
     draft.currentPickerId =
       draft.currentPickerId === draft.firstPickerId ? draft.secondPickerId : draft.firstPickerId;
     draft.pickTimerSeconds = DRAFT.SECOND_PICK_SECONDS;
+  }
+
+  /** Record one immutable ballot in the active Rumble rally phase. */
+  private applyRallyVote(
+    draft: DraftState,
+    playerId: PlayerId,
+    category: DraftCategory,
+    value: string,
+  ): void {
+    if (draft.rallyCategory !== category || draft.rallyVotes.has(playerId)) return;
+    const valid =
+      category === 'map'
+        ? listMapNames().includes(value)
+        : (GAME_MODE_ROTATION as readonly string[]).includes(value);
+    if (!valid) {
+      logger.debug(
+        { matchId: draft.matchId, playerId, category, value },
+        'Ignoring invalid rally vote',
+      );
+      return;
+    }
+
+    draft.rallyVotes.set(playerId, value);
+    logger.info(
+      { matchId: draft.matchId, playerId, category, value },
+      'Rumble rally vote recorded',
+    );
+    if (draft.rallyVotes.size === draft.playerEntries.length) {
+      this.resolveRallyVote(draft, 'all_voted');
+    }
+  }
+
+  /**
+   * Resolve the current ballot by plurality. Registry order makes the tied
+   * candidate set stable; the injected RNG breaks a real tie once so every
+   * client receives the same authoritative outcome. Abstainers never gain
+   * random votes, while a fully AFK phase still selects a legal option.
+   */
+  private resolveRallyVote(draft: DraftState, reason: 'all_voted' | 'timeout'): void {
+    const category = draft.rallyCategory;
+    if (category === null) return;
+    const options: readonly string[] = category === 'map' ? listMapNames() : GAME_MODE_ROTATION;
+    const counts = new Map(options.map((option) => [option, 0]));
+    for (const value of draft.rallyVotes.values()) {
+      counts.set(value, (counts.get(value) ?? 0) + 1);
+    }
+    const highest = Math.max(...counts.values());
+    const leaders = options.filter((option) => counts.get(option) === highest);
+    const winner = leaders[Math.min(Math.floor(this.rng() * leaders.length), leaders.length - 1)];
+
+    logger.info(
+      {
+        matchId: draft.matchId,
+        category,
+        winner,
+        reason,
+        ballots: draft.rallyVotes.size,
+        counts: Object.fromEntries(counts),
+      },
+      'Rumble rally vote resolved',
+    );
+
+    if (category === 'map') {
+      draft.mapPick = winner;
+      draft.rallyCategory = 'mode';
+      draft.rallyVotes.clear();
+      draft.pickTimerSeconds = DRAFT.RALLY_VOTE_SECONDS;
+      return;
+    }
+
+    draft.modePick = winner as GameModeType;
+    draft.rallyCategory = null;
+    draft.rallyVotes.clear();
+    this.finalizeDraft(draft);
   }
 
   /**
@@ -1421,6 +1510,10 @@ export class MatchmakingManager {
     const draft = matchId !== undefined ? this.draftStates.get(matchId) : undefined;
     if (!draft) {
       logger.debug({ playerId, category, value }, 'Ignoring draft pick from player not in a draft');
+      return;
+    }
+    if (draft.draftKind === 'rally') {
+      this.applyRallyVote(draft, playerId, category, value);
       return;
     }
     if (draft.currentPickerId !== playerId) {

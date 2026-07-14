@@ -466,6 +466,8 @@ export const DRAFT = Object.freeze({
   FIRST_PICK_SECONDS: 20,
   /** Seconds the second picker has once the first pick lands. */
   SECOND_PICK_SECONDS: 15,
+  /** Seconds allotted to each all-fighter Rumble vote. */
+  RALLY_VOTE_SECONDS: 15,
   /**
    * Client-side duration of the "WHO PICKS FIRST?" nickname ping-pong
    * before the option columns unlock. Purely cosmetic — the outcome is

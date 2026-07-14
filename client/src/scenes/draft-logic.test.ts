@@ -7,6 +7,7 @@ import {
   deriveDraftView,
   firstPickedCategory,
   formatDraftCountdown,
+  formatRallyCountdown,
   shouldSkipSpectacle,
 } from './draft-logic.js';
 
@@ -119,6 +120,62 @@ describe('deriveDraftView', () => {
     expect(view.yourTurn).toBe(false);
     expect(view.enabledCategories).toEqual([]);
   });
+
+  it('lets every Rumble fighter cast one vote in the active rally phase', () => {
+    const view = deriveDraftView(
+      snap({
+        draftKind: 'rally',
+        players: [
+          { id: 'p1', nickname: 'ryan' },
+          { id: 'p2', nickname: 'dave' },
+          { id: 'p3', nickname: 'cora' },
+        ],
+        currentPickerId: null,
+        rallyCategory: 'map',
+        rallyVotes: [{ playerId: 'p2', value: 'Scrapyard' }],
+      }),
+      'p1',
+      null,
+    );
+    expect(view).toMatchObject({
+      isRally: true,
+      yourTurn: true,
+      enabledCategories: ['map'],
+      statusLine: 'YOUR VOTE - CHOOSE A MAP',
+      voteCounts: { Scrapyard: 1 },
+      localVote: null,
+    });
+  });
+
+  it('locks a rally ballot and reports how many fighters remain', () => {
+    const view = deriveDraftView(
+      snap({
+        draftKind: 'rally',
+        players: [
+          { id: 'p1', nickname: 'ryan' },
+          { id: 'p2', nickname: 'dave' },
+          { id: 'p3', nickname: 'cora' },
+        ],
+        currentPickerId: null,
+        rallyCategory: 'mode',
+        mapPick: 'Scrapyard',
+        rallyVotes: [
+          { playerId: 'p1', value: GameModeType.KOTH },
+          { playerId: 'p2', value: GameModeType.KOTH },
+        ],
+      }),
+      'p1',
+      null,
+    );
+    expect(view).toMatchObject({
+      yourTurn: false,
+      enabledCategories: [],
+      statusLine: 'VOTE CAST - WAITING FOR 1 FIGHTER',
+      mapBadge: 'GROUP PICK',
+      voteCounts: { [GameModeType.KOTH]: 2 },
+      localVote: GameModeType.KOTH,
+    });
+  });
 });
 
 describe('firstPickedCategory', () => {
@@ -146,6 +203,10 @@ describe('shouldSkipSpectacle', () => {
   it('skips once any pick is recorded (late arrival)', () => {
     expect(shouldSkipSpectacle(snap({ mapPick: 'Scrapyard' }))).toBe(true);
     expect(shouldSkipSpectacle(snap({ modePick: GameModeType.KOTH }))).toBe(true);
+  });
+
+  it('skips the two-player spectacle for a group rally', () => {
+    expect(shouldSkipSpectacle(snap({ draftKind: 'rally' }))).toBe(true);
   });
 });
 
@@ -207,5 +268,9 @@ describe('formatDraftCountdown', () => {
 
   it('rolls into minutes past 60s', () => {
     expect(formatDraftCountdown(61000)).toBe('AUTO-PICK IN 1:01');
+  });
+
+  it('labels the same countdown as a vote deadline in a rally', () => {
+    expect(formatRallyCountdown(14200)).toBe('VOTE CLOSES IN 0:15');
   });
 });

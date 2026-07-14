@@ -54,9 +54,11 @@ match death counter, so every client sees the same cosmetic beat.
 `QUICK MATCH` keeps the focused 1v1 rivalry experience. `RUMBLE 2–4` opens a
 short gathering window once two fighters arrive, launches immediately at four,
 and turns every existing arena, mode, character, and shared event into a
-free-for-all. Two server-selected fighters make the map and mode draft picks
-while everyone else watches, then the whole connected group can vote for the
-next round from the final standings. Direct Rumble rematches also carry a
+free-for-all. In a three- or four-fighter group, everyone votes on the arena
+and then the mode; live ballot counts invite negotiation, plurality wins, and
+the server breaks ties. Two-fighter Rumbles keep the quicker head-to-head
+draft. The whole connected group can then vote for the next round from the
+final standings. Direct Rumble rematches also carry a
 session-only Crown: the winner claims it, repeat wins extend the reign, and the
 next winner can steal it. The Crown disappears when the group returns to the
 lobby, so it stays a social run-it-back story instead of persistent grind.
