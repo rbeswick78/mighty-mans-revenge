@@ -10,6 +10,9 @@ import {
   KILL_WEAPONS,
   GAME_MODES,
   GAME_MODE_ROTATION,
+  BOT,
+  RUMBLE,
+  PRACTICE_KINDS,
   getNextGameMode,
   gameModeDisplayName,
   characterMaxHealth,
@@ -765,6 +768,13 @@ describe('WEAPONS registry', () => {
 });
 
 describe('session-8 polish backlog config', () => {
+  it('defines one distinct Scrap Pit bot callsign per open Rumble slot', () => {
+    expect(PRACTICE_KINDS).toContain('rusty_rumble');
+    expect(BOT.RUMBLE_NICKNAMES).toHaveLength(RUMBLE.MAX_PLAYERS - 1);
+    expect(new Set(BOT.RUMBLE_NICKNAMES).size).toBe(BOT.RUMBLE_NICKNAMES.length);
+    expect(Object.isFrozen(BOT.RUMBLE_NICKNAMES)).toBe(true);
+  });
+
   it('a pistol weapon pickup fills the magazine plus a positive reserve', () => {
     const p = WEAPONS.pistol;
     expect(p.pickupAmmo).toBeGreaterThan(p.magazineSize);

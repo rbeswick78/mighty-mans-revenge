@@ -107,6 +107,7 @@ export class LobbyScene extends Phaser.Scene {
   private quickMatchButton!: PixelButton;
   private rumbleButton!: PixelButton;
   private practiceButton!: PixelButton;
+  private rustyRumbleButton!: PixelButton;
   private gauntletButton!: PixelButton;
   private dailyButton!: PixelButton;
   private difficultyButton!: PixelButton;
@@ -338,8 +339,8 @@ export class LobbyScene extends Phaser.Scene {
     );
     panel.add(this.rumbleButton);
 
-    const soloGap = 8;
-    const soloW = (qmW - soloGap * 2) / 3;
+    const soloGap = 6;
+    const soloW = (qmW - soloGap * 3) / 4;
     const selectorW = (qmW - 10) / 2;
     this.practiceButton = new PixelButton(
       this,
@@ -350,22 +351,37 @@ export class LobbyScene extends Phaser.Scene {
       'RUSTY SPAR',
       {
         variant: 'secondary',
-        fontSize: 7,
+        fontSize: 6,
         onClick: () => this.onPractice('sparring'),
       },
     );
     panel.add(this.practiceButton);
 
-    this.gauntletButton = new PixelButton(
+    this.rustyRumbleButton = new PixelButton(
       this,
       panel.centerX - qmW / 2 + soloW + soloGap,
+      158,
+      soloW,
+      qmH,
+      'SCRAP PIT',
+      {
+        variant: 'secondary',
+        fontSize: 6,
+        onClick: () => this.onPractice('rusty_rumble'),
+      },
+    );
+    panel.add(this.rustyRumbleButton);
+
+    this.gauntletButton = new PixelButton(
+      this,
+      panel.centerX - qmW / 2 + (soloW + soloGap) * 2,
       158,
       soloW,
       qmH,
       'GAUNTLET',
       {
         variant: 'secondary',
-        fontSize: 7,
+        fontSize: 6,
         onClick: () => this.onPractice('gauntlet'),
       },
     );
@@ -373,14 +389,14 @@ export class LobbyScene extends Phaser.Scene {
 
     this.dailyButton = new PixelButton(
       this,
-      panel.centerX - qmW / 2 + (soloW + soloGap) * 2,
+      panel.centerX - qmW / 2 + (soloW + soloGap) * 3,
       158,
       soloW,
       qmH,
       'DAILY RUN',
       {
         variant: 'secondary',
-        fontSize: 7,
+        fontSize: 6,
         onClick: () => this.onPractice('daily'),
       },
     );
@@ -705,6 +721,7 @@ export class LobbyScene extends Phaser.Scene {
       this.quickMatchButton,
       this.rumbleButton,
       this.practiceButton,
+      this.rustyRumbleButton,
       this.gauntletButton,
       this.dailyButton,
       this.difficultyButton,
@@ -1014,6 +1031,7 @@ export class LobbyScene extends Phaser.Scene {
     this.quickMatchButton.setVisible(false);
     this.rumbleButton.setVisible(false);
     this.practiceButton.setVisible(false);
+    this.rustyRumbleButton.setVisible(false);
     this.gauntletButton.setVisible(false);
     this.dailyButton.setVisible(false);
     this.difficultyButton.setVisible(false);
@@ -1056,9 +1074,13 @@ export class LobbyScene extends Phaser.Scene {
       this.nickname,
       this.practiceDifficulty,
       kind,
-      kind === 'sparring' ? (this.practiceMode ?? undefined) : undefined,
-      kind === 'sparring' ? (this.practiceRival ?? undefined) : undefined,
-      kind === 'sparring' ? (this.practiceMutator ?? undefined) : undefined,
+      kind === 'sparring' || kind === 'rusty_rumble' ? (this.practiceMode ?? undefined) : undefined,
+      kind === 'sparring' || kind === 'rusty_rumble'
+        ? (this.practiceRival ?? undefined)
+        : undefined,
+      kind === 'sparring' || kind === 'rusty_rumble'
+        ? (this.practiceMutator ?? undefined)
+        : undefined,
     );
   }
 
@@ -1159,6 +1181,7 @@ export class LobbyScene extends Phaser.Scene {
     this.quickMatchButton.setVisible(true);
     this.rumbleButton.setVisible(true);
     this.practiceButton.setVisible(true);
+    this.rustyRumbleButton.setVisible(true);
     this.gauntletButton.setVisible(true);
     this.dailyButton.setVisible(true);
     this.difficultyButton.setVisible(true);
@@ -1186,6 +1209,7 @@ export class LobbyScene extends Phaser.Scene {
       this.quickMatchButton,
       this.rumbleButton,
       this.practiceButton,
+      this.rustyRumbleButton,
       this.gauntletButton,
       this.dailyButton,
     ]) {

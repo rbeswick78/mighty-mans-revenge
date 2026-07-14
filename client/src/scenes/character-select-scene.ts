@@ -185,7 +185,9 @@ export class CharacterSelectScene extends Phaser.Scene {
             this.matchData.mapName,
           )
         : [
-            `NEXT: ${modeName} - ${this.matchData.mapName.toUpperCase()}`,
+            `${
+              this.matchData.practiceKind === 'rusty_rumble' ? 'SCRAP PIT' : 'NEXT'
+            }: ${modeName} - ${this.matchData.mapName.toUpperCase()}`,
             ...(crownLabel ? [crownLabel] : []),
             ...(grudgeLabel ? [grudgeLabel] : []),
             ...(this.matchData.practiceMutatorId

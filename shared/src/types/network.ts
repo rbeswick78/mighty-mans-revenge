@@ -68,11 +68,11 @@ export interface ClientStartPracticeMessage {
   difficulty: BotDifficulty;
   /** Optional for backward compatibility; old clients start ordinary sparring. */
   kind?: PracticeKind;
-  /** Optional validated mode pin for ordinary Sparring; Gauntlet ignores it. */
+  /** Optional validated mode pin for Sparring or Scrap Pit; Gauntlet ignores it. */
   gameMode?: GameModeType;
-  /** Optional validated Rusty fighter pin for ordinary Sparring; Gauntlet ignores it. */
+  /** Optional featured Rusty fighter for Sparring or Scrap Pit; Gauntlet ignores it. */
   opponentCharacterId?: CharacterId;
-  /** Optional validated mid-match chaos pin for ordinary Sparring; Gauntlet ignores it. */
+  /** Optional mid-match chaos pin for Sparring or Scrap Pit; Gauntlet ignores it. */
   mutatorId?: MutatorId;
 }
 
@@ -325,6 +325,8 @@ export interface ServerMatchFoundMessage {
   gameMode: GameModeType;
   /** Queue family; optional so older servers still interoperate. */
   matchKind?: 'duel' | 'rumble' | 'practice';
+  /** Solo route that created this match; lets pre-match UI name the experience truthfully. */
+  practiceKind?: PracticeKind;
   /** Reigning champion carried only into a direct Wasteland Rumble rematch. */
   rumbleCrown?: RumbleCrownState;
   /** Local fighter's personal target from the immediately previous Rumble. */

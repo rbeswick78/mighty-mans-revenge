@@ -9,6 +9,8 @@ import {
   OVERTIME,
   DRAFT,
   RUMBLE,
+  BOT,
+  CHARACTER_IDS,
   listMapNames,
   GameModeType,
   GAME_MODE_ROTATION,
@@ -1741,6 +1743,113 @@ describe('MatchmakingManager solo practice flow', () => {
       rematchMutatorExclusions: ReadonlySet<MutatorId>;
     };
     expect([...rematchInternals.rematchMutatorExclusions]).toEqual(previousMutators);
+  });
+
+  it('opens a full Scrap Pit, drives three Rusties, and preserves Rumble rematches', () => {
+    const { fake, sent, connected } = makeFakeServer();
+    connected.push('A');
+    const mgr = new MatchmakingManager(fake, () => 0, store, seededRng([0, 0, 0, 0, 0]));
+
+    mgr.handleStartPractice(
+      'A',
+      'Alpha',
+      'warlord',
+      'rusty_rumble',
+      GameModeType.DEATHMATCH,
+      'frost_wizard',
+      'blackout',
+    );
+
+    expect(mgr.getActiveMatches()).toHaveLength(1);
+    const first = mgr.getActiveMatches()[0];
+    const botIds = [...first.players.keys()].filter((playerId) => playerId.startsWith('bot:'));
+    const botNicknames = botIds.map((playerId) => first.players.get(playerId)?.nickname);
+    const botLocks = botIds.map((playerId) => first.selectionState.get(playerId)?.locked);
+    expect(first.players).toHaveLength(RUMBLE.MAX_PLAYERS);
+    expect(botNicknames).toEqual([...BOT.RUMBLE_NICKNAMES]);
+    expect(new Set(botLocks).size).toBe(botIds.length);
+    expect(botLocks).toContain('frost_wizard');
+    expect(first.gameModeType).toBe(GameModeType.DEATHMATCH);
+
+    const controllers = (
+      mgr as unknown as {
+        botControllers: Map<string, Array<{ playerId: PlayerId; difficulty: string }>>;
+      }
+    ).botControllers.get(first.matchId);
+    expect(controllers?.map((controller) => controller.playerId)).toEqual(botIds);
+    expect(controllers?.every((controller) => controller.difficulty === 'warlord')).toBe(true);
+
+    const opening = sent.find(
+      (entry) => entry.playerId === 'A' && entry.message.type === 'server:matchFound',
+    );
+    if (!opening || opening.message.type !== 'server:matchFound') {
+      throw new Error('missing Scrap Pit matchFound');
+    }
+    expect(opening.message.matchKind).toBe('rumble');
+    expect(opening.message.practiceKind).toBe('rusty_rumble');
+    expect(opening.message.opponents.map((opponent) => opponent.nickname)).toEqual([
+      ...BOT.RUMBLE_NICKNAMES,
+    ]);
+    expect(opening.message.practiceMutatorId).toBe('blackout');
+
+    const humanCharacter = CHARACTER_IDS.find((characterId) => !botLocks.includes(characterId));
+    if (!humanCharacter) throw new Error('missing open fighter');
+    first.setLock('A', humanCharacter);
+    first.updateCharacterSelect(0);
+    first.players.get('A')!.score = 5;
+    first.phase = MatchPhase.ENDED;
+    mgr.tick(0.05, 1);
+
+    const ended = [...sent]
+      .reverse()
+      .find((entry) => entry.playerId === 'A' && entry.message.type === 'server:matchEnd');
+    if (!ended || ended.message.type !== 'server:matchEnd') {
+      throw new Error('missing Scrap Pit matchEnd');
+    }
+    expect(ended.message.result.isPractice).toBe(true);
+    expect(ended.message.result.matchKind).toBe('rumble');
+    expect(ended.message.result.rivalrySet).toBeNull();
+    expect(ended.message.result.rumbleCrown?.crown?.holderId).toBe('A');
+    expect(store.getLifetime('Alpha')).toBeNull();
+
+    sent.length = 0;
+    mgr.handleRematchRequest('A');
+    expect(mgr.getActiveMatches()).toHaveLength(1);
+    const rematch = mgr.getActiveMatches()[0];
+    expect(rematch.players).toHaveLength(RUMBLE.MAX_PLAYERS);
+    expect(
+      [...rematch.selectionState.values()].filter((selection) => selection.locked),
+    ).toHaveLength(RUMBLE.MAX_PLAYERS - 1);
+    const rematchFound = sent.find(
+      (entry) => entry.playerId === 'A' && entry.message.type === 'server:matchFound',
+    );
+    if (!rematchFound || rematchFound.message.type !== 'server:matchFound') {
+      throw new Error('missing Scrap Pit rematch');
+    }
+    expect(rematchFound.message.matchKind).toBe('rumble');
+    expect(rematchFound.message.practiceKind).toBe('rusty_rumble');
+    expect(rematchFound.message.rumbleCrown?.holderId).toBe('A');
+  });
+
+  it('tears down every Scrap Pit bot when its solo player disconnects', () => {
+    const { fake } = makeFakeServer();
+    const mgr = new MatchmakingManager(fake, () => 0, store, seededRng([0, 0, 0, 0, 0]));
+    mgr.handleStartPractice('A', 'Alpha', 'scrapper', 'rusty_rumble');
+    const match = mgr.getActiveMatches()[0];
+    const botIds = [...match.players.keys()].filter((playerId) => playerId.startsWith('bot:'));
+    match.phase = MatchPhase.ACTIVE;
+
+    mgr.handlePlayerDisconnect('A');
+
+    expect(mgr.getActiveMatches()).toHaveLength(0);
+    const internals = mgr as unknown as {
+      botControllers: Map<string, unknown[]>;
+      botPlayerIds: Set<PlayerId>;
+      playerMatchMap: Map<PlayerId, string>;
+    };
+    expect(internals.botControllers.size).toBe(0);
+    expect(internals.botPlayerIds.size).toBe(0);
+    expect(botIds.every((botId) => !internals.playerMatchMap.has(botId))).toBe(true);
   });
 
   it('pins a validated Spar mode through the result promise and direct rematch', () => {

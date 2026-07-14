@@ -99,11 +99,16 @@ outside this progression so mastery remains a record of friend-group victories.
 
 `RUSTY SPAR` starts the familiar single Practice match at your selected Rusty
 difficulty. Its `RIVAL` selector can stay on `RANDOM` or pin any roster fighter
-for matchup practice, while `SPAR MODE` can keep the rotating mix or pin any of
-the eight modes. `SPAR CHAOS` can also lock any compatible shared event into
+for matchup practice, while `SOLO MODE` can keep the rotating mix or pin any of
+the eight modes. `SOLO CHAOS` can also lock any compatible shared event into
 the mid-match slot while leaving the final-minute twist random. All three
 choices persist on that device and rematches keep them while maps continue to
 rotate; Random mode skips rulesets that cannot honor the chosen event.
+`SCRAP PIT` uses those same settings to launch a full four-fighter Rumble on
+demand against Rusty, Scrapjaw, and Clank. All three are ordinary
+server-authoritative fighters, so the solo brawl includes the live Rumble
+lead, assists, standings, Crown, and direct-rematch stories without writing
+lifetime PvP records.
 `GAUNTLET` starts a three-fight run that
 escalates from Rookie to Scrapper to Warlord; win to advance, while a loss or
 draw restarts the run.

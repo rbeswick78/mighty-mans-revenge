@@ -51,6 +51,7 @@ export interface MatchData {
   /** Mode this match will be played in — drives the pre-match mode label. */
   gameMode: GameModeType;
   matchKind?: 'duel' | 'rumble' | 'practice';
+  practiceKind?: PracticeKind;
   /** Reigning champion in this connected Rumble rematch chain. */
   rumbleCrown?: RumbleCrownState;
   /** Local fighter's personal target from the previous Rumble round. */
@@ -306,6 +307,7 @@ export class GameService {
         mapName: msg.mapName,
         gameMode: msg.gameMode,
         matchKind: msg.matchKind ?? (msg.gauntlet ? 'practice' : 'duel'),
+        practiceKind: msg.practiceKind,
         rumbleCrown: msg.rumbleCrown,
         rumbleGrudge: msg.rumbleGrudge,
         characterWins: {

@@ -29,8 +29,8 @@ describe('practice mutator preferences', () => {
   });
 
   it('authors compact lobby and pre-fight copy from the shared display name', () => {
-    expect(practiceMutatorPreferenceLabel(null)).toBe('SPAR CHAOS: RANDOM');
-    expect(practiceMutatorPreferenceLabel('blackout')).toBe('SPAR CHAOS: BLACKOUT');
+    expect(practiceMutatorPreferenceLabel(null)).toBe('SOLO CHAOS: RANDOM');
+    expect(practiceMutatorPreferenceLabel('blackout')).toBe('SOLO CHAOS: BLACKOUT');
     expect(practiceMutatorBriefingLabel('ability_overdrive')).toBe('MID-MATCH: ABILITY OVERDRIVE');
   });
 });

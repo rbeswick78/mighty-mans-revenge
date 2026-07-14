@@ -26,10 +26,10 @@ describe('Practice mode preference', () => {
   });
 
   it('uses the shared player-facing mode names', () => {
-    expect(practiceModePreferenceLabel(null)).toBe('SPAR MODE: RANDOM');
+    expect(practiceModePreferenceLabel(null)).toBe('SOLO MODE: RANDOM');
     for (const mode of GAME_MODE_ROTATION) {
       expect(practiceModePreferenceLabel(mode)).toBe(
-        `SPAR MODE: ${gameModeDisplayName(mode)}`,
+        `SOLO MODE: ${gameModeDisplayName(mode)}`,
       );
     }
   });

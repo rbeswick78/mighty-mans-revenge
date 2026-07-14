@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–82 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Quick Match 1v1 plus 2–4 player Wasteland Rumble with all-player group draft rallies, a rematch-chain Rumble Crown, live lead-change drama, personal rematch Grudges, authoritative Rumble Assists with K/A/D, and visible bounded Wasteland Signal Recovery, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–83 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Quick Match 1v1 plus 2–4 player Wasteland Rumble with all-player group draft rallies, a rematch-chain Rumble Crown, live lead-change drama, personal rematch Grudges, authoritative Rumble Assists with K/A/D, a solo four-fighter Scrap Pit against three server-authoritative Rusties, and visible bounded Wasteland Signal Recovery, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -114,6 +114,7 @@ Each session below attacks one of these.
 | 80  | Rumble Grudges                                  | Every group finish leaves each fighter a personal rematch score to settle     | **DONE** (2026-07-14) |
 | 81  | Rumble Assists                                  | Meaningful setup damage earns visible credit in chaotic group fights          | **DONE** (2026-07-14) |
 | 82  | Wasteland Signal Recovery                       | Brief server trouble becomes visible and recoverable instead of a frozen loop | **DONE** (2026-07-14) |
+| 83  | Scrap Pit                                       | Solo players can enter the full four-fighter Rumble chaos on demand            | **DONE** (2026-07-14) |
 
 ---
 
@@ -3231,6 +3232,52 @@ attempt one attainable friend score to hunt from the first stage onward.
 
 ---
 
+## Session 83 — Scrap Pit
+
+**Goal:** unlock the game's richest four-fighter systems for a solo player by
+filling a real Wasteland Rumble with three server-authoritative Rusties.
+
+**Locked design decisions**
+
+- `SCRAP PIT` is a fourth on-demand lobby route beside Rusty Spar, Gauntlet,
+  and Daily Run. It uses the selected Rusty level, mode, rival, and compatible
+  chaos preferences; the chosen rival becomes the featured first bot while
+  the other two receive different available fighters.
+- The match is an ordinary four-entrant authoritative `Match` with
+  `matchKind: rumble`, not a parallel combat simulation. Each bot owns an
+  independent `BotController`, picks its target from every living opponent,
+  and queues normal server inputs before the shared match update.
+- Rusty, Scrapjaw, and Clank have distinct callsigns and distinct fighter
+  locks. The server advertises `practiceKind: rusty_rumble` so Character
+  Select can name the Scrap Pit while preserving the existing Rumble HUD,
+  standings, assists, lead drama, Crown, and Grudge presentations.
+- Scrap Pit remains Practice: it never writes lifetime PvP, mastery, streak,
+  rivalry, contract-career, or friend-leaderboard progress. Direct rematches
+  auto-accept all three bots and retain the Rumble Crown, Grudges, chosen solo
+  settings, fresh-chaos exclusions, and normal next-map promise.
+- A solo disconnect dissolves the whole bot match in every phase and releases
+  controllers, bot ids, match routing, and practice metadata immediately.
+  Ordinary human Rumble teardown behavior is unchanged.
+
+**Acceptance criteria**
+
+- [x] Shared and matchmaking tests prove three unique configured callsigns,
+      four entrants, three distinct locks, the featured rival, one controller
+      per bot, accepted mode/chaos settings, no persistent stats, and a
+      Crown-carrying direct Rumble rematch.
+- [x] Disconnect coverage proves an active Scrap Pit releases every bot,
+      controller, and route when its only human leaves.
+- [x] Network coverage proves the new practice request remains an explicit
+      discriminated-union value.
+- [x] Chromium and Firefox browser journeys launch the real server flow and
+      observe three authoritative locked rivals; mobile-landscape verifies the
+      four-route lobby remains ordered and readable despite its local WebRTC
+      emulator limitation.
+- [x] Typecheck, lint, all unit tests, production build, and the complete
+      Playwright desktop/mobile matrix pass.
+
+---
+
 ## Session 82 — Wasteland Signal Recovery
 
 **Goal:** make every return session trustworthy by turning startup stalls and
@@ -3842,6 +3889,48 @@ favorite mid-match event while the final-minute surprise stays fresh.
 ---
 
 ## Session Log
+
+### Session 83 — 2026-07-14 — Scrap Pit
+
+**Shipped:** the best parts of Wasteland Rumble are now playable without
+waiting for three friends. `SCRAP PIT` launches one human with Rusty,
+Scrapjaw, and Clank in a real four-fighter server-authoritative match. All
+three bots run independent controllers, choose naturally among every living
+opponent, lock different roster fighters, and participate in the existing
+Rumble score, lead, assist, Crown, Grudge, and standings systems.
+
+The route honors the lobby's level, mode, featured rival, and compatible
+chaos selectors. Its explicit practice metadata gives Character Select a
+truthful `SCRAP PIT` briefing. Results and direct rematches stay in the Rumble
+family while Practice isolation keeps every lifetime PvP and leaderboard
+record clean. Rematches auto-accept the three synthetic entrants and carry
+the Crown and personal targets; disconnect teardown now releases the entire
+solo group even after the fight begins. No combat, physics, scoring, bot
+difficulty, persistence schema, assets, or ordinary PvP matchmaking rules
+changed.
+
+**Verification:** focused shared, network, and matchmaking coverage passes,
+including four entrants, unique callsigns and locks, featured-rival selection,
+three bot controllers, practice-only persistence, Crown-carrying rematches,
+and full disconnect cleanup. The dedicated browser journey passes in Chromium
+and Firefox against the real local server; 844×390 mobile-landscape verifies
+the compact four-option lobby layout. A hands-on browser review confirms the
+new row remains readable at the normal desktop canvas size. Typecheck, lint,
+all 1,261 unit/integration tests across 90 files, the production build, and the
+complete Playwright matrix pass with 60 passes and 12 intentional
+project-scoped skips; Vite retains its existing chunk-size advisory. One
+mobile Crown check hit its existing cold-start lobby timeout on the first full
+run, passed immediately in isolation, and passed again in the clean full-matrix
+rerun.
+
+**Operational watch:** three bots increase per-match AI work by a small,
+bounded factor. Watch a real group machine for server tick drift before ever
+raising the bot count or path-recalculation cadence. The local long-running
+watch server can retain an old `shared/dist` module after shared config edits;
+the verified production build and Playwright server start fresh and do not.
+
+**Deployment:** not run; production deployment still requires explicit user
+authorization.
 
 ### Session 82 — 2026-07-14 — Wasteland Signal Recovery
 

@@ -28,7 +28,7 @@ export function nextPracticeMutatorPreference(
 }
 
 export function practiceMutatorPreferenceLabel(mutator: PracticeMutatorPreference): string {
-  return `SPAR CHAOS: ${mutator === null ? 'RANDOM' : eventDisplayName(mutator)}`;
+  return `SOLO CHAOS: ${mutator === null ? 'RANDOM' : eventDisplayName(mutator)}`;
 }
 
 export function practiceMutatorBriefingLabel(mutator: MutatorId): string {

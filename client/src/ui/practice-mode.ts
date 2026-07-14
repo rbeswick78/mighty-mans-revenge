@@ -24,5 +24,5 @@ export function nextPracticeModePreference(
 }
 
 export function practiceModePreferenceLabel(mode: PracticeModePreference): string {
-  return `SPAR MODE: ${mode === null ? 'RANDOM' : gameModeDisplayName(mode)}`;
+  return `SOLO MODE: ${mode === null ? 'RANDOM' : gameModeDisplayName(mode)}`;
 }

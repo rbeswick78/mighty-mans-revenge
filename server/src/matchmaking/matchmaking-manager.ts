@@ -202,8 +202,8 @@ export class MatchmakingManager {
   private readonly draftStates: Map<string, DraftState> = new Map();
   /** Ephemeral first-to-N scores shared by consecutive rematches. */
   private readonly playerRivalrySets: Map<PlayerId, RivalrySetState> = new Map();
-  /** One live authoritative controller per practice match. */
-  private readonly botControllers: Map<string, BotController> = new Map();
+  /** Every live authoritative controller per practice match. */
+  private readonly botControllers: Map<string, BotController[]> = new Map();
   /** Match ids whose lifetime stats must stay out of friend leaderboards. */
   private readonly practiceDifficulties: Map<string, BotDifficulty> = new Map();
   /** Optional validated mode choice for ordinary Sparring matches. */
@@ -313,7 +313,7 @@ export class MatchmakingManager {
     this.broadcastRumbleStatus();
   }
 
-  /** Start a real authoritative match immediately with a synthetic opponent. */
+  /** Start a real authoritative match immediately with synthetic opponents. */
   handleStartPractice(
     playerId: PlayerId,
     nickname: string,
@@ -328,18 +328,18 @@ export class MatchmakingManager {
       ? difficulty
       : DEFAULT_BOT_DIFFICULTY;
     const safeKind = PRACTICE_KINDS.includes(kind) ? kind : 'sparring';
+    const usesSparRules = safeKind === 'sparring' || safeKind === 'rusty_rumble';
     const practiceModePin =
-      safeKind === 'sparring' && gameMode !== undefined && GAME_MODE_ROTATION.includes(gameMode)
+      usesSparRules && gameMode !== undefined && GAME_MODE_ROTATION.includes(gameMode)
         ? gameMode
         : null;
     const practiceRivalPin =
-      safeKind === 'sparring' &&
+      usesSparRules &&
       opponentCharacterId !== undefined &&
       CHARACTER_IDS.includes(opponentCharacterId)
         ? opponentCharacterId
         : null;
-    const practiceMutatorPreference =
-      safeKind === 'sparring' && isMutatorId(mutatorId) ? mutatorId : null;
+    const practiceMutatorPreference = usesSparRules && isMutatorId(mutatorId) ? mutatorId : null;
     const dailyKey = safeKind === 'daily' ? dailyChallengeKey(this.now()) : undefined;
     const dailyOpening = dailyKey
       ? practiceDailyGauntletOpening(dailyKey, listMapNames(), GAME_MODE_ROTATION, CHARACTER_IDS)
@@ -362,9 +362,13 @@ export class MatchmakingManager {
     this.rumbleQueue.removePlayer(playerId);
     this.playerNicknames.set(playerId, nickname);
 
-    const botId = `${BOT.PLAYER_ID_PREFIX}${crypto.randomUUID()}` as PlayerId;
-    this.botPlayerIds.add(botId);
-    this.playerNicknames.set(botId, BOT.NICKNAME);
+    const botNicknames = safeKind === 'rusty_rumble' ? BOT.RUMBLE_NICKNAMES : [BOT.NICKNAME];
+    const botEntries = botNicknames.map((botNickname) => {
+      const id = `${BOT.PLAYER_ID_PREFIX}${crypto.randomUUID()}` as PlayerId;
+      this.botPlayerIds.add(id);
+      this.playerNicknames.set(id, botNickname);
+      return { id, nickname: botNickname };
+    });
     const names = listMapNames();
     const mapName =
       dailyOpening?.mapName ??
@@ -381,14 +385,13 @@ export class MatchmakingManager {
       randomModePool[
         Math.min(Math.floor(this.rng() * randomModePool.length), randomModePool.length - 1)
       ];
+    const matchId = crypto.randomUUID();
+    if (safeKind === 'rusty_rumble') this.matchKinds.set(matchId, 'rumble');
     this.launchMatch(
-      crypto.randomUUID(),
+      matchId,
       this.forcedMap() ?? getMap(mapName),
       selectedMode,
-      [
-        { id: playerId, nickname },
-        { id: botId, nickname: BOT.NICKNAME },
-      ],
+      [{ id: playerId, nickname }, ...botEntries],
       {},
       gauntlet?.difficulty ?? safeDifficulty,
       [],
@@ -441,8 +444,9 @@ export class MatchmakingManager {
       const match = this.activeMatches.get(matchId);
       if (match) {
         const isRumble = this.matchKinds.get(matchId) === 'rumble';
-        if (isRumble && match.phase !== MatchPhase.ACTIVE) {
-          this.teardownRumbleBeforeFight(matchId, match, playerId);
+        const isPracticeRumble = isRumble && this.practiceDifficulties.has(matchId);
+        if (isRumble && (match.phase !== MatchPhase.ACTIVE || isPracticeRumble)) {
+          this.teardownRumbleAfterDeparture(matchId, match, playerId);
           return;
         }
         match.onPlayerDisconnect(playerId, isRumble);
@@ -641,7 +645,9 @@ export class MatchmakingManager {
     // Update active matches
     for (const [matchId, match] of this.activeMatches) {
       const prevPhase = this.previousPhases.get(matchId);
-      this.botControllers.get(matchId)?.update(dt, match, serverTick);
+      for (const botController of this.botControllers.get(matchId) ?? []) {
+        botController.update(dt, match, serverTick);
+      }
       match.update(dt);
       const newPhase = match.phase;
 
@@ -953,8 +959,8 @@ export class MatchmakingManager {
     }
   }
 
-  /** A group that loses someone before FIGHT returns intact to the lobby. */
-  private teardownRumbleBeforeFight(
+  /** Dissolve a pre-fight group or an ownerless solo Rumble without leaving bot state behind. */
+  private teardownRumbleAfterDeparture(
     matchId: string,
     match: Match,
     leavingPlayerId: PlayerId,
@@ -971,9 +977,17 @@ export class MatchmakingManager {
     }
     this.activeMatches.delete(matchId);
     this.previousPhases.delete(matchId);
+    this.botControllers.delete(matchId);
+    this.practiceDifficulties.delete(matchId);
+    this.practiceModePins.delete(matchId);
+    this.practiceRivalPins.delete(matchId);
+    this.practiceMutatorPreferences.delete(matchId);
+    this.practiceGauntlets.delete(matchId);
+    this.practiceGauntletRunHistories.delete(matchId);
     this.matchKinds.delete(matchId);
     this.rumbleCrowns.delete(matchId);
-    logger.info({ matchId, leavingPlayerId }, 'Rumble dissolved before fight');
+    this.releasePracticePlayers([...match.players.keys()]);
+    logger.info({ matchId, leavingPlayerId }, 'Rumble dissolved after player departure');
   }
 
   /**
@@ -1003,6 +1017,16 @@ export class MatchmakingManager {
     const matchKind =
       this.matchKinds.get(matchId) ?? (practiceDifficulty === null ? 'duel' : 'practice');
     this.matchKinds.set(matchId, matchKind);
+    const practiceKind: PracticeKind | undefined =
+      practiceDifficulty === null
+        ? undefined
+        : gauntlet?.challengeKey
+          ? 'daily'
+          : gauntlet
+            ? 'gauntlet'
+            : matchKind === 'rumble'
+              ? 'rusty_rumble'
+              : 'sparring';
     const dailySeed = gauntlet?.challengeKey
       ? [
           gauntlet.challengeKey,
@@ -1050,29 +1074,42 @@ export class MatchmakingManager {
         this.practiceMutatorPreferences.set(matchId, practiceMutatorPreference);
       }
       if (gauntlet) this.practiceGauntlets.set(matchId, gauntlet);
-      const botEntry = playerEntries.find((entry) => this.botPlayerIds.has(entry.id));
-      if (botEntry) {
-        this.botControllers.set(matchId, new BotController(botEntry.id, practiceDifficulty));
-        const character =
-          gauntlet?.opponentCharacterId ??
-          practiceRivalPin ??
-          CHARACTER_IDS[
-            Math.min(Math.floor(this.rng() * CHARACTER_IDS.length), CHARACTER_IDS.length - 1)
-          ];
-        if (gauntlet) {
-          gauntlet.opponentCharacterId = character;
-          this.practiceGauntletRunHistories.set(matchId, {
-            opponentCharacterIds: gauntletRunHistory.opponentCharacterIds.includes(character)
-              ? [...gauntletRunHistory.opponentCharacterIds]
-              : [...gauntletRunHistory.opponentCharacterIds, character],
-            forecastMutatorIds:
-              gauntlet.forecastMutatorId &&
-              !gauntletRunHistory.forecastMutatorIds.includes(gauntlet.forecastMutatorId)
-                ? [...gauntletRunHistory.forecastMutatorIds, gauntlet.forecastMutatorId]
-                : [...gauntletRunHistory.forecastMutatorIds],
-          });
+      const botEntries = playerEntries.filter((entry) => this.botPlayerIds.has(entry.id));
+      if (botEntries.length > 0) {
+        this.botControllers.set(
+          matchId,
+          botEntries.map((entry) => new BotController(entry.id, practiceDifficulty)),
+        );
+        const availableCharacters = [...CHARACTER_IDS];
+        for (const [botIndex, botEntry] of botEntries.entries()) {
+          let character: CharacterId;
+          if (gauntlet?.opponentCharacterId) {
+            character = gauntlet.opponentCharacterId;
+          } else if (botIndex === 0 && practiceRivalPin) {
+            character = practiceRivalPin;
+            availableCharacters.splice(availableCharacters.indexOf(character), 1);
+          } else {
+            const randomIndex = Math.min(
+              Math.floor(this.rng() * availableCharacters.length),
+              availableCharacters.length - 1,
+            );
+            character = availableCharacters.splice(randomIndex, 1)[0];
+          }
+          if (gauntlet) {
+            gauntlet.opponentCharacterId = character;
+            this.practiceGauntletRunHistories.set(matchId, {
+              opponentCharacterIds: gauntletRunHistory.opponentCharacterIds.includes(character)
+                ? [...gauntletRunHistory.opponentCharacterIds]
+                : [...gauntletRunHistory.opponentCharacterIds, character],
+              forecastMutatorIds:
+                gauntlet.forecastMutatorId &&
+                !gauntletRunHistory.forecastMutatorIds.includes(gauntlet.forecastMutatorId)
+                  ? [...gauntletRunHistory.forecastMutatorIds, gauntlet.forecastMutatorId]
+                  : [...gauntletRunHistory.forecastMutatorIds],
+            });
+          }
+          match.setLock(botEntry.id, character);
         }
-        match.setLock(botEntry.id, character);
       }
     }
 
@@ -1108,6 +1145,7 @@ export class MatchmakingManager {
           mapName: mapData.name,
           gameMode,
           matchKind,
+          practiceKind,
           rumbleCrown: this.rumbleCrowns.get(matchId),
           rumbleGrudge: activeGrudge,
           characterWins,
@@ -2168,13 +2206,16 @@ export class MatchmakingManager {
 
     if (postMatch.isPractice) {
       const nextMatchId = crypto.randomUUID();
-      this.matchKinds.set(nextMatchId, 'practice');
+      this.matchKinds.set(nextMatchId, rematchKind === 'rumble' ? 'rumble' : 'practice');
+      if (rematchKind === 'rumble' && postMatch.rumbleCrown) {
+        this.rumbleCrowns.set(nextMatchId, postMatch.rumbleCrown);
+      }
       this.launchMatch(
         nextMatchId,
         getMap(postMatch.nextMapName),
         postMatch.nextGameMode,
         playerEntries,
-        {},
+        rematchKind === 'rumble' ? postMatch.rumbleGrudges : {},
         postMatch.nextGauntlet?.difficulty ?? postMatch.practiceDifficulty,
         postMatch.previousMutators,
         postMatch.previousContractId,

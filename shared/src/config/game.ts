@@ -495,6 +495,8 @@ export const RIVALRY_SET = Object.freeze({
 export const BOT = Object.freeze({
   PLAYER_ID_PREFIX: 'bot:',
   NICKNAME: 'RUSTY',
+  /** Distinct callsigns for the three rivals in a solo four-fighter Scrap Pit. */
+  RUMBLE_NICKNAMES: Object.freeze(['RUSTY', 'SCRAPJAW', 'CLANK']),
   PATH_RECALC_SECONDS: 0.25,
   PREFERRED_DISTANCE: 220,
   RETREAT_DISTANCE: 120,
@@ -534,7 +536,7 @@ export const BOT_DIFFICULTIES = ['rookie', 'scrapper', 'warlord'] as const;
 export type BotDifficulty = (typeof BOT_DIFFICULTIES)[number];
 export const DEFAULT_BOT_DIFFICULTY: BotDifficulty = 'scrapper';
 
-export const PRACTICE_KINDS = ['sparring', 'gauntlet', 'daily'] as const;
+export const PRACTICE_KINDS = ['sparring', 'rusty_rumble', 'gauntlet', 'daily'] as const;
 export type PracticeKind = (typeof PRACTICE_KINDS)[number];
 
 /** Run-long rewards drafted alongside Gauntlet routes. */

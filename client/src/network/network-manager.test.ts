@@ -509,6 +509,13 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
       difficulty: 'scrapper',
       kind: 'gauntlet',
     });
+    manager.startPractice('Delta', 'rookie', 'rusty_rumble');
+    expect(hoisted.sentMessages).toContainEqual({
+      type: 'client:startPractice',
+      nickname: 'Delta',
+      difficulty: 'rookie',
+      kind: 'rusty_rumble',
+    });
     manager.startPractice(
       'Charlie',
       'rookie',
