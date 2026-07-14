@@ -446,9 +446,12 @@ export const RUMBLE = Object.freeze({
   LAUNCH_DELAY_SECONDS: 6,
 });
 
-/** Instant 2v2 practice battle: one human + one Rusty versus two Rusties. */
+/** 2v2 Practice battle: invite one human ally briefly, then let Rusty fill in. */
 export const CREW_BATTLE = Object.freeze({
   TEAM_SIZE: 2,
+  MAX_HUMANS: 2,
+  /** First entrant never waits long for co-op; Rusty owns the open slot at zero. */
+  ALLY_WAIT_SECONDS: 6,
   KILL_TARGET: 15,
 });
 

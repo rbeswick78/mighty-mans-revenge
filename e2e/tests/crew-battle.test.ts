@@ -1,6 +1,113 @@
 import { test, expect } from '../fixtures';
 
 test.describe('Crew Battle 2v2', () => {
+  test('opens a readable ally window and lets every project cancel back to the lobby', async ({
+    gamePage,
+  }) => {
+    await expect
+      .poll(() =>
+        gamePage.evaluate(() => {
+          const scene = (
+            window as unknown as { game?: { scene: { getScene: (key: string) => unknown } } }
+          ).game?.scene.getScene('LobbyScene') as {
+            sys?: { settings: { active: boolean } };
+          };
+          return scene?.sys?.settings.active ?? false;
+        }),
+        { timeout: 10000, message: 'expected the Crew lobby' },
+      )
+      .toBe(true);
+
+    await gamePage.locator('input[type="text"]').first().fill('Scout');
+    expect(
+      await gamePage.evaluate(() => {
+        const scene = (
+          window as unknown as { game?: { scene: { getScene: (key: string) => unknown } } }
+        ).game?.scene.getScene('LobbyScene') as {
+          crewBattleButton?: { activate: () => boolean };
+          gameService?: {
+            startPractice: (...args: unknown[]) => void;
+            cancelMatchmaking: () => void;
+          };
+          updateConnectionUi?: (state: 'connected') => void;
+          onMatchmakingStatus?: (message: {
+            type: 'server:matchmakingStatus';
+            status: 'queued';
+            matchKind: 'duos';
+            groupSize: number;
+            maxGroupSize: number;
+            launchInMs: number;
+          }) => void;
+        };
+        if (!scene.gameService) return false;
+        scene.gameService.startPractice = () => {};
+        scene.gameService.cancelMatchmaking = () => {};
+        scene.updateConnectionUi?.('connected');
+        const activated = scene.crewBattleButton?.activate() ?? false;
+        scene.onMatchmakingStatus?.({
+          type: 'server:matchmakingStatus',
+          status: 'queued',
+          matchKind: 'duos',
+          groupSize: 1,
+          maxGroupSize: 2,
+          launchInMs: 6000,
+        });
+        return activated;
+      }),
+    ).toBe(true);
+
+    await expect
+      .poll(() =>
+        gamePage.evaluate(() => {
+          const scene = (
+            window as unknown as { game?: { scene: { getScene: (key: string) => unknown } } }
+          ).game?.scene.getScene('LobbyScene') as {
+            searchingText?: { text: string; visible: boolean; displayWidth: number };
+            searchTimerText?: { text: string; visible: boolean; displayWidth: number };
+            cancelButton?: { visible: boolean; activate: () => boolean };
+          };
+          return {
+            searching: scene?.searchingText?.text ?? null,
+            timer: scene?.searchTimerText?.text ?? null,
+            visible:
+              Boolean(scene?.searchingText?.visible) &&
+              Boolean(scene?.searchTimerText?.visible) &&
+              Boolean(scene?.cancelButton?.visible),
+            fits:
+              (scene?.searchingText?.displayWidth ?? Number.POSITIVE_INFINITY) <= 420 &&
+              (scene?.searchTimerText?.displayWidth ?? Number.POSITIVE_INFINITY) <= 420,
+          };
+        }),
+      )
+      .toMatchObject({ searching: 'CREWING UP  1/2', visible: true, fits: true });
+    expect(
+      await gamePage.evaluate(() => {
+        const scene = (
+          window as unknown as { game?: { scene: { getScene: (key: string) => unknown } } }
+        ).game?.scene.getScene('LobbyScene') as {
+          cancelButton?: { activate: () => boolean };
+        };
+        return scene.cancelButton?.activate() ?? false;
+      }),
+    ).toBe(true);
+    await expect
+      .poll(() =>
+        gamePage.evaluate(() => {
+          const scene = (
+            window as unknown as { game?: { scene: { getScene: (key: string) => unknown } } }
+          ).game?.scene.getScene('LobbyScene') as {
+            searchingText?: { visible: boolean };
+            crewBattleButton?: { visible: boolean };
+          };
+          return {
+            searching: scene?.searchingText?.visible ?? true,
+            crew: scene?.crewBattleButton?.visible ?? false,
+          };
+        }),
+      )
+      .toEqual({ searching: false, crew: true });
+  });
+
   test('launches two server-authored crews and marks the Rusty ally in live play', async ({
     gamePage,
   }, testInfo) => {
@@ -61,6 +168,7 @@ test.describe('Crew Battle 2v2', () => {
             const briefingNode = scene?.children?.list.find(
               (child) =>
                 child.text?.includes('CREW BATTLE 2V2') &&
+                child.text.includes('ALLY: RUSTY // RUSTY FILLED IN') &&
                 child.text.includes('CREW TOUR 0/4 // HILL PATCH OPEN'),
             );
             return {
@@ -139,6 +247,148 @@ test.describe('Crew Battle 2v2', () => {
         markerVisible: true,
         score: 'YOUR CREW: 0 | RIVALS: 0',
       });
+  });
+
+  test('crews up two real friends under the captain settings', async ({
+    gamePage,
+    context,
+  }, testInfo) => {
+    test.skip(
+      testInfo.project.name !== 'desktop-chromium',
+      'Two-client WebRTC Crew pair-up is pinned to its stable Chromium project.',
+    );
+    test.setTimeout(60000);
+    const pageB = await context.newPage();
+    try {
+      await pageB.goto('/');
+      await pageB.waitForSelector('canvas');
+      await expect
+        .poll(async () =>
+          Promise.all(
+            [gamePage, pageB].map((page) =>
+              page.evaluate(() => {
+                const scene = (
+                  window as unknown as {
+                    game?: { scene: { getScene: (key: string) => unknown } };
+                  }
+                ).game?.scene.getScene('LobbyScene') as {
+                  sys?: { settings: { active: boolean } };
+                  connectionState?: string;
+                };
+                return {
+                  active: scene?.sys?.settings.active ?? false,
+                  connected: scene?.connectionState === 'connected',
+                };
+              }),
+            ),
+          ),
+          { timeout: 20000, message: 'expected both Crew clients to reach the connected lobby' },
+        )
+        .toEqual([
+          { active: true, connected: true },
+          { active: true, connected: true },
+        ]);
+
+      await gamePage.locator('input[type="text"]').first().fill('Captain');
+      await pageB.locator('input[type="text"]').first().fill('Bravo');
+      await gamePage.evaluate(() => {
+        const scene = (
+          window as unknown as { game?: { scene: { getScene: (key: string) => unknown } } }
+        ).game?.scene.getScene('LobbyScene') as {
+          practiceMode?: string | null;
+          crewBattleButton?: { activate: () => boolean };
+        };
+        scene.practiceMode = 'koth';
+        if (!scene.crewBattleButton?.activate()) throw new Error('captain could not open Crew');
+      });
+      await expect
+        .poll(() =>
+          gamePage.evaluate(() => {
+            const scene = (
+              window as unknown as { game?: { scene: { getScene: (key: string) => unknown } } }
+            ).game?.scene.getScene('LobbyScene') as { searchingText?: { text: string } };
+            return scene?.searchingText?.text ?? null;
+          }),
+        )
+        .toBe('CREWING UP  1/2');
+      await pageB.evaluate(() => {
+        const scene = (
+          window as unknown as { game?: { scene: { getScene: (key: string) => unknown } } }
+        ).game?.scene.getScene('LobbyScene') as {
+          practiceMode?: string | null;
+          crewBattleButton?: { activate: () => boolean };
+        };
+        scene.practiceMode = 'deathmatch';
+        if (!scene.crewBattleButton?.activate()) throw new Error('ally could not join Crew');
+      });
+
+      await expect
+        .poll(async () =>
+          Promise.all(
+            [gamePage, pageB].map((page) =>
+              page.evaluate(() => {
+                const scene = (
+                  window as unknown as {
+                    game?: { scene: { getScene: (key: string) => unknown } };
+                  }
+                ).game?.scene.getScene('CharacterSelectScene') as {
+                  sys?: { settings: { active: boolean } };
+                  matchData?: {
+                    gameMode: string;
+                    playerTeams?: Record<string, string>;
+                    opponents: Array<{ id: string; nickname: string }>;
+                  };
+                  gameService?: { getPlayerId: () => string | null };
+                  children?: { list: Array<{ text?: string; displayWidth?: number }> };
+                };
+                const localId = scene?.gameService?.getPlayerId() ?? null;
+                const localTeam = localId ? scene?.matchData?.playerTeams?.[localId] : null;
+                const humanAlly = scene?.matchData?.opponents.find(
+                  (opponent) =>
+                    !opponent.id.startsWith('bot:') &&
+                    scene?.matchData?.playerTeams?.[opponent.id] === localTeam,
+                );
+                const bots = scene?.matchData?.opponents
+                  .filter((opponent) => opponent.id.startsWith('bot:'))
+                  .map((opponent) => opponent.nickname)
+                  .sort();
+                const briefing = scene?.children?.list.find((child) =>
+                  child.text?.includes('HUMAN ALLY:'),
+                );
+                return {
+                  active: scene?.sys?.settings.active ?? false,
+                  mode: scene?.matchData?.gameMode ?? null,
+                  ally: humanAlly?.nickname ?? null,
+                  bots,
+                  briefing: briefing?.text?.includes('CREWED UP') ?? false,
+                  fits: (briefing?.displayWidth ?? Number.POSITIVE_INFINITY) <= 920,
+                };
+              }),
+            ),
+          ),
+          { timeout: 15000, message: 'expected both friends in Crew character select' },
+        )
+        .toEqual([
+          {
+            active: true,
+            mode: 'koth',
+            ally: 'Bravo',
+            bots: ['CLANK', 'SCRAPJAW'],
+            briefing: true,
+            fits: true,
+          },
+          {
+            active: true,
+            mode: 'koth',
+            ally: 'Captain',
+            bots: ['CLANK', 'SCRAPJAW'],
+            briefing: true,
+            fits: true,
+          },
+        ]);
+    } finally {
+      await pageB.close();
+    }
   });
 
   test('presents a roster-authentic team victory card', async ({ gamePage }) => {

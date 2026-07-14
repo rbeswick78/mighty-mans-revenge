@@ -4,6 +4,7 @@ import {
   GAME_MODE_ROTATION,
   DRAFT,
   RUMBLE,
+  CREW_BATTLE,
   CREW_BATTLE_MODES,
   RIVALRY_SET,
   BOT,
@@ -69,6 +70,7 @@ import { getGameMode } from '../game/modes/index.js';
 import { GameServer } from '../network/server.js';
 import { MatchmakingQueue } from './matchmaking-queue.js';
 import { RumbleQueue } from './rumble-queue.js';
+import { CrewQueue, type CrewQueueEntry } from './crew-queue.js';
 import { resolveRumbleCrown } from './rumble-crown.js';
 import { resolveRumbleGrudges } from './rumble-grudges.js';
 import { logger } from '../utils/logger.js';
@@ -195,6 +197,7 @@ interface RivalrySetState {
 export class MatchmakingManager {
   private readonly queue: MatchmakingQueue;
   private readonly rumbleQueue: RumbleQueue;
+  private readonly crewQueue: CrewQueue;
   private readonly server: GameServer;
   private readonly activeMatches: Map<string, Match> = new Map();
   /** Queue family survives draft, live match, results, and direct rematches. */
@@ -262,6 +265,8 @@ export class MatchmakingManager {
   private modeRotationIndex = 0;
   /** Suppress 20Hz reliable queue spam; the lobby only renders whole seconds. */
   private lastRumbleStatusKey = '';
+  /** Same throttle contract for the one-or-two-human Crew ally window. */
+  private lastCrewStatusKey = '';
 
   constructor(
     server: GameServer,
@@ -273,6 +278,7 @@ export class MatchmakingManager {
     this.server = server;
     this.queue = new MatchmakingQueue();
     this.rumbleQueue = new RumbleQueue();
+    this.crewQueue = new CrewQueue();
     this.getPlayerRTT = getPlayerRTT;
     this.statsStore = statsStore;
     this.rng = rng;
@@ -281,7 +287,11 @@ export class MatchmakingManager {
 
   handleJoinMatchmaking(playerId: PlayerId, nickname: string): void {
     // If player is already in a match, ignore
-    if (this.playerMatchMap.has(playerId) || this.rumbleQueue.isPlayerQueued(playerId)) {
+    if (
+      this.playerMatchMap.has(playerId) ||
+      this.rumbleQueue.isPlayerQueued(playerId) ||
+      this.crewQueue.isPlayerQueued(playerId)
+    ) {
       logger.debug({ playerId }, 'Player already in a match, ignoring matchmaking request');
       return;
     }
@@ -310,7 +320,13 @@ export class MatchmakingManager {
   }
 
   handleJoinRumble(playerId: PlayerId, nickname: string): void {
-    if (this.playerMatchMap.has(playerId) || this.queue.isPlayerQueued(playerId)) return;
+    if (
+      this.playerMatchMap.has(playerId) ||
+      this.queue.isPlayerQueued(playerId) ||
+      this.crewQueue.isPlayerQueued(playerId)
+    ) {
+      return;
+    }
     this.playerNicknames.set(playerId, nickname);
     if (!this.rumbleQueue.addPlayer(playerId, nickname)) return;
     logger.info(
@@ -320,7 +336,7 @@ export class MatchmakingManager {
     this.broadcastRumbleStatus();
   }
 
-  /** Start a real authoritative match immediately with synthetic opponents. */
+  /** Start solo Practice immediately, or enter Crew's short optional-ally window. */
   handleStartPractice(
     playerId: PlayerId,
     nickname: string,
@@ -372,13 +388,34 @@ export class MatchmakingManager {
       }
     }
     this.queue.removePlayer(playerId);
-    this.rumbleQueue.removePlayer(playerId);
+    const leftRumbleQueue = this.rumbleQueue.removePlayer(playerId);
+    if (leftRumbleQueue) this.broadcastRumbleStatus();
     this.playerNicknames.set(playerId, nickname);
 
+    if (safeKind === 'crew_battle') {
+      if (
+        this.crewQueue.addPlayer({
+          playerId,
+          nickname,
+          difficulty: safeDifficulty,
+          gameMode: practiceModePin,
+          mutatorId: practiceMutatorPreference,
+        })
+      ) {
+        logger.info(
+          { playerId, nickname, queueLength: this.crewQueue.getQueueLength() },
+          'Player opened Crew ally window',
+        );
+      }
+      this.broadcastCrewStatus();
+      return;
+    }
+
+    const leftCrewQueue = this.crewQueue.removePlayer(playerId);
+    if (leftCrewQueue) this.broadcastCrewStatus();
+
     const botNicknames =
-      safeKind === 'rusty_rumble' || safeKind === 'crew_battle'
-        ? SCRAP_PIT_RIVALS.map((rival) => rival.nickname)
-        : [BOT.NICKNAME];
+      safeKind === 'rusty_rumble' ? SCRAP_PIT_RIVALS.map((rival) => rival.nickname) : [BOT.NICKNAME];
     const botEntries = botNicknames.map((botNickname) => {
       const id = `${BOT.PLAYER_ID_PREFIX}${crypto.randomUUID()}` as PlayerId;
       this.botPlayerIds.add(id);
@@ -389,46 +426,22 @@ export class MatchmakingManager {
     const mapName =
       dailyOpening?.mapName ??
       names[Math.min(Math.floor(this.rng() * names.length), names.length - 1)];
-    const eligibleModePool = safeKind === 'crew_battle' ? CREW_BATTLE_MODES : GAME_MODE_ROTATION;
+    const eligibleModePool = GAME_MODE_ROTATION;
     const randomModePool = practiceMutatorPreference
       ? eligibleModePool.filter((mode) =>
           isMutatorCompatibleWithMode(practiceMutatorPreference, mode),
         )
       : eligibleModePool;
     const forcedMode = this.forcedMode();
-    const crewForcedMode =
-      safeKind === 'crew_battle' &&
-      forcedMode !== null &&
-      isCrewBattleMode(forcedMode) &&
-      (!practiceMutatorPreference ||
-        isMutatorCompatibleWithMode(practiceMutatorPreference, forcedMode))
-        ? forcedMode
-        : null;
     const selectedMode =
-      safeKind === 'crew_battle'
-        ? (crewForcedMode ??
-          practiceModePin ??
-          randomModePool[
-            Math.min(Math.floor(this.rng() * randomModePool.length), randomModePool.length - 1)
-          ])
-        : (forcedMode ??
-          practiceModePin ??
-          dailyOpening?.gameMode ??
-          randomModePool[
-            Math.min(Math.floor(this.rng() * randomModePool.length), randomModePool.length - 1)
-          ]);
+      forcedMode ??
+      practiceModePin ??
+      dailyOpening?.gameMode ??
+      randomModePool[
+        Math.min(Math.floor(this.rng() * randomModePool.length), randomModePool.length - 1)
+      ];
     const matchId = crypto.randomUUID();
     if (safeKind === 'rusty_rumble') this.matchKinds.set(matchId, 'rumble');
-    if (safeKind === 'crew_battle') this.matchKinds.set(matchId, 'duos');
-    const playerTeams =
-      safeKind === 'crew_battle'
-        ? new Map<PlayerId, TeamId>([
-            [playerId, 'blue'],
-            [botEntries[0].id, 'blue'],
-            [botEntries[1].id, 'red'],
-            [botEntries[2].id, 'red'],
-          ])
-        : new Map<PlayerId, TeamId>();
     this.launchMatch(
       matchId,
       this.forcedMap() ?? getMap(mapName),
@@ -443,12 +456,14 @@ export class MatchmakingManager {
       practiceModePin,
       practiceRivalPin,
       practiceMutatorPreference,
-      playerTeams,
     );
   }
 
   handleCancelMatchmaking(playerId: PlayerId): void {
-    const removed = this.queue.removePlayer(playerId) || this.rumbleQueue.removePlayer(playerId);
+    const removedDuel = this.queue.removePlayer(playerId);
+    const removedRumble = this.rumbleQueue.removePlayer(playerId);
+    const removedCrew = this.crewQueue.removePlayer(playerId);
+    const removed = removedDuel || removedRumble || removedCrew;
     if (removed) {
       logger.info({ playerId }, 'Player cancelled matchmaking');
       this.server.sendTo(
@@ -460,7 +475,8 @@ export class MatchmakingManager {
         },
         { reliable: true },
       );
-      this.broadcastRumbleStatus();
+      if (removedRumble) this.broadcastRumbleStatus();
+      if (removedCrew) this.broadcastCrewStatus();
     }
   }
 
@@ -469,6 +485,8 @@ export class MatchmakingManager {
     this.queue.removePlayer(playerId);
     const leftRumbleQueue = this.rumbleQueue.removePlayer(playerId);
     if (leftRumbleQueue) this.broadcastRumbleStatus();
+    const leftCrewQueue = this.crewQueue.removePlayer(playerId);
+    if (leftCrewQueue) this.broadcastCrewStatus();
     this.playerNicknames.delete(playerId);
 
     // Handle disconnect in active match
@@ -486,10 +504,15 @@ export class MatchmakingManager {
 
       const match = this.activeMatches.get(matchId);
       if (match) {
-        const isRumble = this.matchKinds.get(matchId) === 'rumble';
+        const matchKind = this.matchKinds.get(matchId);
+        const isRumble = matchKind === 'rumble';
         const isPracticeRumble = isRumble && this.practiceDifficulties.has(matchId);
-        if (isRumble && (match.phase !== MatchPhase.ACTIVE || isPracticeRumble)) {
-          this.teardownRumbleAfterDeparture(matchId, match, playerId);
+        const isPracticeDuos = matchKind === 'duos' && this.practiceDifficulties.has(matchId);
+        if (
+          (isRumble && (match.phase !== MatchPhase.ACTIVE || isPracticeRumble)) ||
+          isPracticeDuos
+        ) {
+          this.teardownPracticeGroupAfterDeparture(matchId, match, playerId);
           return;
         }
         match.onPlayerDisconnect(playerId, isRumble);
@@ -681,6 +704,7 @@ export class MatchmakingManager {
     // Try to create matches from queued players
     this.tryCreateMatch();
     this.tryCreateRumble(dt);
+    this.tryCreateCrew(dt);
 
     // Drive pre-match draft deadlines + snapshots
     this.tickDrafts(dt);
@@ -747,7 +771,11 @@ export class MatchmakingManager {
   }
 
   getQueueLength(): number {
-    return this.queue.getQueueLength() + this.rumbleQueue.getQueueLength();
+    return (
+      this.queue.getQueueLength() +
+      this.rumbleQueue.getQueueLength() +
+      this.crewQueue.getQueueLength()
+    );
   }
 
   /** Route a player input to the correct match. */
@@ -1017,8 +1045,126 @@ export class MatchmakingManager {
     }
   }
 
-  /** Dissolve a pre-fight group or an ownerless solo Rumble without leaving bot state behind. */
-  private teardownRumbleAfterDeparture(
+  private tryCreateCrew(dt: number): void {
+    const group = this.crewQueue.tick(dt);
+    if (!group) {
+      if (this.crewQueue.getQueueLength() > 0) this.broadcastCrewStatus();
+      return;
+    }
+    this.launchCrewBattle(group);
+    this.broadcastCrewStatus();
+  }
+
+  /** Captain settings author the fight; a second entrant contributes only their fighter. */
+  private launchCrewBattle(group: CrewQueueEntry[]): void {
+    const captain = group[0];
+    if (!captain) return;
+
+    const humanEntries = group.map((entry) => ({ id: entry.playerId, nickname: entry.nickname }));
+    const rivalNicknames =
+      group.length >= CREW_BATTLE.MAX_HUMANS
+        ? SCRAP_PIT_RIVALS.slice(1).map((rival) => rival.nickname)
+        : SCRAP_PIT_RIVALS.map((rival) => rival.nickname);
+    const botEntries = rivalNicknames.map((nickname) => {
+      const id = `${BOT.PLAYER_ID_PREFIX}${crypto.randomUUID()}` as PlayerId;
+      this.botPlayerIds.add(id);
+      this.playerNicknames.set(id, nickname);
+      return { id, nickname };
+    });
+
+    const captainMutatorId = captain.mutatorId;
+    const compatibleModes = captainMutatorId
+      ? CREW_BATTLE_MODES.filter((mode) => isMutatorCompatibleWithMode(captainMutatorId, mode))
+      : [...CREW_BATTLE_MODES];
+    const randomModePool = compatibleModes.length > 0 ? compatibleModes : [...CREW_BATTLE_MODES];
+    const forcedMode = this.forcedMode();
+    const acceptedForcedMode =
+      forcedMode !== null &&
+      isCrewBattleMode(forcedMode) &&
+      (!captain.mutatorId || isMutatorCompatibleWithMode(captain.mutatorId, forcedMode))
+        ? forcedMode
+        : null;
+    const acceptedCaptainMode =
+      captain.gameMode !== null &&
+      (!captain.mutatorId || isMutatorCompatibleWithMode(captain.mutatorId, captain.gameMode))
+        ? captain.gameMode
+        : null;
+    const selectedMode =
+      acceptedForcedMode ??
+      acceptedCaptainMode ??
+      randomModePool[
+        Math.min(Math.floor(this.rng() * randomModePool.length), randomModePool.length - 1)
+      ];
+    const mapNames = listMapNames();
+    const mapName =
+      mapNames[Math.min(Math.floor(this.rng() * mapNames.length), mapNames.length - 1)];
+    const matchId = crypto.randomUUID();
+    this.matchKinds.set(matchId, 'duos');
+
+    const blueEntries =
+      group.length >= CREW_BATTLE.MAX_HUMANS
+        ? humanEntries
+        : [...humanEntries, botEntries[0]];
+    const redEntries =
+      group.length >= CREW_BATTLE.MAX_HUMANS ? botEntries : botEntries.slice(1);
+    const playerTeams = new Map<PlayerId, TeamId>([
+      ...blueEntries.map((entry) => [entry.id, 'blue'] as const),
+      ...redEntries.map((entry) => [entry.id, 'red'] as const),
+    ]);
+    const allEntries = [...blueEntries, ...redEntries];
+
+    logger.info(
+      {
+        captainId: captain.playerId,
+        humanPlayers: humanEntries.map((entry) => entry.id),
+        rustyFilled: group.length === 1,
+        gameMode: selectedMode,
+      },
+      'Crew group ready',
+    );
+    this.launchMatch(
+      matchId,
+      this.forcedMap() ?? getMap(mapName),
+      selectedMode,
+      allEntries,
+      {},
+      captain.difficulty,
+      [],
+      undefined,
+      null,
+      undefined,
+      acceptedCaptainMode,
+      null,
+      captain.mutatorId,
+      playerTeams,
+    );
+  }
+
+  private broadcastCrewStatus(): void {
+    const groupSize = this.crewQueue.getQueueLength();
+    const launchInMs = this.crewQueue.getLaunchInMs();
+    const statusKey = `${groupSize}:${launchInMs === undefined ? 'idle' : Math.ceil(launchInMs / 1000)}`;
+    if (statusKey === this.lastCrewStatusKey) return;
+    this.lastCrewStatusKey = statusKey;
+    for (const entry of this.crewQueue.getEntries()) {
+      this.server.sendTo(
+        entry.playerId,
+        {
+          type: 'server:matchmakingStatus',
+          status: 'queued',
+          matchKind: 'duos',
+          groupSize,
+          maxGroupSize: CREW_BATTLE.MAX_HUMANS,
+          ...(launchInMs === undefined ? {} : { launchInMs }),
+          playersOnline: this.getOnlinePlayerCount(),
+        },
+        { reliable: true },
+      );
+    }
+  }
+
+  /** Dissolve a pre-fight or bot-backed Practice group without leaving bot state behind. */
+  private teardownPracticeGroupAfterDeparture(
     matchId: string,
     match: Match,
     leavingPlayerId: PlayerId,
@@ -1045,7 +1191,7 @@ export class MatchmakingManager {
     this.matchKinds.delete(matchId);
     this.rumbleCrowns.delete(matchId);
     this.releasePracticePlayers([...match.players.keys()]);
-    logger.info({ matchId, leavingPlayerId }, 'Rumble dissolved after player departure');
+    logger.info({ matchId, leavingPlayerId }, 'Practice group dissolved after player departure');
   }
 
   /**

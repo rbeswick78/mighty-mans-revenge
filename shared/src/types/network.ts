@@ -471,8 +471,8 @@ export interface ServerMatchmakingStatusMessage {
   queuePosition?: number;
   playersOnline?: number;
   /** Queue family for queue-specific lobby presentation. */
-  matchKind?: 'duel' | 'rumble';
-  /** Current Rumble party size while its join window is open. */
+  matchKind?: 'duel' | 'rumble' | 'duos';
+  /** Current Rumble party or human Crew size while its join window is open. */
   groupSize?: number;
   maxGroupSize?: number;
   launchInMs?: number;

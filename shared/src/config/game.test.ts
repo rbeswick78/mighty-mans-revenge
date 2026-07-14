@@ -14,6 +14,7 @@ import {
   BOT_TACTICS,
   SCRAP_PIT_RIVALS,
   RUMBLE,
+  CREW_BATTLE,
   CREW_BATTLE_MODES,
   PRACTICE_KINDS,
   getNextGameMode,
@@ -118,6 +119,12 @@ describe('game mode rotation', () => {
 
 describe('Crew Battle mode rotation', () => {
   it('contains only explicitly team-aware objectives and wraps', () => {
+    expect(CREW_BATTLE).toMatchObject({
+      TEAM_SIZE: 2,
+      MAX_HUMANS: 2,
+      ALLY_WAIT_SECONDS: 6,
+      KILL_TARGET: 15,
+    });
     expect(CREW_BATTLE_MODES).toEqual([
       GameModeType.DEATHMATCH,
       GameModeType.KOTH,

@@ -9,6 +9,7 @@ import {
   OVERTIME,
   DRAFT,
   RUMBLE,
+  CREW_BATTLE,
   BOT,
   SCRAP_PIT_RIVALS,
   CHARACTER_IDS,
@@ -1922,6 +1923,19 @@ describe('MatchmakingManager solo practice flow', () => {
       undefined,
       'blackout',
     );
+    expect(mgr.getActiveMatches()).toHaveLength(0);
+    const queued = [...sent]
+      .reverse()
+      .find((entry) => entry.playerId === 'A' && entry.message.type === 'server:matchmakingStatus');
+    expect(queued?.message).toMatchObject({
+      type: 'server:matchmakingStatus',
+      status: 'queued',
+      matchKind: 'duos',
+      groupSize: 1,
+      maxGroupSize: 2,
+      launchInMs: CREW_BATTLE.ALLY_WAIT_SECONDS * 1000,
+    });
+    mgr.tick(CREW_BATTLE.ALLY_WAIT_SECONDS, 0);
 
     const first = mgr.getActiveMatches()[0];
     expect(first.gameModeType).toBe(GameModeType.KOTH);
@@ -1979,12 +1993,102 @@ describe('MatchmakingManager solo practice flow', () => {
     ).toBe('crew_battle');
   });
 
+  it('launches two real friends as the blue crew under the captain settings', () => {
+    const { fake, sent, connected } = makeFakeServer();
+    connected.push('A', 'B');
+    const mgr = new MatchmakingManager(fake, () => 0, store, seededRng([0, 0, 0, 0, 0]));
+
+    mgr.handleStartPractice(
+      'A',
+      'Alpha',
+      'warlord',
+      'crew_battle',
+      GameModeType.KOTH,
+      undefined,
+      'blackout',
+    );
+    mgr.tick(2, 0);
+    mgr.handleStartPractice(
+      'B',
+      'Bravo',
+      'rookie',
+      'crew_battle',
+      GameModeType.DEATHMATCH,
+    );
+    mgr.tick(0, 1);
+
+    const match = mgr.getActiveMatches()[0];
+    expect(match.players).toHaveLength(4);
+    expect(match.gameModeType).toBe(GameModeType.KOTH);
+    expect(Object.fromEntries(match.getTeamAssignments())).toMatchObject({
+      A: 'blue',
+      B: 'blue',
+    });
+    const bots = [...match.players.keys()].filter((playerId) => playerId.startsWith('bot:'));
+    expect(bots).toHaveLength(2);
+    expect(bots.every((playerId) => match.getTeamId(playerId) === 'red')).toBe(true);
+    const foundByPlayer = new Map(
+      sent
+        .filter((entry) => entry.message.type === 'server:matchFound')
+        .map((entry) => [entry.playerId, entry.message]),
+    );
+    expect(foundByPlayer.get('A')).toMatchObject({
+      matchKind: 'duos',
+      practiceKind: 'crew_battle',
+      gameMode: GameModeType.KOTH,
+    });
+    expect(foundByPlayer.get('B')).toMatchObject({
+      matchKind: 'duos',
+      practiceKind: 'crew_battle',
+      gameMode: GameModeType.KOTH,
+    });
+    const controllers = (
+      mgr as unknown as {
+        botControllers: Map<string, Array<{ tactic: string }>>;
+      }
+    ).botControllers.get(match.matchId);
+    expect(controllers?.map((controller) => controller.tactic)).toEqual(
+      SCRAP_PIT_RIVALS.slice(1).map((rival) => rival.tactic),
+    );
+    const practiceSettings = mgr as unknown as {
+      practiceDifficulties: Map<string, string>;
+      practiceMutatorPreferences: Map<string, MutatorId>;
+    };
+    expect(practiceSettings.practiceDifficulties.get(match.matchId)).toBe('warlord');
+    expect(practiceSettings.practiceMutatorPreferences.get(match.matchId)).toBe('blackout');
+
+    const originalTeams = Object.fromEntries(match.getTeamAssignments());
+    match.phase = MatchPhase.ENDED;
+    mgr.tick(0.05, 2);
+    expect(mgr.getActiveMatches()).toHaveLength(0);
+    mgr.handleRematchRequest('A');
+    expect(mgr.getActiveMatches()).toHaveLength(0);
+    mgr.handleRematchRequest('B');
+    const rematch = mgr.getActiveMatches()[0];
+    expect(Object.fromEntries(rematch.getTeamAssignments())).toEqual(originalTeams);
+    expect(practiceSettings.practiceDifficulties.get(rematch.matchId)).toBe('warlord');
+    expect(practiceSettings.practiceMutatorPreferences.get(rematch.matchId)).toBe('blackout');
+
+    rematch.phase = MatchPhase.ACTIVE;
+    mgr.handlePlayerDisconnect('B');
+    expect(mgr.getActiveMatches()).toHaveLength(0);
+    expect(
+      sent.some(
+        (entry) =>
+          entry.playerId === 'A' &&
+          entry.message.type === 'server:opponentDisconnected' &&
+          entry.message.playerId === 'B',
+      ),
+    ).toBe(true);
+  });
+
   it('rotates a random Crew Battle through only team-compatible objectives', () => {
     const { fake, sent, connected } = makeFakeServer();
     connected.push('A');
     const mgr = new MatchmakingManager(fake, () => 0, store, seededRng([0, 0, 0, 0, 0]));
 
     mgr.handleStartPractice('A', 'Alpha', 'scrapper', 'crew_battle');
+    mgr.tick(CREW_BATTLE.ALLY_WAIT_SECONDS, 0);
     const first = mgr.getActiveMatches()[0];
     expect(first.gameModeType).toBe(GameModeType.DEATHMATCH);
     const teams = first.getTeamAssignments();

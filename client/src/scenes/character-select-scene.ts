@@ -24,6 +24,7 @@ import { practiceMutatorBriefingLabel } from '../ui/practice-mutator.js';
 import { rumbleCrownBriefingLabel } from '../ui/rumble-crown.js';
 import { rumbleGrudgeBriefingLabel } from '../ui/rumble-grudge.js';
 import { scrapPitCrewLabel } from '../ui/scrap-pit-crew.js';
+import { crewUpBriefingLabel } from '../ui/crew-up.js';
 import {
   CREW_TOUR_STORAGE_KEY,
   crewTourBriefingLabel,
@@ -202,12 +203,13 @@ export class CharacterSelectScene extends Phaser.Scene {
             ...(this.matchData.practiceKind === 'rusty_rumble' ? [scrapPitCrewLabel()] : []),
             ...(this.matchData.practiceKind === 'crew_battle'
               ? [
+                  crewUpBriefingLabel(this.matchData, this.gameService.getPlayerId()),
                   `FRIENDLY FIRE OFF  //  ${crewBattleObjective(this.matchData.gameMode)}`,
                   crewTourBriefingLabel(
                     normalizeCrewTourRecord(localStorage.getItem(CREW_TOUR_STORAGE_KEY)),
                     this.matchData.gameMode,
                   ),
-                ]
+                ].filter((line): line is string => line !== null)
               : []),
             ...(crownLabel ? [crownLabel] : []),
             ...(grudgeLabel ? [grudgeLabel] : []),

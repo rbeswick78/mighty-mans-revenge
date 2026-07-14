@@ -135,7 +135,7 @@ export class LobbyScene extends Phaser.Scene {
   private practiceMode: GameModeType | null;
   private practiceMutator: MutatorId | null;
   private isSearching = false;
-  private searchKind: 'duel' | 'rumble' = 'duel';
+  private searchKind: 'duel' | 'rumble' | 'duos' = 'duel';
   private searchStartTime = 0;
   private cursorVisible = true;
   private gameService!: GameService;
@@ -397,7 +397,7 @@ export class LobbyScene extends Phaser.Scene {
       {
         variant: 'secondary',
         fontSize: 6,
-        onClick: () => this.onPractice('crew_battle'),
+        onClick: () => this.onCrew(),
       },
     );
     panel.add(this.crewBattleButton);
@@ -845,6 +845,16 @@ export class LobbyScene extends Phaser.Scene {
             : `FIGHT IN ${Math.max(1, Math.ceil(msg.launchInMs / 1000))}`,
         );
       }
+      if (msg.status === 'queued' && msg.matchKind === 'duos') {
+        const size = msg.groupSize ?? 1;
+        const max = msg.maxGroupSize ?? 2;
+        this.searchingText.setText(size >= max ? `CREW READY  ${size}/${max}` : `CREWING UP  ${size}/${max}`);
+        this.searchTimerText.setText(
+          size >= max
+            ? 'FIGHTING TOGETHER'
+            : `RUSTY IN ${Math.max(1, Math.ceil((msg.launchInMs ?? 1000) / 1000))}`,
+        );
+      }
     };
 
     this.onConnecting = () => {
@@ -1033,7 +1043,11 @@ export class LobbyScene extends Phaser.Scene {
     this.startMatchmaking('rumble');
   }
 
-  private startMatchmaking(kind: 'duel' | 'rumble'): void {
+  private onCrew(): void {
+    this.startMatchmaking('duos');
+  }
+
+  private startMatchmaking(kind: 'duel' | 'rumble' | 'duos'): void {
     if (this.isSearching || this.connectionState !== 'connected') return;
     if (!this.validateNickname()) return;
 
@@ -1053,10 +1067,16 @@ export class LobbyScene extends Phaser.Scene {
     // invisible HTML <input> would otherwise keep swallowing taps.
     this.setNameEntryVisible(false);
     this.searchingText.setText(
-      kind === 'rumble' ? 'GATHERING RUMBLE  1/4' : 'SEARCHING FOR OPPONENT',
+      kind === 'rumble'
+        ? 'GATHERING RUMBLE  1/4'
+        : kind === 'duos'
+          ? 'CREWING UP  1/2'
+          : 'SEARCHING FOR OPPONENT',
     );
     this.searchingText.setVisible(true);
-    this.searchTimerText.setText(kind === 'rumble' ? 'WAITING FOR 2' : '0:00');
+    this.searchTimerText.setText(
+      kind === 'rumble' ? 'WAITING FOR 2' : kind === 'duos' ? 'RUSTY IN 6' : '0:00',
+    );
     this.searchTimerText.setVisible(true);
     this.cancelButton.setVisible(true);
     this.quickMatchButton.setVisible(false);
@@ -1084,7 +1104,7 @@ export class LobbyScene extends Phaser.Scene {
       loop: true,
       callback: () => {
         if (!this.isSearching) return;
-        if (this.searchKind === 'rumble') return;
+        if (this.searchKind === 'rumble' || this.searchKind === 'duos') return;
         const elapsed = Math.floor((Date.now() - this.searchStartTime) / 1000);
         const mins = Math.floor(elapsed / 60);
         const secs = elapsed % 60;
@@ -1092,8 +1112,20 @@ export class LobbyScene extends Phaser.Scene {
       },
     });
 
-    if (kind === 'rumble') this.gameService.joinRumble(this.nickname);
-    else this.gameService.joinMatchmaking(this.nickname);
+    if (kind === 'rumble') {
+      this.gameService.joinRumble(this.nickname);
+    } else if (kind === 'duos') {
+      this.gameService.startPractice(
+        this.nickname,
+        this.practiceDifficulty,
+        'crew_battle',
+        this.practiceMode ?? undefined,
+        undefined,
+        this.practiceMutator ?? undefined,
+      );
+    } else {
+      this.gameService.joinMatchmaking(this.nickname);
+    }
   }
 
   private onPractice(kind: PracticeKind): void {

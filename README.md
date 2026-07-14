@@ -118,8 +118,12 @@ cry during the brawl and the nearest available rival answers in character;
 each crew member also has a signature cry when they knock you out. Completed
 rounds build a device-local `PIT RECORD`: wins extend a run, draws hold it,
 losses end it, and the best run stays visible on the Scrap Pit button.
-`CREW 2V2` turns the same four-fighter foundation into an instant team fight:
-you and Rusty face Scrapjaw and Clank with friendly fire off across bullets,
+`CREW 2V2` opens a six-second ally window before the same four-fighter team
+fight. A second human can join you immediately; if nobody does, Rusty fills
+the open blue slot and you still launch without another menu. The first player
+in the window is captain: their compatible favorite mode, difficulty, and Solo
+Chaos choice author the round, while a joining friend contributes their fighter.
+Blue faces Scrapjaw and Clank with friendly fire off across bullets,
 melee, axes, fire, grenades, barrels, and delayed explosives. Shots and thrown
 weapons pass through Rusty instead of treating him as cover. Four explicit
 team rulesets rotate: first-to-15 combined Deathmatch knockouts, King of the
@@ -132,11 +136,13 @@ Every authoritative Crew win also secures that objective's device-local patch.
 Collecting Deathmatch, Hill, Tags, and Core patches completes a `CREW TOUR`,
 starts the next four-patch set, and increments a compact lobby tally. Duplicate
 mode wins still extend the separate best win-run chase; draws hold the run,
-losses end it, and neither removes earned patches. Fighter Select shows whether
+losses end it, and neither removes earned patches. Fighter Select identifies
+the human ally or Rusty fill and shows whether
 the current objective offers an open or final patch, while Results celebrates
 new patches and complete tours.
-Difficulty and compatible Solo Chaos still apply, and the mode remains
-Practice so it never writes lifetime PvP records.
+Direct rematches preserve the exact crew and require both humans to vote when a
+friend joined. Difficulty and compatible Solo Chaos still apply, and the mode
+remains Practice so it never writes lifetime PvP records.
 `GAUNTLET` starts a three-fight run that
 escalates from Rookie to Scrapper to Warlord; win to advance, while a loss or
 draw restarts the run.

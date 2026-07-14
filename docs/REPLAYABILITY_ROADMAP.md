@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–90 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, roster-authentic duel/Rumble results, Gun Game, Rivalry Sets, Quick Match 1v1 plus 2–4 player Wasteland Rumble with all-player group draft rallies, a rematch-chain Rumble Crown, live lead-change drama, personal rematch Grudges, authoritative Rumble Assists with K/A/D, a solo four-fighter Scrap Pit whose three server-authoritative rivals have distinct readable tactics, answer player taunts with signature banter, and feed a device-local win/run record chase, a fixed 2v2 Crew Battle with friendly-fire protection, a four-objective Crew Clash rotation, and a device-local four-patch Crew Tour, and visible bounded Wasteland Signal Recovery, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–91 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, roster-authentic duel/Rumble results, Gun Game, Rivalry Sets, Quick Match 1v1 plus 2–4 player Wasteland Rumble with all-player group draft rallies, a rematch-chain Rumble Crown, live lead-change drama, personal rematch Grudges, authoritative Rumble Assists with K/A/D, a solo four-fighter Scrap Pit whose three server-authoritative rivals have distinct readable tactics, answer player taunts with signature banter, and feed a device-local win/run record chase, a 2v2 Crew Battle with friendly-fire protection and an optional six-second real-friend join window, a four-objective Crew Clash rotation, and a device-local four-patch Crew Tour, and visible bounded Wasteland Signal Recovery, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -122,6 +122,7 @@ Each session below attacks one of these.
 | 88  | Crew Battle 2v2                                 | Protecting an ally creates the game's first true team-play loop               | **DONE** (2026-07-14) |
 | 89  | Crew Clash Rotation                             | Four cooperative objectives keep the same crews changing strategy             | **DONE** (2026-07-14) |
 | 90  | Crew Tour                                       | Winning every team objective turns the rotation into a repeatable patch chase | **DONE** (2026-07-14) |
+| 91  | Crew Up                                         | A friend can join the team instantly without taking solo Crew away            | **DONE** (2026-07-14) |
 
 ---
 
@@ -3239,6 +3240,51 @@ attempt one attainable friend score to hunt from the first stage onward.
 
 ---
 
+## Session 91 — Crew Up
+
+**Goal:** let two real friends play Crew Battle together without adding a room
+code, splitting the small queue, or taking away the instant solo fallback.
+
+**Locked design decisions**
+
+- Pressing Crew opens one server-tick-owned six-second ally window. A second
+  human launches the four-fighter match immediately; otherwise Rusty fills the
+  allied slot at expiry. There is no second confirmation screen.
+- The first entrant is captain. Their validated difficulty, compatible Crew
+  mode pin, and compatible Solo Chaos preference author the round. The joiner
+  contributes only their callsign and chosen fighter, so simultaneous local
+  preferences cannot silently rewrite a nearly-started match.
+- Human crews are always blue; Scrapjaw and Clank remain the red rivals. Solo
+  fallback preserves the original human + Rusty versus Scrapjaw + Clank roster.
+  The server remains the only team authority.
+- Crew queue membership is exclusive with Quick Match and Rumble. Countdown
+  state comes from the matchmaking tick, not a client timeout. Cancelling or
+  disconnecting removes the entrant without leaving stale bot or match state.
+- A direct rematch retains the exact humans, bots, sides, captain settings, and
+  Practice boundary. Bots auto-vote; every human must vote. If either human
+  leaves any queued, pre-fight, active, or post-match Practice duo, the group
+  dissolves and the survivor returns instead of continuing a broken bot match.
+- Character Select identifies a real human ally or Rusty fill from authoritative
+  `playerTeams` and bot ids. Callsigns, entry order, and local settings are not
+  valid team evidence. Crew Up cannot write lifetime PvP progression.
+
+**Acceptance criteria**
+
+- [x] A lone entrant receives a six-second `duos` status and launches the exact
+      original Rusty/Scrapjaw/Clank lineup only when server ticks expire it.
+- [x] A second human launches immediately on the captain's compatible mode,
+      difficulty, and chaos settings; both humans are blue and only Scrapjaw
+      plus Clank receive rival bot tactics.
+- [x] Direct rematches require both humans and retain exact teams/settings;
+      cancelling or disconnecting tears down queue and Practice duo state.
+- [x] Lobby waiting/cancel copy and Character Select human/Rusty ally briefings
+      are readable on desktop and mobile landscape and derive from server data.
+- [x] Typecheck, lint, all unit/integration tests, and the complete Playwright
+      desktop/mobile matrix pass; the production bundle receives an equivalent
+      typecheck plus client bundle validation when the sandbox permits it.
+
+---
+
 ## Session 90 — Crew Tour
 
 **Goal:** turn Crew Clash's four-objective rotation into a repeatable collection
@@ -4221,6 +4267,54 @@ favorite mid-match event while the final-minute surprise stays fresh.
 ---
 
 ## Session Log
+
+### Session 91 — 2026-07-14 — Crew Up
+
+**Shipped:** Crew Battle now gives a nearby friend six server-timed seconds to
+join the blue side before Rusty fills the slot. A full human crew launches on
+the next matchmaking tick against Scrapjaw and Clank; a lone player receives
+the original human/Rusty lineup without another prompt. The first entrant is
+captain, so their validated compatible mode, difficulty, and Solo Chaos choice
+stay authoritative while the friend contributes their callsign and fighter.
+
+The new bounded `CrewQueue` is exclusive with Quick Match and Rumble, reports
+its countdown through the existing matchmaking status channel, and handles
+cancel, captain departure, and joiner departure without wall-clock timers or
+stale membership. Human rematches retain the exact roster and settings and wait
+for both votes; any human departure dissolves the Practice duo and returns the
+survivor instead of leaving a partial bot match. The lobby presents `CREWING UP
+1/2` and the Rusty fallback countdown, while Character Select identifies either
+the authoritative human ally or `RUSTY FILLED IN`. Crew Tour and every existing
+team objective, friendly-fire rule, bot tactic, HUD, and result remain reused.
+
+**Verification:** typecheck and lint pass. All 1,299 unit/integration tests pass
+across 95 files, including deterministic queue timing, captain preference,
+two-human side assignment, rematch voting, disconnect teardown, and pure ally
+copy coverage. The focused Crew browser matrix passes 9 cases with 3 intentional
+project skips. The final complete Playwright matrix passes 75 tests with 15
+intentional project-scoped skips across 90 configured Chromium, Firefox, and
+mobile-landscape cases. It covers a real two-client Crew handshake under the
+captain's KOTH settings plus bounded desktop/mobile waiting and briefing copy.
+An earlier full run had one Firefox-only miss in the unchanged Scrap Pit banter
+test: its keyboard taunt did not register inside the five-second poll. The case
+passed immediately unchanged in isolation and again in the clean full rerun.
+
+The aggregate production build could not be rerun in this managed sandbox:
+the bundled `pnpm` is 11.7 while the repo pins 10.33, and the pinned Corepack
+runner is denied read access to pnpm-linked compiler executables. The dependency
+replacement prompt was declined, no dependency files changed, and the same
+TypeScript build graph passed through the root `npm run typecheck` gate. This is
+an environment limitation to recheck outside the sandbox, not a compiler error.
+
+**Operational watch:** six seconds should feel like an invitation rather than
+a lobby tax for solo players. Watch whether friends understand that the first
+entrant's settings captain the round, and whether returning both players after
+a disconnect feels better than silently replacing the missing human with a bot.
+Do not promote the joiner's preferences or extend the window without observing
+real group play first.
+
+**Deployment:** not run; production deployment still requires explicit user
+authorization.
 
 ### Session 90 — 2026-07-14 — Crew Tour
 
