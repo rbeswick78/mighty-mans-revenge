@@ -75,12 +75,14 @@ import { confirmedTagCallout } from '../ui/confirmed-tag.js';
 import { rumbleLeadCallout } from '../ui/rumble-lead.js';
 import { HUD } from '../ui/hud.js';
 import { InputManager } from '../input/input-manager.js';
+import { MenuGamepadInput } from '../input/menu-gamepad.js';
 import { isTouchDevice } from '../input/is-touch-device.js';
 import { GameService, type MatchData } from '../services/game-service.js';
 import { AudioManager } from '../audio/audio-manager.js';
 import type { LocalCorrection, NetworkManager } from '../network/network-manager.js';
 import { getMap, DEFAULT_MAP_NAME } from '@shared/maps/registry.js';
 import { MENU_FONTS } from '../ui/menu/fonts.js';
+import { MatchMenu } from '../ui/match-menu.js';
 
 const LOCAL_CORRECTION_SMOOTH_MS = 120;
 const LOCAL_CORRECTION_EPSILON = 0.01;
@@ -167,6 +169,10 @@ export class GameScene extends Phaser.Scene {
   private hud: HUD | null = null;
   private crosshair: Crosshair | null = null;
   private inputManager: InputManager | null = null;
+  private matchMenu: MatchMenu | null = null;
+  private matchMenuGamepad: MenuGamepadInput | null = null;
+  private onMatchMenuEscape: (() => void) | null = null;
+  private leavingMatch = false;
   /** Announce the first meaningful controller input once per round. */
   private controllerAnnounced = false;
   private nextTauntIndex = 0;
@@ -269,6 +275,7 @@ export class GameScene extends Phaser.Scene {
     this.fadeComplete = false;
     this.pendingResult = null;
     this.connectionLostTransitionStarted = false;
+    this.leavingMatch = false;
     this.modeBriefingShown = false;
     this.prevAbilityActive = false;
     this.prevAbilityCoolingDown = false;
@@ -359,6 +366,25 @@ export class GameScene extends Phaser.Scene {
       this,
       this.matchData?.gameMode === GameModeType.ONE_IN_THE_CHAMBER,
     );
+    this.matchMenuGamepad = new MenuGamepadInput();
+    this.matchMenu = new MatchMenu(
+      this,
+      {
+        matchKind: this.matchData?.matchKind,
+        practiceKind: this.matchData?.practiceKind,
+      },
+      () => this.leaveCurrentMatch(),
+      (open) => {
+        this.inputManager?.setGameplayEnabled(!open && this.matchPhase === MatchPhase.ACTIVE);
+      },
+    );
+    this.matchMenu.setAvailable(false);
+    this.onMatchMenuEscape = () => {
+      if (this.leavingMatch || this.endTransitionStarted) return;
+      if (this.matchMenu?.isOpen()) this.matchMenu.back();
+      else this.matchMenu?.show();
+    };
+    this.input.keyboard?.on('keydown-ESC', this.onMatchMenuEscape);
 
     // Wire up network events
     this.wireGameServiceEvents();
@@ -366,6 +392,7 @@ export class GameScene extends Phaser.Scene {
 
   update(_time: number, delta: number): void {
     if (!this.inputManager || !this.hud) return;
+    this.updateMatchMenuInput();
 
     // Decay chromatic aberration toward 0 every frame; it's pushed to the
     // pipeline at the end of update() so a same-frame hit registers
@@ -419,7 +446,7 @@ export class GameScene extends Phaser.Scene {
         localState.position,
         this.currentTick,
         hasActiveGrenade,
-        localState.frozenTimer > 0,
+        localState.frozenTimer > 0 || !!this.matchMenu?.isOpen(),
         this.matchData?.gameMode === GameModeType.ONE_IN_THE_CHAMBER,
       );
       this.gameService.sendInput(input);
@@ -1142,6 +1169,41 @@ export class GameScene extends Phaser.Scene {
     this.cleanup();
   }
 
+  private updateMatchMenuInput(): void {
+    const actions = this.matchMenuGamepad?.poll();
+    if (!actions?.hasAction || !this.matchMenu || this.leavingMatch) return;
+
+    if (actions.menu) {
+      if (this.matchMenu.isOpen()) this.matchMenu.hide();
+      else if (!this.endTransitionStarted) this.matchMenu.show();
+      return;
+    }
+    if (!this.matchMenu.isOpen()) return;
+    if (actions.back) {
+      this.matchMenu.back();
+      return;
+    }
+    if (actions.up || actions.left) this.matchMenu.moveFocus(-1);
+    else if (actions.down || actions.right) this.matchMenu.moveFocus(1);
+    else if (actions.confirm) this.matchMenu.activateFocused();
+  }
+
+  private leaveCurrentMatch(): void {
+    if (this.leavingMatch) return;
+    this.leavingMatch = true;
+    this.endTransitionStarted = true;
+    this.pendingResult = null;
+    this.matchMenu?.setAvailable(false);
+    this.inputManager?.setGameplayEnabled(false);
+    this.gameService.returnToLobby();
+    AudioManager.getInstance()?.stopMusic(200);
+    this.cameras.main.fadeOut(250, 0, 0, 0);
+    this.cameras.main.once('camerafadeoutcomplete', () => {
+      this.cleanup();
+      this.scene.start('LobbyScene');
+    });
+  }
+
   private installCrtPipeline(): void {
     // Phaser's PostFXPipeline subclasses can't be registered via the GameConfig
     // 'pipeline' field — its typing expects ordinary pipelines. Register here
@@ -1191,7 +1253,8 @@ export class GameScene extends Phaser.Scene {
 
     this.onMatchStart = () => {
       this.matchPhase = MatchPhase.ACTIVE;
-      this.inputManager?.setGameplayEnabled(true);
+      this.matchMenu?.setAvailable(true);
+      this.inputManager?.setGameplayEnabled(!this.matchMenu?.isOpen());
       if (this.hud) {
         this.hud.showCountdown(0); // Shows "FIGHT!"
         this.hud.hideModeBriefing();
@@ -1204,12 +1267,16 @@ export class GameScene extends Phaser.Scene {
     };
 
     this.onMatchEnd = (result: MatchResult) => {
+      if (this.leavingMatch) return;
+      this.matchMenu?.setAvailable(false);
       this.pendingResult = result;
       this.beginEndTransition();
       this.tryStartResultsScene();
     };
 
     this.onOpponentDisconnected = (_playerId: PlayerId) => {
+      if (this.leavingMatch) return;
+      this.matchMenu?.setAvailable(false);
       // Show disconnect message
       const msg = this.add
         .text(this.cameras.main.width / 2, this.cameras.main.height / 2, 'OPPONENT DISCONNECTED', {
@@ -1727,6 +1794,7 @@ export class GameScene extends Phaser.Scene {
     };
 
     this.onConnectionLost = () => {
+      this.matchMenu?.setAvailable(false);
       this.returnToLobbyAfterConnectionLoss();
     };
 
@@ -1765,6 +1833,7 @@ export class GameScene extends Phaser.Scene {
   private beginEndTransition(): void {
     if (this.endTransitionStarted) return;
     this.endTransitionStarted = true;
+    this.matchMenu?.setAvailable(false);
     this.matchPhase = MatchPhase.ENDED;
     this.hud?.setActiveEventLabel(null);
     AudioManager.getInstance()?.stopMusic(300);
@@ -1937,6 +2006,15 @@ export class GameScene extends Phaser.Scene {
 
   private cleanup(): void {
     this.cleanupEvents();
+    if (this.onMatchMenuEscape) {
+      this.input.keyboard?.off('keydown-ESC', this.onMatchMenuEscape);
+      this.onMatchMenuEscape = null;
+    }
+    if (this.matchMenu) {
+      this.matchMenu.destroy();
+      this.matchMenu = null;
+    }
+    this.matchMenuGamepad = null;
 
     this.cameras.main.resetPostPipeline();
     this.cameras.main.postFX.clear();

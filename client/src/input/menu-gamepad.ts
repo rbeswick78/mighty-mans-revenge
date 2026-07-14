@@ -15,6 +15,7 @@ export interface MenuGamepadActions {
   confirm: boolean;
   back: boolean;
   alternate: boolean;
+  menu: boolean;
   hasAction: boolean;
 }
 
@@ -30,6 +31,7 @@ const noActions = (connected: boolean): MenuGamepadActions => ({
   confirm: false,
   back: false,
   alternate: false,
+  menu: false,
   hasAction: false,
 });
 
@@ -71,6 +73,7 @@ export class MenuGamepadInput {
       buttonDown(pad, STANDARD_GAMEPAD_BUTTON.A),
       buttonDown(pad, STANDARD_GAMEPAD_BUTTON.B),
       buttonDown(pad, STANDARD_GAMEPAD_BUTTON.X),
+      buttonDown(pad, STANDARD_GAMEPAD_BUTTON.START),
     ];
     if (!this.initialized) {
       this.previous = current;
@@ -88,6 +91,7 @@ export class MenuGamepadInput {
       confirm: edge(4),
       back: edge(5),
       alternate: edge(6),
+      menu: edge(7),
       hasAction: false,
     };
     actions.hasAction =
@@ -97,7 +101,8 @@ export class MenuGamepadInput {
       actions.down ||
       actions.confirm ||
       actions.back ||
-      actions.alternate;
+      actions.alternate ||
+      actions.menu;
     this.previous = current;
     return actions;
   }

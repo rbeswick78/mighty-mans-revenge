@@ -504,35 +504,8 @@ export class MatchmakingManager {
 
       const match = this.activeMatches.get(matchId);
       if (match) {
-        const matchKind = this.matchKinds.get(matchId);
-        const isRumble = matchKind === 'rumble';
-        const isPracticeRumble = isRumble && this.practiceDifficulties.has(matchId);
-        const isPracticeDuos = matchKind === 'duos' && this.practiceDifficulties.has(matchId);
-        if (
-          (isRumble && (match.phase !== MatchPhase.ACTIVE || isPracticeRumble)) ||
-          isPracticeDuos
-        ) {
-          this.teardownActiveGroupAfterDeparture(matchId, match, playerId);
-          return;
-        }
-        match.onPlayerDisconnect(playerId, isRumble);
-
-        // Notify other players in the match
-        for (const [pid] of match.players) {
-          if (pid !== playerId) {
-            this.server.sendTo(
-              pid,
-              isRumble
-                ? {
-                    type: 'server:playerLeft',
-                    playerId,
-                    nickname: match.players.get(playerId)?.nickname ?? 'A fighter',
-                  }
-                : { type: 'server:opponentDisconnected', playerId },
-              { reliable: true },
-            );
-          }
-        }
+        this.departActiveMatch(matchId, match, playerId);
+        return;
       }
       this.playerMatchMap.delete(playerId);
     }
@@ -695,18 +668,10 @@ export class MatchmakingManager {
       this.releasePracticePlayers(postMatch.playerIds);
     } else {
       const match = this.activeMatches.get(matchId);
-      if (match?.phase === MatchPhase.CHARACTER_SELECT) {
-        // The client now exposes an explicit pre-fight back action. Nobody
-        // has entered combat yet, so dissolve the whole pending group and
-        // release every entrant immediately instead of creating a phantom
-        // forfeit/result that leaves the others mapped to a dead match.
-        this.teardownActiveGroupAfterDeparture(matchId, match, playerId);
+      if (match) {
+        this.departActiveMatch(matchId, match, playerId);
         return;
       }
-
-      // Player returning to lobby from an active match (forfeit). Live-play
-      // UI does not currently expose this path; retain the compatibility
-      // behavior for stale clients.
       this.playerMatchMap.delete(playerId);
     }
   }
@@ -1173,6 +1138,47 @@ export class MatchmakingManager {
         { reliable: true },
       );
     }
+  }
+
+  /**
+   * Apply one authoritative departure contract to disconnects and the
+   * explicit in-match leave action. Pre-fight and active Practice groups
+   * dissolve together; live real Rumbles eliminate only the leaver; live
+   * duels end as a forfeit on the next match tick.
+   */
+  private departActiveMatch(matchId: string, match: Match, playerId: PlayerId): void {
+    const matchKind = this.matchKinds.get(matchId) ?? 'duel';
+    const isRumble = matchKind === 'rumble';
+    const isPreFight =
+      match.phase === MatchPhase.CHARACTER_SELECT || match.phase === MatchPhase.COUNTDOWN;
+    const isActivePractice =
+      match.phase === MatchPhase.ACTIVE && this.practiceDifficulties.has(matchId);
+
+    if (isPreFight || isActivePractice) {
+      this.teardownActiveGroupAfterDeparture(matchId, match, playerId);
+      return;
+    }
+
+    const nickname = match.players.get(playerId)?.nickname ?? 'A fighter';
+    const eliminate = isRumble && match.phase === MatchPhase.ACTIVE;
+    match.onPlayerDisconnect(playerId, eliminate);
+    this.playerMatchMap.delete(playerId);
+
+    const remainingPlayerIds = new Set(match.getConnectedPlayerIds());
+    for (const pid of remainingPlayerIds) {
+      this.server.sendTo(
+        pid,
+        eliminate
+          ? {
+              type: 'server:playerLeft',
+              playerId,
+              nickname,
+            }
+          : { type: 'server:opponentDisconnected', playerId },
+        { reliable: true },
+      );
+    }
+    logger.info({ matchId, playerId, eliminate }, 'Player left active match');
   }
 
   /** Dissolve a pre-fight or bot-backed group without leaving match state behind. */
@@ -2333,7 +2339,7 @@ export class MatchmakingManager {
       }
     }
 
-    // Send match end to all players
+    // Send match end only to players who still belong to this match.
     // MatchResult uses Map for playerStats, but JSON.stringify can't serialize Maps.
     // Convert to a plain-object-friendly structure for the wire format.
     const serializableResult = {
@@ -2341,7 +2347,9 @@ export class MatchmakingManager {
       playerStats: Object.fromEntries(result.playerStats),
     };
 
-    for (const [playerId] of match.players) {
+    // A player who deliberately left may already be queued for a new match.
+    // Never let this old match deliver results or own post-match state for them.
+    for (const playerId of connectedPlayerIds) {
       this.server.sendTo(
         playerId,
         {
@@ -2355,7 +2363,7 @@ export class MatchmakingManager {
     logger.info({ matchId, winnerId: result.winnerId, duration: result.duration }, 'Match ended');
 
     // Move to post-match state for rematch handling
-    const playerIds = matchKind === 'rumble' ? connectedPlayerIds : [...match.players.keys()];
+    const playerIds = connectedPlayerIds;
     const timeoutHandle = setTimeout(() => {
       this.onRematchTimeout(matchId);
     }, REMATCH_TIMEOUT_MS);

@@ -6,7 +6,7 @@ import { MENU_FONTS } from './fonts.js';
 
 const HOVER_LIGHTEN = 20;
 
-export type PixelButtonVariant = 'primary' | 'secondary';
+export type PixelButtonVariant = 'primary' | 'secondary' | 'danger';
 
 export interface PixelButtonOpts {
   variant?: PixelButtonVariant;
@@ -61,7 +61,12 @@ export class PixelButton extends Phaser.GameObjects.Container {
     this.sound = opts?.sound === undefined ? 'menuSelect' : opts.sound;
 
     const variant = opts?.variant ?? 'primary';
-    this.baseColor = variant === 'primary' ? Wasteland.LOADING_BAR_FILL : Wasteland.WALL_FILL;
+    this.baseColor =
+      variant === 'primary'
+        ? Wasteland.LOADING_BAR_FILL
+        : variant === 'danger'
+          ? Wasteland.HEALTH_DANGER
+          : Wasteland.WALL_FILL;
     this.hoverColor = lighten(this.baseColor, HOVER_LIGHTEN);
 
     this.chromeOpts = {

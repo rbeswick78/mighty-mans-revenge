@@ -39,7 +39,7 @@ describe('MenuGamepadInput', () => {
     expect(input.poll()).toMatchObject({ confirm: true, hasAction: true });
   });
 
-  it('maps D-pad, left-stick thresholds, B, and X on edges only', () => {
+  it('maps D-pad, left-stick thresholds, B, X, and Start on edges only', () => {
     const pad = makePad();
     const input = new MenuGamepadInput(() => [pad]);
     input.poll();
@@ -53,10 +53,12 @@ describe('MenuGamepadInput', () => {
     setButton(pad, STANDARD_GAMEPAD_BUTTON.DPAD_DOWN, true);
     setButton(pad, STANDARD_GAMEPAD_BUTTON.B, true);
     setButton(pad, STANDARD_GAMEPAD_BUTTON.X, true);
+    setButton(pad, STANDARD_GAMEPAD_BUTTON.START, true);
     expect(input.poll()).toMatchObject({
       down: true,
       back: true,
       alternate: true,
+      menu: true,
       hasAction: true,
     });
   });

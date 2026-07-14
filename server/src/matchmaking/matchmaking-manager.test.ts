@@ -440,6 +440,33 @@ describe('MatchmakingManager rematch flow', () => {
     ).toEqual(['A', 'B']);
   });
 
+  it('applies the same elimination contract to an explicit Rumble leave', () => {
+    for (const [id, nickname] of [
+      ['A', 'Alpha'],
+      ['B', 'Bravo'],
+      ['C', 'Cora'],
+    ] as const) {
+      mgr.handleJoinRumble(id, nickname);
+    }
+    mgr.tick(RUMBLE.LAUNCH_DELAY_SECONDS, 0);
+    walkDraft(mgr, sent);
+    const match = mgr.getActiveMatches()[0];
+    match.phase = MatchPhase.ACTIVE;
+    sent.length = 0;
+
+    mgr.handleReturnToLobby('C');
+
+    expect(match.players.get('C')).toMatchObject({ isDead: true, health: 0, score: -1 });
+    expect(
+      sent
+        .filter((entry) => entry.message.type === 'server:playerLeft')
+        .map((entry) => entry.playerId)
+        .sort(),
+    ).toEqual(['A', 'B']);
+    mgr.tick(0.05, 1);
+    expect(match.phase).toBe(MatchPhase.ACTIVE);
+  });
+
   it('scores a first-to-three set, gives the loser revenge picks, then resets after a clinch', () => {
     mgr.handleJoinMatchmaking('A', 'Alpha');
     mgr.handleJoinMatchmaking('B', 'Bravo');
@@ -1504,6 +1531,60 @@ describe('MatchmakingManager pre-match draft', () => {
     expect(sent.some((entry) => entry.message.type === 'server:draftState')).toBe(true);
   });
 
+  it('ends an active duel as a forfeit without sending results to the leaver', () => {
+    const mgr = makeManager([0, 0]);
+    pairUp(mgr);
+    walkDraft(mgr, sent);
+    const match = mgr.getActiveMatches()[0];
+    mgr.handleCharacterLock('A', 'mighty_man');
+    mgr.handleCharacterLock('B', 'bruce');
+    mgr.tick(0.05, 1);
+    mgr.tick(MATCH.COUNTDOWN_DURATION + 0.05, 2);
+    expect(match.phase).toBe(MatchPhase.ACTIVE);
+    sent.length = 0;
+
+    mgr.handleReturnToLobby('A');
+
+    expect(match.getConnectedPlayerIds()).toEqual(['B']);
+    expect(
+      sent.filter((entry) => entry.message.type === 'server:opponentDisconnected'),
+    ).toMatchObject([{ playerId: 'B', reliable: true }]);
+
+    mgr.tick(0.05, 3);
+    const endings = sent.filter((entry) => entry.message.type === 'server:matchEnd');
+    expect(endings.map((entry) => entry.playerId)).toEqual(['B']);
+    expect(
+      endings[0]?.message.type === 'server:matchEnd'
+        ? endings[0].message.result.winnerId
+        : null,
+    ).toBe('B');
+
+    sent.length = 0;
+    mgr.handleJoinMatchmaking('A', 'Alpha');
+    expect(
+      sent.some(
+        (entry) =>
+          entry.playerId === 'A' &&
+          entry.message.type === 'server:matchmakingStatus' &&
+          entry.message.status === 'queued',
+      ),
+    ).toBe(true);
+  });
+
+  it('tears character select down when a player loses connection', () => {
+    const mgr = makeManager([0, 0]);
+    pairUp(mgr);
+    walkDraft(mgr, sent);
+    sent.length = 0;
+
+    mgr.handlePlayerDisconnect('A');
+
+    expect(mgr.getActiveMatches()).toHaveLength(0);
+    expect(
+      sent.filter((entry) => entry.message.type === 'server:opponentDisconnected'),
+    ).toMatchObject([{ playerId: 'B', reliable: true }]);
+  });
+
   it('ignores joinMatchmaking from a player already in a draft', () => {
     const mgr = makeManager([0, 0]);
     pairUp(mgr);
@@ -1713,6 +1794,26 @@ describe('MatchmakingManager solo practice flow', () => {
   afterEach(async () => {
     await store.flush();
     rmSync(dataDir, { recursive: true, force: true });
+  });
+
+  it('dissolves an active Practice match when the human leaves', () => {
+    const { fake, sent } = makeFakeServer();
+    const mgr = new MatchmakingManager(fake, () => 0, store, seededRng([0, 0, 0]));
+    mgr.handleStartPractice('A', 'Alpha');
+    const match = mgr.getActiveMatches()[0];
+    match.phase = MatchPhase.ACTIVE;
+    sent.length = 0;
+
+    mgr.handleReturnToLobby('A');
+
+    expect(mgr.getActiveMatches()).toHaveLength(0);
+    mgr.handleStartPractice('A', 'Alpha');
+    expect(mgr.getActiveMatches()).toHaveLength(1);
+    expect(
+      sent.some(
+        (entry) => entry.playerId === 'A' && entry.message.type === 'server:matchFound',
+      ),
+    ).toBe(true);
   });
 
   it('starts immediately, locks Rusty, keeps stats clean, and auto-accepts a direct rematch', () => {
