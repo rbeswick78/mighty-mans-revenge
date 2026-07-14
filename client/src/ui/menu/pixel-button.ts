@@ -11,6 +11,8 @@ export type PixelButtonVariant = 'primary' | 'secondary';
 export interface PixelButtonOpts {
   variant?: PixelButtonVariant;
   fontSize?: number;
+  subtitle?: string;
+  subtitleFontSize?: number;
   onClick?: () => void;
   disabled?: boolean;
   /** Expand the pointer target vertically without changing visible chrome. */
@@ -29,6 +31,7 @@ const lighten = (hex: number, amount: number): number =>
 export class PixelButton extends Phaser.GameObjects.Container {
   private readonly gfx: Phaser.GameObjects.Graphics;
   private readonly label: Phaser.GameObjects.Text;
+  private readonly subtitle: Phaser.GameObjects.Text | null;
   private readonly zone: Phaser.GameObjects.Zone;
   private readonly baseColor: number;
   private readonly hoverColor: number;
@@ -70,22 +73,37 @@ export class PixelButton extends Phaser.GameObjects.Container {
     };
 
     this.gfx = scene.add.graphics();
+    const hasSubtitle = opts?.subtitle !== undefined;
     this.label = scene.add
-      .text(width / 2, height / 2, labelText, {
+      .text(width / 2, hasSubtitle ? height * 0.34 : height / 2, labelText, {
         fontFamily: MENU_FONTS.HEADER,
         fontSize: `${opts?.fontSize ?? 11}px`,
         color: cssHex(Wasteland.TEXT_PRIMARY),
       })
       .setOrigin(0.5);
     // Nudge label up by 1px — Press Start 2P's optical center sits low.
-    this.label.setY(height / 2 - 1);
+    this.label.setY(this.label.y - 1);
+
+    this.subtitle = hasSubtitle
+      ? scene.add
+          .text(width / 2, height * 0.72, opts.subtitle ?? '', {
+            fontFamily: MENU_FONTS.HEADER,
+            fontSize: `${opts.subtitleFontSize ?? 7}px`,
+            color: cssHex(Wasteland.COVER_FILL),
+          })
+          .setOrigin(0.5)
+      : null;
 
     const hitPaddingY = Math.max(0, opts?.hitPaddingY ?? 0);
     this.zone = scene.add
       .zone(width / 2, height / 2, width, height + hitPaddingY * 2)
       .setInteractive({ useHandCursor: true });
 
-    this.add([this.gfx, this.label, this.zone]);
+    this.add(
+      this.subtitle
+        ? [this.gfx, this.label, this.subtitle, this.zone]
+        : [this.gfx, this.label, this.zone],
+    );
 
     this.zone.on('pointerover', () => {
       // Touch browsers may synthesize pointerover after pointerdown. Keep
@@ -147,6 +165,11 @@ export class PixelButton extends Phaser.GameObjects.Container {
   setLabel(text: string): this {
     this.label.setText(text);
     return this;
+  }
+
+  /** Exposed for scene-level E2E assertions on canvas-rendered cards. */
+  getSubtitleText(): string | null {
+    return this.subtitle?.text ?? null;
   }
 
   /** Controller/keyboard focus, visually matching pointer hover. */

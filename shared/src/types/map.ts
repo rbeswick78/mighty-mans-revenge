@@ -71,6 +71,9 @@ export interface MapData {
   kothHills?: { x: number; y: number }[];
 }
 
+/** Persisted real-match wins keyed by canonical arena name. */
+export type ArenaWins = Record<string, number>;
+
 export interface CollisionGrid {
   width: number;
   height: number;

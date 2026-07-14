@@ -12,6 +12,7 @@ import {
   GameModeType,
   GAME_MODE_ROTATION,
   createEmptyCharacterWins,
+  createEmptyArenaWins,
   practiceGauntletChaosBounty,
   dailyChallengeKey,
 } from '@shared/game';
@@ -1041,8 +1042,8 @@ describe('MatchmakingManager pre-match draft', () => {
 
     const snap1 = latestDraftState(sent);
     expect(snap1.players).toEqual([
-      { id: 'A', nickname: 'Ryan' },
-      { id: 'B', nickname: 'Dave' },
+      { id: 'A', nickname: 'Ryan', arenaWins: createEmptyArenaWins() },
+      { id: 'B', nickname: 'Dave', arenaWins: createEmptyArenaWins() },
     ]);
     expect(snap1.firstPickerId).toBe('A');
     expect(snap1.currentPickerId).toBe('A');
@@ -1233,6 +1234,9 @@ describe('MatchmakingManager persistent stats integration', () => {
     expect(store.getLifetime('Dave')!.losses).toBe(1);
     expect(store.getLifetime('Ryan')!.characterWins.jack).toBe(1);
     expect(store.getLifetime('Dave')!.characterWins.bubba).toBe(0);
+    const arenaName = match.getMapData().name;
+    expect(store.getLifetime('Ryan')!.arenaWins[arenaName]).toBe(1);
+    expect(store.getLifetime('Dave')!.arenaWins[arenaName]).toBe(0);
 
     // ...and both matchEnd messages carry the updated rivalry.
     const matchEndMsgs = sent.filter((s) => s.message.type === 'server:matchEnd');
@@ -1250,6 +1254,10 @@ describe('MatchmakingManager persistent stats integration', () => {
         A: { previous: 0, current: 1, previousBest: 0, best: 1 },
         B: { previous: 0, current: 0, previousBest: 0, best: 0 },
       });
+      expect(message.result.arenaMastery).toEqual({
+        A: { mapName: arenaName, previousWins: 0, wins: 1 },
+        B: { mapName: arenaName, previousWins: 0, wins: 0 },
+      });
     }
 
     mgr.handleRematchRequest('A');
@@ -1262,6 +1270,16 @@ describe('MatchmakingManager persistent stats integration', () => {
       throw new Error('missing rematch matchFound');
     }
     expect(rematchFound.message.characterWins?.jack).toBe(1);
+    const rematchDraft = [...sent]
+      .reverse()
+      .find((entry) => entry.message.type === 'server:draftState');
+    if (!rematchDraft || rematchDraft.message.type !== 'server:draftState') {
+      throw new Error('missing rematch draft mastery');
+    }
+    expect(rematchDraft.message.players.find((player) => player.id === 'A')?.arenaWins).toEqual({
+      ...createEmptyArenaWins(),
+      [arenaName]: 1,
+    });
   });
 
   it('rebroadcasts the refreshed leaderboard to every connection after stats are recorded', () => {
@@ -1403,6 +1421,7 @@ describe('MatchmakingManager solo practice flow', () => {
     expect(ended.message.result.isPractice).toBe(true);
     expect(ended.message.result.rivalry).toBeNull();
     expect(ended.message.result.winStreaks).toBeUndefined();
+    expect(ended.message.result.arenaMastery).toBeUndefined();
     expect(ended.message.result.rivalrySet?.players[0].wins).toBe(1);
     expect(store.getLifetime('Alpha')).toBeNull();
     expect(store.getLifetime('Rusty')).toBeNull();

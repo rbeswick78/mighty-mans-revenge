@@ -56,6 +56,11 @@ power vault, open north/south approaches, and diagonal side gates that can be
 shot open into fresh flanking routes. Paired barrels, scavenger caches, and
 power pickups make its central fight volatile without adding map-only rules.
 
+Real PvP wins also build a separate Arena Mastery record for every battlefield.
+The pre-match draft compares both rivals' experience on each map, while Results
+celebrates new SCOUTED, CLAIMED, STRONGHOLD, and HOME TURF tiers. Practice stays
+outside this progression so mastery remains a record of friend-group victories.
+
 ## Solo play
 
 `RUSTY SPAR` starts the familiar single Practice match at your selected Rusty

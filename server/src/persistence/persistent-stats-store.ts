@@ -5,11 +5,14 @@ import { fileURLToPath } from 'node:url';
 import {
   DAILY_GAUNTLET_LEADERBOARD,
   KILL_WEAPONS,
+  createEmptyArenaWins,
   createEmptyCharacterWins,
   createEmptyKillsByWeapon,
+  normalizeArenaWins,
 } from '@shared/game';
 import type {
   CharacterId,
+  ArenaWins,
   DailyGauntletChaseTarget,
   DailyGauntletLeaderboardEntry,
   KillWeapon,
@@ -32,6 +35,7 @@ export interface LifetimePlayerStats {
   currentWinStreak: number;
   bestWinStreak: number;
   characterWins: Record<CharacterId, number>;
+  arenaWins: ArenaWins;
   weaponKills: Record<KillWeapon, number>;
 }
 
@@ -143,6 +147,7 @@ function emptyLifetime(nickname: string): LifetimePlayerStats {
     currentWinStreak: 0,
     bestWinStreak: 0,
     characterWins: createEmptyCharacterWins(),
+    arenaWins: createEmptyArenaWins(),
     weaponKills: createEmptyKillsByWeapon(),
   };
 }
@@ -175,7 +180,7 @@ export class PersistentStatsStore {
    * path. Head-to-head is only recorded for 1v1 matches (the pairing key
    * has no meaning otherwise). `winnerNickname` null means a draw.
    */
-  recordMatch(entries: MatchStatsEntry[], winnerNickname: string | null): void {
+  recordMatch(entries: MatchStatsEntry[], winnerNickname: string | null, arenaName?: string): void {
     const winnerKey = winnerNickname === null ? null : normalizeKey(winnerNickname);
 
     for (const entry of entries) {
@@ -202,6 +207,12 @@ export class PersistentStatsStore {
         if (entry.characterId !== null) {
           lifetime.characterWins[entry.characterId] =
             (lifetime.characterWins[entry.characterId] ?? 0) + 1;
+        }
+        if (
+          arenaName !== undefined &&
+          Object.prototype.hasOwnProperty.call(lifetime.arenaWins, arenaName)
+        ) {
+          lifetime.arenaWins[arenaName] += 1;
         }
       } else {
         lifetime.losses += 1;
@@ -429,6 +440,7 @@ export class PersistentStatsStore {
           ...createEmptyCharacterWins(),
           ...lifetime.characterWins,
         };
+        lifetime.arenaWins = normalizeArenaWins(lifetime.arenaWins);
         lifetime.weaponKills = {
           ...createEmptyKillsByWeapon(),
           ...lifetime.weaponKills,

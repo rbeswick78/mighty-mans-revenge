@@ -10,6 +10,7 @@ import { WastelandStreet } from '../ui/menu/wasteland-street.js';
 import { PixelButton } from '../ui/menu/pixel-button.js';
 import { TitleLogo } from '../ui/menu/title-logo.js';
 import { MENU_FONTS } from '../ui/menu/fonts.js';
+import { arenaMasteryDraftSubtitle } from '../ui/arena-mastery.js';
 import {
   buildHopSchedule,
   deriveDraftView,
@@ -39,11 +40,11 @@ const FOOTER_COLOR = Wasteland.COVER_FILL;
 const CARD_WIDTH = 380;
 const LEFT_COL_CENTER_X = 270;
 const RIGHT_COL_CENTER_X = 690;
-const COLUMN_HEADER_Y = 188;
-const BADGE_Y = 210;
-const CARDS_TOP_Y = 232;
-const STATUS_Y = 508;
-const TIMER_Y = 540;
+const COLUMN_HEADER_Y = 156;
+const BADGE_Y = 176;
+const CARDS_TOP_Y = 192;
+const STATUS_Y = 635;
+const TIMER_Y = 660;
 
 // Spectacle beats inside DRAFT.SPECTACLE_MS (2600ms): hops stop by
 // SPECTACLE_MS - LAND_HOLD_MS, the "<NICK> PICKS FIRST" beat lands
@@ -510,7 +511,7 @@ export class DraftScene extends Phaser.Scene {
     const rowCount = Math.max(draft.mapOptions.length, draft.modeOptions.length);
     const compact = rowCount > 4;
     const cardH = compact ? 48 : 64;
-    const gap = compact ? 10 : 14;
+    const gap = compact ? 5 : 14;
 
     draft.mapOptions.forEach((mapName, i) => {
       this.addCard(
@@ -520,6 +521,7 @@ export class DraftScene extends Phaser.Scene {
         LEFT_COL_CENTER_X,
         CARDS_TOP_Y + i * (cardH + gap),
         cardH,
+        arenaMasteryDraftSubtitle(draft.players, this.gameService.getPlayerId(), mapName),
       );
     });
     draft.modeOptions.forEach((mode, i) => {
@@ -596,11 +598,14 @@ export class DraftScene extends Phaser.Scene {
     colCenterX: number,
     y: number,
     cardH: number,
+    subtitle?: string | null,
   ): void {
     const x = colCenterX - CARD_WIDTH / 2;
     const button = new PixelButton(this, x, y, CARD_WIDTH, cardH, label, {
       variant: 'secondary',
-      fontSize: 12,
+      fontSize: subtitle ? 10 : 12,
+      subtitle: subtitle ?? undefined,
+      subtitleFontSize: 7,
       disabled: true,
       onClick: () => this.onCardClick(category, value),
     });

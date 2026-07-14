@@ -115,6 +115,38 @@ async function draftPickIfMyTurn(page: Page): Promise<boolean> {
   });
 }
 
+/** The canvas has no DOM labels, so inspect the live card widgets directly. */
+async function waitForArenaMasteryCards(page: Page): Promise<void> {
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const w = window as unknown as {
+            game?: { scene: { getScene: (key: string) => unknown } };
+          };
+          const scene = w.game?.scene.getScene('DraftScene') as {
+            phase?: string;
+            cards?: Array<{
+              category: string;
+              button: { getSubtitleText: () => string | null };
+            }>;
+          } | null;
+          if (scene?.phase !== 'pick') return false;
+          const subtitles = (scene.cards ?? [])
+            .filter((card) => card.category === 'map')
+            .map((card) => card.button.getSubtitleText());
+          return (
+            subtitles.length >= 6 && subtitles.every((subtitle) => subtitle?.startsWith('YOU '))
+          );
+        }),
+      {
+        timeout: 10000,
+        message: 'expected every map card to compare arena mastery',
+      },
+    )
+    .toBe(true);
+}
+
 /**
  * Drive both pages through the draft until CharacterSelectScene is active
  * on both. Tolerates the ~900ms locked-in beat and either pick order.
@@ -1301,6 +1333,7 @@ test.describe('Character select (desktop)', () => {
     await startQuickMatch(pageA, 'Alpha');
     await startQuickMatch(pageB, 'Bravo');
 
+    await waitForArenaMasteryCards(pageA);
     await completeDraft(pageA, pageB);
   });
 

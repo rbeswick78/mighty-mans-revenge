@@ -1530,6 +1530,49 @@ export function createEmptyCharacterWins(): Record<CharacterId, number> {
   return Object.fromEntries(CHARACTER_IDS.map((id) => [id, 0])) as Record<CharacterId, number>;
 }
 
+export type ArenaMasteryTierId = 'uncharted' | 'scouted' | 'claimed' | 'stronghold' | 'home_turf';
+
+export interface ArenaMasteryTier {
+  id: ArenaMasteryTierId;
+  title: string;
+  minWins: number;
+}
+
+export interface ArenaMasteryProgress {
+  wins: number;
+  current: ArenaMasteryTier;
+  next: ArenaMasteryTier | null;
+  remaining: number;
+}
+
+/** Cosmetic per-arena ladder; records never affect picks, spawns, or balance. */
+export const ARENA_MASTERY_TIERS: readonly ArenaMasteryTier[] = Object.freeze([
+  Object.freeze({ id: 'uncharted', title: 'UNCHARTED', minWins: 0 }),
+  Object.freeze({ id: 'scouted', title: 'SCOUTED', minWins: 1 }),
+  Object.freeze({ id: 'claimed', title: 'CLAIMED', minWins: 3 }),
+  Object.freeze({ id: 'stronghold', title: 'STRONGHOLD', minWins: 7 }),
+  Object.freeze({ id: 'home_turf', title: 'HOME TURF', minWins: 15 }),
+]);
+
+export function arenaMasteryProgressForWins(value: number): ArenaMasteryProgress {
+  const wins = Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
+  let current = ARENA_MASTERY_TIERS[0];
+  let next: ArenaMasteryTier | null = null;
+  for (const tier of ARENA_MASTERY_TIERS) {
+    if (wins >= tier.minWins) current = tier;
+    else {
+      next = tier;
+      break;
+    }
+  }
+  return {
+    wins,
+    current,
+    next,
+    remaining: next ? next.minWins - wins : 0,
+  };
+}
+
 /**
  * Stat-identity accessors. All take `CharacterId | null` because
  * PlayerState.characterId is null until the select screen locks —

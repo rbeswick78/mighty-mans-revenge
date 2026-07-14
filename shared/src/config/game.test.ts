@@ -28,11 +28,13 @@ import {
   CAREER_RANKS,
   careerRankProgressForContracts,
   CHARACTER_MASTERY_TIERS,
+  ARENA_MASTERY_TIERS,
   MUTATORS,
   ONE_IN_THE_CHAMBER,
   CORE_RUN,
   BOUNTY_HUNT,
   characterMasteryProgressForWins,
+  arenaMasteryProgressForWins,
   createEmptyCharacterWins,
   selectMatchContract,
   SCAVENGER_CACHE,
@@ -398,6 +400,37 @@ describe('fighter mastery', () => {
     expect(createEmptyCharacterWins()).toEqual(
       Object.fromEntries(CHARACTER_IDS.map((id) => [id, 0])),
     );
+  });
+});
+
+describe('arena mastery', () => {
+  it('defines a frozen ordered battlefield ladder beginning at zero wins', () => {
+    expect(Object.isFrozen(ARENA_MASTERY_TIERS)).toBe(true);
+    expect(ARENA_MASTERY_TIERS[0]).toMatchObject({ title: 'UNCHARTED', minWins: 0 });
+    expect(ARENA_MASTERY_TIERS[ARENA_MASTERY_TIERS.length - 1]).toMatchObject({
+      title: 'HOME TURF',
+      minWins: 15,
+    });
+    for (let i = 0; i < ARENA_MASTERY_TIERS.length; i++) {
+      expect(Object.isFrozen(ARENA_MASTERY_TIERS[i])).toBe(true);
+      if (i > 0) {
+        expect(ARENA_MASTERY_TIERS[i].minWins).toBeGreaterThan(
+          ARENA_MASTERY_TIERS[i - 1].minWins,
+        );
+      }
+    }
+  });
+
+  it('changes tier at each threshold and normalizes invalid totals', () => {
+    for (let i = 0; i < ARENA_MASTERY_TIERS.length; i++) {
+      const tier = ARENA_MASTERY_TIERS[i];
+      const progress = arenaMasteryProgressForWins(tier.minWins);
+      expect(progress.current).toBe(tier);
+      expect(progress.next).toBe(ARENA_MASTERY_TIERS[i + 1] ?? null);
+    }
+    expect(arenaMasteryProgressForWins(7.9).wins).toBe(7);
+    expect(arenaMasteryProgressForWins(-2).wins).toBe(0);
+    expect(arenaMasteryProgressForWins(Number.NaN).wins).toBe(0);
   });
 });
 

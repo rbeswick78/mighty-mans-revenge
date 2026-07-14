@@ -2,6 +2,7 @@ import { PlayerId, MatchId, Tick, Vec2 } from './common.js';
 import { PlayerInput } from './player.js';
 import { AxeState, GrenadeState, BulletTrail, PunchEvent } from './projectile.js';
 import { PickupState } from './pickup.js';
+import type { ArenaWins } from './map.js';
 import {
   MatchPhase,
   KillFeedEntry,
@@ -319,11 +320,18 @@ export interface ServerMatchFoundMessage {
  */
 export type DraftFirstPickerReason = 'coin_toss' | 'revenge';
 
+export interface DraftPlayer {
+  id: PlayerId;
+  nickname: string;
+  /** Server-persisted real-match wins for every current arena. */
+  arenaWins?: ArenaWins;
+}
+
 export interface ServerDraftStateMessage {
   type: 'server:draftState';
   matchId: MatchId;
   /** Everyone in the pending match, draft roles included. */
-  players: { id: PlayerId; nickname: string }[];
+  players: DraftPlayer[];
   /**
    * Winner of the server-side who-picks-first roll. The client plays
    * its spectacle to land on this player — the outcome is decided

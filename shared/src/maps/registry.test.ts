@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_MAP_NAME,
   MAP_REGISTRY,
+  createEmptyArenaWins,
   getMap,
   getNextMapName,
   listMapNames,
+  normalizeArenaWins,
 } from './registry.js';
 import { validateMap } from '../utils/map-validator.js';
 
@@ -25,6 +27,23 @@ describe('MAP_REGISTRY', () => {
 
   it('listMapNames includes the default map', () => {
     expect(listMapNames()).toContain(DEFAULT_MAP_NAME);
+  });
+
+  it('creates and normalizes complete registry-keyed arena records', () => {
+    expect(createEmptyArenaWins()).toEqual(
+      Object.fromEntries(listMapNames().map((name) => [name, 0])),
+    );
+    expect(
+      normalizeArenaWins({
+        'Wasteland Outpost': 3.9,
+        Scrapyard: -2,
+        'Rusted Refinery': Number.NaN,
+        'Retired Arena': 99,
+      }),
+    ).toEqual({
+      ...createEmptyArenaWins(),
+      'Wasteland Outpost': 3,
+    });
   });
 
   it('every registered map passes validateMap', () => {

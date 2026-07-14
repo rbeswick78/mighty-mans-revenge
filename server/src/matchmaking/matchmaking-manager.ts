@@ -10,6 +10,7 @@ import {
   PRACTICE_KINDS,
   CHARACTER_IDS,
   MUTATORS,
+  createEmptyArenaWins,
   createEmptyCharacterWins,
   DAILY_GAUNTLET_LEADERBOARD,
   LEADERBOARD,
@@ -33,7 +34,7 @@ import {
   isMutatorId,
   mutatorsConflict,
 } from '@shared/game';
-import type { MapData } from '@shared/game';
+import type { ArenaWins, MapData } from '@shared/game';
 import type {
   PlayerId,
   MatchResult,
@@ -132,7 +133,7 @@ interface PostMatchState {
  */
 interface DraftState {
   matchId: string;
-  playerEntries: { id: PlayerId; nickname: string }[];
+  playerEntries: { id: PlayerId; nickname: string; arenaWins: ArenaWins }[];
   /** Winner of the who-picks-first roll — claims a category by picking. */
   firstPickerId: PlayerId;
   firstPickerReason: DraftFirstPickerReason;
@@ -1012,6 +1013,13 @@ export class MatchmakingManager {
     previousContractId?: MatchContractId,
   ): void {
     const matchId = crypto.randomUUID();
+    const draftEntries = playerEntries.map((entry) => ({
+      ...entry,
+      arenaWins: {
+        ...createEmptyArenaWins(),
+        ...this.statsStore?.getLifetime(entry.nickname)?.arenaWins,
+      },
+    }));
 
     // Roll two DISTINCT picker roles (N-player safe: any extra entrants
     // just spectate the draft). Decided here, once — the client's
@@ -1032,7 +1040,7 @@ export class MatchmakingManager {
 
     const draft: DraftState = {
       matchId,
-      playerEntries,
+      playerEntries: draftEntries,
       firstPickerId: playerEntries[firstIdx].id,
       firstPickerReason: revengeIdx >= 0 ? 'revenge' : 'coin_toss',
       secondPickerId: playerEntries[secondIdx].id,
@@ -1091,6 +1099,7 @@ export class MatchmakingManager {
       players: draft.playerEntries.map((e) => ({
         id: e.id,
         nickname: e.nickname,
+        arenaWins: { ...e.arenaWins },
       })),
       firstPickerId: draft.firstPickerId,
       firstPickerReason: draft.firstPickerReason,
@@ -1672,6 +1681,8 @@ export class MatchmakingManager {
     if (this.statsStore && !isPractice) {
       const entries: MatchStatsEntry[] = [];
       const previousStreaks = new Map<PlayerId, { current: number; best: number }>();
+      const arenaName = match.getMapData().name;
+      const previousArenaWins = new Map<PlayerId, number>();
       for (const [playerId, player] of match.players) {
         const stats = result.playerStats.get(playerId);
         if (!stats) continue;
@@ -1680,6 +1691,7 @@ export class MatchmakingManager {
           current: previousLifetime?.currentWinStreak ?? 0,
           best: previousLifetime?.bestWinStreak ?? 0,
         });
+        previousArenaWins.set(playerId, previousLifetime?.arenaWins[arenaName] ?? 0);
         entries.push({
           nickname: player.nickname,
           kills: stats.kills,
@@ -1693,8 +1705,9 @@ export class MatchmakingManager {
       }
       const winnerNickname =
         result.winnerId !== null ? (match.players.get(result.winnerId)?.nickname ?? null) : null;
-      this.statsStore.recordMatch(entries, winnerNickname);
+      this.statsStore.recordMatch(entries, winnerNickname, arenaName);
       result.winStreaks = {};
+      result.arenaMastery = {};
       for (const [playerId, player] of match.players) {
         const lifetime = this.statsStore.getLifetime(player.nickname);
         const previous = previousStreaks.get(playerId);
@@ -1704,6 +1717,11 @@ export class MatchmakingManager {
           best: lifetime.bestWinStreak,
           previous: previous.current,
           previousBest: previous.best,
+        };
+        result.arenaMastery[playerId] = {
+          mapName: arenaName,
+          previousWins: previousArenaWins.get(playerId) ?? 0,
+          wins: lifetime.arenaWins[arenaName] ?? 0,
         };
       }
       if (result.contract) {

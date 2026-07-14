@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   DAILY_GAUNTLET_LEADERBOARD,
+  createEmptyArenaWins,
   createEmptyCharacterWins,
   createEmptyKillsByWeapon,
 } from '@shared/game';
@@ -210,6 +211,23 @@ describe('PersistentStatsStore', () => {
     });
   });
 
+  it('banks arena mastery only for a real winner on a registered battlefield', () => {
+    const store = makeStore();
+    store.recordMatch([entry('Ryan'), entry('Dave')], 'Ryan', 'Rusted Refinery');
+    store.recordMatch([entry('Ryan'), entry('Dave')], null, 'Rusted Refinery');
+    store.recordMatch([entry('Ryan'), entry('Dave')], 'Dave', 'Scrapyard');
+    store.recordMatch([entry('Ryan'), entry('Dave')], 'Ryan', 'Retired Arena');
+
+    expect(store.getLifetime('Ryan')!.arenaWins).toEqual({
+      ...createEmptyArenaWins(),
+      'Rusted Refinery': 1,
+    });
+    expect(store.getLifetime('Dave')!.arenaWins).toEqual({
+      ...createEmptyArenaWins(),
+      Scrapyard: 1,
+    });
+  });
+
   it('skips head-to-head for non-1v1 matches but still counts lifetime totals', () => {
     const store = makeStore();
     store.recordMatch([entry('Ryan', 3), entry('Dave', 2), entry('Pat', 1)], 'Ryan');
@@ -301,6 +319,7 @@ describe('PersistentStatsStore', () => {
     expect(ryan.bestWinStreak).toBe(0);
     expect(ryan.characterWins).toEqual(createEmptyCharacterWins());
     expect(ryan.characterWins.rook).toBe(0);
+    expect(ryan.arenaWins).toEqual(createEmptyArenaWins());
     expect(store.getDailyGauntletLeaderboard('2026-07-13', 5)).toEqual([]);
 
     // Accumulating a new-era match on top of the migrated record works.

@@ -1,4 +1,4 @@
-import type { MapData } from '../types/map.js';
+import type { ArenaWins, MapData } from '../types/map.js';
 import { validateMap } from '../utils/map-validator.js';
 import wastelandOutpost from '../../maps/wasteland-outpost.json' with { type: 'json' };
 import overgrownSuburb from '../../maps/overgrown-suburb.json' with { type: 'json' };
@@ -44,6 +44,28 @@ export function getMap(name: string): MapData {
 
 export function listMapNames(): readonly string[] {
   return [...MAP_REGISTRY.keys()];
+}
+
+/** A complete zero-filled arena record for persistence and wire defaults. */
+export function createEmptyArenaWins(): ArenaWins {
+  return Object.fromEntries(listMapNames().map((name) => [name, 0]));
+}
+
+/**
+ * Normalize untrusted persisted/wire arena records to the current registry.
+ * Unknown arenas disappear; newly shipped arenas arrive at zero.
+ */
+export function normalizeArenaWins(value: unknown): ArenaWins {
+  const normalized = createEmptyArenaWins();
+  if (typeof value !== 'object' || value === null) return normalized;
+  const source = value as Record<string, unknown>;
+  for (const name of listMapNames()) {
+    const wins = source[name];
+    if (typeof wins === 'number' && Number.isFinite(wins) && wins >= 0) {
+      normalized[name] = Math.floor(wins);
+    }
+  }
+  return normalized;
 }
 
 /**

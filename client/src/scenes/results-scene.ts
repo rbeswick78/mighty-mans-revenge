@@ -16,6 +16,7 @@ import { MENU_FONTS } from '../ui/menu/fonts.js';
 import { formatRivalrySummary, nextDraftTeaser, rematchButtonLabel } from '../ui/rivalry-set.js';
 import { careerRankPresentation } from '../ui/career-rank.js';
 import { winStreakPresentation, type WinStreakTone } from '../ui/win-streak.js';
+import { arenaMasteryResultPresentation } from '../ui/arena-mastery.js';
 import {
   GAUNTLET_BEST_CLEAR_STORAGE_KEY,
   gauntletBestClearLabel,
@@ -247,16 +248,39 @@ export class ResultsScene extends Phaser.Scene {
     // ON <MAP>") can no longer be known at results time —
     // MatchResult.nextMapName/nextGameMode stay populated for wire compat
     // but only the FORCE/no-draft path honors them.
+    const arenaMastery = arenaMasteryResultPresentation(this.result, localPlayerId);
+    if (arenaMastery) {
+      const masteryText = this.add
+        .text(centerX, 104, arenaMastery.text, {
+          fontFamily: MENU_FONTS.HEADER,
+          fontSize: arenaMastery.tierUp ? '9px' : '8px',
+          color: cssHex(arenaMastery.tierUp ? CAREER_RANK_UP_COLOR : LABEL_COLOR),
+        })
+        .setOrigin(0.5)
+        .setAlpha(0)
+        .setScale(arenaMastery.tierUp ? 1.15 : 1)
+        .setDepth(WastelandStreet.DEPTH.UI);
+      this.tweens.add({
+        targets: masteryText,
+        alpha: 1,
+        scaleX: 1,
+        scaleY: 1,
+        duration: 450,
+        delay: 100,
+        ease: arenaMastery.tierUp ? 'Back.easeOut' : 'Quad.easeOut',
+      });
+    }
+
     const nextTeaser = this.add
       .text(
         centerX,
-        112,
+        arenaMastery ? 120 : 112,
         this.result
           ? (gauntletNextTeaser(this.result) ?? nextDraftTeaser(this.result))
           : 'NEXT: COIN TOSS PICKS WHO DRAFTS MAP + MODE',
         {
           fontFamily: MENU_FONTS.HEADER,
-          fontSize: '10px',
+          fontSize: arenaMastery ? '8px' : '10px',
           color: cssHex(NEXT_DRAFT_COLOR),
         },
       )

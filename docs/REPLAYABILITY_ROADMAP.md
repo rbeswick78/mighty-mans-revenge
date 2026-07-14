@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–73 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–74 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -105,6 +105,7 @@ Each session below attacks one of these.
 | 71  | Gauntlet Build Codex                            | Every two-boon clear can discover one more named build                        | **DONE** (2026-07-13) |
 | 72  | Gauntlet Build Mastery                          | Every discovered build gains its own score chase and trophy                   | **DONE** (2026-07-13) |
 | 73  | Rusted Refinery                                 | A breachable power vault creates a fresh contest from every route             | **DONE** (2026-07-13) |
+| 74  | Arena Mastery                                   | Every battlefield gains a persistent identity and rivalry chase               | **DONE** (2026-07-14) |
 
 ---
 
@@ -3222,6 +3223,48 @@ attempt one attainable friend score to hunt from the first stage onward.
 
 ---
 
+## Session 74 — Arena Mastery
+
+**Goal:** make every arena a persistent friend-group chase, so players return
+to defend a stronghold, claim a weak battlefield, or deny a rival's home turf.
+
+**Locked design decisions**
+
+- Every player has independent real-match wins for each registered arena.
+  Server persistence normalizes the record from the live map registry, so old
+  saves gain new arenas at zero and unknown/removed keys cannot leak forward.
+- Only an authoritative PvP winner advances the arena played. Draws, losses,
+  Practice, unknown arenas, and client input cannot earn progress.
+- The cosmetic ladder is UNCHARTED at 0 wins, SCOUTED at 1, CLAIMED at 3,
+  STRONGHOLD at 7, and HOME TURF at 15. Tiers change no map odds, first-pick
+  role, spawn, matchmaking, combat, scoring, physics, or balance value.
+- Draft map cards compare `YOU` with `RIVAL` in 1v1. Extra entrants use an
+  N-player-safe `FIELD BEST`; old snapshots that omit records render the old
+  label-only cards. The complete six-map/eight-mode layout retains 48px cards
+  and moves status/timer below the actual registry rather than overlapping it.
+- Results receives server-authored previous/current arena wins for every real
+  participant, celebrates a crossed tier, and otherwise shows progress toward
+  the next one. Practice and old results render no mastery line.
+
+**Acceptance criteria**
+
+- [x] Registry/config tests cover complete zero records, malformed migration,
+      unknown-key removal, ordered frozen tiers, thresholds, and normalization.
+- [x] Persistence and matchmaking tests prove winner-only advancement, draw/
+      loss/Practice isolation, authoritative before/after results, and updated
+      records in the next rematch draft.
+- [x] Pure client tests cover 1v1 comparisons, N-player field best, old payloads,
+      promotions, ordinary progress, and absent results.
+- [x] A real two-player Chromium journey sees mastery on all six map cards and
+      completes the draft; desktop visual QA confirms all eight mode cards,
+      status, timer, and footer remain separated.
+- [x] Browser-level Results smoke passes on desktop Chromium and 844×390 mobile
+      landscape with the promotion and next-draft lines at distinct positions.
+- [x] Typecheck, lint, all 1,192 unit tests across 81 files, production build,
+      and the full Playwright desktop/mobile matrix pass.
+
+---
+
 ## Session 73 — Rusted Refinery
 
 **Goal:** add a sixth arena whose breachable central landmark and alternate
@@ -3446,6 +3489,39 @@ favorite mid-match event while the final-minute surprise stays fresh.
 ---
 
 ## Session Log
+
+### Session 74 — 2026-07-14 — Arena Mastery
+
+**Shipped:** every real PvP victory now claims progress on the battlefield where
+it happened. The server persists a complete win record across all six arenas,
+migrates old saves safely, and sends the current roster's records into the
+pre-match draft. Each map card compares your tier and progress with your rival;
+larger rosters fall back to the field's best total instead of assuming 1v1.
+
+Results now turns a first win or tier threshold into a compact promotion beat,
+then keeps the next goal visible after ordinary wins. Practice, losses, draws,
+old payloads, and unknown maps remain isolated. The tiers are bragging rights
+only: no draft, matchmaking, map, spawn, combat, scoring, physics, event, bot,
+or balance behavior changed. The draft was also reflowed around its real six-
+map/eight-mode registry so lower mode cards no longer overlap status and timer.
+
+**Verification:** 172 focused tests pass across registry/config, persistence,
+matchmaking/rematch propagation, and client presentation. A real two-browser
+Chromium flow observed Arena Mastery subtitles on every map card before both
+players completed the draft. Live desktop visual QA confirmed the full draft
+hierarchy and spacing. A dedicated ResultsScene smoke passes in desktop
+Chromium and 844×390 mobile landscape. Typecheck, lint, all 1,192 unit tests
+across 81 files, and the production build pass; Vite retains its existing
+chunk-size advisory. The full Playwright matrix passes 25 tests with 11
+intentional project-scoped skips.
+
+**Tuning watch:** the early tier cadence should create quick identity without
+making HOME TURF feel routine. Watch whether players choose maps to attack a
+rival's stronger record, protect their own, or merely optimize the nearest
+promotion; adjust only presentation thresholds after real group evidence.
+
+**Deployment:** not run; production deployment still requires explicit user
+authorization.
 
 ### Session 73 — 2026-07-13 — Rusted Refinery
 

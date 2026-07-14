@@ -385,6 +385,14 @@ export interface MatchResult {
   contract?: MatchContractResult;
   /** Lifetime streak snapshots; absent for Practice and older payloads. */
   winStreaks?: Record<PlayerId, WinStreakResult>;
+  /** Per-player battlefield records after this real match; absent for Practice/old servers. */
+  arenaMastery?: Record<PlayerId, ArenaMasteryResult>;
   /** Authoritative solo-run progress; absent for ordinary Practice/PvP. */
   gauntlet?: PracticeGauntletResult;
+}
+
+export interface ArenaMasteryResult {
+  mapName: string;
+  previousWins: number;
+  wins: number;
 }
