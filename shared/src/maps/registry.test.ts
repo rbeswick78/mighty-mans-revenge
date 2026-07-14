@@ -34,13 +34,14 @@ describe('MAP_REGISTRY', () => {
     }
   });
 
-  it('contains all five rotation maps in order', () => {
+  it('contains all six rotation maps in order', () => {
     expect(listMapNames()).toEqual([
       'Wasteland Outpost',
       'Overgrown Suburb',
       'Scrapyard',
       'Collapsed Overpass',
       'Checkpoint Zero',
+      'Rusted Refinery',
     ]);
   });
 
@@ -177,6 +178,31 @@ describe('MAP_REGISTRY', () => {
       ),
     ).toBe(true);
   });
+
+  it('Rusted Refinery wraps a rotationally fair power vault in breachable side lanes', () => {
+    const refinery = getMap('Rusted Refinery');
+    expect(refinery.theme).toBe('refinery');
+    expect(refinery.kothHills?.[0]).toEqual({ x: 9, y: 5 });
+
+    for (let y = 0; y < refinery.height; y++) {
+      for (let x = 0; x < refinery.width; x++) {
+        expect(refinery.tiles[y][x], `tile (${x},${y}) rotational partner`).toBe(
+          refinery.tiles[refinery.height - 1 - y][refinery.width - 1 - x],
+        );
+      }
+    }
+
+    const gates = (refinery.decorations ?? []).filter(
+      (decoration) => decoration.interaction === 'shootable_gate',
+    );
+    expect(gates.map(({ x, y }) => [x, y])).toEqual([
+      [7, 5],
+      [12, 6],
+    ]);
+    for (const y of [2, 3, 8, 9]) {
+      expect(refinery.tiles[y].slice(9, 11), `open vault approach on row ${y}`).toEqual([0, 0]);
+    }
+  });
 });
 
 describe('getNextMapName', () => {
@@ -186,7 +212,8 @@ describe('getNextMapName', () => {
     expect(getNextMapName(names[1])).toBe(names[2]);
     expect(getNextMapName(names[2])).toBe(names[3]);
     expect(getNextMapName(names[3])).toBe(names[4]);
-    expect(getNextMapName(names[4])).toBe(names[0]);
+    expect(getNextMapName(names[4])).toBe(names[5]);
+    expect(getNextMapName(names[5])).toBe(names[0]);
   });
 
   it('restarts the cycle for unknown names instead of throwing', () => {

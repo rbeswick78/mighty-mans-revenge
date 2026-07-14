@@ -349,14 +349,10 @@ describe('MatchmakingManager map rotation (FORCE-pinned, draft skipped)', () => 
 
   it('fresh matches cycle the registry order and wrap', () => {
     const names = listMapNames();
-    const pairs: Array<[PlayerId, PlayerId]> = [
-      ['A', 'B'],
-      ['C', 'D'],
-      ['E', 'F'],
-      ['G', 'H'],
-      ['I', 'J'],
-      ['K', 'L'],
-    ];
+    const pairs: Array<[PlayerId, PlayerId]> = Array.from(
+      { length: names.length + 1 },
+      (_, index) => [`P${index}A`, `P${index}B`],
+    );
     pairs.forEach(([p1, p2], i) => {
       sent.length = 0;
       mgr.handleJoinMatchmaking(p1, p1);
@@ -364,7 +360,7 @@ describe('MatchmakingManager map rotation (FORCE-pinned, draft skipped)', () => 
       expect(matchFoundMapName(p1)).toBe(names[i % names.length]);
       expect(matchFoundMapName(p2)).toBe(names[i % names.length]);
     });
-    expect(matchFoundMapName('K')).toBe(names[0]); // wrapped
+    expect(matchFoundMapName(pairs[names.length][0])).toBe(names[0]); // wrapped
   });
 
   it('matchEnd promises the next map and the pinned rematch delivers it', () => {
@@ -373,36 +369,17 @@ describe('MatchmakingManager map rotation (FORCE-pinned, draft skipped)', () => 
     mgr.handleJoinMatchmaking('B', 'B');
     expect(matchFoundMapName('A')).toBe(names[0]);
 
-    // First match ends → results promise map #2 → rematch plays map #2.
-    endActiveMatch();
-    expect(lastMatchEndNextMap()).toBe(names[1]);
-    sent.length = 0;
-    mgr.handleRematchRequest('A');
-    mgr.handleRematchRequest('B');
-    expect(matchFoundMapName('A')).toBe(names[1]);
+    // Every result promises the next registry map and its rematch delivers it.
+    for (let i = 1; i < names.length; i += 1) {
+      endActiveMatch();
+      expect(lastMatchEndNextMap()).toBe(names[i]);
+      sent.length = 0;
+      mgr.handleRematchRequest('A');
+      mgr.handleRematchRequest('B');
+      expect(matchFoundMapName('A')).toBe(names[i]);
+    }
 
-    // Chain continues through maps #3, #4, and #5, then wraps to #1.
-    endActiveMatch();
-    expect(lastMatchEndNextMap()).toBe(names[2]);
-    sent.length = 0;
-    mgr.handleRematchRequest('A');
-    mgr.handleRematchRequest('B');
-    expect(matchFoundMapName('A')).toBe(names[2]);
-
-    endActiveMatch();
-    expect(lastMatchEndNextMap()).toBe(names[3]);
-    sent.length = 0;
-    mgr.handleRematchRequest('A');
-    mgr.handleRematchRequest('B');
-    expect(matchFoundMapName('A')).toBe(names[3]);
-
-    endActiveMatch();
-    expect(lastMatchEndNextMap()).toBe(names[4]);
-    sent.length = 0;
-    mgr.handleRematchRequest('A');
-    mgr.handleRematchRequest('B');
-    expect(matchFoundMapName('A')).toBe(names[4]);
-
+    // The final map promises the first map again.
     endActiveMatch();
     expect(lastMatchEndNextMap()).toBe(names[0]);
   });

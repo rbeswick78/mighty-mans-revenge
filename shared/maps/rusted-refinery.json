@@ -1,0 +1,96 @@
+{
+  "name": "Rusted Refinery",
+  "width": 20,
+  "height": 12,
+  "tileSize": 48,
+  "theme": "refinery",
+  "tiles": [
+    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+    [1, 0, 3, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 3, 0, 1],
+    [1, 0, 0, 2, 2, 2, 0, 1, 1, 0, 0, 1, 1, 0, 2, 2, 2, 0, 0, 1],
+    [1, 0, 2, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 2, 0, 1],
+    [1, 0, 0, 0, 1, 2, 0, 1, 0, 0, 4, 0, 1, 0, 2, 1, 0, 0, 0, 1],
+    [1, 4, 0, 2, 1, 0, 0, 1, 0, 4, 0, 0, 1, 0, 0, 1, 2, 0, 0, 1],
+    [1, 0, 0, 2, 1, 0, 0, 1, 0, 0, 4, 0, 1, 0, 0, 1, 2, 0, 4, 1],
+    [1, 0, 0, 0, 1, 2, 0, 1, 0, 4, 0, 0, 1, 0, 2, 1, 0, 0, 0, 1],
+    [1, 0, 2, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 2, 0, 1],
+    [1, 0, 0, 2, 2, 2, 0, 1, 1, 0, 0, 1, 1, 0, 2, 2, 2, 0, 0, 1],
+    [1, 0, 3, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 3, 0, 1],
+    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+  ],
+  "spawnPoints": [
+    { "x": 2, "y": 1 },
+    { "x": 17, "y": 10 },
+    { "x": 17, "y": 1 },
+    { "x": 2, "y": 10 }
+  ],
+  "pickupSpawns": [
+    { "x": 10, "y": 4, "type": "weapon_shotgun" },
+    { "x": 14, "y": 10, "type": "weapon_pistol" },
+    { "x": 5, "y": 1, "type": "weapon_bat" },
+    { "x": 9, "y": 5, "type": "overcharge" },
+    { "x": 10, "y": 6, "type": "armor" },
+    { "x": 9, "y": 7, "type": "gun_ammo" },
+    { "x": 14, "y": 1, "type": "bandage" },
+    { "x": 5, "y": 10, "type": "bandage" },
+    { "x": 1, "y": 5, "type": "grenade" },
+    { "x": 18, "y": 6, "type": "grenade" }
+  ],
+  "decorations": [
+    {
+      "x": 5,
+      "y": 4,
+      "w": 1,
+      "h": 1,
+      "texture": "deco_barrel_red",
+      "hazard": "explosive_barrel"
+    },
+    {
+      "x": 14,
+      "y": 7,
+      "w": 1,
+      "h": 1,
+      "texture": "deco_barrel_red",
+      "hazard": "explosive_barrel"
+    },
+    {
+      "x": 3,
+      "y": 5,
+      "w": 1,
+      "h": 1,
+      "texture": "deco_scavenger_cache",
+      "interaction": "scavenger_cache"
+    },
+    {
+      "x": 16,
+      "y": 6,
+      "w": 1,
+      "h": 1,
+      "texture": "deco_scavenger_cache",
+      "interaction": "scavenger_cache"
+    },
+    {
+      "x": 7,
+      "y": 5,
+      "w": 1,
+      "h": 1,
+      "texture": "tiles_wire_fence_closing",
+      "interaction": "shootable_gate"
+    },
+    {
+      "x": 12,
+      "y": 6,
+      "w": 1,
+      "h": 1,
+      "texture": "tiles_wire_fence_closing",
+      "interaction": "shootable_gate"
+    }
+  ],
+  "kothHills": [
+    { "x": 9, "y": 5 },
+    { "x": 1, "y": 4 },
+    { "x": 17, "y": 6 },
+    { "x": 9, "y": 1 },
+    { "x": 9, "y": 9 }
+  ]
+}

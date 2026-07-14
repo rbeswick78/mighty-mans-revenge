@@ -20,6 +20,7 @@ describe('getTheme', () => {
     expect(getTheme('scrapyard')).toBe(MAP_THEMES.scrapyard);
     expect(getTheme('overpass')).toBe(MAP_THEMES.overpass);
     expect(getTheme('checkpoint')).toBe(MAP_THEMES.checkpoint);
+    expect(getTheme('refinery')).toBe(MAP_THEMES.refinery);
   });
 
   it('falls back to wasteland for undefined and unknown ids', () => {
@@ -43,8 +44,14 @@ describe('getTheme', () => {
     expect(getTheme('scrapyard')).not.toBe(getTheme(undefined));
     expect(getTheme('overpass')).not.toBe(getTheme(undefined));
     expect(getTheme('checkpoint')).not.toBe(getTheme(undefined));
+    expect(getTheme('refinery')).not.toBe(getTheme(undefined));
     expect(getTheme('suburb').floorTexture).not.toBe(getTheme('scrapyard').floorTexture);
     expect(getTheme('overpass').innerWall).toBe('roofDark');
+    expect(getTheme('refinery')).toMatchObject({
+      coverTexture: 'cover_reinforced',
+      coverStyle: 'barricade',
+      innerWall: 'roofRed',
+    });
   });
 
   it('gives the two barricade themes distinct art', () => {

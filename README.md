@@ -50,11 +50,11 @@ match death counter, so every client sees the same cosmetic beat.
 
 ## Arena variety
 
-Five arenas now shape matchmaking, rematches, and solo runs. Checkpoint Zero is
-the newest: a fortified, rotationally balanced crossing built around long
-reinforced-barricade lanes, shoot-open shortcuts, and a dangerous central
-pickup fight. Its low cover is deliberately readable in both directions and
-can still be blasted away to rewrite the sightlines during a round.
+Six arenas now shape matchmaking, rematches, and solo runs. Rusted Refinery is
+the newest: a rotationally balanced industrial yard built around a red-roofed
+power vault, open north/south approaches, and diagonal side gates that can be
+shot open into fresh flanking routes. Paired barrels, scavenger caches, and
+power pickups make its central fight volatile without adding map-only rules.
 
 ## Solo play
 

@@ -391,6 +391,16 @@ export const MAP_THEMES: Record<string, MapTheme> = {
     outerWall: 'brick',
     innerWall: 'iron',
   },
+  refinery: {
+    floorTexture: 'tiles_bleak',
+    floorVariants: FLOOR_VARIANTS,
+    coverTexture: 'cover_reinforced',
+    coverVariants: [0],
+    coverStyle: 'barricade',
+    scorchFrame: SCORCH_FRAME,
+    outerWall: 'brick',
+    innerWall: 'roofRed',
+  },
 };
 
 export const DEFAULT_THEME_ID = 'wasteland';

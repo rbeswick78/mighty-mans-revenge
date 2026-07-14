@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–72 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, five arenas including barricade-focused Checkpoint Zero, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–73 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, Gun Game, Rivalry Sets, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, eight modes, contracts/reputation/mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -104,6 +104,7 @@ Each session below attacks one of these.
 | 70  | Gauntlet Boon Drafts                            | Every route choice builds a different run worth replaying                     | **DONE** (2026-07-13) |
 | 71  | Gauntlet Build Codex                            | Every two-boon clear can discover one more named build                        | **DONE** (2026-07-13) |
 | 72  | Gauntlet Build Mastery                          | Every discovered build gains its own score chase and trophy                   | **DONE** (2026-07-13) |
+| 73  | Rusted Refinery                                 | A breachable power vault creates a fresh contest from every route             | **DONE** (2026-07-13) |
 
 ---
 
@@ -3221,6 +3222,45 @@ attempt one attainable friend score to hunt from the first stage onward.
 
 ---
 
+## Session 73 — Rusted Refinery
+
+**Goal:** add a sixth arena whose breachable central landmark and alternate
+routes create fresh positioning decisions in every existing mode.
+
+**Locked design decisions**
+
+- Rusted Refinery is a 20×12 arena with exact 180-degree tile symmetry, four
+  paired spawns, and a red-roofed central power vault.
+- The vault keeps its north and south two-tile approaches open as reliable
+  primary routes. Two diagonal east/west gates are shootable shortcuts, so
+  fighters can permanently open fresh flanks during a round.
+- The map uses the established universal economy: one shotgun, pistol, bat,
+  overcharge cell, scrap armor, and ammo spawn; two bandages, grenades,
+  explosive barrels, scavenger caches, and shootable gates; plus five legal
+  KOTH sites. It introduces no map-only pickup, collision, or destruction rule.
+- The `refinery` presentation theme pairs a bleak industrial floor, red roof,
+  brick perimeter, and reinforced barricades. Theme choices remain client-only.
+- All eight modes, bots, Practice, Gauntlet, Daily, drafts, rematches, and the
+  forced-map smoke path consume the same registry entry and shared map
+  contracts. No weapon, fighter, event, physics, scoring, or balance value
+  changes with this arena.
+
+**Acceptance criteria**
+
+- [x] Registry tests validate all six maps, exact Refinery tile symmetry,
+      paired props and gates, open vault approaches, five KOTH sites, and the
+      six-map fallback rotation.
+- [x] Theme tests resolve the distinct Refinery palette without altering the
+      unknown-theme fallback or existing themes.
+- [x] A real two-player Chromium draft chooses Rusted Refinery, reaches live
+      Bounty Hunt, and observes both gate sprites and both cache sprites.
+- [x] Desktop and 844×390 mobile-landscape walkthroughs keep the full arena,
+      vault routes, interactive props, players, and HUD readable.
+- [x] Typecheck, lint, all 1,182 unit tests across 80 files, production build,
+      and the 22-pass/11-intentional-skip Playwright desktop/mobile matrix pass.
+
+---
+
 ## Session 72 — Gauntlet Build Mastery
 
 **Goal:** turn the Build Codex from a progress counter into a readable trophy
@@ -3406,6 +3446,40 @@ favorite mid-match event while the final-minute surprise stays fresh.
 ---
 
 ## Session Log
+
+### Session 73 — 2026-07-13 — Rusted Refinery
+
+**Shipped:** matchmaking, rematches, Practice, and solo runs now draw from six
+arenas. Rusted Refinery centers its fights on a red-roofed power vault: the
+north and south entrances stay open, while two diagonal side gates can be shot
+apart to create permanent east/west flanks. Reinforced barricades, paired
+barrels and caches, and mirrored pickup fights give the yard its own tactical
+rhythm while exact rotational tile symmetry keeps starts fair.
+
+The new `refinery` theme makes the vault and industrial lanes immediately
+recognizable but remains presentation-only. The arena uses the same collision,
+destruction, pickup, KOTH, bot, draft, and match-mode contracts as every other
+map; no combat, event, physics, scoring, or balance value changed.
+
+**Verification:** focused map and theme suites pass 32 tests. A real two-player
+Chromium journey drafted Rusted Refinery into Bounty Hunt, reached live play,
+and observed the expected two gate and two cache renderers. Desktop visual QA
+confirmed the vault landmark, open approaches, diagonal shortcuts, pickup
+contrast, and unobstructed HUD; the same match remained fully readable at
+844×390 mobile landscape. Typecheck, lint, all 1,182 unit tests across 80 files,
+and the production build pass; Vite retains its existing chunk-size advisory.
+The full Playwright matrix passes 22 tests with 11 intentional project-scoped
+skips.
+
+**Tuning watch:** the side gates should be tempting alternatives rather than
+mandatory opening shots, and the vault should create central contests without
+making the two open approaches feel interchangeable. Watch actual groups for
+which gate opens first, whether barrels create memorable reversals, and whether
+all five KOTH sites pull fights into meaningfully different routes before any
+topology change.
+
+**Deployment:** not run; production deployment still requires explicit user
+authorization.
 
 ### Session 72 — 2026-07-13 — Gauntlet Build Mastery
 

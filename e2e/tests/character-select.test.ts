@@ -93,7 +93,12 @@ async function draftPickIfMyTurn(page: Page): Promise<boolean> {
     const myId = service.getNetworkManager().getPlayerId();
     if (!myId || draft.currentPickerId !== myId) return false;
     if (draft.mapPick === null) {
-      service.sendDraftPick('map', draft.mapOptions[0]);
+      // Keep the primary live-match journey exercising the newest arena;
+      // retain an old-server fallback for mixed-version local development.
+      service.sendDraftPick(
+        'map',
+        draft.mapOptions.includes('Rusted Refinery') ? 'Rusted Refinery' : draft.mapOptions[0],
+      );
       return true;
     }
     if (draft.modePick === null) {
@@ -1338,7 +1343,11 @@ test.describe('Character select (desktop)', () => {
               game?: { scene: { getScene: (key: string) => unknown } };
             };
             const scene = w.game?.scene.getScene('GameScene') as {
-              matchData?: { gameMode?: string } | null;
+              matchData?: { gameMode?: string; mapName?: string } | null;
+              mapRenderer?: {
+                gateSpritesByCell?: { size: number };
+                cacheSpritesByCell?: { size: number };
+              } | null;
               playerManager?: {
                 getRenderer: (id: string) =>
                   | {
@@ -1359,6 +1368,9 @@ test.describe('Character select (desktop)', () => {
               : undefined;
             return {
               mode: scene?.matchData?.gameMode ?? null,
+              map: scene?.matchData?.mapName ?? null,
+              gateCount: scene?.mapRenderer?.gateSpritesByCell?.size ?? 0,
+              cacheCount: scene?.mapRenderer?.cacheSpritesByCell?.size ?? 0,
               hasTarget: state?.targetId !== null && state?.targetId !== undefined,
               markerVisible: targetRenderer?.bountyMarkerText?.visible ?? false,
               hudVisible: scene?.hud?.bountyHuntText?.visible ?? false,
@@ -1366,11 +1378,14 @@ test.describe('Character select (desktop)', () => {
           }),
         {
           timeout: 10000,
-          message: 'expected drafted Bounty Hunt state, world marker, and HUD',
+          message: 'expected Rusted Refinery with drafted Bounty Hunt presentation',
         },
       )
       .toEqual({
         mode: 'bounty_hunt',
+        map: 'Rusted Refinery',
+        gateCount: 2,
+        cacheCount: 2,
         hasTarget: true,
         markerVisible: true,
         hudVisible: true,
