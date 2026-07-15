@@ -110,7 +110,10 @@ test.describe('Selected fighter briefing', () => {
       };
       const jack = scene.cards.get('jack');
       if (!jack) throw new Error('Jack card is missing');
-      const footer = scene.children.list.find((child) => child.text?.startsWith('TAP / CLICK'));
+      const footer = scene.children.list.find(
+        (child) =>
+          child.text?.startsWith('TAB / ARROWS') || child.text?.startsWith('TAP A FIGHTER'),
+      );
       const staleAbilityCopy = [...scene.cards.values()].flatMap((card) =>
         card.container.list
           .map((child) => child.text)

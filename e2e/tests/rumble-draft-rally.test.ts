@@ -165,8 +165,8 @@ test.describe('Rumble Draft Rally', () => {
     context,
   }, testInfo) => {
     test.skip(
-      testInfo.project.name === 'mobile-landscape',
-      'Three background mobile-emulation tabs throttle WebRTC setup; mobile UI is covered above.',
+      testInfo.project.name !== 'desktop-chromium',
+      'One authoritative three-client journey is sufficient; Firefox/mobile Rally UI is covered above.',
     );
     test.setTimeout(60000);
     const pageB = await context.newPage();

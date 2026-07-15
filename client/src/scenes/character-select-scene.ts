@@ -328,7 +328,9 @@ export class CharacterSelectScene extends Phaser.Scene {
       .text(
         centerX,
         camHeight - 24,
-        'TAP / CLICK OR D-PAD TO PICK  •  ENTER / A LOCK  •  ESC / B BACK',
+        isTouchDevice()
+          ? 'TAP A FIGHTER + LOCK IN  •  DOUBLE-TAP TO LOCK'
+          : 'TAB / ARROWS / D-PAD PICK  •  ENTER / A LOCK  •  ESC / B LOBBY',
         {
           fontFamily: MENU_FONTS.BODY,
           fontSize: '12px',
@@ -338,14 +340,39 @@ export class CharacterSelectScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(WastelandStreet.DEPTH.UI);
 
-    this.input.keyboard?.on('keydown-LEFT', () => this.cycleHover(-1));
-    this.input.keyboard?.on('keydown-A', () => this.cycleHover(-1));
-    this.input.keyboard?.on('keydown-RIGHT', () => this.cycleHover(1));
-    this.input.keyboard?.on('keydown-D', () => this.cycleHover(1));
-    this.input.keyboard?.on('keydown-ENTER', () => this.tryLockCurrent());
-    this.input.keyboard?.on('keydown-SPACE', () => this.tryLockCurrent());
+    this.input.keyboard?.on('keydown-TAB', (event: KeyboardEvent) => {
+      // Firefox can deliver one bubbling DOM Tab event twice. Consume the
+      // physical press once, matching the other full-keyboard menu scenes.
+      if (event.defaultPrevented) return;
+      event.preventDefault();
+      this.navigateCharacters(event.shiftKey ? -1 : 1);
+    });
+    const navigateCharactersOnce = (event: KeyboardEvent, direction: -1 | 1): void => {
+      // Firefox can surface the same bubbling DOM key event twice through
+      // Phaser. Consuming it keeps one physical press equal to one fighter.
+      if (event.defaultPrevented) return;
+      event.preventDefault();
+      this.navigateCharacters(direction);
+    };
+    this.input.keyboard?.on('keydown-LEFT', (event: KeyboardEvent) =>
+      navigateCharactersOnce(event, -1),
+    );
+    this.input.keyboard?.on('keydown-UP', (event: KeyboardEvent) =>
+      navigateCharactersOnce(event, -1),
+    );
+    this.input.keyboard?.on('keydown-A', () => this.navigateCharacters(-1));
+    this.input.keyboard?.on('keydown-RIGHT', (event: KeyboardEvent) =>
+      navigateCharactersOnce(event, 1),
+    );
+    this.input.keyboard?.on('keydown-DOWN', (event: KeyboardEvent) =>
+      navigateCharactersOnce(event, 1),
+    );
+    this.input.keyboard?.on('keydown-D', () => this.navigateCharacters(1));
+    this.input.keyboard?.on('keydown-ENTER', () => this.activateLockButton());
+    this.input.keyboard?.on('keydown-SPACE', () => this.activateLockButton());
     this.input.keyboard?.on('keydown-ESC', () => this.leavePreFight());
     this.input.keyboard?.on('keydown-BACKSPACE', () => this.leavePreFight());
+    this.input.on('pointerdown', () => this.setActionFocus(false));
 
     this.wireGameServiceEvents();
   }
@@ -365,7 +392,7 @@ export class CharacterSelectScene extends Phaser.Scene {
       this.leavePreFight();
       return;
     }
-    this.lockButton.setFocused(true);
+    this.setActionFocus(true);
     if (actions.left || actions.up) this.cycleHover(-1);
     else if (actions.right || actions.down) this.cycleHover(1);
     if (actions.confirm || actions.alternate) this.lockButton.activate();
@@ -773,7 +800,12 @@ export class CharacterSelectScene extends Phaser.Scene {
 
     const current = this.localHoveredId ?? selectable[0];
     const idx = selectable.indexOf(current);
-    const nextIdx = (idx + direction + selectable.length) % selectable.length;
+    const nextIdx =
+      idx < 0
+        ? direction > 0
+          ? 0
+          : selectable.length - 1
+        : (idx + direction + selectable.length) % selectable.length;
     const next = selectable[nextIdx];
     this.localHoveredId = next;
     this.updateFighterDetail(next);
@@ -788,10 +820,28 @@ export class CharacterSelectScene extends Phaser.Scene {
 
   private tryLockCurrent(): void {
     if (this.findSelfLocked()) return;
-    const id = this.localHoveredId;
+    const id =
+      this.localHoveredId && !this.isCardLockedByOther(this.localHoveredId)
+        ? this.localHoveredId
+        : CHARACTER_IDS.find((candidate) => !this.isCardLockedByOther(candidate));
     if (!id) return;
-    if (this.isCardLockedByOther(id)) return;
+    this.localHoveredId = id;
+    this.updateFighterDetail(id);
     this.gameService.sendCharacterLock(id);
+  }
+
+  private navigateCharacters(direction: 1 | -1): void {
+    this.setActionFocus(true);
+    this.cycleHover(direction);
+  }
+
+  private activateLockButton(): void {
+    this.setActionFocus(true);
+    this.lockButton.activate();
+  }
+
+  private setActionFocus(active: boolean): void {
+    this.lockButton.setFocused(active);
   }
 
   private findSelfLocked(): CharacterId | null {

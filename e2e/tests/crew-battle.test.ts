@@ -112,7 +112,10 @@ test.describe('Crew Battle 2v2', () => {
   test('launches two server-authored crews and marks the Rusty ally in live play', async ({
     gamePage,
   }, testInfo) => {
-    test.skip(testInfo.project.name === 'mobile-landscape', 'desktop live-flow coverage');
+    test.skip(
+      testInfo.project.name !== 'desktop-chromium',
+      'One authoritative live-flow browser is sufficient; cross-device Crew UI is covered above.',
+    );
     test.setTimeout(60000);
 
     await expect

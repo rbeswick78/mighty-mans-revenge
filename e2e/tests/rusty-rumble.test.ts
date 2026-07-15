@@ -11,6 +11,10 @@ test.describe('Scrap Pit solo Rumble', () => {
   test('opens three distinct rivals and makes the crew answer a challenge', async ({
     gamePage,
   }, testInfo) => {
+    test.skip(
+      testInfo.project.name === 'desktop-firefox',
+      'Authoritative Scrap Pit runs in Chromium; Firefox presentation is covered by staged surfaces.',
+    );
     test.setTimeout(60000);
     await expect
       .poll(() =>

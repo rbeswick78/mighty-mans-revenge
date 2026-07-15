@@ -745,10 +745,25 @@ export class LobbyScene extends Phaser.Scene {
       event.preventDefault();
       this.moveKeyboardFocus(event.shiftKey ? -1 : 1, true);
     });
-    this.input.keyboard?.on('keydown-UP', () => this.moveKeyboardFocus(-1));
-    this.input.keyboard?.on('keydown-LEFT', () => this.moveKeyboardFocus(-1));
-    this.input.keyboard?.on('keydown-DOWN', () => this.moveKeyboardFocus(1));
-    this.input.keyboard?.on('keydown-RIGHT', () => this.moveKeyboardFocus(1));
+    const moveKeyboardFocusOnce = (event: KeyboardEvent, direction: -1 | 1): void => {
+      // Firefox can surface the same bubbling DOM key event twice through
+      // Phaser. Consuming it keeps one physical press equal to one route.
+      if (event.defaultPrevented) return;
+      event.preventDefault();
+      this.moveKeyboardFocus(direction);
+    };
+    this.input.keyboard?.on('keydown-UP', (event: KeyboardEvent) =>
+      moveKeyboardFocusOnce(event, -1),
+    );
+    this.input.keyboard?.on('keydown-LEFT', (event: KeyboardEvent) =>
+      moveKeyboardFocusOnce(event, -1),
+    );
+    this.input.keyboard?.on('keydown-DOWN', (event: KeyboardEvent) =>
+      moveKeyboardFocusOnce(event, 1),
+    );
+    this.input.keyboard?.on('keydown-RIGHT', (event: KeyboardEvent) =>
+      moveKeyboardFocusOnce(event, 1),
+    );
     // Escape backs out of the setup overlay before cancelling an active search.
     this.input.keyboard?.on('keydown-ESC', () => {
       if (this.practiceSetupMenu.isOpen()) this.practiceSetupMenu.back();

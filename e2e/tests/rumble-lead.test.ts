@@ -28,10 +28,10 @@ async function waitForActiveScene(
 test('composes Rumble lead drama in the live HUD', async ({ gamePage }, testInfo) => {
   test.setTimeout(45000);
   await waitForActiveScene(gamePage, 'LobbyScene', 20000);
-  if (testInfo.project.name === 'mobile-landscape') {
-    // Mobile WebRTC setup is intentionally outside this composition check.
-    // Start the real GameScene/HUD with a synthetic local identity; desktop
-    // projects below still exercise the authoritative Practice path.
+  if (testInfo.project.name !== 'desktop-chromium') {
+    // Headless Firefox/mobile WebRTC setup is intentionally outside this
+    // composition check. Start the real GameScene/HUD with a synthetic local
+    // identity; Chromium below still exercises the authoritative path.
     await gamePage.evaluate(() => {
       const lobby = (
         window as unknown as { game?: { scene: { getScene: (key: string) => unknown } } }
@@ -41,7 +41,7 @@ test('composes Rumble lead drama in the live HUD', async ({ gamePage }, testInfo
           getNetworkManager: () => { getPlayerId: () => string | null };
         };
       };
-      lobby.gameService.getNetworkManager().getPlayerId = () => 'mobile-local';
+      lobby.gameService.getNetworkManager().getPlayerId = () => 'staged-local';
       lobby.scene.start('GameScene', {
         nickname: 'Lead Tester',
         matchData: {

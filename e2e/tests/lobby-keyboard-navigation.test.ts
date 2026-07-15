@@ -90,7 +90,30 @@ test.describe('Lobby keyboard navigation', () => {
     lobbyPage,
   }, testInfo) => {
     const mobile = testInfo.project.name === 'mobile-landscape';
-    await waitForLobby(lobbyPage, !mobile);
+    await waitForLobby(lobbyPage, false);
+    if (!mobile) {
+      // This regression owns menu navigation, not WebRTC. Detach transient
+      // connection callbacks and stage the connected presentation so every
+      // online and local route remains deterministically enumerable.
+      await lobbyPage.evaluate(() => {
+        const game = (
+          window as unknown as { game?: { scene: { getScene: (key: string) => unknown } } }
+        ).game;
+        const scene = game?.scene.getScene('LobbyScene') as {
+          gameService: { off: (event: string, callback: (() => void) | null) => void };
+          onConnecting: (() => void) | null;
+          onConnected: (() => void) | null;
+          onReconnecting: (() => void) | null;
+          onDisconnected: (() => void) | null;
+          updateConnectionUi: (state: 'connected') => void;
+        };
+        scene.gameService.off('connecting', scene.onConnecting);
+        scene.gameService.off('connected', scene.onConnected);
+        scene.gameService.off('reconnecting', scene.onReconnecting);
+        scene.gameService.off('disconnected', scene.onDisconnected);
+        scene.updateConnectionUi('connected');
+      });
+    }
 
     const initial = await keyboardState(lobbyPage);
     expect(initial).toMatchObject({

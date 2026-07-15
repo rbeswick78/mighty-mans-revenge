@@ -144,7 +144,9 @@ async function backControlState(page: Page, sceneKey: string): Promise<BackContr
       label: scene?.backButton?.list?.find((child) => child.text === 'BACK TO LOBBY')?.text ?? null,
       footerHasBack:
         scene?.children?.list.some(
-          (child) => child.visible && child.text?.includes('ESC / B BACK'),
+          (child) =>
+            child.visible &&
+            (child.text?.includes('ESC / B BACK') || child.text?.includes('ESC / B LOBBY')),
         ) ?? false,
       bounds: bounds
         ? { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height }
@@ -192,7 +194,10 @@ test.describe('Pre-fight exit routes', () => {
 
     await startCharacterSelect(gamePage);
     const select = await backControlState(gamePage, 'CharacterSelectScene');
-    expect(select).toMatchObject({ label: 'BACK TO LOBBY', footerHasBack: true });
+    expect(select).toMatchObject({
+      label: 'BACK TO LOBBY',
+      footerHasBack: testInfo.project.name !== 'mobile-landscape',
+    });
     expect(select.bounds).toMatchObject({ x: 24, y: 14, width: 150, height: 50 });
     await gamePage.waitForTimeout(400);
     await gamePage.screenshot({ path: testInfo.outputPath('fighter-select-back-control.png') });
