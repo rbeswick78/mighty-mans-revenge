@@ -180,6 +180,20 @@ server locking remain authoritative, match entry remains disabled, and
 Challenges/Records/Settings plus the complete legacy Lobby fallback remain
 unchanged.
 
+**Reforged Challenges (Batch 7):** the capability-owned Challenges tab exposes
+Spar, Scrap Pit, Gauntlet, Daily Run, Practice Setup, and the complete six-build
+Codex on the persistent responsive shell. It reads the same `mmr_nickname`,
+practice difficulty/mode/rival/mutator, Scrap Pit, Gauntlet, Daily, and Codex
+device keys through their established normalizers. Spar and Scrap Pit pass saved
+compatible setup through the unchanged `GameService.startPractice` boundary;
+Gauntlet and Daily omit optional client pins so server-authored difficulty,
+routes, rivals, forecasts, scoring, persistence, and deliberate randomness stay
+authoritative. The existing server `matchFound` event still enters unchanged
+Character Select at the legacy gameplay size. A missing callsign fails closed;
+Batch 9 owns callsign entry. Play/Fighters remain unchanged, Records/Settings
+remain empty, and the default-false capability keeps the complete legacy Lobby
+fallback.
+
 ### Why This Matters for Agents
 
 Client prediction and server simulation **must use identical physics code** from `/shared`. If you change movement, collision, or physics logic, you must change it in `/shared` and verify both client and server still agree. A mismatch between client prediction and server authority causes visible rubber-banding.

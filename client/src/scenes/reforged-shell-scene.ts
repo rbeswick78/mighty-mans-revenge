@@ -4,8 +4,13 @@ import { cssHex } from '@shared/config/palette.js';
 import { listMapNames } from '@shared/maps/registry.js';
 import type { ServerCapabilities } from '@shared/types/network.js';
 import { MenuGamepadInput } from '../input/menu-gamepad.js';
-import { GameService } from '../services/game-service.js';
+import { GameService, type MatchData } from '../services/game-service.js';
 import { MENU_FONTS } from '../ui/menu/fonts.js';
+import {
+  REFORGED_CHALLENGE_STORAGE_KEYS,
+  type ReforgedChallengeStartRequest,
+} from '../ui/reforged/challenge-menu.js';
+import { ChallengesPanel, type ChallengesPanelSnapshot } from '../ui/reforged/challenges-panel.js';
 import { ReforgedMenuTokens } from '../ui/reforged/design-tokens.js';
 import { persistFighterSelection, readFighterSelection } from '../ui/reforged/fighter-selection.js';
 import { FightersPanel, type FightersPanelSnapshot } from '../ui/reforged/fighters-panel.js';
@@ -33,6 +38,13 @@ export const REFORGED_TABS = Object.freeze([
 
 export type ReforgedTabId = (typeof REFORGED_TABS)[number]['id'];
 
+const SHELL_DEPTH = Object.freeze({
+  background: 0,
+  chrome: 10,
+  panel: 20,
+  controls: 30,
+});
+
 function createBatch5RosterAvailability() {
   const arenaNames = listMapNames();
   // Batch 5 needs an injected, read-only arena value to prove the pure builder
@@ -52,8 +64,10 @@ export class ReforgedShellScene extends Phaser.Scene {
   private focusNavigator: MenuFocusNavigator<ReforgedTabButton> | null = null;
   private playRosterPanel: PlayRosterPanel | null = null;
   private fightersPanel: FightersPanel | null = null;
+  private challengesPanel: ChallengesPanel | null = null;
   private selectedFighterId!: CharacterId;
-  private inputRegion: 'tabs' | 'play' | 'fighters' = 'tabs';
+  private nickname = '';
+  private inputRegion: 'tabs' | 'play' | 'fighters' | 'challenges' = 'tabs';
   private activeTabId: ReforgedTabId = 'play';
   private safeArea: MenuSafeArea | null = null;
   private background!: Phaser.GameObjects.Rectangle;
@@ -63,6 +77,7 @@ export class ReforgedShellScene extends Phaser.Scene {
   private contentTitle!: Phaser.GameObjects.Text;
   private contentState!: Phaser.GameObjects.Text;
   private inputHint!: Phaser.GameObjects.Text;
+  private onMatchFound: ((matchData: MatchData) => void) | null = null;
   private onCapabilitiesChanged: ((capabilities: Readonly<ServerCapabilities>) => void) | null =
     null;
   private onReconnecting: (() => void) | null = null;
@@ -89,63 +104,80 @@ export class ReforgedShellScene extends Phaser.Scene {
       localStorage,
       readFighterSelection(localStorage),
     );
+    this.nickname = localStorage.getItem(REFORGED_CHALLENGE_STORAGE_KEYS.nickname) ?? '';
 
     const tokens = ReforgedMenuTokens;
     this.background = this.add
       .rectangle(0, 0, MENU_LOGICAL_WIDTH, MENU_LOGICAL_HEIGHT, tokens.color.canvas)
-      .setOrigin(0);
-    this.eyebrow = this.add.text(0, 0, "MIGHTY MAN'S REVENGE  /  REFORGED", {
-      fontFamily: MENU_FONTS.HEADER,
-      fontSize: `${tokens.type.eyebrow}px`,
-      color: cssHex(tokens.color.accentActive),
-    });
-    this.title = this.add.text(0, 0, 'WASTELAND COMMAND', {
-      fontFamily: MENU_FONTS.HEADER,
-      fontSize: `${tokens.type.title}px`,
-      color: cssHex(tokens.color.text),
-    });
-    this.contentPanel = this.add.graphics();
-    this.contentTitle = this.add.text(0, 0, 'PLAY', {
-      fontFamily: MENU_FONTS.HEADER,
-      fontSize: `${tokens.type.section}px`,
-      color: cssHex(tokens.color.text),
-    });
-    this.contentState = this.add.text(0, 0, 'NAVIGATION FOUNDATION READY', {
-      fontFamily: MENU_FONTS.BODY,
-      fontSize: `${tokens.type.body}px`,
-      color: cssHex(tokens.color.textMuted),
-    });
+      .setOrigin(0)
+      .setDepth(SHELL_DEPTH.background);
+    this.eyebrow = this.add
+      .text(0, 0, "MIGHTY MAN'S REVENGE  /  REFORGED", {
+        fontFamily: MENU_FONTS.HEADER,
+        fontSize: `${tokens.type.eyebrow}px`,
+        color: cssHex(tokens.color.accentActive),
+      })
+      .setDepth(SHELL_DEPTH.chrome);
+    this.title = this.add
+      .text(0, 0, 'WASTELAND COMMAND', {
+        fontFamily: MENU_FONTS.HEADER,
+        fontSize: `${tokens.type.title}px`,
+        color: cssHex(tokens.color.text),
+      })
+      .setDepth(SHELL_DEPTH.chrome);
+    this.contentPanel = this.add.graphics().setDepth(SHELL_DEPTH.chrome);
+    this.contentTitle = this.add
+      .text(0, 0, 'PLAY', {
+        fontFamily: MENU_FONTS.HEADER,
+        fontSize: `${tokens.type.section}px`,
+        color: cssHex(tokens.color.text),
+      })
+      .setDepth(SHELL_DEPTH.chrome);
+    this.contentState = this.add
+      .text(0, 0, 'NAVIGATION FOUNDATION READY', {
+        fontFamily: MENU_FONTS.BODY,
+        fontSize: `${tokens.type.body}px`,
+        color: cssHex(tokens.color.textMuted),
+      })
+      .setDepth(SHELL_DEPTH.chrome);
     this.inputHint = this.add
       .text(0, 0, 'POINTER / TOUCH  /  ARROWS + ENTER  /  D-PAD + A', {
         fontFamily: MENU_FONTS.BODY,
         fontSize: `${tokens.type.eyebrow}px`,
         color: cssHex(tokens.color.textMuted),
       })
-      .setOrigin(0.5, 1);
+      .setOrigin(0.5, 1)
+      .setDepth(SHELL_DEPTH.controls);
 
     this.playRosterPanel = new PlayRosterPanel(this, {
       availability: createBatch5RosterAvailability(),
       fighterId: this.selectedFighterId,
       onPointerIntent: () => this.enterPlayInput(false),
-    });
+    }).setDepth(SHELL_DEPTH.panel);
     this.fightersPanel = new FightersPanel(this, {
       initialFighterId: this.selectedFighterId,
       characterWins: this.gameService.getLatestCharacterWins(),
       onPointerIntent: () => this.enterFightersInput(false),
       onSelectionChange: (fighterId) => this.selectFighter(fighterId),
-    });
+    }).setDepth(SHELL_DEPTH.panel);
+    this.challengesPanel = new ChallengesPanel(this, {
+      storage: localStorage,
+      nickname: this.nickname,
+      onPointerIntent: () => this.enterChallengesInput(false),
+      onStartChallenge: (request) => this.startChallenge(request),
+    }).setDepth(SHELL_DEPTH.panel);
 
-    this.tabButtons = REFORGED_TABS.map(
-      (tab) =>
-        new ReforgedTabButton(this, tab.label, {
-          onPointerIntent: () => {
-            this.inputRegion = 'tabs';
-            this.playRosterPanel?.clearFocus();
-            this.fightersPanel?.clearFocus();
-            this.focusNavigator?.clear();
-          },
-          onSelect: () => this.selectTab(tab.id),
-        }),
+    this.tabButtons = REFORGED_TABS.map((tab) =>
+      new ReforgedTabButton(this, tab.label, {
+        onPointerIntent: () => {
+          this.inputRegion = 'tabs';
+          this.playRosterPanel?.clearFocus();
+          this.fightersPanel?.clearFocus();
+          this.challengesPanel?.clearFocus();
+          this.focusNavigator?.clear();
+        },
+        onSelect: () => this.selectTab(tab.id),
+      }).setDepth(SHELL_DEPTH.controls),
     );
     this.focusNavigator = new MenuFocusNavigator(this.tabButtons);
     this.selectTab('play');
@@ -180,8 +212,17 @@ export class ReforgedShellScene extends Phaser.Scene {
       if (actions.confirm) this.fightersPanel?.activateFocused();
       return;
     }
+    if (this.inputRegion === 'challenges') {
+      if (actions.left) this.challengesPanel?.moveHorizontal(-1);
+      else if (actions.right) this.challengesPanel?.moveHorizontal(1);
+      else if (actions.up) this.challengesPanel?.moveVertical(-1);
+      else if (actions.down) this.challengesPanel?.moveVertical(1);
+      if (actions.confirm) this.challengesPanel?.activateFocused();
+      return;
+    }
     if (actions.down && this.activeTabId === 'play') this.enterPlayInput(true);
     else if (actions.down && this.activeTabId === 'fighters') this.enterFightersInput(true);
+    else if (actions.down && this.activeTabId === 'challenges') this.enterChallengesInput(true);
     else if (actions.left || actions.up) this.focusNavigator.move(-1);
     else if (actions.right || actions.down) this.focusNavigator.move(1);
     if (actions.confirm) this.focusNavigator.activateFocused();
@@ -210,6 +251,10 @@ export class ReforgedShellScene extends Phaser.Scene {
     return this.fightersPanel?.getSnapshot() ?? null;
   }
 
+  getChallengesSnapshot(): ChallengesPanelSnapshot | null {
+    return this.challengesPanel?.getSnapshot() ?? null;
+  }
+
   getFighterOptionCenter(index: number): { x: number; y: number } | null {
     return this.activeTabId === 'fighters'
       ? (this.fightersPanel?.getOptionCenter(index) ?? null)
@@ -219,6 +264,12 @@ export class ReforgedShellScene extends Phaser.Scene {
   getPlayRosterOptionCenter(index: number): { x: number; y: number } | null {
     return this.activeTabId === 'play'
       ? (this.playRosterPanel?.getOptionCenter(index) ?? null)
+      : null;
+  }
+
+  getChallengeOptionCenter(index: number): { x: number; y: number } | null {
+    return this.activeTabId === 'challenges'
+      ? (this.challengesPanel?.getOptionCenter(index) ?? null)
       : null;
   }
 
@@ -233,6 +284,7 @@ export class ReforgedShellScene extends Phaser.Scene {
       this.inputRegion = 'tabs';
       this.playRosterPanel?.clearFocus();
       this.fightersPanel?.clearFocus();
+      this.challengesPanel?.clearFocus();
       this.focusNavigator?.move(direction);
     };
     this.input.keyboard?.on('keydown-TAB', (event: KeyboardEvent) => {
@@ -244,6 +296,7 @@ export class ReforgedShellScene extends Phaser.Scene {
       this.inputRegion = 'tabs';
       this.playRosterPanel?.clearFocus();
       this.fightersPanel?.clearFocus();
+      this.challengesPanel?.clearFocus();
       this.focusNavigator?.move(event.shiftKey ? -1 : 1);
     });
     this.input.keyboard?.on('keydown-LEFT', (event: KeyboardEvent) => {
@@ -275,11 +328,13 @@ export class ReforgedShellScene extends Phaser.Scene {
   }
 
   private bindConnectionLifecycle(): void {
+    this.onMatchFound = (matchData) => this.openCharacterSelect(matchData);
     this.onCapabilitiesChanged = (capabilities) => {
       if (menuSceneForCapabilities(capabilities) !== 'ReforgedShellScene') this.returnToLobby();
     };
     this.onReconnecting = () => this.returnToLobby();
     this.onDisconnected = () => this.returnToLobby();
+    this.gameService.on('matchFound', this.onMatchFound);
     this.gameService.on('capabilitiesChanged', this.onCapabilitiesChanged);
     this.gameService.on('reconnecting', this.onReconnecting);
     this.gameService.on('disconnected', this.onDisconnected);
@@ -294,21 +349,26 @@ export class ReforgedShellScene extends Phaser.Scene {
     this.contentTitle?.setText(tab?.label ?? 'PLAY');
     const playActive = tabId === 'play';
     const fightersActive = tabId === 'fighters';
+    const challengesActive = tabId === 'challenges';
     this.playRosterPanel?.setPanelVisible(playActive);
     this.fightersPanel?.setPanelVisible(fightersActive);
-    this.contentState?.setVisible(!playActive && !fightersActive);
+    this.challengesPanel?.setPanelVisible(challengesActive);
+    this.contentState?.setVisible(!playActive && !fightersActive && !challengesActive);
     this.inputHint?.setText(
       playActive
         ? 'TAP / CLICK  /  ARROWS + ENTER  /  D-PAD + A  /  ESC / B TO EDIT'
         : fightersActive
           ? 'TAP / CLICK  /  ARROWS + ENTER  /  D-PAD + A  /  SELECTION PERSISTS'
-          : 'POINTER / TOUCH  /  ARROWS + ENTER  /  D-PAD + A',
+          : challengesActive
+            ? 'TAP / CLICK  /  ARROWS + ENTER  /  D-PAD + A  /  ESC / B BACK'
+            : 'POINTER / TOUCH  /  ARROWS + ENTER  /  D-PAD + A',
     );
-    if (!playActive && !fightersActive) {
+    if (!playActive && !fightersActive && !challengesActive) {
       this.inputRegion = 'tabs';
     }
     if (!playActive) this.playRosterPanel?.clearFocus();
     if (!fightersActive) this.fightersPanel?.clearFocus();
+    if (!challengesActive) this.challengesPanel?.clearFocus();
   }
 
   private layoutShell(): void {
@@ -354,6 +414,12 @@ export class ReforgedShellScene extends Phaser.Scene {
       safe.width - tokens.space.lg * 2,
       panelHeight - tokens.space.lg * 2 - 46,
     );
+    this.challengesPanel?.layout(
+      safe.left + tokens.space.lg,
+      panelTop + tokens.space.lg + 46,
+      safe.width - tokens.space.lg * 2,
+      panelHeight - tokens.space.lg * 2 - 46,
+    );
     this.inputHint.setPosition((safe.left + safe.right) / 2, safe.bottom);
   }
 
@@ -371,6 +437,13 @@ export class ReforgedShellScene extends Phaser.Scene {
     if (focusFirst) this.fightersPanel?.focusFirst();
   }
 
+  private enterChallengesInput(focusFirst: boolean): void {
+    if (this.activeTabId !== 'challenges') return;
+    this.inputRegion = 'challenges';
+    this.focusNavigator?.clear();
+    if (focusFirst) this.challengesPanel?.focusFirst();
+  }
+
   private enterActivePanelInput(focusFirst: boolean): boolean {
     if (this.activeTabId === 'play') {
       this.enterPlayInput(focusFirst);
@@ -380,13 +453,22 @@ export class ReforgedShellScene extends Phaser.Scene {
       this.enterFightersInput(focusFirst);
       return true;
     }
+    if (this.activeTabId === 'challenges') {
+      this.enterChallengesInput(focusFirst);
+      return true;
+    }
     return false;
   }
 
   private movePanel(event: KeyboardEvent, direction: 'left' | 'right' | 'up' | 'down'): void {
     if (event.defaultPrevented) return;
     event.preventDefault();
-    const panel = this.inputRegion === 'play' ? this.playRosterPanel : this.fightersPanel;
+    const panel =
+      this.inputRegion === 'play'
+        ? this.playRosterPanel
+        : this.inputRegion === 'fighters'
+          ? this.fightersPanel
+          : this.challengesPanel;
     if (direction === 'left') panel?.moveHorizontal(-1);
     else if (direction === 'right') panel?.moveHorizontal(1);
     else if (direction === 'up') panel?.moveVertical(-1);
@@ -396,6 +478,7 @@ export class ReforgedShellScene extends Phaser.Scene {
   private activateFocusedRegion(): void {
     if (this.inputRegion === 'play') this.playRosterPanel?.activateFocused();
     else if (this.inputRegion === 'fighters') this.fightersPanel?.activateFocused();
+    else if (this.inputRegion === 'challenges') this.challengesPanel?.activateFocused();
     else this.focusNavigator?.activateFocused();
   }
 
@@ -404,12 +487,54 @@ export class ReforgedShellScene extends Phaser.Scene {
     else if (this.inputRegion === 'fighters') {
       this.fightersPanel?.clearFocus();
       this.inputRegion = 'tabs';
+    } else if (this.inputRegion === 'challenges' && !this.challengesPanel?.back()) {
+      this.challengesPanel?.clearFocus();
+      this.inputRegion = 'tabs';
     }
   }
 
   private selectFighter(fighterId: CharacterId): void {
     this.selectedFighterId = persistFighterSelection(localStorage, fighterId);
     this.playRosterPanel?.setPersistedFighterSelection(this.selectedFighterId);
+  }
+
+  private startChallenge(request: ReforgedChallengeStartRequest): void {
+    if (this.leaving || this.nickname.length < 2) return;
+    this.tryStartFullscreen();
+    this.gameService.startPractice(
+      this.nickname,
+      request.difficulty,
+      request.kind,
+      request.gameMode,
+      request.opponentCharacterId,
+      request.mutatorId,
+    );
+  }
+
+  private openCharacterSelect(matchData: MatchData): void {
+    if (this.leaving) return;
+    this.leaving = true;
+    let transitioned = false;
+    const go = (): void => {
+      if (transitioned) return;
+      transitioned = true;
+      this.cleanupEvents();
+      useLegacyLogicalSize(this.scale);
+      this.scene.start('CharacterSelectScene', { nickname: this.nickname, matchData });
+    };
+    this.cameras.main.fadeOut(300, 0, 0, 0);
+    this.cameras.main.once('camerafadeoutcomplete', go);
+    this.time.delayedCall(500, go);
+  }
+
+  /** Preserve the established best-effort challenge-entry fullscreen gesture. */
+  private tryStartFullscreen(): void {
+    if (!document.fullscreenEnabled || document.fullscreenElement) return;
+    const target = document.getElementById('game-container');
+    if (!target?.requestFullscreen) return;
+    void target.requestFullscreen().catch(() => {
+      // Embedded browsers and automation may deny it; challenge entry continues.
+    });
   }
 
   private returnToLobby(): void {
@@ -422,6 +547,10 @@ export class ReforgedShellScene extends Phaser.Scene {
 
   private cleanupEvents(): void {
     this.scale.off(Phaser.Scale.Events.RESIZE, this.layoutShell, this);
+    if (this.onMatchFound) {
+      this.gameService.off('matchFound', this.onMatchFound);
+      this.onMatchFound = null;
+    }
     if (this.onCapabilitiesChanged) {
       this.gameService.off('capabilitiesChanged', this.onCapabilitiesChanged);
       this.onCapabilitiesChanged = null;
@@ -441,6 +570,7 @@ export class ReforgedShellScene extends Phaser.Scene {
     this.menuGamepad = null;
     this.playRosterPanel = null;
     this.fightersPanel = null;
+    this.challengesPanel = null;
     useLegacyLogicalSize(this.scale);
   }
 }

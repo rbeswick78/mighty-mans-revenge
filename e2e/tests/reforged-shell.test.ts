@@ -18,6 +18,16 @@ async function waitForActiveScene(page: Page, key: string): Promise<void> {
     .toBe(true);
 }
 
+async function waitForRenderedFrames(page: Page): Promise<void> {
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      }),
+  );
+  await page.waitForTimeout(500);
+}
+
 async function clickLogicalTab(page: Page, tabId: string, touch: boolean): Promise<void> {
   const center = await page.evaluate((id) => {
     const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
@@ -57,6 +67,25 @@ async function clickLogicalFighterOption(page: Page, index: number, touch: boole
   }, index);
   const canvas = await page.locator('canvas').boundingBox();
   if (!center || !canvas) throw new Error(`Missing rendered Fighters option ${index}`);
+  const x = canvas.x + (center.x / 1280) * canvas.width;
+  const y = canvas.y + (center.y / 720) * canvas.height;
+  if (touch) await page.touchscreen.tap(x, y);
+  else await page.mouse.click(x, y);
+}
+
+async function clickLogicalChallengeOption(
+  page: Page,
+  index: number,
+  touch: boolean,
+): Promise<void> {
+  const center = await page.evaluate((optionIndex) => {
+    const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'ReforgedShellScene',
+    ) as unknown as { getChallengeOptionCenter(index: number): { x: number; y: number } | null };
+    return scene.getChallengeOptionCenter(optionIndex);
+  }, index);
+  const canvas = await page.locator('canvas').boundingBox();
+  if (!center || !canvas) throw new Error(`Missing rendered Challenges option ${index}`);
   const x = canvas.x + (center.x / 1280) * canvas.width;
   const y = canvas.y + (center.y / 720) * canvas.height;
   if (touch) await page.touchscreen.tap(x, y);
@@ -134,6 +163,31 @@ async function fightersSnapshot(page: Page): Promise<{
   });
 }
 
+async function challengesSnapshot(page: Page): Promise<{
+  view: string;
+  optionLabels: string[];
+  optionDetails: string[];
+  preferences: Record<string, unknown>;
+  nicknameReady: boolean;
+  status: string;
+}> {
+  return page.evaluate(() => {
+    const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'ReforgedShellScene',
+    ) as unknown as {
+      getChallengesSnapshot(): {
+        view: string;
+        optionLabels: string[];
+        optionDetails: string[];
+        preferences: Record<string, unknown>;
+        nicknameReady: boolean;
+        status: string;
+      };
+    };
+    return scene.getChallengesSnapshot();
+  });
+}
+
 async function queueMenuGamepadActions(
   page: Page,
   actions: readonly Partial<
@@ -170,6 +224,51 @@ async function activeTab(page: Page): Promise<string> {
   });
 }
 
+async function shellChromeState(page: Page): Promise<{
+  background: boolean;
+  title: boolean;
+  contentPanel: boolean;
+  tabs: boolean;
+  depths: number[];
+  camera: number[];
+}> {
+  return page.evaluate(() => {
+    const shell = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'ReforgedShellScene',
+    ) as unknown as {
+      children: { list: unknown[] };
+      background: { visible: boolean; active: boolean; alpha: number; depth: number };
+      title: { visible: boolean; active: boolean; alpha: number; depth: number };
+      contentPanel: { visible: boolean; active: boolean; alpha: number; depth: number };
+      challengesPanel: { depth: number };
+      tabButtons: Array<{ visible: boolean; active: boolean; alpha: number; depth: number }>;
+      cameras: { main: { scrollX: number; scrollY: number; zoom: number; alpha: number } };
+    };
+    const listed = shell.children.list;
+    const liveAndListed = (object: { visible: boolean; active: boolean; alpha: number }): boolean =>
+      object.visible && object.active && object.alpha === 1 && listed.includes(object);
+    return {
+      background: liveAndListed(shell.background),
+      title: liveAndListed(shell.title),
+      contentPanel: liveAndListed(shell.contentPanel),
+      tabs: shell.tabButtons.every((button) => liveAndListed(button)),
+      depths: [
+        shell.background.depth,
+        shell.title.depth,
+        shell.contentPanel.depth,
+        shell.challengesPanel.depth,
+        shell.tabButtons[0]?.depth ?? -1,
+      ],
+      camera: [
+        shell.cameras.main.scrollX,
+        shell.cameras.main.scrollY,
+        shell.cameras.main.zoom,
+        shell.cameras.main.alpha,
+      ],
+    };
+  });
+}
+
 test('disabled newShell capability preserves the complete legacy Lobby', async ({ page }) => {
   test.skip(shellAdvertised, 'This invocation explicitly advertises the gated shell.');
   await page.goto('/');
@@ -177,13 +276,39 @@ test('disabled newShell capability preserves the complete legacy Lobby', async (
 
   const state = await page.evaluate(() => {
     const game = (window as unknown as { game?: Phaser.Game }).game;
+    const lobby = game?.scene.getScene('LobbyScene') as unknown as Record<
+      string,
+      { list?: Array<{ text?: string }> }
+    >;
+    const buttonLabel = (key: string): string =>
+      lobby[key]?.list?.find((child) => typeof child.text === 'string')?.text ?? '';
     return {
       width: game?.scale.width,
       height: game?.scale.height,
       shellActive: game?.scene.getScene('ReforgedShellScene')?.sys.settings.active ?? false,
+      legacyChallenges: [
+        buttonLabel('practiceButton'),
+        buttonLabel('rustyRumbleButton'),
+        buttonLabel('gauntletButton'),
+        buttonLabel('dailyButton'),
+        buttonLabel('practiceSetupButton'),
+        buttonLabel('buildCodexButton'),
+      ],
     };
   });
-  expect(state).toEqual({ width: 960, height: 720, shellActive: false });
+  expect(state).toEqual({
+    width: 960,
+    height: 720,
+    shellActive: false,
+    legacyChallenges: [
+      'SPAR',
+      'SCRAP PIT',
+      'GAUNTLET',
+      'DAILY RUN',
+      'PRACTICE SETUP',
+      'BUILD CODEX: 0/6  //  VIEW',
+    ],
+  });
 });
 
 test('advertised shell is 16:9, safe-area bounded, and navigable across inputs', async ({
@@ -471,4 +596,172 @@ test('Fighters owns roster detail, mastery, persistent selection, and Play hando
       return scene.getFighterOptionCenter(0);
     }),
   ).toBeNull();
+});
+
+test('Challenges preserves setup, progress, authority, and every established entry path', async ({
+  page,
+}, testInfo) => {
+  test.skip(!shellAdvertised, 'Run with CAPABILITY_NEW_SHELL=true for the gated shell path.');
+  await page.addInitScript(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    localStorage.setItem('mmr_nickname', 'Batch7');
+    localStorage.setItem('mmr_bot_difficulty', 'warlord');
+    localStorage.setItem('mmr_practice_mode', 'koth');
+    localStorage.setItem('mmr_practice_rival', 'bruce');
+    localStorage.setItem('mmr_practice_mutator', 'blackout');
+    localStorage.setItem(
+      'mmr_scrap_pit_record',
+      JSON.stringify({
+        rounds: 5,
+        wins: 3,
+        currentStreak: 2,
+        bestStreak: 3,
+        lastMatchId: 'pit-5',
+      }),
+    );
+    localStorage.setItem('mmr_gauntlet_best_clear', '4200');
+    localStorage.setItem(
+      'mmr_daily_gauntlet_progress',
+      JSON.stringify({ challengeKey: today, bestScore: 3600, lastClearKey: today, streak: 4 }),
+    );
+    localStorage.setItem(
+      'mmr_gauntlet_build_codex',
+      JSON.stringify({
+        discovered: ['scrap_plating+kill_salvage'],
+        bestScores: { 'scrap_plating+kill_salvage': 4200 },
+      }),
+    );
+  });
+  await page.goto('/');
+  const touch = testInfo.project.name === 'mobile-landscape';
+  if (testInfo.project.name !== 'desktop-chromium') await stageNonChromiumShell(page);
+  await waitForActiveScene(page, 'ReforgedShellScene');
+  await clickLogicalTab(page, 'challenges', touch);
+
+  expect(await challengesSnapshot(page)).toMatchObject({
+    view: 'challenges',
+    optionLabels: ['SPAR', 'SCRAP PIT', 'GAUNTLET', 'DAILY RUN', 'PRACTICE SETUP', 'BUILD CODEX'],
+    preferences: {
+      difficulty: 'warlord',
+      mode: 'koth',
+      rival: 'bruce',
+      mutator: 'blackout',
+    },
+    nicknameReady: true,
+  });
+  const details = (await challengesSnapshot(page)).optionDetails;
+  expect(details[1]).toContain('3W');
+  expect(details[2]).toContain('4,200');
+  expect(details[3]).toContain('3,600');
+  expect(details[5]).toContain('1/6');
+
+  // Pointer/touch opens the established setup, keyboard and gamepad cycle the
+  // same persisted values, and mode compatibility remains centralized.
+  await clickLogicalChallengeOption(page, 4, touch);
+  await expect.poll(async () => (await challengesSnapshot(page)).view).toBe('setup');
+  await page.keyboard.press('Enter');
+  await expect
+    .poll(() => page.evaluate(() => localStorage.getItem('mmr_bot_difficulty')))
+    .toBe('rookie');
+  await queueMenuGamepadActions(page, [{ right: true }, { confirm: true }]);
+  await expect
+    .poll(async () => (await challengesSnapshot(page)).preferences.rival)
+    .toBe('frost_wizard');
+  await clickLogicalChallengeOption(page, 2, touch);
+  await expect.poll(async () => (await challengesSnapshot(page)).preferences.mode).toBe('gun_game');
+  await page.keyboard.press('Escape');
+  await expect.poll(async () => (await challengesSnapshot(page)).view).toBe('challenges');
+
+  await page.evaluate(() => {
+    const shell = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'ReforgedShellScene',
+    ) as unknown as {
+      gameService: { startPractice: (...args: unknown[]) => void };
+    };
+    const calls: unknown[][] = [];
+    (window as unknown as { batch7ChallengeCalls?: unknown[][] }).batch7ChallengeCalls = calls;
+    shell.gameService.startPractice = (...args: unknown[]) => calls.push(args);
+  });
+
+  for (const index of [0, 1, 2, 3]) await clickLogicalChallengeOption(page, index, touch);
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { batch7ChallengeCalls?: unknown[][] }).batch7ChallengeCalls,
+    ),
+  ).toEqual([
+    ['Batch7', 'rookie', 'sparring', 'gun_game', 'frost_wizard', 'blackout'],
+    ['Batch7', 'rookie', 'rusty_rumble', 'gun_game', 'frost_wizard', 'blackout'],
+    ['Batch7', 'rookie', 'gauntlet', undefined, undefined, undefined],
+    ['Batch7', 'rookie', 'daily', undefined, undefined, undefined],
+  ]);
+  await page.evaluate(async () => {
+    if (document.fullscreenElement) await document.exitFullscreen();
+  });
+
+  await clickLogicalChallengeOption(page, 5, touch);
+  await expect.poll(async () => (await challengesSnapshot(page)).view).toBe('codex');
+  expect((await challengesSnapshot(page)).optionLabels).toEqual(['BACK TO CHALLENGES']);
+
+  if (touch) {
+    // RFG-003: staged WebKit retains real touch/object assertions; pixels are black.
+    await page.screenshot({ path: testInfo.outputPath('challenges-mobile-webkit.png') });
+  } else if (testInfo.project.name === 'desktop-chromium') {
+    await page.screenshot({ path: testInfo.outputPath('challenges-codex-desktop.png') });
+    await page.setViewportSize({ width: 844, height: 390 });
+    await waitForRenderedFrames(page);
+    expect(await shellChromeState(page)).toEqual({
+      background: true,
+      title: true,
+      contentPanel: true,
+      tabs: true,
+      depths: [0, 10, 10, 20, 30],
+      camera: [0, 0, 1, 1],
+    });
+    await page.screenshot({ path: testInfo.outputPath('challenges-codex-mobile-chromium.png') });
+    await clickLogicalChallengeOption(page, 0, false);
+    await expect.poll(async () => (await challengesSnapshot(page)).view).toBe('challenges');
+    await page.screenshot({ path: testInfo.outputPath('challenges-grid-mobile-chromium.png') });
+    await clickLogicalChallengeOption(page, 4, false);
+    await expect.poll(async () => (await challengesSnapshot(page)).view).toBe('setup');
+    expect(await shellChromeState(page)).toEqual({
+      background: true,
+      title: true,
+      contentPanel: true,
+      tabs: true,
+      depths: [0, 10, 10, 20, 30],
+      camera: [0, 0, 1, 1],
+    });
+    await waitForRenderedFrames(page);
+    await page.screenshot({ path: testInfo.outputPath('challenges-setup-mobile-chromium.png') });
+  }
+
+  // The server-authored matchFound event retains the existing Character Select
+  // route and restores the untouched legacy gameplay logical size.
+  await page.evaluate(() => {
+    const shell = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'ReforgedShellScene',
+    ) as unknown as {
+      gameService: {
+        getNetworkManager(): { handleMessage(message: unknown): void };
+      };
+    };
+    shell.gameService.getNetworkManager().handleMessage({
+      type: 'server:matchFound',
+      matchId: 'batch-7-route',
+      opponents: [{ id: 'bot:rusty', nickname: 'Rusty' }],
+      mapName: 'Wasteland Outpost',
+      gameMode: 'deathmatch',
+      matchKind: 'practice',
+      practiceKind: 'sparring',
+    });
+  });
+  await waitForActiveScene(page, 'CharacterSelectScene');
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const game = (window as unknown as { game?: Phaser.Game }).game;
+        return [game?.scale.width, game?.scale.height];
+      }),
+    )
+    .toEqual([960, 720]);
 });

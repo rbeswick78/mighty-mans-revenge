@@ -5,8 +5,8 @@ Read this file and `CLAUDE.md` completely at the start of every batch. The
 completed `docs/REPLAYABILITY_ROADMAP.md` remains the historical record for the
 systems this program preserves and reorganizes.
 
-- **Status:** Batch 6 complete on 2026-07-15.
-- **Next batch:** Batch 7 — Challenges tab.
+- **Status:** Batch 7 complete on 2026-07-15.
+- **Next batch:** Batch 8 — Records tab.
 - **Public releases:** Reforged Arena, then Battle Royale.
 - **Working model:** one numbered batch per session, direct commits and pushes
   to `main`, milestone-gated production deployments.
@@ -159,8 +159,8 @@ Production deployment happens only at a gate or for an urgent live fix.
 |   4 | Responsive menu foundation             | Navigation    | **DONE — 2026-07-15** |
 |   5 | Play roster builder                    | Navigation    | **DONE — 2026-07-15** |
 |   6 | Fighters tab                           | Navigation    | **DONE — 2026-07-15** |
-|   7 | Challenges tab                         | Navigation    | NEXT                  |
-|   8 | Records tab                            | Navigation    | Pending               |
+|   7 | Challenges tab                         | Navigation    | **DONE — 2026-07-15** |
+|   8 | Records tab                            | Navigation    | NEXT                  |
 |   9 | Settings tab                           | Navigation    | Pending               |
 |  10 | Scheduled arenas                       | Navigation    | Pending               |
 |  11 | General match intent                   | Navigation    | Pending               |
@@ -349,6 +349,30 @@ Acceptance:
 
 Relocate Spar, Scrap Pit, Gauntlet, Daily Run, Practice Setup, and Build Codex
 without changing challenge rules, saved progress, or deliberate randomness.
+
+Acceptance:
+
+- [x] The capability-owned Challenges tab exposes Spar, Scrap Pit, Gauntlet,
+      Daily Run, Practice Setup, and the complete six-build Codex on the shared
+      responsive shell surface with pointer, touch, keyboard, and standard
+      gamepad paths.
+- [x] Spar and Scrap Pit send the established saved difficulty, compatible
+      mode, rival, and mutator preferences through the unchanged
+      `client:startPractice` path; Gauntlet and Daily omit those optional pins
+      and retain fixed server-authored difficulty, routes, rivals, forecasts,
+      scoring, seeded randomness, and persistence behavior.
+- [x] Existing device-local nickname, practice setup, Scrap Pit, Gauntlet,
+      Daily, and Build Codex storage keys and normalization remain the only
+      client persistence; missing callsign fails closed without beginning the
+      Settings tab's Batch 9 editor.
+- [x] The established server-authored `matchFound` transition still opens the
+      unchanged Character Select path at the legacy gameplay size. Challenge
+      Results, rematches, Draft, server locking, and every server/shared rule
+      remain unchanged.
+- [x] Batch 5 Play serialization and Batch 6 Fighters selection remain intact,
+      Records and Settings stay empty, every capability default stays false,
+      and false/absent capability behavior preserves the complete legacy Lobby
+      including all six original challenge controls.
 
 #### Batch 8 — Records tab
 
@@ -1008,6 +1032,62 @@ Firefox/WebKit practice is unreliable and staged gameplay/Reforged-shell PNGs
 are black, so staged object/input assertions and mobile-sized Chromium visual
 evidence remain the required combination. None blocks Batch 7.
 
+### Batch 7 — 2026-07-15 — Challenges tab
+
+**Shipped:** Added the capability-owned Challenges activity grid for Spar,
+Scrap Pit, Gauntlet, Daily Run, Practice Setup, and the complete six-build
+Codex. The tab reads the exact existing nickname, difficulty, favorite mode,
+rival, compatible Solo Chaos, Scrap Pit record, Gauntlet best, Daily progress,
+and Build Codex device keys through their existing normalizers. Spar and Scrap
+Pit project those preferences onto the unchanged `startPractice` arguments;
+Gauntlet and Daily deliberately omit the optional mode/rival/mutator pins. A
+server-authored `matchFound` still routes into the unchanged Character Select
+scene and legacy gameplay size. Missing callsign fails closed in Challenges so
+Batch 9 retains ownership of callsign entry. Records and Settings remain empty.
+
+**Verification:** Selected the isolated pure logic/capability-owned client UI
+tier because executable changes stay inside the gated client shell, reuse the
+existing `client:startPractice` and `server:matchFound` contracts unchanged,
+and do not alter shared/server/network persistence, recovery, capability
+defaults, or the legacy scene foundation. Focused Vitest passed 20
+Challenges/Play/Fighters compatibility tests across three files.
+`corepack pnpm typecheck`, `corepack pnpm lint`, and
+`corepack pnpm --filter @game/client build` passed. With only
+`CAPABILITY_NEW_SHELL=true`, the focused desktop Chromium and mobile-landscape
+shell subset passed eight tests with two expected inverse-gate skips, covering
+tab navigation, Play/Fighters preservation, all six challenge surfaces,
+pointer/touch, keyboard, gamepad, exact challenge request shapes, saved setup,
+saved progress, Codex, server-authored Character Select entry, and staged
+mobile-WebKit object/input behavior. With all capability defaults false, the
+complete legacy Lobby and its six challenge controls passed in desktop
+Chromium, desktop Firefox, and mobile landscape. Manual inspection found the
+desktop and 844×390 Chromium activity, setup, and Codex captures readable,
+complete, and unclipped. The complete unit inventory and unrelated browser
+journeys were not rerun after the final fix because no broader boundary changed
+and the focused evidence showed no wider risk.
+
+**Deployment:** Skipped. Batch 7 remains incomplete navigation-milestone code
+behind the default-false `newShell` capability, and the roadmap authorizes
+deployment only at a release gate or for an urgent live fix. No production
+environment or capability flag changed.
+
+**Deviations:** No scope deviation. An initial pnpm argument form accidentally
+expanded a focused Vitest command to the full inventory and exposed one wrong
+expectation in the new malformed-storage fixture; the implementation correctly
+retained a valid Random-mode mutator. The fixture was corrected and the focused
+gate passed. Initial Chromium interaction evidence also exposed shell chrome
+being covered after a Challenges subview rebuild because nested Phaser controls
+were removed directly while their parent container still tracked them. Parent-
+owned remove-and-destroy plus explicit shell depths fixed the tightly coupled
+Batch 7 presentation defect; visual evidence uses the established two-frame
+headless render settle before capture.
+
+**Known issues:** No new bug ID was required. RFG-001 and RFG-002 remain assigned
+to Batches 20/24 and were untouched. RFG-003 remains unchanged: live headless
+Firefox/WebKit practice is unreliable and staged gameplay/Reforged-shell PNGs
+are black, so staged object/input assertions and mobile-sized Chromium visual
+evidence remain the required combination. None blocks Batch 8.
+
 ## Next-session prompt
 
 ```text
@@ -1015,39 +1095,44 @@ Continue the Reforged build for Mighty Man's Revenge.
 
 Read docs/REIMAGINING_ROADMAP.md and CLAUDE.md completely first. Read
 docs/REFORGED_BASELINE.md and docs/REFORGED_CAPABILITIES.md before
-implementation. Implement Batch 7 — Challenges tab exactly as specified.
-Preserve unrelated changes and do not begin Batch 8 — Records tab.
+implementation. Implement Batch 8 — Records tab exactly as specified. Preserve
+unrelated changes and do not begin Batch 9 — Settings tab.
 
-Relocate Spar, Scrap Pit, Gauntlet, Daily Run, Practice Setup, and Build Codex
-into the capability-owned Challenges tab without changing challenge rules,
-saved progress, server authority, deliberate randomness, difficulty, rivals,
-mutators, scoring, persistence, rematches, or existing challenge input paths.
+Consolidate the existing career, all-time and Daily leaderboards, rivalry,
+fighter and arena mastery, and challenge records into readable capability-owned
+Records sections. Reserve an explicit zero-state area for future Battle Royale
+records without implementing Battle Royale persistence or gameplay. Reuse
+existing server-authored snapshots and device-local records; do not change
+recording rules, normalization, authority, saved values, scoring, ranking,
+retention, rematches, or wire contracts.
+
 Preserve the Batch 5 pure Play roster compatibility/serialization boundary, the
 Batch 6 persisted Fighters selection and server-authoritative locking boundary,
-the empty Records and Settings tabs, and the complete legacy Lobby fallback.
+the complete Batch 7 Challenges activity/setup/Codex paths, the empty Settings
+tab, and the complete legacy Lobby fallback. Do not implement settings content,
+parties, scheduled-arena authority, generalized match intent, queue fallback,
+Reforged Results, or new record categories beyond the reserved Battle Royale
+zero state. Do not retire Draft or Character Select, enable any capability by
+default or in production, change gameplay viewport/camera, or begin art work.
 
-Do not implement records/settings content, parties, scheduled-arena authority,
-generalized match intent, queue fallback, or Reforged Results; do not retire
-Draft or Character Select, enable any capability by default or in production,
-change the gameplay viewport/camera, or begin modern art production.
+Batch 7 is complete and pushed on main. Challenges reads the established local
+callsign, practice preferences, Scrap Pit/Gauntlet/Daily/Codex progress, emits
+the unchanged challenge start arguments, keeps Gauntlet/Daily server-authored,
+and routes server `matchFound` into unchanged Character Select. Missing callsign
+fails closed until Batch 9 owns entry. Play/Fighters boundaries remain intact,
+the injected Play arena remains a fixed non-authoritative preview until Batch
+10, and all five server capability flags still default false.
 
-Batch 6 is complete and pushed on main. Fighters owns roster browsing, shared
-stats, canonical abilities, latest server-authored mastery presentation, and
-device-local `mmr_fighter_selection`; Play reads it into the unchanged pure
-local draft, match entry remains disabled, and server locking remains
-authoritative. The injected Play arena is still a fixed non-authoritative
-preview until Batch 10. All five server capability flags still default false.
-
-Choose and document the Batch 7 verification tier from the roadmap's risk-based
-test-selection matrix. Run focused Challenges/navigation tests, typecheck,
-lint, the affected client build, targeted desktop and mobile-landscape
-interaction evidence, and the legacy fallback check. Escalate to broader unit
-or browser suites only if shared, server, network, persistence, routing,
-recovery, or cross-cutting input boundaries change or focused evidence indicates
-wider risk. Update roadmap acceptance evidence, the bug ledger if needed, and
-the Session Log. Run the end-of-batch ritual, commit and push directly to main,
-skip deployment unless the roadmap explicitly authorizes it, and end with the
-fenced paste-ready prompt for Batch 8.
+Choose and document the Batch 8 verification tier from the roadmap's risk-based
+test-selection matrix. Run focused Records/navigation/presentation tests,
+typecheck, lint, the affected client build, targeted desktop and
+mobile-landscape interaction evidence, and the legacy fallback check. Escalate
+to broader unit or browser suites only if shared, server, network, persistence,
+routing, recovery, or cross-cutting input boundaries change or focused evidence
+indicates wider risk. Update roadmap acceptance evidence, the bug ledger if
+needed, and the Session Log. Run the end-of-batch ritual, commit and push
+directly to main, skip deployment unless explicitly authorized, and end with
+the fenced paste-ready prompt for Batch 9.
 
 Carry-over warnings: RFG-001 CameraKick and RFG-002 ZoomPulse overwrite future
 base camera state and remain assigned to Batches 20/24. RFG-003 means headless
@@ -1059,5 +1144,5 @@ remained far below the 50ms budget. Batch 4 broadened RFG-003 evidence: the
 staged mobile WebKit Reforged-shell PNG is also black, so use mobile-sized
 Chromium for visual evidence while retaining staged WebKit object/input
 assertions. Use Corepack pnpm 10.33.0 if the local pnpm shim selects a mismatched
-version. Batch 8 follows Batch 7.
+version. Batch 9 follows Batch 8.
 ```
