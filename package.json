@@ -9,6 +9,8 @@
     "test": "vitest run",
     "test:watch": "vitest watch",
     "test:e2e": "playwright test --config e2e/playwright.config.ts",
+    "baseline:server": "pnpm --filter @game/server baseline:evidence",
+    "baseline:client": "playwright test --config e2e/playwright.config.ts e2e/tests/baseline-evidence.test.ts",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",

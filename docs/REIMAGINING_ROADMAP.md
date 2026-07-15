@@ -5,8 +5,8 @@ Read this file and `CLAUDE.md` completely at the start of every batch. The
 completed `docs/REPLAYABILITY_ROADMAP.md` remains the historical record for the
 systems this program preserves and reorganizes.
 
-- **Status:** Batch 1 complete on 2026-07-15.
-- **Next batch:** Batch 2 — Baseline evidence.
+- **Status:** Batch 2 complete on 2026-07-15.
+- **Next batch:** Batch 3 — Capabilities and flags.
 - **Public releases:** Reforged Arena, then Battle Royale.
 - **Working model:** one numbered batch per session, direct commits and pushes
   to `main`, milestone-gated production deployments.
@@ -154,8 +154,8 @@ Production deployment happens only at a gate or for an urgent live fix.
 |   # | Batch                                  | Milestone     | Status                |
 | --: | -------------------------------------- | ------------- | --------------------- |
 |   1 | Roadmap bootstrap                      | Safety rails  | **DONE — 2026-07-15** |
-|   2 | Baseline evidence                      | Safety rails  | NEXT                  |
-|   3 | Capabilities and flags                 | Safety rails  | Pending               |
+|   2 | Baseline evidence                      | Safety rails  | **DONE — 2026-07-15** |
+|   3 | Capabilities and flags                 | Safety rails  | NEXT                  |
 |   4 | Responsive menu foundation             | Navigation    | Pending               |
 |   5 | Play roster builder                    | Navigation    | Pending               |
 |   6 | Fighters tab                           | Navigation    | Pending               |
@@ -233,6 +233,21 @@ Capture current unit, typecheck, lint, desktop/mobile E2E, and visual status;
 record server tick, representative snapshot size, and client frame baselines;
 inventory camera/world-coordinate assumptions; reproduce adjacent known bugs.
 Commit evidence and test helpers only—do not begin capabilities or UI work.
+
+Acceptance:
+
+- [x] Unchanged runtime typecheck, lint, unit/integration, desktop, Firefox,
+      mobile-landscape, and current visual status are recorded.
+- [x] Repeatable helpers record authoritative tick processing, effective loop
+      pacing, representative two/four-player snapshot sizes, and client frame
+      timing without imposing machine-specific pass thresholds.
+- [x] Fixed-canvas, camera, aiming, touch, HUD, overlay, render-target, and
+      world-coordinate assumptions are inventoried for Batches 18-24.
+- [x] Adjacent camera-composition bugs have deterministic reproduction tests;
+      observed non-Chromium E2E limitations have evidence and explicit future
+      dispositions.
+- [x] Only evidence, tests, recorder helpers, and documentation changed; no
+      Batch 3 capability or product UI work began.
 
 #### Batch 3 — Capabilities and flags
 
@@ -556,9 +571,11 @@ flags with full regression and rollback notes.
    deliberately. It does not silently expand the active batch.
 4. Existing user changes are never discarded or staged accidentally.
 
-| ID  | Discovered | Reproduction/evidence                  | Relationship | Disposition | Status |
-| --- | ---------- | -------------------------------------- | ------------ | ----------- | ------ |
-| —   | —          | No Reforged-program bugs recorded yet. | —            | —           | —      |
+| ID      | Discovered | Reproduction/evidence                                                                | Relationship  | Disposition                                                      | Status |
+| ------- | ---------- | ------------------------------------------------------------------------------------ | ------------- | ---------------------------------------------------------------- | ------ |
+| RFG-001 | 2026-07-15 | Idle `CameraKick.update()` clears a sustained `(320, 144)` base scroll to `(0, 0)`.  | Batches 20/24 | Replace with composed transient offsets in Batch 20; gate in 24. | Open   |
+| RFG-002 | 2026-07-15 | Idle `ZoomPulse.update()` clears a sustained base zoom of `0.9` back to `1`.         | Batches 20/24 | Replace with composed transient zoom in Batch 20; gate in 24.    | Open   |
+| RFG-003 | 2026-07-15 | Headless Firefox/WebKit live practice gets no player ID; staged gameplay PNGs black. | Batches 17/24 | Keep staged assertions; restore trustworthy visual path by gate. | Open   |
 
 ## End-of-batch ritual
 
@@ -635,20 +652,72 @@ release capability exists yet.
 **Known issues:** None discovered during Batch 1. Batch 2 owns measured baseline
 evidence and adjacent bug reproduction.
 
+### Batch 2 — 2026-07-15 — Baseline evidence
+
+**Shipped:** Added repeatable server/network and cross-browser client frame
+recorders, deterministic camera composition reproductions, and
+`docs/REFORGED_BASELINE.md`. Captured the clean Batch 1 quality/E2E state,
+current visual coverage, tick processing and pacing, two/four-player snapshot
+sizes, headless client frame timing, fixed-world/camera assumptions, and the
+three adjacent issues now listed in the bug ledger. No capability, navigation,
+gameplay, UI, or art behavior changed.
+
+**Verification:** The unchanged runtime baseline passed typecheck, lint, 1,331
+unit/integration tests, and all three E2E projects (Chromium 47 passed/1
+skipped, Firefox 39 passed/9 skipped, mobile landscape 40 passed/8 skipped).
+After adding the evidence helpers, focused camera reproductions, server and
+client recorders, typecheck, lint, the complete 106-file/1,333-test unit suite,
+the complete three-project E2E suite (129 passed/18 expected skips), Prettier,
+and `git diff --check` passed. Manual visual inspection confirmed a complete
+unclipped live Chromium board/HUD and reproduced black staged gameplay captures
+in headless Firefox/WebKit.
+
+**Performance/network:** The 20Hz loop has a 50ms budget. A four-player
+simulation measured 0.017ms mean, 0.035ms p95, 0.110ms p99, and 1.087ms max;
+the live callback EMA was 0.108ms. The local live window also recorded one
+254.279ms host event-loop drift reset (15.932 effective Hz despite a 20Hz
+rolling counter). Representative active two/four-player UTF-8 JSON snapshots
+were 2,481/3,762 bytes. Headless client samples are recorded in
+`docs/REFORGED_BASELINE.md` as recorder output, not hardware gates.
+
+**Deployment:** Skipped. Batch 2 contains evidence/test tooling and the roadmap
+does not authorize a production deployment before a milestone gate or urgent
+live fix.
+
+**Deviations:** Firefox and mobile WebKit could not use the live local WebRTC
+practice path, so their frame samples use a staged real `GameScene`; their
+screenshots are black and their frame numbers are not directly comparable with
+live Chromium. No screenshot binaries were committed. The local `pnpm` shim
+selected a mismatched bundled pnpm, so verification used the repository's
+declared pnpm 10.33.0 through Corepack.
+
+**Known issues:** RFG-001 and RFG-002 are deterministic future-camera
+composition blockers assigned to Batch 20/24. RFG-003 is a headless
+non-Chromium network/visual harness limitation that must be resolved before the
+relevant journey/camera visual gates. None blocks Batch 3 capability contracts.
+
 ## Next-session prompt
 
 ```text
 Continue the Reforged build for Mighty Man's Revenge.
 
 Read docs/REIMAGINING_ROADMAP.md and CLAUDE.md completely first. This session:
-implement Batch 2 — Baseline evidence exactly as specified. Preserve unrelated
-changes and do not begin Batch 3 capabilities work.
+implement Batch 3 — Capabilities and flags exactly as specified. Preserve
+unrelated changes and do not begin Batch 4 responsive-menu work.
 
-Capture current unit/typecheck/lint/E2E/visual status, server tick and snapshot
-baselines, client frame baselines, camera/world-coordinate assumptions, and
-reproducible adjacent bugs. Update the roadmap and Session Log, run the
-end-of-batch ritual, commit and push to main, then provide the paste-ready
-prompt for Batch 3.
+Add backward-compatible server-advertised capabilities for the new shell,
+schedules, large worlds, modern art, and Battle Royale. Default every
+unfinished capability off, cover old/new handshake combinations, document the
+server-first rollout order, preserve every current route while disabled, and
+do not enable or build any capability-owned feature. Update the roadmap and
+Session Log, run the complete end-of-batch ritual, commit and push directly to
+main, skip deployment unless the roadmap newly authorizes it, and provide the
+paste-ready prompt for Batch 4.
 
-Carry-over notes: none.
+Carry-over notes: read docs/REFORGED_BASELINE.md. RFG-001 and RFG-002 document
+camera kick/zoom overwriting future base camera state for Batches 20/24.
+RFG-003 documents that headless Firefox/WebKit cannot use the live local WebRTC
+practice path and staged gameplay screenshots are black; do not treat staged
+frame numbers as hardware-comparable. Use Corepack pnpm 10.33.0 if the local
+pnpm shim selects a mismatched version. No deployment was required for Batch 2.
 ```

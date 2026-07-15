@@ -6,7 +6,8 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc -b",
     "start": "node dist/index.js",
-    "test": "vitest run"
+    "test": "vitest run",
+    "baseline:evidence": "tsx src/tools/baseline-evidence.ts"
   },
   "dependencies": {
     "@shared/game": "workspace:*",
