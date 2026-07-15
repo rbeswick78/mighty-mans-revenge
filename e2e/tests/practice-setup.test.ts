@@ -66,7 +66,10 @@ test.describe('Practice setup overlay', () => {
         buildCodexButton: { getBounds: () => Bounds };
         gamepadButtons: () => unknown[];
       };
-      const footer = scene.children.list.find((child) => child.text?.startsWith('GAMEPAD:'));
+      const footer = scene.children.list.find(
+        (child) =>
+          child.text?.startsWith('TAB / ARROWS') || child.text?.startsWith('TAP A ROUTE'),
+      );
       const gamepadButtons = scene.gamepadButtons();
       return {
         setupBounds: scene.practiceSetupButton.getBounds(),

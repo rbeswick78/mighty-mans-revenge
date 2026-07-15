@@ -6,6 +6,7 @@ import type {
 } from '@shared/types/network.js';
 import { Wasteland, cssHex } from '@shared/config/palette.js';
 import { AudioManager } from '../audio/audio-manager.js';
+import { isTouchDevice } from '../input/is-touch-device.js';
 import { MenuGamepadInput } from '../input/menu-gamepad.js';
 import { GameService, type MatchData } from '../services/game-service.js';
 import { WastelandStreet } from '../ui/menu/wasteland-street.js';
@@ -616,11 +617,16 @@ export class LobbyScene extends Phaser.Scene {
       .setDepth(WastelandStreet.DEPTH.UI);
 
     this.add
-      .text(centerX, camHeight - 24, 'GAMEPAD: D-PAD + A  •  B CANCEL', {
-        fontFamily: MENU_FONTS.BODY,
-        fontSize: '10px',
-        color: cssHex(FOOTER_COLOR),
-      })
+      .text(
+        centerX,
+        camHeight - 24,
+        isTouchDevice() ? 'TAP A ROUTE  •  LANDSCAPE' : 'TAB / ARROWS + ENTER  •  ESC / B BACK',
+        {
+          fontFamily: MENU_FONTS.BODY,
+          fontSize: '10px',
+          color: cssHex(FOOTER_COLOR),
+        },
+      )
       .setOrigin(0.5)
       .setDepth(WastelandStreet.DEPTH.UI);
 
@@ -719,26 +725,45 @@ export class LobbyScene extends Phaser.Scene {
       .setVisible(false);
     this.updateDailyLeaderboard(this.gameService.getDailyGauntletLeaderboard());
 
-    // Enter = quick match (works whether the nickname input has focus
-    // or not, since the keydown bubbles up from the input element).
+    // Enter keeps its instant Quick Match shortcut until the player chooses a
+    // route with Tab/arrows. It then activates the visibly focused route.
     this.input.keyboard?.on('keydown-ENTER', () => {
       if (this.practiceSetupMenu.isOpen()) {
         this.practiceSetupMenu.activateFocused();
+      } else if (this.isSearching && this.gamepadFocusActive) {
+        this.cancelButton.activate();
+      } else if (this.gamepadFocusActive) {
+        this.gamepadButtons()[this.gamepadFocusIndex]?.activate();
       } else if (!this.isSearching && this.connectionState === 'connected') {
         this.onQuickMatch();
       }
     });
-    this.input.keyboard?.on('keydown-UP', () => this.movePracticeSetupFocus(-1));
-    this.input.keyboard?.on('keydown-LEFT', () => this.movePracticeSetupFocus(-1));
-    this.input.keyboard?.on('keydown-DOWN', () => this.movePracticeSetupFocus(1));
-    this.input.keyboard?.on('keydown-RIGHT', () => this.movePracticeSetupFocus(1));
+    this.input.keyboard?.on('keydown-TAB', (event: KeyboardEvent) => {
+      // Firefox can surface this same bubbling DOM event twice when focus
+      // begins inside the transparent callsign input. Consume it only once.
+      if (event.defaultPrevented) return;
+      event.preventDefault();
+      this.moveKeyboardFocus(event.shiftKey ? -1 : 1, true);
+    });
+    this.input.keyboard?.on('keydown-UP', () => this.moveKeyboardFocus(-1));
+    this.input.keyboard?.on('keydown-LEFT', () => this.moveKeyboardFocus(-1));
+    this.input.keyboard?.on('keydown-DOWN', () => this.moveKeyboardFocus(1));
+    this.input.keyboard?.on('keydown-RIGHT', () => this.moveKeyboardFocus(1));
     // Escape backs out of the setup overlay before cancelling an active search.
     this.input.keyboard?.on('keydown-ESC', () => {
       if (this.practiceSetupMenu.isOpen()) this.practiceSetupMenu.back();
       else if (this.isSearching) this.onCancelSearch();
+      else if (this.gamepadFocusActive) this.returnFocusToCallsign();
     });
     // F2 never collides with callsign entry, unlike an ordinary letter key.
     this.input.keyboard?.on('keydown-F2', () => this.toggleAudio());
+    // Once a pointer takes over, don't leave a second keyboard/gamepad route
+    // highlighted elsewhere in the menu.
+    this.input.on('pointerdown', () => {
+      if (!this.gamepadFocusActive) return;
+      this.gamepadFocusActive = false;
+      this.syncGamepadFocus();
+    });
 
     // Wire up network events
     this.wireGameServiceEvents();
@@ -844,6 +869,41 @@ export class LobbyScene extends Phaser.Scene {
       );
     });
     this.cancelButton.setFocused(this.gamepadFocusActive && this.isSearching);
+  }
+
+  private moveKeyboardFocus(direction: -1 | 1, fromTab = false): void {
+    if (this.practiceSetupMenu.isOpen()) {
+      this.practiceSetupMenu.moveFocus(direction);
+      return;
+    }
+
+    // Left/right remain ordinary caret controls while the callsign field owns
+    // DOM focus. Tab deliberately leaves the field and enters the route menu.
+    if (!fromTab && document.activeElement === this.nicknameInput) return;
+
+    this.nicknameInput?.blur();
+    if (this.isSearching) {
+      this.gamepadFocusActive = true;
+      this.syncGamepadFocus();
+      return;
+    }
+
+    const buttons = this.gamepadButtons();
+    if (buttons.length === 0) return;
+    if (!this.gamepadFocusActive) {
+      this.gamepadFocusIndex = direction > 0 ? 0 : buttons.length - 1;
+      this.gamepadFocusActive = true;
+    } else {
+      this.gamepadFocusIndex =
+        (this.gamepadFocusIndex + direction + buttons.length) % buttons.length;
+    }
+    this.syncGamepadFocus();
+  }
+
+  private returnFocusToCallsign(): void {
+    this.gamepadFocusActive = false;
+    this.syncGamepadFocus();
+    this.nicknameInput?.focus();
   }
 
   /**
@@ -1164,6 +1224,7 @@ export class LobbyScene extends Phaser.Scene {
     this.gauntletButton.setVisible(false);
     this.dailyButton.setVisible(false);
     this.practiceSetupButton.setVisible(false);
+    this.syncGamepadFocus();
 
     this.searchingTween = this.tweens.add({
       targets: this.searchingText,
@@ -1241,10 +1302,6 @@ export class LobbyScene extends Phaser.Scene {
   private onPracticeSetupOpenChanged(open: boolean): void {
     this.nicknameDom?.setVisible(!open && !this.isSearching);
     if (!open) this.syncGamepadFocus();
-  }
-
-  private movePracticeSetupFocus(direction: -1 | 1): void {
-    if (this.practiceSetupMenu.isOpen()) this.practiceSetupMenu.moveFocus(direction);
   }
 
   private cyclePracticeDifficulty(): void {
@@ -1343,6 +1400,7 @@ export class LobbyScene extends Phaser.Scene {
     this.dailyButton.setVisible(true);
     this.practiceSetupButton.setVisible(true);
     this.setNameEntryVisible(true);
+    this.syncGamepadFocus();
 
     if (this.searchingTween) {
       this.searchingTween.stop();
