@@ -578,7 +578,40 @@ Run this at the end of every numbered or inserted batch.
    stage only intended files, and push.
 6. **Deploy only when authorized by the roadmap:** milestone gate or urgent
    production fix. Record deployment, health, smoke evidence, or why skipped.
-7. **Hand off:** provide the next batch prompt and all carry-over warnings.
+7. **Hand off to a fresh session:** the final response must always include a
+   fenced, paste-ready prompt intended to start a new Codex session. If the
+   batch completed, target the next batch; if incomplete or blocked, resume the
+   same batch. Include all carry-over warnings and never rely on conversation
+   context surviving.
+
+## Fresh-session prompt contract
+
+Every session ends with a prompt the user can copy directly into a new Codex
+task. This is mandatory for implementation, documentation, verification,
+release, tuning, inserted-bug, and blocked sessions.
+
+The prompt must state:
+
+- the repository/program name and the roadmap plus `CLAUDE.md` read-first
+  requirement;
+- the exact next or resumed batch number and title;
+- a strict instruction to implement only that batch;
+- relevant verification and end-of-batch ritual requirements;
+- the current commit, push, and deployment state;
+- every known issue, deviation, unfinished item, or environmental warning;
+- the following batch number when known, so the next handoff remains chained.
+
+Put the prompt in a fenced `text` block in the final response. Do not replace it
+with a link to this file, a summary, or an offer to provide it later.
+
+## Roadmap amendments
+
+### 2026-07-15 — Mandatory fresh-session prompt
+
+At the user's request, made the paste-ready fresh-session prompt an explicit
+non-optional result of every session, including incomplete and blocked work.
+This clarifies the existing handoff ritual without changing batch scope or
+release order.
 
 ## Session Log
 

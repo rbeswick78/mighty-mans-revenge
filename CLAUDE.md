@@ -347,6 +347,17 @@ Map choice is player-drafted per match since Session 9 (see the pre-match draft 
 - **Commits:** Conventional Commits format — `feat:`, `fix:`, `test:`, `chore:`, `docs:`, `refactor:`
   - Scope is optional but encouraged: `feat(server): add lag compensation rewind buffer`
 
+### Required Fresh-Session Handoff
+
+At the end of every session working from a multi-session roadmap, the final
+response must include a fenced, paste-ready prompt for a **new Codex session**.
+Do this even when the session was documentation-only, stopped early, or ended
+blocked. If the active batch completed, the prompt starts the next batch; if it
+did not complete, the prompt resumes the same batch. Include the roadmap and
+`CLAUDE.md` read-first instruction, exact batch/scope boundary, verification and
+ritual expectations, commit/push/deploy state, and every carry-over warning.
+Never rely on the next session inheriting the current conversation context.
+
 ## Testing Guidelines
 
 ### Unit Tests (Vitest)
