@@ -20,7 +20,7 @@ async function waitForLobby(gamePage: import('@playwright/test').Page): Promise<
 }
 
 test.describe('Rumble Draft Rally', () => {
-  test('shows live group ballots and the local locked vote', async ({ gamePage }) => {
+  test('shows live group ballots and the local locked vote', async ({ gamePage }, testInfo) => {
     await waitForLobby(gamePage);
     await gamePage.evaluate(() => {
       const w = window as unknown as {
@@ -94,7 +94,10 @@ test.describe('Rumble Draft Rally', () => {
         title: 'RUMBLE DRAFT RALLY',
         status: 'YOUR VOTE - CHOOSE A MAP',
         countedCard: 'SCRAPYARD · 2',
-        footer: 'EVERY FIGHTER GETS ONE VOTE  •  TIES BREAK RANDOMLY',
+        footer:
+          testInfo.project.name === 'mobile-landscape'
+            ? 'TAP ONE CARD  •  EVERY FIGHTER VOTES  •  TIES BREAK RANDOMLY'
+            : 'TAB / ARROWS + ENTER  •  ESC / B LOBBY',
       });
 
     await gamePage.evaluate(() => {
@@ -306,7 +309,9 @@ async function collectRallyText(gamePage: import('@playwright/test').Page) {
       title: texts.find((text) => text === 'RUMBLE DRAFT RALLY'),
       status: texts.find((text) => text.startsWith('YOUR VOTE') || text.startsWith('VOTE CAST')),
       countedCard: texts.find((text) => text.endsWith('· 2')),
-      footer: texts.find((text) => text.startsWith('EVERY FIGHTER GETS ONE VOTE')),
+      footer: texts.find(
+        (text) => text.startsWith('TAP ONE CARD') || text.startsWith('TAB / ARROWS + ENTER'),
+      ),
       groupPick: texts.find((text) => text === 'GROUP PICK'),
     };
   });

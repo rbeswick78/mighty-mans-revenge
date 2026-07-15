@@ -4,6 +4,7 @@ import type { DraftCategory, ServerDraftStateMessage } from '@shared/types/netwo
 import { DRAFT, gameModeDisplayName } from '@shared/config/game.js';
 import { Wasteland, cssHex } from '@shared/config/palette.js';
 import { AudioManager } from '../audio/audio-manager.js';
+import { isTouchDevice } from '../input/is-touch-device.js';
 import { MenuGamepadInput } from '../input/menu-gamepad.js';
 import { GameService, type MatchData } from '../services/game-service.js';
 import { WastelandStreet } from '../ui/menu/wasteland-street.js';
@@ -159,8 +160,27 @@ export class DraftScene extends Phaser.Scene {
       onClick: () => this.leavePreFight(),
     });
     this.backButton.setDepth(WastelandStreet.DEPTH.UI + 2);
+    this.input.keyboard?.on('keydown-ENTER', () => this.activateKeyboardCard());
+    this.input.keyboard?.on('keydown-TAB', (event: KeyboardEvent) => {
+      // Firefox can deliver one bubbling DOM Tab event twice. Consume the
+      // physical press once, matching the lobby's keyboard handoff guard.
+      if (event.defaultPrevented) return;
+      event.preventDefault();
+      this.moveKeyboardCardLinear(event.shiftKey ? -1 : 1);
+    });
+    this.input.keyboard?.on('keydown-LEFT', () => this.moveKeyboardCard(-1, 0));
+    this.input.keyboard?.on('keydown-RIGHT', () => this.moveKeyboardCard(1, 0));
+    this.input.keyboard?.on('keydown-UP', () => this.moveKeyboardCard(0, -1));
+    this.input.keyboard?.on('keydown-DOWN', () => this.moveKeyboardCard(0, 1));
     this.input.keyboard?.on('keydown-ESC', () => this.leavePreFight());
     this.input.keyboard?.on('keydown-BACKSPACE', () => this.leavePreFight());
+    // Pointer input takes ownership immediately so keyboard/gamepad focus
+    // cannot leave a second card highlighted elsewhere in either column.
+    this.input.on('pointerdown', () => {
+      if (!this.gamepadFocusActive) return;
+      this.gamepadFocusActive = false;
+      this.syncGamepadCardFocus(this.enabledGamepadCards());
+    });
 
     this.wireGameServiceEvents();
 
@@ -604,9 +624,11 @@ export class DraftScene extends Phaser.Scene {
       .text(
         centerX,
         camHeight - 34,
-        isRally
-          ? 'EVERY FIGHTER GETS ONE VOTE  •  TIES BREAK RANDOMLY'
-          : 'TAP A CARD OR USE D-PAD + A  •  OTHER COLUMN GOES TO YOUR RIVAL',
+        isTouchDevice()
+          ? isRally
+            ? 'TAP ONE CARD  •  EVERY FIGHTER VOTES  •  TIES BREAK RANDOMLY'
+            : 'TAP A CARD  •  OTHER COLUMN GOES TO YOUR RIVAL'
+          : 'TAB / ARROWS + ENTER  •  ESC / B LOBBY',
         {
           fontFamily: MENU_FONTS.BODY,
           fontSize: '12px',
@@ -725,8 +747,13 @@ export class DraftScene extends Phaser.Scene {
   }
 
   private syncGamepadCardFocus(enabled: DraftCard[]): void {
-    if (this.gamepadFocusedCard && !enabled.includes(this.gamepadFocusedCard)) {
+    if (
+      this.gamepadFocusActive &&
+      (!this.gamepadFocusedCard || !enabled.includes(this.gamepadFocusedCard))
+    ) {
       this.gamepadFocusedCard = enabled[0] ?? null;
+    } else if (this.gamepadFocusedCard && !enabled.includes(this.gamepadFocusedCard)) {
+      this.gamepadFocusedCard = null;
     }
     for (const card of this.cards) {
       card.button.setFocused(this.gamepadFocusActive && card === this.gamepadFocusedCard);
@@ -754,6 +781,57 @@ export class DraftScene extends Phaser.Scene {
       .filter((candidate) => candidate.forward > 1)
       .sort((a, b) => a.score - b.score);
     this.gamepadFocusedCard = candidates[0]?.card ?? current;
+  }
+
+  /** Tab follows the visible card order and wraps through enabled choices. */
+  private moveKeyboardCardLinear(direction: -1 | 1): void {
+    if (this.phase !== 'pick' || this.transitioned) return;
+    const enabled = this.enabledGamepadCards();
+    if (enabled.length === 0) {
+      this.syncGamepadCardFocus([]);
+      return;
+    }
+
+    if (!this.gamepadFocusActive || !this.gamepadFocusedCard) {
+      this.gamepadFocusedCard = direction > 0 ? enabled[0] : enabled[enabled.length - 1];
+      this.gamepadFocusActive = true;
+    } else {
+      const currentIndex = enabled.indexOf(this.gamepadFocusedCard);
+      const safeIndex = currentIndex < 0 ? (direction > 0 ? -1 : 0) : currentIndex;
+      this.gamepadFocusedCard = enabled[(safeIndex + direction + enabled.length) % enabled.length];
+    }
+    this.syncGamepadCardFocus(enabled);
+  }
+
+  /** Arrow keys share the gamepad's spatial two-column navigation. */
+  private moveKeyboardCard(directionX: -1 | 0 | 1, directionY: -1 | 0 | 1): void {
+    if (this.phase !== 'pick' || this.transitioned) return;
+    const enabled = this.enabledGamepadCards();
+    if (enabled.length === 0) {
+      this.syncGamepadCardFocus([]);
+      return;
+    }
+
+    if (!this.gamepadFocusActive || !this.gamepadFocusedCard) {
+      this.gamepadFocusedCard = enabled[0];
+      this.gamepadFocusActive = true;
+    } else {
+      this.moveGamepadCard(directionX, directionY, enabled);
+    }
+    this.syncGamepadCardFocus(enabled);
+  }
+
+  /** Enter selects the focused card, or the first enabled card immediately. */
+  private activateKeyboardCard(): void {
+    if (this.phase !== 'pick' || this.transitioned) return;
+    const enabled = this.enabledGamepadCards();
+    if (enabled.length === 0) return;
+    if (!this.gamepadFocusActive || !this.gamepadFocusedCard) {
+      this.gamepadFocusActive = true;
+      this.gamepadFocusedCard = enabled[0];
+      this.syncGamepadCardFocus(enabled);
+    }
+    this.gamepadFocusedCard?.button.activate();
   }
 
   /**

@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–108 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, readable selected-fighter ability/stat briefings, adaptive live ammo/grenade labels, explicit live health/armor/sprint labels, readable live match status, kill feed, lobby leaderboards, readable lobby play choices, full keyboard lobby navigation, and complete multi-input Results navigation, roster-authentic duel/Rumble results, Gun Game, Rivalry Sets, Quick Match 1v1 plus 2–4 player Wasteland Rumble with all-player group draft rallies, a rematch-chain Rumble Crown, live lead-change drama, personal rematch Grudges, authoritative Rumble Assists with K/A/D, a solo four-fighter Scrap Pit whose three server-authoritative rivals have distinct readable tactics, answer player taunts with signature banter, and feed a device-local win/run record chase, a 2v2 Crew Battle with friendly-fire protection and an optional six-second real-friend join window, a four-objective Crew Clash rotation, and a device-local four-patch Crew Tour, visible bounded Wasteland Signal Recovery, device-aware pre-fight control onboarding with early touch affordances, persistent user-controlled lobby audio, safe multi-input exits before and during fights with confirmed authoritative forfeits, a focused cross-device Practice Setup overlay, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–109 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, readable selected-fighter ability/stat briefings, adaptive live ammo/grenade labels, explicit live health/armor/sprint labels, readable live match status, kill feed, lobby leaderboards, readable lobby play choices, complete keyboard lobby and Draft navigation, and complete multi-input Results navigation, roster-authentic duel/Rumble results, Gun Game, Rivalry Sets, Quick Match 1v1 plus 2–4 player Wasteland Rumble with all-player group draft rallies, a rematch-chain Rumble Crown, live lead-change drama, personal rematch Grudges, authoritative Rumble Assists with K/A/D, a solo four-fighter Scrap Pit whose three server-authoritative rivals have distinct readable tactics, answer player taunts with signature banter, and feed a device-local win/run record chase, a 2v2 Crew Battle with friendly-fire protection and an optional six-second real-friend join window, a four-objective Crew Clash rotation, and a device-local four-patch Crew Tour, visible bounded Wasteland Signal Recovery, device-aware pre-fight control onboarding with early touch affordances, persistent user-controlled lobby audio, safe multi-input exits before and during fights with confirmed authoritative forfeits, a focused cross-device Practice Setup overlay, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -140,6 +140,7 @@ Each session below attacks one of these.
 | 106 | Readable Lobby Play Choices                     | Every route is legible, distinct, and safely tappable on every device         | **DONE** (2026-07-15) |
 | 107 | Complete Lobby Keyboard Navigation              | Every play route works without forcing desktop players back to the mouse      | **DONE** (2026-07-15) |
 | 108 | Complete Results Navigation                     | Every rematch, route, and exit stays reachable on the player's current input  | **DONE** (2026-07-15) |
+| 109 | Complete Draft Navigation                       | Every map and mode choice stays reachable without changing input devices      | **DONE** (2026-07-15) |
 
 ---
 
@@ -4284,6 +4285,34 @@ favorite mid-match event while the final-minute surprise stays fresh.
 ---
 
 ## Session Log
+
+### Session 109 — 2026-07-15 — Complete Draft Navigation
+
+**Shipped:** map and mode drafts now work from every input surface. Tab moves
+linearly through enabled cards, arrows preserve the two-column spatial layout,
+and Enter confirms the focused choice. Escape and Backspace still return to
+the lobby. When an authoritative snapshot advances from the map phase to the
+mode phase, keyboard and gamepad focus hands off to the first enabled card
+instead of disappearing or remaining on an invalid choice.
+
+Pointer input clears stale keyboard/gamepad focus before a mouse click or tap
+takes over. Desktop guidance now explains Tab/arrows/Enter and the lobby exit;
+touch guidance explains the direct card vote and Rally tie rule. Duel picks,
+Rally ballots, server authority, matchmaking, combat, balance, persistence,
+and networking behavior are unchanged.
+
+**Verification:** typecheck and lint pass; all 1,331 unit and integration tests
+pass across 105 files. The production build passes with the existing Vite
+chunk-size advisory (`index-DPyOCQt5.js`, 1,869.19 kB / 447.20 kB gzip).
+The dedicated Draft regression passes in Chromium, Firefox, and 844×390 mobile
+landscape, proving linear and spatial keyboard navigation, cross-column focus,
+Enter activation, authoritative phase handoff, pointer takeover, real touch
+selection, and adaptive guidance. The complete 141-case Playwright matrix
+validates all 126 executable cases with 15 intentional project-specific skips.
+
+**Operational watch:** future Draft phases must continue to expose one ordered
+enabled-card list so keyboard and gamepad focus hand off together when server
+snapshots replace the available choices.
 
 ### Session 108 — 2026-07-15 — Complete Results Navigation
 
