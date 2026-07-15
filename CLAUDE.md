@@ -398,6 +398,30 @@ Never rely on the next session inheriting the current conversation context.
 
 ## Testing Guidelines
 
+### Risk-Based Test Selection
+
+Choose verification from the boundaries a change can affect instead of running
+every suite by default. The detailed matrix and release-gate triggers live in
+`docs/REIMAGINING_ROADMAP.md`.
+
+- Documentation/process-only edits: run the formatter for touched docs,
+  `git diff --check`, and intended-diff/link/command review. Skip runtime suites
+  unless executable configuration or generated runtime content changed.
+- Runtime edits: always run focused tests plus `pnpm typecheck` and
+  `pnpm lint`. Build the affected package and exercise the affected desktop and
+  mobile-landscape flow.
+- Run full `pnpm test` for shared, server, network, persistence, cross-package,
+  or release-gate work. Isolated client-only changes may use focused and
+  affected-package tests.
+- Run focused multi-browser E2E when navigation, input, recovery, or capability
+  foundations change. Reserve the complete Playwright project matrix for
+  release/verification gates, deployment or capability-default changes, legacy
+  retirement, broad cross-cutting changes, or evidence of wider regression.
+- Reproduce a failure narrowly before spending time rerunning a complete suite.
+  After the fix, rerun the gate appropriate to the changed boundary.
+- Record the chosen verification tier, commands, results, and rationale for
+  omitted broader suites in the roadmap Session Log.
+
 ### Unit Tests (Vitest)
 
 - **Coverage target:** 80% overall, 90%+ on server game logic and shared utils

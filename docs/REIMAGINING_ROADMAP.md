@@ -609,6 +609,37 @@ flags with full regression and rollback notes.
   50ms tick budget and the client to hold 60 FPS or enter the documented
   reduced-effects tier.
 
+### Risk-based verification selection
+
+The test contract is cumulative across the Reforged program; it does not mean
+that every batch must run every repository check. Before implementation, name
+the boundaries the batch can affect and select the smallest verification tier
+that can disprove the likely regressions. Escalate when a focused check fails,
+reveals unexpected coupling, or changes touch a broader boundary than planned.
+
+| Change surface                                            | Minimum batch evidence                                                                                                                                   | Escalate to broader suites when                                                                                           |
+| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Documentation or process only                             | Repository formatter for touched docs, `git diff --check`, link/command review, and intended-diff review. Runtime suites are not required.               | Executable configuration, generated runtime content, or code also changed.                                                |
+| Isolated pure logic or capability-owned client UI         | Focused unit tests, `pnpm typecheck`, `pnpm lint`, affected package build, targeted desktop Chromium and mobile-landscape interaction/fallback evidence. | Shared contracts, networking, persistence, scene routing, or multiple packages are affected.                              |
+| Shared, server, networking, persistence, or cross-package | Focused unit/integration tests, full `pnpm test`, relevant or full production build, and targeted E2E for affected journeys.                             | Wire behavior, recovery, timing, or multiple player-facing journeys change.                                               |
+| Cross-cutting navigation, input, recovery, or capability  | Focused multi-browser E2E plus the affected legacy/new-shell journey subset, alongside the applicable unit/build evidence above.                         | A foundation used by most journeys changes, a capability is exposed, or focused evidence suggests a repository-wide risk. |
+| Camera, world, performance, arena, or visual work         | The affected deterministic validators, recorders, performance probes, and desktop/mobile Chromium visual evidence; retain required object assertions.    | A performance/release gate is reached, shared simulation changes, or measured evidence regresses.                         |
+
+The complete three-project Playwright matrix is reserved for release and
+verification gates (including Batches 17, 24, 33, 39, 51, 52, and 54), a
+deployment or capability-default change, legacy retirement, broad cross-cutting
+foundations, or a focused result that indicates wider risk. It is not required
+for every isolated capability batch. The full unit/integration suite remains
+required for shared/server/network/persistence and cross-package changes and at
+those gates; isolated client-only work may use the affected package and focused
+tests. Never rerun a complete suite merely to investigate one failure: reproduce
+and diagnose it with the narrowest reliable check first, then rerun the
+appropriate gate after the fix.
+
+Every Session Log verification entry must record the selected tier, the checks
+actually run, and why any normally broader suite was unnecessary. This changes
+test frequency, not acceptance coverage or release quality gates.
+
 ## Dynamic bug ledger
 
 ### Insertion rules
@@ -634,9 +665,12 @@ Run this at the end of every numbered or inserted batch.
 
 1. **Verify scope and worktree:** inspect status/diff, preserve unrelated work,
    and confirm only the active batch was implemented.
-2. **Verify behavior:** run focused tests plus `pnpm typecheck`, `pnpm lint`,
-   and `pnpm test`; run relevant desktop/mobile E2E, visual, manual, network,
-   and performance checks for affected flows.
+2. **Verify behavior by risk:** apply the test-selection matrix above. Runtime
+   changes always receive focused tests plus `pnpm typecheck` and `pnpm lint`;
+   add the affected package build and targeted desktop/mobile evidence. Run the
+   full unit, build, browser, network, visual, or performance suites only when
+   the changed boundary or a gate requires them. Documentation-only changes
+   may omit runtime suites. Record the tier, commands, results, and rationale.
 3. **Update docs:** check acceptance, update status and Session Log, record
    deviations/bugs/tuning, and update README, `CLAUDE.md`, architecture docs,
    attribution, and asset provenance when affected.
@@ -674,6 +708,16 @@ with a link to this file, a summary, or an offer to provide it later.
 
 ## Roadmap amendments
 
+### 2026-07-15 — Risk-based verification
+
+At the user's request, replaced the blanket expectation to run the complete
+unit and browser inventory after every batch with an explicit risk-based
+selection matrix. Focused tests and cheap static checks remain mandatory for
+runtime work; broader suites now follow affected boundaries and escalation
+signals, while the complete matrix remains mandatory at release, rollout,
+legacy-retirement, and other cross-cutting gates. This reduces repeated
+low-signal runtime without lowering the cumulative acceptance contract.
+
 ### 2026-07-15 — Mandatory fresh-session prompt
 
 At the user's request, made the paste-ready fresh-session prompt an explicit
@@ -682,6 +726,28 @@ This clarifies the existing handoff ritual without changing batch scope or
 release order.
 
 ## Session Log
+
+### Process amendment — 2026-07-15 — Risk-based verification
+
+**Shipped:** Added a risk-based test-selection matrix and aligned the
+end-of-batch ritual so future sessions choose verification from the actual
+change surface. Defined minimum evidence for documentation, isolated client,
+shared/server/network, cross-cutting interaction, and performance/visual work;
+reserved the complete Playwright matrix for explicit gates and escalation.
+
+**Verification:** Used the documentation/process tier: repository Prettier,
+`git diff --check`, command/link review, and intended-diff review. Runtime test
+suites were deliberately omitted because no executable source, configuration,
+dependency, or generated runtime content changed.
+
+**Deployment:** Skipped. This amendment changes repository guidance only and
+does not authorize or require a production deployment.
+
+**Deviations:** None. Existing acceptance coverage and release gates remain in
+force; only the frequency and rationale for broad suite execution changed.
+
+**Known issues:** RFG-001, RFG-002, and RFG-003 remain unchanged. No new bug ID
+was required.
 
 ### Batch 1 — 2026-07-15 — Roadmap bootstrap
 
@@ -897,9 +963,9 @@ Batch 5 is complete and pushed on main. Its reviewed roster remains a local
 draft with match entry disabled; the injected arena is a fixed non-authoritative
 preview until Batch 10, and all five strict server capability flags still
 default false. Update roadmap acceptance evidence and the Session Log, run the
-complete end-of-batch ritual, commit and push directly to main, skip deployment
-unless the roadmap explicitly authorizes it, and end with the fenced paste-ready
-prompt for Batch 7.
+risk-based end-of-batch ritual, commit and push directly to main, skip
+deployment unless the roadmap explicitly authorizes it, and end with the fenced
+paste-ready prompt for Batch 7.
 
 Carry-over warnings: RFG-001 CameraKick and RFG-002 ZoomPulse overwrite future
 base camera state and remain assigned to Batches 20/24. RFG-003 means headless
