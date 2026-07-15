@@ -235,7 +235,9 @@ test.describe('Crew Battle 2v2', () => {
               phase: scene?.matchPhase ?? null,
               markerText: marker?.text ?? null,
               markerVisible: marker?.visible ?? false,
-              score: scene?.hud?.scoreText?.text ?? null,
+              scoreReadable: /^YOUR CREW: \d+ {2}\| {2}RIVALS: \d+$/.test(
+                scene?.hud?.scoreText?.text ?? '',
+              ),
             };
           }),
         { timeout: 15000, message: 'expected live Crew Battle team presentation' },
@@ -245,7 +247,7 @@ test.describe('Crew Battle 2v2', () => {
         phase: 'active',
         markerText: '[ ALLY ]',
         markerVisible: true,
-        score: 'YOUR CREW: 0 | RIVALS: 0',
+        scoreReadable: true,
       });
   });
 

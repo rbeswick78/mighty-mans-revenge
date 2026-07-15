@@ -37,6 +37,11 @@ import {
   type AbilityStatusTone,
 } from './ability-status.js';
 import type { KillFeedTone } from './kill-feed-presentation.js';
+import {
+  matchScorePresentation,
+  matchTimerPresentation,
+  type MatchTimerTone,
+} from './match-status-presentation.js';
 
 // Press Start 2P is much wider per glyph than Courier, so the final-minute
 // banner size drops to compensate (Courier 40px ≈ PS2P 22-24px in width).
@@ -119,6 +124,7 @@ export class HUD {
   // Middle column: match state
   private scoreText: Phaser.GameObjects.Text;
   private timerText: Phaser.GameObjects.Text;
+  private timerSecondsRemaining = 300;
 
   // KOTH capture bar (middle column, between score and timer). Hidden in
   // deathmatch and while the hill is retired for overtime.
@@ -384,17 +390,22 @@ export class HUD {
 
     // --- Middle column: score + timer ---
     const middleX = MAP_WIDTH_PX / 2;
-    this.scoreText = scene.add.text(middleX, stripTop + 22, 'YOU: 0 | ENEMY: 0', {
+    this.scoreText = scene.add.text(middleX, stripTop + 14, 'YOU: 0  |  ENEMY: 0', {
       ...HEADER_STYLE,
-      fontSize: '14px',
+      fontSize: '16px',
+      align: 'center',
+      stroke: '#000000',
+      strokeThickness: 2,
     });
     this.scoreText.setOrigin(0.5, 0);
     this.scoreText.setScrollFactor(0);
     this.scoreText.setDepth(1000);
 
-    this.timerText = scene.add.text(middleX, stripTop + 58, '5:00', {
+    this.timerText = scene.add.text(middleX, stripTop + 68, '5:00', {
       ...HEADER_STYLE,
-      fontSize: '13px',
+      fontSize: '18px',
+      stroke: '#000000',
+      strokeThickness: 2,
     });
     this.timerText.setOrigin(0.5, 0);
     this.timerText.setScrollFactor(0);
@@ -406,8 +417,10 @@ export class HUD {
     const kothBarW = 140;
     const kothBarY = stripTop + 44;
     this.kothLabel = scene.add.text(middleX - kothBarW / 2 - 8, kothBarY - 1, 'HILL', {
-      ...HEADER_STYLE,
-      fontSize: '8px',
+      ...FONT_STYLE,
+      fontSize: '13px',
+      stroke: '#000000',
+      strokeThickness: 2,
     });
     this.kothLabel.setOrigin(1, 0);
     this.kothLabel.setScrollFactor(0);
@@ -443,9 +456,11 @@ export class HUD {
     // canvas keep the middle column single-purpose. Hidden until
     // updateGunGame receives a rung.
     this.gunGameLadderText = scene.add.text(middleX, kothBarY - 1, '', {
-      ...HEADER_STYLE,
-      fontSize: '9px',
+      ...FONT_STYLE,
+      fontSize: '13px',
       color: cssHex(Wasteland.TEXT_RELOAD_WARNING),
+      stroke: '#000000',
+      strokeThickness: 2,
     });
     this.gunGameLadderText.setOrigin(0.5, 0);
     this.gunGameLadderText.setScrollFactor(0);
@@ -453,9 +468,11 @@ export class HUD {
     this.gunGameLadderText.setVisible(false);
 
     this.lastStandText = scene.add.text(middleX, kothBarY - 1, 'LIVES REMAINING', {
-      ...HEADER_STYLE,
-      fontSize: '9px',
+      ...FONT_STYLE,
+      fontSize: '13px',
       color: cssHex(Wasteland.TEXT_RELOAD_WARNING),
+      stroke: '#000000',
+      strokeThickness: 2,
     });
     this.lastStandText.setOrigin(0.5, 0);
     this.lastStandText.setScrollFactor(0);
@@ -463,9 +480,11 @@ export class HUD {
     this.lastStandText.setVisible(false);
 
     this.killConfirmedText = scene.add.text(middleX, kothBarY - 1, 'COLLECT ENEMY TAGS', {
-      ...HEADER_STYLE,
-      fontSize: '9px',
+      ...FONT_STYLE,
+      fontSize: '13px',
       color: cssHex(Wasteland.TEXT_RELOAD_WARNING),
+      stroke: '#000000',
+      strokeThickness: 2,
     });
     this.killConfirmedText.setOrigin(0.5, 0);
     this.killConfirmedText.setScrollFactor(0);
@@ -473,9 +492,11 @@ export class HUD {
     this.killConfirmedText.setVisible(false);
 
     this.oneInTheChamberText = scene.add.text(middleX, kothBarY - 1, '', {
-      ...HEADER_STYLE,
-      fontSize: '9px',
+      ...FONT_STYLE,
+      fontSize: '13px',
       color: cssHex(Wasteland.TEXT_RELOAD_WARNING),
+      stroke: '#000000',
+      strokeThickness: 2,
     });
     this.oneInTheChamberText.setOrigin(0.5, 0);
     this.oneInTheChamberText.setScrollFactor(0);
@@ -483,9 +504,11 @@ export class HUD {
     this.oneInTheChamberText.setVisible(false);
 
     this.coreRunText = scene.add.text(middleX, kothBarY - 1, '', {
-      ...HEADER_STYLE,
-      fontSize: '8px',
+      ...FONT_STYLE,
+      fontSize: '13px',
       color: cssHex(Wasteland.TEXT_RELOAD_WARNING),
+      stroke: '#000000',
+      strokeThickness: 2,
     });
     this.coreRunText.setOrigin(0.5, 0);
     this.coreRunText.setScrollFactor(0);
@@ -493,9 +516,11 @@ export class HUD {
     this.coreRunText.setVisible(false);
 
     this.bountyHuntText = scene.add.text(middleX, kothBarY - 1, '', {
-      ...HEADER_STYLE,
-      fontSize: '8px',
+      ...FONT_STYLE,
+      fontSize: '13px',
       color: '#ffd166',
+      stroke: '#000000',
+      strokeThickness: 2,
     });
     this.bountyHuntText.setOrigin(0.5, 0);
     this.bountyHuntText.setScrollFactor(0);
@@ -504,10 +529,12 @@ export class HUD {
 
     // Persistent active-event label, sits right under the timer. Hidden
     // until an event activates; never moves, just toggles text + visibility.
-    this.activeEventLabel = scene.add.text(middleX, stripTop + 84, '', {
-      ...HEADER_STYLE,
-      fontSize: '10px',
+    this.activeEventLabel = scene.add.text(middleX, stripTop + 104, '', {
+      ...FONT_STYLE,
+      fontSize: '12px',
       color: cssHex(Wasteland.TEXT_RELOAD_WARNING),
+      stroke: '#000000',
+      strokeThickness: 2,
     });
     this.activeEventLabel.setOrigin(0.5, 0);
     this.activeEventLabel.setScrollFactor(0);
@@ -869,16 +896,10 @@ export class HUD {
   }
 
   updateScores(scores: ReadonlyArray<{ name: string; score: number }>): void {
-    const compact = scores.length > 2;
-    this.scoreText.setFontSize(compact ? 10 : 14);
-    this.scoreText.setText(
-      scores
-        .map(({ name, score }, index) => {
-          const label = compact && index === 0 ? 'YOU' : name.slice(0, compact ? 8 : 16);
-          return `${label}: ${score}`;
-        })
-        .join(compact ? '  ·  ' : ' | '),
-    );
+    const presentation = matchScorePresentation(scores);
+    this.scoreText
+      .setFontSize(presentation.fontSize)
+      .setText(presentation.text);
   }
 
   updateContract(
@@ -986,22 +1007,30 @@ export class HUD {
   setOvertime(active: boolean): void {
     if (active === this.overtimeStyle) return;
     this.overtimeStyle = active;
-    this.timerText.setColor(
-      cssHex(active ? Wasteland.TEXT_DEATH : Wasteland.TEXT_PRIMARY),
-    );
+    this.syncTimerPresentation();
   }
 
   updateTimer(secondsRemaining: number): void {
-    // Round UP so the displayed clock represents "at most this much time
-    // left." Matches countdown convention everywhere else in the app —
-    // "1:00" means up to 60s remaining, "0:00" means the timer has hit
-    // zero. Floor would flip "1:00" → "0:59" the instant the event-trigger
-    // threshold (60s remaining) was crossed and would show "0:00" for the
-    // entire final second, making the music appear to outlast the clock.
-    const totalSeconds = Math.ceil(secondsRemaining);
-    const mins = Math.floor(totalSeconds / 60);
-    const secs = totalSeconds % 60;
-    this.timerText.setText(`${mins}:${secs.toString().padStart(2, '0')}`);
+    this.timerSecondsRemaining = secondsRemaining;
+    this.syncTimerPresentation();
+  }
+
+  private syncTimerPresentation(): void {
+    const presentation = matchTimerPresentation(
+      this.timerSecondsRemaining,
+      this.overtimeStyle,
+    );
+    this.timerText
+      .setText(presentation.text)
+      .setColor(cssHex(this.matchTimerColor(presentation.tone)));
+  }
+
+  private matchTimerColor(tone: MatchTimerTone): number {
+    if (tone === 'warning') return Wasteland.TEXT_LOW_AMMO;
+    if (tone === 'danger' || tone === 'overtime') {
+      return Wasteland.TEXT_GRENADE_LIVE;
+    }
+    return Wasteland.TEXT_PRIMARY;
   }
 
   addKillFeedEntry(label: string, tone: KillFeedTone): void {

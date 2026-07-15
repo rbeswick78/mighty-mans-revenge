@@ -821,7 +821,7 @@ export class GameScene extends Phaser.Scene {
           // entrants so a four-player Rumble remains readable.
           this.hud.updateScores([
             {
-              name: currentLocalState.nickname || this.nickname,
+              name: 'YOU',
               score: currentLocalState.score,
             },
             ...[...interpolatedPlayers.values()].map((state) => ({

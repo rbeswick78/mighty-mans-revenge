@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–103 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, readable selected-fighter ability/stat briefings, adaptive live ammo/grenade labels, explicit live health/armor/sprint labels, an authoritative readable live kill feed, roster-authentic duel/Rumble results, Gun Game, Rivalry Sets, Quick Match 1v1 plus 2–4 player Wasteland Rumble with all-player group draft rallies, a rematch-chain Rumble Crown, live lead-change drama, personal rematch Grudges, authoritative Rumble Assists with K/A/D, a solo four-fighter Scrap Pit whose three server-authoritative rivals have distinct readable tactics, answer player taunts with signature banter, and feed a device-local win/run record chase, a 2v2 Crew Battle with friendly-fire protection and an optional six-second real-friend join window, a four-objective Crew Clash rotation, and a device-local four-patch Crew Tour, visible bounded Wasteland Signal Recovery, device-aware pre-fight control onboarding with early touch affordances, persistent user-controlled lobby audio, safe multi-input exits before and during fights with confirmed authoritative forfeits, a focused cross-device Practice Setup overlay, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–104 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, readable selected-fighter ability/stat briefings, adaptive live ammo/grenade labels, explicit live health/armor/sprint labels, readable live match status and kill feed, roster-authentic duel/Rumble results, Gun Game, Rivalry Sets, Quick Match 1v1 plus 2–4 player Wasteland Rumble with all-player group draft rallies, a rematch-chain Rumble Crown, live lead-change drama, personal rematch Grudges, authoritative Rumble Assists with K/A/D, a solo four-fighter Scrap Pit whose three server-authoritative rivals have distinct readable tactics, answer player taunts with signature banter, and feed a device-local win/run record chase, a 2v2 Crew Battle with friendly-fire protection and an optional six-second real-friend join window, a four-objective Crew Clash rotation, and a device-local four-patch Crew Tour, visible bounded Wasteland Signal Recovery, device-aware pre-fight control onboarding with early touch affordances, persistent user-controlled lobby audio, safe multi-input exits before and during fights with confirmed authoritative forfeits, a focused cross-device Practice Setup overlay, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -131,6 +131,11 @@ Each session below attacks one of these.
 | 97  | Readable Fighter Briefings                      | Every roster choice becomes one clear matchup decision                        | **DONE** (2026-07-14) |
 | 98  | Readable Combat Resources                       | Ammo, reloads, and grenades become instant mid-fight decisions                | **DONE** (2026-07-14) |
 | 99  | Readable Vitality HUD                           | Health, armor, and sprint become explicit survival decisions                  | **DONE** (2026-07-14) |
+| 100 | Readable Ability Status                         | Every signature move shows its identity and exact readiness                   | **DONE** (2026-07-14) |
+| 101 | Readable Touch Actions                          | Mobile combat controls name every action and live state                       | **DONE** (2026-07-14) |
+| 102 | Readable Post-Match Stats                       | Every combat total stays scannable even at extreme values                     | **DONE** (2026-07-14) |
+| 103 | Readable Live Kill Feed                         | Every elimination immediately explains who did what                           | **DONE** (2026-07-14) |
+| 104 | Readable Match Status                           | Score, objective, clock, and events become instant fight decisions            | **DONE** (2026-07-14) |
 
 ---
 
@@ -4275,6 +4280,40 @@ favorite mid-match event while the final-minute surprise stays fresh.
 ---
 
 ## Session Log
+
+### Session 104 — 2026-07-14 — Readable Match Status
+
+**Shipped:** the center HUD lane now carries the same visual authority as the
+health, ammo, and kill-feed columns. Duel and team scores use a 16px outlined
+header with the local fighter consistently labeled `YOU`; four-player Rumble
+scores keep all identities in a bounded two-row 11px layout. Every mode's
+live objective moves from tiny 8–9px header copy to 13px body text, the clock
+grows to 18px, and active-event labels grow to 12px. The final 30 seconds turn
+amber, the final 10 turn bright combat red, and overtime keeps the red danger
+state without changing authoritative timing or scoring.
+
+The presentation rules now live in a pure typed helper that normalizes and
+bounds callsigns, safely handles invalid clock values, and keeps rounding
+consistent with the established countdown convention. The live Crew Battle
+browser guard now accepts any valid score reached while bots are already
+fighting instead of racing the match for an exact 0–0 frame. This is client
+presentation only: game modes, match duration, overtime rules, score targets,
+network messages, combat, bots, and server behavior are unchanged.
+
+**Verification:** typecheck and lint pass; all 1,331 unit and integration tests
+pass across 105 files. The full production build passes with the existing Vite
+chunk-size advisory (`index-CrlCYN9U.js`, 1,863.79 kB / 446.17 kB gzip). Pure
+coverage checks duel/team and bounded four-player scores plus normal, warning,
+danger, overtime, and invalid clock states. The new browser journey passes on
+Chromium, Firefox, and 844×390 mobile landscape, proving exact copy, colors,
+font sizes, lane bounds, and vertical separation. Across the complete 126-case
+matrix and the corrected Crew Battle rerun, all 111 executable cases pass with
+15 intentional project-specific skips.
+
+**Operational watch:** keep future mode-state copy inside the center lane and
+route new clock semantics through the pure presentation helper. If Rumble
+expands beyond four fighters, introduce a dedicated scoreboard instead of
+shrinking this at-a-glance strip below 11px.
 
 ### Session 103 — 2026-07-14 — Readable Live Kill Feed
 
