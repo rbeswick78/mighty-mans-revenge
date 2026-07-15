@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–98 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, readable selected-fighter ability/stat briefings, adaptive live ammo/grenade labels, roster-authentic duel/Rumble results, Gun Game, Rivalry Sets, Quick Match 1v1 plus 2–4 player Wasteland Rumble with all-player group draft rallies, a rematch-chain Rumble Crown, live lead-change drama, personal rematch Grudges, authoritative Rumble Assists with K/A/D, a solo four-fighter Scrap Pit whose three server-authoritative rivals have distinct readable tactics, answer player taunts with signature banter, and feed a device-local win/run record chase, a 2v2 Crew Battle with friendly-fire protection and an optional six-second real-friend join window, a four-objective Crew Clash rotation, and a device-local four-patch Crew Tour, visible bounded Wasteland Signal Recovery, device-aware pre-fight control onboarding with early touch affordances, persistent user-controlled lobby audio, safe multi-input exits before and during fights with confirmed authoritative forfeits, a focused cross-device Practice Setup overlay, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–99 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, readable selected-fighter ability/stat briefings, adaptive live ammo/grenade labels, explicit live health/armor/sprint labels, roster-authentic duel/Rumble results, Gun Game, Rivalry Sets, Quick Match 1v1 plus 2–4 player Wasteland Rumble with all-player group draft rallies, a rematch-chain Rumble Crown, live lead-change drama, personal rematch Grudges, authoritative Rumble Assists with K/A/D, a solo four-fighter Scrap Pit whose three server-authoritative rivals have distinct readable tactics, answer player taunts with signature banter, and feed a device-local win/run record chase, a 2v2 Crew Battle with friendly-fire protection and an optional six-second real-friend join window, a four-objective Crew Clash rotation, and a device-local four-patch Crew Tour, visible bounded Wasteland Signal Recovery, device-aware pre-fight control onboarding with early touch affordances, persistent user-controlled lobby audio, safe multi-input exits before and during fights with confirmed authoritative forfeits, a focused cross-device Practice Setup overlay, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -130,6 +130,7 @@ Each session below attacks one of these.
 | 96  | Focused Practice Setup                          | Solo tuning stays readable, touchable, and clear of lobby play choices        | **DONE** (2026-07-14) |
 | 97  | Readable Fighter Briefings                      | Every roster choice becomes one clear matchup decision                        | **DONE** (2026-07-14) |
 | 98  | Readable Combat Resources                       | Ammo, reloads, and grenades become instant mid-fight decisions                | **DONE** (2026-07-14) |
+| 99  | Readable Vitality HUD                           | Health, armor, and sprint become explicit survival decisions                  | **DONE** (2026-07-14) |
 
 ---
 
@@ -4274,6 +4275,41 @@ favorite mid-match event while the final-minute surprise stays fresh.
 ---
 
 ## Session Log
+
+### Session 99 — 2026-07-14 — Readable Vitality HUD
+
+**Shipped:** the live lower-left HUD no longer asks players to infer survival
+state from two anonymous colored bars. Health now names both the current and
+fighter-specific maximum pool (`HP 100/100`), while Scrap Armor is explicit
+inside the same bounded label (`ARM 13`) instead of appearing as an unexplained
+`+13`. The former six-pixel stamina sliver is now a labeled 16px sprint bar
+that says `SPRINT READY`, a live percentage while draining, or `SPRINT EMPTY`.
+
+Both vitality labels use outlined pixel text so they remain readable when the
+filled portion shrinks beneath them. The final quarter of sprint turns amber
+and empty sprint turns hot red, matching the combat-resource warning language
+without changing stamina regeneration, sprint duration, health, armor,
+damage, movement, prediction, reconciliation, or server authority. Pure
+presentation helpers clamp malformed display input and keep the HUD logic
+deterministic.
+
+**Verification:** typecheck and lint pass; all 1,317 unit and integration tests
+pass across 101 files. Pure coverage proves fighter-specific health capacity,
+armor, ready/draining/scarce/empty sprint, and malformed display behavior. The
+production build passes with the existing Vite chunk-size advisory
+(`index-B58RLW_D.js`, 1,860.17 kB / 445.14 kB gzip). Focused Chromium and
+844×390 mobile screenshots verify the ready and depleted treatments, 14px HP
+copy, 13px sprint copy, 16px bar, exact warning palette, and left-column bounds.
+The complete 114-case Playwright matrix produced 98 passes and 15 intentional
+cross-project skips; one unrelated Chromium live-menu journey timed out only
+at its final lobby-active poll after the long run, then passed cleanly on an
+isolated rerun. Across the clean results, all 99 executable cases pass,
+including the vitality journey on Chromium, Firefox, and mobile landscape.
+
+**Operational watch:** the larger sprint bar uses the vertical room recovered
+inside the existing 144px strip and still leaves the special-weapon row within
+the canvas. Keep future vitality wording within the current 200px column;
+prefer transient audio or color feedback over adding another permanent row.
 
 ### Session 98 — 2026-07-14 — Readable Combat Resources
 

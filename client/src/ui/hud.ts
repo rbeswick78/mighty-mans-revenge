@@ -27,6 +27,11 @@ import {
   rifleAmmoPresentation,
   type CombatResourceTone,
 } from './combat-resources.js';
+import {
+  healthStatusLabel,
+  sprintPresentation,
+  type SprintTone,
+} from './vitality-presentation.js';
 
 // Press Start 2P is much wider per glyph than Courier, so the final-minute
 // banner size drops to compensate (Courier 40px ≈ PS2P 22-24px in width).
@@ -82,6 +87,7 @@ export class HUD {
   private healthText: Phaser.GameObjects.Text;
   private staminaBarBg: Phaser.GameObjects.Rectangle;
   private staminaBarFg: Phaser.GameObjects.Rectangle;
+  private staminaText: Phaser.GameObjects.Text;
   private ammoText: Phaser.GameObjects.Text;
   private grenadeText: Phaser.GameObjects.Text;
 
@@ -214,17 +220,19 @@ export class HUD {
     this.armorBarFg = scene.add.rectangle(hbX, hbY - 6, hbW, 4, Wasteland.ARMOR_FILL);
     this.armorBarFg.setOrigin(0, 0).setScrollFactor(0).setDepth(1001).setVisible(false);
 
-    this.healthText = scene.add.text(hbX + hbW / 2, hbY + hbH / 2, '100', {
+    this.healthText = scene.add.text(hbX + hbW / 2, hbY + hbH / 2, 'HP  100/100', {
       ...FONT_STYLE,
       fontSize: '14px',
-      color: '#000000',
+      color: cssHex(Wasteland.TEXT_PRIMARY),
+      stroke: '#000000',
+      strokeThickness: 2,
     });
     this.healthText.setOrigin(0.5, 0.5);
     this.healthText.setScrollFactor(0);
     this.healthText.setDepth(1002);
 
     const stY = hbY + hbH + 6;
-    const stH = 6;
+    const stH = 16;
 
     this.staminaBarBg = scene.add.rectangle(hbX, stY, hbW, stH, Wasteland.STAMINA_BAR_BG);
     this.staminaBarBg.setOrigin(0, 0);
@@ -235,6 +243,17 @@ export class HUD {
     this.staminaBarFg.setOrigin(0, 0);
     this.staminaBarFg.setScrollFactor(0);
     this.staminaBarFg.setDepth(1001);
+
+    this.staminaText = scene.add.text(hbX + hbW / 2, stY + stH / 2, 'SPRINT  READY', {
+      ...FONT_STYLE,
+      fontSize: '13px',
+      color: cssHex(Wasteland.TEXT_PRIMARY),
+      stroke: '#000000',
+      strokeThickness: 2,
+    });
+    this.staminaText.setOrigin(0.5, 0.5);
+    this.staminaText.setScrollFactor(0);
+    this.staminaText.setDepth(1002);
 
     const ammoY = stY + stH + 12;
     const startingAmmo = rifleAmmoPresentation(
@@ -630,7 +649,7 @@ export class HUD {
     this.healthBarFg.setFillStyle(healthColor(ratio));
     this.armorBarBg.setVisible(shield.visible);
     this.armorBarFg.setVisible(shield.visible).setSize(fullWidth * shield.ratio, 4);
-    this.healthText.setText(shield.healthLabel);
+    this.healthText.setText(healthStatusLabel(current, max, armor));
   }
 
   updateAmmo(current: number, max: number, isReloading: boolean): void {
@@ -809,9 +828,18 @@ export class HUD {
     return Wasteland.TEXT_PRIMARY;
   }
 
+  private sprintColor(tone: SprintTone): number {
+    if (tone === 'warning') return Wasteland.TEXT_LOW_AMMO;
+    if (tone === 'danger') return Wasteland.TEXT_GRENADE_LIVE;
+    return Wasteland.TEXT_PRIMARY;
+  }
+
   updateStamina(current: number, max: number): void {
-    const ratio = Math.max(0, Math.min(1, current / max));
-    this.staminaBarFg.setSize(200 * ratio, 6);
+    const presentation = sprintPresentation(current, max);
+    this.staminaBarFg.setSize(200 * presentation.ratio, 16);
+    this.staminaText
+      .setText(presentation.label)
+      .setColor(cssHex(this.sprintColor(presentation.tone)));
   }
 
   updateScores(scores: ReadonlyArray<{ name: string; score: number }>): void {
@@ -1433,6 +1461,7 @@ export class HUD {
     this.healthText.destroy();
     this.staminaBarBg.destroy();
     this.staminaBarFg.destroy();
+    this.staminaText.destroy();
     this.ammoText.destroy();
     this.grenadeText.destroy();
     this.specialWeaponLabel.destroy();
