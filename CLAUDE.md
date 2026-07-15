@@ -399,4 +399,5 @@ Map choice is player-drafted per match since Session 9 (see the pre-match draft 
 - [Geckos.io docs](https://github.com/geckosio/geckos.io) — WebRTC networking library
 - [Phaser 3 docs](https://photonstorm.github.io/phaser3-docs/) — game engine
 - User stories and full spec: `USER_STORIES.md` in repo root
-- Replayability build plan (multi-session, in progress): `docs/REPLAYABILITY_ROADMAP.md` — read it before working on weapons, modes, maps, mutators, characters, or stats/awards
+- Active Reforged build plan (multi-session): `docs/REIMAGINING_ROADMAP.md` — read it before every Reforged batch and implement only the active batch
+- Completed replayability build history: `docs/REPLAYABILITY_ROADMAP.md` — read it when changing established weapons, modes, maps, mutators, characters, stats, awards, or challenge behavior

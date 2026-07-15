@@ -196,10 +196,12 @@ them.
 
 ## Where to read next
 
-| If you want…                                | Read                                     |
-| ------------------------------------------- | ---------------------------------------- |
-| Conventions, architecture, deploy, pitfalls | [`CLAUDE.md`](./CLAUDE.md)               |
-| Why each big decision was made              | [`docs/adr/`](./docs/adr/)               |
-| Full feature spec / user stories            | [`USER_STORIES.md`](./USER_STORIES.md)   |
-| Visual / graphics roadmap                   | [`GRAPHICS_PLAN.md`](./GRAPHICS_PLAN.md) |
-| Idea backlog                                | [`IDEAS.md`](./IDEAS.md)                 |
+| If you want…                                | Read                                                               |
+| ------------------------------------------- | ------------------------------------------------------------------ |
+| Conventions, architecture, deploy, pitfalls | [`CLAUDE.md`](./CLAUDE.md)                                         |
+| Why each big decision was made              | [`docs/adr/`](./docs/adr/)                                         |
+| Full feature spec / user stories            | [`USER_STORIES.md`](./USER_STORIES.md)                             |
+| Active Reforged multi-session roadmap       | [`docs/REIMAGINING_ROADMAP.md`](./docs/REIMAGINING_ROADMAP.md)     |
+| Completed replayability build history       | [`docs/REPLAYABILITY_ROADMAP.md`](./docs/REPLAYABILITY_ROADMAP.md) |
+| Visual / graphics roadmap                   | [`GRAPHICS_PLAN.md`](./GRAPHICS_PLAN.md)                           |
+| Idea backlog                                | [`IDEAS.md`](./IDEAS.md)                                           |
