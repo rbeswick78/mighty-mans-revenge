@@ -4276,6 +4276,38 @@ favorite mid-match event while the final-minute surprise stays fresh.
 
 ## Session Log
 
+### Session 101 — 2026-07-14 — Readable Touch Actions
+
+**Shipped:** mobile players no longer have to decode the anonymous `T`, `G`,
+and `A` circles during their first fight. The action cluster now says `TAUNT`,
+`GRENADE`, and `ABILITY READY`, then follows live play with `DETONATE` while a
+grenade is armed and `ABILITY ACTIVE` or `ABILITY COOLDOWN` from the
+authoritative snapshot timers. The pre-fight briefing uses the same explicit
+button names, and desktop/gamepad copy now consistently calls the fighter move
+an `ABILITY` instead of switching to `POWER`.
+
+The top-right action cluster also moves below the complete Menu launcher hit
+area with a 12px safety gap. Menu geometry, hit padding, and the touch-action
+anchor now share layout constants so future visual changes cannot silently put
+two interactive targets on top of each other. Input buffering, grenade and
+ability rules, combat, prediction, reconciliation, modes, and server authority
+are unchanged.
+
+**Verification:** typecheck and lint pass; all 1,323 unit and integration tests
+pass across 103 files. Pure coverage proves every touch label and
+ready/active/cooldown transition. The production build passes with the existing
+Vite chunk-size advisory (`index-03HHnSVN.js`, 1,861.68 kB / 445.55 kB gzip).
+Chromium, Firefox, and 844×390 mobile-landscape browser coverage verifies the
+11px labels, live detonate/cooldown states, buffered input, bounded controls,
+and the full 12px separation from the Menu hit target. The complete 117-case
+Playwright matrix passes with 102 executable passes and 15 intentional
+project-specific skips in 13.0 minutes.
+
+**Operational watch:** preserve the 12px gap from the Menu launcher's complete
+interactive bounds, not only its painted rectangle. Keep future action copy
+inside the current 80px circles and avoid expanding the cluster into the
+right-stick movement/fire area.
+
 ### Session 100 — 2026-07-14 — Readable Ability Status
 
 **Shipped:** the live HUD no longer asks players to remember what a small

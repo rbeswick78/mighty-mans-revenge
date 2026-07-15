@@ -7,6 +7,7 @@ import { TouchInput } from './touch-input.js';
 import type { RawInput } from './types.js';
 import { withoutSecondaryActions } from './combat-input.js';
 import { GamepadInput } from './gamepad-input.js';
+import type { TouchAbilityState } from './touch-action-presentation.js';
 
 export type InputMode = 'keyboard' | 'touch' | 'gamepad';
 
@@ -178,6 +179,11 @@ export class InputManager {
   /** Keep visible touch affordances inert until the authoritative fight starts. */
   setGameplayEnabled(enabled: boolean): void {
     this.touchInput.setGameplayEnabled(enabled);
+  }
+
+  /** Keep the visible touch ability button aligned with the latest snapshot. */
+  setAbilityButtonState(state: TouchAbilityState): void {
+    this.touchInput.setAbilityButtonState(state);
   }
 
   /** Optional tactile feedback; silently ignored on unsupported browsers/pads. */

@@ -1,6 +1,13 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from '../fixtures';
 
+interface Bounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 async function waitForActiveScene(page: Page, key: string): Promise<void> {
   await expect
     .poll(
@@ -71,12 +78,33 @@ test.describe('Pre-fight control briefing', () => {
             grenadeButton?: {
               visible: boolean;
               radius: number;
+              x: number;
+              y: number;
               emit: (event: string) => void;
             };
-            abilityButton?: { visible: boolean; radius: number };
-            tauntButton?: { visible: boolean; radius: number };
+            abilityButton?: { visible: boolean; radius: number; x: number; y: number };
+            tauntButton?: { visible: boolean; radius: number; x: number; y: number };
+            grenadeButtonText?: {
+              text: string;
+              visible: boolean;
+              style: { fontSize: string };
+              getBounds: () => Bounds;
+            };
+            abilityButtonText?: {
+              text: string;
+              visible: boolean;
+              style: { fontSize: string };
+              getBounds: () => Bounds;
+            };
+            tauntButtonText?: {
+              text: string;
+              visible: boolean;
+              style: { fontSize: string };
+              getBounds: () => Bounds;
+            };
           };
         };
+        matchMenu: { launcher: { getBounds: () => Bounds } };
       };
       scene.gameService.emit('matchCountdown', 3);
       const visibleText = scene.children.list
@@ -94,13 +122,57 @@ test.describe('Pre-fight control briefing', () => {
               gameplayEnabled: touch.gameplayEnabled ?? null,
               bufferedGrenade: touch.grenadeButtonPressedFlag ?? null,
               grenade: touch.grenadeButton
-                ? { visible: touch.grenadeButton.visible, radius: touch.grenadeButton.radius }
+                ? {
+                    visible: touch.grenadeButton.visible,
+                    radius: touch.grenadeButton.radius,
+                    x: touch.grenadeButton.x,
+                    y: touch.grenadeButton.y,
+                  }
                 : null,
               ability: touch.abilityButton
-                ? { visible: touch.abilityButton.visible, radius: touch.abilityButton.radius }
+                ? {
+                    visible: touch.abilityButton.visible,
+                    radius: touch.abilityButton.radius,
+                    x: touch.abilityButton.x,
+                    y: touch.abilityButton.y,
+                  }
                 : null,
               taunt: touch.tauntButton
-                ? { visible: touch.tauntButton.visible, radius: touch.tauntButton.radius }
+                ? {
+                    visible: touch.tauntButton.visible,
+                    radius: touch.tauntButton.radius,
+                    x: touch.tauntButton.x,
+                    y: touch.tauntButton.y,
+                  }
+                : null,
+            }
+          : null,
+        menuLauncherBounds: scene.matchMenu.launcher.getBounds(),
+        labels: touch
+          ? {
+              grenade: touch.grenadeButtonText
+                ? {
+                    text: touch.grenadeButtonText.text,
+                    visible: touch.grenadeButtonText.visible,
+                    font: Number.parseInt(touch.grenadeButtonText.style.fontSize, 10),
+                    bounds: touch.grenadeButtonText.getBounds(),
+                  }
+                : null,
+              ability: touch.abilityButtonText
+                ? {
+                    text: touch.abilityButtonText.text,
+                    visible: touch.abilityButtonText.visible,
+                    font: Number.parseInt(touch.abilityButtonText.style.fontSize, 10),
+                    bounds: touch.abilityButtonText.getBounds(),
+                  }
+                : null,
+              taunt: touch.tauntButtonText
+                ? {
+                    text: touch.tauntButtonText.text,
+                    visible: touch.tauntButtonText.visible,
+                    font: Number.parseInt(touch.tauntButtonText.style.fontSize, 10),
+                    bounds: touch.tauntButtonText.getBounds(),
+                  }
                 : null,
             }
           : null,
@@ -117,13 +189,37 @@ test.describe('Pre-fight control briefing', () => {
       expect(state.visibleText.some((text) => text.includes('HOLD RIGHT SIDE TO AIM'))).toBe(
         true,
       );
+      expect(
+        state.visibleText.some((text) => text.includes('GRENADE  •  ABILITY  •  TAUNT')),
+      ).toBe(true);
       expect(state.actions).toEqual({
         gameplayEnabled: false,
         bufferedGrenade: false,
-        grenade: { visible: true, radius: 40 },
-        ability: { visible: true, radius: 40 },
-        taunt: { visible: true, radius: 40 },
+        grenade: { visible: true, radius: 40, x: 904, y: 116 },
+        ability: { visible: true, radius: 40, x: 904, y: 208 },
+        taunt: { visible: true, radius: 40, x: 808, y: 116 },
       });
+      const menuBottom = state.menuLauncherBounds.y + state.menuLauncherBounds.height;
+      for (const action of [state.actions.grenade, state.actions.taunt]) {
+        expect(action).not.toBeNull();
+        if (!action) continue;
+        expect(action.y - action.radius).toBeGreaterThanOrEqual(menuBottom + 12);
+      }
+      expect(state.labels).toMatchObject({
+        grenade: { text: 'GRENADE', visible: true, font: 11 },
+        ability: { text: 'ABILITY\nREADY', visible: true, font: 11 },
+        taunt: { text: 'TAUNT', visible: true, font: 11 },
+      });
+      for (const label of Object.values(state.labels ?? {})) {
+        expect(label).not.toBeNull();
+        if (!label) continue;
+        expect(label.bounds.width).toBeLessThanOrEqual(76);
+        expect(label.bounds.height).toBeLessThanOrEqual(60);
+        expect(label.bounds.x).toBeGreaterThanOrEqual(0);
+        expect(label.bounds.x + label.bounds.width).toBeLessThanOrEqual(960);
+        expect(label.bounds.y).toBeGreaterThanOrEqual(0);
+        expect(label.bounds.y + label.bounds.height).toBeLessThanOrEqual(576);
+      }
     } else {
       expect(state.inputMode).toBe('keyboard');
       expect(state.visibleText).toContain('HOW TO FIGHT // KEYBOARD + MOUSE');
@@ -142,22 +238,44 @@ test.describe('Pre-fight control briefing', () => {
         ).game?.scene.getScene('GameScene') as {
           gameService: { emit: (event: string) => void };
           inputManager?: {
+            setAbilityButtonState: (state: 'ready' | 'active' | 'cooldown') => void;
             touchInput?: {
               gameplayEnabled?: boolean;
               grenadeButtonPressedFlag?: boolean;
               grenadeButton?: { emit: (event: string) => void };
+              grenadeButtonText?: { text: string };
+              abilityButtonText?: { text: string };
+              tauntButtonText?: { text: string };
+              getInput: (hasActiveGrenade: boolean) => unknown;
             };
           };
         };
         scene.gameService.emit('matchStart');
-        scene.inputManager?.touchInput?.grenadeButton?.emit('pointerdown');
+        scene.inputManager?.setAbilityButtonState('cooldown');
+        const touch = scene.inputManager?.touchInput;
+        touch?.getInput(true);
+        touch?.grenadeButton?.emit('pointerdown');
         return {
-          gameplayEnabled: scene.inputManager?.touchInput?.gameplayEnabled ?? null,
-          bufferedGrenade:
-            scene.inputManager?.touchInput?.grenadeButtonPressedFlag ?? null,
+          gameplayEnabled: touch?.gameplayEnabled ?? null,
+          bufferedGrenade: touch?.grenadeButtonPressedFlag ?? null,
+          labels: {
+            grenade: touch?.grenadeButtonText?.text ?? null,
+            ability: touch?.abilityButtonText?.text ?? null,
+            taunt: touch?.tauntButtonText?.text ?? null,
+          },
         };
       });
-      expect(armed).toEqual({ gameplayEnabled: true, bufferedGrenade: true });
+      expect(armed).toEqual({
+        gameplayEnabled: true,
+        bufferedGrenade: true,
+        labels: {
+          grenade: 'DETONATE',
+          ability: 'ABILITY\nCOOLDOWN',
+          taunt: 'TAUNT',
+        },
+      });
+      await gamePage.waitForTimeout(50);
+      await gamePage.screenshot({ path: testInfo.outputPath('touch-actions-live.png') });
     }
   });
 });

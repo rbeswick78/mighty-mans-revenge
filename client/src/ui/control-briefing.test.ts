@@ -7,22 +7,23 @@ describe('controlBriefingFor', () => {
       title: 'HOW TO FIGHT // KEYBOARD + MOUSE',
       detail:
         'WASD MOVE  •  HOLD LMB TO AIM  •  RELEASE TO FIRE\n' +
-        'SHIFT SPRINT  •  RMB GRENADE  •  SPACE POWER  •  R RELOAD',
+        'SHIFT SPRINT  •  RMB GRENADE  •  SPACE ABILITY  •  R RELOAD',
     });
   });
 
   it('maps the same release model to touch and gamepad language', () => {
     expect(controlBriefingFor('touch').detail).toContain('HOLD RIGHT SIDE TO AIM');
     expect(controlBriefingFor('touch').detail).toContain('RELEASE TO FIRE');
+    expect(controlBriefingFor('touch').detail).toContain('GRENADE  •  ABILITY  •  TAUNT');
     expect(controlBriefingFor('gamepad').detail).toContain('HOLD RT TO AIM');
     expect(controlBriefingFor('gamepad').detail).toContain('RELEASE TO FIRE');
   });
 
-  it('does not advertise disabled grenade or power actions', () => {
+  it('does not advertise disabled grenade or ability actions', () => {
     for (const mode of ['keyboard', 'touch', 'gamepad'] as const) {
       const briefing = controlBriefingFor(mode, false);
       expect(briefing.detail).not.toContain('GRENADE');
-      expect(briefing.detail).not.toContain('POWER');
+      expect(briefing.detail).not.toContain('ABILITY');
     }
   });
 });

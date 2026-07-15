@@ -18,8 +18,8 @@ export function controlBriefingFor(
     return {
       title: 'HOW TO FIGHT // TOUCH',
       detail: secondaryActionsEnabled
-        ? 'LEFT SIDE MOVE  •  HOLD RIGHT SIDE TO AIM\nRELEASE TO FIRE  •  G GRENADE  •  A POWER  •  T TAUNT'
-        : 'LEFT SIDE MOVE  •  HOLD RIGHT SIDE TO AIM\nRELEASE TO FIRE  •  T TAUNT',
+        ? 'LEFT SIDE MOVE  •  HOLD RIGHT SIDE TO AIM\nRELEASE TO FIRE  •  GRENADE  •  ABILITY  •  TAUNT'
+        : 'LEFT SIDE MOVE  •  HOLD RIGHT SIDE TO AIM\nRELEASE TO FIRE  •  TAUNT',
     };
   }
 
@@ -27,7 +27,7 @@ export function controlBriefingFor(
     return {
       title: 'HOW TO FIGHT // GAMEPAD',
       detail: secondaryActionsEnabled
-        ? 'LEFT STICK MOVE  •  HOLD RT TO AIM\nRELEASE TO FIRE  •  LS SPRINT  •  LT GRENADE  •  RB POWER'
+        ? 'LEFT STICK MOVE  •  HOLD RT TO AIM\nRELEASE TO FIRE  •  LS SPRINT  •  LT GRENADE  •  RB ABILITY'
         : 'LEFT STICK MOVE  •  HOLD RT TO AIM\nRELEASE TO FIRE  •  LS SPRINT  •  X RELOAD  •  Y TAUNT',
     };
   }
@@ -35,7 +35,7 @@ export function controlBriefingFor(
   return {
     title: 'HOW TO FIGHT // KEYBOARD + MOUSE',
     detail: secondaryActionsEnabled
-      ? 'WASD MOVE  •  HOLD LMB TO AIM  •  RELEASE TO FIRE\nSHIFT SPRINT  •  RMB GRENADE  •  SPACE POWER  •  R RELOAD'
+      ? 'WASD MOVE  •  HOLD LMB TO AIM  •  RELEASE TO FIRE\nSHIFT SPRINT  •  RMB GRENADE  •  SPACE ABILITY  •  R RELOAD'
       : 'WASD MOVE  •  HOLD LMB TO AIM  •  RELEASE TO FIRE\nSHIFT SPRINT  •  R RELOAD  •  T TAUNT',
   };
 }

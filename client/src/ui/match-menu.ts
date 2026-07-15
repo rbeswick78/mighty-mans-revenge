@@ -6,6 +6,13 @@ import { matchLeaveCopy, type MatchMenuContext } from './match-leave-copy.js';
 import { MENU_FONTS } from './menu/fonts.js';
 import { drawBeveledChrome } from './menu/menu-panel.js';
 import { PixelButton } from './menu/pixel-button.js';
+import {
+  MATCH_MENU_LAUNCHER_HEIGHT,
+  MATCH_MENU_LAUNCHER_HIT_PADDING_Y,
+  MATCH_MENU_LAUNCHER_WIDTH,
+  MATCH_MENU_LAUNCHER_X,
+  MATCH_MENU_LAUNCHER_Y,
+} from './layout.js';
 
 export type MatchMenuView = 'menu' | 'confirm';
 
@@ -36,14 +43,22 @@ export class MatchMenu {
     this.onOpenChanged = onOpenChanged;
     const touch = isTouchDevice();
 
-    this.launcher = new PixelButton(scene, 816, 14, 128, 42, 'MENU', {
-      variant: 'secondary',
-      fontSize: 9,
-      subtitle: touch ? 'TAP TO OPEN' : 'ESC / START',
-      subtitleFontSize: 6,
-      hitPaddingY: 8,
-      onClick: () => this.show(),
-    });
+    this.launcher = new PixelButton(
+      scene,
+      MATCH_MENU_LAUNCHER_X,
+      MATCH_MENU_LAUNCHER_Y,
+      MATCH_MENU_LAUNCHER_WIDTH,
+      MATCH_MENU_LAUNCHER_HEIGHT,
+      'MENU',
+      {
+        variant: 'secondary',
+        fontSize: 9,
+        subtitle: touch ? 'TAP TO OPEN' : 'ESC / START',
+        subtitleFontSize: 6,
+        hitPaddingY: MATCH_MENU_LAUNCHER_HIT_PADDING_Y,
+        onClick: () => this.show(),
+      },
+    );
     this.launcher.setDepth(24_000);
 
     const scrim = scene.add

@@ -48,6 +48,7 @@ import { SmokeFx } from '../rendering/smoke-fx.js';
 import { FireBreathFx } from '../rendering/fire-breath-fx.js';
 import { XrayFx } from '../rendering/xray-fx.js';
 import { AbilityAura } from '../rendering/ability-aura.js';
+import { touchAbilityState } from '../input/touch-action-presentation.js';
 import { DecalRenderer } from '../rendering/decal-renderer.js';
 import { KothHillRenderer } from '../rendering/koth-hill-renderer.js';
 import { RadiationStormRenderer } from '../rendering/radiation-storm-renderer.js';
@@ -793,6 +794,12 @@ export class GameScene extends Phaser.Scene {
           currentLocalState.characterId,
           currentLocalState.abilityActiveSeconds,
           currentLocalState.abilityCooldownSeconds,
+        );
+        this.inputManager?.setAbilityButtonState(
+          touchAbilityState(
+            currentLocalState.abilityActiveSeconds,
+            currentLocalState.abilityCooldownSeconds,
+          ),
         );
 
         if (localTeam && this.matchData?.playerTeams) {

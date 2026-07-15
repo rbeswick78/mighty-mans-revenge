@@ -2,7 +2,13 @@ import Phaser from 'phaser';
 import type { RawInput } from './types.js';
 import { isTouchDevice } from './is-touch-device.js';
 import { Wasteland, cssHex } from '@shared/config/palette.js';
-import { MAP_HEIGHT_PX } from '../ui/layout.js';
+import { MAP_HEIGHT_PX, TOUCH_ACTION_TOP_PX } from '../ui/layout.js';
+import {
+  TAUNT_BUTTON_LABEL,
+  abilityButtonLabel,
+  grenadeButtonLabel,
+  type TouchAbilityState,
+} from './touch-action-presentation.js';
 
 const JOYSTICK_MAX_RADIUS = 50;
 const DEAD_ZONE_RATIO = 0.15;
@@ -27,6 +33,17 @@ const GRENADE_DETONATE_ALPHA = 0.85;
 const ABILITY_READY_COLOR = 0x4ad8e8;
 const ABILITY_DIM_COLOR = 0x55667a;
 const ABILITY_BUTTON_ALPHA = 0.55;
+
+const ACTION_BUTTON_TEXT_STYLE: Phaser.Types.GameObjects.Text.TextStyle = {
+  fontFamily: 'Courier, monospace',
+  fontSize: '11px',
+  color: cssHex(Wasteland.TEXT_PRIMARY),
+  fontStyle: 'bold',
+  align: 'center',
+  stroke: '#000000',
+  strokeThickness: 2,
+  lineSpacing: -2,
+};
 
 interface VirtualJoystick {
   active: boolean;
@@ -86,19 +103,19 @@ export class TouchInput {
 
     const { width } = scene.scale;
     const btnX = width - GRENADE_BUTTON_MARGIN - GRENADE_BUTTON_SIZE;
-    const btnY = GRENADE_BUTTON_MARGIN + GRENADE_BUTTON_SIZE;
+    const btnY = TOUCH_ACTION_TOP_PX + GRENADE_BUTTON_SIZE;
 
     this.grenadeButton = scene.add.circle(btnX, btnY, GRENADE_BUTTON_SIZE, GRENADE_AIM_COLOR, GRENADE_AIM_ALPHA);
     this.grenadeButton.setScrollFactor(0);
     this.grenadeButton.setDepth(3000);
     this.grenadeButton.setVisible(false);
 
-    this.grenadeButtonText = scene.add.text(btnX, btnY, 'G', {
-      fontFamily: 'Courier, monospace',
-      fontSize: '18px',
-      color: cssHex(Wasteland.TEXT_PRIMARY),
-      fontStyle: 'bold',
-    });
+    this.grenadeButtonText = scene.add.text(
+      btnX,
+      btnY,
+      grenadeButtonLabel(false),
+      ACTION_BUTTON_TEXT_STYLE,
+    );
     this.grenadeButtonText.setOrigin(0.5, 0.5);
     this.grenadeButtonText.setScrollFactor(0);
     this.grenadeButtonText.setDepth(3001);
@@ -131,12 +148,12 @@ export class TouchInput {
     this.abilityButton.setDepth(3000);
     this.abilityButton.setVisible(false);
 
-    this.abilityButtonText = scene.add.text(abilityX, abilityY, 'A', {
-      fontFamily: 'Courier, monospace',
-      fontSize: '18px',
-      color: cssHex(Wasteland.TEXT_PRIMARY),
-      fontStyle: 'bold',
-    });
+    this.abilityButtonText = scene.add.text(
+      abilityX,
+      abilityY,
+      abilityButtonLabel('ready'),
+      ACTION_BUTTON_TEXT_STYLE,
+    );
     this.abilityButtonText.setOrigin(0.5, 0.5);
     this.abilityButtonText.setScrollFactor(0);
     this.abilityButtonText.setDepth(3001);
@@ -160,12 +177,12 @@ export class TouchInput {
     );
     this.tauntButton.setScrollFactor(0).setDepth(3000).setVisible(false);
 
-    this.tauntButtonText = scene.add.text(tauntX, tauntY, 'T', {
-      fontFamily: 'Courier, monospace',
-      fontSize: '16px',
-      color: cssHex(Wasteland.TEXT_PRIMARY),
-      fontStyle: 'bold',
-    });
+    this.tauntButtonText = scene.add.text(
+      tauntX,
+      tauntY,
+      TAUNT_BUTTON_LABEL,
+      ACTION_BUTTON_TEXT_STYLE,
+    );
     this.tauntButtonText.setOrigin(0.5).setScrollFactor(0).setDepth(3001).setVisible(false);
     this.tauntButton.on('pointerdown', () => {
       if (!this.gameplayEnabled) return;
@@ -178,7 +195,7 @@ export class TouchInput {
 
     // Show the action cluster during COUNTDOWN instead of waiting for the
     // player's first gameplay touch. The pre-fight control card explains the
-    // G/A/T labels, and the larger taunt target now clears a 40px canvas-space
+    // named buttons, and the larger taunt target now clears a 40px canvas-space
     // radius like the other actions. Dynamic joysticks still appear only where
     // the player places their thumbs.
     if (this.isTouch) this.showTouchUI();
@@ -365,10 +382,10 @@ export class TouchInput {
   private syncGrenadeButtonAppearance(hasActiveGrenade: boolean): void {
     if (hasActiveGrenade) {
       this.grenadeButton.setFillStyle(GRENADE_DETONATE_COLOR, GRENADE_DETONATE_ALPHA);
-      this.grenadeButtonText.setText('!');
+      this.grenadeButtonText.setText(grenadeButtonLabel(true));
     } else {
       this.grenadeButton.setFillStyle(GRENADE_AIM_COLOR, GRENADE_AIM_ALPHA);
-      this.grenadeButtonText.setText('G');
+      this.grenadeButtonText.setText(grenadeButtonLabel(false));
     }
   }
 
@@ -442,8 +459,8 @@ export class TouchInput {
    * scene each frame from the local player's snapshot. Visible-state only —
    * input still goes through regardless of color so the server has final say.
    */
-  setAbilityButtonState(state: 'ready' | 'active' | 'cooldown'): void {
-    if (!this.abilityButton.visible) return;
+  setAbilityButtonState(state: TouchAbilityState): void {
+    this.abilityButtonText.setText(abilityButtonLabel(state));
     if (state === 'ready') {
       this.abilityButton.setFillStyle(ABILITY_READY_COLOR, ABILITY_BUTTON_ALPHA);
     } else if (state === 'active') {
