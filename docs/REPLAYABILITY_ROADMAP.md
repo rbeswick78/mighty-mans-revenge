@@ -4276,6 +4276,39 @@ favorite mid-match event while the final-minute surprise stays fresh.
 
 ## Session Log
 
+### Session 100 — 2026-07-14 — Readable Ability Status
+
+**Shipped:** the live HUD no longer asks players to remember what a small
+character icon means. Every fighter now carries the same canonical ability
+name from Character Select into combat (`X-RAY VISION`, `FIRE BREATH`, `FROST
+LOCK`, `IRON HIDE`, `AXE THROW`, or `BREACH DASH`) with an explicit second-line
+state: `READY`, `ACTIVE 2S`, or `READY IN 7S`. Both lines use outlined 12px
+pixel text inside the existing ability lane, leaving health, sprint, ammo,
+grenades, score, timer, and touch controls untouched.
+
+The icon and radial sweep remain the fast peripheral cue, while the labels
+remove the memory test for new and returning players. Rook also receives the
+missing twin-chevron dash icon instead of incorrectly falling through to Frost
+Wizard's snowflake. Ability timing, cooldowns, activation, input, combat,
+prediction, reconciliation, modes, and server authority are unchanged. One in
+the Chamber still hides the disabled ability indicator completely.
+
+**Verification:** typecheck and lint pass; all 1,320 unit and integration tests
+pass across 102 files. Pure coverage proves all six canonical names,
+ready/active/cooldown wording, rounded seconds, and malformed timer handling.
+The production build passes with the existing Vite chunk-size advisory
+(`index-RPLZhISJ.js`, 1,861.29 kB / 445.38 kB gzip). Chromium, Firefox, and
+844×390 mobile-landscape screenshots verify the 12px two-line treatment, all
+HUD bounds, ready/active/cooldown colors, and Rook's chevron icon. The complete
+117-case Playwright matrix passes cleanly with 102 executable passes and 15
+intentional project-specific skips in 13.3 minutes.
+
+**Operational watch:** keep future ability copy within the current 125px lane;
+the longest shipped names and `READY IN 30S` fit, but rule explanations belong
+in the existing pre-fight briefing rather than the live strip. If playtesting
+shows cooldown text is still missed during combat, prefer a one-shot ready
+sound/callout over another permanent HUD row.
+
 ### Session 99 — 2026-07-14 — Readable Vitality HUD
 
 **Shipped:** the live lower-left HUD no longer asks players to infer survival

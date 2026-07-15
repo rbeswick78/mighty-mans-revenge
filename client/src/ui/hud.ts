@@ -32,6 +32,10 @@ import {
   sprintPresentation,
   type SprintTone,
 } from './vitality-presentation.js';
+import {
+  abilityStatusPresentation,
+  type AbilityStatusTone,
+} from './ability-status.js';
 
 // Press Start 2P is much wider per glyph than Courier, so the final-minute
 // banner size drops to compensate (Courier 40px ≈ PS2P 22-24px in width).
@@ -53,6 +57,8 @@ const HEADER_STYLE: Phaser.Types.GameObjects.Text.TextStyle = {
   fontSize: '12px',
   color: cssHex(Wasteland.TEXT_PRIMARY),
 };
+
+const ABILITY_COOLDOWN_TEXT_COLOR = 0x9aa3b0;
 
 // Map-centered overlays (countdown, death overlay, ability activation
 // banner) stay in Courier — they are gameplay-language UI, separate from
@@ -163,9 +169,10 @@ export class HUD {
   private activeEventLabel: Phaser.GameObjects.Text;
 
   // Ability indicator (left column, near the grenade row): icon + radial
-  // sweep cooldown overlay + numeric countdown.
+  // sweep cooldown overlay + explicit ability name and state.
   private abilityBg: Phaser.GameObjects.Arc;
   private abilityIconGfx: Phaser.GameObjects.Graphics;
+  private abilityNameText: Phaser.GameObjects.Text;
   private abilityCountdownText: Phaser.GameObjects.Text;
   private abilitySweep: Phaser.GameObjects.Graphics;
   private abilityCenterX: number = 0;
@@ -342,13 +349,31 @@ export class HUD {
     this.abilitySweep.setScrollFactor(0);
     this.abilitySweep.setDepth(1001);
 
-    this.abilityCountdownText = scene.add.text(
+    this.abilityNameText = scene.add.text(
       this.abilityCenterX,
-      this.abilityCenterY + this.abilityRadius + 6,
+      this.abilityCenterY + this.abilityRadius + 4,
       '',
       {
-        ...HEADER_STYLE,
-        fontSize: '9px',
+        ...FONT_STYLE,
+        fontSize: '12px',
+        stroke: '#000000',
+        strokeThickness: 2,
+      },
+    );
+    this.abilityNameText.setOrigin(0.5, 0);
+    this.abilityNameText.setScrollFactor(0);
+    this.abilityNameText.setDepth(1002);
+    this.abilityNameText.setVisible(false);
+
+    this.abilityCountdownText = scene.add.text(
+      this.abilityCenterX,
+      this.abilityCenterY + this.abilityRadius + 20,
+      '',
+      {
+        ...FONT_STYLE,
+        fontSize: '12px',
+        stroke: '#000000',
+        strokeThickness: 2,
       },
     );
     this.abilityCountdownText.setOrigin(0.5, 0);
@@ -1151,11 +1176,11 @@ export class HUD {
    * Update the per-character ability indicator. Pass null/undefined character
    * before COUNTDOWN to hide it.
    *
-   *   ready    — icon glows, no sweep, blank countdown
+   *   ready    — icon glows, no sweep, state says READY
    *   active   — icon pulses, sweep shows shrinking active fraction (cyan),
-   *              countdown shows ceil(active seconds)
+   *              state says ACTIVE plus ceil(active seconds)
    *   cooldown — icon dimmed, sweep shows shrinking cooldown fraction (red),
-   *              countdown shows ceil(cooldown seconds)
+   *              state says READY IN plus ceil(cooldown seconds)
    */
   updateAbility(
     characterId: CharacterId | null,
@@ -1165,6 +1190,7 @@ export class HUD {
     if (!characterId || this.oneInTheChamberActive) {
       this.abilityBg.setVisible(false);
       this.abilityIconGfx.setVisible(false);
+      this.abilityNameText.setVisible(false);
       this.abilityCountdownText.setVisible(false);
       this.abilitySweep.clear();
       this.abilityIconGfx.clear();
@@ -1207,6 +1233,7 @@ export class HUD {
 
     const isActive = activeSeconds > 0;
     const isCoolingDown = !isActive && cooldownSeconds > 0;
+    const presentation = abilityStatusPresentation(characterId, activeSeconds, cooldownSeconds);
 
     let fillColor: number;
     let strokeColor: number;
@@ -1214,7 +1241,6 @@ export class HUD {
     let iconColorNum: number;
     let sweepColor: number;
     let sweepFraction: number;
-    let countdownText: string;
 
     if (isActive) {
       // Pulsing ready-color fill so the player feels the active window.
@@ -1224,7 +1250,6 @@ export class HUD {
       iconColorNum = 0x000000;
       sweepColor = 0xffffff;
       sweepFraction = activeSeconds / activeDuration;
-      countdownText = `${Math.ceil(activeSeconds)}`;
     } else if (isCoolingDown) {
       // Flat dark grey — the unmistakable "not ready" state.
       fillColor = cooldownColor;
@@ -1233,7 +1258,6 @@ export class HUD {
       iconColorNum = 0x9aa3b0;
       sweepColor = readyColor;
       sweepFraction = cooldownSeconds / totalCycle;
-      countdownText = `${Math.ceil(cooldownSeconds)}`;
     } else {
       // Ready: solid character color. Reads clearly even peripheral.
       fillColor = readyColor;
@@ -1242,7 +1266,6 @@ export class HUD {
       iconColorNum = 0x000000;
       sweepColor = 0;
       sweepFraction = 0;
-      countdownText = 'READY';
     }
 
     this.abilityBg.setFillStyle(fillColor, 1);
@@ -1255,10 +1278,16 @@ export class HUD {
       this.drawShieldIcon(iconColorNum, iconAlpha);
     } else if (characterId === 'jack') {
       this.drawAxeIcon(iconColorNum, iconAlpha);
+    } else if (characterId === 'rook') {
+      this.drawDashIcon(iconColorNum, iconAlpha);
     } else {
       this.drawSnowflakeIcon(iconColorNum, iconAlpha);
     }
-    this.abilityCountdownText.setText(countdownText);
+    this.abilityNameText.setText(presentation.name);
+    this.abilityNameText.setVisible(true);
+    this.abilityCountdownText
+      .setText(presentation.state)
+      .setColor(cssHex(this.abilityStatusColor(presentation.tone, readyColor)));
     this.abilityCountdownText.setVisible(true);
 
     this.abilitySweep.clear();
@@ -1277,6 +1306,12 @@ export class HUD {
       );
       this.abilitySweep.strokePath();
     }
+  }
+
+  private abilityStatusColor(tone: AbilityStatusTone, readyColor: number): number {
+    if (tone === 'ready') return readyColor;
+    if (tone === 'cooldown') return ABILITY_COOLDOWN_TEXT_COLOR;
+    return Wasteland.TEXT_PRIMARY;
   }
 
   /**
@@ -1383,6 +1418,20 @@ export class HUD {
     g.lineTo(4, -1);
     g.closePath();
     g.fillPath();
+  }
+
+  /** Twin forward chevrons for Rook's aim-directed Breach Dash. */
+  private drawDashIcon(color: number, alpha: number): void {
+    const g = this.abilityIconGfx;
+    g.clear();
+    g.lineStyle(3, color, alpha);
+    for (const offset of [-6, 3]) {
+      g.beginPath();
+      g.moveTo(offset - 4, -8);
+      g.lineTo(offset + 3, 0);
+      g.lineTo(offset - 4, 8);
+      g.strokePath();
+    }
   }
 
   /**
@@ -1493,6 +1542,7 @@ export class HUD {
     this.activeEventLabel.destroy();
     this.abilityBg.destroy();
     this.abilityIconGfx.destroy();
+    this.abilityNameText.destroy();
     this.abilityCountdownText.destroy();
     this.abilitySweep.destroy();
     for (const entry of this.killFeedEntries) {

@@ -32,6 +32,11 @@ const FIGHTER_ABILITY_COPY = {
   },
 } as const satisfies Record<CharacterId, { name: string; rule: string }>;
 
+/** Canonical player-facing ability name shared by selection and live HUD copy. */
+export function fighterAbilityName(id: CharacterId): string {
+  return FIGHTER_ABILITY_COPY[id].name;
+}
+
 /** Large selected-fighter copy; card grids only need identity at a glance. */
 export function fighterBriefing(id: CharacterId): FighterBriefing {
   const fighter = CHARACTERS[id];
