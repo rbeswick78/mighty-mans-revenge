@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { WEAPONS, ABILITY, GAME_MODES } from '@shared/config/game.js';
+import { WEAPONS, ABILITY, GAME_MODES, GRENADE } from '@shared/config/game.js';
 import type { CharacterId, WeaponId } from '@shared/config/game.js';
 import type {
   CoreRunState,
@@ -22,6 +22,11 @@ import { batDurabilityLabel } from '../rendering/bat-presentation.js';
 import { armorPresentation } from './armor-presentation.js';
 import type { InputMode } from '../input/input-manager.js';
 import { controlBriefingFor } from './control-briefing.js';
+import {
+  grenadePresentation,
+  rifleAmmoPresentation,
+  type CombatResourceTone,
+} from './combat-resources.js';
 
 // Press Start 2P is much wider per glyph than Courier, so the final-minute
 // banner size drops to compensate (Courier 40px ≈ PS2P 22-24px in width).
@@ -78,7 +83,6 @@ export class HUD {
   private staminaBarBg: Phaser.GameObjects.Rectangle;
   private staminaBarFg: Phaser.GameObjects.Rectangle;
   private ammoText: Phaser.GameObjects.Text;
-  private reloadingText: Phaser.GameObjects.Text;
   private grenadeText: Phaser.GameObjects.Text;
 
   // Special-weapon row: label + indicator icons + count text. Hidden while
@@ -95,11 +99,9 @@ export class HUD {
   private readonly shotgunReserveTextX: number;
 
   // Rifle-ammo-row suppression inputs (see syncAmmoRowVisibility): the
-  // held weapon, the Gun Game rung (null outside that mode), and whether
-  // the row's RELOADING flag was last set.
+  // held weapon and the Gun Game rung (null outside that mode).
   private currentWeaponId: WeaponId = 'rifle';
   private gunGameRung: GunGameRung | null = null;
-  private rifleAmmoReloading = false;
 
   // Middle column: match state
   private scoreText: Phaser.GameObjects.Text;
@@ -235,29 +237,25 @@ export class HUD {
     this.staminaBarFg.setDepth(1001);
 
     const ammoY = stY + stH + 12;
-    this.ammoText = scene.add.text(
-      hbX,
-      ammoY,
-      `${WEAPONS.rifle.magazineSize} / ${WEAPONS.rifle.magazineSize}`,
-      {
-        ...FONT_STYLE,
-      },
+    const startingAmmo = rifleAmmoPresentation(
+      WEAPONS.rifle.magazineSize,
+      WEAPONS.rifle.magazineSize,
+      false,
     );
+    this.ammoText = scene.add.text(hbX, ammoY, startingAmmo.label, {
+      ...FONT_STYLE,
+      fontSize: '18px',
+      color: cssHex(this.combatResourceColor(startingAmmo.tone)),
+    });
     this.ammoText.setScrollFactor(0);
     this.ammoText.setDepth(1000);
 
-    this.reloadingText = scene.add.text(hbX + 80, ammoY, 'RELOADING', {
-      ...HEADER_STYLE,
-      fontSize: '10px',
-      color: cssHex(Wasteland.TEXT_RELOAD_WARNING),
-    });
-    this.reloadingText.setScrollFactor(0);
-    this.reloadingText.setDepth(1000);
-    this.reloadingText.setVisible(false);
-
     const grenadeY = ammoY + 24;
-    this.grenadeText = scene.add.text(hbX, grenadeY, 'GRN: ready', {
+    const startingGrenades = grenadePresentation(false, GRENADE.STARTING_COUNT, false);
+    this.grenadeText = scene.add.text(hbX, grenadeY, startingGrenades.label, {
       ...FONT_STYLE,
+      fontSize: '18px',
+      color: cssHex(this.combatResourceColor(startingGrenades.tone)),
     });
     this.grenadeText.setScrollFactor(0);
     this.grenadeText.setDepth(1000);
@@ -636,8 +634,10 @@ export class HUD {
   }
 
   updateAmmo(current: number, max: number, isReloading: boolean): void {
-    this.ammoText.setText(`${current} / ${max}`);
-    this.rifleAmmoReloading = isReloading;
+    const presentation = rifleAmmoPresentation(current, max, isReloading);
+    this.ammoText
+      .setText(presentation.label)
+      .setColor(cssHex(this.combatResourceColor(presentation.tone)));
     this.syncAmmoRowVisibility();
   }
 
@@ -774,7 +774,6 @@ export class HUD {
   private syncAmmoRowVisibility(): void {
     const visible = rifleAmmoRowVisible(this.currentWeaponId, this.gunGameRung);
     this.ammoText.setVisible(visible);
-    this.reloadingText.setVisible(visible && this.rifleAmmoReloading);
   }
 
   /** Show a respawn countdown or permanent stock-elimination state. */
@@ -797,18 +796,17 @@ export class HUD {
    * otherwise show the player's remaining carry count (right-click will throw).
    */
   updateGrenadeStatus(hasActiveGrenade: boolean, count: number): void {
-    if (this.oneInTheChamberActive) {
-      this.grenadeText.setText('GRN: DISABLED');
-      this.grenadeText.setColor(cssHex(Wasteland.HUD_STRIP_BORDER));
-      return;
-    }
-    if (hasActiveGrenade) {
-      this.grenadeText.setText('GRN: LIVE');
-      this.grenadeText.setColor(cssHex(Wasteland.TEXT_GRENADE_LIVE));
-    } else {
-      this.grenadeText.setText(`GRN: ${count}`);
-      this.grenadeText.setColor(cssHex(Wasteland.TEXT_GRENADE_READY));
-    }
+    const presentation = grenadePresentation(hasActiveGrenade, count, this.oneInTheChamberActive);
+    this.grenadeText
+      .setText(presentation.label)
+      .setColor(cssHex(this.combatResourceColor(presentation.tone)));
+  }
+
+  private combatResourceColor(tone: CombatResourceTone): number {
+    if (tone === 'warning') return Wasteland.TEXT_LOW_AMMO;
+    if (tone === 'danger' || tone === 'live') return Wasteland.TEXT_GRENADE_LIVE;
+    if (tone === 'disabled') return Wasteland.HUD_STRIP_BORDER;
+    return Wasteland.TEXT_PRIMARY;
   }
 
   updateStamina(current: number, max: number): void {
@@ -1436,7 +1434,6 @@ export class HUD {
     this.staminaBarBg.destroy();
     this.staminaBarFg.destroy();
     this.ammoText.destroy();
-    this.reloadingText.destroy();
     this.grenadeText.destroy();
     this.specialWeaponLabel.destroy();
     for (const icon of this.specialShellIcons) {
