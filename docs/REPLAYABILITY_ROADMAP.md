@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–104 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, readable selected-fighter ability/stat briefings, adaptive live ammo/grenade labels, explicit live health/armor/sprint labels, readable live match status and kill feed, roster-authentic duel/Rumble results, Gun Game, Rivalry Sets, Quick Match 1v1 plus 2–4 player Wasteland Rumble with all-player group draft rallies, a rematch-chain Rumble Crown, live lead-change drama, personal rematch Grudges, authoritative Rumble Assists with K/A/D, a solo four-fighter Scrap Pit whose three server-authoritative rivals have distinct readable tactics, answer player taunts with signature banter, and feed a device-local win/run record chase, a 2v2 Crew Battle with friendly-fire protection and an optional six-second real-friend join window, a four-objective Crew Clash rotation, and a device-local four-patch Crew Tour, visible bounded Wasteland Signal Recovery, device-aware pre-fight control onboarding with early touch affordances, persistent user-controlled lobby audio, safe multi-input exits before and during fights with confirmed authoritative forfeits, a focused cross-device Practice Setup overlay, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–105 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, readable selected-fighter ability/stat briefings, adaptive live ammo/grenade labels, explicit live health/armor/sprint labels, readable live match status, kill feed, and lobby leaderboards, roster-authentic duel/Rumble results, Gun Game, Rivalry Sets, Quick Match 1v1 plus 2–4 player Wasteland Rumble with all-player group draft rallies, a rematch-chain Rumble Crown, live lead-change drama, personal rematch Grudges, authoritative Rumble Assists with K/A/D, a solo four-fighter Scrap Pit whose three server-authoritative rivals have distinct readable tactics, answer player taunts with signature banter, and feed a device-local win/run record chase, a 2v2 Crew Battle with friendly-fire protection and an optional six-second real-friend join window, a four-objective Crew Clash rotation, and a device-local four-patch Crew Tour, visible bounded Wasteland Signal Recovery, device-aware pre-fight control onboarding with early touch affordances, persistent user-controlled lobby audio, safe multi-input exits before and during fights with confirmed authoritative forfeits, a focused cross-device Practice Setup overlay, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -136,6 +136,7 @@ Each session below attacks one of these.
 | 102 | Readable Post-Match Stats                       | Every combat total stays scannable even at extreme values                     | **DONE** (2026-07-14) |
 | 103 | Readable Live Kill Feed                         | Every elimination immediately explains who did what                           | **DONE** (2026-07-14) |
 | 104 | Readable Match Status                           | Score, objective, clock, and events become instant fight decisions            | **DONE** (2026-07-14) |
+| 105 | Readable Lobby Leaderboards                     | Career and daily records become clear targets worth chasing                   | **DONE** (2026-07-14) |
 
 ---
 
@@ -4280,6 +4281,40 @@ favorite mid-match event while the final-minute surprise stays fresh.
 ---
 
 ## Session Log
+
+### Session 105 — 2026-07-14 — Readable Lobby Leaderboards
+
+**Shipped:** the lobby's two replay-driving scoreboards no longer disappear
+into the animated street. All-time career records and the current Daily Run
+Top 5 now sit in mirrored, opaque bordered cards that remain completely clear
+of the central play menu. Headers grow to 11px outlined display type, rows grow
+to 14px outlined body type, and record text switches from dim wall gray to the
+HUD's bone-white primary color. The result stays readable after the fixed
+960×720 canvas is scaled into an 844×390 mobile landscape viewport.
+
+The career card now explains its `W · L · C CONTRACTS` column order once in the
+header and renders each record as a compact `42·17·28`, eliminating redundant
+suffix letters that pushed long callsigns into the menu. Reputation badges,
+rank order, all five names, wins, losses, contracts, Daily scores, empty-board
+invitation, server caching, and live updates remain intact. This is client
+presentation only: persistence, ranking, score submission, challenge dates,
+network messages, matchmaking, and server behavior are unchanged.
+
+**Verification:** typecheck and lint pass; all 1,331 unit and integration tests
+pass across 105 files. The full production build passes with the existing Vite
+chunk-size advisory (`index-BN0A4qzs.js`, 1,864.46 kB / 446.32 kB gzip). The
+new rendered browser journey stages two full five-row boards and passes on
+Chromium, Firefox, and 844×390 mobile landscape, proving exact copy, colors,
+font sizes, card bounds, text containment, header separation, and center-menu
+clearance. The complete 129-case matrix plus the isolated rerun validates all
+114 executable cases with 15 intentional project-specific skips; the only
+initial miss was a one-off mobile fixture timeout before Phaser created its
+canvas, and that exact journey passed immediately on rerun.
+
+**Operational watch:** keep future row fields inside these fixed 258px cards;
+if the record schema gains another stat, add a detail surface instead of
+shrinking the five-row chase below 14px. The all-time card remains hidden for
+an empty store, while Daily deliberately keeps its `SET THE PACE` invitation.
 
 ### Session 104 — 2026-07-14 — Readable Match Status
 

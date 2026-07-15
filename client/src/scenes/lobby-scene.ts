@@ -92,7 +92,7 @@ const PLAYER_COUNT_COLOR = Wasteland.WALL_FILL; // dim
 const FOOTER_COLOR = Wasteland.WALL_LINE; // very dim ash-shadow
 const ERROR_COLOR = Wasteland.HIT_FLASH; // dried blood
 const LEADERBOARD_TITLE_COLOR = Wasteland.COVER_FILL; // weathered tan
-const LEADERBOARD_ROW_COLOR = Wasteland.WALL_FILL; // dim, matches footer
+const LEADERBOARD_ROW_COLOR = Wasteland.TEXT_PRIMARY; // readable bone-white
 const GAUNTLET_BEST_COLOR = Wasteland.HEALTH_WARNING;
 
 export class LobbyScene extends Phaser.Scene {
@@ -112,8 +112,10 @@ export class LobbyScene extends Phaser.Scene {
   private searchTimerText!: Phaser.GameObjects.Text;
   private cancelButton!: PixelButton;
   private playerCountText!: Phaser.GameObjects.Text;
+  private leaderboardPanelBg!: Phaser.GameObjects.Rectangle;
   private leaderboardTitleText!: Phaser.GameObjects.Text;
   private leaderboardRowsText!: Phaser.GameObjects.Text;
+  private dailyLeaderboardPanelBg!: Phaser.GameObjects.Rectangle;
   private dailyLeaderboardTitleText!: Phaser.GameObjects.Text;
   private dailyLeaderboardRowsText!: Phaser.GameObjects.Text;
   private quickMatchButton!: PixelButton;
@@ -607,31 +609,50 @@ export class LobbyScene extends Phaser.Scene {
 
     // ────────────────────────────────────────────────────────────────────
     // All-time top-5 leaderboard — bottom-left column, above the player
-    // count. Bottom-anchored (origin y=1) and positioned off the camera
-    // dims like the footer, so it stays in the narrow strip left of the
-    // centered menu panel on every viewport (canvas is a fixed 960×720
-    // design resolution, FIT-scaled on mobile landscape). Hidden until the
-    // server ships a non-empty server:leaderboard.
+    // count. A solid bordered card prevents the animated street from
+    // swallowing the small progression data, especially after FIT scaling
+    // on mobile landscape. Hidden until the server ships a non-empty
+    // server:leaderboard.
     // ────────────────────────────────────────────────────────────────────
-    this.leaderboardRowsText = this.add
-      .text(36, camHeight - 48, '', {
-        fontFamily: MENU_FONTS.BODY,
-        fontSize: '13px',
-        color: cssHex(LEADERBOARD_ROW_COLOR),
-        lineSpacing: 6,
-      })
+    const leaderboardPanelWidth = 258;
+    const leaderboardPanelHeight = 192;
+    const leaderboardPanelBottom = camHeight - 40;
+    this.leaderboardPanelBg = this.add
+      .rectangle(
+        24,
+        leaderboardPanelBottom,
+        leaderboardPanelWidth,
+        leaderboardPanelHeight,
+        Wasteland.HUD_STRIP_BG,
+        0.92,
+      )
       .setOrigin(0, 1)
+      .setStrokeStyle(2, LEADERBOARD_TITLE_COLOR, 0.9)
       .setDepth(WastelandStreet.DEPTH.UI)
       .setVisible(false);
-    this.leaderboardTitleText = this.add
-      .text(36, camHeight - 48, 'ALL-TIME TOP 5\nRANK  W/L  C=CONTRACTS', {
-        fontFamily: MENU_FONTS.HEADER,
-        fontSize: '10px',
-        color: cssHex(LEADERBOARD_TITLE_COLOR),
-        lineSpacing: 3,
+    this.leaderboardRowsText = this.add
+      .text(36, camHeight - 58, '', {
+        fontFamily: MENU_FONTS.BODY,
+        fontSize: '14px',
+        color: cssHex(LEADERBOARD_ROW_COLOR),
+        lineSpacing: 6,
+        stroke: '#000000',
+        strokeThickness: 2,
       })
       .setOrigin(0, 1)
-      .setDepth(WastelandStreet.DEPTH.UI)
+      .setDepth(WastelandStreet.DEPTH.UI + 1)
+      .setVisible(false);
+    this.leaderboardTitleText = this.add
+      .text(36, camHeight - 58, 'ALL-TIME TOP 5\nW · L · C CONTRACTS', {
+        fontFamily: MENU_FONTS.HEADER,
+        fontSize: '11px',
+        color: cssHex(LEADERBOARD_TITLE_COLOR),
+        lineSpacing: 5,
+        stroke: '#000000',
+        strokeThickness: 2,
+      })
+      .setOrigin(0, 1)
+      .setDepth(WastelandStreet.DEPTH.UI + 1)
       .setVisible(false);
     // GameService caches the latest entries, so a lobby created after the
     // message (returning from a match, or reconnect) renders immediately.
@@ -640,27 +661,44 @@ export class LobbyScene extends Phaser.Scene {
     // Current UTC Daily Run standings mirror the all-time panel on the
     // bottom-right. Unlike lifetime stats, an empty board is an invitation:
     // show "SET THE PACE" after the server snapshot instead of hiding it.
+    this.dailyLeaderboardPanelBg = this.add
+      .rectangle(
+        this.cameras.main.width - 24,
+        leaderboardPanelBottom,
+        leaderboardPanelWidth,
+        leaderboardPanelHeight,
+        Wasteland.HUD_STRIP_BG,
+        0.92,
+      )
+      .setOrigin(1, 1)
+      .setStrokeStyle(2, Wasteland.LOADING_BAR_FILL, 0.9)
+      .setDepth(WastelandStreet.DEPTH.UI)
+      .setVisible(false);
     this.dailyLeaderboardRowsText = this.add
-      .text(this.cameras.main.width - 36, camHeight - 48, '', {
+      .text(this.cameras.main.width - 36, camHeight - 58, '', {
         fontFamily: MENU_FONTS.BODY,
-        fontSize: '13px',
+        fontSize: '14px',
         color: cssHex(LEADERBOARD_ROW_COLOR),
         lineSpacing: 6,
         align: 'right',
+        stroke: '#000000',
+        strokeThickness: 2,
       })
       .setOrigin(1, 1)
-      .setDepth(WastelandStreet.DEPTH.UI)
+      .setDepth(WastelandStreet.DEPTH.UI + 1)
       .setVisible(false);
     this.dailyLeaderboardTitleText = this.add
       .text(this.cameras.main.width - 36, camHeight - 48, '', {
         fontFamily: MENU_FONTS.HEADER,
-        fontSize: '10px',
+        fontSize: '11px',
         color: cssHex(Wasteland.LOADING_BAR_FILL),
-        lineSpacing: 3,
+        lineSpacing: 5,
         align: 'right',
+        stroke: '#000000',
+        strokeThickness: 2,
       })
       .setOrigin(1, 1)
-      .setDepth(WastelandStreet.DEPTH.UI)
+      .setDepth(WastelandStreet.DEPTH.UI + 1)
       .setVisible(false);
     this.updateDailyLeaderboard(this.gameService.getDailyGauntletLeaderboard());
 
@@ -961,6 +999,7 @@ export class LobbyScene extends Phaser.Scene {
    */
   private updateLeaderboard(entries: LeaderboardEntry[]): void {
     const hasEntries = entries.length > 0;
+    this.leaderboardPanelBg.setVisible(hasEntries);
     this.leaderboardRowsText.setVisible(hasEntries);
     this.leaderboardTitleText.setVisible(hasEntries);
     if (!hasEntries) return;
@@ -977,6 +1016,7 @@ export class LobbyScene extends Phaser.Scene {
 
   private updateDailyLeaderboard(snapshot: ServerDailyGauntletLeaderboardMessage | null): void {
     const visible = snapshot !== null;
+    this.dailyLeaderboardPanelBg.setVisible(visible);
     this.dailyLeaderboardRowsText.setVisible(visible);
     this.dailyLeaderboardTitleText.setVisible(visible);
     if (!snapshot) return;

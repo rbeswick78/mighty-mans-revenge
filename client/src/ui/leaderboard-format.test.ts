@@ -21,26 +21,26 @@ function entry(overrides: Partial<LeaderboardEntry> = {}): LeaderboardEntry {
 
 describe('formatLeaderboardRow', () => {
   it('formats rank, uppercased name, and W/L on one line', () => {
-    expect(formatLeaderboardRow(1, entry())).toBe('1. RYAN [DOG] 14W 9L 12C');
+    expect(formatLeaderboardRow(1, entry())).toBe('1. RYAN [DOG] 14·9·12');
   });
 
   it('clips long callsigns to the panel-safe length', () => {
     const row = formatLeaderboardRow(5, entry({ nickname: 'sixteen_char_max' }));
-    expect(row).toBe(`5. ${'sixteen_char_max'.toUpperCase().slice(0, LEADERBOARD_NAME_MAX_CHARS)} [DOG] 14W 9L 12C`);
+    expect(row).toBe(
+      `5. ${'sixteen_char_max'.toUpperCase().slice(0, LEADERBOARD_NAME_MAX_CHARS)} [DOG] 14·9·12`,
+    );
     expect(row).not.toContain('SIXTEEN_CHAR_MAX');
   });
 
   it('handles zero records without special-casing', () => {
     expect(formatLeaderboardRow(3, entry({ nickname: 'newbie', wins: 0, losses: 0 }))).toBe(
-      '3. NEWBIE [DOG] 0W 0L 12C',
+      '3. NEWBIE [DOG] 0·0·12',
     );
   });
 
   it('derives the cosmetic badge from completed contracts and backfills old rows', () => {
     expect(formatLeaderboardRow(2, entry({ contractsCompleted: 15 }))).toContain('[MAR]');
-    expect(formatLeaderboardRow(2, entry({ contractsCompleted: undefined }))).toContain(
-      '[DRF]',
-    );
+    expect(formatLeaderboardRow(2, entry({ contractsCompleted: undefined }))).toContain('[DRF]');
   });
 });
 
