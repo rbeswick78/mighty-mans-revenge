@@ -5,8 +5,8 @@ Read this file and `CLAUDE.md` completely at the start of every batch. The
 completed `docs/REPLAYABILITY_ROADMAP.md` remains the historical record for the
 systems this program preserves and reorganizes.
 
-- **Status:** Batch 2 complete on 2026-07-15.
-- **Next batch:** Batch 3 — Capabilities and flags.
+- **Status:** Batch 3 complete on 2026-07-15.
+- **Next batch:** Batch 4 — Responsive menu foundation.
 - **Public releases:** Reforged Arena, then Battle Royale.
 - **Working model:** one numbered batch per session, direct commits and pushes
   to `main`, milestone-gated production deployments.
@@ -155,8 +155,8 @@ Production deployment happens only at a gate or for an urgent live fix.
 | --: | -------------------------------------- | ------------- | --------------------- |
 |   1 | Roadmap bootstrap                      | Safety rails  | **DONE — 2026-07-15** |
 |   2 | Baseline evidence                      | Safety rails  | **DONE — 2026-07-15** |
-|   3 | Capabilities and flags                 | Safety rails  | NEXT                  |
-|   4 | Responsive menu foundation             | Navigation    | Pending               |
+|   3 | Capabilities and flags                 | Safety rails  | **DONE — 2026-07-15** |
+|   4 | Responsive menu foundation             | Navigation    | NEXT                  |
 |   5 | Play roster builder                    | Navigation    | Pending               |
 |   6 | Fighters tab                           | Navigation    | Pending               |
 |   7 | Challenges tab                         | Navigation    | Pending               |
@@ -255,6 +255,19 @@ Add server-advertised, backward-compatible feature capabilities for the new
 shell, schedules, large worlds, modern art, and Battle Royale. Default every
 unfinished capability off, cover old/new handshake combinations, document the
 server-first rollout order, and preserve all current routes when disabled.
+
+Acceptance:
+
+- [x] The reliable welcome handshake advertises complete server-owned flags for
+      the new shell, schedules, large worlds, modern art, and Battle Royale.
+- [x] Every unfinished capability is a strict opt-in and defaults off.
+- [x] Old-server/new-client, new-server/old-client, partial, malformed,
+      reconnect, and disconnect behavior fails closed without breaking the
+      legacy player-id welcome contract.
+- [x] Disabled capabilities preserve every established route and no
+      capability-owned product feature was enabled or implemented.
+- [x] The server-first rollout, rollback, flag registry, and compatibility
+      matrix are documented in `docs/REFORGED_CAPABILITIES.md`.
 
 ### Milestone 1 — Clean navigation and intentional matchmaking
 
@@ -696,28 +709,75 @@ composition blockers assigned to Batch 20/24. RFG-003 is a headless
 non-Chromium network/visual harness limitation that must be resolved before the
 relevant journey/camera visual gates. None blocks Batch 3 capability contracts.
 
+### Batch 3 — 2026-07-15 — Capabilities and flags
+
+**Shipped:** Extended the existing reliable `server:welcome` handshake with an
+optional server-owned capability snapshot for the new shell, schedules, large
+worlds, modern art, and Battle Royale. Added strict environment opt-ins that
+default every capability off, a frozen fail-closed client normalization path,
+connection-lifecycle resets, and a `GameService` accessor for future gated
+routes. Covered absent, partial, malformed, new-server/legacy-reader,
+reconnect, and disconnect combinations. Documented the flag registry,
+compatibility matrix, server-first exposure order, and flag-first rollback in
+`docs/REFORGED_CAPABILITIES.md`. No capability-owned feature, route, schedule,
+world, art, or Battle Royale behavior was enabled or implemented.
+
+**Verification:** Capability-focused shared/server/client coverage passed as
+part of the complete 109-file/1,342-test unit/integration suite. Typecheck,
+lint, and the full production build passed. The complete Playwright suite
+passed with 129 tests and the established 18 expected skips across desktop
+Chromium, desktop Firefox, and mobile landscape in 17.5 minutes. That suite
+exercised the retained Lobby, challenge setup, Draft, Character Select, match,
+recovery, and Results routes while all capability defaults remained false.
+Repository Prettier and `git diff --check` passed for the intended Batch 3
+files.
+
+**Deployment:** Skipped. Batch 3 establishes disabled compatibility rails, and
+the roadmap authorizes production deployment only at a milestone gate or for an
+urgent live fix. No production capability flag was changed.
+
+**Deviations:** None. The first focused server test invocation needed the
+shared package rebuilt so `@shared/game` exposed the new runtime export; the
+normal typecheck/build order produced the expected artifact and all final
+verification passed.
+
+**Known issues:** No new bugs were found, so the bug ledger is unchanged.
+RFG-001 and RFG-002 remain assigned to Batches 20/24. RFG-003 remains the
+documented headless Firefox/WebKit live-network and black staged-capture
+limitation; staged frame measurements are still not hardware-comparable.
+
 ## Next-session prompt
 
 ```text
 Continue the Reforged build for Mighty Man's Revenge.
 
-Read docs/REIMAGINING_ROADMAP.md and CLAUDE.md completely first. This session:
-implement Batch 3 — Capabilities and flags exactly as specified. Preserve
-unrelated changes and do not begin Batch 4 responsive-menu work.
+Read docs/REIMAGINING_ROADMAP.md and CLAUDE.md completely first. Read
+docs/REFORGED_BASELINE.md and docs/REFORGED_CAPABILITIES.md before
+implementation. Implement Batch 4 — Responsive menu foundation exactly as
+specified. Preserve unrelated changes and do not begin Batch 5 — Play roster
+builder.
 
-Add backward-compatible server-advertised capabilities for the new shell,
-schedules, large worlds, modern art, and Battle Royale. Default every
-unfinished capability off, cover old/new handshake combinations, document the
-server-first rollout order, preserve every current route while disabled, and
-do not enable or build any capability-owned feature. Update the roadmap and
-Session Log, run the complete end-of-batch ritual, commit and push directly to
-main, skip deployment unless the roadmap newly authorizes it, and provide the
-paste-ready prompt for Batch 4.
+Introduce the logical 16:9 menu layout, safe-area helpers, modern design tokens,
+shared focus/navigation behavior, and an empty five-tab shell behind the
+server-advertised newShell capability. Keep the existing Lobby as the complete
+fallback for an old server or a false/absent/malformed capability. Do not move
+activities into tabs, build the roster builder, enable any capability by
+default or in production, change gameplay viewport/camera behavior, or begin
+modern art production. Cover desktop and mobile landscape plus pointer,
+keyboard, gamepad, and touch behavior appropriate to this foundation.
 
-Carry-over notes: read docs/REFORGED_BASELINE.md. RFG-001 and RFG-002 document
-camera kick/zoom overwriting future base camera state for Batches 20/24.
-RFG-003 documents that headless Firefox/WebKit cannot use the live local WebRTC
-practice path and staged gameplay screenshots are black; do not treat staged
-frame numbers as hardware-comparable. Use Corepack pnpm 10.33.0 if the local
-pnpm shim selects a mismatched version. No deployment was required for Batch 2.
+Batch 3 is complete and pushed on main; all five strict server capability flags
+default false and no deployment was required. Update the roadmap acceptance
+evidence and Session Log, run the complete end-of-batch ritual, commit and push
+directly to main, skip deployment unless the roadmap explicitly authorizes it,
+and end with the fenced paste-ready prompt for Batch 5.
+
+Carry-over warnings: RFG-001 CameraKick and RFG-002 ZoomPulse overwrite future
+base camera state and remain assigned to Batches 20/24. RFG-003 means headless
+Firefox/WebKit cannot use the live local WebRTC practice path and staged
+gameplay screenshots are black; staged frame numbers are not
+hardware-comparable. The local Batch 2 live-loop sample recorded a 254.279ms
+host scheduling drift reset and 15.932 effective Hz while simulation processing
+remained far below the 50ms budget. Use Corepack pnpm 10.33.0 if the local pnpm
+shim selects a mismatched version. Batch 5 is next after Batch 4.
 ```

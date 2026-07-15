@@ -158,9 +158,23 @@ export type ServerMessage =
   | ServerPongMessage
   | ServerErrorMessage;
 
+/** Server-owned gates for Reforged surfaces and gameplay families. */
+export interface ServerCapabilities {
+  readonly newShell: boolean;
+  readonly schedules: boolean;
+  readonly largeWorlds: boolean;
+  readonly modernArt: boolean;
+  readonly battleRoyale: boolean;
+}
+
 export interface ServerWelcomeMessage {
   type: 'server:welcome';
   playerId: PlayerId;
+  /**
+   * Optional for old-server compatibility. Missing flags are disabled by the
+   * client, so server support must be explicit before a feature is reachable.
+   */
+  capabilities?: Partial<ServerCapabilities>;
 }
 
 export interface ServerGameStateMessage {

@@ -17,11 +17,16 @@ import type {
 } from '@shared/types/game.js';
 import type {
   DraftCategory,
+  ServerCapabilities,
   ServerMessage,
   ServerGameStateMessage,
   KothHudState,
 } from '@shared/types/network.js';
 import { MatchPhase } from '@shared/types/game.js';
+import {
+  DISABLED_SERVER_CAPABILITIES,
+  normalizeServerCapabilities,
+} from '@shared/config/server-capabilities.js';
 import {
   SERVER,
   type BotDifficulty,
@@ -92,6 +97,7 @@ export class NetworkManager {
   private interpolation: EntityInterpolation;
 
   private localPlayerId: PlayerId | null = null;
+  private serverCapabilities: Readonly<ServerCapabilities> = DISABLED_SERVER_CAPABILITIES;
   private localPlayerState: PlayerState | null = null;
   private collisionGrid: CollisionGrid | null = null;
   private lastCountdownEmitted = -1;
@@ -175,14 +181,18 @@ export class NetworkManager {
     this.connection.onMessage((msg) => this.handleMessage(msg));
 
     this.connection.onStateChange((state) => {
-      if (state === 'connecting') this.emit('connecting');
-      else if (state === 'connected') this.emit('connected');
+      if (state === 'connecting') {
+        this.serverCapabilities = DISABLED_SERVER_CAPABILITIES;
+        this.emit('connecting');
+      } else if (state === 'connected') this.emit('connected');
       else if (state === 'disconnected') {
         this.localPlayerId = null;
+        this.serverCapabilities = DISABLED_SERVER_CAPABILITIES;
         this.resetMatchState();
         this.emit('disconnected');
       } else if (state === 'reconnecting') {
         this.localPlayerId = null;
+        this.serverCapabilities = DISABLED_SERVER_CAPABILITIES;
         this.resetMatchState();
         this.emit('reconnecting');
       }
@@ -208,6 +218,7 @@ export class NetworkManager {
   disconnect(): void {
     this.connection.disconnect();
     this.localPlayerId = null;
+    this.serverCapabilities = DISABLED_SERVER_CAPABILITIES;
     this.resetMatchState();
   }
 
@@ -471,6 +482,11 @@ export class NetworkManager {
     return this.localPlayerId;
   }
 
+  /** Complete fail-closed capability snapshot from the latest welcome. */
+  getServerCapabilities(): Readonly<ServerCapabilities> {
+    return this.serverCapabilities;
+  }
+
   /** Current round-trip time in milliseconds. */
   getRTT(): number {
     return this.connection.getRTT();
@@ -507,6 +523,7 @@ export class NetworkManager {
     switch (msg.type) {
       case 'server:welcome':
         this.localPlayerId = msg.playerId;
+        this.serverCapabilities = normalizeServerCapabilities(msg.capabilities);
         this.emit('welcome', msg.playerId);
         break;
 

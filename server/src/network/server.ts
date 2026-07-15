@@ -1,7 +1,9 @@
 import geckos, { type GeckosServer, type ServerChannel, type Data } from '@geckos.io/server';
 import { BOT, SERVER } from '@shared/game';
-import type { ClientMessage, PlayerId, ServerMessage } from '@shared/game';
+import type { ClientMessage, PlayerId, ServerCapabilities, ServerMessage } from '@shared/game';
+import { serverCapabilitiesFromEnv } from '../config/feature-flags.js';
 import { logger } from '../utils/logger.js';
+import { createWelcomeMessage } from './welcome-message.js';
 
 export type MessageHandler = (playerId: PlayerId, message: ClientMessage) => void;
 
@@ -27,9 +29,7 @@ const CLIENT_MESSAGE_TYPE_FLAGS: Record<ClientMessage['type'], true> = {
   'client:ping': true,
 };
 
-const VALID_CLIENT_MESSAGE_TYPES = new Set<string>(
-  Object.keys(CLIENT_MESSAGE_TYPE_FLAGS),
-);
+const VALID_CLIENT_MESSAGE_TYPES = new Set<string>(Object.keys(CLIENT_MESSAGE_TYPE_FLAGS));
 
 export class GameServer {
   private readonly io: GeckosServer;
@@ -38,9 +38,14 @@ export class GameServer {
   private connectHandler: ((playerId: PlayerId) => void) | null = null;
   private disconnectHandler: ((playerId: PlayerId) => void) | null = null;
   private readonly port: number;
+  private readonly capabilities: Readonly<ServerCapabilities>;
 
-  constructor(port?: number) {
+  constructor(
+    port?: number,
+    capabilities: Readonly<ServerCapabilities> = serverCapabilitiesFromEnv(),
+  ) {
     this.port = port ?? parseInt(process.env['PORT'] ?? '3000', 10);
+    this.capabilities = capabilities;
     this.io = geckos({
       cors: { allowAuthorization: true, origin: '*' },
       // STUN servers let the WebRTC stack discover the VM's public IP via NAT
@@ -81,7 +86,7 @@ export class GameServer {
       // Send welcome message with assigned player ID. Reliable: this is the
       // one-shot that gives the client its assigned playerId; if it's
       // dropped, every later message is misrouted on the client side.
-      this.sendTo(playerId, { type: 'server:welcome', playerId }, { reliable: true });
+      this.sendTo(playerId, createWelcomeMessage(playerId, this.capabilities), { reliable: true });
 
       // Notify connect handler
       this.connectHandler?.(playerId);
@@ -91,7 +96,8 @@ export class GameServer {
         if (!this.messageHandler) return;
 
         try {
-          const raw = typeof data === 'string' ? data : new TextDecoder().decode(data as ArrayBuffer);
+          const raw =
+            typeof data === 'string' ? data : new TextDecoder().decode(data as ArrayBuffer);
           const parsed: unknown = JSON.parse(raw);
 
           if (
@@ -117,10 +123,7 @@ export class GameServer {
 
         this.channels.delete(id);
 
-        logger.info(
-          { playerId: id, playerCount: this.channels.size },
-          'Player disconnected',
-        );
+        logger.info({ playerId: id, playerCount: this.channels.size }, 'Player disconnected');
 
         this.disconnectHandler?.(id);
       });
@@ -152,10 +155,7 @@ export class GameServer {
       // channel. Matchmaking broadcasts through the same N-player loops;
       // quietly discard their outbound copies instead of warning at 20 Hz.
       if (playerId.startsWith(BOT.PLAYER_ID_PREFIX)) return;
-      logger.warn(
-        { playerId, type: message.type },
-        'Cannot send to unknown player',
-      );
+      logger.warn({ playerId, type: message.type }, 'Cannot send to unknown player');
       return;
     }
     if (opts?.reliable) {

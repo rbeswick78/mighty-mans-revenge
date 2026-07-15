@@ -130,6 +130,19 @@ live play shows the interruption beat before returning, and Results disables
 rematch. Do not invent client-side match recovery without a server-owned
 session-resume protocol.
 
+**Reforged capabilities (Batch 3):** the reliable `server:welcome` handshake
+optionally carries a complete server-owned `capabilities` snapshot for
+`newShell`, `schedules`, `largeWorlds`, `modernArt`, and `battleRoyale`. New
+clients normalize absent, partial, or malformed advertisements fail-closed to
+false; old clients ignore the additive field and retain the player-id welcome
+contract. Capability state resets before reconnection and on disconnect. Every
+unfinished capability defaults off through strict server environment flags,
+and false/absent flags must preserve all established routes. Deploy feature
+support server-first, deploy the gated client fallback second, and enable only
+from the server after the owning release gate. See
+`docs/REFORGED_CAPABILITIES.md` for the compatibility matrix, flag names,
+rollout, and rollback order.
+
 ### Why This Matters for Agents
 
 Client prediction and server simulation **must use identical physics code** from `/shared`. If you change movement, collision, or physics logic, you must change it in `/shared` and verify both client and server still agree. A mismatch between client prediction and server authority causes visible rubber-banding.

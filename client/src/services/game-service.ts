@@ -20,6 +20,7 @@ import type {
   ServerMatchmakingStatusMessage,
   ServerPlayerKilledMessage,
   ServerCharacterSelectStateMessage,
+  ServerCapabilities,
   SerializedPlayerState,
 } from '@shared/types/network.js';
 import { createEmptyCharacterWins } from '@shared/config/game.js';
@@ -172,6 +173,10 @@ export class GameService {
 
   getPlayerId(): PlayerId | null {
     return this.networkManager.getPlayerId();
+  }
+
+  getServerCapabilities(): Readonly<ServerCapabilities> {
+    return this.networkManager.getServerCapabilities();
   }
 
   getNickname(): string {

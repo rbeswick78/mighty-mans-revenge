@@ -122,6 +122,32 @@ describe('NetworkConnection recovery', () => {
     expect(playerIds).toEqual(['current']);
   });
 
+  it('keeps a legacy welcome reader working when a new server adds capabilities', async () => {
+    const connection = new NetworkConnection('http://localhost:3000');
+    const playerIds: string[] = [];
+    connection.onMessage((message) => {
+      if (message.type === 'server:welcome') playerIds.push(message.playerId);
+    });
+
+    await connection.connect();
+    transport.channels[0]!.connectCallback?.();
+    transport.channels[0]!.messageCallback?.(
+      JSON.stringify({
+        type: 'server:welcome',
+        playerId: 'new-server-player',
+        capabilities: {
+          newShell: false,
+          schedules: false,
+          largeWorlds: false,
+          modernArt: false,
+          battleRoyale: false,
+        },
+      }),
+    );
+
+    expect(playerIds).toEqual(['new-server-player']);
+  });
+
   it('stops after five backoff attempts and exposes a terminal disconnected state', async () => {
     const connection = new NetworkConnection('http://localhost:3000');
     await connection.connect();

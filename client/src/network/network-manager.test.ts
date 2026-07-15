@@ -139,6 +139,32 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
     expect(manager.getLocalPlayerState()?.characterId).toBe('bubba');
   });
 
+  it('keeps every capability disabled when an old server omits the advertisement', () => {
+    expect(manager.getServerCapabilities()).toEqual({
+      newShell: false,
+      schedules: false,
+      largeWorlds: false,
+      modernArt: false,
+      battleRoyale: false,
+    });
+  });
+
+  it('normalizes a new server advertisement and defaults missing flags off', () => {
+    deliver({
+      type: 'server:welcome',
+      playerId: LOCAL_ID,
+      capabilities: { newShell: true, schedules: true },
+    });
+
+    expect(manager.getServerCapabilities()).toEqual({
+      newShell: true,
+      schedules: true,
+      largeWorlds: false,
+      modernArt: false,
+      battleRoyale: false,
+    });
+  });
+
   it('clears stale identity and match state as soon as the transport begins reconnecting', () => {
     deliver(makeGameState([makeSerialized(), makeSerialized({ id: REMOTE_ID })]));
     const reconnecting = vi.fn();
@@ -148,6 +174,13 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
 
     expect(reconnecting).toHaveBeenCalledOnce();
     expect(manager.getPlayerId()).toBeNull();
+    expect(manager.getServerCapabilities()).toEqual({
+      newShell: false,
+      schedules: false,
+      largeWorlds: false,
+      modernArt: false,
+      battleRoyale: false,
+    });
     expect(manager.getLocalPlayerState()).toBeNull();
     expect(manager.getRemotePlayerIds()).toHaveLength(0);
   });
