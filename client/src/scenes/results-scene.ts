@@ -15,6 +15,7 @@ import {
 import type { CharacterDef } from '@shared/types/character.js';
 import { Wasteland, cssHex } from '@shared/config/palette.js';
 import { AudioManager } from '../audio/audio-manager.js';
+import { isTouchDevice } from '../input/is-touch-device.js';
 import { MenuGamepadInput } from '../input/menu-gamepad.js';
 import { GameService, type MatchData } from '../services/game-service.js';
 import { WastelandStreet, type Outcome } from '../ui/menu/wasteland-street.js';
@@ -515,13 +516,43 @@ export class ResultsScene extends Phaser.Scene {
 
     // Footer
     this.add
-      .text(centerX, camHeight - 24, "A SELECT  •  B LOBBY  //  MIGHTY MAN'S REVENGE", {
-        fontFamily: MENU_FONTS.BODY,
-        fontSize: '12px',
-        color: cssHex(FOOTER_COLOR),
-      })
+      .text(
+        centerX,
+        camHeight - 24,
+        isTouchDevice() ? 'TAP REMATCH, ROUTE, OR LOBBY' : 'TAB / ARROWS + ENTER  •  ESC / B LOBBY',
+        {
+          fontFamily: MENU_FONTS.BODY,
+          fontSize: '12px',
+          color: cssHex(FOOTER_COLOR),
+        },
+      )
       .setOrigin(0.5)
       .setDepth(WastelandStreet.DEPTH.UI);
+
+    this.input.keyboard?.on('keydown-ENTER', () => {
+      const buttons = this.actionButtons();
+      if (!this.gamepadFocusActive) {
+        this.gamepadFocusActive = true;
+        this.gamepadFocusIndex = 0;
+        this.syncGamepadFocus();
+      }
+      buttons[this.gamepadFocusIndex]?.activate();
+    });
+    this.input.keyboard?.on('keydown-TAB', (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return;
+      event.preventDefault();
+      this.moveKeyboardFocus(event.shiftKey ? -1 : 1);
+    });
+    this.input.keyboard?.on('keydown-UP', () => this.moveKeyboardFocus(-1));
+    this.input.keyboard?.on('keydown-LEFT', () => this.moveKeyboardFocus(-1));
+    this.input.keyboard?.on('keydown-DOWN', () => this.moveKeyboardFocus(1));
+    this.input.keyboard?.on('keydown-RIGHT', () => this.moveKeyboardFocus(1));
+    this.input.keyboard?.on('keydown-ESC', () => this.lobbyButton?.activate());
+    this.input.on('pointerdown', () => {
+      if (!this.gamepadFocusActive) return;
+      this.gamepadFocusActive = false;
+      this.syncGamepadFocus();
+    });
 
     this.wireGameServiceEvents();
   }
@@ -552,22 +583,41 @@ export class ResultsScene extends Phaser.Scene {
   }
 
   private syncGamepadFocus(): void {
-    this.rematchButton?.setFocused(this.gamepadFocusActive && this.gamepadFocusIndex === 0);
-    this.alternateRouteButton?.setFocused(this.gamepadFocusActive && this.gamepadFocusIndex === 1);
-    this.lobbyButton?.setFocused(
-      this.gamepadFocusActive && this.gamepadFocusIndex === (this.alternateRouteButton ? 2 : 1),
+    const focusedButton = this.actionButtons()[this.gamepadFocusIndex] ?? null;
+    this.rematchButton?.setFocused(this.gamepadFocusActive && focusedButton === this.rematchButton);
+    this.alternateRouteButton?.setFocused(
+      this.gamepadFocusActive && focusedButton === this.alternateRouteButton,
     );
+    this.lobbyButton?.setFocused(this.gamepadFocusActive && focusedButton === this.lobbyButton);
   }
 
   private actionButtons(): PixelButton[] {
     return [this.rematchButton, this.alternateRouteButton, this.lobbyButton].filter(
-      (button): button is PixelButton => button !== null,
+      (button): button is PixelButton => button !== null && !button.isDisabled(),
     );
   }
 
   private setRematchButtonsDisabled(disabled: boolean): void {
     this.rematchButton?.setDisabled(disabled);
     this.alternateRouteButton?.setDisabled(disabled);
+    this.gamepadFocusIndex = Math.min(
+      this.gamepadFocusIndex,
+      Math.max(0, this.actionButtons().length - 1),
+    );
+    this.syncGamepadFocus();
+  }
+
+  private moveKeyboardFocus(direction: -1 | 1): void {
+    const buttons = this.actionButtons();
+    if (buttons.length === 0) return;
+    if (!this.gamepadFocusActive) {
+      this.gamepadFocusIndex = direction > 0 ? 0 : buttons.length - 1;
+      this.gamepadFocusActive = true;
+    } else {
+      this.gamepadFocusIndex =
+        (this.gamepadFocusIndex + direction + buttons.length) % buttons.length;
+    }
+    this.syncGamepadFocus();
   }
 
   private renderTableau(

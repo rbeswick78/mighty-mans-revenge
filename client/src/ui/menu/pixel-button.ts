@@ -167,6 +167,11 @@ export class PixelButton extends Phaser.GameObjects.Container {
     return this;
   }
 
+  /** Scene-level navigation uses this to skip unavailable actions. */
+  isDisabled(): boolean {
+    return this.disabled;
+  }
+
   setLabel(text: string): this {
     this.label.setText(text);
     return this;
