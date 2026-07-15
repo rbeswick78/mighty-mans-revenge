@@ -169,14 +169,22 @@ test.describe('Scrap Pit Records', () => {
             }
           ).game?.scene.getScene('LobbyScene') as {
             sys?: { settings: { active: boolean } };
-            rustyRumbleButton?: { list: Array<{ text?: string }> };
+            rustyRumbleButton?: {
+              list: Array<{ text?: string }>;
+              getSubtitleText: () => string | null;
+            };
           };
+          const label = scene.rustyRumbleButton?.list.find(
+            (child) => typeof child.text === 'string',
+          );
           return scene?.sys?.settings.active
-            ? (scene.rustyRumbleButton?.list.find((child) => typeof child.text === 'string')
-                ?.text ?? null)
+            ? {
+                label: label?.text ?? null,
+                progress: scene.rustyRumbleButton?.getSubtitleText() ?? null,
+              }
             : null;
         }),
       )
-      .toBe('SCRAP PIT\n1W · BEST 1');
+      .toEqual({ label: 'SCRAP PIT', progress: '1W · BEST 1' });
   });
 });

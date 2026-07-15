@@ -88,7 +88,7 @@ test.describe('Practice setup overlay', () => {
 
     expect(initial).toMatchObject({
       setupLabel: 'PRACTICE SETUP',
-      setupSubtitle: 'TUNE LEVEL  //  RIVAL  //  MODE  //  CHAOS',
+      setupSubtitle: 'LEVEL · RIVAL · MODE · CHAOS',
       setupGamepadReachable: true,
       selectorsRemovedFromMainFocus: true,
     });

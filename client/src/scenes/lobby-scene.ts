@@ -354,6 +354,7 @@ export class LobbyScene extends Phaser.Scene {
       {
         variant: 'primary',
         fontSize: 9,
+        hitPaddingY: 2,
         onClick: () => this.onQuickMatch(),
       },
     );
@@ -369,6 +370,7 @@ export class LobbyScene extends Phaser.Scene {
       {
         variant: 'primary',
         fontSize: 9,
+        hitPaddingY: 2,
         onClick: () => this.onRumble(),
       },
     );
@@ -377,17 +379,26 @@ export class LobbyScene extends Phaser.Scene {
     const soloGap = 6;
     const soloTopW = (qmW - soloGap * 2) / 3;
     const soloBottomW = (qmW - soloGap) / 2;
-    const soloH = 28;
+    const soloH = 34;
+    const [scrapPitTitle, scrapPitProgress] = scrapPitButtonLabel(
+      normalizeScrapPitRecord(localStorage.getItem(SCRAP_PIT_RECORD_STORAGE_KEY)),
+    ).split('\n');
+    const [crewTitle, crewProgress] = crewTourButtonLabel(
+      normalizeCrewTourRecord(localStorage.getItem(CREW_TOUR_STORAGE_KEY)),
+    ).split('\n');
     this.practiceButton = new PixelButton(
       this,
       panel.centerX - qmW / 2,
-      140,
+      138,
       soloTopW,
       soloH,
-      'RUSTY SPAR',
+      'SPAR',
       {
         variant: 'secondary',
-        fontSize: 6,
+        fontSize: 8,
+        subtitle: 'VS RUSTY',
+        subtitleFontSize: 6,
+        hitPaddingY: 2,
         onClick: () => this.onPractice('sparring'),
       },
     );
@@ -396,15 +407,16 @@ export class LobbyScene extends Phaser.Scene {
     this.rustyRumbleButton = new PixelButton(
       this,
       panel.centerX - qmW / 2 + soloTopW + soloGap,
-      140,
+      138,
       soloTopW,
       soloH,
-      scrapPitButtonLabel(
-        normalizeScrapPitRecord(localStorage.getItem(SCRAP_PIT_RECORD_STORAGE_KEY)),
-      ),
+      scrapPitTitle,
       {
         variant: 'secondary',
-        fontSize: 6,
+        fontSize: 8,
+        subtitle: scrapPitProgress,
+        subtitleFontSize: 6,
+        hitPaddingY: 2,
         onClick: () => this.onPractice('rusty_rumble'),
       },
     );
@@ -413,13 +425,16 @@ export class LobbyScene extends Phaser.Scene {
     this.crewBattleButton = new PixelButton(
       this,
       panel.centerX - qmW / 2 + (soloTopW + soloGap) * 2,
-      140,
+      138,
       soloTopW,
       soloH,
-      crewTourButtonLabel(normalizeCrewTourRecord(localStorage.getItem(CREW_TOUR_STORAGE_KEY))),
+      crewTitle,
       {
         variant: 'secondary',
-        fontSize: 6,
+        fontSize: 8,
+        subtitle: crewProgress,
+        subtitleFontSize: 6,
+        hitPaddingY: 2,
         onClick: () => this.onCrew(),
       },
     );
@@ -428,13 +443,14 @@ export class LobbyScene extends Phaser.Scene {
     this.gauntletButton = new PixelButton(
       this,
       panel.centerX - qmW / 2,
-      172,
+      176,
       soloBottomW,
       soloH,
       'GAUNTLET',
       {
         variant: 'secondary',
-        fontSize: 6,
+        fontSize: 8,
+        hitPaddingY: 2,
         onClick: () => this.onPractice('gauntlet'),
       },
     );
@@ -443,13 +459,14 @@ export class LobbyScene extends Phaser.Scene {
     this.dailyButton = new PixelButton(
       this,
       panel.centerX - qmW / 2 + soloBottomW + soloGap,
-      172,
+      176,
       soloBottomW,
       soloH,
       'DAILY RUN',
       {
         variant: 'secondary',
-        fontSize: 6,
+        fontSize: 8,
+        hitPaddingY: 2,
         onClick: () => this.onPractice('daily'),
       },
     );
@@ -458,16 +475,16 @@ export class LobbyScene extends Phaser.Scene {
     this.practiceSetupButton = new PixelButton(
       this,
       panel.centerX - qmW / 2,
-      206,
+      216,
       qmW,
-      36,
+      38,
       'PRACTICE SETUP',
       {
         variant: 'secondary',
-        fontSize: 8,
-        subtitle: 'TUNE LEVEL  //  RIVAL  //  MODE  //  CHAOS',
-        subtitleFontSize: 5,
-        hitPaddingY: 6,
+        fontSize: 9,
+        subtitle: 'LEVEL · RIVAL · MODE · CHAOS',
+        subtitleFontSize: 6,
+        hitPaddingY: 3,
         onClick: () => this.openPracticeSetup(),
       },
     );
@@ -487,7 +504,7 @@ export class LobbyScene extends Phaser.Scene {
     const gauntletBestText = this.add
       .text(
         panel.centerX,
-        250,
+        260,
         gauntletBestClearLabel(
           normalizeGauntletBestClear(localStorage.getItem(GAUNTLET_BEST_CLEAR_STORAGE_KEY)),
         ),
@@ -506,7 +523,7 @@ export class LobbyScene extends Phaser.Scene {
       dailyChallengeKey(),
     );
     const dailyBestText = this.add
-      .text(panel.centerX, 264, dailyGauntletProgressLabel(dailyProgress), {
+      .text(panel.centerX, 273, dailyGauntletProgressLabel(dailyProgress), {
         fontFamily: MENU_FONTS.HEADER,
         fontSize: '7px',
         color: cssHex(Wasteland.LOADING_BAR_FILL),
@@ -518,7 +535,7 @@ export class LobbyScene extends Phaser.Scene {
     this.buildCodexButton = new PixelButton(
       this,
       panel.centerX - qmW / 2,
-      274,
+      280,
       qmW,
       18,
       `${gauntletBuildCodexLabel(
@@ -526,8 +543,8 @@ export class LobbyScene extends Phaser.Scene {
       )}  //  VIEW`,
       {
         variant: 'secondary',
-        fontSize: 6,
-        hitPaddingY: 5,
+        fontSize: 7,
+        hitPaddingY: 2,
         onClick: () => this.openBuildCodex(),
       },
     );

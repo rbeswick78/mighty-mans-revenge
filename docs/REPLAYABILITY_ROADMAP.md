@@ -5,7 +5,7 @@ Revenge worth playing over and over. **Read this whole file at the start of
 every session.** It contains the plan, locked design decisions, the asset
 manifest, the end-of-session ritual, and a running session log.
 
-- **Status:** Sessions 1–105 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, readable selected-fighter ability/stat briefings, adaptive live ammo/grenade labels, explicit live health/armor/sprint labels, readable live match status, kill feed, and lobby leaderboards, roster-authentic duel/Rumble results, Gun Game, Rivalry Sets, Quick Match 1v1 plus 2–4 player Wasteland Rumble with all-player group draft rallies, a rematch-chain Rumble Crown, live lead-change drama, personal rematch Grudges, authoritative Rumble Assists with K/A/D, a solo four-fighter Scrap Pit whose three server-authoritative rivals have distinct readable tactics, answer player taunts with signature banter, and feed a device-local win/run record chase, a 2v2 Crew Battle with friendly-fire protection and an optional six-second real-friend join window, a four-objective Crew Clash rotation, and a device-local four-patch Crew Tour, visible bounded Wasteland Signal Recovery, device-aware pre-fight control onboarding with early touch affordances, persistent user-controlled lobby audio, safe multi-input exits before and during fights with confirmed authoritative forfeits, a focused cross-device Practice Setup overlay, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
+- **Status:** Sessions 1–106 complete. Completed work includes weapons, awards + rivalry stats, mutator expansion and activation rule callouts, maps + rotation, KOTH + overtime, character identities and death-animation variety, readable selected-fighter ability/stat briefings, adaptive live ammo/grenade labels, explicit live health/armor/sprint labels, readable live match status, kill feed, lobby leaderboards, and readable lobby play choices, roster-authentic duel/Rumble results, Gun Game, Rivalry Sets, Quick Match 1v1 plus 2–4 player Wasteland Rumble with all-player group draft rallies, a rematch-chain Rumble Crown, live lead-change drama, personal rematch Grudges, authoritative Rumble Assists with K/A/D, a solo four-fighter Scrap Pit whose three server-authoritative rivals have distinct readable tactics, answer player taunts with signature banter, and feed a device-local win/run record chase, a 2v2 Crew Battle with friendly-fire protection and an optional six-second real-friend join window, a four-objective Crew Clash rotation, and a device-local four-patch Crew Tour, visible bounded Wasteland Signal Recovery, device-aware pre-fight control onboarding with early touch affordances, persistent user-controlled lobby audio, safe multi-input exits before and during fights with confirmed authoritative forfeits, a focused cross-device Practice Setup overlay, Practice vs Rusty with favorite-mode, choose-your-rival, and custom-chaos selectors plus Scavenger Instincts, the three-stage Wasteland Gauntlet with score attack, performance bonuses, route drafts, rival drafts, chaos forecasts, danger bounties, run-long boon drafts, a browsable six-build codex with per-build bests, style bonuses, live style callouts, and a deterministic Daily Run with local bests, clear streaks, a shared server-authoritative Daily Top 5, and locked nearest-rival chase targets, six arenas including the breachable Rusted Refinery, persistent Arena Mastery, gameplay-neutral Wasteland Taunts, eight modes, contracts/reputation/fighter mastery, dynamic destruction, scavenger caches, Wasteland Warp, Last Laugh, Bounty Hunt, Power Weapon Drops, Clutch Kills, Scavenger Rush, Wasteland Bat, Radiation Storm, Scrap Armor, Scrapstorm, Demolition Wave, Blood Rush, Ability Overdrive, Overcharge Cells, twin-stick controller support, and the six-fighter roster. **The first group playtest happened** — it surfaced two bugs and one feature request (Session 9) but produced NO balance verdicts, so tuning (pistol/punch/RUNG_KILLS, character stats) remains untouched and the watch-item list carries forward to the next group night.
 - **Rules of the road:** everything in `CLAUDE.md` still applies — shared
   physics are sacred, N-player everywhere, constants in
   `shared/src/config/game.ts`, discriminated-union network messages, mobile
@@ -137,6 +137,7 @@ Each session below attacks one of these.
 | 103 | Readable Live Kill Feed                         | Every elimination immediately explains who did what                           | **DONE** (2026-07-14) |
 | 104 | Readable Match Status                           | Score, objective, clock, and events become instant fight decisions            | **DONE** (2026-07-14) |
 | 105 | Readable Lobby Leaderboards                     | Career and daily records become clear targets worth chasing                   | **DONE** (2026-07-14) |
+| 106 | Readable Lobby Play Choices                     | Every route is legible, distinct, and safely tappable on every device         | **DONE** (2026-07-15) |
 
 ---
 
@@ -4281,6 +4282,34 @@ favorite mid-match event while the final-minute surprise stays fresh.
 ---
 
 ## Session Log
+
+### Session 106 — 2026-07-15 — Readable Lobby Play Choices
+
+**Shipped:** the lobby's dense play menu now makes every route readable before
+the player commits. Spar, Scrap Pit, and Crew Battle use larger route titles
+with their rival or local-record context separated into a quieter second line;
+Gauntlet and Daily Run retain one-line titles with matching visual weight.
+Practice Setup and the Build Codex also gain larger labels and clearer spacing.
+The primary Quick Match and Rumble controls keep their established hierarchy.
+
+Visible buttons and their invisible pointer zones are taller, with every
+adjacent row kept non-overlapping. This preserves forgiving touch input after
+the fixed 960×720 canvas scales into an 844×390 mobile landscape viewport.
+All route callbacks, local progression, matchmaking requests, Practice setup,
+network messages, combat, balance, and server behavior are unchanged.
+
+**Verification:** typecheck and lint pass; all 1,331 unit and integration tests
+pass across 105 files. The production build passes with the existing Vite
+chunk-size advisory. A dedicated geometry guard verifies exact route titles,
+subtitles, text containment, font hierarchy, button bounds, expanded pointer
+targets, and non-overlap on Chromium, Firefox, and 844×390 mobile landscape.
+The five affected browser journeys pass with 21 executable cases and three
+intentional project-specific skips. The complete Playwright matrix was also
+run before release.
+
+**Operational watch:** keep future lobby routes inside this two-tier hierarchy.
+Put the durable action name on the button title and progression or opponent
+context in the subtitle instead of shrinking both into one line.
 
 ### Session 105 — 2026-07-14 — Readable Lobby Leaderboards
 

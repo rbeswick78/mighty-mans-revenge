@@ -1,5 +1,12 @@
 import { test, expect } from '../fixtures';
 
+interface ButtonSnapshot {
+  x: number;
+  y: number;
+  list: Array<{ text?: string }>;
+  getSubtitleText: () => string | null;
+}
+
 test.describe('Scrap Pit solo Rumble', () => {
   test('opens three distinct rivals and makes the crew answer a challenge', async ({
     gamePage,
@@ -35,11 +42,11 @@ test.describe('Scrap Pit solo Rumble', () => {
           game?: { scene: { getScene: (key: string) => unknown } };
         };
         const scene = w.game?.scene.getScene('LobbyScene') as {
-          practiceButton: { x: number; y: number; list: Array<{ text?: string }> };
-          rustyRumbleButton: { x: number; y: number; list: Array<{ text?: string }> };
-          crewBattleButton: { x: number; y: number; list: Array<{ text?: string }> };
-          gauntletButton: { x: number; y: number; list: Array<{ text?: string }> };
-          dailyButton: { x: number; y: number; list: Array<{ text?: string }> };
+          practiceButton: ButtonSnapshot;
+          rustyRumbleButton: ButtonSnapshot;
+          crewBattleButton: ButtonSnapshot;
+          gauntletButton: ButtonSnapshot;
+          dailyButton: ButtonSnapshot;
         };
         const buttons = [
           scene.practiceButton,
@@ -52,17 +59,19 @@ test.describe('Scrap Pit solo Rumble', () => {
           labels: buttons.map(
             (button) => button.list.find((child) => typeof child.text === 'string')?.text ?? null,
           ),
+          subtitles: buttons.map((button) => button.getSubtitleText()),
           xs: buttons.map((button) => button.x),
           ys: buttons.map((button) => button.y),
         };
       });
       expect(mobileLobby.labels).toEqual([
-        'RUSTY SPAR',
-        'SCRAP PIT\nNO WINS YET',
-        'CREW 2V2\nTOUR 0/4',
+        'SPAR',
+        'SCRAP PIT',
+        'CREW 2V2',
         'GAUNTLET',
         'DAILY RUN',
       ]);
+      expect(mobileLobby.subtitles).toEqual(['VS RUSTY', 'NO WINS YET', 'TOUR 0/4', null, null]);
       expect(mobileLobby.xs.slice(0, 3)).toEqual(
         [...mobileLobby.xs.slice(0, 3)].sort((a, b) => a - b),
       );
@@ -97,17 +106,14 @@ test.describe('Scrap Pit solo Rumble', () => {
         game?: { scene: { getScene: (key: string) => unknown } };
       };
       const scene = w.game?.scene.getScene('LobbyScene') as {
-        practiceButton: { x: number; y: number; list: Array<{ text?: string }> };
-        rustyRumbleButton: {
-          x: number;
-          y: number;
+        practiceButton: ButtonSnapshot;
+        rustyRumbleButton: ButtonSnapshot & {
           active: boolean;
           activate: () => boolean;
-          list: Array<{ text?: string }>;
         };
-        crewBattleButton: { x: number; y: number; list: Array<{ text?: string }> };
-        gauntletButton: { x: number; y: number; list: Array<{ text?: string }> };
-        dailyButton: { x: number; y: number; list: Array<{ text?: string }> };
+        crewBattleButton: ButtonSnapshot;
+        gauntletButton: ButtonSnapshot;
+        dailyButton: ButtonSnapshot;
       };
       const label = (button: { list: Array<{ text?: string }> }) =>
         button.list.find((child) => typeof child.text === 'string')?.text ?? null;
@@ -118,6 +124,13 @@ test.describe('Scrap Pit solo Rumble', () => {
           label(scene.crewBattleButton),
           label(scene.gauntletButton),
           label(scene.dailyButton),
+        ],
+        subtitles: [
+          scene.practiceButton.getSubtitleText(),
+          scene.rustyRumbleButton.getSubtitleText(),
+          scene.crewBattleButton.getSubtitleText(),
+          scene.gauntletButton.getSubtitleText(),
+          scene.dailyButton.getSubtitleText(),
         ],
         xs: [
           scene.practiceButton.x,
@@ -138,13 +151,8 @@ test.describe('Scrap Pit solo Rumble', () => {
       return snapshot;
     });
 
-    expect(lobby.labels).toEqual([
-      'RUSTY SPAR',
-      'SCRAP PIT\nNO WINS YET',
-      'CREW 2V2\nTOUR 0/4',
-      'GAUNTLET',
-      'DAILY RUN',
-    ]);
+    expect(lobby.labels).toEqual(['SPAR', 'SCRAP PIT', 'CREW 2V2', 'GAUNTLET', 'DAILY RUN']);
+    expect(lobby.subtitles).toEqual(['VS RUSTY', 'NO WINS YET', 'TOUR 0/4', null, null]);
     expect(lobby.xs.slice(0, 3)).toEqual([...lobby.xs.slice(0, 3)].sort((a, b) => a - b));
     expect(lobby.xs.slice(3)).toEqual([...lobby.xs.slice(3)].sort((a, b) => a - b));
     expect(new Set(lobby.ys.slice(0, 3)).size).toBe(1);

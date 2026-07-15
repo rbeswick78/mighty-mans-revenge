@@ -5,15 +5,16 @@ test.describe('Crew Battle 2v2', () => {
     gamePage,
   }) => {
     await expect
-      .poll(() =>
-        gamePage.evaluate(() => {
-          const scene = (
-            window as unknown as { game?: { scene: { getScene: (key: string) => unknown } } }
-          ).game?.scene.getScene('LobbyScene') as {
-            sys?: { settings: { active: boolean } };
-          };
-          return scene?.sys?.settings.active ?? false;
-        }),
+      .poll(
+        () =>
+          gamePage.evaluate(() => {
+            const scene = (
+              window as unknown as { game?: { scene: { getScene: (key: string) => unknown } } }
+            ).game?.scene.getScene('LobbyScene') as {
+              sys?: { settings: { active: boolean } };
+            };
+            return scene?.sys?.settings.active ?? false;
+          }),
         { timeout: 10000, message: 'expected the Crew lobby' },
       )
       .toBe(true);
@@ -265,25 +266,26 @@ test.describe('Crew Battle 2v2', () => {
       await pageB.goto('/');
       await pageB.waitForSelector('canvas');
       await expect
-        .poll(async () =>
-          Promise.all(
-            [gamePage, pageB].map((page) =>
-              page.evaluate(() => {
-                const scene = (
-                  window as unknown as {
-                    game?: { scene: { getScene: (key: string) => unknown } };
-                  }
-                ).game?.scene.getScene('LobbyScene') as {
-                  sys?: { settings: { active: boolean } };
-                  connectionState?: string;
-                };
-                return {
-                  active: scene?.sys?.settings.active ?? false,
-                  connected: scene?.connectionState === 'connected',
-                };
-              }),
+        .poll(
+          async () =>
+            Promise.all(
+              [gamePage, pageB].map((page) =>
+                page.evaluate(() => {
+                  const scene = (
+                    window as unknown as {
+                      game?: { scene: { getScene: (key: string) => unknown } };
+                    }
+                  ).game?.scene.getScene('LobbyScene') as {
+                    sys?: { settings: { active: boolean } };
+                    connectionState?: string;
+                  };
+                  return {
+                    active: scene?.sys?.settings.active ?? false,
+                    connected: scene?.connectionState === 'connected',
+                  };
+                }),
+              ),
             ),
-          ),
           { timeout: 20000, message: 'expected both Crew clients to reach the connected lobby' },
         )
         .toEqual([
@@ -325,49 +327,50 @@ test.describe('Crew Battle 2v2', () => {
       });
 
       await expect
-        .poll(async () =>
-          Promise.all(
-            [gamePage, pageB].map((page) =>
-              page.evaluate(() => {
-                const scene = (
-                  window as unknown as {
-                    game?: { scene: { getScene: (key: string) => unknown } };
-                  }
-                ).game?.scene.getScene('CharacterSelectScene') as {
-                  sys?: { settings: { active: boolean } };
-                  matchData?: {
-                    gameMode: string;
-                    playerTeams?: Record<string, string>;
-                    opponents: Array<{ id: string; nickname: string }>;
+        .poll(
+          async () =>
+            Promise.all(
+              [gamePage, pageB].map((page) =>
+                page.evaluate(() => {
+                  const scene = (
+                    window as unknown as {
+                      game?: { scene: { getScene: (key: string) => unknown } };
+                    }
+                  ).game?.scene.getScene('CharacterSelectScene') as {
+                    sys?: { settings: { active: boolean } };
+                    matchData?: {
+                      gameMode: string;
+                      playerTeams?: Record<string, string>;
+                      opponents: Array<{ id: string; nickname: string }>;
+                    };
+                    gameService?: { getPlayerId: () => string | null };
+                    children?: { list: Array<{ text?: string; displayWidth?: number }> };
                   };
-                  gameService?: { getPlayerId: () => string | null };
-                  children?: { list: Array<{ text?: string; displayWidth?: number }> };
-                };
-                const localId = scene?.gameService?.getPlayerId() ?? null;
-                const localTeam = localId ? scene?.matchData?.playerTeams?.[localId] : null;
-                const humanAlly = scene?.matchData?.opponents.find(
-                  (opponent) =>
-                    !opponent.id.startsWith('bot:') &&
-                    scene?.matchData?.playerTeams?.[opponent.id] === localTeam,
-                );
-                const bots = scene?.matchData?.opponents
-                  .filter((opponent) => opponent.id.startsWith('bot:'))
-                  .map((opponent) => opponent.nickname)
-                  .sort();
-                const briefing = scene?.children?.list.find((child) =>
-                  child.text?.includes('HUMAN ALLY:'),
-                );
-                return {
-                  active: scene?.sys?.settings.active ?? false,
-                  mode: scene?.matchData?.gameMode ?? null,
-                  ally: humanAlly?.nickname ?? null,
-                  bots,
-                  briefing: briefing?.text?.includes('CREWED UP') ?? false,
-                  fits: (briefing?.displayWidth ?? Number.POSITIVE_INFINITY) <= 920,
-                };
-              }),
+                  const localId = scene?.gameService?.getPlayerId() ?? null;
+                  const localTeam = localId ? scene?.matchData?.playerTeams?.[localId] : null;
+                  const humanAlly = scene?.matchData?.opponents.find(
+                    (opponent) =>
+                      !opponent.id.startsWith('bot:') &&
+                      scene?.matchData?.playerTeams?.[opponent.id] === localTeam,
+                  );
+                  const bots = scene?.matchData?.opponents
+                    .filter((opponent) => opponent.id.startsWith('bot:'))
+                    .map((opponent) => opponent.nickname)
+                    .sort();
+                  const briefing = scene?.children?.list.find((child) =>
+                    child.text?.includes('HUMAN ALLY:'),
+                  );
+                  return {
+                    active: scene?.sys?.settings.active ?? false,
+                    mode: scene?.matchData?.gameMode ?? null,
+                    ally: humanAlly?.nickname ?? null,
+                    bots,
+                    briefing: briefing?.text?.includes('CREWED UP') ?? false,
+                    fits: (briefing?.displayWidth ?? Number.POSITIVE_INFINITY) <= 920,
+                  };
+                }),
+              ),
             ),
-          ),
           { timeout: 15000, message: 'expected both friends in Crew character select' },
         )
         .toEqual([
@@ -575,7 +578,10 @@ test.describe('Crew Battle 2v2', () => {
             }
           ).game?.scene.getScene('LobbyScene') as {
             sys?: { settings: { active: boolean } };
-            crewBattleButton?: { list: Array<{ text?: string }> };
+            crewBattleButton?: {
+              list: Array<{ text?: string }>;
+              getSubtitleText: () => string | null;
+            };
           };
           const label = scene?.crewBattleButton?.list.find(
             (child) => typeof child.text === 'string',
@@ -583,6 +589,7 @@ test.describe('Crew Battle 2v2', () => {
           return scene?.sys?.settings.active
             ? {
                 text: label?.text ?? null,
+                progress: scene.crewBattleButton?.getSubtitleText() ?? null,
                 fits: (label as { displayWidth?: number } | undefined)?.displayWidth
                   ? (label as { displayWidth: number }).displayWidth <= 110
                   : false,
@@ -590,6 +597,6 @@ test.describe('Crew Battle 2v2', () => {
             : null;
         }),
       )
-      .toEqual({ text: 'CREW 2V2\nTOUR 1/4', fits: true });
+      .toEqual({ text: 'CREW 2V2', progress: 'TOUR 1/4', fits: true });
   });
 });
