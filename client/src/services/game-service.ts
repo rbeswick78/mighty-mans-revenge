@@ -116,6 +116,10 @@ export class GameService {
 
   private readonly networkManager: NetworkManager;
   private currentMatch: MatchData | null = null;
+  /** Latest server-authored mastery snapshot, zero-filled until one arrives. */
+  private latestCharacterWins: Readonly<Record<CharacterId, number>> = Object.freeze(
+    createEmptyCharacterWins(),
+  );
   private lastMatchResult: MatchResult | null = null;
   /**
    * Latest all-time leaderboard from the server (empty until the first
@@ -186,6 +190,10 @@ export class GameService {
 
   getCurrentMatch(): MatchData | null {
     return this.currentMatch;
+  }
+
+  getLatestCharacterWins(): Readonly<Record<CharacterId, number>> {
+    return this.latestCharacterWins;
   }
 
   getLastMatchResult(): MatchResult | null {
@@ -314,6 +322,11 @@ export class GameService {
     });
 
     this.networkManager.on('matchFound', (msg: ServerMatchFoundMessage) => {
+      const characterWins = Object.freeze({
+        ...createEmptyCharacterWins(),
+        ...msg.characterWins,
+      });
+      this.latestCharacterWins = characterWins;
       this.currentMatch = {
         matchId: msg.matchId,
         opponents: msg.opponents,
@@ -324,10 +337,7 @@ export class GameService {
         practiceKind: msg.practiceKind,
         rumbleCrown: msg.rumbleCrown,
         rumbleGrudge: msg.rumbleGrudge,
-        characterWins: {
-          ...createEmptyCharacterWins(),
-          ...msg.characterWins,
-        },
+        characterWins: { ...characterWins },
         gauntlet: msg.gauntlet,
         practiceMutatorId: msg.practiceMutatorId,
       };

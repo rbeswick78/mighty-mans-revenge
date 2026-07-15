@@ -5,8 +5,8 @@ Read this file and `CLAUDE.md` completely at the start of every batch. The
 completed `docs/REPLAYABILITY_ROADMAP.md` remains the historical record for the
 systems this program preserves and reorganizes.
 
-- **Status:** Batch 5 complete on 2026-07-15.
-- **Next batch:** Batch 6 — Fighters tab.
+- **Status:** Batch 6 complete on 2026-07-15.
+- **Next batch:** Batch 7 — Challenges tab.
 - **Public releases:** Reforged Arena, then Battle Royale.
 - **Working model:** one numbered batch per session, direct commits and pushes
   to `main`, milestone-gated production deployments.
@@ -158,8 +158,8 @@ Production deployment happens only at a gate or for an urgent live fix.
 |   3 | Capabilities and flags                 | Safety rails  | **DONE — 2026-07-15** |
 |   4 | Responsive menu foundation             | Navigation    | **DONE — 2026-07-15** |
 |   5 | Play roster builder                    | Navigation    | **DONE — 2026-07-15** |
-|   6 | Fighters tab                           | Navigation    | NEXT                  |
-|   7 | Challenges tab                         | Navigation    | Pending               |
+|   6 | Fighters tab                           | Navigation    | **DONE — 2026-07-15** |
+|   7 | Challenges tab                         | Navigation    | NEXT                  |
 |   8 | Records tab                            | Navigation    | Pending               |
 |   9 | Settings tab                           | Navigation    | Pending               |
 |  10 | Scheduled arenas                       | Navigation    | Pending               |
@@ -326,6 +326,24 @@ Acceptance:
 Move roster browsing, stats, abilities, mastery, and persistent fighter
 selection into Fighters. Play reads the persisted selection; server locking
 remains authoritative.
+
+Acceptance:
+
+- [x] The capability-owned Fighters tab browses all six registry fighters with
+      their shared HP/speed identity, canonical ability rules, and complete
+      mastery presentation from the latest existing server-authored snapshot.
+- [x] A registry-normalized device-local fighter preference defaults safely to
+      Mighty Man, persists across scene recreation, and is selectable through
+      pointer, touch, keyboard, and standard gamepad paths.
+- [x] Play consumes the persisted fighter without duplicating roster browsing,
+      while the unchanged Batch 5 pure reducer and fail-closed serializer still
+      validate the fighter in every reviewed local draft.
+- [x] Character Select and server locking remain authoritative, match entry
+      remains disabled, and no challenge activity, party, scheduled arena,
+      generalized intent, viewport/camera, capability default, or art work began.
+- [x] Challenges, Records, and Settings remain empty; false/absent capability,
+      reconnect, and disconnect behavior retain the complete legacy Lobby
+      fallback.
 
 #### Batch 7 — Challenges tab
 
@@ -940,6 +958,56 @@ Firefox/WebKit live practice plus black staged gameplay and Reforged-shell PNGs;
 mobile-sized Chromium remains the visual source while staged WebKit retains
 object/input coverage. None blocks Batch 6.
 
+### Batch 6 — 2026-07-15 — Fighters tab
+
+**Shipped:** Added the capability-owned six-fighter roster browser with shared
+HP/speed identity, canonical ability rules, mastery tiers from the latest
+existing server-authored match-found snapshot, and a registry-normalized
+`mmr_fighter_selection` device preference. Missing or stale values safely become
+Mighty Man and are rewritten. Pointer/touch, keyboard, and standard gamepad all
+select through the same card path. Play now consumes that persisted selection
+as the final dependency of the unchanged pure Batch 5 reducer and serializer,
+skips its old duplicate fighter step, and updates an already reviewed local
+draft when the Fighters preference changes. Character Select and server locking
+remain authoritative; match entry remains disabled.
+
+**Verification:** Selected the isolated pure logic/capability-owned client UI
+tier because executable changes stayed inside the client, reused the existing
+`server:matchFound` mastery field without changing its wire contract, and did
+not change shared/server/network/persistence, scene routing, recovery, or any
+capability default. Focused Vitest passed 21 Fighters/Play/mastery tests across
+three files. `corepack pnpm typecheck`, `corepack pnpm lint`, and
+`corepack pnpm --filter @game/client build` passed. With only
+`CAPABILITY_NEW_SHELL=true`, the focused three-project shell run passed nine
+tests with three expected inverse-gate skips, covering pointer/touch, keyboard,
+gamepad, persistence through scene recreation, Fighters-to-Play handoff, and
+staged Firefox/WebKit object/input paths. With every capability at its default
+false value, the legacy Lobby fallback passed in desktop Chromium, desktop
+Firefox, and mobile landscape with nine expected gated skips. Manual inspection
+of final desktop and 844×390 Chromium Fighters captures found all cards, stats,
+abilities, mastery, selection, and authority copy readable and unclipped.
+The complete unit suite and unrelated browser journeys were deliberately omitted
+because no broader boundary changed and focused evidence showed no wider risk.
+
+**Deployment:** Skipped. Batch 6 remains incomplete navigation-milestone code
+behind the default-false `newShell` capability, and the roadmap authorizes
+production deployment only at a release gate or for an urgent live fix. No
+production environment or capability flag changed.
+
+**Deviations:** No scope deviation. The existing handshake still has no
+callsign-scoped mastery payload, so Fighters retains the latest complete
+server-authored match-found snapshot in client memory and starts from the same
+normalized zero-win presentation used before any such snapshot arrives. Initial
+Chromium evidence exposed overflowing card/header copy; the tightly coupled
+Batch 6 layout defect was corrected with bounded two-line card details before
+final verification.
+
+**Known issues:** No new bug ID was required. RFG-001 and RFG-002 remain assigned
+to Batches 20/24 and were untouched. RFG-003 remains unchanged: live headless
+Firefox/WebKit practice is unreliable and staged gameplay/Reforged-shell PNGs
+are black, so staged object/input assertions and mobile-sized Chromium visual
+evidence remain the required combination. None blocks Batch 7.
+
 ## Next-session prompt
 
 ```text
@@ -947,25 +1015,39 @@ Continue the Reforged build for Mighty Man's Revenge.
 
 Read docs/REIMAGINING_ROADMAP.md and CLAUDE.md completely first. Read
 docs/REFORGED_BASELINE.md and docs/REFORGED_CAPABILITIES.md before
-implementation. Implement Batch 6 — Fighters tab exactly as specified. Preserve
-unrelated changes and do not begin Batch 7 — Challenges tab.
+implementation. Implement Batch 7 — Challenges tab exactly as specified.
+Preserve unrelated changes and do not begin Batch 8 — Records tab.
 
-Move roster browsing, stats, abilities, mastery, and persistent fighter
-selection into the capability-owned Fighters tab. Play must read that persisted
-selection while server locking remains authoritative. Preserve the Batch 5 pure
-Play roster compatibility/serialization boundary, the empty Challenges,
-Records, and Settings tabs, and the complete legacy Lobby fallback. Do not move
-challenge activities, implement parties/scheduled-arena authority/general match
-intent, retire Draft or Character Select, enable any capability by default or
-in production, change the gameplay viewport/camera, or begin modern art.
+Relocate Spar, Scrap Pit, Gauntlet, Daily Run, Practice Setup, and Build Codex
+into the capability-owned Challenges tab without changing challenge rules,
+saved progress, server authority, deliberate randomness, difficulty, rivals,
+mutators, scoring, persistence, rematches, or existing challenge input paths.
+Preserve the Batch 5 pure Play roster compatibility/serialization boundary, the
+Batch 6 persisted Fighters selection and server-authoritative locking boundary,
+the empty Records and Settings tabs, and the complete legacy Lobby fallback.
 
-Batch 5 is complete and pushed on main. Its reviewed roster remains a local
-draft with match entry disabled; the injected arena is a fixed non-authoritative
-preview until Batch 10, and all five strict server capability flags still
-default false. Update roadmap acceptance evidence and the Session Log, run the
-risk-based end-of-batch ritual, commit and push directly to main, skip
-deployment unless the roadmap explicitly authorizes it, and end with the fenced
-paste-ready prompt for Batch 7.
+Do not implement records/settings content, parties, scheduled-arena authority,
+generalized match intent, queue fallback, or Reforged Results; do not retire
+Draft or Character Select, enable any capability by default or in production,
+change the gameplay viewport/camera, or begin modern art production.
+
+Batch 6 is complete and pushed on main. Fighters owns roster browsing, shared
+stats, canonical abilities, latest server-authored mastery presentation, and
+device-local `mmr_fighter_selection`; Play reads it into the unchanged pure
+local draft, match entry remains disabled, and server locking remains
+authoritative. The injected Play arena is still a fixed non-authoritative
+preview until Batch 10. All five server capability flags still default false.
+
+Choose and document the Batch 7 verification tier from the roadmap's risk-based
+test-selection matrix. Run focused Challenges/navigation tests, typecheck,
+lint, the affected client build, targeted desktop and mobile-landscape
+interaction evidence, and the legacy fallback check. Escalate to broader unit
+or browser suites only if shared, server, network, persistence, routing,
+recovery, or cross-cutting input boundaries change or focused evidence indicates
+wider risk. Update roadmap acceptance evidence, the bug ledger if needed, and
+the Session Log. Run the end-of-batch ritual, commit and push directly to main,
+skip deployment unless the roadmap explicitly authorizes it, and end with the
+fenced paste-ready prompt for Batch 8.
 
 Carry-over warnings: RFG-001 CameraKick and RFG-002 ZoomPulse overwrite future
 base camera state and remain assigned to Batches 20/24. RFG-003 means headless
@@ -977,5 +1059,5 @@ remained far below the 50ms budget. Batch 4 broadened RFG-003 evidence: the
 staged mobile WebKit Reforged-shell PNG is also black, so use mobile-sized
 Chromium for visual evidence while retaining staged WebKit object/input
 assertions. Use Corepack pnpm 10.33.0 if the local pnpm shim selects a mismatched
-version. Batch 7 follows Batch 6.
+version. Batch 8 follows Batch 7.
 ```

@@ -48,6 +48,21 @@ async function clickLogicalPlayOption(page: Page, index: number, touch: boolean)
   else await page.mouse.click(x, y);
 }
 
+async function clickLogicalFighterOption(page: Page, index: number, touch: boolean): Promise<void> {
+  const center = await page.evaluate((optionIndex) => {
+    const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'ReforgedShellScene',
+    ) as unknown as { getFighterOptionCenter(index: number): { x: number; y: number } | null };
+    return scene.getFighterOptionCenter(optionIndex);
+  }, index);
+  const canvas = await page.locator('canvas').boundingBox();
+  if (!center || !canvas) throw new Error(`Missing rendered Fighters option ${index}`);
+  const x = canvas.x + (center.x / 1280) * canvas.width;
+  const y = canvas.y + (center.y / 720) * canvas.height;
+  if (touch) await page.touchscreen.tap(x, y);
+  else await page.mouse.click(x, y);
+}
+
 async function stageNonChromiumShell(page: Page): Promise<void> {
   await waitForActiveScene(page, 'LobbyScene');
   await page.evaluate(() => {
@@ -97,6 +112,25 @@ async function playRosterSnapshot(page: Page): Promise<{
       };
     };
     return scene.getPlayRosterSnapshot();
+  });
+}
+
+async function fightersSnapshot(page: Page): Promise<{
+  selectedFighterId: string;
+  optionLabels: string[];
+  selectedDetail: string;
+}> {
+  return page.evaluate(() => {
+    const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'ReforgedShellScene',
+    ) as unknown as {
+      getFightersSnapshot(): {
+        selectedFighterId: string;
+        optionLabels: string[];
+        selectedDetail: string;
+      };
+    };
+    return scene.getFightersSnapshot();
   });
 }
 
@@ -259,6 +293,7 @@ test('Play roster builder reaches only a valid review across pointer, keyboard, 
   page,
 }, testInfo) => {
   test.skip(!shellAdvertised, 'Run with CAPABILITY_NEW_SHELL=true for the gated shell path.');
+  await page.addInitScript(() => localStorage.setItem('mmr_fighter_selection', 'frost_wizard'));
   await page.goto('/');
   const touch = testInfo.project.name === 'mobile-landscape';
   if (testInfo.project.name !== 'desktop-chromium') await stageNonChromiumShell(page);
@@ -292,13 +327,9 @@ test('Play roster builder reaches only a valid review across pointer, keyboard, 
     await expect.poll(async () => (await playRosterSnapshot(page)).step).toBe('arena');
   }
 
-  // Standard gamepad A confirms the read-only arena, then D-pad chooses Frost Wizard.
-  await queueMenuGamepadActions(page, [
-    { confirm: true },
-    { right: true },
-    { right: true },
-    { confirm: true },
-  ]);
+  // Standard gamepad A confirms the read-only arena. Play consumes the
+  // persisted Fighters selection without offering a second roster browser.
+  await queueMenuGamepadActions(page, [{ confirm: true }]);
   await expect.poll(async () => (await playRosterSnapshot(page)).step).toBe('review');
   const review = await playRosterSnapshot(page);
   expect(review.serialized).toEqual({
@@ -310,17 +341,19 @@ test('Play roster builder reaches only a valid review across pointer, keyboard, 
   });
   expect(review.optionLabels).toEqual([]);
 
-  // Standard gamepad B edits instead of serializing a stale review.
+  // Standard gamepad B skips the Fighters-owned dependency and edits arena.
   await queueMenuGamepadActions(page, [{ back: true }]);
-  await expect.poll(async () => (await playRosterSnapshot(page)).step).toBe('fighter');
+  await expect.poll(async () => (await playRosterSnapshot(page)).step).toBe('arena');
   expect((await playRosterSnapshot(page)).serialized).toBeNull();
-  await clickLogicalPlayOption(page, 4, touch);
+  await clickLogicalPlayOption(page, 0, touch);
   await expect.poll(async () => (await playRosterSnapshot(page)).step).toBe('review');
-  expect((await playRosterSnapshot(page)).serialized?.fighterId).toBe('jack');
+  expect((await playRosterSnapshot(page)).serialized?.fighterId).toBe('frost_wizard');
 
-  // Other Batch 4 tabs remain empty and never expose the Play control objects.
+  // Fighters owns selection now and updates an already reviewed Play draft.
   await clickLogicalTab(page, 'fighters', touch);
   await expect.poll(() => activeTab(page)).toBe('fighters');
+  await clickLogicalFighterOption(page, 4, touch);
+  await expect.poll(async () => (await fightersSnapshot(page)).selectedFighterId).toBe('jack');
   const hidden = await page.evaluate(() => {
     const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
       'ReforgedShellScene',
@@ -363,11 +396,79 @@ test('Play roster builder reaches only a valid review across pointer, keyboard, 
     await page.keyboard.press('Escape');
     await page.keyboard.press('Escape');
     await page.keyboard.press('Escape');
-    await page.keyboard.press('Escape');
     await expect.poll(async () => (await playRosterSnapshot(page)).step).toBe('composition');
     expect((await playRosterSnapshot(page)).optionLabels).toHaveLength(9);
     await page.screenshot({
       path: testInfo.outputPath('play-roster-options-mobile-chromium.png'),
     });
   }
+});
+
+test('Fighters owns roster detail, mastery, persistent selection, and Play handoff', async ({
+  page,
+}, testInfo) => {
+  test.skip(!shellAdvertised, 'Run with CAPABILITY_NEW_SHELL=true for the gated shell path.');
+  await page.addInitScript(() => {
+    if (sessionStorage.getItem('batch6-fighter-initialized') === null) {
+      localStorage.removeItem('mmr_fighter_selection');
+      sessionStorage.setItem('batch6-fighter-initialized', 'true');
+    }
+  });
+  await page.goto('/');
+  const touch = testInfo.project.name === 'mobile-landscape';
+  if (testInfo.project.name !== 'desktop-chromium') await stageNonChromiumShell(page);
+  await waitForActiveScene(page, 'ReforgedShellScene');
+  await clickLogicalTab(page, 'fighters', touch);
+
+  expect(await fightersSnapshot(page)).toMatchObject({
+    selectedFighterId: 'mighty_man',
+    optionLabels: ['MIGHTY MAN', 'BRUCE', 'FROST WIZARD', 'BUBBA', 'JACK', 'ROOK'],
+  });
+  expect((await fightersSnapshot(page)).selectedDetail).toContain('X-RAY VISION');
+  expect((await fightersSnapshot(page)).selectedDetail).toContain('100 HP');
+  expect((await fightersSnapshot(page)).selectedDetail).toContain('MASTERY  /  UNTESTED');
+
+  // Pointer or touch selects and persists Jack.
+  await clickLogicalFighterOption(page, 4, touch);
+  await expect.poll(async () => (await fightersSnapshot(page)).selectedFighterId).toBe('jack');
+  await expect
+    .poll(() => page.evaluate(() => localStorage.getItem('mmr_fighter_selection')))
+    .toBe('jack');
+  expect((await fightersSnapshot(page)).selectedDetail).toContain('AXE THROW');
+
+  // External keyboard and standard gamepad use the same card activation path.
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowLeft');
+  await page.keyboard.press('Enter');
+  await expect.poll(async () => (await fightersSnapshot(page)).selectedFighterId).toBe('bubba');
+  await queueMenuGamepadActions(page, [{ right: true }, { confirm: true }]);
+  await expect.poll(async () => (await fightersSnapshot(page)).selectedFighterId).toBe('jack');
+
+  if (touch) {
+    // RFG-003: retain real staged WebKit touch/object assertions; pixels are black.
+    await page.screenshot({ path: testInfo.outputPath('fighters-mobile-webkit.png') });
+  } else if (testInfo.project.name === 'desktop-chromium') {
+    await page.screenshot({ path: testInfo.outputPath('fighters-desktop.png') });
+    await page.setViewportSize({ width: 844, height: 390 });
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: testInfo.outputPath('fighters-mobile-chromium.png') });
+  }
+
+  // Scene recreation reads the device preference; no network message is authored.
+  await page.reload();
+  if (testInfo.project.name !== 'desktop-chromium') await stageNonChromiumShell(page);
+  await waitForActiveScene(page, 'ReforgedShellScene');
+  await clickLogicalTab(page, 'fighters', touch);
+  await expect.poll(async () => (await fightersSnapshot(page)).selectedFighterId).toBe('jack');
+
+  await clickLogicalTab(page, 'challenges', touch);
+  await expect.poll(() => activeTab(page)).toBe('challenges');
+  expect(
+    await page.evaluate(() => {
+      const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+        'ReforgedShellScene',
+      ) as unknown as { getFighterOptionCenter(index: number): unknown };
+      return scene.getFighterOptionCenter(0);
+    }),
+  ).toBeNull();
 });

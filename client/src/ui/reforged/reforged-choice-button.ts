@@ -6,6 +6,7 @@ import { ReforgedMenuTokens } from './design-tokens.js';
 export interface ReforgedChoiceButtonOptions {
   readonly onSelect: () => void;
   readonly onPointerIntent: () => void;
+  readonly detailFontSize?: number;
 }
 
 export class ReforgedChoiceButton extends Phaser.GameObjects.Container {
@@ -18,6 +19,7 @@ export class ReforgedChoiceButton extends Phaser.GameObjects.Container {
   private hovered = false;
   private pressed = false;
   private focused = false;
+  private selected = false;
 
   constructor(
     scene: Phaser.Scene,
@@ -39,9 +41,10 @@ export class ReforgedChoiceButton extends Phaser.GameObjects.Container {
     this.detail = scene.add
       .text(0, 0, detail, {
         fontFamily: MENU_FONTS.BODY,
-        fontSize: `${tokens.type.eyebrow}px`,
+        fontSize: `${options.detailFontSize ?? tokens.type.eyebrow}px`,
         color: Phaser.Display.Color.IntegerToColor(tokens.color.textMuted).rgba,
         align: 'center',
+        lineSpacing: 2,
       })
       .setOrigin(0.5);
     this.hitZone = scene.add.zone(0, 0, 1, 1).setInteractive({ useHandCursor: true });
@@ -83,7 +86,7 @@ export class ReforgedChoiceButton extends Phaser.GameObjects.Container {
     this.visualHeight = height;
     const hasDetail = this.detail.text.length > 0;
     this.label.setPosition(width / 2, hasDetail ? height / 2 - 9 : height / 2);
-    this.detail.setPosition(width / 2, height / 2 + 13).setVisible(hasDetail);
+    this.detail.setPosition(width / 2, height / 2 + 10).setVisible(hasDetail);
     this.hitZone.setPosition(width / 2, height / 2).setSize(width, height);
     this.redraw();
     return this;
@@ -95,6 +98,12 @@ export class ReforgedChoiceButton extends Phaser.GameObjects.Container {
 
   setFocused(focused: boolean): this {
     this.focused = focused;
+    this.redraw();
+    return this;
+  }
+
+  setSelected(selected: boolean): this {
+    this.selected = selected;
     this.redraw();
     return this;
   }
@@ -114,8 +123,15 @@ export class ReforgedChoiceButton extends Phaser.GameObjects.Container {
 
   private redraw(): void {
     const tokens = ReforgedMenuTokens;
-    const fill = this.hovered || this.focused ? tokens.color.surfaceRaised : tokens.color.canvas;
-    const border = this.hovered || this.focused ? tokens.color.borderStrong : tokens.color.border;
+    const fill =
+      this.hovered || this.focused || this.selected
+        ? tokens.color.surfaceRaised
+        : tokens.color.canvas;
+    const border = this.selected
+      ? tokens.color.accentActive
+      : this.hovered || this.focused
+        ? tokens.color.borderStrong
+        : tokens.color.border;
     const inset = this.pressed ? 3 : 0;
     this.chrome.clear();
     this.chrome
@@ -136,6 +152,6 @@ export class ReforgedChoiceButton extends Phaser.GameObjects.Container {
     }
     const labelY = this.detail.visible ? this.visualHeight / 2 - 9 : this.visualHeight / 2;
     this.label.setY(labelY + inset);
-    this.detail.setY(this.visualHeight / 2 + 13 + inset);
+    this.detail.setY(this.visualHeight / 2 + 10 + inset);
   }
 }

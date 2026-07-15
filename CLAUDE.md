@@ -168,6 +168,18 @@ clock, rotation, queue lock, or authority. Batch 11 owns network intent. Keep
 Fighters/Challenges/Records/Settings empty until their batches and preserve the
 complete legacy Lobby, Draft, and Character Select fallback.
 
+**Reforged Fighters preference (Batch 6):** the capability-owned Fighters tab
+owns all six registry fighters, HP/speed identity, canonical ability copy, the
+latest server-authored mastery snapshot already carried by `server:matchFound`,
+and device-local `mmr_fighter_selection`. Missing or stale stored fighter ids
+normalize to Mighty Man and are rewritten immediately. Play consumes that
+persisted fighter as the final dependency of the unchanged pure Batch 5 reducer
+and fail-closed serializer; Play no longer offers a duplicate roster browser.
+This remains a local preference and reviewed draft only: Character Select and
+server locking remain authoritative, match entry remains disabled, and
+Challenges/Records/Settings plus the complete legacy Lobby fallback remain
+unchanged.
+
 ### Why This Matters for Agents
 
 Client prediction and server simulation **must use identical physics code** from `/shared`. If you change movement, collision, or physics logic, you must change it in `/shared` and verify both client and server still agree. A mismatch between client prediction and server authority causes visible rubber-banding.

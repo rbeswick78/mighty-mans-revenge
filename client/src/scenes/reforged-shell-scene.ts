@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_MODE_ROTATION } from '@shared/config/game.js';
+import { GAME_MODE_ROTATION, type CharacterId } from '@shared/config/game.js';
 import { cssHex } from '@shared/config/palette.js';
 import { listMapNames } from '@shared/maps/registry.js';
 import type { ServerCapabilities } from '@shared/types/network.js';
@@ -7,6 +7,8 @@ import { MenuGamepadInput } from '../input/menu-gamepad.js';
 import { GameService } from '../services/game-service.js';
 import { MENU_FONTS } from '../ui/menu/fonts.js';
 import { ReforgedMenuTokens } from '../ui/reforged/design-tokens.js';
+import { persistFighterSelection, readFighterSelection } from '../ui/reforged/fighter-selection.js';
+import { FightersPanel, type FightersPanelSnapshot } from '../ui/reforged/fighters-panel.js';
 import { MenuFocusNavigator } from '../ui/reforged/focus-navigation.js';
 import { menuSceneForCapabilities } from '../ui/reforged/menu-route.js';
 import { normalizePlayRosterAvailability } from '../ui/reforged/play-roster-builder.js';
@@ -49,7 +51,9 @@ export class ReforgedShellScene extends Phaser.Scene {
   private tabButtons: ReforgedTabButton[] = [];
   private focusNavigator: MenuFocusNavigator<ReforgedTabButton> | null = null;
   private playRosterPanel: PlayRosterPanel | null = null;
-  private inputRegion: 'tabs' | 'play' = 'tabs';
+  private fightersPanel: FightersPanel | null = null;
+  private selectedFighterId!: CharacterId;
+  private inputRegion: 'tabs' | 'play' | 'fighters' = 'tabs';
   private activeTabId: ReforgedTabId = 'play';
   private safeArea: MenuSafeArea | null = null;
   private background!: Phaser.GameObjects.Rectangle;
@@ -81,6 +85,10 @@ export class ReforgedShellScene extends Phaser.Scene {
     this.cameras.main.setViewport(0, 0, MENU_LOGICAL_WIDTH, MENU_LOGICAL_HEIGHT);
     this.menuGamepad = new MenuGamepadInput();
     this.leaving = false;
+    this.selectedFighterId = persistFighterSelection(
+      localStorage,
+      readFighterSelection(localStorage),
+    );
 
     const tokens = ReforgedMenuTokens;
     this.background = this.add
@@ -117,7 +125,14 @@ export class ReforgedShellScene extends Phaser.Scene {
 
     this.playRosterPanel = new PlayRosterPanel(this, {
       availability: createBatch5RosterAvailability(),
+      fighterId: this.selectedFighterId,
       onPointerIntent: () => this.enterPlayInput(false),
+    });
+    this.fightersPanel = new FightersPanel(this, {
+      initialFighterId: this.selectedFighterId,
+      characterWins: this.gameService.getLatestCharacterWins(),
+      onPointerIntent: () => this.enterFightersInput(false),
+      onSelectionChange: (fighterId) => this.selectFighter(fighterId),
     });
 
     this.tabButtons = REFORGED_TABS.map(
@@ -126,6 +141,7 @@ export class ReforgedShellScene extends Phaser.Scene {
           onPointerIntent: () => {
             this.inputRegion = 'tabs';
             this.playRosterPanel?.clearFocus();
+            this.fightersPanel?.clearFocus();
             this.focusNavigator?.clear();
           },
           onSelect: () => this.selectTab(tab.id),
@@ -144,8 +160,8 @@ export class ReforgedShellScene extends Phaser.Scene {
   update(): void {
     const actions = this.menuGamepad?.poll();
     if (!actions?.hasAction || !this.focusNavigator) return;
-    if (actions.back && this.inputRegion === 'play') {
-      this.playRosterPanel?.back();
+    if (actions.back && this.inputRegion !== 'tabs') {
+      this.backPanelInput();
       return;
     }
     if (this.inputRegion === 'play') {
@@ -156,7 +172,16 @@ export class ReforgedShellScene extends Phaser.Scene {
       if (actions.confirm) this.playRosterPanel?.activateFocused();
       return;
     }
+    if (this.inputRegion === 'fighters') {
+      if (actions.left) this.fightersPanel?.moveHorizontal(-1);
+      else if (actions.right) this.fightersPanel?.moveHorizontal(1);
+      else if (actions.up) this.fightersPanel?.moveVertical(-1);
+      else if (actions.down) this.fightersPanel?.moveVertical(1);
+      if (actions.confirm) this.fightersPanel?.activateFocused();
+      return;
+    }
     if (actions.down && this.activeTabId === 'play') this.enterPlayInput(true);
+    else if (actions.down && this.activeTabId === 'fighters') this.enterFightersInput(true);
     else if (actions.left || actions.up) this.focusNavigator.move(-1);
     else if (actions.right || actions.down) this.focusNavigator.move(1);
     if (actions.confirm) this.focusNavigator.activateFocused();
@@ -181,6 +206,16 @@ export class ReforgedShellScene extends Phaser.Scene {
     return this.playRosterPanel?.getSnapshot() ?? null;
   }
 
+  getFightersSnapshot(): FightersPanelSnapshot | null {
+    return this.fightersPanel?.getSnapshot() ?? null;
+  }
+
+  getFighterOptionCenter(index: number): { x: number; y: number } | null {
+    return this.activeTabId === 'fighters'
+      ? (this.fightersPanel?.getOptionCenter(index) ?? null)
+      : null;
+  }
+
   getPlayRosterOptionCenter(index: number): { x: number; y: number } | null {
     return this.activeTabId === 'play'
       ? (this.playRosterPanel?.getOptionCenter(index) ?? null)
@@ -197,36 +232,36 @@ export class ReforgedShellScene extends Phaser.Scene {
       event.preventDefault();
       this.inputRegion = 'tabs';
       this.playRosterPanel?.clearFocus();
+      this.fightersPanel?.clearFocus();
       this.focusNavigator?.move(direction);
     };
     this.input.keyboard?.on('keydown-TAB', (event: KeyboardEvent) => {
       if (event.defaultPrevented) return;
       event.preventDefault();
-      if (this.activeTabId === 'play' && this.inputRegion === 'tabs' && !event.shiftKey) {
-        this.enterPlayInput(true);
+      if (this.inputRegion === 'tabs' && !event.shiftKey && this.enterActivePanelInput(true)) {
         return;
       }
       this.inputRegion = 'tabs';
       this.playRosterPanel?.clearFocus();
+      this.fightersPanel?.clearFocus();
       this.focusNavigator?.move(event.shiftKey ? -1 : 1);
     });
     this.input.keyboard?.on('keydown-LEFT', (event: KeyboardEvent) => {
-      if (this.inputRegion === 'play') this.movePlay(event, 'left');
+      if (this.inputRegion !== 'tabs') this.movePanel(event, 'left');
       else moveTabs(event, -1);
     });
     this.input.keyboard?.on('keydown-UP', (event: KeyboardEvent) => {
-      if (this.inputRegion === 'play') this.movePlay(event, 'up');
+      if (this.inputRegion !== 'tabs') this.movePanel(event, 'up');
       else moveTabs(event, -1);
     });
     this.input.keyboard?.on('keydown-RIGHT', (event: KeyboardEvent) => {
-      if (this.inputRegion === 'play') this.movePlay(event, 'right');
+      if (this.inputRegion !== 'tabs') this.movePanel(event, 'right');
       else moveTabs(event, 1);
     });
     this.input.keyboard?.on('keydown-DOWN', (event: KeyboardEvent) => {
-      if (this.inputRegion === 'play') this.movePlay(event, 'down');
-      else if (this.activeTabId === 'play') {
+      if (this.inputRegion !== 'tabs') this.movePanel(event, 'down');
+      else if (this.enterActivePanelInput(true)) {
         event.preventDefault();
-        this.enterPlayInput(true);
       } else moveTabs(event, 1);
     });
     this.input.keyboard?.on('keydown-ENTER', () => this.activateFocusedRegion());
@@ -234,8 +269,8 @@ export class ReforgedShellScene extends Phaser.Scene {
       event.preventDefault();
       this.activateFocusedRegion();
     });
-    this.input.keyboard?.on('keydown-ESC', () => this.backPlayInput());
-    this.input.keyboard?.on('keydown-BACKSPACE', () => this.backPlayInput());
+    this.input.keyboard?.on('keydown-ESC', () => this.backPanelInput());
+    this.input.keyboard?.on('keydown-BACKSPACE', () => this.backPanelInput());
     this.input.on('pointerdown', () => this.focusNavigator?.clear());
   }
 
@@ -258,17 +293,22 @@ export class ReforgedShellScene extends Phaser.Scene {
     const tab = REFORGED_TABS.find((candidate) => candidate.id === tabId);
     this.contentTitle?.setText(tab?.label ?? 'PLAY');
     const playActive = tabId === 'play';
+    const fightersActive = tabId === 'fighters';
     this.playRosterPanel?.setPanelVisible(playActive);
-    this.contentState?.setVisible(!playActive);
+    this.fightersPanel?.setPanelVisible(fightersActive);
+    this.contentState?.setVisible(!playActive && !fightersActive);
     this.inputHint?.setText(
       playActive
         ? 'TAP / CLICK  /  ARROWS + ENTER  /  D-PAD + A  /  ESC / B TO EDIT'
-        : 'POINTER / TOUCH  /  ARROWS + ENTER  /  D-PAD + A',
+        : fightersActive
+          ? 'TAP / CLICK  /  ARROWS + ENTER  /  D-PAD + A  /  SELECTION PERSISTS'
+          : 'POINTER / TOUCH  /  ARROWS + ENTER  /  D-PAD + A',
     );
-    if (!playActive) {
+    if (!playActive && !fightersActive) {
       this.inputRegion = 'tabs';
-      this.playRosterPanel?.clearFocus();
     }
+    if (!playActive) this.playRosterPanel?.clearFocus();
+    if (!fightersActive) this.fightersPanel?.clearFocus();
   }
 
   private layoutShell(): void {
@@ -308,6 +348,12 @@ export class ReforgedShellScene extends Phaser.Scene {
       safe.width - tokens.space.lg * 2,
       panelHeight - tokens.space.lg * 2 - 46,
     );
+    this.fightersPanel?.layout(
+      safe.left + tokens.space.lg,
+      panelTop + tokens.space.lg + 46,
+      safe.width - tokens.space.lg * 2,
+      panelHeight - tokens.space.lg * 2 - 46,
+    );
     this.inputHint.setPosition((safe.left + safe.right) / 2, safe.bottom);
   }
 
@@ -318,22 +364,52 @@ export class ReforgedShellScene extends Phaser.Scene {
     if (focusFirst) this.playRosterPanel?.focusFirst();
   }
 
-  private movePlay(event: KeyboardEvent, direction: 'left' | 'right' | 'up' | 'down'): void {
+  private enterFightersInput(focusFirst: boolean): void {
+    if (this.activeTabId !== 'fighters') return;
+    this.inputRegion = 'fighters';
+    this.focusNavigator?.clear();
+    if (focusFirst) this.fightersPanel?.focusFirst();
+  }
+
+  private enterActivePanelInput(focusFirst: boolean): boolean {
+    if (this.activeTabId === 'play') {
+      this.enterPlayInput(focusFirst);
+      return true;
+    }
+    if (this.activeTabId === 'fighters') {
+      this.enterFightersInput(focusFirst);
+      return true;
+    }
+    return false;
+  }
+
+  private movePanel(event: KeyboardEvent, direction: 'left' | 'right' | 'up' | 'down'): void {
     if (event.defaultPrevented) return;
     event.preventDefault();
-    if (direction === 'left') this.playRosterPanel?.moveHorizontal(-1);
-    else if (direction === 'right') this.playRosterPanel?.moveHorizontal(1);
-    else if (direction === 'up') this.playRosterPanel?.moveVertical(-1);
-    else this.playRosterPanel?.moveVertical(1);
+    const panel = this.inputRegion === 'play' ? this.playRosterPanel : this.fightersPanel;
+    if (direction === 'left') panel?.moveHorizontal(-1);
+    else if (direction === 'right') panel?.moveHorizontal(1);
+    else if (direction === 'up') panel?.moveVertical(-1);
+    else panel?.moveVertical(1);
   }
 
   private activateFocusedRegion(): void {
     if (this.inputRegion === 'play') this.playRosterPanel?.activateFocused();
+    else if (this.inputRegion === 'fighters') this.fightersPanel?.activateFocused();
     else this.focusNavigator?.activateFocused();
   }
 
-  private backPlayInput(): void {
+  private backPanelInput(): void {
     if (this.inputRegion === 'play') this.playRosterPanel?.back();
+    else if (this.inputRegion === 'fighters') {
+      this.fightersPanel?.clearFocus();
+      this.inputRegion = 'tabs';
+    }
+  }
+
+  private selectFighter(fighterId: CharacterId): void {
+    this.selectedFighterId = persistFighterSelection(localStorage, fighterId);
+    this.playRosterPanel?.setPersistedFighterSelection(this.selectedFighterId);
   }
 
   private returnToLobby(): void {
@@ -364,6 +440,7 @@ export class ReforgedShellScene extends Phaser.Scene {
     this.cleanupEvents();
     this.menuGamepad = null;
     this.playRosterPanel = null;
+    this.fightersPanel = null;
     useLegacyLogicalSize(this.scale);
   }
 }

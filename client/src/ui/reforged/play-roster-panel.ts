@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { CHARACTER_IDS } from '@shared/config/game.js';
+import type { CharacterId } from '@shared/config/game.js';
 import { cssHex } from '@shared/config/palette.js';
 import { MENU_FONTS } from '../menu/fonts.js';
 import { ReforgedMenuTokens } from './design-tokens.js';
@@ -27,6 +27,7 @@ import { ReforgedChoiceButton } from './reforged-choice-button.js';
 
 interface PlayRosterPanelOptions {
   readonly availability: PlayRosterAvailability;
+  readonly fighterId: CharacterId;
   readonly onPointerIntent: () => void;
 }
 
@@ -49,7 +50,7 @@ const STEP_NUMBER: Readonly<Record<PlayRosterBuilderStep, number>> = Object.free
   mode: 3,
   arena: 4,
   fighter: 5,
-  review: 6,
+  review: 5,
 });
 
 export class PlayRosterPanel extends Phaser.GameObjects.Container {
@@ -61,6 +62,7 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
   private optionButtons: ReforgedChoiceButton[] = [];
   private optionLabels: string[] = [];
   private focusNavigator: MenuFocusNavigator<ReforgedChoiceButton> | null = null;
+  private persistedFighterId: CharacterId;
   private panelWidth = 1;
   private panelHeight = 1;
 
@@ -69,6 +71,7 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
     private readonly options: PlayRosterPanelOptions,
   ) {
     super(scene, 0, 0);
+    this.persistedFighterId = options.fighterId;
     const tokens = ReforgedMenuTokens;
     this.stageLabel = scene.add.text(0, 0, '', {
       fontFamily: MENU_FONTS.HEADER,
@@ -134,7 +137,12 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
   }
 
   back(): boolean {
-    const next = backPlayRosterBuilder(this.builderState);
+    let next = backPlayRosterBuilder(this.builderState);
+    // Fighter choice now belongs to Fighters. Editing a reviewed Play draft
+    // skips that internal pure-reducer dependency and returns to arena.
+    if (playRosterBuilderStep(this.builderState) === 'review') {
+      next = backPlayRosterBuilder(next);
+    }
     if (next === this.builderState) return false;
     this.builderState = next;
     this.rebuild();
@@ -149,6 +157,17 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
       serialized: serializePlayRosterDraft(this.builderState, this.options.availability),
       optionLabels: [...this.optionLabels],
     };
+  }
+
+  setPersistedFighterSelection(fighterId: CharacterId): void {
+    this.persistedFighterId = fighterId;
+    if (playRosterBuilderStep(this.builderState) !== 'review') return;
+    const fighterStep = backPlayRosterBuilder(this.builderState);
+    this.builderState = applyPlayRosterChoice(fighterStep, this.options.availability, {
+      kind: 'fighter',
+      fighterId,
+    });
+    this.rebuild();
   }
 
   getOptionCenter(index: number): { x: number; y: number } | null {
@@ -170,8 +189,14 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
   }
 
   private choose(choice: PlayRosterChoice): void {
-    const next = applyPlayRosterChoice(this.builderState, this.options.availability, choice);
+    let next = applyPlayRosterChoice(this.builderState, this.options.availability, choice);
     if (next === this.builderState) return;
+    if (playRosterBuilderStep(next) === 'fighter') {
+      next = applyPlayRosterChoice(next, this.options.availability, {
+        kind: 'fighter',
+        fighterId: this.persistedFighterId,
+      });
+    }
     this.builderState = next;
     this.rebuild();
     this.focusFirst();
@@ -212,13 +237,6 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
             },
           ];
     }
-    if (step === 'fighter') {
-      return CHARACTER_IDS.map((fighterId) => ({
-        label: fighterLabel(fighterId),
-        detail: 'THIS PLAY DRAFT',
-        choice: { kind: 'fighter', fighterId },
-      }));
-    }
     return [];
   }
 
@@ -230,7 +248,7 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
 
     const step = playRosterBuilderStep(this.builderState);
     const number = STEP_NUMBER[step];
-    this.stageLabel.setText(`PLAY ROSTER  /  STEP ${number} OF 6`);
+    this.stageLabel.setText(`PLAY ROSTER  /  STEP ${number} OF 5`);
     this.prompt.setText(this.promptFor(step));
     this.trail.setText(this.trailText());
     const serialized = serializePlayRosterDraft(this.builderState, this.options.availability);
@@ -284,7 +302,7 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
       case 'arena':
         return 'CONFIRM THE READ-ONLY ARENA SNAPSHOT';
       case 'fighter':
-        return 'CHOOSE YOUR FIGHTER FOR THIS DRAFT';
+        return 'READING YOUR PERSISTED FIGHTERS TAB SELECTION';
       case 'review':
         return 'REVIEWED ROSTER DRAFT';
     }
