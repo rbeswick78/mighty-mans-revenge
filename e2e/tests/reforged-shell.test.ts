@@ -107,6 +107,25 @@ async function clickLogicalRecordOption(page: Page, index: number, touch: boolea
   else await page.mouse.click(x, y);
 }
 
+async function clickLogicalSettingsOption(
+  page: Page,
+  index: number,
+  touch: boolean,
+): Promise<void> {
+  const center = await page.evaluate((optionIndex) => {
+    const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'ReforgedShellScene',
+    ) as unknown as { getSettingsOptionCenter(index: number): { x: number; y: number } | null };
+    return scene.getSettingsOptionCenter(optionIndex);
+  }, index);
+  const canvas = await page.locator('canvas').boundingBox();
+  if (!center || !canvas) throw new Error(`Missing rendered Settings option ${index}`);
+  const x = canvas.x + (center.x / 1280) * canvas.width;
+  const y = canvas.y + (center.y / 720) * canvas.height;
+  if (touch) await page.touchscreen.tap(x, y);
+  else await page.mouse.click(x, y);
+}
+
 async function stageNonChromiumShell(page: Page): Promise<void> {
   await waitForActiveScene(page, 'LobbyScene');
   await page.evaluate(() => {
@@ -223,6 +242,29 @@ async function recordsSnapshot(page: Page): Promise<{
       };
     };
     return scene.getRecordsSnapshot();
+  });
+}
+
+async function settingsSnapshot(page: Page): Promise<{
+  selectedSectionId: string;
+  sectionLabels: string[];
+  heading: string;
+  authority: string;
+  columns: [string[], string[]];
+  actionLabels: string[];
+  callsign: string;
+  editingCallsign: boolean;
+  muted: boolean;
+  masterVolume: number;
+  sfxVolume: number;
+  musicVolume: number;
+  connectionState: string;
+}> {
+  return page.evaluate(() => {
+    const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'ReforgedShellScene',
+    ) as unknown as { getSettingsSnapshot(): Record<string, unknown> };
+    return scene.getSettingsSnapshot() as never;
   });
 }
 
@@ -1021,16 +1063,188 @@ test('Records consolidates authoritative snapshots and device records with a Bat
     ) as unknown as {
       contentState: { visible: boolean; text: string };
       recordsPanel: { visible: boolean };
+      settingsPanel: { visible: boolean };
     };
     return {
       placeholderVisible: shell.contentState.visible,
       placeholder: shell.contentState.text,
       recordsVisible: shell.recordsPanel.visible,
+      settingsVisible: shell.settingsPanel.visible,
     };
   });
   expect(settings).toEqual({
-    placeholderVisible: true,
+    placeholderVisible: false,
     placeholder: 'NAVIGATION FOUNDATION READY',
     recordsVisible: false,
+    settingsVisible: true,
   });
+});
+
+test('Settings reuses callsign, audio, controls, graphics, fullscreen, and signal recovery', async ({
+  page,
+}, testInfo) => {
+  test.skip(!shellAdvertised, 'Run with CAPABILITY_NEW_SHELL=true for the gated shell path.');
+  await page.addInitScript(() => {
+    if (sessionStorage.getItem('batch9-missing-callsign') !== 'true') {
+      localStorage.setItem('mmr_nickname', 'Batch9');
+    }
+    localStorage.setItem('mmr_audio_master', '0.75');
+    localStorage.setItem('mmr_audio_sfx', '0.5');
+    localStorage.setItem('mmr_audio_music', '0.25');
+    localStorage.setItem('mmr_audio_muted', 'false');
+  });
+  await page.goto('/');
+  const touch = testInfo.project.name === 'mobile-landscape';
+  if (testInfo.project.name !== 'desktop-chromium') await stageNonChromiumShell(page);
+  await waitForActiveScene(page, 'ReforgedShellScene');
+  await clickLogicalTab(page, 'settings', touch);
+
+  expect(await settingsSnapshot(page)).toMatchObject({
+    selectedSectionId: 'profile',
+    sectionLabels: ['CALLSIGN', 'AUDIO', 'CONTROLS', 'GRAPHICS', 'DISPLAY', 'SIGNAL'],
+    callsign: 'Batch9',
+    editingCallsign: false,
+    authority: 'DEVICE LOCAL / NO ACCOUNT',
+    actionLabels: ['EDIT CALLSIGN'],
+  });
+  await expect(page.locator('#reforged-callsign-input')).toBeHidden();
+
+  // A stored callsign is presented without prompting. Pointer/touch opens the
+  // established input, whose allowlist and key remain shared with the Lobby.
+  await clickLogicalSettingsOption(page, 6, touch);
+  await expect(page.locator('#reforged-callsign-input')).toBeVisible();
+  await page.locator('#reforged-callsign-input').fill('New Pilot!');
+  await page.locator('#reforged-callsign-input').press('Enter');
+  expect(await settingsSnapshot(page)).toMatchObject({
+    callsign: 'NewPilot',
+    editingCallsign: false,
+  });
+  expect(await page.evaluate(() => localStorage.getItem('mmr_nickname'))).toBe('NewPilot');
+
+  await clickLogicalTab(page, 'challenges', touch);
+  expect(await challengesSnapshot(page)).toMatchObject({
+    nicknameReady: true,
+    status: 'CALLSIGN NEWPILOT  /  SERVER-AUTHORITATIVE ENTRY',
+  });
+  await clickLogicalTab(page, 'settings', touch);
+
+  // Audio actions delegate to the existing manager and preserve its four keys.
+  await clickLogicalSettingsOption(page, 1, touch);
+  expect(await settingsSnapshot(page)).toMatchObject({
+    selectedSectionId: 'audio',
+    muted: false,
+    masterVolume: 0.75,
+    sfxVolume: 0.5,
+    musicVolume: 0.25,
+  });
+  await clickLogicalSettingsOption(page, 6, touch);
+  await clickLogicalSettingsOption(page, 7, touch);
+  expect(await settingsSnapshot(page)).toMatchObject({ muted: true, masterVolume: 1 });
+  expect(
+    await page.evaluate(() => ({
+      muted: localStorage.getItem('mmr_audio_muted'),
+      master: localStorage.getItem('mmr_audio_master'),
+      sfx: localStorage.getItem('mmr_audio_sfx'),
+      music: localStorage.getItem('mmr_audio_music'),
+    })),
+  ).toEqual({ muted: 'true', master: '1', sfx: '0.5', music: '0.25' });
+  await page.keyboard.press('F2');
+  await expect.poll(async () => (await settingsSnapshot(page)).muted).toBe(false);
+
+  // Keyboard and gamepad traverse the same section controls. Both surfaces
+  // remain read-only because input takeover and graphics semantics are fixed.
+  await clickLogicalTab(page, 'settings', touch);
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('Enter');
+  expect(await settingsSnapshot(page)).toMatchObject({
+    selectedSectionId: 'controls',
+    authority: 'READ ONLY / NO MODE TOGGLE',
+  });
+  await queueMenuGamepadActions(page, [{ right: true }, { confirm: true }]);
+  await expect.poll(async () => (await settingsSnapshot(page)).selectedSectionId).toBe('graphics');
+  expect((await settingsSnapshot(page)).columns.flat()).toEqual(
+    expect.arrayContaining(['FULL CURRENT EFFECTS', 'QUALITY SEMANTICS UNCHANGED']),
+  );
+
+  // Fullscreen remains a best-effort request on this physical user gesture.
+  await page.evaluate(() => {
+    (window as unknown as { batch9FullscreenCalls?: number }).batch9FullscreenCalls = 0;
+    Object.defineProperty(document, 'fullscreenEnabled', { configurable: true, value: true });
+    const target = document.getElementById('game-container');
+    if (target) {
+      target.requestFullscreen = () => {
+        (window as unknown as { batch9FullscreenCalls?: number }).batch9FullscreenCalls =
+          ((window as unknown as { batch9FullscreenCalls?: number }).batch9FullscreenCalls ?? 0) +
+          1;
+        return Promise.resolve();
+      };
+    }
+  });
+  await clickLogicalSettingsOption(page, 4, touch);
+  await clickLogicalSettingsOption(page, 6, touch);
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { batch9FullscreenCalls?: number }).batch9FullscreenCalls,
+    ),
+  ).toBe(1);
+
+  // Signal copy and Retry Now reuse the legacy presentation and exact service action.
+  await clickLogicalSettingsOption(page, 5, touch);
+  expect(await settingsSnapshot(page)).toMatchObject({
+    selectedSectionId: 'signal',
+    connectionState: 'connected',
+    actionLabels: ['SIGNAL ONLINE'],
+  });
+  await page.evaluate(() => {
+    const shell = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'ReforgedShellScene',
+    ) as unknown as {
+      settingsPanel: { setConnectionState(state: string): void };
+      gameService: { retryConnection(): void };
+    };
+    (window as unknown as { batch9RetryCalls?: number }).batch9RetryCalls = 0;
+    shell.gameService.retryConnection = () => {
+      (window as unknown as { batch9RetryCalls?: number }).batch9RetryCalls =
+        ((window as unknown as { batch9RetryCalls?: number }).batch9RetryCalls ?? 0) + 1;
+    };
+    shell.settingsPanel.setConnectionState('reconnecting');
+  });
+  expect(await settingsSnapshot(page)).toMatchObject({
+    heading: 'WASTELAND SIGNAL / SIGNAL LOST // AUTO-RETRYING',
+    actionLabels: ['RETRY NOW'],
+  });
+  await clickLogicalSettingsOption(page, 6, touch);
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { batch9RetryCalls?: number }).batch9RetryCalls,
+    ),
+  ).toBe(1);
+
+  if (touch) {
+    await page.screenshot({ path: testInfo.outputPath('settings-mobile-webkit.png') });
+  } else if (testInfo.project.name === 'desktop-chromium') {
+    await waitForRenderedFrames(page);
+    await page.screenshot({ path: testInfo.outputPath('settings-signal-desktop.png') });
+    await page.setViewportSize({ width: 844, height: 390 });
+    await waitForRenderedFrames(page);
+    await page.screenshot({ path: testInfo.outputPath('settings-signal-mobile-chromium.png') });
+  }
+
+  // Removing the device value is the only state that automatically opens the editor.
+  await page.evaluate(() => {
+    sessionStorage.setItem('batch9-missing-callsign', 'true');
+    localStorage.removeItem('mmr_nickname');
+  });
+  await page.reload();
+  if (testInfo.project.name !== 'desktop-chromium') await stageNonChromiumShell(page);
+  await waitForActiveScene(page, 'ReforgedShellScene');
+  await clickLogicalTab(page, 'settings', touch);
+  expect(await settingsSnapshot(page)).toMatchObject({
+    callsign: '',
+    editingCallsign: true,
+    heading: 'CALLSIGN REQUIRED',
+  });
+  await expect(page.locator('#reforged-callsign-input')).toBeVisible();
 });

@@ -20,6 +20,8 @@ export class ReforgedChoiceButton extends Phaser.GameObjects.Container {
   private pressed = false;
   private focused = false;
   private selected = false;
+  private disabled = false;
+  private soundEnabled = true;
 
   constructor(
     scene: Phaser.Scene,
@@ -60,13 +62,14 @@ export class ReforgedChoiceButton extends Phaser.GameObjects.Container {
       this.redraw();
     });
     this.hitZone.on('pointerdown', () => {
+      if (this.disabled) return;
       this.options.onPointerIntent();
       this.pressed = true;
-      AudioManager.getInstance()?.play('menuSelect');
+      if (this.soundEnabled) AudioManager.getInstance()?.play('menuSelect');
       this.redraw();
     });
     this.hitZone.on('pointerup', () => {
-      if (!this.pressed) return;
+      if (!this.pressed || this.disabled) return;
       this.pressed = false;
       this.options.onSelect();
       this.redraw();
@@ -93,7 +96,25 @@ export class ReforgedChoiceButton extends Phaser.GameObjects.Container {
   }
 
   isDisabled(): boolean {
-    return false;
+    return this.disabled;
+  }
+
+  setDisabled(disabled: boolean): this {
+    this.disabled = disabled;
+    this.redraw();
+    return this;
+  }
+
+  setLabel(label: string, detail = this.detail.text): this {
+    this.label.setText(label);
+    this.detail.setText(detail);
+    this.layout(this.x, this.y, this.visualWidth, this.visualHeight);
+    return this;
+  }
+
+  setSoundEnabled(enabled: boolean): this {
+    this.soundEnabled = enabled;
+    return this;
   }
 
   setFocused(focused: boolean): this {
@@ -109,8 +130,9 @@ export class ReforgedChoiceButton extends Phaser.GameObjects.Container {
   }
 
   activate(): boolean {
+    if (this.disabled) return false;
     this.pressed = true;
-    AudioManager.getInstance()?.play('menuSelect');
+    if (this.soundEnabled) AudioManager.getInstance()?.play('menuSelect');
     this.redraw();
     this.scene.time.delayedCall(ReforgedMenuTokens.motion.activationMs, () => {
       if (!this.active) return;
@@ -124,15 +146,19 @@ export class ReforgedChoiceButton extends Phaser.GameObjects.Container {
   private redraw(): void {
     const tokens = ReforgedMenuTokens;
     const fill =
-      this.hovered || this.focused || this.selected
+      !this.disabled && (this.hovered || this.focused || this.selected)
         ? tokens.color.surfaceRaised
         : tokens.color.canvas;
-    const border = this.selected
-      ? tokens.color.accentActive
-      : this.hovered || this.focused
-        ? tokens.color.borderStrong
-        : tokens.color.border;
+    const border = this.disabled
+      ? tokens.color.border
+      : this.selected
+        ? tokens.color.accentActive
+        : this.hovered || this.focused
+          ? tokens.color.borderStrong
+          : tokens.color.border;
     const inset = this.pressed ? 3 : 0;
+    this.label.setAlpha(this.disabled ? 0.5 : 1);
+    this.detail.setAlpha(this.disabled ? 0.5 : 1);
     this.chrome.clear();
     this.chrome
       .fillStyle(fill, 1)

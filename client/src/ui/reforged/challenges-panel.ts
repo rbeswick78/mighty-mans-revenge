@@ -80,6 +80,7 @@ export class ChallengesPanel extends Phaser.GameObjects.Container {
   private codexObjects: Array<Phaser.GameObjects.Graphics | Phaser.GameObjects.Text> = [];
   private panelWidth = 1;
   private panelHeight = 1;
+  private nickname: string;
 
   constructor(
     scene: Phaser.Scene,
@@ -87,6 +88,7 @@ export class ChallengesPanel extends Phaser.GameObjects.Container {
   ) {
     super(scene, 0, 0);
     const tokens = ReforgedMenuTokens;
+    this.nickname = options.nickname;
     this.preferences = readReforgedChallengePreferences(options.storage);
     this.prompt = scene.add.text(0, 0, '', {
       fontFamily: MENU_FONTS.HEADER,
@@ -126,6 +128,11 @@ export class ChallengesPanel extends Phaser.GameObjects.Container {
     if (!visible) this.clearFocus();
   }
 
+  setNickname(nickname: string): void {
+    this.nickname = nickname;
+    this.rebuild();
+  }
+
   focusFirst(): boolean {
     return this.focusNavigator?.focus(0) ?? false;
   }
@@ -160,7 +167,7 @@ export class ChallengesPanel extends Phaser.GameObjects.Container {
       optionLabels: [...this.optionLabels],
       optionDetails: [...this.optionDetails],
       preferences: { ...this.preferences },
-      nicknameReady: this.options.nickname.length >= 2,
+      nicknameReady: this.nickname.length >= 2,
       status: this.statusText.text,
     };
   }
@@ -277,7 +284,7 @@ export class ChallengesPanel extends Phaser.GameObjects.Container {
   }
 
   private startChallenge(kind: ReforgedChallengeKind): void {
-    if (this.options.nickname.length < 2) {
+    if (this.nickname.length < 2) {
       this.statusText.setText('CALLSIGN REQUIRED BEFORE CHALLENGE ENTRY');
       return;
     }
@@ -327,8 +334,8 @@ export class ChallengesPanel extends Phaser.GameObjects.Container {
     this.statusText
       .setText(
         this.view === 'challenges'
-          ? this.options.nickname.length >= 2
-            ? `CALLSIGN ${this.options.nickname.toUpperCase()}  /  SERVER-AUTHORITATIVE ENTRY`
+          ? this.nickname.length >= 2
+            ? `CALLSIGN ${this.nickname.toUpperCase()}  /  SERVER-AUTHORITATIVE ENTRY`
             : 'CALLSIGN REQUIRED BEFORE CHALLENGE ENTRY'
           : this.view === 'setup'
             ? 'TUNE SPAR + SCRAP PIT  /  SAVED ON THIS DEVICE'

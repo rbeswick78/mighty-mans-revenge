@@ -10,6 +10,7 @@ import { AudioManager } from '../audio/audio-manager.js';
 import { isTouchDevice } from '../input/is-touch-device.js';
 import { MenuGamepadInput } from '../input/menu-gamepad.js';
 import { GameService, type MatchData } from '../services/game-service.js';
+import { persistCallsign, readCallsign, sanitizeCallsignInput } from '../ui/callsign.js';
 import { WastelandStreet } from '../ui/menu/wasteland-street.js';
 import { MenuPanel } from '../ui/menu/menu-panel.js';
 import { PixelButton } from '../ui/menu/pixel-button.js';
@@ -77,7 +78,6 @@ import { PracticeSetupMenu } from '../ui/practice-setup-menu.js';
 import { menuSceneForCapabilities } from '../ui/reforged/menu-route.js';
 import { useLegacyLogicalSize } from '../ui/reforged/responsive-menu-layout.js';
 
-const STORAGE_KEY_NICKNAME = 'mmr_nickname';
 const STORAGE_KEY_BOT_DIFFICULTY = 'mmr_bot_difficulty';
 const STORAGE_KEY_PRACTICE_MODE = 'mmr_practice_mode';
 const STORAGE_KEY_PRACTICE_RIVAL = 'mmr_practice_rival';
@@ -180,7 +180,7 @@ export class LobbyScene extends Phaser.Scene {
   create(): void {
     useLegacyLogicalSize(this.scale);
     this.cameras.main.fadeIn(300, 0, 0, 0);
-    this.nickname = localStorage.getItem(STORAGE_KEY_NICKNAME) ?? '';
+    this.nickname = readCallsign(localStorage);
     const savedDifficulty = localStorage.getItem(STORAGE_KEY_BOT_DIFFICULTY);
     this.practiceDifficulty = BOT_DIFFICULTIES.includes(savedDifficulty as BotDifficulty)
       ? (savedDifficulty as BotDifficulty)
@@ -1178,7 +1178,7 @@ export class LobbyScene extends Phaser.Scene {
       .setDepth(WastelandStreet.DEPTH.UI + 1);
 
     input.addEventListener('input', () => {
-      const sanitized = input.value.replace(/[^a-zA-Z0-9_\-.]/g, '').slice(0, 16);
+      const sanitized = sanitizeCallsignInput(input.value);
       if (sanitized !== input.value) input.value = sanitized;
       this.nickname = sanitized;
       this.saveNickname();
@@ -1202,7 +1202,7 @@ export class LobbyScene extends Phaser.Scene {
   }
 
   private saveNickname(): void {
-    localStorage.setItem(STORAGE_KEY_NICKNAME, this.nickname);
+    this.nickname = persistCallsign(localStorage, this.nickname);
   }
 
   private onQuickMatch(): void {

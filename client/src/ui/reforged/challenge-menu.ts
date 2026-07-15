@@ -7,6 +7,7 @@ import {
   type PracticeKind,
 } from '@shared/config/game.js';
 import type { GameModeType } from '@shared/types/game.js';
+import { CALLSIGN_STORAGE_KEY } from '../callsign.js';
 import { nextPracticeModePreference, normalizePracticeModePreference } from '../practice-mode.js';
 import {
   nextPracticeMutatorPreference,
@@ -18,7 +19,7 @@ import {
 } from '../practice-rival.js';
 
 export const REFORGED_CHALLENGE_STORAGE_KEYS = Object.freeze({
-  nickname: 'mmr_nickname',
+  nickname: CALLSIGN_STORAGE_KEY,
   difficulty: 'mmr_bot_difficulty',
   mode: 'mmr_practice_mode',
   rival: 'mmr_practice_rival',

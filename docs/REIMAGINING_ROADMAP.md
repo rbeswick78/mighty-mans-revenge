@@ -5,8 +5,8 @@ Read this file and `CLAUDE.md` completely at the start of every batch. The
 completed `docs/REPLAYABILITY_ROADMAP.md` remains the historical record for the
 systems this program preserves and reorganizes.
 
-- **Status:** Batch 8 complete on 2026-07-15.
-- **Next batch:** Batch 9 — Settings tab.
+- **Status:** Batch 9 complete on 2026-07-15.
+- **Next batch:** Batch 10 — Scheduled arenas.
 - **Public releases:** Reforged Arena, then Battle Royale.
 - **Working model:** one numbered batch per session, direct commits and pushes
   to `main`, milestone-gated production deployments.
@@ -161,8 +161,8 @@ Production deployment happens only at a gate or for an urgent live fix.
 |   6 | Fighters tab                           | Navigation    | **DONE — 2026-07-15** |
 |   7 | Challenges tab                         | Navigation    | **DONE — 2026-07-15** |
 |   8 | Records tab                            | Navigation    | **DONE — 2026-07-15** |
-|   9 | Settings tab                           | Navigation    | NEXT                  |
-|  10 | Scheduled arenas                       | Navigation    | Pending               |
+|   9 | Settings tab                           | Navigation    | **DONE — 2026-07-15** |
+|  10 | Scheduled arenas                       | Navigation    | NEXT                  |
 |  11 | General match intent                   | Navigation    | Pending               |
 |  12 | Party core                             | Navigation    | Pending               |
 |  13 | Party readiness and recovery           | Navigation    | Pending               |
@@ -408,6 +408,28 @@ Acceptance:
 
 Relocate callsign, audio, controls, graphics quality, fullscreen, and signal
 recovery. Ask for a callsign only when none is stored; do not add accounts.
+
+Acceptance:
+
+- [x] The capability-owned Settings tab presents Callsign, Audio, Controls,
+      Graphics, Display, and Signal only. A stored callsign is shown without a
+      prompt; a missing value opens the editor using the exact established key,
+      character allowlist, length cap, and two-character readiness boundary.
+- [x] Callsign edits immediately update Challenges readiness and Records
+      identity for future entries without adding an account, changing existing
+      server-authored records, or rewriting a stored value merely by reading it.
+- [x] Audio delegates to the existing `AudioManager` mute/master/SFX/music
+      controls and keys, including F2 behavior. Controls and current fixed
+      pixel-art/full-effects quality semantics are documented read-only rather
+      than adding a mode toggle or new quality preference.
+- [x] Fullscreen reuses best-effort game-container gesture entry and browser
+      denial behavior. Signal uses the established connection projection and
+      Retry Now action; capability loss still fails closed to the complete
+      legacy Lobby recovery surface with unchanged timeout/backoff authority.
+- [x] Pointer, touch, keyboard, and standard gamepad reach Settings on desktop
+      and mobile landscape. Play/Fighters/Challenges/Records, Draft, Character
+      Select, default-false capabilities, and the legacy Lobby remain intact;
+      no Batch 10 schedule or later feature work began.
 
 #### Batch 10 — Scheduled arenas
 
@@ -1167,6 +1189,63 @@ Firefox/WebKit practice is unreliable and staged gameplay/Reforged-shell PNGs
 are black, so staged object/input assertions and mobile-sized Chromium visual
 evidence remain the required combination. None blocks Batch 9.
 
+### Batch 9 — 2026-07-15 — Settings tab
+
+**Shipped:** Added the capability-owned Callsign, Audio, Controls, Graphics,
+Display, and Signal settings sections. Callsign reuses the exact
+`mmr_nickname` key, legacy character allowlist, 16-character cap, and
+two-character readiness rule; a stored value is presented without prompting,
+while a missing value opens the editor. Edits immediately refresh Challenges
+readiness and Records identity for future entries without an account or record
+rewrite. Audio delegates to the existing `AudioManager` mute, master, SFX, and
+music values/keys and retains F2 plus silent-mute/confirmation-on-unmute
+behavior. Controls and the current fixed pixel-art/full-effects quality
+semantics are read-only. Fullscreen retains best-effort game-container gesture
+entry, and Signal reuses the established connection projection and exact Retry
+Now service action. Capability loss still returns to the complete legacy Lobby
+recovery surface.
+
+**Verification:** Selected the cross-cutting navigation/input/recovery tier
+because implementation stayed client-only but re-exposed callsign, audio,
+fullscreen, and signal recovery across pointer, keyboard, gamepad, and touch.
+Focused Vitest passed 32 Settings/callsign plus Play/Fighters/Challenges/
+Records/recovery compatibility tests across seven files. `corepack pnpm
+typecheck`, `corepack pnpm lint`, and `corepack pnpm --filter @game/client
+build` passed; Vite retained its existing chunk-size advisory. With only
+`CAPABILITY_NEW_SHELL=true`, the full affected desktop Chromium and
+mobile-landscape shell file passed 12 tests with two expected inverse-gate
+skips, and the Settings case additionally passed desktop Firefox. The final
+post-audio-polish Settings rerun passed desktop Chromium and mobile landscape.
+With defaults false, the legacy Lobby fallback passed in all three projects.
+The focused audio, keyboard, and recovery subset passed all 12 configured
+cases across desktop Chromium, desktop Firefox, and mobile landscape after
+clearing a stale test-only capability listener. Manual review found the
+1280×720 and 844×390 Chromium Signal/Retry captures readable, complete, and
+safe-area bounded; staged mobile WebKit retained real touch/object assertions
+under RFG-003. The complete unit and unrelated Playwright inventories were
+omitted because no shared/server/wire/persistence rule, routing foundation,
+capability default, or production exposure changed and focused evidence showed
+no wider risk.
+
+**Deployment:** Skipped. Batch 9 remains incomplete navigation-milestone code
+behind the default-false `newShell` capability, and the roadmap authorizes
+deployment only at a release gate or for an urgent live fix. No production
+environment or capability flag changed.
+
+**Deviations:** No product-scope deviation. One initial Playwright command
+quoted its grep/capability arguments incorrectly and therefore ran only the
+inverse-gate fallback. A later combined legacy run reused the prior
+test-only-capability server on port 3000, redirecting live Chromium into the
+shell; Firefox/mobile still passed, the exact stale test listeners were stopped,
+and fresh default-false Chromium passed all affected cases. These were local
+harness-state corrections, not runtime defects.
+
+**Known issues:** No new bug ID was required. RFG-001 and RFG-002 remain assigned
+to Batches 20/24 and were untouched. RFG-003 remains unchanged: live headless
+Firefox/WebKit practice is unreliable and staged gameplay/Reforged-shell PNGs
+are black, so staged object/input assertions and mobile-sized Chromium visual
+evidence remain the required combination. None blocks Batch 10.
+
 ## Next-session prompt
 
 ```text
@@ -1174,49 +1253,50 @@ Continue the Reforged build for Mighty Man's Revenge.
 
 Read docs/REIMAGINING_ROADMAP.md and CLAUDE.md completely first. Read
 docs/REFORGED_BASELINE.md and docs/REFORGED_CAPABILITIES.md before
-implementation. Implement Batch 9 — Settings tab exactly as specified. Preserve
-unrelated changes and do not begin Batch 10 — Scheduled arenas.
+implementation. Implement Batch 10 — Scheduled arenas exactly as specified.
+Preserve unrelated changes and do not begin Batch 11 — General match intent.
 
-Relocate the established callsign, audio, controls, graphics quality,
-fullscreen, and authoritative signal-recovery surfaces into the
-capability-owned Settings tab. Ask for a callsign only when none is stored and
-do not add accounts. Reuse the existing keys, normalizers, managers, fullscreen
-gesture behavior, connection state, retry action, and recovery rules; do not
-change saved values, audio/control behavior, quality semantics, networking,
-timeouts, backoff, recovery authority, or wire contracts.
+Replace the Batch 5 fixed Play preview adapter with server-owned,
+epoch-derived five-minute arena schedules for every standard mode. Use
+deterministic mode offsets, synchronize presentation from authoritative server
+time, lock the displayed arena at queue entry, and retain FORCE_MAP/FORCE_MODE
+diagnostics. Add only the additive compatibility types/messages needed for the
+schedule snapshot; clients must display server truth and never derive schedule
+outcomes, clocks, or locks locally. Old servers/new clients, new servers/old
+clients, absent/partial/malformed snapshots, reconnects, disconnects, and the
+default-false schedules capability must fail closed to the established
+behavior.
 
-Preserve the Batch 5 pure Play roster compatibility/serialization boundary, the
-Batch 6 persisted Fighters selection and server-authoritative locking boundary,
-the complete Batch 7 Challenges activity/setup/Codex paths, the Batch 8
-read-only Records archive and reserved Battle Royale zero state, and the
-complete legacy Lobby fallback. Do not implement parties, scheduled-arena
-authority, generalized match intent, queue fallback, Reforged Results, Battle
-Royale persistence/gameplay, or new settings/record categories. Do not retire
-Draft or Character Select, enable any capability by default or in production,
-change gameplay viewport/camera, or begin art work.
+Preserve the Batch 5 pure Play roster compatibility/serialization boundary,
+Batch 6 persisted Fighters selection and server-authoritative locking, all
+Batch 7 Challenges paths, the Batch 8 read-only Records archive, the complete
+Batch 9 Settings surfaces, and the complete legacy Lobby fallback. Do not add
+generalized match intent, parties, readiness, queue fallback, Reforged Results,
+or Battle Royale schedules/gameplay. Do not retire Draft or Character Select,
+enable a capability by default or in production, change gameplay
+viewport/camera, alter existing map/mode rotation outside the gated schedule
+contract, or begin art work.
 
-Batch 8 is complete and pushed on main. Records consumes only existing
-server-authored career/leaderboard/rivalry/mastery snapshots and established
-device-local challenge records; it writes nothing and keeps all ranking,
-retention, scoring, rematch, persistence, and wire rules unchanged. Battle
-Royale remains an explicit unrecorded future zero state. Challenges still fail
-closed when no callsign exists; Batch 9 now owns the missing-callsign entry.
-Play/Fighters/Challenges boundaries remain intact, the injected Play arena
-remains a fixed non-authoritative preview until Batch 10, and all five server
-capability flags still default false.
+Batch 9 is complete and pushed on main as `feat(client): add Reforged Settings
+tab`. Settings reuses the established callsign/audio/fullscreen/recovery
+actions, keeps controls and graphics quality read-only, and changes no saved
+format, networking rule, timeout, backoff, capability default, or wire
+authority. Play still consumes the fixed non-authoritative arena preview that
+Batch 10 now replaces. All five server capability flags remain default false,
+and no production deployment has run.
 
-Choose and document the Batch 9 verification tier from the roadmap's risk-based
-test-selection matrix. Run focused Settings/navigation/persistence-presentation
-tests, typecheck, lint, the affected client build, targeted desktop and
-mobile-landscape interaction evidence, and the legacy fallback check. Because
-signal recovery and cross-cutting input surfaces may be touched, add the focused
-multi-browser recovery/input journey subset required by the matrix; escalate to
-broader unit or browser suites only if shared, server, wire, persistence rules,
-routing foundations, or capability defaults change or focused evidence
-indicates wider risk. Update roadmap acceptance evidence, the bug ledger if
-needed, and the Session Log. Run the end-of-batch ritual, commit and push
-directly to main, skip deployment unless explicitly authorized, and end with
-the fenced paste-ready prompt for Batch 10.
+Choose and document the shared/server/network cross-package verification tier
+from the roadmap's risk-based matrix. Add deterministic schedule/offset/clock/
+lock normalization coverage, focused server and compatibility integration,
+the full `corepack pnpm test` suite, typecheck, lint, relevant production
+builds, targeted desktop/mobile advertised-schedule evidence, and legacy plus
+old/new fallback coverage. Because wire timing and capability behavior change,
+include the focused multi-browser schedule/reconnect journey subset and
+escalate further if focused evidence shows wider risk. Update roadmap
+acceptance evidence, capability/architecture docs, the bug ledger if needed,
+and the Session Log. Run the end-of-batch ritual, commit and push directly to
+main, skip deployment unless explicitly authorized, and end with the fenced
+paste-ready prompt for Batch 11.
 
 Carry-over warnings: RFG-001 CameraKick and RFG-002 ZoomPulse overwrite future
 base camera state and remain assigned to Batches 20/24. RFG-003 means headless
@@ -1228,5 +1308,5 @@ remained far below the 50ms budget. Batch 4 broadened RFG-003 evidence: the
 staged mobile WebKit Reforged-shell PNG is also black, so use mobile-sized
 Chromium for visual evidence while retaining staged WebKit object/input
 assertions. Use Corepack pnpm 10.33.0 if the local pnpm shim selects a mismatched
-version. Batch 10 follows Batch 9.
+version. Batch 11 follows Batch 10.
 ```

@@ -207,6 +207,19 @@ authority rule changed. Settings remains empty, Play/Fighters/Challenges keep
 their established boundaries, and the default-false capability preserves the
 complete legacy Lobby fallback.
 
+**Reforged Settings (Batch 9):** the capability-owned Settings tab owns the
+established device-local callsign, AudioManager mute/master/SFX/music controls,
+read-only automatic input map, read-only current pixel-art/full-effects quality
+semantics, best-effort fullscreen gesture entry, and authoritative signal
+status/Retry Now presentation. It asks for a callsign only when none is stored
+and reuses `mmr_nickname`, the legacy allowlist/length/readiness rules, the
+existing audio keys and manager, `lobbyConnectionPresentation`, and
+`GameService.retryConnection()`. Capability loss still fails closed to the
+complete legacy Lobby recovery surface; networking timeouts/backoff, saved
+values, audio/input/quality behavior, fullscreen denial, and wire contracts are
+unchanged. Play/Fighters/Challenges/Records keep their Batch 5-8 boundaries,
+and Batch 10 still owns scheduled arenas.
+
 ### Why This Matters for Agents
 
 Client prediction and server simulation **must use identical physics code** from `/shared`. If you change movement, collision, or physics logic, you must change it in `/shared` and verify both client and server still agree. A mismatch between client prediction and server authority causes visible rubber-banding.

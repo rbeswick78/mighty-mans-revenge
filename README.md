@@ -43,6 +43,16 @@ Gamepad menus use the D-pad or left stick, A / Cross to select, and B /
 Circle to cancel or return. Mouse, touch, keyboard, and gamepad can take over
 at any time; no settings toggle is required.
 
+## Reforged settings
+
+When the server advertises the disabled-by-default Reforged shell, Settings
+collects the existing device-local callsign and audio controls, the read-only
+automatic control map and current graphics presentation, best-effort
+fullscreen entry, and authoritative signal status/Retry Now action. It does
+not add accounts, remapping, a new graphics preference, or client-side recovery
+authority. The complete legacy Lobby remains the fallback whenever the shell
+capability is absent or the connection must recover.
+
 ## Combat feel
 
 Repeated knockouts cycle through roster-aware collapse animations instead of
