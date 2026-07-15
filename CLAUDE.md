@@ -143,6 +143,18 @@ from the server after the owning release gate. See
 `docs/REFORGED_CAPABILITIES.md` for the compatibility matrix, flag names,
 rollout, and rollback order.
 
+**Reforged menu foundation (Batch 4):** `ReforgedShellScene` owns a menu-only
+1280×720 logical FIT surface, browser-safe-area conversion, frozen procedural
+design tokens, and the empty persistent Play/Fighters/Challenges/Records/
+Settings navigation. `MenuFocusNavigator` is the shared disabled-aware wrapping
+focus primitive; tab controls use the same activation path for pointer, touch,
+keyboard, and `MenuGamepadInput`. The legacy 960×720 canvas remains the default.
+`LobbyScene` may enter the shell only after the normalized welcome advertises
+literal `newShell: true`; reconnect/disconnect restores the legacy size and
+complete Lobby fallback. Do not put activities or client-authored matchmaking
+policy into the shell before their owning batches, and never use the menu size
+to change `GameScene`, its viewport, or its camera.
+
 ### Why This Matters for Agents
 
 Client prediction and server simulation **must use identical physics code** from `/shared`. If you change movement, collision, or physics logic, you must change it in `/shared` and verify both client and server still agree. A mismatch between client prediction and server authority causes visible rubber-banding.

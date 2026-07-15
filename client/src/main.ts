@@ -8,6 +8,7 @@ import { GameScene } from './scenes/game-scene.js';
 import { ResultsScene } from './scenes/results-scene.js';
 import { GauntletCodexScene } from './scenes/gauntlet-codex-scene.js';
 import { TilePickerScene } from './scenes/tile-picker-scene.js';
+import { ReforgedShellScene } from './scenes/reforged-shell-scene.js';
 import { CANVAS_HEIGHT, CANVAS_WIDTH } from './ui/layout.js';
 
 const config: Phaser.Types.Core.GameConfig = {
@@ -42,6 +43,7 @@ const config: Phaser.Types.Core.GameConfig = {
   scene: [
     BootScene,
     LobbyScene,
+    ReforgedShellScene,
     DraftScene,
     CharacterSelectScene,
     GameScene,

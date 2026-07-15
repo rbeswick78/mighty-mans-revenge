@@ -71,6 +71,7 @@ export interface MatchData {
 type GameServiceEvent =
   | 'connecting'
   | 'connected'
+  | 'capabilitiesChanged'
   | 'reconnecting'
   | 'disconnected'
   | 'matchFound'
@@ -293,6 +294,10 @@ export class GameService {
 
     this.networkManager.on('connected', () => {
       this.emit('connected');
+    });
+
+    this.networkManager.on('welcome', () => {
+      this.emit('capabilitiesChanged', this.networkManager.getServerCapabilities());
     });
 
     this.networkManager.on('reconnecting', () => {

@@ -40,6 +40,13 @@ Disabled capabilities must not hide, redirect, or replace any current route.
 The current Lobby, Draft, Character Select, challenge, match, and Results paths
 remain the fallback until the owning batch adds a tested gated alternative.
 
+Batch 4 adds the first such alternative only for `newShell`: a menu-only
+1280×720 five-tab foundation. The client routes there after the normalized
+welcome only when `newShell` is literal `true`; reconnect, disconnect, old
+servers, and false/absent/partial/malformed advertisements retain or restore the
+complete 960×720 Lobby. The shell contains no activities yet, every production
+default remains false, and its logical size does not alter gameplay.
+
 ## Server-first rollout and rollback
 
 For each capability, keep this order:

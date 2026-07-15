@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import type {
   LeaderboardEntry,
   ServerDailyGauntletLeaderboardMessage,
+  ServerCapabilities,
   ServerMatchmakingStatusMessage,
 } from '@shared/types/network.js';
 import { Wasteland, cssHex } from '@shared/config/palette.js';
@@ -73,6 +74,8 @@ import {
 } from '../ui/crew-tour.js';
 import { audioToggleLabel } from '../ui/audio-toggle.js';
 import { PracticeSetupMenu } from '../ui/practice-setup-menu.js';
+import { menuSceneForCapabilities } from '../ui/reforged/menu-route.js';
+import { useLegacyLogicalSize } from '../ui/reforged/responsive-menu-layout.js';
 
 const STORAGE_KEY_NICKNAME = 'mmr_nickname';
 const STORAGE_KEY_BOT_DIFFICULTY = 'mmr_bot_difficulty';
@@ -156,11 +159,14 @@ export class LobbyScene extends Phaser.Scene {
   private onMatchmakingStatus: ((msg: ServerMatchmakingStatusMessage) => void) | null = null;
   private onConnecting: (() => void) | null = null;
   private onConnected: (() => void) | null = null;
+  private onCapabilitiesChanged: ((capabilities: Readonly<ServerCapabilities>) => void) | null =
+    null;
   private onReconnecting: (() => void) | null = null;
   private onDisconnected: (() => void) | null = null;
   private onLeaderboard: ((entries: LeaderboardEntry[]) => void) | null = null;
   private onDailyLeaderboard: ((snapshot: ServerDailyGauntletLeaderboardMessage) => void) | null =
     null;
+  private transitioningToShell = false;
 
   constructor() {
     super({ key: 'LobbyScene' });
@@ -172,6 +178,7 @@ export class LobbyScene extends Phaser.Scene {
   }
 
   create(): void {
+    useLegacyLogicalSize(this.scale);
     this.cameras.main.fadeIn(300, 0, 0, 0);
     this.nickname = localStorage.getItem(STORAGE_KEY_NICKNAME) ?? '';
     const savedDifficulty = localStorage.getItem(STORAGE_KEY_BOT_DIFFICULTY);
@@ -195,6 +202,8 @@ export class LobbyScene extends Phaser.Scene {
 
     this.gameService = GameService.getInstance();
     this.connectionState = this.gameService.getNetworkManager().getConnectionState();
+    this.transitioningToShell = false;
+    if (this.connectionState === 'connected' && this.openReforgedShellIfEnabled()) return;
 
     AudioManager.getInstance()?.playMusic('music-lobby');
 
@@ -1016,6 +1025,10 @@ export class LobbyScene extends Phaser.Scene {
       this.updateConnectionUi('connected');
     };
 
+    this.onCapabilitiesChanged = (capabilities) => {
+      this.openReforgedShellIfEnabled(capabilities);
+    };
+
     this.onReconnecting = () => {
       this.stopSearching();
       this.updateConnectionUi('reconnecting');
@@ -1039,6 +1052,7 @@ export class LobbyScene extends Phaser.Scene {
     this.gameService.on('matchmakingStatus', this.onMatchmakingStatus);
     this.gameService.on('connecting', this.onConnecting);
     this.gameService.on('connected', this.onConnected);
+    this.gameService.on('capabilitiesChanged', this.onCapabilitiesChanged);
     this.gameService.on('reconnecting', this.onReconnecting);
     this.gameService.on('disconnected', this.onDisconnected);
     this.gameService.on('leaderboard', this.onLeaderboard);
@@ -1065,6 +1079,10 @@ export class LobbyScene extends Phaser.Scene {
     if (this.onConnected) {
       this.gameService.off('connected', this.onConnected);
       this.onConnected = null;
+    }
+    if (this.onCapabilitiesChanged) {
+      this.gameService.off('capabilitiesChanged', this.onCapabilitiesChanged);
+      this.onCapabilitiesChanged = null;
     }
     if (this.onReconnecting) {
       this.gameService.off('reconnecting', this.onReconnecting);
@@ -1451,6 +1469,21 @@ export class LobbyScene extends Phaser.Scene {
       Math.max(0, this.gamepadButtons().length - 1),
     );
     this.syncGamepadFocus();
+  }
+
+  private openReforgedShellIfEnabled(
+    capabilities: unknown = this.gameService.getServerCapabilities(),
+  ): boolean {
+    if (
+      this.transitioningToShell ||
+      menuSceneForCapabilities(capabilities) !== 'ReforgedShellScene'
+    ) {
+      return false;
+    }
+    this.transitioningToShell = true;
+    this.cleanupEvents();
+    this.scene.start('ReforgedShellScene');
+    return true;
   }
 
   setPlayerCount(count: number): void {

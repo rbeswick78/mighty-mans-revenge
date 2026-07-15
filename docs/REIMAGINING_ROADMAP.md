@@ -5,8 +5,8 @@ Read this file and `CLAUDE.md` completely at the start of every batch. The
 completed `docs/REPLAYABILITY_ROADMAP.md` remains the historical record for the
 systems this program preserves and reorganizes.
 
-- **Status:** Batch 3 complete on 2026-07-15.
-- **Next batch:** Batch 4 — Responsive menu foundation.
+- **Status:** Batch 4 complete on 2026-07-15.
+- **Next batch:** Batch 5 — Play roster builder.
 - **Public releases:** Reforged Arena, then Battle Royale.
 - **Working model:** one numbered batch per session, direct commits and pushes
   to `main`, milestone-gated production deployments.
@@ -156,8 +156,8 @@ Production deployment happens only at a gate or for an urgent live fix.
 |   1 | Roadmap bootstrap                      | Safety rails  | **DONE — 2026-07-15** |
 |   2 | Baseline evidence                      | Safety rails  | **DONE — 2026-07-15** |
 |   3 | Capabilities and flags                 | Safety rails  | **DONE — 2026-07-15** |
-|   4 | Responsive menu foundation             | Navigation    | NEXT                  |
-|   5 | Play roster builder                    | Navigation    | Pending               |
+|   4 | Responsive menu foundation             | Navigation    | **DONE — 2026-07-15** |
+|   5 | Play roster builder                    | Navigation    | NEXT                  |
 |   6 | Fighters tab                           | Navigation    | Pending               |
 |   7 | Challenges tab                         | Navigation    | Pending               |
 |   8 | Records tab                            | Navigation    | Pending               |
@@ -276,6 +276,23 @@ Acceptance:
 Introduce the logical 16:9 menu layout, safe-area helpers, modern design
 tokens, shared focus/navigation behavior, and an empty five-tab shell behind
 its capability. Existing Lobby remains the fallback.
+
+Acceptance:
+
+- [x] The capability-owned menu uses a 1280×720 logical FIT surface with
+      reusable safe-area conversion helpers; the legacy 960×720 gameplay and
+      Lobby surface remains unchanged when the shell is inactive.
+- [x] Frozen modern layout, color, typography, control, and motion tokens drive
+      an intentionally empty Play, Fighters, Challenges, Records, and Settings
+      shell without moving or implementing any activity.
+- [x] Shared wrapping focus/navigation behavior and the tab controls work with
+      pointer, keyboard, standard gamepad, and touch-sized targets.
+- [x] Only a literal normalized `newShell: true` welcome opens the shell; old,
+      false, absent, partial, malformed, reconnecting, and disconnected states
+      retain or restore the complete existing Lobby fallback.
+- [x] Desktop and mobile-landscape layout/input checks pass behind the temporary
+      test-only server opt-in; all five production capability defaults remain
+      false and no Batch 5 roster-builder behavior began.
 
 #### Batch 5 — Play roster builder
 
@@ -584,11 +601,11 @@ flags with full regression and rollback notes.
    deliberately. It does not silently expand the active batch.
 4. Existing user changes are never discarded or staged accidentally.
 
-| ID      | Discovered | Reproduction/evidence                                                                | Relationship  | Disposition                                                      | Status |
-| ------- | ---------- | ------------------------------------------------------------------------------------ | ------------- | ---------------------------------------------------------------- | ------ |
-| RFG-001 | 2026-07-15 | Idle `CameraKick.update()` clears a sustained `(320, 144)` base scroll to `(0, 0)`.  | Batches 20/24 | Replace with composed transient offsets in Batch 20; gate in 24. | Open   |
-| RFG-002 | 2026-07-15 | Idle `ZoomPulse.update()` clears a sustained base zoom of `0.9` back to `1`.         | Batches 20/24 | Replace with composed transient zoom in Batch 20; gate in 24.    | Open   |
-| RFG-003 | 2026-07-15 | Headless Firefox/WebKit live practice gets no player ID; staged gameplay PNGs black. | Batches 17/24 | Keep staged assertions; restore trustworthy visual path by gate. | Open   |
+| ID      | Discovered | Reproduction/evidence                                                                                              | Relationship  | Disposition                                                                                                 | Status |
+| ------- | ---------- | ------------------------------------------------------------------------------------------------------------------ | ------------- | ----------------------------------------------------------------------------------------------------------- | ------ |
+| RFG-001 | 2026-07-15 | Idle `CameraKick.update()` clears a sustained `(320, 144)` base scroll to `(0, 0)`.                                | Batches 20/24 | Replace with composed transient offsets in Batch 20; gate in 24.                                            | Open   |
+| RFG-002 | 2026-07-15 | Idle `ZoomPulse.update()` clears a sustained base zoom of `0.9` back to `1`.                                       | Batches 20/24 | Replace with composed transient zoom in Batch 20; gate in 24.                                               | Open   |
+| RFG-003 | 2026-07-15 | Headless Firefox/WebKit live practice gets no player ID; staged gameplay and Reforged-shell WebKit PNGs are black. | Batches 17/24 | Keep staged assertions plus Chromium visual evidence; restore trustworthy non-Chromium visual path by gate. | Open   |
 
 ## End-of-batch ritual
 
@@ -746,6 +763,51 @@ RFG-001 and RFG-002 remain assigned to Batches 20/24. RFG-003 remains the
 documented headless Firefox/WebKit live-network and black staged-capture
 limitation; staged frame measurements are still not hardware-comparable.
 
+### Batch 4 — 2026-07-15 — Responsive menu foundation
+
+**Shipped:** Added a capability-owned `ReforgedShellScene` on a responsive
+1280×720 logical FIT surface, with viewport-to-logical safe-area conversion,
+frozen modern design tokens, a reusable disabled-aware wrapping focus
+navigator, and five persistent procedural tab controls. The empty Play,
+Fighters, Challenges, Records, and Settings surfaces share pointer, keyboard,
+gamepad, and touch behavior. The welcome boundary now publishes normalized
+capability changes to scenes; only literal server-advertised `newShell: true`
+opens the shell, while reconnection/disconnection restores the complete
+960×720 Lobby. No activity moved, no roster builder or gameplay viewport work
+began, and no production flag default changed.
+
+**Verification:** Typecheck and lint passed. The complete 112-file/1,356-test
+unit/integration suite passed, including deterministic safe-area, capability
+route, and focus-navigation coverage. With `CAPABILITY_NEW_SHELL=true` only in
+the local test process, the focused desktop Chromium and mobile-landscape shell
+run passed its two applicable tests with two expected inverse-gate skips. It
+covered 1280×720 sizing, 844×390 responsive FIT, safe bounds, pointer, keyboard,
+gamepad, touch, literal capability entry, and reconnect restoration to the
+960×720 Lobby. Manual inspection found the desktop and 844×390 Chromium shell
+captures complete and unclipped. The production build passed. With every
+capability at its default false value, the complete 153-case Playwright matrix
+finished with 132 passed and the established/new inverse-gate 21 expected skips
+across desktop Chromium, desktop Firefox, and mobile landscape in 16.8 minutes;
+the legacy Lobby fallback check passed in all three projects. Repository
+Prettier and `git diff --check` also passed for the intended Batch 4 files.
+
+**Deployment:** Skipped. Batch 4 is incomplete milestone code behind a disabled
+server capability, and the roadmap authorizes production deployment only at a
+release gate or for an urgent live fix. No production environment or capability
+flag changed.
+
+**Deviations:** Headless mobile WebKit again failed to receive the live local
+WebRTC welcome under RFG-003, so its shell route used a staged complete welcome
+at the existing normalized client boundary. Real shell layout and input objects
+were exercised, while visual review used mobile-sized Chromium. The staged
+WebKit shell PNG was also black, broadening RFG-003 from staged gameplay pixels
+to staged Phaser canvas pixels; it remains non-hardware-comparable evidence.
+
+**Known issues:** No new bug ID was required. RFG-001 and RFG-002 remain assigned
+to Batches 20/24 and were untouched. RFG-003 now explicitly includes the black
+staged Reforged-shell WebKit capture in addition to its existing live-network
+and staged-gameplay limitations. None blocks Batch 5's pure roster builder.
+
 ## Next-session prompt
 
 ```text
@@ -753,24 +815,24 @@ Continue the Reforged build for Mighty Man's Revenge.
 
 Read docs/REIMAGINING_ROADMAP.md and CLAUDE.md completely first. Read
 docs/REFORGED_BASELINE.md and docs/REFORGED_CAPABILITIES.md before
-implementation. Implement Batch 4 — Responsive menu foundation exactly as
-specified. Preserve unrelated changes and do not begin Batch 5 — Play roster
-builder.
+implementation. Implement Batch 5 — Play roster builder exactly as specified.
+Preserve unrelated changes and do not begin Batch 6 — Fighters tab.
 
-Introduce the logical 16:9 menu layout, safe-area helpers, modern design tokens,
-shared focus/navigation behavior, and an empty five-tab shell behind the
-server-advertised newShell capability. Keep the existing Lobby as the complete
-fallback for an old server or a false/absent/malformed capability. Do not move
-activities into tabs, build the roster builder, enable any capability by
-default or in production, change gameplay viewport/camera behavior, or begin
-modern art production. Cover desktop and mobile landscape plus pointer,
-keyboard, gamepad, and touch behavior appropriate to this foundation.
+Implement a pure, exhaustively tested Play roster builder for format, human/bot
+composition, compatible explicit mode, current scheduled arena, selected
+fighter, and review. Invalid combinations must never become selectable or
+serializable. Build only inside the capability-owned Play tab; preserve the
+empty Fighters, Challenges, Records, and Settings tabs and the complete legacy
+Lobby fallback. Do not move activities, implement parties/schedules/general
+match intent, retire Draft or Character Select, enable capabilities, change the
+gameplay viewport/camera, or begin modern art.
 
-Batch 3 is complete and pushed on main; all five strict server capability flags
-default false and no deployment was required. Update the roadmap acceptance
-evidence and Session Log, run the complete end-of-batch ritual, commit and push
-directly to main, skip deployment unless the roadmap explicitly authorizes it,
-and end with the fenced paste-ready prompt for Batch 5.
+Batch 4 is complete and pushed on main; the 16:9 safe-area shell and shared
+navigation foundation remain behind `newShell`, all five strict server
+capability flags default false, and no deployment was required. Update the
+roadmap acceptance evidence and Session Log, run the complete end-of-batch
+ritual, commit and push directly to main, skip deployment unless the roadmap
+explicitly authorizes it, and end with the fenced paste-ready prompt for Batch 6.
 
 Carry-over warnings: RFG-001 CameraKick and RFG-002 ZoomPulse overwrite future
 base camera state and remain assigned to Batches 20/24. RFG-003 means headless
@@ -778,6 +840,9 @@ Firefox/WebKit cannot use the live local WebRTC practice path and staged
 gameplay screenshots are black; staged frame numbers are not
 hardware-comparable. The local Batch 2 live-loop sample recorded a 254.279ms
 host scheduling drift reset and 15.932 effective Hz while simulation processing
-remained far below the 50ms budget. Use Corepack pnpm 10.33.0 if the local pnpm
-shim selects a mismatched version. Batch 5 is next after Batch 4.
+remained far below the 50ms budget. Batch 4 broadened RFG-003 evidence: the
+staged mobile WebKit Reforged-shell PNG is also black, so use mobile-sized
+Chromium for visual evidence while retaining staged WebKit object/input
+assertions. Use Corepack pnpm 10.33.0 if the local pnpm shim selects a mismatched
+version. Batch 6 follows Batch 5.
 ```
