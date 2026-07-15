@@ -112,6 +112,10 @@ const CONTRACT_Y = 496;
 const CAREER_RANK_Y = 516;
 const AWARDS_START_Y = 536;
 const AWARD_ROW_H = 20;
+// Stat values align away from the centered label column. Centering every
+// value in its half lets four- and five-digit damage totals bleed inward
+// until CRT bloom visually joins them to labels such as DMG TAKEN.
+const STAT_VALUE_GAP = 78;
 
 export class ResultsScene extends Phaser.Scene {
   private gameService!: GameService;
@@ -376,6 +380,7 @@ export class ResultsScene extends Phaser.Scene {
     const panel = new MenuPanel(this, panelX, panelY, panelW, panelH, {
       fillAlpha: 0.92,
     });
+    panel.setName('result-stats-panel');
     panel.setDepth(WastelandStreet.DEPTH.UI);
 
     if (this.result) {
@@ -779,24 +784,27 @@ export class ResultsScene extends Phaser.Scene {
           color: cssHex(LABEL_COLOR),
         })
         .setOrigin(0.5)
+        .setName(`result-stat-label-${i}`)
         .setAlpha(0);
 
       const leftVal = this.add
-        .text(col1X, localY, row.left, {
+        .text(labelX - STAT_VALUE_GAP, localY, row.left, {
           fontFamily: MENU_FONTS.BODY,
           fontSize: '16px',
           color: cssHex(VALUE_COLOR),
         })
-        .setOrigin(0.5)
+        .setOrigin(1, 0.5)
+        .setName(`result-stat-left-${i}`)
         .setAlpha(0);
 
       const rightVal = this.add
-        .text(col2X, localY, row.right, {
+        .text(labelX + STAT_VALUE_GAP, localY, row.right, {
           fontFamily: MENU_FONTS.BODY,
           fontSize: '16px',
           color: cssHex(VALUE_COLOR),
         })
-        .setOrigin(0.5)
+        .setOrigin(0, 0.5)
+        .setName(`result-stat-right-${i}`)
         .setAlpha(0);
 
       panel.add(label);

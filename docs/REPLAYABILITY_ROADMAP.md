@@ -4276,6 +4276,35 @@ favorite mid-match event while the final-minute surprise stays fresh.
 
 ## Session Log
 
+### Session 102 — 2026-07-14 — Readable Post-Match Stats
+
+**Shipped:** duel Results no longer lets large combat totals run into the
+center labels. Each left-side value is now right-aligned and each right-side
+value is left-aligned around a fixed center gutter, so ordinary single-digit
+scores and exceptional five-digit damage totals share the same crisp scan
+line. Player headers, row order, stats, awards, rivalry stories, rematch
+actions, Rumble standings, and Crew standings are unchanged.
+
+The result rows also carry stable semantic names for browser geometry checks.
+That coverage stages deliberately extreme `12,345`/`98,765` damage totals and
+proves every value keeps at least 20px of clear space from its label while the
+entire table stays inside the existing 380px panel on desktop and 844×390
+mobile landscape. This is presentation only: stat collection, authoritative
+results, scoring, persistence, matchmaking, and server behavior are untouched.
+
+**Verification:** typecheck and lint pass; all 1,323 unit and integration tests
+pass across 103 files. The full production build passes with the existing Vite
+chunk-size advisory (`index-hY045890.js`, 1,861.82 kB / 445.61 kB gzip).
+Focused Chromium, Firefox, and mobile-landscape screenshots verify all nine
+rows with five-digit totals and the balanced outward-facing columns. The
+complete 120-case Playwright matrix passes with 105 executable passes and 15
+intentional project-specific skips in 14.3 minutes; the final strengthened
+three-project panel-bounds rerun also passes.
+
+**Operational watch:** keep future duel stat labels in the centered column and
+let values grow away from it. New rows should join the semantic naming pattern
+so the browser guard checks their gutters and panel bounds automatically.
+
 ### Session 101 — 2026-07-14 — Readable Touch Actions
 
 **Shipped:** mobile players no longer have to decode the anonymous `T`, `G`,
