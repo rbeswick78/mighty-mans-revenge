@@ -92,6 +92,21 @@ async function clickLogicalChallengeOption(
   else await page.mouse.click(x, y);
 }
 
+async function clickLogicalRecordOption(page: Page, index: number, touch: boolean): Promise<void> {
+  const center = await page.evaluate((optionIndex) => {
+    const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'ReforgedShellScene',
+    ) as unknown as { getRecordOptionCenter(index: number): { x: number; y: number } | null };
+    return scene.getRecordOptionCenter(optionIndex);
+  }, index);
+  const canvas = await page.locator('canvas').boundingBox();
+  if (!center || !canvas) throw new Error(`Missing rendered Records option ${index}`);
+  const x = canvas.x + (center.x / 1280) * canvas.width;
+  const y = canvas.y + (center.y / 720) * canvas.height;
+  if (touch) await page.touchscreen.tap(x, y);
+  else await page.mouse.click(x, y);
+}
+
 async function stageNonChromiumShell(page: Page): Promise<void> {
   await waitForActiveScene(page, 'LobbyScene');
   await page.evaluate(() => {
@@ -185,6 +200,29 @@ async function challengesSnapshot(page: Page): Promise<{
       };
     };
     return scene.getChallengesSnapshot();
+  });
+}
+
+async function recordsSnapshot(page: Page): Promise<{
+  selectedSectionId: string;
+  sectionLabels: string[];
+  heading: string;
+  authority: string;
+  columns: [string[], string[]];
+}> {
+  return page.evaluate(() => {
+    const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'ReforgedShellScene',
+    ) as unknown as {
+      getRecordsSnapshot(): {
+        selectedSectionId: string;
+        sectionLabels: string[];
+        heading: string;
+        authority: string;
+        columns: [string[], string[]];
+      };
+    };
+    return scene.getRecordsSnapshot();
   });
 }
 
@@ -764,4 +802,235 @@ test('Challenges preserves setup, progress, authority, and every established ent
       }),
     )
     .toEqual([960, 720]);
+});
+
+test('Records consolidates authoritative snapshots and device records with a Battle Royale zero state', async ({
+  page,
+}, testInfo) => {
+  test.skip(!shellAdvertised, 'Run with CAPABILITY_NEW_SHELL=true for the gated shell path.');
+  await page.addInitScript(() => {
+    localStorage.setItem('mmr_nickname', 'Batch8');
+    localStorage.setItem(
+      'mmr_scrap_pit_record',
+      JSON.stringify({
+        rounds: 8,
+        wins: 5,
+        currentStreak: 2,
+        bestStreak: 4,
+        lastMatchId: 'pit-8',
+      }),
+    );
+    localStorage.setItem('mmr_gauntlet_best_clear', '7200');
+    localStorage.setItem(
+      'mmr_daily_gauntlet_progress',
+      JSON.stringify({
+        challengeKey: '2026-07-15',
+        bestScore: 6500,
+        lastClearKey: '2026-07-15',
+        streak: 3,
+      }),
+    );
+    localStorage.setItem(
+      'mmr_gauntlet_build_codex',
+      JSON.stringify({
+        discovered: ['scrap_plating+kill_salvage'],
+        bestScores: { 'scrap_plating+kill_salvage': 7200 },
+      }),
+    );
+    localStorage.setItem(
+      'mmr_crew_tour',
+      JSON.stringify({
+        toursCompleted: 1,
+        securedModes: ['deathmatch', 'koth'],
+        wins: 8,
+        currentWinStreak: 2,
+        bestWinStreak: 5,
+        lastMatchId: 'crew-8',
+      }),
+    );
+  });
+  await page.goto('/');
+  const touch = testInfo.project.name === 'mobile-landscape';
+  if (testInfo.project.name !== 'desktop-chromium') await stageNonChromiumShell(page);
+  await waitForActiveScene(page, 'ReforgedShellScene');
+
+  await page.evaluate(() => {
+    const shell = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'ReforgedShellScene',
+    ) as unknown as {
+      gameService: {
+        latestCharacterWins: Record<string, number>;
+        latestArenaWins: Record<string, number>;
+        lastMatchResult: Record<string, unknown>;
+        getPlayerId(): string | null;
+        getNetworkManager(): { handleMessage(message: unknown): void };
+      };
+    };
+    const playerId = shell.gameService.getPlayerId() ?? 'staged-shell-player';
+    shell.gameService.latestCharacterWins = {
+      mighty_man: 15,
+      bruce: 7,
+      frost_wizard: 3,
+      bubba: 1,
+      jack: 4,
+      rook: 9,
+    };
+    shell.gameService.latestArenaWins = {
+      'Wasteland Outpost': 15,
+      'Overgrown Suburb': 7,
+      Scrapyard: 3,
+      'Collapsed Overpass': 1,
+      'Checkpoint Zero': 4,
+      'Rusted Refinery': 9,
+    };
+    shell.gameService.lastMatchResult = {
+      matchId: 'batch-8-result',
+      winnerId: playerId,
+      playerStats: new Map(),
+      duration: 120,
+      gameMode: 'deathmatch',
+      awards: [],
+      rivalry: {
+        nicknameA: 'Batch8',
+        nicknameB: 'Rival',
+        winsA: 7,
+        winsB: 5,
+        draws: 2,
+      },
+      rivalrySet: {
+        winsToClinch: 3,
+        roundsPlayed: 2,
+        players: [
+          { playerId, nickname: 'Batch8', wins: 2 },
+          { playerId: 'rival', nickname: 'Rival', wins: 0 },
+        ],
+        championId: null,
+      },
+      isPractice: false,
+      nextMapName: null,
+      nextGameMode: null,
+      wentToOvertime: false,
+      contract: {
+        id: 'hot_shot',
+        title: 'Hot Shot',
+        objective: 'Land hits',
+        target: 1,
+        players: [],
+        careerCompletions: { [playerId]: 9 },
+      },
+      winStreaks: {
+        [playerId]: { current: 3, best: 6, previous: 2, previousBest: 6 },
+      },
+    };
+    const manager = shell.gameService.getNetworkManager();
+    manager.handleMessage({
+      type: 'server:leaderboard',
+      entries: [
+        {
+          nickname: 'Other',
+          wins: 20,
+          losses: 4,
+          draws: 1,
+          kills: 200,
+          matches: 25,
+          contractsCompleted: 18,
+        },
+        {
+          nickname: 'Batch8',
+          wins: 12,
+          losses: 8,
+          draws: 2,
+          kills: 144,
+          matches: 22,
+          contractsCompleted: 9,
+        },
+      ],
+    });
+    manager.handleMessage({
+      type: 'server:dailyGauntletLeaderboard',
+      challengeKey: '2026-07-15',
+      entries: [
+        { nickname: 'DailyAce', score: 8000 },
+        { nickname: 'Batch8', score: 6500 },
+      ],
+    });
+  });
+
+  await clickLogicalTab(page, 'records', touch);
+  expect(await recordsSnapshot(page)).toMatchObject({
+    selectedSectionId: 'career',
+    sectionLabels: ['CAREER', 'BOARDS', 'RIVALRY', 'FIGHTERS', 'ARENAS', 'CHALLENGE', 'BR FUTURE'],
+    heading: 'CAREER / BATCH8',
+  });
+  expect((await recordsSnapshot(page)).columns.flat()).toContain('ALL-TIME TOP 5 / #2');
+
+  // Pointer/touch, keyboard, and standard gamepad all select the same
+  // read-only section controls without authoring a record or request.
+  await clickLogicalRecordOption(page, 1, touch);
+  expect(await recordsSnapshot(page)).toMatchObject({ selectedSectionId: 'leaderboards' });
+  expect((await recordsSnapshot(page)).columns.flat()).toEqual(
+    expect.arrayContaining(['#1 OTHER / 20W 4L 1D / 200 KOs', '#2 BATCH8 / 6,500']),
+  );
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('Enter');
+  expect(await recordsSnapshot(page)).toMatchObject({ selectedSectionId: 'rivalry' });
+  expect((await recordsSnapshot(page)).columns.flat()).toContain('BATCH8 7 - 5 RIVAL');
+  await queueMenuGamepadActions(page, [{ right: true }, { confirm: true }]);
+  await expect.poll(async () => (await recordsSnapshot(page)).selectedSectionId).toBe('fighters');
+  expect((await recordsSnapshot(page)).columns.flat()).toContain('MIGHTY MAN / MASTER / 15 WINS');
+
+  await clickLogicalRecordOption(page, 4, touch);
+  expect((await recordsSnapshot(page)).columns.flat()).toContain(
+    'WASTELAND OUTPOST / HOME TURF / 15 WINS',
+  );
+  await clickLogicalRecordOption(page, 5, touch);
+  expect((await recordsSnapshot(page)).columns.flat()).toEqual(
+    expect.arrayContaining([
+      '5 WINS / 8 ROUNDS',
+      'BEST CLEAR / 7,200',
+      '1/6 DISCOVERED',
+      '1 TOURS / 2/4 PATCHES',
+    ]),
+  );
+  await clickLogicalRecordOption(page, 6, touch);
+  expect(await recordsSnapshot(page)).toMatchObject({
+    selectedSectionId: 'battle_royale',
+    authority: 'EXPLICIT ZERO STATE / BATCH 49 OWNS FUTURE PERSISTENCE',
+  });
+  expect((await recordsSnapshot(page)).columns.flat()).toEqual(
+    expect.arrayContaining(['MATCHES / --', 'BEST PLACEMENT / --', 'NOT RECORDED OR INFERRED']),
+  );
+
+  if (touch) {
+    await page.screenshot({ path: testInfo.outputPath('records-mobile-webkit.png') });
+  } else if (testInfo.project.name === 'desktop-chromium') {
+    await clickLogicalRecordOption(page, 1, false);
+    await waitForRenderedFrames(page);
+    await page.screenshot({ path: testInfo.outputPath('records-leaderboards-desktop.png') });
+    await page.setViewportSize({ width: 844, height: 390 });
+    await waitForRenderedFrames(page);
+    await clickLogicalRecordOption(page, 5, false);
+    await page.screenshot({ path: testInfo.outputPath('records-challenges-mobile-chromium.png') });
+  }
+
+  await clickLogicalTab(page, 'settings', touch);
+  const settings = await page.evaluate(() => {
+    const shell = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'ReforgedShellScene',
+    ) as unknown as {
+      contentState: { visible: boolean; text: string };
+      recordsPanel: { visible: boolean };
+    };
+    return {
+      placeholderVisible: shell.contentState.visible,
+      placeholder: shell.contentState.text,
+      recordsVisible: shell.recordsPanel.visible,
+    };
+  });
+  expect(settings).toEqual({
+    placeholderVisible: true,
+    placeholder: 'NAVIGATION FOUNDATION READY',
+    recordsVisible: false,
+  });
 });

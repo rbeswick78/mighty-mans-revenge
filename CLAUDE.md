@@ -194,6 +194,19 @@ Batch 9 owns callsign entry. Play/Fighters remain unchanged, Records/Settings
 remain empty, and the default-false capability keeps the complete legacy Lobby
 fallback.
 
+**Reforged Records (Batch 8):** the capability-owned Records tab is a read-only
+archive over existing record sources. It renders the cached server-authored
+all-time and current Daily boards, the local callsign's available career and
+win-streak context, the latest lifetime rivalry/set result, all fighter mastery
+totals, and retained local arena mastery from the established draft/result
+snapshots. It also reads Scrap Pit, Gauntlet best, Daily progress, Build Codex,
+and Crew Tour through their existing device-local keys and normalizers. Battle
+Royale has an explicit unrecorded zero state only; Batch 49 still owns its
+persistence. No record write, ranking, retention, scoring, rematch, wire, or
+authority rule changed. Settings remains empty, Play/Fighters/Challenges keep
+their established boundaries, and the default-false capability preserves the
+complete legacy Lobby fallback.
+
 ### Why This Matters for Agents
 
 Client prediction and server simulation **must use identical physics code** from `/shared`. If you change movement, collision, or physics logic, you must change it in `/shared` and verify both client and server still agree. A mismatch between client prediction and server authority causes visible rubber-banding.

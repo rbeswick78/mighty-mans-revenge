@@ -23,10 +23,12 @@ import type {
   ServerCapabilities,
   SerializedPlayerState,
 } from '@shared/types/network.js';
+import type { ArenaWins } from '@shared/types/map.js';
 import { createEmptyCharacterWins } from '@shared/config/game.js';
 import type { BotDifficulty, PracticeKind } from '@shared/config/game.js';
 import type { CharacterId, WeaponId, MutatorId, TauntId } from '@shared/config/game.js';
 import { NetworkManager, type LocalCorrection } from '../network/network-manager.js';
+import { localArenaWinsFromDraft, mergeArenaWinsFromResult } from './record-snapshots.js';
 
 export interface EventWarningPayload {
   event: MutatorId;
@@ -120,6 +122,8 @@ export class GameService {
   private latestCharacterWins: Readonly<Record<CharacterId, number>> = Object.freeze(
     createEmptyCharacterWins(),
   );
+  /** Latest local server-authored arena record, retained for Records presentation. */
+  private latestArenaWins: Readonly<ArenaWins> | null = null;
   private lastMatchResult: MatchResult | null = null;
   /**
    * Latest all-time leaderboard from the server (empty until the first
@@ -194,6 +198,10 @@ export class GameService {
 
   getLatestCharacterWins(): Readonly<Record<CharacterId, number>> {
     return this.latestCharacterWins;
+  }
+
+  getLatestArenaWins(): Readonly<ArenaWins> | null {
+    return this.latestArenaWins;
   }
 
   getLastMatchResult(): MatchResult | null {
@@ -349,6 +357,8 @@ export class GameService {
 
     this.networkManager.on('draftState', (msg: ServerDraftStateMessage) => {
       this.latestDraftState = msg;
+      const arenaWins = localArenaWinsFromDraft(msg.players, this.getPlayerId());
+      if (arenaWins) this.latestArenaWins = Object.freeze(arenaWins);
       this.emit('draftState', msg);
     });
 
@@ -362,6 +372,12 @@ export class GameService {
 
     this.networkManager.on('matchEnd', (msg: { result: MatchResult }) => {
       this.lastMatchResult = msg.result;
+      const arenaWins = mergeArenaWinsFromResult(
+        this.latestArenaWins,
+        msg.result,
+        this.getPlayerId(),
+      );
+      this.latestArenaWins = arenaWins ? Object.freeze(arenaWins) : null;
       this.emit('matchEnd', msg.result);
     });
 
