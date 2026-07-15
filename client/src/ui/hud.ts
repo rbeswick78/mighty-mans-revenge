@@ -36,6 +36,7 @@ import {
   abilityStatusPresentation,
   type AbilityStatusTone,
 } from './ability-status.js';
+import type { KillFeedTone } from './kill-feed-presentation.js';
 
 // Press Start 2P is much wider per glyph than Courier, so the final-minute
 // banner size drops to compensate (Courier 40px ≈ PS2P 22-24px in width).
@@ -1003,12 +1004,21 @@ export class HUD {
     this.timerText.setText(`${mins}:${secs.toString().padStart(2, '0')}`);
   }
 
-  addKillFeedEntry(killerName: string, victimName: string, weapon: string): void {
+  addKillFeedEntry(label: string, tone: KillFeedTone): void {
     const MAX_ENTRIES = 5;
+    const color =
+      tone === 'local-kill'
+        ? Wasteland.HEALTH_GOOD
+        : tone === 'local-death'
+          ? Wasteland.TEXT_GRENADE_LIVE
+          : Wasteland.TEXT_PRIMARY;
 
-    const text = this.scene.add.text(0, 0, `${killerName} [${weapon}] ${victimName}`, {
+    const text = this.scene.add.text(0, 0, label, {
       ...FONT_STYLE,
-      fontSize: '14px',
+      fontSize: '16px',
+      color: cssHex(color),
+      stroke: '#000000',
+      strokeThickness: 2,
     });
     text.setOrigin(1, 0);
 
@@ -1018,11 +1028,13 @@ export class HUD {
       this.removeKillFeedEntry(text);
     });
 
-    this.killFeedEntries.push({ text, timer });
+    // Newest events stay on top, where a player can read their own kill or
+    // death without scanning a moving stack.
+    this.killFeedEntries.unshift({ text, timer });
 
     // Keep only MAX_ENTRIES
     while (this.killFeedEntries.length > MAX_ENTRIES) {
-      const oldest = this.killFeedEntries.shift();
+      const oldest = this.killFeedEntries.pop();
       if (oldest) {
         oldest.timer.remove();
         oldest.text.destroy();
@@ -1043,7 +1055,7 @@ export class HUD {
 
   private layoutKillFeed(): void {
     for (let i = 0; i < this.killFeedEntries.length; i++) {
-      this.killFeedEntries[i].text.setY(i * 20);
+      this.killFeedEntries[i].text.setY(i * 24);
     }
   }
 

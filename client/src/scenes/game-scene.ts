@@ -73,6 +73,7 @@ import {
 import { Crosshair } from '../rendering/crosshair.js';
 import { combatCalloutFor, withGauntletStyle } from '../ui/combat-callout.js';
 import { confirmedTagCallout } from '../ui/confirmed-tag.js';
+import { killFeedPresentation } from '../ui/kill-feed-presentation.js';
 import { rumbleLeadCallout } from '../ui/rumble-lead.js';
 import { HUD } from '../ui/hud.js';
 import { InputManager } from '../input/input-manager.js';
@@ -1433,8 +1434,24 @@ export class GameScene extends Phaser.Scene {
     this.onPlayerKilled = (entry: KillFeedEntry) => {
       // Killer hears the kill sound; victim hears the death sound. Suicide
       // (killer === victim, e.g. own grenade) plays only the death sound.
-      const localId = this.gameService.getNetworkManager().getPlayerId();
+      const networkManager = this.gameService.getNetworkManager();
+      const localId = networkManager.getPlayerId();
       if (!localId) return;
+
+      // The reliable event owns attribution. Resolve presentation names from
+      // the match roster first so a death still reads after interpolation has
+      // already pruned a departed fighter; live snapshots may refine them.
+      const playerNames = new Map<PlayerId, string>();
+      for (const opponent of this.matchData?.opponents ?? []) {
+        playerNames.set(opponent.id, opponent.nickname);
+      }
+      playerNames.set(localId, networkManager.getLocalPlayerState()?.nickname || this.nickname);
+      for (const [playerId, state] of networkManager.getInterpolatedPlayers()) {
+        playerNames.set(playerId, state.nickname);
+      }
+      const feed = killFeedPresentation(entry, playerNames, localId);
+      this.hud?.addKillFeedEntry(feed.label, feed.tone);
+
       const baseCallout = combatCalloutFor(entry, localId);
       // The reliable kill event is authoritative, but the displayed points are
       // still provisional until the server confirms a stage win. Avoid a
