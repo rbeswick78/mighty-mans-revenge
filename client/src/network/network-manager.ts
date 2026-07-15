@@ -36,7 +36,9 @@ import {
   type TauntId,
 } from '@shared/config/game.js';
 import { playerMovementModifiers } from '@shared/utils/event-modifiers.js';
+import { listMapNames } from '@shared/maps/registry.js';
 import { NetworkConnection } from './connection.js';
+import { normalizeArenaSchedule, type NormalizedArenaSchedule } from './arena-schedule.js';
 import { ClientPrediction } from './prediction.js';
 import { ServerReconciliation } from './reconciliation.js';
 import { EntityInterpolation } from './interpolation.js';
@@ -48,6 +50,7 @@ type EventName =
   | 'disconnected'
   | 'reconnecting'
   | 'welcome'
+  | 'lobbyConfig'
   | 'matchFound'
   | 'draftState'
   | 'matchCountdown'
@@ -98,6 +101,7 @@ export class NetworkManager {
 
   private localPlayerId: PlayerId | null = null;
   private serverCapabilities: Readonly<ServerCapabilities> = DISABLED_SERVER_CAPABILITIES;
+  private arenaSchedule: NormalizedArenaSchedule | null = null;
   private localPlayerState: PlayerState | null = null;
   private collisionGrid: CollisionGrid | null = null;
   private lastCountdownEmitted = -1;
@@ -183,16 +187,19 @@ export class NetworkManager {
     this.connection.onStateChange((state) => {
       if (state === 'connecting') {
         this.serverCapabilities = DISABLED_SERVER_CAPABILITIES;
+        this.arenaSchedule = null;
         this.emit('connecting');
       } else if (state === 'connected') this.emit('connected');
       else if (state === 'disconnected') {
         this.localPlayerId = null;
         this.serverCapabilities = DISABLED_SERVER_CAPABILITIES;
+        this.arenaSchedule = null;
         this.resetMatchState();
         this.emit('disconnected');
       } else if (state === 'reconnecting') {
         this.localPlayerId = null;
         this.serverCapabilities = DISABLED_SERVER_CAPABILITIES;
+        this.arenaSchedule = null;
         this.resetMatchState();
         this.emit('reconnecting');
       }
@@ -219,6 +226,7 @@ export class NetworkManager {
     this.connection.disconnect();
     this.localPlayerId = null;
     this.serverCapabilities = DISABLED_SERVER_CAPABILITIES;
+    this.arenaSchedule = null;
     this.resetMatchState();
   }
 
@@ -487,6 +495,11 @@ export class NetworkManager {
     return this.serverCapabilities;
   }
 
+  /** Latest complete server-authored arena schedule, or null on every fallback path. */
+  getArenaSchedule(): NormalizedArenaSchedule | null {
+    return this.arenaSchedule;
+  }
+
   /** Current round-trip time in milliseconds. */
   getRTT(): number {
     return this.connection.getRTT();
@@ -524,7 +537,15 @@ export class NetworkManager {
       case 'server:welcome':
         this.localPlayerId = msg.playerId;
         this.serverCapabilities = normalizeServerCapabilities(msg.capabilities);
+        this.arenaSchedule = null;
         this.emit('welcome', msg.playerId);
+        break;
+
+      case 'server:lobbyConfig':
+        this.arenaSchedule = this.serverCapabilities.schedules
+          ? normalizeArenaSchedule(msg, listMapNames())
+          : null;
+        this.emit('lobbyConfig', this.arenaSchedule);
         break;
 
       case 'server:gameState':

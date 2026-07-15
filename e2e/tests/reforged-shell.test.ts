@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 const shellAdvertised = process.env.CAPABILITY_NEW_SHELL === 'true';
+const schedulesAdvertised = process.env.CAPABILITY_SCHEDULES === 'true';
 
 async function waitForActiveScene(page: Page, key: string): Promise<void> {
   await expect
@@ -128,7 +129,7 @@ async function clickLogicalSettingsOption(
 
 async function stageNonChromiumShell(page: Page): Promise<void> {
   await waitForActiveScene(page, 'LobbyScene');
-  await page.evaluate(() => {
+  await page.evaluate((advertiseSchedules) => {
     const lobby = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
       'LobbyScene',
     ) as unknown as {
@@ -148,13 +149,40 @@ async function stageNonChromiumShell(page: Page): Promise<void> {
       playerId: 'staged-shell-player',
       capabilities: {
         newShell: true,
-        schedules: false,
+        schedules: advertiseSchedules,
         largeWorlds: false,
         modernArt: false,
         battleRoyale: false,
       },
     });
-  });
+    if (advertiseSchedules) {
+      manager.handleMessage({
+        type: 'server:lobbyConfig',
+        serverTime: 1_000_000,
+        schedules: [
+          'deathmatch',
+          'koth',
+          'gun_game',
+          'last_stand',
+          'kill_confirmed',
+          'one_in_the_chamber',
+          'core_run',
+          'bounty_hunt',
+        ].map((mode, index) => ({
+          mode,
+          mapName: [
+            'Wasteland Outpost',
+            'Overgrown Suburb',
+            'Scrapyard',
+            'Collapsed Overpass',
+            'Checkpoint Zero',
+            'Rusted Refinery',
+          ][index % 6],
+          rotationEndsAt: 1_240_000,
+        })),
+      });
+    }
+  }, schedulesAdvertised);
 }
 
 async function playRosterSnapshot(page: Page): Promise<{
@@ -162,6 +190,7 @@ async function playRosterSnapshot(page: Page): Promise<{
   state: Record<string, unknown>;
   serialized: Record<string, unknown> | null;
   optionLabels: string[];
+  arenaStatus: string | null;
 }> {
   return page.evaluate(() => {
     const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
@@ -172,6 +201,7 @@ async function playRosterSnapshot(page: Page): Promise<{
         state: Record<string, unknown>;
         serialized: Record<string, unknown> | null;
         optionLabels: string[];
+        arenaStatus: string | null;
       };
     };
     return scene.getPlayRosterSnapshot();
@@ -473,16 +503,22 @@ test('advertised shell is 16:9, safe-area bounded, and navigable across inputs',
 
   await page.screenshot({ path: testInfo.outputPath('reforged-shell.png') });
 
-  await page.evaluate(() => {
+  const resetState = await page.evaluate(() => {
     const shell = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
       'ReforgedShellScene',
     ) as unknown as {
       gameService: {
-        getNetworkManager(): { connection: { setState(state: string): void } };
+        getNetworkManager(): {
+          connection: { setState(state: string): void };
+          getArenaSchedule(): unknown;
+        };
       };
     };
-    shell.gameService.getNetworkManager().connection.setState('reconnecting');
+    const manager = shell.gameService.getNetworkManager();
+    manager.connection.setState('reconnecting');
+    return manager.getArenaSchedule();
   });
+  expect(resetState).toBeNull();
   await waitForActiveScene(page, 'LobbyScene');
   await expect
     .poll(() =>
@@ -537,13 +573,26 @@ test('Play roster builder reaches only a valid review across pointer, keyboard, 
   await queueMenuGamepadActions(page, [{ confirm: true }]);
   await expect.poll(async () => (await playRosterSnapshot(page)).step).toBe('review');
   const review = await playRosterSnapshot(page);
-  expect(review.serialized).toEqual({
+  expect(review.serialized).toMatchObject({
     format: 'rumble',
     composition: { humanCount: 1, botCount: 2 },
     mode: 'koth',
-    arenaName: 'Overgrown Suburb',
     fighterId: 'frost_wizard',
   });
+  if (schedulesAdvertised) {
+    expect(review.arenaStatus).toMatch(/^ROTATES IN \d+:\d{2} {2}\/ {2}SERVER CLOCK$/);
+    expect([
+      'Wasteland Outpost',
+      'Overgrown Suburb',
+      'Scrapyard',
+      'Collapsed Overpass',
+      'Checkpoint Zero',
+      'Rusted Refinery',
+    ]).toContain(review.serialized?.arenaName);
+  } else {
+    expect(review.serialized?.arenaName).toBe('Overgrown Suburb');
+    expect(review.arenaStatus).toBeNull();
+  }
   expect(review.optionLabels).toEqual([]);
 
   // Standard gamepad B skips the Fighters-owned dependency and edits arena.

@@ -28,6 +28,7 @@ import { createEmptyCharacterWins } from '@shared/config/game.js';
 import type { BotDifficulty, PracticeKind } from '@shared/config/game.js';
 import type { CharacterId, WeaponId, MutatorId, TauntId } from '@shared/config/game.js';
 import { NetworkManager, type LocalCorrection } from '../network/network-manager.js';
+import type { NormalizedArenaSchedule } from '../network/arena-schedule.js';
 import { localArenaWinsFromDraft, mergeArenaWinsFromResult } from './record-snapshots.js';
 
 export interface EventWarningPayload {
@@ -74,6 +75,7 @@ type GameServiceEvent =
   | 'connecting'
   | 'connected'
   | 'capabilitiesChanged'
+  | 'lobbyConfig'
   | 'reconnecting'
   | 'disconnected'
   | 'matchFound'
@@ -186,6 +188,10 @@ export class GameService {
 
   getServerCapabilities(): Readonly<ServerCapabilities> {
     return this.networkManager.getServerCapabilities();
+  }
+
+  getArenaSchedule(): NormalizedArenaSchedule | null {
+    return this.networkManager.getArenaSchedule();
   }
 
   getNickname(): string {
@@ -314,6 +320,10 @@ export class GameService {
 
     this.networkManager.on('welcome', () => {
       this.emit('capabilitiesChanged', this.networkManager.getServerCapabilities());
+    });
+
+    this.networkManager.on('lobbyConfig', (schedule: NormalizedArenaSchedule | null) => {
+      this.emit('lobbyConfig', schedule);
     });
 
     this.networkManager.on('reconnecting', () => {

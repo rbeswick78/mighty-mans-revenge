@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_MODE_ROTATION, type CharacterId } from '@shared/config/game.js';
+import type { CharacterId } from '@shared/config/game.js';
 import { cssHex } from '@shared/config/palette.js';
 import { listMapNames } from '@shared/maps/registry.js';
 import type {
@@ -8,6 +8,7 @@ import type {
   ServerDailyGauntletLeaderboardMessage,
 } from '@shared/types/network.js';
 import { MenuGamepadInput } from '../input/menu-gamepad.js';
+import type { NormalizedArenaSchedule } from '../network/arena-schedule.js';
 import type { ConnectionState } from '../network/types.js';
 import { GameService, type MatchData } from '../services/game-service.js';
 import { readCallsign } from '../ui/callsign.js';
@@ -19,8 +20,8 @@ import { persistFighterSelection, readFighterSelection } from '../ui/reforged/fi
 import { FightersPanel, type FightersPanelSnapshot } from '../ui/reforged/fighters-panel.js';
 import { MenuFocusNavigator } from '../ui/reforged/focus-navigation.js';
 import { menuSceneForCapabilities } from '../ui/reforged/menu-route.js';
-import { normalizePlayRosterAvailability } from '../ui/reforged/play-roster-builder.js';
 import { PlayRosterPanel, type PlayRosterPanelSnapshot } from '../ui/reforged/play-roster-panel.js';
+import { playSchedulePresentation } from '../ui/reforged/arena-schedule-presentation.js';
 import { RecordsPanel, type RecordsPanelSnapshot } from '../ui/reforged/records-panel.js';
 import type { ReforgedRecordsServerSnapshots } from '../ui/reforged/records-model.js';
 import { ReforgedTabButton } from '../ui/reforged/reforged-tab-button.js';
@@ -51,18 +52,6 @@ const SHELL_DEPTH = Object.freeze({
   controls: 30,
 });
 
-function createBatch5RosterAvailability() {
-  const arenaNames = listMapNames();
-  // Batch 5 needs an injected, read-only arena value to prove the pure builder
-  // boundary. This fixed preview has no clock, rotation, queue lock, network
-  // emission, or authority; Batch 10 replaces the adapter with server truth.
-  const preview = GAME_MODE_ROTATION.map((mode, index) => ({
-    mode,
-    arenaName: arenaNames[index % arenaNames.length],
-  }));
-  return normalizePlayRosterAvailability(preview, arenaNames);
-}
-
 export class ReforgedShellScene extends Phaser.Scene {
   private gameService!: GameService;
   private menuGamepad: MenuGamepadInput | null = null;
@@ -92,6 +81,7 @@ export class ReforgedShellScene extends Phaser.Scene {
     null;
   private onCapabilitiesChanged: ((capabilities: Readonly<ServerCapabilities>) => void) | null =
     null;
+  private onLobbyConfig: ((schedule: NormalizedArenaSchedule | null) => void) | null = null;
   private onReconnecting: (() => void) | null = null;
   private onDisconnected: (() => void) | null = null;
   private onFullscreenChange: (() => void) | null = null;
@@ -162,8 +152,14 @@ export class ReforgedShellScene extends Phaser.Scene {
       .setOrigin(0.5, 1)
       .setDepth(SHELL_DEPTH.controls);
 
+    const playSchedule = playSchedulePresentation(
+      this.gameService.getServerCapabilities(),
+      this.gameService.getArenaSchedule(),
+      listMapNames(),
+    );
     this.playRosterPanel = new PlayRosterPanel(this, {
-      availability: createBatch5RosterAvailability(),
+      availability: playSchedule.availability,
+      arenaStatusByMode: playSchedule.arenaStatusByMode,
       fighterId: this.selectedFighterId,
       onPointerIntent: () => this.enterPlayInput(false),
     }).setDepth(SHELL_DEPTH.panel);
@@ -402,6 +398,17 @@ export class ReforgedShellScene extends Phaser.Scene {
     this.onCapabilitiesChanged = (capabilities) => {
       if (menuSceneForCapabilities(capabilities) !== 'ReforgedShellScene') this.returnToLobby();
     };
+    this.onLobbyConfig = (schedule) => {
+      const presentation = playSchedulePresentation(
+        this.gameService.getServerCapabilities(),
+        schedule,
+        listMapNames(),
+      );
+      this.playRosterPanel?.setArenaSchedule(
+        presentation.availability,
+        presentation.arenaStatusByMode,
+      );
+    };
     this.onReconnecting = () => this.handleShellConnectionLoss('reconnecting');
     this.onDisconnected = () => this.handleShellConnectionLoss('disconnected');
     this.onFullscreenChange = () =>
@@ -410,6 +417,7 @@ export class ReforgedShellScene extends Phaser.Scene {
     this.gameService.on('leaderboard', this.onLeaderboard);
     this.gameService.on('dailyGauntletLeaderboard', this.onDailyLeaderboard);
     this.gameService.on('capabilitiesChanged', this.onCapabilitiesChanged);
+    this.gameService.on('lobbyConfig', this.onLobbyConfig);
     this.gameService.on('reconnecting', this.onReconnecting);
     this.gameService.on('disconnected', this.onDisconnected);
     document.addEventListener('fullscreenchange', this.onFullscreenChange);
@@ -726,6 +734,10 @@ export class ReforgedShellScene extends Phaser.Scene {
     if (this.onCapabilitiesChanged) {
       this.gameService.off('capabilitiesChanged', this.onCapabilitiesChanged);
       this.onCapabilitiesChanged = null;
+    }
+    if (this.onLobbyConfig) {
+      this.gameService.off('lobbyConfig', this.onLobbyConfig);
+      this.onLobbyConfig = null;
     }
     if (this.onReconnecting) {
       this.gameService.off('reconnecting', this.onReconnecting);

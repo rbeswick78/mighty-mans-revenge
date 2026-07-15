@@ -1,10 +1,11 @@
 import { DAILY_GAUNTLET_LEADERBOARD, LEADERBOARD, SERVER, dailyChallengeKey } from '@shared/game';
-import type { PlayerId, ClientMessage } from '@shared/game';
+import type { PlayerId, ClientMessage, GameModeType, ScheduledArenaLock } from '@shared/game';
 import { GameLoop } from './game-loop.js';
 import { GameServer } from '../network/server.js';
 import { MatchmakingManager } from '../matchmaking/matchmaking-manager.js';
 import { logger } from '../utils/logger.js';
 import type { PersistentStatsStore } from '../persistence/persistent-stats-store.js';
+import { createArenaScheduleMessage, lockScheduledArena } from '../matchmaking/arena-schedule.js';
 
 export class GameManager {
   private readonly gameLoop: GameLoop;
@@ -27,6 +28,10 @@ export class GameManager {
   private readonly now: () => Date;
   /** Last board announced to connected clients; advances at UTC rollover. */
   private currentDailyChallengeKey: string;
+  /** Last whole server-clock second broadcast for schedule countdown repair. */
+  private lastArenaScheduleSecond = -1;
+  /** Per-player server locks retained through later schedule clock refreshes. */
+  private readonly arenaScheduleLocks = new Map<PlayerId, Readonly<ScheduledArenaLock>>();
 
   constructor(
     server: GameServer,
@@ -82,6 +87,10 @@ export class GameManager {
       // Player connected — they'll join matchmaking via a client message
       logger.debug({ playerId }, 'Player connected, awaiting matchmaking join');
 
+      if (this.server.getCapabilities().schedules) {
+        this.sendArenaSchedule(playerId, true);
+      }
+
       // Ship the all-time leaderboard right behind the welcome. Reliable:
       // it's a one-shot — the next refresh only comes when a match ends.
       // Empty entries are still sent so the client knows to hide the panel.
@@ -101,6 +110,7 @@ export class GameManager {
 
     this.server.onDisconnect((playerId: PlayerId) => {
       this.playerRTTs.delete(playerId);
+      this.arenaScheduleLocks.delete(playerId);
       this.matchmaking.handlePlayerDisconnect(playerId);
     });
 
@@ -182,6 +192,7 @@ export class GameManager {
 
   private tick(dt: number, tick: number): void {
     this.matchmaking.tick(dt, tick);
+    this.broadcastArenaScheduleClock();
     if (!this.statsStore || tick % SERVER.TICK_RATE !== 0) return;
     const challengeKey = dailyChallengeKey(this.now());
     if (challengeKey === this.currentDailyChallengeKey) return;
@@ -189,6 +200,51 @@ export class GameManager {
     for (const playerId of this.server.getConnectedPlayerIds()) {
       this.sendDailyGauntletLeaderboard(playerId, challengeKey);
     }
+  }
+
+  private broadcastArenaScheduleClock(): void {
+    if (!this.server.getCapabilities().schedules) return;
+    const serverTime = this.now().getTime();
+    const second = Math.floor(serverTime / 1000);
+    if (second === this.lastArenaScheduleSecond) return;
+    this.lastArenaScheduleSecond = second;
+    for (const playerId of this.server.getConnectedPlayerIds()) {
+      this.sendArenaSchedule(playerId, false, serverTime);
+    }
+  }
+
+  /**
+   * Server-authoritative queue-entry lock for Batch 11's intent path. Batch 10
+   * exposes the lock lifecycle without adding or routing generalized intents.
+   */
+  lockArenaForQueue(playerId: PlayerId, mode: GameModeType): ScheduledArenaLock | null {
+    if (!this.server.getCapabilities().schedules) return null;
+    const serverTime = this.now().getTime();
+    const schedule = createArenaScheduleMessage(serverTime);
+    if (schedule.forcedMode !== undefined && schedule.forcedMode !== mode) return null;
+    const lock = lockScheduledArena(schedule, mode, serverTime);
+    if (lock === null) return null;
+    this.arenaScheduleLocks.set(playerId, lock);
+    this.sendArenaSchedule(playerId, true, serverTime);
+    return lock;
+  }
+
+  /** Release a queue lock and immediately restore the current server snapshot. */
+  releaseArenaScheduleLock(playerId: PlayerId): void {
+    if (!this.arenaScheduleLocks.delete(playerId)) return;
+    this.sendArenaSchedule(playerId, true);
+  }
+
+  private sendArenaSchedule(
+    playerId: PlayerId,
+    reliable: boolean,
+    serverTime = this.now().getTime(),
+  ): void {
+    this.server.sendTo(
+      playerId,
+      createArenaScheduleMessage(serverTime, process.env, this.arenaScheduleLocks.get(playerId)),
+      { reliable },
+    );
   }
 
   private sendDailyGauntletLeaderboard(playerId: PlayerId, challengeKey: string): void {

@@ -189,4 +189,9 @@ export class GameServer {
   getConnectedPlayerIds(): PlayerId[] {
     return [...this.channels.keys()];
   }
+
+  /** Complete immutable feature support advertised by this server process. */
+  getCapabilities(): Readonly<ServerCapabilities> {
+    return this.capabilities;
+  }
 }

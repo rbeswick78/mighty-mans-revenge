@@ -2,7 +2,12 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createEmptyKillsByWeapon } from '@shared/game';
+import {
+  ARENA_SCHEDULE,
+  createEmptyKillsByWeapon,
+  DISABLED_SERVER_CAPABILITIES,
+  GameModeType,
+} from '@shared/game';
 import type { PlayerId, ServerMessage } from '@shared/game';
 import { GameManager } from './game-manager.js';
 import { PersistentStatsStore } from '../persistence/persistent-stats-store.js';
@@ -18,7 +23,7 @@ interface SentMessage {
  * Fake GameServer that captures the handlers GameManager wires up, so a
  * test can simulate a connection without real geckos networking.
  */
-function makeFakeServer() {
+function makeFakeServer(schedules = false) {
   const sent: SentMessage[] = [];
   const connected: PlayerId[] = [];
   let connectHandler: ((playerId: PlayerId) => void) | null = null;
@@ -27,6 +32,12 @@ function makeFakeServer() {
       sent.push({ playerId, message, reliable: !!opts?.reliable });
     }),
     getConnectedPlayerIds: vi.fn(() => [...connected]),
+    getCapabilities: vi.fn(() => ({ ...DISABLED_SERVER_CAPABILITIES, schedules })),
+    broadcast: vi.fn((message: ServerMessage) => {
+      for (const playerId of connected) {
+        sent.push({ playerId, message, reliable: false });
+      }
+    }),
     onConnect: vi.fn((handler: (playerId: PlayerId) => void) => {
       connectHandler = handler;
     }),
@@ -104,9 +115,7 @@ describe('GameManager connection leaderboard', () => {
       throw new Error('missing server:leaderboard on connect');
     }
     expect(leaderboard.message.entries).toEqual([]);
-    const daily = sent.find(
-      (s) => s.message.type === 'server:dailyGauntletLeaderboard',
-    );
+    const daily = sent.find((s) => s.message.type === 'server:dailyGauntletLeaderboard');
     if (!daily || daily.message.type !== 'server:dailyGauntletLeaderboard') {
       throw new Error('missing server:dailyGauntletLeaderboard on connect');
     }
@@ -122,9 +131,7 @@ describe('GameManager connection leaderboard', () => {
 
     connect('p1');
 
-    const daily = sent.find(
-      (s) => s.message.type === 'server:dailyGauntletLeaderboard',
-    );
+    const daily = sent.find((s) => s.message.type === 'server:dailyGauntletLeaderboard');
     if (!daily || daily.message.type !== 'server:dailyGauntletLeaderboard') {
       throw new Error('missing server:dailyGauntletLeaderboard on connect');
     }
@@ -151,9 +158,7 @@ describe('GameManager connection leaderboard', () => {
     now = new Date('2026-07-14T00:00:01Z');
     (manager as unknown as { tick: (dt: number, tick: number) => void }).tick(0.05, 20);
 
-    const daily = sent.find(
-      (s) => s.message.type === 'server:dailyGauntletLeaderboard',
-    );
+    const daily = sent.find((s) => s.message.type === 'server:dailyGauntletLeaderboard');
     if (!daily || daily.message.type !== 'server:dailyGauntletLeaderboard') {
       throw new Error('missing rollover Daily leaderboard');
     }
@@ -172,8 +177,60 @@ describe('GameManager connection leaderboard', () => {
     connect('p1');
 
     expect(sent.some((s) => s.message.type === 'server:leaderboard')).toBe(false);
+    expect(sent.some((s) => s.message.type === 'server:dailyGauntletLeaderboard')).toBe(false);
+  });
+
+  it('sends and refreshes authoritative schedules only when advertised', () => {
+    const { fake, sent, connect } = makeFakeServer(true);
+    let now = new Date('2026-07-15T12:00:00.250Z');
+    const manager = new GameManager(fake, undefined, () => now);
+
+    connect('p1');
+    const initial = sent.find((entry) => entry.message.type === 'server:lobbyConfig');
+    expect(initial?.reliable).toBe(true);
+    if (!initial || initial.message.type !== 'server:lobbyConfig') {
+      throw new Error('missing advertised schedule on connect');
+    }
+    expect(initial.message.serverTime).toBe(now.getTime());
+    expect(initial.message.schedules).toHaveLength(8);
+
+    sent.length = 0;
+    (manager as unknown as { tick: (dt: number, tick: number) => void }).tick(0.05, 1);
+    (manager as unknown as { tick: (dt: number, tick: number) => void }).tick(0.05, 2);
+    expect(sent.filter((entry) => entry.message.type === 'server:lobbyConfig')).toHaveLength(1);
+
+    now = new Date(now.getTime() + 1000);
+    (manager as unknown as { tick: (dt: number, tick: number) => void }).tick(0.05, 3);
+    expect(sent.filter((entry) => entry.message.type === 'server:lobbyConfig')).toHaveLength(2);
+
+    const lock = manager.lockArenaForQueue('p1', GameModeType.KOTH);
+    expect(lock?.mode).toBe(GameModeType.KOTH);
+    const lockedMap = lock?.mapName;
+    sent.length = 0;
+    now = new Date(now.getTime() + ARENA_SCHEDULE.ROTATION_MS);
+    (manager as unknown as { tick: (dt: number, tick: number) => void }).tick(0.05, 4);
+    const refreshed = sent.find((entry) => entry.message.type === 'server:lobbyConfig');
+    if (!refreshed || refreshed.message.type !== 'server:lobbyConfig') {
+      throw new Error('missing locked schedule refresh');
+    }
+    expect(refreshed.message.lockedArena?.mapName).toBe(lockedMap);
     expect(
-      sent.some((s) => s.message.type === 'server:dailyGauntletLeaderboard'),
-    ).toBe(false);
+      refreshed.message.schedules.find(({ mode }) => mode === GameModeType.KOTH)?.mapName,
+    ).not.toBe(lockedMap);
+
+    manager.releaseArenaScheduleLock('p1');
+    const released = sent.at(-1);
+    expect(released?.message.type).toBe('server:lobbyConfig');
+    if (released?.message.type === 'server:lobbyConfig') {
+      expect(released.message.lockedArena).toBeUndefined();
+    }
+  });
+
+  it('keeps the established server behavior when schedules are disabled', () => {
+    const { fake, sent, connect } = makeFakeServer(false);
+    const manager = new GameManager(fake, undefined, () => new Date('2026-07-15T12:00:00Z'));
+    connect('p1');
+    (manager as unknown as { tick: (dt: number, tick: number) => void }).tick(0.05, 1);
+    expect(sent.some((entry) => entry.message.type === 'server:lobbyConfig')).toBe(false);
   });
 });

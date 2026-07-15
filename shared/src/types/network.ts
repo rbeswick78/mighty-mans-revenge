@@ -133,6 +133,7 @@ export interface ClientPingMessage {
 
 export type ServerMessage =
   | ServerWelcomeMessage
+  | ServerLobbyConfigMessage
   | ServerGameStateMessage
   | ServerMatchFoundMessage
   | ServerDraftStateMessage
@@ -175,6 +176,36 @@ export interface ServerWelcomeMessage {
    * client, so server support must be explicit before a feature is reachable.
    */
   capabilities?: Partial<ServerCapabilities>;
+}
+
+/** One server-authored arena outcome for a standard mode's active epoch slot. */
+export interface ScheduledArena {
+  mode: GameModeType;
+  mapName: string;
+  /** Authoritative Unix epoch milliseconds at which this outcome expires. */
+  rotationEndsAt: number;
+}
+
+/**
+ * Server-owned queue-entry lock. It may outlive the active slot so a queued
+ * roster never changes the arena it was shown when it entered the queue.
+ */
+export interface ScheduledArenaLock extends ScheduledArena {
+  /** Authoritative Unix epoch milliseconds when the server created the lock. */
+  lockedAt: number;
+}
+
+/** Additive lobby truth. Old clients safely ignore this unknown message. */
+export interface ServerLobbyConfigMessage {
+  type: 'server:lobbyConfig';
+  /** Authoritative server wall-clock sample for presentation synchronization. */
+  serverTime: number;
+  /** Complete current schedule: exactly one server-owned outcome per standard mode. */
+  schedules: readonly ScheduledArena[];
+  /** Valid FORCE_MODE diagnostic, when configured. */
+  forcedMode?: GameModeType;
+  /** Present only after a server-authoritative queue entry has locked an arena. */
+  lockedArena?: ScheduledArenaLock;
 }
 
 export interface ServerGameStateMessage {

@@ -165,6 +165,50 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
     });
   });
 
+  it('accepts complete advertised schedules and clears them on malformed updates', () => {
+    deliver({
+      type: 'server:welcome',
+      playerId: LOCAL_ID,
+      capabilities: { newShell: true, schedules: true },
+    });
+    const serverTime = 1_000_000;
+    deliver({
+      type: 'server:lobbyConfig',
+      serverTime,
+      schedules: [
+        'deathmatch',
+        'koth',
+        'gun_game',
+        'last_stand',
+        'kill_confirmed',
+        'one_in_the_chamber',
+        'core_run',
+        'bounty_hunt',
+      ].map((mode) => ({
+        mode: mode as GameModeType,
+        mapName: 'Wasteland Outpost',
+        rotationEndsAt: serverTime + 60_000,
+      })),
+    });
+    expect(manager.getArenaSchedule()?.schedules).toHaveLength(8);
+
+    deliver({
+      type: 'server:lobbyConfig',
+      serverTime,
+      schedules: [],
+    });
+    expect(manager.getArenaSchedule()).toBeNull();
+  });
+
+  it('ignores schedule outcomes unless the server advertises schedules', () => {
+    deliver({
+      type: 'server:lobbyConfig',
+      serverTime: 1,
+      schedules: [],
+    });
+    expect(manager.getArenaSchedule()).toBeNull();
+  });
+
   it('clears stale identity and match state as soon as the transport begins reconnecting', () => {
     deliver(makeGameState([makeSerialized(), makeSerialized({ id: REMOTE_ID })]));
     const reconnecting = vi.fn();
@@ -181,6 +225,7 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
       modernArt: false,
       battleRoyale: false,
     });
+    expect(manager.getArenaSchedule()).toBeNull();
     expect(manager.getLocalPlayerState()).toBeNull();
     expect(manager.getRemotePlayerIds()).toHaveLength(0);
   });

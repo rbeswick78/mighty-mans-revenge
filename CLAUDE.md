@@ -220,6 +220,22 @@ values, audio/input/quality behavior, fullscreen denial, and wire contracts are
 unchanged. Play/Fighters/Challenges/Records keep their Batch 5-8 boundaries,
 and Batch 10 still owns scheduled arenas.
 
+**Reforged scheduled arenas (Batch 10):** when both `newShell` and `schedules`
+are advertised, `GameManager` sends the additive reliable
+`server:lobbyConfig` snapshot on connect and refreshes each connected player
+from authoritative server time once per whole second. Five-minute epoch slots,
+deterministic per-mode offsets, registered maps, and valid `FORCE_MAP` /
+`FORCE_MODE` diagnostics are derived only by
+`server/src/matchmaking/arena-schedule.ts`. The client accepts only a complete,
+current, internally consistent snapshot for every standard mode and renders the
+server-supplied map, clock delta, forced mode, and optional immutable
+queue-entry lock; it never derives schedule outcomes or advances a clock
+locally. Missing, partial, malformed, stale, disconnected, or capability-off
+state returns Play to the Batch 5 fixed preview. The server exposes the narrow
+lock/release boundary for Batch 11 without adding match intent, and leaves the
+legacy join messages plus existing map/mode rotation untouched. All capability
+defaults remain false.
+
 ### Why This Matters for Agents
 
 Client prediction and server simulation **must use identical physics code** from `/shared`. If you change movement, collision, or physics logic, you must change it in `/shared` and verify both client and server still agree. A mismatch between client prediction and server authority causes visible rubber-banding.

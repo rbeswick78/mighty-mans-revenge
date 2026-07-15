@@ -13,6 +13,7 @@ import {
   playRosterBuilderStep,
   playRosterCompositions,
   playRosterModes,
+  reconcilePlayRosterAvailability,
   serializePlayRosterDraft,
   type PlayFormatId,
   type PlayRosterBuilderState,
@@ -247,6 +248,28 @@ describe('Play roster builder', () => {
       ARENAS,
     );
     expect(serializePlayRosterDraft(state, changedAvailability)).toBeNull();
+    const reconciled = reconcilePlayRosterAvailability(state, changedAvailability);
+    expect(reconciled).toEqual({ ...state, arenaName: 'Arena C' });
+    expect(serializePlayRosterDraft(reconciled, changedAvailability)?.arenaName).toBe('Arena C');
+  });
+
+  it('backs up to mode selection if server truth removes the selected mode', () => {
+    const state = completeDraft(
+      'duel',
+      { humanCount: 2, botCount: 0 },
+      GameModeType.DEATHMATCH,
+      'mighty_man',
+    );
+    const kothOnly = normalizePlayRosterAvailability(
+      [{ mode: 'koth', arenaName: 'Arena B' }],
+      ARENAS,
+    );
+    expect(reconcilePlayRosterAvailability(state, kothOnly)).toEqual({
+      ...state,
+      mode: null,
+      arenaName: null,
+      fighterId: null,
+    });
   });
 
   it('provides exhaustive presentation labels without changing policy', () => {

@@ -811,6 +811,15 @@ export const GAME_MODE_ROTATION: readonly GameModeType[] = Object.freeze([
 ]);
 
 /**
+ * Standard Play arena schedules are server-owned five-minute epoch slots.
+ * Keep the duration centralized so server generation and compatibility
+ * validation agree without teaching clients how to choose an arena.
+ */
+export const ARENA_SCHEDULE = Object.freeze({
+  ROTATION_MS: 5 * 60 * 1000,
+});
+
+/**
  * The mode that follows `current` in rotation order, wrapping at the end.
  * Unknown values restart the cycle at the first mode rather than throwing —
  * rotation should never kill a match (same contract as getNextMapName).

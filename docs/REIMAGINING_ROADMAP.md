@@ -5,8 +5,8 @@ Read this file and `CLAUDE.md` completely at the start of every batch. The
 completed `docs/REPLAYABILITY_ROADMAP.md` remains the historical record for the
 systems this program preserves and reorganizes.
 
-- **Status:** Batch 9 complete on 2026-07-15.
-- **Next batch:** Batch 10 — Scheduled arenas.
+- **Status:** Batch 10 complete on 2026-07-15.
+- **Next batch:** Batch 11 — General match intent.
 - **Public releases:** Reforged Arena, then Battle Royale.
 - **Working model:** one numbered batch per session, direct commits and pushes
   to `main`, milestone-gated production deployments.
@@ -162,8 +162,8 @@ Production deployment happens only at a gate or for an urgent live fix.
 |   7 | Challenges tab                         | Navigation    | **DONE — 2026-07-15** |
 |   8 | Records tab                            | Navigation    | **DONE — 2026-07-15** |
 |   9 | Settings tab                           | Navigation    | **DONE — 2026-07-15** |
-|  10 | Scheduled arenas                       | Navigation    | NEXT                  |
-|  11 | General match intent                   | Navigation    | Pending               |
+|  10 | Scheduled arenas                       | Navigation    | **DONE — 2026-07-15** |
+|  11 | General match intent                   | Navigation    | NEXT                  |
 |  12 | Party core                             | Navigation    | Pending               |
 |  13 | Party readiness and recovery           | Navigation    | Pending               |
 |  14 | Queue fallback                         | Navigation    | Pending               |
@@ -436,6 +436,29 @@ Acceptance:
 Implement epoch-derived five-minute per-mode schedules with deterministic
 mode offsets, server clock synchronization, queue-time locking, and FORCE
 diagnostics. Clients display only server-authored schedule snapshots.
+
+Acceptance:
+
+- [x] The server derives every standard mode's registered arena from a shared
+      five-minute epoch slot with deterministic mode offsets. Valid
+      `FORCE_MAP` pins every advertised outcome, valid `FORCE_MODE` constrains
+      presentation/locking, and malformed diagnostics are ignored.
+- [x] The additive reliable `server:lobbyConfig` snapshot is sent on connect
+      and refreshed per player from authoritative server time once per whole
+      second. It carries a complete schedule, rotation deadline, optional
+      forced mode, and optional immutable server-owned queue-entry lock.
+- [x] The client validates the full snapshot atomically, clears it across
+      reconnect/disconnect boundaries, and displays only server-supplied maps,
+      clock delta, forced mode, and lock. It never derives a schedule outcome,
+      advances a clock locally, or invents a lock.
+- [x] Old server/new client, new server/old client, absent, partial, malformed,
+      stale, capability-off, reconnect, and disconnect cases fail closed to
+      the Batch 5 fixed Play preview. All capability defaults remain false.
+- [x] The pure Play roster serialization boundary, Fighters locking,
+      Challenges, Records, Settings, Draft, Character Select, existing
+      map/mode rotation, and the complete legacy Lobby remain intact. Batch 10
+      adds only the narrow server lock/release seam; no Batch 11 match intent
+      or later feature work began.
 
 #### Batch 11 — General match intent
 
@@ -1246,6 +1269,60 @@ Firefox/WebKit practice is unreliable and staged gameplay/Reforged-shell PNGs
 are black, so staged object/input assertions and mobile-sized Chromium visual
 evidence remain the required combination. None blocks Batch 10.
 
+### Batch 10 — 2026-07-15 — Scheduled arenas
+
+**Shipped:** Replaced the Batch 5 fixed Play preview on the gated path with a
+server-owned five-minute schedule for every standard mode. Epoch slots use
+deterministic mode offsets and registered maps, while valid `FORCE_MAP` and
+`FORCE_MODE` diagnostics remain strongest. The additive reliable
+`server:lobbyConfig` snapshot carries authoritative server time, rotation
+deadlines, all mode outcomes, and an optional immutable queue-entry lock. The
+server sends it on connect and refreshes each connected player once per whole
+second, retaining that player's lock across later slots until release or
+disconnect. The client accepts only a complete, current snapshot, clears it
+across recovery boundaries, and renders server truth without deriving outcomes,
+clocks, or locks. Capability-off and compatibility paths retain the fixed Play
+preview and complete legacy Lobby. The narrow lock/release seam is ready for
+Batch 11, but no generalized match intent was added.
+
+**Verification:** Selected the shared/server/network cross-package tier and
+escalated the affected schedule/reconnect journey to the focused multi-browser
+subset because the batch adds wire timing and capability behavior. Focused
+Vitest passed 71 schedule, offset, clock, lock, normalization, GameManager,
+NetworkManager, presentation, and Play compatibility tests across six files.
+The mandatory `corepack pnpm test` passed 122 files and 1,414 tests;
+`corepack pnpm typecheck`, `corepack pnpm lint`, and the full `corepack pnpm
+build` passed, with Vite's existing chunk-size advisory unchanged. With both
+`CAPABILITY_NEW_SHELL=true` and `CAPABILITY_SCHEDULES=true`, advertised Play
+and reconnect/clearing evidence passed in desktop Chromium, desktop Firefox,
+and mobile landscape. With only `newShell` enabled, all three projects retained
+the fixed preview; with defaults false, all three retained the legacy Lobby.
+The final desktop Chromium schedule journey passed after presentation cleanup.
+Manual review found the 1280×720 and 844×390 Chromium schedule captures
+complete, readable, and safe-area bounded; the staged mobile composition grid
+also remained complete. The full unrelated Playwright inventory was omitted
+because this is not the Batch 17 release gate and focused evidence showed no
+wider journey risk.
+
+**Deployment:** Skipped. Batch 10 remains navigation-milestone code behind
+default-false `newShell` and `schedules` capabilities. No production environment
+or capability flag changed, and this task did not authorize deployment.
+
+**Deviations:** No product-scope deviation. The first focused test invocation
+used an argument form that expanded to the full workspace suite, and the server
+initially resolved a stale built shared package; rebuilding shared and using its
+public `@shared/game` export restored the intended focused path. An initial
+reconnect E2E assertion assigned a page-evaluation result in the test callback;
+the test-only callback was corrected and the final multi-browser run passed.
+These were local verification-harness corrections, not runtime defects.
+
+**Known issues:** No new bug ID was required. RFG-001 and RFG-002 remain
+assigned to Batches 20/24 and were untouched. RFG-003 remains unchanged:
+headless Firefox/WebKit cannot use the live local WebRTC practice path and
+staged gameplay/Reforged-shell WebKit PNGs are black, so staged object/input
+assertions plus mobile-sized Chromium visual evidence remain required. None
+blocks Batch 11.
+
 ## Next-session prompt
 
 ```text
@@ -1253,50 +1330,51 @@ Continue the Reforged build for Mighty Man's Revenge.
 
 Read docs/REIMAGINING_ROADMAP.md and CLAUDE.md completely first. Read
 docs/REFORGED_BASELINE.md and docs/REFORGED_CAPABILITIES.md before
-implementation. Implement Batch 10 — Scheduled arenas exactly as specified.
-Preserve unrelated changes and do not begin Batch 11 — General match intent.
+implementation. Implement Batch 11 — General match intent exactly as specified.
+Preserve unrelated changes and do not begin Batch 12 — Party core.
 
-Replace the Batch 5 fixed Play preview adapter with server-owned,
-epoch-derived five-minute arena schedules for every standard mode. Use
-deterministic mode offsets, synchronize presentation from authoritative server
-time, lock the displayed arena at queue entry, and retain FORCE_MAP/FORCE_MODE
-diagnostics. Add only the additive compatibility types/messages needed for the
-schedule snapshot; clients must display server truth and never derive schedule
-outcomes, clocks, or locks locally. Old servers/new clients, new servers/old
-clients, absent/partial/malformed snapshots, reconnects, disconnects, and the
-default-false schedules capability must fail closed to the established
-behavior.
+Introduce a validated, server-owned general match intent for Duel, Rumble, and
+Crew. Carry explicit format, compatible human/bot composition, standard mode,
+persisted fighter selection, and the Batch 10 scheduled-arena lock through an
+additive compatibility boundary. The server must normalize and authorize every
+field, consume its own queue-entry arena lock, and reject stale, malformed, or
+incompatible intent without client-authored random selection. Retain the
+legacy join messages temporarily for old clients and old servers, and make
+old/new, capability-off, reconnect, disconnect, duplicate, stale, and replayed
+paths fail closed to established behavior.
 
 Preserve the Batch 5 pure Play roster compatibility/serialization boundary,
 Batch 6 persisted Fighters selection and server-authoritative locking, all
 Batch 7 Challenges paths, the Batch 8 read-only Records archive, the complete
-Batch 9 Settings surfaces, and the complete legacy Lobby fallback. Do not add
-generalized match intent, parties, readiness, queue fallback, Reforged Results,
-or Battle Royale schedules/gameplay. Do not retire Draft or Character Select,
+Batch 9 Settings surfaces, Batch 10 schedule/clock/lock authority and FORCE
+diagnostics, and the complete legacy Lobby fallback. Do not add parties,
+readiness, party codes or links, queue fallback, Reforged Results, rematches,
+or Battle Royale intent/gameplay. Do not retire Draft or Character Select,
 enable a capability by default or in production, change gameplay
-viewport/camera, alter existing map/mode rotation outside the gated schedule
-contract, or begin art work.
+viewport/camera, alter Practice paths, or begin art work.
 
-Batch 9 is complete and pushed on main as `feat(client): add Reforged Settings
-tab`. Settings reuses the established callsign/audio/fullscreen/recovery
-actions, keeps controls and graphics quality read-only, and changes no saved
-format, networking rule, timeout, backoff, capability default, or wire
-authority. Play still consumes the fixed non-authoritative arena preview that
-Batch 10 now replaces. All five server capability flags remain default false,
-and no production deployment has run.
+Batch 10 is complete and pushed on main as `feat(server): add Reforged arena
+schedules`. Enabled servers now advertise complete five-minute per-mode
+schedules from authoritative time, deterministic offsets, registered maps, and
+valid FORCE diagnostics. Play accepts only complete server snapshots, retains
+the Batch 5 fixed preview on every compatibility failure, and shows immutable
+server-owned queue locks. Batch 11 may consume the narrow lock/release seam but
+must not move schedule derivation to the client. All five server capability
+flags remain default false, and no production deployment has run.
 
 Choose and document the shared/server/network cross-package verification tier
-from the roadmap's risk-based matrix. Add deterministic schedule/offset/clock/
-lock normalization coverage, focused server and compatibility integration,
+from the roadmap's risk-based matrix. Add exhaustive intent normalization and
+compatibility coverage, focused matchmaking/server integration for all three
+formats and their compatible compositions/modes, scheduled-lock consumption,
+duplicate/stale/replay/reconnect handling, and legacy join preservation. Run
 the full `corepack pnpm test` suite, typecheck, lint, relevant production
-builds, targeted desktop/mobile advertised-schedule evidence, and legacy plus
-old/new fallback coverage. Because wire timing and capability behavior change,
-include the focused multi-browser schedule/reconnect journey subset and
-escalate further if focused evidence shows wider risk. Update roadmap
-acceptance evidence, capability/architecture docs, the bug ledger if needed,
-and the Session Log. Run the end-of-batch ritual, commit and push directly to
-main, skip deployment unless explicitly authorized, and end with the fenced
-paste-ready prompt for Batch 11.
+builds, targeted desktop/mobile Play-entry evidence, and legacy plus old/new
+fallback coverage. Because matchmaking wire authority changes, include the
+focused multi-browser entry/recovery subset and escalate further if focused
+evidence shows wider risk. Update roadmap acceptance evidence, capability and
+architecture docs, the bug ledger if needed, and the Session Log. Run the
+end-of-batch ritual, commit and push directly to main, skip deployment unless
+explicitly authorized, and end with the fenced paste-ready prompt for Batch 12.
 
 Carry-over warnings: RFG-001 CameraKick and RFG-002 ZoomPulse overwrite future
 base camera state and remain assigned to Batches 20/24. RFG-003 means headless
@@ -1308,5 +1386,5 @@ remained far below the 50ms budget. Batch 4 broadened RFG-003 evidence: the
 staged mobile WebKit Reforged-shell PNG is also black, so use mobile-sized
 Chromium for visual evidence while retaining staged WebKit object/input
 assertions. Use Corepack pnpm 10.33.0 if the local pnpm shim selects a mismatched
-version. Batch 11 follows Batch 10.
+version. Batch 12 follows Batch 11.
 ```

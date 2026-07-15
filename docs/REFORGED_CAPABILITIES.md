@@ -47,6 +47,21 @@ servers, and false/absent/partial/malformed advertisements retain or restore the
 complete 960×720 Lobby. The shell contains no activities yet, every production
 default remains false, and its logical size does not alter gameplay.
 
+Batch 10 implements the `schedules` contract without exposing it by default.
+An enabled server sends the additive reliable `server:lobbyConfig` message on
+connect and refreshes each player from authoritative server time once per
+whole second. Every accepted snapshot contains all standard modes, one
+server-derived registered map per mode, the five-minute rotation deadline,
+and optional valid `FORCE_MODE` plus a server-owned queue-entry lock. The
+client validates the entire snapshot atomically and may render only the
+server-supplied outcome and clock delta. A missing, partial, malformed, stale,
+or disconnected snapshot, or a non-literal/disabled `schedules` capability,
+fails closed to the fixed Batch 5 Play preview. Older clients ignore the
+additive message; newer clients retain that preview against old servers. The
+server lock/release boundary is present for the next batch, but no generalized
+match intent, legacy rotation change, or production capability enablement is
+part of Batch 10.
+
 ## Server-first rollout and rollback
 
 For each capability, keep this order:

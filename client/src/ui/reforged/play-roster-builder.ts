@@ -195,6 +195,24 @@ export function currentPlayRosterArena(
   return availability.currentArenaByMode[mode] ?? null;
 }
 
+/**
+ * Reconcile an in-progress presentation draft to a new server snapshot. A
+ * changed active arena updates the read-only dependency; a removed mode backs
+ * up to mode selection. The serializer remains the final compatibility gate.
+ */
+export function reconcilePlayRosterAvailability(
+  state: PlayRosterBuilderState,
+  availability: PlayRosterAvailability,
+): PlayRosterBuilderState {
+  if (state.mode === null) return state;
+  const arenaName = currentPlayRosterArena(state.mode, availability);
+  if (arenaName === null) {
+    return Object.freeze({ ...state, mode: null, arenaName: null, fighterId: null });
+  }
+  if (state.arenaName === null || state.arenaName === arenaName) return state;
+  return Object.freeze({ ...state, arenaName });
+}
+
 export function playRosterBuilderStep(state: PlayRosterBuilderState): PlayRosterBuilderStep {
   if (state.format === null) return 'format';
   if (state.composition === null) return 'composition';
