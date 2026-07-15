@@ -155,6 +155,19 @@ complete Lobby fallback. Do not put activities or client-authored matchmaking
 policy into the shell before their owning batches, and never use the menu size
 to change `GameScene`, its viewport, or its camera.
 
+**Reforged Play roster draft (Batch 5):** the capability-owned Play tab uses the
+pure `play-roster-builder` reducer to guide format, exact human/bot composition,
+compatible explicit mode, an injected read-only arena snapshot, fighter, and
+review. Only Duel/Rumble/Crew formats, format-valid capacities, Crew's existing
+four-mode allowlist, registered arenas, and registered fighters can appear or
+serialize; any missing, stale, malformed, or out-of-order dependency fails
+closed. The serialized value is deliberately a local `SerializedPlayRosterDraft`,
+not a network `MatchIntent`, and the review keeps match entry disabled. Until
+Batch 10, the shell adapter supplies a fixed preview arena snapshot with no
+clock, rotation, queue lock, or authority. Batch 11 owns network intent. Keep
+Fighters/Challenges/Records/Settings empty until their batches and preserve the
+complete legacy Lobby, Draft, and Character Select fallback.
+
 ### Why This Matters for Agents
 
 Client prediction and server simulation **must use identical physics code** from `/shared`. If you change movement, collision, or physics logic, you must change it in `/shared` and verify both client and server still agree. A mismatch between client prediction and server authority causes visible rubber-banding.

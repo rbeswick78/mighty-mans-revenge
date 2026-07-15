@@ -5,8 +5,8 @@ Read this file and `CLAUDE.md` completely at the start of every batch. The
 completed `docs/REPLAYABILITY_ROADMAP.md` remains the historical record for the
 systems this program preserves and reorganizes.
 
-- **Status:** Batch 4 complete on 2026-07-15.
-- **Next batch:** Batch 5 — Play roster builder.
+- **Status:** Batch 5 complete on 2026-07-15.
+- **Next batch:** Batch 6 — Fighters tab.
 - **Public releases:** Reforged Arena, then Battle Royale.
 - **Working model:** one numbered batch per session, direct commits and pushes
   to `main`, milestone-gated production deployments.
@@ -157,8 +157,8 @@ Production deployment happens only at a gate or for an urgent live fix.
 |   2 | Baseline evidence                      | Safety rails  | **DONE — 2026-07-15** |
 |   3 | Capabilities and flags                 | Safety rails  | **DONE — 2026-07-15** |
 |   4 | Responsive menu foundation             | Navigation    | **DONE — 2026-07-15** |
-|   5 | Play roster builder                    | Navigation    | NEXT                  |
-|   6 | Fighters tab                           | Navigation    | Pending               |
+|   5 | Play roster builder                    | Navigation    | **DONE — 2026-07-15** |
+|   6 | Fighters tab                           | Navigation    | NEXT                  |
 |   7 | Challenges tab                         | Navigation    | Pending               |
 |   8 | Records tab                            | Navigation    | Pending               |
 |   9 | Settings tab                           | Navigation    | Pending               |
@@ -299,6 +299,27 @@ Acceptance:
 Implement a pure, exhaustively tested builder for format, human/bot
 composition, compatible mode, current scheduled arena, selected fighter, and
 review. Invalid combinations must never become selectable or serializable.
+
+Acceptance:
+
+- [x] A pure reducer covers Duel, 2–4 fighter Rumble, and Crew 2v2 with exact
+      human/bot requests, explicit compatible modes, an injected current arena,
+      all registered fighters, reversible steps, and a reviewed local draft.
+- [x] The UI derives every option from the same compatibility model used by the
+      fail-closed serializer; malformed, out-of-order, incompatible, missing,
+      stale-arena, and unknown-fighter combinations cannot become selectable or
+      serializable, with all 624 legal products covered deterministically.
+- [x] The builder exists only inside the capability-owned Play tab. Fighters,
+      Challenges, Records, and Settings remain empty, while false/absent flags,
+      reconnects, and disconnects preserve the complete legacy Lobby fallback.
+- [x] Pointer, keyboard, standard gamepad, and touch reach the guided flow on
+      desktop and mobile landscape; dense options and review remain safe-area
+      bounded in Chromium visual evidence, with staged WebKit object/input
+      assertions retained under RFG-003.
+- [x] The reviewed value remains a presentation-only draft with match entry
+      disabled. No party, server schedule authority, generalized match intent,
+      Draft/Character Select retirement, capability default, gameplay viewport,
+      camera, activity relocation, or modern art work began.
 
 #### Batch 6 — Fighters tab
 
@@ -808,6 +829,51 @@ to Batches 20/24 and were untouched. RFG-003 now explicitly includes the black
 staged Reforged-shell WebKit capture in addition to its existing live-network
 and staged-gameplay limitations. None blocks Batch 5's pure roster builder.
 
+### Batch 5 — 2026-07-15 — Play roster builder
+
+**Shipped:** Added a pure, dependency-ordered Play roster reducer and fail-closed
+serializer for Duel, Rumble, and Crew; exact human/bot requests; explicit
+format-compatible modes; an injected registered arena snapshot; all six
+fighters; backtracking; and review. The capability-owned Play tab now renders
+that flow with one activation path for pointer/touch, keyboard, and standard
+gamepad. The other four tabs remain empty. Review produces only a local roster
+draft and visibly leaves match entry disabled. A fixed Batch 5 adapter exercises
+the arena boundary without clocks, rotation, queue locking, network messages,
+or server authority; Batches 10 and 11 still own those systems.
+
+**Verification:** The pure builder exhaustively covered all 624 legal
+format/composition/mode/fighter products plus malformed, incompatible,
+out-of-order, missing-schedule, stale-arena, and unknown-fighter rejection.
+Typecheck, lint, the complete 113-file/1,371-test unit/integration suite, and the
+production build passed. With only `CAPABILITY_NEW_SHELL=true`, the shell's
+three-project matrix finished with six passes and three expected inverse-gate
+skips. With every capability default false, the complete 156-case Playwright
+matrix finished with 132 passes and 24 established/intentional skips across
+desktop Chromium, desktop Firefox, and mobile landscape in 18.0 minutes.
+Repository Prettier, `git diff --check`, and intended-diff review passed.
+Desktop and 844×390 Chromium captures showed complete unclipped review and dense
+nine-choice layouts. Staged Firefox/WebKit exercised real scene, layout,
+pointer/touch, keyboard, and gamepad paths while the WebKit PNG remained black
+under RFG-003.
+
+**Deployment:** Skipped. Batch 5 remains incomplete milestone code behind the
+default-false `newShell` capability, and the roadmap authorizes deployment only
+at a release gate or for an urgent live fix. No production environment or flag
+changed.
+
+**Deviations:** The Batch 5 shell uses a fixed, injected arena preview solely to
+exercise the pure read-only boundary before Batch 10 supplies authoritative
+server schedules. It is not time-derived or networked and cannot start a match.
+The longer staged mobile flow also sets the test boundary connected before the
+synthetic welcome so the unrelated live five-second WebRTC timeout cannot tear
+down its object/input assertions.
+
+**Known issues:** No new bug ID was required. RFG-001 and RFG-002 remain assigned
+to Batches 20/24 and were untouched. RFG-003 still covers unreliable headless
+Firefox/WebKit live practice plus black staged gameplay and Reforged-shell PNGs;
+mobile-sized Chromium remains the visual source while staged WebKit retains
+object/input coverage. None blocks Batch 6.
+
 ## Next-session prompt
 
 ```text
@@ -815,24 +881,25 @@ Continue the Reforged build for Mighty Man's Revenge.
 
 Read docs/REIMAGINING_ROADMAP.md and CLAUDE.md completely first. Read
 docs/REFORGED_BASELINE.md and docs/REFORGED_CAPABILITIES.md before
-implementation. Implement Batch 5 — Play roster builder exactly as specified.
-Preserve unrelated changes and do not begin Batch 6 — Fighters tab.
+implementation. Implement Batch 6 — Fighters tab exactly as specified. Preserve
+unrelated changes and do not begin Batch 7 — Challenges tab.
 
-Implement a pure, exhaustively tested Play roster builder for format, human/bot
-composition, compatible explicit mode, current scheduled arena, selected
-fighter, and review. Invalid combinations must never become selectable or
-serializable. Build only inside the capability-owned Play tab; preserve the
-empty Fighters, Challenges, Records, and Settings tabs and the complete legacy
-Lobby fallback. Do not move activities, implement parties/schedules/general
-match intent, retire Draft or Character Select, enable capabilities, change the
-gameplay viewport/camera, or begin modern art.
+Move roster browsing, stats, abilities, mastery, and persistent fighter
+selection into the capability-owned Fighters tab. Play must read that persisted
+selection while server locking remains authoritative. Preserve the Batch 5 pure
+Play roster compatibility/serialization boundary, the empty Challenges,
+Records, and Settings tabs, and the complete legacy Lobby fallback. Do not move
+challenge activities, implement parties/scheduled-arena authority/general match
+intent, retire Draft or Character Select, enable any capability by default or
+in production, change the gameplay viewport/camera, or begin modern art.
 
-Batch 4 is complete and pushed on main; the 16:9 safe-area shell and shared
-navigation foundation remain behind `newShell`, all five strict server
-capability flags default false, and no deployment was required. Update the
-roadmap acceptance evidence and Session Log, run the complete end-of-batch
-ritual, commit and push directly to main, skip deployment unless the roadmap
-explicitly authorizes it, and end with the fenced paste-ready prompt for Batch 6.
+Batch 5 is complete and pushed on main. Its reviewed roster remains a local
+draft with match entry disabled; the injected arena is a fixed non-authoritative
+preview until Batch 10, and all five strict server capability flags still
+default false. Update roadmap acceptance evidence and the Session Log, run the
+complete end-of-batch ritual, commit and push directly to main, skip deployment
+unless the roadmap explicitly authorizes it, and end with the fenced paste-ready
+prompt for Batch 7.
 
 Carry-over warnings: RFG-001 CameraKick and RFG-002 ZoomPulse overwrite future
 base camera state and remain assigned to Batches 20/24. RFG-003 means headless
@@ -844,5 +911,5 @@ remained far below the 50ms budget. Batch 4 broadened RFG-003 evidence: the
 staged mobile WebKit Reforged-shell PNG is also black, so use mobile-sized
 Chromium for visual evidence while retaining staged WebKit object/input
 assertions. Use Corepack pnpm 10.33.0 if the local pnpm shim selects a mismatched
-version. Batch 6 follows Batch 5.
+version. Batch 7 follows Batch 6.
 ```
