@@ -197,6 +197,28 @@ non-hardware pass thresholds; the mobile staged PNG is still black under
 RFG-003, while inspected live and mobile-sized Chromium gameplay captures
 remain the visual evidence.
 
+### Batch 22 responsive combat HUD evidence
+
+`responsiveCombatHudLayout()` now owns one immutable logical screen-space
+model for the complete combat HUD, touch action cluster, and confirmed
+live-match menu. The capability-owned path places health/armor, stamina,
+rifle/special ammo, grenades, ability, score/mode/timer status, active events,
+kill feed, contracts, countdown/briefings, death, and separate combat/contract/
+event callout lanes inside Batch 18's safe area. Desktop and mobile FIT surfaces
+consume identical 1280x720 logical coordinates; safe-area movement changes no
+camera or world visibility.
+
+The exact 960x720 fallback geometry remains frozen for capability-off and old-
+server paths. Every display value still comes from its established snapshot,
+event, and pure presentation helper, while touch buttons retain their ordinary
+input edges and the non-pausing live-match menu retains its consequence-specific
+confirmation. Results, rematch re-entry, and recovery restore their owning
+logical layouts. Focused deterministic and desktop Chromium/mobile-landscape
+evidence covers all resources and mode statuses, simultaneous callout lanes,
+kill feed, contracts, touch actions, menu confirmation, current small-world
+anchoring, equal logical visibility, fallback, rematch, and recovery. Mobile-
+sized Chromium remains the trusted mobile visual source under RFG-003.
+
 ## Adjacent bug reproductions
 
 `client/src/rendering/camera-baseline.test.ts` now asserts the repaired

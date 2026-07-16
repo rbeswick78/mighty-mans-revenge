@@ -9,6 +9,7 @@ import { withoutSecondaryActions } from './combat-input.js';
 import { GamepadInput } from './gamepad-input.js';
 import type { TouchAbilityState } from './touch-action-presentation.js';
 import type { GameplayCoordinateSpace } from '../rendering/gameplay-coordinate-space.js';
+import type { ResponsiveCombatHudLayout } from '../ui/responsive-combat-hud.js';
 
 export type InputMode = 'keyboard' | 'touch' | 'gamepad';
 
@@ -33,9 +34,15 @@ export class InputManager {
     scene: Phaser.Scene,
     coordinates: GameplayCoordinateSpace,
     secondaryActionsDisabled = false,
+    touchActionLayout?: ResponsiveCombatHudLayout['touchActions'],
   ) {
     this.keyboardMouseInput = new KeyboardMouseInput(scene, coordinates);
-    this.touchInput = new TouchInput(scene, coordinates, !secondaryActionsDisabled);
+    this.touchInput = new TouchInput(
+      scene,
+      coordinates,
+      !secondaryActionsDisabled,
+      touchActionLayout,
+    );
     this.gamepadInput = new GamepadInput();
     this.canvas = scene.game.canvas;
 
@@ -187,6 +194,10 @@ export class InputManager {
   /** Keep the visible touch ability button aligned with the latest snapshot. */
   setAbilityButtonState(state: TouchAbilityState): void {
     this.touchInput.setAbilityButtonState(state);
+  }
+
+  setTouchActionLayout(layout: ResponsiveCombatHudLayout['touchActions']): void {
+    this.touchInput.setLayout(layout);
   }
 
   /** Optional tactile feedback; silently ignored on unsupported browsers/pads. */

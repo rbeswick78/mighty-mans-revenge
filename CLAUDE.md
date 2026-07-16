@@ -397,6 +397,21 @@ hysteretic frame-time governor. Current maps still derive to 960x576 at
 minimap, arena, physics, simulation, wire, or production contract changed.
 Batch 22 owns responsive combat HUD.
 
+**Reforged responsive combat HUD (Batch 22):**
+`responsiveCombatHudLayout()` is the single logical screen-space model for
+health/armor, stamina, rifle and special ammo, grenades, ability state,
+score/mode/timer status, kill feed, contracts, countdown/briefings, death and
+event/combat/contract callouts, touch actions, and the confirmed live-match
+menu. It consumes Batch 18's logical safe area and moves overlays only; desktop
+and mobile retain the same 1280x720 logical world visibility. The three
+transient callout lanes are separately prioritized, touch actions and the menu
+share the same safe bounds, and every presentation continues to consume its
+existing authoritative snapshot/event helper. Capability-off, old-server,
+reconnecting, and disconnected play retains the exact established 960x720 HUD
+geometry and routes. Batch 19 remains the sole coordinate transform, Batch 20
+the sole camera owner, and Batch 21 the sole world-resource plan; no minimap,
+wire, simulation, balance, capability default, or production behavior changed.
+
 ### Why This Matters for Agents
 
 Client prediction and server simulation **must use identical physics code** from `/shared`. If you change movement, collision, or physics logic, you must change it in `/shared` and verify both client and server still agree. A mismatch between client prediction and server authority causes visible rubber-banding.

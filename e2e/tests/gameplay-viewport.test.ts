@@ -131,6 +131,13 @@ async function viewportSnapshot(page: Page): Promise<Record<string, unknown>> {
       getCameraController(): {
         getState(): unknown;
       } | null;
+      getResponsiveHudLayout(): {
+        mode: string;
+        vitalsPanel: unknown;
+        score: unknown;
+        menu: { launcher: unknown };
+        touchActions: unknown;
+      } | null;
       getDynamicWorldRenderState(): {
         plan: {
           worldBounds: { left: number; top: number; width: number; height: number };
@@ -166,6 +173,7 @@ async function viewportSnapshot(page: Page): Promise<Record<string, unknown>> {
     const contract = scene.getGameplayViewportContract();
     const coordinates = scene.getGameplayCoordinateSpace();
     const cameraController = scene.getCameraController();
+    const hudLayout = scene.getResponsiveHudLayout();
     const dynamic = scene.getDynamicWorldRenderState();
     const playerMarkerOwner = scene.playerManager.getRenderer('viewport-local')?.getContainer();
     return {
@@ -181,6 +189,15 @@ async function viewportSnapshot(page: Page): Promise<Record<string, unknown>> {
         height: scene.cameras.main.worldView.height,
       },
       cameraController: cameraController?.getState() ?? null,
+      hudLayout: hudLayout
+        ? {
+            mode: hudLayout.mode,
+            vitalsPanel: hudLayout.vitalsPanel,
+            score: hudLayout.score,
+            menuLauncher: hudLayout.menu.launcher,
+            touchActions: hudLayout.touchActions,
+          }
+        : null,
       dynamic: {
         worldBounds: dynamic.plan?.worldBounds ?? null,
         viewportResource: dynamic.plan?.viewportResource ?? null,
@@ -231,6 +248,288 @@ async function viewportSnapshot(page: Page): Promise<Record<string, unknown>> {
           scene.scrapstormRenderer.localWarning.scrollFactorY,
         ],
         xrayOverlay: [scene.xrayFx.tintRect.scrollFactorX, scene.xrayFx.tintRect.scrollFactorY],
+      },
+    };
+  });
+}
+
+async function responsiveHudSnapshot(page: Page): Promise<Record<string, unknown>> {
+  return page.evaluate(() => {
+    type TextNode = {
+      text: string;
+      visible: boolean;
+      x: number;
+      y: number;
+      alpha: number;
+      scrollFactorX: number;
+      scrollFactorY: number;
+      setAlpha(value: number): TextNode;
+      setScale(value: number): TextNode;
+    };
+    type ButtonNode = {
+      emit(event: string): void;
+      getBounds(): { x: number; y: number; width: number; height: number };
+      scrollFactorX: number;
+      scrollFactorY: number;
+    };
+    const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'GameScene',
+    ) as unknown as {
+      getResponsiveHudLayout(): Record<string, unknown> | null;
+      gameService: {
+        getNetworkManager(): {
+          getLocalPlayerState(): Record<string, unknown> | null;
+          getMatchTimer(): number;
+          getContractState(): unknown;
+          getActiveMutators(): string[];
+        };
+      };
+      hud: {
+        healthText: TextNode;
+        staminaText: TextNode;
+        ammoText: TextNode;
+        grenadeText: TextNode;
+        specialWeaponLabel: TextNode;
+        abilityNameText: TextNode;
+        abilityCountdownText: TextNode;
+        scoreText: TextNode;
+        timerText: TextNode;
+        activeEventLabel: TextNode;
+        gunGameLadderText: TextNode;
+        lastStandText: TextNode;
+        killConfirmedText: TextNode;
+        oneInTheChamberText: TextNode;
+        coreRunText: TextNode;
+        bountyHuntText: TextNode;
+        kothLabel: TextNode;
+        contractTitleText: TextNode;
+        contractProgressText: TextNode;
+        countdownText: TextNode;
+        modeBriefingTitle: TextNode;
+        deathOverlay: TextNode;
+        combatCalloutText: TextNode;
+        contractCalloutText: TextNode;
+        eventBannerText: TextNode;
+        killFeedEntries: Array<{ text: TextNode }>;
+        updateHealth(current: number, max: number, armor: number): void;
+        updateStamina(current: number, max: number): void;
+        updateAmmo(current: number, max: number, reloading: boolean): void;
+        updateGrenadeStatus(live: boolean, count: number): void;
+        updateSpecialWeapon(weaponId: string, mag: number, reserve: number): void;
+        updateAbility(characterId: string, active: number, cooldown: number): void;
+        updateScores(scores: ReadonlyArray<{ name: string; score: number }>): void;
+        updateTimer(seconds: number): void;
+        setActiveEventLabel(text: string): void;
+        updateGunGame(rung: unknown): void;
+        updateLastStand(active: boolean): void;
+        updateKillConfirmed(active: boolean): void;
+        updateOneInTheChamber(
+          active: boolean,
+          weaponId: string,
+          rounds: number,
+          dead: boolean,
+          started: boolean,
+        ): void;
+        updateCoreRun(state: unknown, localId: string): void;
+        updateBountyHunt(state: unknown, localId: string, nickname: string): void;
+        updateKothState(state: unknown, localId: string): void;
+        updateContract(state: unknown, localId: string): void;
+        addKillFeedEntry(label: string, tone: string): void;
+        showCountdown(value: number): void;
+        showModeBriefing(mode: string, input: string, secondary: boolean): void;
+        updateDeathState(dead: boolean, seconds: number, eliminated: boolean): void;
+        showCombatCallout(headline: string, detail: string, tint: number): void;
+        showEventBanner(headline: string, detail: string, tint: number): void;
+      };
+      tweens: { killTweensOf(target: unknown): void };
+      update(time: number, delta: number): void;
+      inputManager: {
+        touchInput: {
+          grenadeButton: ButtonNode;
+          abilityButton: ButtonNode;
+          tauntButton: ButtonNode;
+          setGameplayEnabled(enabled: boolean): void;
+          getInput(liveGrenade: boolean): {
+            throwPressed: boolean;
+            abilityPressed: boolean;
+            tauntPressed: boolean;
+          };
+        };
+      };
+    };
+    const hud = scene.hud;
+    const manager = scene.gameService.getNetworkManager();
+    const local = manager.getLocalPlayerState();
+    if (!local) throw new Error('responsive HUD local snapshot is missing');
+    manager.getLocalPlayerState = () => ({
+      ...local,
+      health: 41.1,
+      maxHealth: 115,
+      armor: 12.2,
+      stamina: 0.6,
+      ammo: 7,
+      weaponId: 'shotgun',
+      specialAmmo: 3,
+      specialReserve: 8,
+      grenades: 2,
+      score: 12,
+      abilityCooldownSeconds: 4.2,
+    });
+    manager.getMatchTimer = () => 29.1;
+    manager.getContractState = () => ({
+      id: 'batch22-contract',
+      title: 'ROAD WARRIOR',
+      objective: 'LAND HITS',
+      target: 8,
+      players: [{ playerId: 'viewport-local', progress: 8, completed: true }],
+    });
+    manager.getActiveMutators = () => ['scrapstorm'];
+    hud.updateHealth(41.1, 115, 12.2);
+    hud.updateStamina(0.6, 3);
+    hud.updateAmmo(7, 30, false);
+    hud.updateGrenadeStatus(false, 2);
+    hud.updateSpecialWeapon('shotgun', 3, 8);
+    hud.updateAbility('mighty_man', 0, 4.2);
+    hud.updateScores([
+      { name: 'YOU', score: 12 },
+      { name: 'RIVAL', score: 9 },
+    ]);
+    hud.updateTimer(29.1);
+    hud.setActiveEventLabel('SCRAPSTORM · MOVE');
+
+    const modeStates: Record<string, string> = {};
+    hud.updateGunGame({ rungIndex: 2, killsIntoRung: 1, killsForRung: 2, weapon: 'pistol' });
+    modeStates.gunGame = hud.gunGameLadderText.text;
+    hud.updateGunGame(null);
+    hud.updateLastStand(true);
+    modeStates.lastStand = hud.lastStandText.text;
+    hud.updateLastStand(false);
+    hud.updateKillConfirmed(true);
+    modeStates.killConfirmed = hud.killConfirmedText.text;
+    hud.updateKillConfirmed(false);
+    hud.updateOneInTheChamber(true, 'pistol', 1, false, true);
+    modeStates.oneInTheChamber = hud.oneInTheChamberText.text;
+    hud.updateOneInTheChamber(false, 'rifle', 0, false, true);
+    hud.updateCoreRun(
+      {
+        position: { x: 480, y: 288 },
+        carrierId: 'viewport-local',
+        returnInSeconds: null,
+        carryFraction: 0.5,
+      },
+      'viewport-local',
+    );
+    modeStates.coreRun = hud.coreRunText.text;
+    hud.updateCoreRun(null, 'viewport-local');
+    hud.updateBountyHunt({ targetId: 'viewport-rival' }, 'viewport-local', 'RIVAL');
+    modeStates.bountyHunt = hud.bountyHuntText.text;
+    hud.updateBountyHunt(null, 'viewport-local', 'RIVAL');
+    hud.updateKothState(
+      {
+        hill: { x: 4, y: 4 },
+        nextHill: null,
+        occupantId: 'viewport-local',
+        contested: false,
+        captureFraction: 0.5,
+      },
+      'viewport-local',
+    );
+    modeStates.koth = hud.kothLabel.text;
+
+    hud.updateContract(
+      {
+        id: 'batch22-contract',
+        title: 'ROAD WARRIOR',
+        objective: 'LAND HITS',
+        target: 8,
+        players: [{ playerId: 'viewport-local', progress: 3, completed: false }],
+      },
+      'viewport-local',
+    );
+    hud.addKillFeedEntry('YOU [RIFLE] RIVAL', 'local-kill');
+    hud.addKillFeedEntry('RIVAL [AXE] YOU', 'local-death');
+    hud.showCountdown(2);
+    hud.showModeBriefing('deathmatch', 'touch', true);
+    hud.updateDeathState(true, 2.2, false);
+    hud.showCombatCallout('DOUBLE KILL', 'KEEP PUSHING', 0xffd166);
+    hud.updateContract(
+      {
+        id: 'batch22-contract',
+        title: 'ROAD WARRIOR',
+        objective: 'LAND HITS',
+        target: 8,
+        players: [{ playerId: 'viewport-local', progress: 8, completed: true }],
+      },
+      'viewport-local',
+    );
+    hud.showEventBanner('SCRAPSTORM', 'MOVE NOW', 0xffa34d);
+    for (const text of [
+      hud.countdownText,
+      hud.combatCalloutText,
+      hud.contractCalloutText,
+      hud.eventBannerText,
+    ]) {
+      scene.tweens.killTweensOf(text);
+      text.setAlpha(1).setScale(1);
+    }
+
+    const touch = scene.inputManager.touchInput;
+    touch.setGameplayEnabled(true);
+    touch.grenadeButton.emit('pointerdown');
+    touch.grenadeButton.emit('pointerup');
+    touch.abilityButton.emit('pointerdown');
+    touch.tauntButton.emit('pointerdown');
+    const touchInput = touch.getInput(false);
+
+    const read = (text: TextNode) => ({
+      text: text.text,
+      visible: text.visible,
+      x: text.x,
+      y: text.y,
+      alpha: text.alpha,
+      scroll: [text.scrollFactorX, text.scrollFactorY],
+    });
+    scene.update = () => undefined;
+    return {
+      layout: scene.getResponsiveHudLayout(),
+      resources: {
+        health: read(hud.healthText),
+        stamina: read(hud.staminaText),
+        ammo: read(hud.ammoText),
+        grenades: read(hud.grenadeText),
+        special: read(hud.specialWeaponLabel),
+        abilityName: read(hud.abilityNameText),
+        abilityState: read(hud.abilityCountdownText),
+      },
+      status: {
+        score: read(hud.scoreText),
+        timer: read(hud.timerText),
+        event: read(hud.activeEventLabel),
+        modes: modeStates,
+      },
+      contract: [read(hud.contractTitleText), read(hud.contractProgressText)],
+      killFeed: hud.killFeedEntries.map(({ text }) => read(text)),
+      overlays: {
+        countdown: read(hud.countdownText),
+        briefing: read(hud.modeBriefingTitle),
+        death: read(hud.deathOverlay),
+        combat: read(hud.combatCalloutText),
+        contract: read(hud.contractCalloutText),
+        event: read(hud.eventBannerText),
+      },
+      touch: {
+        input: touchInput,
+        taunt: touch.tauntButton.getBounds(),
+        grenade: touch.grenadeButton.getBounds(),
+        ability: touch.abilityButton.getBounds(),
+        domains: [
+          touch.tauntButton.scrollFactorX,
+          touch.tauntButton.scrollFactorY,
+          touch.grenadeButton.scrollFactorX,
+          touch.grenadeButton.scrollFactorY,
+          touch.abilityButton.scrollFactorX,
+          touch.abilityButton.scrollFactorY,
+        ],
       },
     };
   });
@@ -562,6 +861,17 @@ test('capability-off and old-server gameplay retain the exact legacy surface', a
       },
       composed: { scrollX: 0, scrollY: 0, zoom: 1, rotation: 0 },
     },
+    hudLayout: {
+      mode: 'legacy',
+      vitalsPanel: { x: 0, y: 576, width: 960, height: 144 },
+      score: { x: 480, y: 590 },
+      menuLauncher: { x: 816, y: 14, width: 128, height: 42 },
+      touchActions: {
+        taunt: { x: 808, y: 116 },
+        grenade: { x: 904, y: 116 },
+        ability: { x: 904, y: 208 },
+      },
+    },
     dynamic: {
       worldBounds: { left: 0, top: 0, width: 960, height: 576 },
       viewportResource: { width: 960, height: 576 },
@@ -619,6 +929,11 @@ test('gated gameplay keeps one 16:9 logical view across desktop and mobile', asy
       target: { kind: 'local-player' },
       base: { scrollX: 0, scrollY: 0, zoom: 1 },
       composed: { scrollX: 0, scrollY: 0, zoom: 1, rotation: 0 },
+    },
+    hudLayout: {
+      mode: 'large-world',
+      vitalsPanel: { x: 32, y: 552, width: 308, height: 136 },
+      menuLauncher: { x: 1120, y: 32, width: 128, height: 42 },
     },
     dynamic: {
       worldBounds: { left: 0, top: 0, width: 960, height: 576 },
@@ -732,6 +1047,154 @@ test('gated gameplay keeps one 16:9 logical view across desktop and mobile', asy
   }
 });
 
+test('responsive combat HUD prioritizes resources, statuses, callouts, touch, and menu', async ({
+  page,
+}, testInfo) => {
+  test.skip(!largeWorldsAdvertised, 'Run with CAPABILITY_LARGE_WORLDS=true.');
+  await stageGameplay(page, true);
+
+  const snapshot = (await responsiveHudSnapshot(page)) as {
+    layout: {
+      logicalWidth: number;
+      logicalHeight: number;
+      safeArea: { left: number; top: number; right: number; bottom: number };
+      vitalsPanel: { x: number; y: number; width: number; height: number };
+      contract: { x: number; y: number; width: number; height: number };
+      menu: { launcher: { x: number; y: number; width: number; height: number } };
+      callouts: {
+        combat: { y: number };
+        contract: { y: number };
+        event: { y: number };
+      };
+      countdown: { y: number };
+    };
+    resources: Record<string, { text: string; visible: boolean; scroll: number[] }>;
+    status: {
+      score: { text: string; visible: boolean; scroll: number[] };
+      timer: { text: string; visible: boolean; scroll: number[] };
+      event: { text: string; visible: boolean; scroll: number[] };
+      modes: Record<string, string>;
+    };
+    contract: Array<{ text: string; visible: boolean; scroll: number[] }>;
+    killFeed: Array<{ text: string; visible: boolean; scroll: number[] }>;
+    overlays: Record<string, { text: string; visible: boolean; y: number; scroll: number[] }>;
+    touch: {
+      input: { throwPressed: boolean; abilityPressed: boolean; tauntPressed: boolean };
+      taunt: { x: number; y: number; width: number; height: number };
+      grenade: { x: number; y: number; width: number; height: number };
+      ability: { x: number; y: number; width: number; height: number };
+      domains: number[];
+    };
+  };
+
+  expect(snapshot.layout).toMatchObject({
+    logicalWidth: 1280,
+    logicalHeight: 720,
+    safeArea: { left: 32, top: 32, right: 1248, bottom: 688 },
+    vitalsPanel: { x: 32, y: 552, width: 308, height: 136 },
+    contract: { x: 32, y: 32 },
+    menu: { launcher: { x: 1120, y: 32, width: 128, height: 42 } },
+  });
+  expect(snapshot.resources.health.text).toContain('42/115');
+  expect(snapshot.resources.health.text).toContain('ARM 13');
+  expect(snapshot.resources.stamina.text).toContain('SPRINT');
+  expect(snapshot.resources.ammo.text).toContain('7/30');
+  expect(snapshot.resources.grenades.text).toContain('2');
+  expect(snapshot.resources.special.text).toBe('SHOTGUN');
+  expect(snapshot.resources.abilityName.text).toContain('X-RAY');
+  expect(snapshot.resources.abilityState.text).toContain('READY IN 5');
+  for (const resource of Object.values(snapshot.resources)) {
+    expect(resource.scroll).toEqual([0, 0]);
+  }
+
+  expect(snapshot.status.score.text).toContain('YOU: 12');
+  expect(snapshot.status.timer.text).toBe('0:30');
+  expect(snapshot.status.event.text).toContain('SCRAPSTORM');
+  expect(snapshot.status.modes).toMatchObject({
+    gunGame: 'PISTOL 1/2 - LVL 3/5',
+    lastStand: 'LIVES REMAINING',
+    killConfirmed: 'COLLECT ENEMY TAGS',
+    oneInTheChamber: 'CHAMBER LOADED',
+    coreRun: expect.stringContaining('YOU HAVE THE CORE'),
+    bountyHunt: expect.stringContaining('HUNT RIVAL'),
+    koth: 'HILL',
+  });
+  expect(snapshot.contract[0]?.text).toBe('CONTRACT COMPLETE');
+  expect(snapshot.killFeed.map(({ text }) => text)).toEqual([
+    'RIVAL [AXE] YOU',
+    'YOU [RIFLE] RIVAL',
+  ]);
+  expect([
+    snapshot.layout.callouts.combat.y,
+    snapshot.layout.callouts.contract.y,
+    snapshot.layout.callouts.event.y,
+    snapshot.layout.countdown.y,
+  ]).toEqual([170, 235, 300, 360]);
+  expect(snapshot.overlays.combat.visible).toBe(true);
+  expect(snapshot.overlays.contract.visible).toBe(true);
+  expect(snapshot.overlays.event.visible).toBe(true);
+  expect(snapshot.overlays.death.text).toContain('RESPAWN IN 3');
+  expect(snapshot.overlays.briefing.text).toContain('DEATHMATCH');
+
+  expect(snapshot.touch.input).toMatchObject({
+    throwPressed: true,
+    abilityPressed: true,
+    tauntPressed: true,
+  });
+  expect(snapshot.touch.domains).toEqual([0, 0, 0, 0, 0, 0]);
+  for (const action of [snapshot.touch.taunt, snapshot.touch.grenade, snapshot.touch.ability]) {
+    expect(action.x).toBeGreaterThanOrEqual(snapshot.layout.safeArea.left);
+    expect(action.y).toBeGreaterThanOrEqual(snapshot.layout.safeArea.top);
+    expect(action.x + action.width).toBeLessThanOrEqual(snapshot.layout.safeArea.right);
+    expect(action.y + action.height).toBeLessThanOrEqual(snapshot.layout.safeArea.bottom);
+  }
+
+  await page.screenshot({ path: testInfo.outputPath('responsive-combat-hud.png') });
+  if (testInfo.project.name === 'desktop-chromium') {
+    await page.setViewportSize({ width: 844, height: 390 });
+    await page.screenshot({
+      path: testInfo.outputPath('responsive-combat-hud-mobile-chromium.png'),
+    });
+  }
+
+  const menu = await page.evaluate(() => {
+    const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'GameScene',
+    ) as unknown as {
+      matchMenu: {
+        setAvailable(available: boolean): void;
+        show(): void;
+        moveFocus(direction: -1 | 1): void;
+        activateFocused(): void;
+        getView(): string;
+        getFocusedIndex(): number;
+        isOpen(): boolean;
+        getLayoutState(): { menu: { panel: unknown; launcher: unknown } } | null;
+      };
+    };
+    scene.matchMenu.setAvailable(true);
+    scene.matchMenu.show();
+    scene.matchMenu.moveFocus(1);
+    scene.matchMenu.activateFocused();
+    return {
+      open: scene.matchMenu.isOpen(),
+      view: scene.matchMenu.getView(),
+      focused: scene.matchMenu.getFocusedIndex(),
+      layout: scene.matchMenu.getLayoutState()?.menu ?? null,
+    };
+  });
+  expect(menu).toMatchObject({
+    open: true,
+    view: 'confirm',
+    focused: 0,
+    layout: {
+      launcher: { x: 1120, y: 32 },
+      panel: { x: 370, y: 145, width: 540, height: 430 },
+    },
+  });
+  await page.screenshot({ path: testInfo.outputPath('responsive-match-menu.png') });
+});
+
 test('dynamic chunks, destruction resources, lighting, and quality stay aligned', async ({
   page,
 }) => {
@@ -774,7 +1237,12 @@ test('Results and connection recovery restore legacy scene sizing', async ({ pag
 
   await page.evaluate(() => {
     const game = (window as unknown as { game?: Phaser.Game }).game;
-    game?.scene.getScene('GameScene').scene.start('ResultsScene', { nickname: 'VIEWPORT' });
+    const scene = game?.scene.getScene('GameScene') as unknown as {
+      shutdown(): void;
+      scene: { start(key: string, data: unknown): void };
+    };
+    scene.shutdown();
+    scene.scene.start('ResultsScene', { nickname: 'VIEWPORT' });
   });
   await waitForScene(page, 'ResultsScene');
   await expect
@@ -786,7 +1254,36 @@ test('Results and connection recovery restore legacy scene sizing', async ({ pag
     )
     .toEqual([960, 720]);
 
-  await stageGameplay(page, true);
+  await page.evaluate(() => {
+    const game = (window as unknown as { game?: Phaser.Game }).game;
+    if (!game) throw new Error('game is missing before rematch restoration');
+    game.scene.stop('ResultsScene');
+    game.scene.start('GameScene', {
+      nickname: 'VIEWPORT',
+      matchData: {
+        matchId: 'batch-22-rematch',
+        opponents: [{ id: 'viewport-rival', nickname: 'RIVAL' }],
+        mapName: 'Scrapyard',
+        gameMode: 'deathmatch',
+        matchKind: 'practice',
+      },
+    });
+  });
+  await waitForScene(page, 'GameScene');
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const game = (window as unknown as { game?: Phaser.Game }).game;
+        const scene = game?.scene.getScene('GameScene') as unknown as {
+          getResponsiveHudLayout(): { mode: string } | null;
+        };
+        return {
+          size: [game?.scale.width, game?.scale.height],
+          hudMode: scene.getResponsiveHudLayout()?.mode ?? null,
+        };
+      }),
+    )
+    .toEqual({ size: [1280, 720], hudMode: 'large-world' });
   await page.evaluate(() => {
     const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
       'GameScene',

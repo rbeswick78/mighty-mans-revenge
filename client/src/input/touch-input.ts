@@ -14,6 +14,7 @@ import {
   grenadeButtonLabel,
   type TouchAbilityState,
 } from './touch-action-presentation.js';
+import type { ResponsiveCombatHudLayout } from '../ui/responsive-combat-hud.js';
 
 const JOYSTICK_MAX_RADIUS = 50;
 const DEAD_ZONE_RATIO = 0.15;
@@ -95,11 +96,13 @@ export class TouchInput {
   private rightStickReleasedFlag = false;
   private sprintActive = false;
   private readonly isTouch: boolean;
+  private actionLayout: ResponsiveCombatHudLayout['touchActions'] | null = null;
 
   constructor(
     scene: Phaser.Scene,
     private readonly coordinates: GameplayCoordinateSpace,
     secondaryActionsEnabled = true,
+    actionLayout?: ResponsiveCombatHudLayout['touchActions'],
   ) {
     this.scene = scene;
     this.isTouch = isTouchDevice();
@@ -212,6 +215,8 @@ export class TouchInput {
       this.tauntButtonPressedFlag = true;
     });
 
+    if (actionLayout) this.setLayout(actionLayout);
+
     scene.input.on('pointerdown', this.onPointerDown, this);
     scene.input.on('pointermove', this.onPointerMove, this);
     scene.input.on('pointerup', this.onPointerUp, this);
@@ -222,6 +227,20 @@ export class TouchInput {
     // radius like the other actions. Dynamic joysticks still appear only where
     // the player places their thumbs.
     if (this.isTouch) this.showTouchUI();
+  }
+
+  setLayout(layout: ResponsiveCombatHudLayout['touchActions']): void {
+    this.actionLayout = layout;
+    this.tauntButton.setPosition(layout.taunt.x, layout.taunt.y);
+    this.tauntButtonText.setPosition(layout.taunt.x, layout.taunt.y);
+    this.grenadeButton.setPosition(layout.grenade.x, layout.grenade.y);
+    this.grenadeButtonText.setPosition(layout.grenade.x, layout.grenade.y);
+    this.abilityButton.setPosition(layout.ability.x, layout.ability.y);
+    this.abilityButtonText.setPosition(layout.ability.x, layout.ability.y);
+  }
+
+  getLayoutState(): ResponsiveCombatHudLayout['touchActions'] | null {
+    return this.actionLayout;
   }
 
   private showTouchUI(): void {

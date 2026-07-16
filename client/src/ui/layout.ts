@@ -1,7 +1,8 @@
 // Established fixed-world and legacy overlay geometry. Capability-off play
 // still splits the 960x720 canvas into the gameboard and dedicated HUD strip.
-// Behind largeWorlds, the same 960x576 map and transitional HUD coordinates
-// sit inside the 1280x720 gameplay surface until Batch 22 owns HUD migration.
+// The capability-owned 1280x720 path now derives its overlays from
+// responsive-combat-hud.ts; these constants remain the exact fallback through
+// Batch 54.
 
 export const MAP_WIDTH_PX = 960;
 export const MAP_HEIGHT_PX = 576; // 20 cols x 12 rows @ 48px

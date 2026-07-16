@@ -27,21 +27,15 @@ import {
   rifleAmmoPresentation,
   type CombatResourceTone,
 } from './combat-resources.js';
-import {
-  healthStatusLabel,
-  sprintPresentation,
-  type SprintTone,
-} from './vitality-presentation.js';
-import {
-  abilityStatusPresentation,
-  type AbilityStatusTone,
-} from './ability-status.js';
+import { healthStatusLabel, sprintPresentation, type SprintTone } from './vitality-presentation.js';
+import { abilityStatusPresentation, type AbilityStatusTone } from './ability-status.js';
 import type { KillFeedTone } from './kill-feed-presentation.js';
 import {
   matchScorePresentation,
   matchTimerPresentation,
   type MatchTimerTone,
 } from './match-status-presentation.js';
+import type { ResponsiveCombatHudLayout } from './responsive-combat-hud.js';
 
 // Press Start 2P is much wider per glyph than Courier, so the final-minute
 // banner size drops to compensate (Courier 40px ≈ PS2P 22-24px in width).
@@ -112,9 +106,10 @@ export class HUD {
   private specialShellIcons: Phaser.GameObjects.Image[] = [];
   private specialReserveText: Phaser.GameObjects.Text;
   /** Left edge of the icon run — reserve-text X is derived per weapon. */
-  private readonly specialIconStartX: number;
+  private specialIconStartX: number;
   /** specialReserveText X while the shotgun's full shell row is visible. */
-  private readonly shotgunReserveTextX: number;
+  private shotgunReserveTextX: number;
+  private responsiveLayout: ResponsiveCombatHudLayout | null = null;
 
   // Rifle-ammo-row suppression inputs (see syncAmmoRowVisibility): the
   // held weapon and the Gun Game rung (null outside that mode).
@@ -186,7 +181,7 @@ export class HUD {
   private abilityCenterY: number = 0;
   private abilityRadius: number = 0;
 
-  constructor(scene: Phaser.Scene) {
+  constructor(scene: Phaser.Scene, layout?: ResponsiveCombatHudLayout) {
     this.scene = scene;
 
     // Strip occupies the bottom band of the canvas. The gameboard owns
@@ -198,7 +193,13 @@ export class HUD {
     // 2px dark stroke at the gameboard/strip boundary reads as a hardware
     // panel seam; a 1px highlight just below it sells the bevel without
     // adding visual weight on top of the gameplay area.
-    this.stripBg = scene.add.rectangle(0, stripTop, MAP_WIDTH_PX, HUD_STRIP_HEIGHT, Wasteland.HUD_STRIP_BG);
+    this.stripBg = scene.add.rectangle(
+      0,
+      stripTop,
+      MAP_WIDTH_PX,
+      HUD_STRIP_HEIGHT,
+      Wasteland.HUD_STRIP_BG,
+    );
     this.stripBg.setOrigin(0, 0);
     this.stripBg.setScrollFactor(0);
     this.stripBg.setDepth(500);
@@ -208,7 +209,14 @@ export class HUD {
     this.stripBorder.setScrollFactor(0);
     this.stripBorder.setDepth(501);
 
-    this.stripBevel = scene.add.rectangle(0, stripTop + 2, MAP_WIDTH_PX, 1, Wasteland.TEXT_PRIMARY, 0.35);
+    this.stripBevel = scene.add.rectangle(
+      0,
+      stripTop + 2,
+      MAP_WIDTH_PX,
+      1,
+      Wasteland.TEXT_PRIMARY,
+      0.35,
+    );
     this.stripBevel.setOrigin(0, 0);
     this.stripBevel.setScrollFactor(0);
     this.stripBevel.setDepth(501);
@@ -317,14 +325,10 @@ export class HUD {
       this.specialShellIcons.push(icon);
     }
 
-    this.shotgunReserveTextX =
-      this.specialIconStartX + WEAPONS.shotgun.magazineSize * 24 + 8;
-    this.specialReserveText = scene.add.text(
-      this.shotgunReserveTextX,
-      specialY + 4,
-      '',
-      { ...FONT_STYLE },
-    );
+    this.shotgunReserveTextX = this.specialIconStartX + WEAPONS.shotgun.magazineSize * 24 + 8;
+    this.specialReserveText = scene.add.text(this.shotgunReserveTextX, specialY + 4, '', {
+      ...FONT_STYLE,
+    });
     this.specialReserveText.setScrollFactor(0);
     this.specialReserveText.setDepth(1000);
     this.specialReserveText.setVisible(false);
@@ -549,7 +553,14 @@ export class HUD {
     // --- Match contract: compact enough not to hide sightlines, but always
     // readable against every biome. The completion transition also fires the
     // established center-screen event banner for a satisfying payoff.
-    this.contractBg = scene.add.rectangle(MAP_WIDTH_PX / 2, 8, 330, 42, Wasteland.HUD_STRIP_BG, 0.84);
+    this.contractBg = scene.add.rectangle(
+      MAP_WIDTH_PX / 2,
+      8,
+      330,
+      42,
+      Wasteland.HUD_STRIP_BG,
+      0.84,
+    );
     this.contractBg.setOrigin(0.5, 0);
     this.contractBg.setStrokeStyle(1, Wasteland.LOADING_BAR_FILL, 0.75);
     this.contractBg.setScrollFactor(0);
@@ -692,6 +703,103 @@ export class HUD {
     this.contractCalloutText.setScrollFactor(0);
     this.contractCalloutText.setDepth(2001);
     this.contractCalloutText.setVisible(false);
+
+    if (layout) this.setLayout(layout);
+  }
+
+  setLayout(layout: ResponsiveCombatHudLayout): void {
+    this.responsiveLayout = layout;
+    const panel = layout.vitalsPanel;
+    this.stripBg
+      .setPosition(panel.x, panel.y)
+      .setSize(panel.width, panel.height)
+      .setFillStyle(Wasteland.HUD_STRIP_BG, layout.mode === 'legacy' ? 1 : 0.9);
+    this.stripBorder.setPosition(panel.x, panel.y).setSize(panel.width, 2);
+    this.stripBevel.setPosition(panel.x, panel.y + 2).setSize(panel.width, 1);
+
+    const health = layout.healthBar;
+    this.healthBarBg.setPosition(health.x, health.y).setSize(health.width, health.height);
+    this.healthBarFg.setPosition(health.x, health.y);
+    this.armorBarBg.setPosition(health.x, health.y - 6).setSize(health.width, 4);
+    this.armorBarFg.setPosition(health.x, health.y - 6);
+    this.healthText.setPosition(health.x + health.width / 2, health.y + health.height / 2);
+
+    const stamina = layout.staminaBar;
+    this.staminaBarBg.setPosition(stamina.x, stamina.y).setSize(stamina.width, stamina.height);
+    this.staminaBarFg.setPosition(stamina.x, stamina.y);
+    this.staminaText.setPosition(stamina.x + stamina.width / 2, stamina.y + stamina.height / 2);
+    this.ammoText.setPosition(layout.ammo.x, layout.ammo.y);
+    this.grenadeText.setPosition(layout.grenades.x, layout.grenades.y);
+
+    this.specialWeaponLabel.setPosition(layout.specialWeapon.x, layout.specialWeapon.y + 4);
+    this.specialIconStartX = layout.specialWeapon.x + 96;
+    for (let i = 0; i < this.specialShellIcons.length; i++) {
+      this.specialShellIcons[i].setPosition(
+        this.specialIconStartX + i * 24,
+        layout.specialWeapon.y,
+      );
+    }
+    this.shotgunReserveTextX = this.specialIconStartX + WEAPONS.shotgun.magazineSize * 24 + 8;
+    this.specialReserveText.setPosition(this.shotgunReserveTextX, layout.specialWeapon.y + 4);
+
+    this.abilityCenterX = layout.ability.x;
+    this.abilityCenterY = layout.ability.y;
+    this.abilityBg.setPosition(this.abilityCenterX, this.abilityCenterY);
+    this.abilityIconGfx.setPosition(this.abilityCenterX, this.abilityCenterY);
+    this.abilityNameText.setPosition(
+      this.abilityCenterX,
+      this.abilityCenterY + this.abilityRadius + 4,
+    );
+    this.abilityCountdownText.setPosition(
+      this.abilityCenterX,
+      this.abilityCenterY + this.abilityRadius + 20,
+    );
+
+    this.scoreText.setPosition(layout.score.x, layout.score.y);
+    this.timerText.setPosition(layout.timer.x, layout.timer.y);
+    this.kothLabel.setPosition(layout.modeStatus.x - 78, layout.modeStatus.y - 1);
+    this.kothBarBg.setPosition(layout.modeStatus.x - 70, layout.modeStatus.y);
+    this.kothBarFg.setPosition(layout.modeStatus.x - 70, layout.modeStatus.y);
+    for (const text of [
+      this.gunGameLadderText,
+      this.lastStandText,
+      this.killConfirmedText,
+      this.oneInTheChamberText,
+      this.coreRunText,
+      this.bountyHuntText,
+    ]) {
+      text.setPosition(layout.modeStatus.x, layout.modeStatus.y - 1);
+    }
+    this.activeEventLabel.setPosition(layout.activeEvent.x, layout.activeEvent.y);
+    this.killFeedContainer.setPosition(layout.killFeed.x, layout.killFeed.y);
+
+    const contract = layout.contract;
+    this.contractBg
+      .setPosition(contract.x + contract.width / 2, contract.y)
+      .setSize(contract.width, contract.height);
+    this.contractTitleText.setPosition(contract.x + contract.width / 2, contract.y + 5);
+    this.contractProgressText.setPosition(contract.x + contract.width / 2, contract.y + 21);
+
+    this.countdownText.setPosition(layout.countdown.x, layout.countdown.y);
+    this.modeBriefingTitle.setPosition(layout.modeBriefingTitle.x, layout.modeBriefingTitle.y);
+    this.modeBriefingObjective.setPosition(
+      layout.modeBriefingObjective.x,
+      layout.modeBriefingObjective.y,
+    );
+    const briefing = layout.controlBriefing;
+    this.controlBriefingBg
+      .setPosition(briefing.x + briefing.width / 2, briefing.y + briefing.height / 2)
+      .setSize(briefing.width, briefing.height);
+    this.controlBriefingTitle.setPosition(briefing.x + briefing.width / 2, briefing.y + 18);
+    this.controlBriefingDetail.setPosition(briefing.x + briefing.width / 2, briefing.y + 52);
+    this.deathOverlay.setPosition(layout.death.x, layout.death.y);
+    this.combatCalloutText.setPosition(layout.callouts.combat.x, layout.callouts.combat.y);
+    this.contractCalloutText.setPosition(layout.callouts.contract.x, layout.callouts.contract.y);
+    this.eventBannerText.setPosition(layout.callouts.event.x, layout.callouts.event.y);
+  }
+
+  getLayoutState(): ResponsiveCombatHudLayout | null {
+    return this.responsiveLayout;
   }
 
   updateHealth(current: number, max: number, armor: number): void {
@@ -808,20 +916,12 @@ export class HUD {
     this.oneInTheChamberText.setVisible(active);
     if (active) {
       this.oneInTheChamberText.setText(
-        oneInTheChamberStatus(
-          weaponId,
-          chamberedRounds,
-          isDead,
-          roundStarted,
-        ),
+        oneInTheChamberStatus(weaponId, chamberedRounds, isDead, roundStarted),
       );
     }
   }
 
-  updateCoreRun(
-    state: CoreRunState | null,
-    localPlayerId: PlayerId | null,
-  ): void {
+  updateCoreRun(state: CoreRunState | null, localPlayerId: PlayerId | null): void {
     const status = coreRunStatus(state, localPlayerId);
     this.coreRunText.setText(status);
     this.coreRunText.setVisible(status.length > 0);
@@ -849,11 +949,7 @@ export class HUD {
   }
 
   /** Show a respawn countdown or permanent stock-elimination state. */
-  updateDeathState(
-    isDead: boolean,
-    respawnSecondsRemaining: number,
-    eliminated = false,
-  ): void {
+  updateDeathState(isDead: boolean, respawnSecondsRemaining: number, eliminated = false): void {
     const label = deathOverlayLabel(isDead, respawnSecondsRemaining, eliminated);
     if (label === null) {
       this.deathOverlay.setVisible(false);
@@ -897,18 +993,11 @@ export class HUD {
 
   updateScores(scores: ReadonlyArray<{ name: string; score: number }>): void {
     const presentation = matchScorePresentation(scores);
-    this.scoreText
-      .setFontSize(presentation.fontSize)
-      .setText(presentation.text);
+    this.scoreText.setFontSize(presentation.fontSize).setText(presentation.text);
   }
 
-  updateContract(
-    state: MatchContractHudState | null,
-    localPlayerId: string | null,
-  ): void {
-    const progress = state?.players.find(
-      (entry) => entry.playerId === localPlayerId,
-    );
+  updateContract(state: MatchContractHudState | null, localPlayerId: string | null): void {
+    const progress = state?.players.find((entry) => entry.playerId === localPlayerId);
     const visible = !!state && !!progress;
     this.contractBg.setVisible(visible);
     this.contractTitleText.setVisible(visible);
@@ -922,12 +1011,8 @@ export class HUD {
 
     if (progress.completed) {
       this.contractBg.setStrokeStyle(1, Wasteland.HEALTH_GOOD, 0.9);
-      this.contractTitleText
-        .setText('CONTRACT COMPLETE')
-        .setColor(cssHex(Wasteland.HEALTH_GOOD));
-      this.contractProgressText.setText(
-        `${state.title}  ${state.target}/${state.target}`,
-      );
+      this.contractTitleText.setText('CONTRACT COMPLETE').setColor(cssHex(Wasteland.HEALTH_GOOD));
+      this.contractProgressText.setText(`${state.title}  ${state.target}/${state.target}`);
       if (!this.previousContractComplete) {
         this.showContractComplete(state.title);
       }
@@ -936,9 +1021,7 @@ export class HUD {
       this.contractTitleText
         .setText(`CONTRACT: ${state.title}`)
         .setColor(cssHex(Wasteland.LOADING_BAR_FILL));
-      this.contractProgressText.setText(
-        `${state.objective}  ${progress.progress}/${state.target}`,
-      );
+      this.contractProgressText.setText(`${state.objective}  ${progress.progress}/${state.target}`);
     }
     this.previousContractComplete = progress.completed;
   }
@@ -992,10 +1075,7 @@ export class HUD {
       return;
     }
     const mine = state.occupantId === localPlayerId;
-    this.kothBarFg.setFillStyle(
-      mine ? Wasteland.HEALTH_GOOD : Wasteland.TEXT_DEATH,
-      1,
-    );
+    this.kothBarFg.setFillStyle(mine ? Wasteland.HEALTH_GOOD : Wasteland.TEXT_DEATH, 1);
     const fraction = Math.max(0, Math.min(1, state.captureFraction));
     this.kothBarFg.setSize(fullWidth * fraction, 8);
   }
@@ -1016,10 +1096,7 @@ export class HUD {
   }
 
   private syncTimerPresentation(): void {
-    const presentation = matchTimerPresentation(
-      this.timerSecondsRemaining,
-      this.overtimeStyle,
-    );
+    const presentation = matchTimerPresentation(this.timerSecondsRemaining, this.overtimeStyle);
     this.timerText
       .setText(presentation.text)
       .setColor(cssHex(this.matchTimerColor(presentation.tone)));
@@ -1242,32 +1319,44 @@ export class HUD {
     // when the ability is up, and a flat dark-grey when on cooldown so the
     // status reads at a glance.
     const readyColor =
-      characterId === 'bruce' ? 0xff7b2a
-      : characterId === 'mighty_man' ? 0x4ad8e8
-      : characterId === 'bubba' ? 0xb8c4d0
-      : characterId === 'jack' ? 0xffb347
-      : characterId === 'rook' ? 0x70e6ff
-      : 0xaaddff; // frost_wizard
+      characterId === 'bruce'
+        ? 0xff7b2a
+        : characterId === 'mighty_man'
+          ? 0x4ad8e8
+          : characterId === 'bubba'
+            ? 0xb8c4d0
+            : characterId === 'jack'
+              ? 0xffb347
+              : characterId === 'rook'
+                ? 0x70e6ff
+                : 0xaaddff; // frost_wizard
     const cooldownColor = 0x3a4252;
     // Total recharge cycle from the moment activation should be measured.
     // Bruce/Bubba: cooldown begins at activation (DURATION overlaps it).
     // Mighty Man: cooldown begins after the active window ends.
     // Frost Wizard/Jack: instant cast, no active window — just COOLDOWN.
     const totalCycle =
-      characterId === 'bruce' ? ABILITY.BRUCE_FIRE_BREATH.COOLDOWN
-      : characterId === 'mighty_man'
-        ? ABILITY.MIGHTY_MAN_XRAY.DURATION + ABILITY.MIGHTY_MAN_XRAY.COOLDOWN
-      : characterId === 'bubba' ? ABILITY.BUBBA_IRON_HIDE.COOLDOWN
-      : characterId === 'jack' ? ABILITY.JACK_AXE_THROW.COOLDOWN
-      : characterId === 'rook' ? ABILITY.ROOK_BREACH_DASH.COOLDOWN
-      : ABILITY.FROST_WIZARD_FREEZE.COOLDOWN;
+      characterId === 'bruce'
+        ? ABILITY.BRUCE_FIRE_BREATH.COOLDOWN
+        : characterId === 'mighty_man'
+          ? ABILITY.MIGHTY_MAN_XRAY.DURATION + ABILITY.MIGHTY_MAN_XRAY.COOLDOWN
+          : characterId === 'bubba'
+            ? ABILITY.BUBBA_IRON_HIDE.COOLDOWN
+            : characterId === 'jack'
+              ? ABILITY.JACK_AXE_THROW.COOLDOWN
+              : characterId === 'rook'
+                ? ABILITY.ROOK_BREACH_DASH.COOLDOWN
+                : ABILITY.FROST_WIZARD_FREEZE.COOLDOWN;
     // Instant-cast characters (Frost Wizard, Jack, Rook) never take the
     // isActive path — the fallback keeps sweep math from dividing by zero.
     const activeDuration =
-      characterId === 'bruce' ? ABILITY.BRUCE_FIRE_BREATH.DURATION
-      : characterId === 'mighty_man' ? ABILITY.MIGHTY_MAN_XRAY.DURATION
-      : characterId === 'bubba' ? ABILITY.BUBBA_IRON_HIDE.DURATION
-      : ABILITY.FROST_WIZARD_FREEZE.DURATION;
+      characterId === 'bruce'
+        ? ABILITY.BRUCE_FIRE_BREATH.DURATION
+        : characterId === 'mighty_man'
+          ? ABILITY.MIGHTY_MAN_XRAY.DURATION
+          : characterId === 'bubba'
+            ? ABILITY.BUBBA_IRON_HIDE.DURATION
+            : ABILITY.FROST_WIZARD_FREEZE.DURATION;
 
     this.abilityBg.setVisible(true);
     this.abilityIconGfx.setVisible(true);

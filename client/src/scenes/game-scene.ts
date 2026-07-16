@@ -100,6 +100,10 @@ import {
   type GameplayViewportContract,
   useGameplayLogicalSize,
 } from '../ui/gameplay-viewport.js';
+import {
+  responsiveCombatHudLayout,
+  type ResponsiveCombatHudLayout,
+} from '../ui/responsive-combat-hud.js';
 import { useLegacyLogicalSize } from '../ui/reforged/responsive-menu-layout.js';
 import {
   createWorldRenderPlan,
@@ -202,6 +206,7 @@ export class GameScene extends Phaser.Scene {
   private gameService!: GameService;
   private gameplayViewport: GameplayViewportContract = gameplayViewportForCapabilities(undefined);
   private gameplaySafeArea: GameplayOverlaySafeArea | null = null;
+  private combatHudLayout: ResponsiveCombatHudLayout | null = null;
   private gameplayCoordinates!: GameplayCoordinateSpace;
   private worldRenderPlan: WorldRenderPlan | null = null;
   private readonly worldRenderQuality = new WorldRenderQualityController();
@@ -314,6 +319,7 @@ export class GameScene extends Phaser.Scene {
     this.localTauntCooldownUntil = 0;
     this.gameplayViewport = gameplayViewportForCapabilities(undefined);
     this.gameplaySafeArea = null;
+    this.combatHudLayout = null;
     this.worldRenderPlan = null;
     this.worldRenderQuality.reset();
   }
@@ -424,7 +430,8 @@ export class GameScene extends Phaser.Scene {
     this.shockwaveController = new ShockwaveController(this.gameplayCoordinates, () =>
       this.worldRenderQuality.getBudget(),
     );
-    this.hud = new HUD(this);
+    this.combatHudLayout = responsiveCombatHudLayout(this.gameplayViewport, this.gameplaySafeArea);
+    this.hud = new HUD(this, this.combatHudLayout);
     // Bullseye replaces the OS cursor on desktop only — touch input
     // doesn't have a hover position to track.
     if (!isTouchDevice()) {
@@ -434,6 +441,7 @@ export class GameScene extends Phaser.Scene {
       this,
       this.gameplayCoordinates,
       this.matchData?.gameMode === GameModeType.ONE_IN_THE_CHAMBER,
+      this.combatHudLayout.touchActions,
     );
     this.matchMenuGamepad = new MenuGamepadInput();
     this.matchMenu = new MatchMenu(
@@ -446,6 +454,7 @@ export class GameScene extends Phaser.Scene {
       (open) => {
         this.inputManager?.setGameplayEnabled(!open && this.matchPhase === MatchPhase.ACTIVE);
       },
+      this.combatHudLayout,
     );
     this.matchMenu.setAvailable(false);
     this.onMatchMenuEscape = () => {
@@ -1272,6 +1281,10 @@ export class GameScene extends Phaser.Scene {
     return this.gameplayCoordinates;
   }
 
+  getResponsiveHudLayout(): ResponsiveCombatHudLayout | null {
+    return this.combatHudLayout;
+  }
+
   getCameraController(): CameraController | null {
     return this.cameraController;
   }
@@ -1350,6 +1363,10 @@ export class GameScene extends Phaser.Scene {
       this.gameplayViewport.mode === 'large-world'
         ? currentGameplayOverlaySafeArea(this.game.canvas)
         : null;
+    this.combatHudLayout = responsiveCombatHudLayout(this.gameplayViewport, this.gameplaySafeArea);
+    this.hud?.setLayout(this.combatHudLayout);
+    this.matchMenu?.setLayout(this.combatHudLayout);
+    this.inputManager?.setTouchActionLayout(this.combatHudLayout.touchActions);
   }
 
   private updateMatchMenuInput(): void {
@@ -1461,19 +1478,18 @@ export class GameScene extends Phaser.Scene {
       if (this.leavingMatch) return;
       this.matchMenu?.setAvailable(false);
       // Show disconnect message
+      const center = this.combatHudLayout?.countdown ?? {
+        x: this.cameras.main.width / 2,
+        y: this.cameras.main.height / 2,
+      };
       const msg = declareScreenSpace(
-        this.add.text(
-          this.cameras.main.width / 2,
-          this.cameras.main.height / 2,
-          'OPPONENT DISCONNECTED',
-          {
-            fontFamily: '"Courier New", Courier, monospace',
-            fontSize: '24px',
-            color: cssHex(Wasteland.TEXT_DISCONNECT),
-            stroke: '#000000',
-            strokeThickness: 4,
-          },
-        ),
+        this.add.text(center.x, center.y, 'OPPONENT DISCONNECTED', {
+          fontFamily: '"Courier New", Courier, monospace',
+          fontSize: '24px',
+          color: cssHex(Wasteland.TEXT_DISCONNECT),
+          stroke: '#000000',
+          strokeThickness: 4,
+        }),
       )
         .setOrigin(0.5)
         .setDepth(2000);
@@ -2065,8 +2081,8 @@ export class GameScene extends Phaser.Scene {
   private returnToLobbyAfterConnectionLoss(): void {
     if (this.connectionLostTransitionStarted) return;
     this.connectionLostTransitionStarted = true;
-    const centerX = this.scale.width / 2;
-    const centerY = this.scale.height / 2;
+    const centerX = this.combatHudLayout?.countdown.x ?? this.scale.width / 2;
+    const centerY = this.combatHudLayout?.countdown.y ?? this.scale.height / 2;
     declareScreenSpace(
       this.add.rectangle(
         centerX,
@@ -2342,6 +2358,7 @@ export class GameScene extends Phaser.Scene {
       this.decalRenderer = null;
     }
     this.worldRenderPlan = null;
+    this.combatHudLayout = null;
     this.worldRenderQuality.reset();
     this.prevDeadStates.clear();
     if (this.hud) {

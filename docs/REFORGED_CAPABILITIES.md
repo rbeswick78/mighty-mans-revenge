@@ -208,6 +208,17 @@ Current maps remain 960x576 at `(0, 0)`, so capability-off and old-server
 transitional HUD, physics, simulation, wire contracts, capability defaults,
 and production exposure remain unchanged. Batch 22 owns HUD migration.
 
+Batch 22 replaces the transitional combat HUD only when normalized
+`largeWorlds` is literal true. One client-owned logical layout consumes Batch
+18's safe-area bounds for every combat resource, mode status, timer, kill feed,
+contract, briefing, callout lane, touch action, and confirmed match menu without
+changing the fixed 1280x720 logical view or deriving gameplay state from screen
+coordinates. All existing authoritative snapshots, reliable events, mode
+visibility/unit rules, input actions, and leave confirmation remain intact.
+False, absent, partial, malformed, reconnecting, disconnected, and old-server
+paths retain the exact 960x720 HUD and Lobby behavior. The capability remains
+strict, server-owned, and default false; Batch 23 owns minimap work.
+
 ## Server-first rollout and rollback
 
 For each capability, keep this order:

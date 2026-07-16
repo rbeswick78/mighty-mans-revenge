@@ -13,17 +13,21 @@ import {
   MATCH_MENU_LAUNCHER_X,
   MATCH_MENU_LAUNCHER_Y,
 } from './layout.js';
+import type { ResponsiveCombatHudLayout } from './responsive-combat-hud.js';
 
 export type MatchMenuView = 'menu' | 'confirm';
 
 export class MatchMenu {
   private readonly launcher: PixelButton;
   private readonly overlay: Phaser.GameObjects.Container;
+  private readonly scrim: Phaser.GameObjects.Rectangle;
+  private readonly panel: Phaser.GameObjects.Graphics;
   private readonly title: Phaser.GameObjects.Text;
   private readonly headline: Phaser.GameObjects.Text;
   private readonly detail: Phaser.GameObjects.Text;
   private readonly primaryButton: PixelButton;
   private readonly secondaryButton: PixelButton;
+  private readonly hint: Phaser.GameObjects.Text;
   private readonly context: MatchMenuContext;
   private readonly onLeave: () => void;
   private readonly onOpenChanged: (open: boolean) => void;
@@ -31,12 +35,14 @@ export class MatchMenu {
   private focusedIndex = 0;
   private available = true;
   private open = false;
+  private layoutState: ResponsiveCombatHudLayout | null = null;
 
   constructor(
     scene: Phaser.Scene,
     context: MatchMenuContext,
     onLeave: () => void,
     onOpenChanged: (open: boolean) => void,
+    layout?: ResponsiveCombatHudLayout,
   ) {
     this.context = context;
     this.onLeave = onLeave;
@@ -61,12 +67,12 @@ export class MatchMenu {
     );
     this.launcher.setDepth(24_000);
 
-    const scrim = scene.add
+    this.scrim = scene.add
       .rectangle(0, 0, 960, 720, Wasteland.CANVAS_BG, 0.86)
       .setOrigin(0)
       .setInteractive();
-    const panel = scene.add.graphics();
-    drawBeveledChrome(panel, 210, 145, 540, 430, {
+    this.panel = scene.add.graphics();
+    drawBeveledChrome(this.panel, 210, 145, 540, 430, {
       fillColor: Wasteland.HUD_STRIP_BG,
       fillAlpha: 0.98,
       strokeColor: Wasteland.CANVAS_BG,
@@ -112,7 +118,7 @@ export class MatchMenu {
       hitPaddingY: 8,
       onClick: () => this.activateSecondary(),
     });
-    const hint = scene.add
+    this.hint = scene.add
       .text(
         480,
         535,
@@ -126,17 +132,48 @@ export class MatchMenu {
       .setOrigin(0.5);
 
     this.overlay = scene.add.container(0, 0, [
-      scrim,
-      panel,
+      this.scrim,
+      this.panel,
       this.title,
       this.headline,
       this.detail,
       this.primaryButton,
       this.secondaryButton,
-      hint,
+      this.hint,
     ]);
     this.overlay.setDepth(25_000).setVisible(false);
+    if (layout) this.setLayout(layout);
     this.renderView();
+  }
+
+  setLayout(layout: ResponsiveCombatHudLayout): void {
+    this.layoutState = layout;
+    this.launcher.setPosition(layout.menu.launcher.x, layout.menu.launcher.y);
+    this.scrim.setPosition(0, 0).setSize(layout.logicalWidth, layout.logicalHeight);
+
+    const panel = layout.menu.panel;
+    const centerX = panel.x + panel.width / 2;
+    this.panel.clear();
+    drawBeveledChrome(this.panel, panel.x, panel.y, panel.width, panel.height, {
+      fillColor: Wasteland.HUD_STRIP_BG,
+      fillAlpha: 0.98,
+      strokeColor: Wasteland.CANVAS_BG,
+      highlightColor: Wasteland.COVER_FILL,
+      shadowColor: Wasteland.WALL_LINE,
+    });
+    this.title.setPosition(centerX, panel.y + 45);
+    this.headline.setPosition(centerX, panel.y + 97);
+    this.detail
+      .setPosition(centerX, panel.y + 141)
+      .setWordWrapWidth(Math.max(320, panel.width - 100), true);
+    const buttonX = centerX - 190;
+    this.primaryButton.setPosition(buttonX, panel.y + 205);
+    this.secondaryButton.setPosition(buttonX, panel.y + 285);
+    this.hint.setPosition(centerX, panel.y + panel.height - 40);
+  }
+
+  getLayoutState(): ResponsiveCombatHudLayout | null {
+    return this.layoutState;
   }
 
   show(): void {
