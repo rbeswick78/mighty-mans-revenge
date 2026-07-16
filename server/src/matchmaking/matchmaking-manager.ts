@@ -65,6 +65,7 @@ import type {
   PracticeGauntletRouteId,
   TeamId,
   MatchIntent,
+  StandardMatchLaunch,
   PartyState,
   PartyParticipant,
   ScheduledArenaLock,
@@ -1310,6 +1311,33 @@ export class MatchmakingManager {
         ...playerEntries.slice(2, 4).map((entry) => [entry.id, 'red'] as const),
       ]);
     }
+    const humanIds = new Set(group.map((entry) => entry.playerId));
+    const participants = Object.freeze(
+      playerEntries.map((entry) =>
+        Object.freeze({
+          playerId: entry.id,
+          nickname: entry.nickname,
+          fighterId: selectedFighters.get(entry.id)!,
+          source: humanIds.has(entry.id) ? ('human' as const) : ('standard_bot' as const),
+          ready: true,
+        }),
+      ),
+    );
+    const standardMatch: Readonly<StandardMatchLaunch> = Object.freeze({
+      format: intent.format,
+      composition: Object.freeze({ ...intent.composition }),
+      scheduledArena: Object.freeze({ ...intent.scheduledArena }),
+      participants: Object.freeze(
+        participants.map(({ playerId, nickname, fighterId, source }) =>
+          Object.freeze({ playerId, nickname, fighterId, source }),
+        ),
+      ),
+      ...(playerTeams.size > 0
+        ? {
+            playerTeams: Object.freeze(Object.fromEntries(playerTeams) as Record<PlayerId, TeamId>),
+          }
+        : {}),
+    });
     this.launchMatch(
       matchId,
       getMap(intent.scheduledArena.mapName),
@@ -1326,18 +1354,7 @@ export class MatchmakingManager {
       null,
       playerTeams,
       selectedFighters,
-    );
-    const humanIds = new Set(group.map((entry) => entry.playerId));
-    const participants = Object.freeze(
-      playerEntries.map((entry) =>
-        Object.freeze({
-          playerId: entry.id,
-          nickname: entry.nickname,
-          fighterId: selectedFighters.get(entry.id)!,
-          source: humanIds.has(entry.id) ? ('human' as const) : ('standard_bot' as const),
-          ready: true,
-        }),
-      ),
+      standardMatch,
     );
     return Object.freeze({ matchId, participants });
   }
@@ -1685,6 +1702,7 @@ export class MatchmakingManager {
     practiceMutatorPreference: MutatorId | null = null,
     playerTeams: ReadonlyMap<PlayerId, TeamId> = new Map(),
     preselectedFighters: ReadonlyMap<PlayerId, CharacterId> = new Map(),
+    standardMatch?: Readonly<StandardMatchLaunch>,
   ): void {
     const matchKind =
       this.matchKinds.get(matchId) ?? (practiceDifficulty === null ? 'duel' : 'practice');
@@ -1839,6 +1857,7 @@ export class MatchmakingManager {
           mapName: mapData.name,
           gameMode,
           matchKind,
+          standardMatch,
           playerTeams:
             playerTeams.size > 0
               ? (Object.fromEntries(playerTeams) as Record<PlayerId, TeamId>)

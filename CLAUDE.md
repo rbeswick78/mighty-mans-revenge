@@ -319,6 +319,21 @@ legacy rematch messages cannot bypass a retained party. Practice and
 capability-off Results remain on their established paths; Batch 16 owns
 standard Draft and Character Select retirement.
 
+**Reforged standard-match direct launch (Batch 16):** capability-owned Duel,
+Rumble, and Crew generalized-intent, complete-party, confirmed bot-fill, and
+retained-party rematch launches now carry an additive `standardMatch`
+projection on `server:matchFound`. The server creates that projection only
+after queue/party validation and includes the exact format, human/standard-bot
+composition, participant IDs, locked fighters, explicit mode, current
+scheduled arena, and Crew teams. The client normalizes the projection against
+the match envelope and local human identity; only a valid projection with both
+`newShell` and `schedules` enabled may route directly into the existing
+countdown/gameplay path. Malformed, partial, contradictory, duplicate, source-
+or team-drifted, and capability-drifted launches return to Lobby without
+client inference. Practice and all challenge setup, capability-off/old-server
+Draft and Character Select, legacy messages/scenes, Results, FORCE diagnostics,
+and wire compatibility remain intact. Capability defaults remain false.
+
 ### Why This Matters for Agents
 
 Client prediction and server simulation **must use identical physics code** from `/shared`. If you change movement, collision, or physics logic, you must change it in `/shared` and verify both client and server still agree. A mismatch between client prediction and server authority causes visible rubber-banding.

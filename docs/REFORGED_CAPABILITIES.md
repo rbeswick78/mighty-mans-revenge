@@ -137,6 +137,22 @@ generic rematch messages cannot bypass retained party authority. Practice and
 legacy Results remain unchanged, all capability defaults remain false, and
 Batch 16 owns standard Draft/Character Select routing retirement.
 
+Batch 16 adds an optional, complete `standardMatch` projection to
+`server:matchFound` for capability-owned Duel, Rumble, and Crew launches. The
+server emits it only after generalized-intent, party, confirmed bot-fill, or
+retained-party rematch authority has revalidated the exact format,
+composition, participant sources, locked fighters, explicit mode, scheduled
+arena, and Crew teams. A client may bypass Draft and Character Select only
+when both `newShell` and `schedules` are enabled and that projection validates
+against the outer match envelope and local human identity. Missing projections
+from old servers retain the complete legacy route when capabilities are off;
+Practice and every challenge route retain their established setup. Partial,
+malformed, contradictory, duplicate-participant, source-drifted, team-drifted,
+or capability-drifted projections fail closed and return to Lobby without
+inventing match state. Legacy scene code and transitional messages remain for
+fallback compatibility through Batch 54. All capability defaults remain false
+and no production capability changed.
+
 ## Server-first rollout and rollback
 
 For each capability, keep this order:

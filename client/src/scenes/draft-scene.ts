@@ -7,6 +7,7 @@ import { AudioManager } from '../audio/audio-manager.js';
 import { isTouchDevice } from '../input/is-touch-device.js';
 import { MenuGamepadInput } from '../input/menu-gamepad.js';
 import { GameService, type MatchData } from '../services/game-service.js';
+import { matchFoundDestination } from '../ui/reforged/standard-match-route.js';
 import { WastelandStreet } from '../ui/menu/wasteland-street.js';
 import { PixelButton } from '../ui/menu/pixel-button.js';
 import { TitleLogo } from '../ui/menu/title-logo.js';
@@ -250,17 +251,26 @@ export class DraftScene extends Phaser.Scene {
 
     this.onMatchFound = (matchData: MatchData) => {
       // Both picks are in — hold a short locked-in beat showing the final
-      // map+mode, then hand off to character select exactly like the
-      // lobby does (fade + fallback timer for backgrounded tabs).
+      // map+mode, then hand off through the validated match route exactly like
+      // the lobby does (fade + fallback timer for backgrounded tabs).
       if (this.transitioned) return;
+      const destination = matchFoundDestination(
+        this.gameService.getServerCapabilities(),
+        matchData,
+      );
+      if (destination === 'reject') {
+        this.gameService.returnToLobby();
+        this.bailToLobby();
+        return;
+      }
       this.transitioned = true;
 
       let started = false;
-      const goToSelect = (): void => {
+      const goToMatch = (): void => {
         if (started) return;
         started = true;
         this.cleanupEvents();
-        this.scene.start('CharacterSelectScene', {
+        this.scene.start(destination === 'game' ? 'GameScene' : 'CharacterSelectScene', {
           nickname: this.nickname,
           matchData,
         });
@@ -270,8 +280,8 @@ export class DraftScene extends Phaser.Scene {
       if (this.phase === 'pick') this.renderLockedBeat(matchData);
       this.time.delayedCall(beatMs, () => {
         this.cameras.main.fadeOut(300, 0, 0, 0);
-        this.cameras.main.once('camerafadeoutcomplete', goToSelect);
-        this.time.delayedCall(500, goToSelect);
+        this.cameras.main.once('camerafadeoutcomplete', goToMatch);
+        this.time.delayedCall(500, goToMatch);
       });
     };
 

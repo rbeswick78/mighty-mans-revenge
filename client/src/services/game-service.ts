@@ -29,9 +29,14 @@ import type { ArenaWins } from '@shared/types/map.js';
 import { createEmptyCharacterWins } from '@shared/config/game.js';
 import type { BotDifficulty, PracticeKind } from '@shared/config/game.js';
 import type { CharacterId, WeaponId, MutatorId, TauntId } from '@shared/config/game.js';
+import { listMapNames } from '@shared/maps/registry.js';
 import { NetworkManager, type LocalCorrection } from '../network/network-manager.js';
 import type { NormalizedArenaSchedule } from '../network/arena-schedule.js';
-import type { MatchIntent } from '@shared/matchmaking/match-intent.js';
+import {
+  normalizeStandardMatchLaunch,
+  type MatchIntent,
+  type StandardMatchLaunch,
+} from '@shared/matchmaking/match-intent.js';
 import type { PartyState } from '@shared/matchmaking/party.js';
 import { localArenaWinsFromDraft, mergeArenaWinsFromResult } from './record-snapshots.js';
 
@@ -60,6 +65,10 @@ export interface MatchData {
   /** Mode this match will be played in — drives the pre-match mode label. */
   gameMode: GameModeType;
   matchKind?: 'duel' | 'rumble' | 'duos' | 'practice';
+  /** Client validation result for the additive direct-launch projection. */
+  standardLaunchStatus?: 'absent' | 'valid' | 'invalid';
+  /** Present only when the complete server-owned projection validates. */
+  standardMatch?: Readonly<StandardMatchLaunch>;
   /** Immutable server-authored sides for Crew Battle. */
   playerTeams?: Record<PlayerId, TeamId>;
   practiceKind?: PracticeKind;
@@ -410,12 +419,28 @@ export class GameService {
         ...msg.characterWins,
       });
       this.latestCharacterWins = characterWins;
+      const rawStandardMatch = msg.standardMatch;
+      const standardMatch =
+        rawStandardMatch !== undefined &&
+        (msg.matchKind === 'duel' || msg.matchKind === 'rumble' || msg.matchKind === 'duos')
+          ? normalizeStandardMatchLaunch(rawStandardMatch, {
+              localPlayerId: this.getPlayerId(),
+              expectedMapName: msg.mapName,
+              expectedMode: msg.gameMode,
+              expectedMatchKind: msg.matchKind,
+              expectedPlayerTeams: msg.playerTeams,
+              allowedArenaNames: listMapNames(),
+            })
+          : null;
       this.currentMatch = {
         matchId: msg.matchId,
         opponents: msg.opponents,
         mapName: msg.mapName,
         gameMode: msg.gameMode,
         matchKind: msg.matchKind ?? (msg.gauntlet ? 'practice' : 'duel'),
+        standardLaunchStatus:
+          rawStandardMatch === undefined ? 'absent' : standardMatch === null ? 'invalid' : 'valid',
+        ...(standardMatch ? { standardMatch } : {}),
         playerTeams: msg.playerTeams,
         practiceKind: msg.practiceKind,
         rumbleCrown: msg.rumbleCrown,

@@ -19,6 +19,7 @@ import { AudioManager } from '../audio/audio-manager.js';
 import { isTouchDevice } from '../input/is-touch-device.js';
 import { MenuGamepadInput } from '../input/menu-gamepad.js';
 import { GameService, type MatchData } from '../services/game-service.js';
+import { matchFoundDestination } from '../ui/reforged/standard-match-route.js';
 import { WastelandStreet, type Outcome } from '../ui/menu/wasteland-street.js';
 import { MenuPanel } from '../ui/menu/menu-panel.js';
 import { PixelButton } from '../ui/menu/pixel-button.js';
@@ -1535,15 +1536,25 @@ export class ResultsScene extends Phaser.Scene {
     };
 
     this.onMatchFound = (matchData: MatchData) => {
-      // Rematch accepted — transition to character-select. Guard against
-      // fade-complete not firing (observed on backgrounded tabs and some
-      // mobile browsers): fall back to a timer.
+      const destination = matchFoundDestination(
+        this.gameService.getServerCapabilities(),
+        matchData,
+      );
+      if (destination === 'reject') {
+        this.gameService.returnToLobby();
+        this.cleanupEvents();
+        this.scene.start('LobbyScene');
+        return;
+      }
+      // Rematch accepted — transition through the validated match route. Guard
+      // against fade-complete not firing (observed on backgrounded tabs and
+      // some mobile browsers): fall back to a timer.
       let transitioned = false;
       const goToGame = (): void => {
         if (transitioned) return;
         transitioned = true;
         this.cleanupEvents();
-        this.scene.start('CharacterSelectScene', {
+        this.scene.start(destination === 'game' ? 'GameScene' : 'CharacterSelectScene', {
           nickname: this.nickname,
           matchData,
         });

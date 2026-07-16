@@ -30,7 +30,7 @@ import type {
   MutatorId,
   TauntId,
 } from '../config/game.js';
-import type { MatchFormat, MatchIntent } from '../matchmaking/match-intent.js';
+import type { MatchFormat, MatchIntent, StandardMatchLaunch } from '../matchmaking/match-intent.js';
 import type { PartyErrorCode, PartyState } from '../matchmaking/party.js';
 
 // === Client -> Server Messages ===
@@ -490,6 +490,11 @@ export interface ServerMatchFoundMessage {
   gameMode: GameModeType;
   /** Queue family; optional so older servers still interoperate. */
   matchKind?: 'duel' | 'rumble' | 'duos' | 'practice';
+  /**
+   * Complete server-owned proof for capability-owned direct countdown entry.
+   * Absent on legacy, old-server, FORCE, and every Practice/challenge route.
+   */
+  standardMatch?: StandardMatchLaunch;
   /** Immutable server-authored sides for Crew Battle. */
   playerTeams?: Record<PlayerId, import('./game.js').TeamId>;
   /** Solo route that created this match; lets pre-match UI name the experience truthfully. */

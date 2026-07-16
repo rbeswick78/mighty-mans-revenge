@@ -72,6 +72,14 @@ party remains authoritative through the match, Results, and valid rematches;
 clients do not reconstruct it from local state. Production capabilities remain
 off until the roadmap release gate.
 
+On capability-enabled servers, a validated standard Duel, Rumble, or Crew
+launch now carries its complete server-owned roster, fighter, source, mode,
+scheduled-arena, and team contract directly into the existing match countdown;
+the client does not repeat Draft or Character Select. Practice and challenge
+setup still use their established routes, while old servers and capability-off
+clients keep the complete legacy Lobby, Draft, Character Select, Results, and
+rematch flow.
+
 `QUICK MATCH` keeps the focused 1v1 rivalry experience. `RUMBLE 2–4` opens a
 short gathering window once two fighters arrive, launches immediately at four,
 and turns every existing arena, mode, character, and shared event into a

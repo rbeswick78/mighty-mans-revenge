@@ -163,16 +163,38 @@ describe('MatchmakingManager generalized match intent', () => {
     expect(match.selectionState.get('p1')?.locked).toBe('mighty_man');
     expect([...match.selectionState.values()].every(({ locked }) => locked !== null)).toBe(true);
     expect(sent.some(({ message }) => message.type === 'server:draftState')).toBe(false);
-    expect(
-      sent.find(
-        ({ playerId, message }) => playerId === 'p1' && message.type === 'server:matchFound',
-      )?.message,
-    ).toMatchObject({
+    const found = sent.find(
+      ({ playerId, message }) => playerId === 'p1' && message.type === 'server:matchFound',
+    );
+    expect(found?.message).toMatchObject({
       type: 'server:matchFound',
       mapName: listMapNames()[0],
       gameMode: GameModeType.DEATHMATCH,
       matchKind: 'duel',
+      standardMatch: {
+        format: 'duel',
+        composition: { humanCount: 1, botCount: 1 },
+        scheduledArena: {
+          mode: GameModeType.DEATHMATCH,
+          mapName: listMapNames()[0],
+          rotationEndsAt: 2_000,
+        },
+      },
     });
+    if (!found || found.message.type !== 'server:matchFound') throw new Error('missing matchFound');
+    expect(found.message.standardMatch?.participants).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          playerId: 'p1',
+          fighterId: 'mighty_man',
+          source: 'human',
+        }),
+        expect.objectContaining({ source: 'standard_bot' }),
+      ]),
+    );
+    manager.tick(0.05, 1);
+    expect(match.phase).toBe(MatchPhase.COUNTDOWN);
+    expect(sent.some(({ message }) => message.type === 'server:characterSelectState')).toBe(false);
     expect(release).toHaveBeenCalledWith('p1');
   });
 
@@ -215,10 +237,23 @@ describe('MatchmakingManager generalized match intent', () => {
     expect(match.selectionState.get('p1')?.locked).toBe('mighty_man');
     expect(match.selectionState.get('p3')?.locked).toBe('bruce');
     expect(match.selectionState.has('p2')).toBe(false);
+    const found = sent.find(
+      ({ playerId, message }) => playerId === 'p1' && message.type === 'server:matchFound',
+    );
+    if (!found || found.message.type !== 'server:matchFound') throw new Error('missing matchFound');
+    expect(found.message.standardMatch).toMatchObject({
+      format: 'rumble',
+      composition: { humanCount: 2, botCount: 1 },
+    });
+    expect(found.message.standardMatch?.participants.map(({ source }) => source).sort()).toEqual([
+      'human',
+      'human',
+      'standard_bot',
+    ]);
   });
 
   it('builds authoritative two-versus-two Crew sides for three humans and one bot', () => {
-    const { manager } = setup();
+    const { manager, sent } = setup();
     for (const [index, fighterId] of CHARACTER_IDS.slice(0, 3).entries()) {
       manager.handleSubmitMatchIntent(
         `p${index + 1}`,
@@ -246,6 +281,18 @@ describe('MatchmakingManager generalized match intent', () => {
     expect([...match.getTeamAssignments().values()].filter((team) => team === 'red')).toHaveLength(
       2,
     );
+    const found = sent.find(
+      ({ playerId, message }) => playerId === 'p1' && message.type === 'server:matchFound',
+    );
+    if (!found || found.message.type !== 'server:matchFound') throw new Error('missing matchFound');
+    expect(found.message.standardMatch?.format).toBe('crew');
+    expect(found.message.standardMatch?.playerTeams).toEqual(found.message.playerTeams);
+    expect(Object.values(found.message.standardMatch?.playerTeams ?? {}).sort()).toEqual([
+      'blue',
+      'blue',
+      'red',
+      'red',
+    ]);
   });
 
   it('fails closed for lock mismatch, duplicate, replay, cancel, and disconnect paths', () => {
@@ -331,6 +378,18 @@ describe('MatchmakingManager generalized match intent', () => {
       expect(sent.filter(({ message }) => message.type === 'server:matchFound')).toHaveLength(
         count,
       );
+      const found = sent.find(
+        ({ playerId, message }) =>
+          playerId === members[0]!.playerId && message.type === 'server:matchFound',
+      );
+      if (!found || found.message.type !== 'server:matchFound') {
+        throw new Error('missing party matchFound');
+      }
+      expect(found.message.standardMatch).toMatchObject({
+        format,
+        composition: { humanCount: count, botCount: format === 'duel' ? 0 : 4 - count },
+        scheduledArena: { mode, mapName: listMapNames()[0], rotationEndsAt: 2_000 },
+      });
       expect(release).toHaveBeenCalledTimes(count);
     },
   );
@@ -384,7 +443,7 @@ describe('MatchmakingManager generalized match intent', () => {
     'revalidates retained %s humans/bots and launches the current scheduled arena',
     (format, humanCount, botCount, mode) => {
       const lockOverride: Partial<ScheduledArenaLock> = {};
-      const { manager } = setup(lockOverride);
+      const { manager, sent } = setup(lockOverride);
       const members = Array.from({ length: humanCount }, (_, index) => ({
         playerId: `rematch-player-${index + 1}` as PlayerId,
         nickname: `Human${index + 1}`,
@@ -496,6 +555,24 @@ describe('MatchmakingManager generalized match intent', () => {
         rematchLaunch.participants.filter((entry) => entry.source === 'standard_bot'),
       ).toHaveLength(botCount);
       expect(manager.getActiveMatches()).toHaveLength(1);
+      const rematchFound = [...sent]
+        .reverse()
+        .find(
+          ({ playerId, message }) =>
+            playerId === members[0]!.playerId && message.type === 'server:matchFound',
+        );
+      if (!rematchFound || rematchFound.message.type !== 'server:matchFound') {
+        throw new Error('missing rematch matchFound');
+      }
+      expect(rematchFound.message.standardMatch).toMatchObject({
+        format,
+        composition: { humanCount, botCount },
+        scheduledArena: {
+          mode,
+          mapName: listMapNames()[1],
+          rotationEndsAt: 302_000,
+        },
+      });
     },
   );
 });
@@ -1753,6 +1830,7 @@ describe('MatchmakingManager pre-match draft', () => {
     for (const f of found) {
       expect(f.message.mapName).toBe(expectedMap);
       expect(f.message.gameMode).toBe(GameModeType.DEATHMATCH);
+      expect(f.message.standardMatch).toBeUndefined();
     }
     const match = mgr.getActiveMatches()[0];
     expect(match.mapManager.getMapData().name).toBe(expectedMap);
@@ -1808,6 +1886,7 @@ describe('MatchmakingManager pre-match draft', () => {
     const found = matchFoundMessages(sent);
     expect(found.map((f) => f.playerId).sort()).toEqual(['A', 'B']);
     expect(found[0].message.mapName).toBe(names[1]);
+    expect(found[0].message.standardMatch).toBeUndefined();
 
     mgr.tick(0.05, 1);
     expect(sent.some((s) => s.message.type === 'server:draftState')).toBe(false);

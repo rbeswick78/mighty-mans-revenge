@@ -765,17 +765,13 @@ test('Play submits one server-scheduled general intent and recovery clears queue
   });
 
   if (liveChromium) {
-    await expect
-      .poll(
-        () =>
-          page.evaluate(() => {
-            const game = (window as unknown as { game?: Phaser.Game }).game;
-            const scenes = game?.scene.getScenes(true).map((scene) => scene.scene.key) ?? [];
-            return scenes.includes('CharacterSelectScene') || scenes.includes('GameScene');
-          }),
-        { timeout: 30_000 },
-      )
-      .toBe(true);
+    await waitForActiveScene(page, 'GameScene');
+    expect(
+      await page.evaluate(() => {
+        const game = (window as unknown as { game?: Phaser.Game }).game;
+        return game?.scene.getScenes(true).map((scene) => scene.scene.key) ?? [];
+      }),
+    ).not.toContain('CharacterSelectScene');
     await expect
       .poll(() =>
         page.evaluate(() => {
@@ -828,6 +824,147 @@ test('Play submits one server-scheduled general intent and recovery clears queue
       }),
     )
     .toEqual([960, 720]);
+});
+
+test('validated standard launch bypasses Draft and Character Select across pointer, keyboard, gamepad, and touch', async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    !shellAdvertised || !schedulesAdvertised,
+    'Run with both Reforged shell and schedule capabilities for direct launch.',
+  );
+  test.setTimeout(60_000);
+  await page.addInitScript(() => {
+    localStorage.setItem('mmr_nickname', 'Direct16');
+    localStorage.setItem('mmr_fighter_selection', 'rook');
+  });
+  await page.goto('/');
+  const liveChromium = testInfo.project.name === 'desktop-chromium';
+  const touch = testInfo.project.name === 'mobile-landscape';
+  if (!liveChromium) await stageNonChromiumShell(page, 'direct-player-16');
+  await waitForActiveScene(page, 'ReforgedShellScene');
+
+  // Pointer/touch enters Play; an external keyboard chooses composition and
+  // explicit mode; standard gamepad A confirms the server arena and launch.
+  await clickLogicalPlayOption(page, 0, touch);
+  await expect.poll(async () => (await playRosterSnapshot(page)).step).toBe('composition');
+  await page.keyboard.press('Enter');
+  await expect.poll(async () => (await playRosterSnapshot(page)).step).toBe('mode');
+  if (touch) {
+    await clickLogicalPlayOption(page, 1, true);
+  } else {
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('Enter');
+  }
+  await expect.poll(async () => (await playRosterSnapshot(page)).step).toBe('arena');
+  await queueMenuGamepadActions(page, [{ confirm: true }]);
+  await expect.poll(async () => (await playRosterSnapshot(page)).step).toBe('review');
+  const reviewed = await playRosterSnapshot(page);
+  expect(reviewed.serialized).toMatchObject({
+    format: 'duel',
+    composition: { humanCount: 1, botCount: 1 },
+    mode: 'koth',
+    fighterId: 'rook',
+  });
+  await queueMenuGamepadActions(page, [{ confirm: true }]);
+
+  if (!liveChromium) {
+    await page.evaluate((serialized) => {
+      if (!serialized) throw new Error('missing reviewed draft');
+      const shell = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+        'ReforgedShellScene',
+      ) as unknown as {
+        gameService: { getNetworkManager(): { handleMessage(message: unknown): void } };
+      };
+      const draft = serialized as {
+        format: 'duel';
+        composition: { humanCount: 1; botCount: 1 };
+        mode: 'koth';
+        arenaName: string;
+        fighterId: 'rook';
+      };
+      shell.gameService.getNetworkManager().handleMessage({
+        type: 'server:matchFound',
+        matchId: 'direct-match-16',
+        opponents: [{ id: 'direct-bot-16', nickname: 'Scrapper 1' }],
+        mapName: draft.arenaName,
+        gameMode: draft.mode,
+        matchKind: 'duel',
+        standardMatch: {
+          format: draft.format,
+          composition: draft.composition,
+          scheduledArena: {
+            mode: draft.mode,
+            mapName: draft.arenaName,
+            rotationEndsAt: 1_240_000,
+          },
+          participants: [
+            {
+              playerId: 'direct-player-16',
+              nickname: 'Direct16',
+              fighterId: draft.fighterId,
+              source: 'human',
+            },
+            {
+              playerId: 'direct-bot-16',
+              nickname: 'Scrapper 1',
+              fighterId: 'mighty_man',
+              source: 'standard_bot',
+            },
+          ],
+        },
+      });
+    }, reviewed.serialized);
+  }
+
+  await waitForActiveScene(page, 'GameScene');
+  const route = await page.evaluate(() => {
+    const game = (window as unknown as { game?: Phaser.Game }).game;
+    const active = game?.scene.getScenes(true).map((scene) => scene.scene.key) ?? [];
+    const scene = game?.scene.getScene('GameScene') as unknown as {
+      matchData?: {
+        mapName: string;
+        gameMode: string;
+        standardLaunchStatus: string;
+        standardMatch?: {
+          participants: Array<{ fighterId: string; source: string }>;
+        };
+      };
+    };
+    return { active, matchData: scene.matchData };
+  });
+  expect(route.active).not.toContain('DraftScene');
+  expect(route.active).not.toContain('CharacterSelectScene');
+  expect(route.matchData).toMatchObject({
+    gameMode: 'koth',
+    standardLaunchStatus: 'valid',
+    standardMatch: {
+      participants: expect.arrayContaining([
+        expect.objectContaining({ fighterId: 'rook', source: 'human' }),
+        expect.objectContaining({ source: 'standard_bot' }),
+      ]),
+    },
+  });
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const game = (window as unknown as { game?: Phaser.Game }).game;
+        return [game?.scale.width, game?.scale.height];
+      }),
+    )
+    .toEqual([960, 720]);
+
+  if (liveChromium) {
+    await waitForRenderedFrames(page);
+    await page.screenshot({ path: testInfo.outputPath('direct-launch-desktop.png') });
+    await page.evaluate(async () => {
+      if (document.fullscreenElement) await document.exitFullscreen();
+    });
+    await expect.poll(() => page.evaluate(() => document.fullscreenElement === null)).toBe(true);
+    await page.setViewportSize({ width: 844, height: 390 });
+    await waitForRenderedFrames(page);
+    await page.screenshot({ path: testInfo.outputPath('direct-launch-mobile-chromium.png') });
+  }
 });
 
 test('Party readiness projects recovery, leadership, and server-owned slots across two clients', async ({
@@ -1090,17 +1227,13 @@ test('Party bot fill remains server-offered and requires explicit leader confirm
     await waitForRenderedFrames(page);
     await page.screenshot({ path: testInfo.outputPath('party-bot-fill-mobile-chromium.png') });
     await clickLogicalPlayOption(page, 0, false);
-    await expect
-      .poll(async () => {
-        return page.evaluate(() => {
-          const scenes = (window as unknown as { game?: Phaser.Game }).game?.scene.getScenes(true);
-          return scenes?.some(
-            (scene) =>
-              scene.scene.key === 'CharacterSelectScene' || scene.scene.key === 'GameScene',
-          );
-        });
-      })
-      .toBe(true);
+    await waitForActiveScene(page, 'GameScene');
+    expect(
+      await page.evaluate(() => {
+        const game = (window as unknown as { game?: Phaser.Game }).game;
+        return game?.scene.getScenes(true).map((scene) => scene.scene.key) ?? [];
+      }),
+    ).not.toContain('CharacterSelectScene');
   } else {
     const reviewed = (await playRosterSnapshot(page)).serialized;
     if (!reviewed) throw new Error('missing reviewed roster');

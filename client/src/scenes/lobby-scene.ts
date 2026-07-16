@@ -76,6 +76,7 @@ import {
 import { audioToggleLabel } from '../ui/audio-toggle.js';
 import { PracticeSetupMenu } from '../ui/practice-setup-menu.js';
 import { menuSceneForCapabilities } from '../ui/reforged/menu-route.js';
+import { matchFoundDestination } from '../ui/reforged/standard-match-route.js';
 import { useLegacyLogicalSize } from '../ui/reforged/responsive-menu-layout.js';
 
 const STORAGE_KEY_BOT_DIFFICULTY = 'mmr_bot_difficulty';
@@ -949,12 +950,21 @@ export class LobbyScene extends Phaser.Scene {
       // and brings down the GameService dispatch chain — silently
       // stranding the live scene's listener.
       this.isSearching = false;
+      const destination = matchFoundDestination(
+        this.gameService.getServerCapabilities(),
+        matchData,
+      );
+      if (destination === 'reject') {
+        this.gameService.returnToLobby();
+        this.stopSearching();
+        return;
+      }
       let transitioned = false;
       const goToGame = (): void => {
         if (transitioned) return;
         transitioned = true;
         this.cleanupEvents();
-        this.scene.start('CharacterSelectScene', {
+        this.scene.start(destination === 'game' ? 'GameScene' : 'CharacterSelectScene', {
           nickname: this.nickname,
           matchData,
         });

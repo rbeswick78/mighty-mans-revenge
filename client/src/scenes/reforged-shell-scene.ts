@@ -25,6 +25,7 @@ import { persistFighterSelection, readFighterSelection } from '../ui/reforged/fi
 import { FightersPanel, type FightersPanelSnapshot } from '../ui/reforged/fighters-panel.js';
 import { MenuFocusNavigator } from '../ui/reforged/focus-navigation.js';
 import { menuSceneForCapabilities } from '../ui/reforged/menu-route.js';
+import { matchFoundDestination } from '../ui/reforged/standard-match-route.js';
 import { PlayRosterPanel, type PlayRosterPanelSnapshot } from '../ui/reforged/play-roster-panel.js';
 import type { SerializedPlayRosterDraft } from '../ui/reforged/play-roster-builder.js';
 import { playSchedulePresentation } from '../ui/reforged/arena-schedule-presentation.js';
@@ -418,7 +419,7 @@ export class ReforgedShellScene extends Phaser.Scene {
   }
 
   private bindConnectionLifecycle(): void {
-    this.onMatchFound = (matchData) => this.openCharacterSelect(matchData);
+    this.onMatchFound = (matchData) => this.openMatch(matchData);
     this.onLeaderboard = () => this.refreshRecordsSnapshots();
     this.onDailyLeaderboard = () => this.refreshRecordsSnapshots();
     this.onCapabilitiesChanged = (capabilities) => {
@@ -800,8 +801,14 @@ export class ReforgedShellScene extends Phaser.Scene {
     );
   }
 
-  private openCharacterSelect(matchData: MatchData): void {
+  private openMatch(matchData: MatchData): void {
     if (this.leaving) return;
+    const destination = matchFoundDestination(this.gameService.getServerCapabilities(), matchData);
+    if (destination === 'reject') {
+      this.gameService.returnToLobby();
+      this.returnToLobby();
+      return;
+    }
     this.leaving = true;
     let transitioned = false;
     const go = (): void => {
@@ -809,7 +816,10 @@ export class ReforgedShellScene extends Phaser.Scene {
       transitioned = true;
       this.cleanupEvents();
       useLegacyLogicalSize(this.scale);
-      this.scene.start('CharacterSelectScene', { nickname: this.nickname, matchData });
+      this.scene.start(destination === 'game' ? 'GameScene' : 'CharacterSelectScene', {
+        nickname: this.nickname,
+        matchData,
+      });
     };
     this.cameras.main.fadeOut(300, 0, 0, 0);
     this.cameras.main.once('camerafadeoutcomplete', go);

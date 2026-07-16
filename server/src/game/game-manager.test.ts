@@ -280,6 +280,15 @@ describe('GameManager connection leaderboard', () => {
       mapName: scheduledArena.mapName,
       gameMode: GameModeType.KOTH,
       matchKind: 'duel',
+      standardMatch: {
+        format: 'duel',
+        composition: { humanCount: 1, botCount: 1 },
+        scheduledArena,
+        participants: expect.arrayContaining([
+          expect.objectContaining({ playerId: 'p1', fighterId: 'bruce', source: 'human' }),
+          expect.objectContaining({ source: 'standard_bot' }),
+        ]),
+      },
     });
     expect(manager.matchmakingManager.getActiveMatches()).toHaveLength(1);
     const lockSnapshots = sent.filter(

@@ -5,6 +5,8 @@ import {
   type CharacterId,
 } from '../config/game.js';
 import type { GameModeType } from '../types/game.js';
+import type { PlayerId } from '../types/common.js';
+import type { TeamId } from '../types/game.js';
 import type { ScheduledArena } from '../types/network.js';
 
 export const MATCH_FORMATS = Object.freeze(['duel', 'rumble', 'crew'] as const);
@@ -27,6 +29,38 @@ export interface MatchIntent {
   readonly fighterId: CharacterId;
   /** Client echo of server schedule truth; authority creates and compares its own lock. */
   readonly scheduledArena: Readonly<ScheduledArena>;
+}
+
+export type StandardMatchParticipantSource = 'human' | 'standard_bot';
+
+/** One exact server-owned entrant in a capability-owned direct launch. */
+export interface StandardMatchParticipant {
+  readonly playerId: PlayerId;
+  readonly nickname: string;
+  readonly fighterId: CharacterId;
+  readonly source: StandardMatchParticipantSource;
+}
+
+/**
+ * Complete additive proof that a standard match may bypass legacy Draft and
+ * Character Select. Absence preserves the legacy/Practice routing contract.
+ */
+export interface StandardMatchLaunch {
+  readonly format: MatchFormat;
+  readonly composition: MatchComposition;
+  readonly scheduledArena: Readonly<ScheduledArena>;
+  readonly participants: readonly StandardMatchParticipant[];
+  /** Present only for Crew and must assign every entrant to an exact 2v2 side. */
+  readonly playerTeams?: Readonly<Record<PlayerId, TeamId>>;
+}
+
+export interface StandardMatchLaunchNormalizationOptions {
+  readonly localPlayerId: PlayerId | null;
+  readonly expectedMapName: string;
+  readonly expectedMode: GameModeType;
+  readonly expectedMatchKind: 'duel' | 'rumble' | 'duos';
+  readonly expectedPlayerTeams?: Readonly<Record<PlayerId, TeamId>>;
+  readonly allowedArenaNames: readonly string[];
 }
 
 export interface MatchIntentNormalizationOptions {
@@ -81,6 +115,44 @@ function isGameMode(value: unknown): value is GameModeType {
 
 function isCharacterId(value: unknown): value is CharacterId {
   return typeof value === 'string' && CHARACTER_IDS.includes(value as CharacterId);
+}
+
+function normalizedTeams(
+  value: unknown,
+  participantIds: readonly PlayerId[],
+): Readonly<Record<PlayerId, TeamId>> | null {
+  if (!isRecord(value)) return null;
+  const keys = Object.keys(value).sort();
+  const expected = [...participantIds].sort();
+  if (keys.length !== expected.length || keys.some((key, index) => key !== expected[index])) {
+    return null;
+  }
+  const teams: Record<PlayerId, TeamId> = {};
+  for (const playerId of participantIds) {
+    const team = value[playerId];
+    if (team !== 'blue' && team !== 'red') return null;
+    teams[playerId] = team;
+  }
+  if (
+    Object.values(teams).filter((team) => team === 'blue').length !== 2 ||
+    Object.values(teams).filter((team) => team === 'red').length !== 2
+  ) {
+    return null;
+  }
+  return Object.freeze(teams);
+}
+
+function sameTeams(
+  left: Readonly<Record<PlayerId, TeamId>> | undefined,
+  right: Readonly<Record<PlayerId, TeamId>> | undefined,
+): boolean {
+  if (left === undefined || right === undefined) return left === right;
+  const keys = Object.keys(left).sort();
+  const otherKeys = Object.keys(right).sort();
+  return (
+    keys.length === otherKeys.length &&
+    keys.every((key, index) => key === otherKeys[index] && left[key] === right[key])
+  );
 }
 
 function normalizeComposition(value: unknown, format: MatchFormat): MatchComposition | null {
@@ -153,6 +225,108 @@ export function normalizeMatchIntent(
     mode,
     fighterId,
     scheduledArena,
+  });
+}
+
+/**
+ * Validate the server-owned direct-launch projection against the surrounding
+ * matchFound envelope. Any partial, contradictory, duplicate, or invented
+ * participant/arena/team state fails closed.
+ */
+export function normalizeStandardMatchLaunch(
+  value: unknown,
+  options: StandardMatchLaunchNormalizationOptions,
+): Readonly<StandardMatchLaunch> | null {
+  if (!isRecord(value) || options.localPlayerId === null) return null;
+  const format = value['format'];
+  if (!isMatchFormat(format)) return null;
+  const expectedKind = format === 'crew' ? 'duos' : format;
+  if (expectedKind !== options.expectedMatchKind) return null;
+
+  const composition = normalizeComposition(value['composition'], format);
+  const arena = value['scheduledArena'];
+  if (!composition || !isRecord(arena)) return null;
+  const rotationEndsAt = arena['rotationEndsAt'];
+  if (
+    arena['mode'] !== options.expectedMode ||
+    arena['mapName'] !== options.expectedMapName ||
+    !options.allowedArenaNames.includes(options.expectedMapName) ||
+    typeof rotationEndsAt !== 'number' ||
+    !Number.isSafeInteger(rotationEndsAt) ||
+    rotationEndsAt <= 0 ||
+    !MATCH_MODES_BY_FORMAT[format].includes(options.expectedMode)
+  ) {
+    return null;
+  }
+
+  const rawParticipants = value['participants'];
+  if (
+    !Array.isArray(rawParticipants) ||
+    rawParticipants.length !== composition.humanCount + composition.botCount
+  ) {
+    return null;
+  }
+  const participants: StandardMatchParticipant[] = [];
+  const ids = new Set<PlayerId>();
+  const fighters = new Set<CharacterId>();
+  for (const raw of rawParticipants) {
+    if (!isRecord(raw)) return null;
+    const playerId = raw['playerId'];
+    const nickname = raw['nickname'];
+    const fighterId = raw['fighterId'];
+    const source = raw['source'];
+    if (
+      typeof playerId !== 'string' ||
+      playerId.length === 0 ||
+      playerId.length > 128 ||
+      typeof nickname !== 'string' ||
+      nickname.length === 0 ||
+      nickname.length > 32 ||
+      !isCharacterId(fighterId) ||
+      (source !== 'human' && source !== 'standard_bot') ||
+      ids.has(playerId) ||
+      fighters.has(fighterId)
+    ) {
+      return null;
+    }
+    ids.add(playerId);
+    fighters.add(fighterId);
+    participants.push(Object.freeze({ playerId, nickname, fighterId, source }));
+  }
+  if (
+    participants.filter((participant) => participant.source === 'human').length !==
+      composition.humanCount ||
+    participants.filter((participant) => participant.source === 'standard_bot').length !==
+      composition.botCount ||
+    !participants.some(
+      (participant) =>
+        participant.playerId === options.localPlayerId && participant.source === 'human',
+    )
+  ) {
+    return null;
+  }
+
+  const participantIds = participants.map((participant) => participant.playerId);
+  const playerTeams =
+    format === 'crew' ? normalizedTeams(value['playerTeams'], participantIds) : undefined;
+  if (
+    (format === 'crew' && playerTeams === null) ||
+    (format !== 'crew' && value['playerTeams'] !== undefined) ||
+    !sameTeams(playerTeams ?? undefined, options.expectedPlayerTeams)
+  ) {
+    return null;
+  }
+
+  return Object.freeze({
+    format,
+    composition: Object.freeze({ ...composition }),
+    scheduledArena: Object.freeze({
+      mode: options.expectedMode,
+      mapName: options.expectedMapName,
+      rotationEndsAt,
+    }),
+    participants: Object.freeze(participants),
+    ...(playerTeams ? { playerTeams } : {}),
   });
 }
 
