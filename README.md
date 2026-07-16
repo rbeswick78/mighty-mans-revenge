@@ -61,6 +61,17 @@ match death counter, so every client sees the same cosmetic beat.
 
 ## Group play
 
+When a server explicitly advertises both disabled-by-default Reforged menu
+capabilities, Play can also create a short-code Duel, Rumble, or Crew party.
+The server projects every occupied/open human slot, leader, fighter, readiness
+edge, and lifecycle transition. A ready incomplete room waits for invited
+humans; a full ready room launches through the same scheduled-arena authority as
+ordinary Reforged Play. Leadership transfers to the earliest remaining member,
+and a disconnected member can rejoin an open room by code or share link. The
+party remains authoritative through the match, Results, and valid rematches;
+clients do not reconstruct it from local state. Production capabilities remain
+off until the roadmap release gate.
+
 `QUICK MATCH` keeps the focused 1v1 rivalry experience. `RUMBLE 2–4` opens a
 short gathering window once two fighters arrive, launches immediately at four,
 and turns every existing arena, mode, character, and shared event into a

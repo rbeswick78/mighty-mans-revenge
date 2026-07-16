@@ -46,6 +46,8 @@ export type ClientMessage =
   | ClientKickPartyMemberMessage
   | ClientUpdatePartyIntentMessage
   | ClientUpdatePartyFighterMessage
+  | ClientSetPartyReadyMessage
+  | ClientCancelPartyQueueMessage
   | ClientStartPracticeMessage
   | ClientCancelMatchmakingMessage
   | ClientRematchRequestMessage
@@ -124,6 +126,21 @@ export interface ClientUpdatePartyFighterMessage {
   partyId: string;
   expectedVersion: number;
   fighterId: CharacterId;
+}
+
+export interface ClientSetPartyReadyMessage {
+  type: 'client:setPartyReady';
+  requestId: string;
+  partyId: string;
+  expectedVersion: number;
+  ready: boolean;
+}
+
+export interface ClientCancelPartyQueueMessage {
+  type: 'client:cancelPartyQueue';
+  requestId: string;
+  partyId: string;
+  expectedVersion: number;
 }
 
 export interface ClientStartPracticeMessage {

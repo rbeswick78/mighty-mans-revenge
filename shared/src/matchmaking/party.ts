@@ -21,7 +21,21 @@ export interface PartyMember {
   readonly nickname: string;
   readonly fighterId: CharacterId;
   readonly joinedAt: number;
+  readonly ready: boolean;
 }
+
+export type PartyLifecycle = 'assembling' | 'queued' | 'match' | 'results';
+
+export type PartySlot =
+  | {
+      readonly index: number;
+      readonly status: 'occupied';
+      readonly member: PartyMember;
+    }
+  | {
+      readonly index: number;
+      readonly status: 'open';
+    };
 
 export interface PartyState {
   readonly partyId: string;
@@ -34,7 +48,12 @@ export interface PartyState {
   readonly capacity: number;
   readonly leaderId: PlayerId;
   readonly version: number;
+  readonly lifecycle: PartyLifecycle;
+  /** Present only while the authoritative party is attached to a live/results match. */
+  readonly matchId?: string;
   readonly members: readonly PartyMember[];
+  /** Complete server-authored slot projection; clients never derive vacancies. */
+  readonly slots: readonly PartySlot[];
   readonly intent: Readonly<MatchIntent>;
 }
 
@@ -122,6 +141,7 @@ export function partyCodeFromBytes(bytes: Uint8Array): string | null {
 export function isPartyState(value: unknown): value is PartyState {
   if (!isRecord(value)) return false;
   const members = value['members'];
+  const slots = value['slots'];
   const format = value['format'];
   if (
     !(
@@ -135,7 +155,9 @@ export function isPartyState(value: unknown): value is PartyState {
       (value['capacity'] as number) <= (value['formatCapacity'] as number) &&
       normalizePartyVersion(value['version']) !== null &&
       typeof value['leaderId'] === 'string' &&
-      Array.isArray(members)
+      Array.isArray(members) &&
+      Array.isArray(slots) &&
+      ['assembling', 'queued', 'match', 'results'].includes(String(value['lifecycle']))
     )
   ) {
     return false;
@@ -144,6 +166,13 @@ export function isPartyState(value: unknown): value is PartyState {
   if (value['joinPath'] !== partyJoinPath(code)) return false;
   const capacity = value['capacity'] as number;
   if (members.length < 1 || members.length > capacity) return false;
+  if (slots.length !== capacity) return false;
+  if (
+    (value['lifecycle'] === 'match' || value['lifecycle'] === 'results') !==
+    (normalizePartyId(value['matchId']) !== null)
+  ) {
+    return false;
+  }
   const playerIds = new Set<string>();
   const fighters = new Set<CharacterId>();
   for (const member of members) {
@@ -152,6 +181,7 @@ export function isPartyState(value: unknown): value is PartyState {
     const nickname = member['nickname'];
     const fighterId = normalizePartyFighter(member['fighterId']);
     const joinedAt = member['joinedAt'];
+    const ready = member['ready'];
     if (
       typeof playerId !== 'string' ||
       playerId.length === 0 ||
@@ -160,6 +190,7 @@ export function isPartyState(value: unknown): value is PartyState {
       fighterId === null ||
       typeof joinedAt !== 'number' ||
       !Number.isFinite(joinedAt) ||
+      typeof ready !== 'boolean' ||
       playerIds.has(playerId) ||
       fighters.has(fighterId)
     ) {
@@ -167,6 +198,32 @@ export function isPartyState(value: unknown): value is PartyState {
     }
     playerIds.add(playerId);
     fighters.add(fighterId);
+  }
+  for (let index = 0; index < slots.length; index += 1) {
+    const slot = slots[index];
+    if (!isRecord(slot) || slot['index'] !== index) return false;
+    if (index < members.length) {
+      if (slot['status'] !== 'occupied' || !isRecord(slot['member'])) return false;
+      const member = members[index] as PartyMember;
+      if (
+        slot['member']['playerId'] !== member.playerId ||
+        slot['member']['nickname'] !== member.nickname ||
+        slot['member']['fighterId'] !== member.fighterId ||
+        slot['member']['joinedAt'] !== member.joinedAt ||
+        slot['member']['ready'] !== member.ready
+      ) {
+        return false;
+      }
+    } else if (slot['status'] !== 'open' || 'member' in slot) {
+      return false;
+    }
+  }
+  if (value['lifecycle'] === 'queued' && !members.every((member) => member.ready)) return false;
+  if (
+    (value['lifecycle'] === 'match' || value['lifecycle'] === 'results') &&
+    (members.length !== capacity || !members.every((member) => member.ready))
+  ) {
+    return false;
   }
   if (!playerIds.has(value['leaderId'])) return false;
   const intent = value['intent'];

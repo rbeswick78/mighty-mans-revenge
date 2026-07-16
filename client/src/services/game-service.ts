@@ -275,6 +275,14 @@ export class GameService {
     this.networkManager.updatePartyFighter(fighterId);
   }
 
+  setPartyReady(ready: boolean): void {
+    this.networkManager.setPartyReady(ready);
+  }
+
+  cancelPartyQueue(): void {
+    this.networkManager.cancelPartyQueue();
+  }
+
   getPartyState(): Readonly<PartyState> | null {
     return this.networkManager.getPartyState();
   }

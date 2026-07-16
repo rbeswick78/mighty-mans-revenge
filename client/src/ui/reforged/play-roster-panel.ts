@@ -42,6 +42,8 @@ interface PlayRosterPanelOptions {
   readonly onLeaveParty: () => void;
   readonly onKickPartyMember: (memberId: PlayerId) => void;
   readonly onUpdatePartyIntent: (draft: SerializedPlayRosterDraft) => boolean;
+  readonly onSetPartyReady: (ready: boolean) => void;
+  readonly onCancelPartyQueue: () => void;
   readonly onCancel: () => void;
 }
 
@@ -321,7 +323,23 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
     if (step === 'review') {
       if (this.partyState) {
         const isLeader = this.partyState.leaderId === this.localPlayerId;
+        const localMember = this.partyState.members.find(
+          (member) => member.playerId === this.localPlayerId,
+        );
         const definitions: ChoiceDefinition[] = [
+          this.partyState.lifecycle === 'queued'
+            ? {
+                label: 'CANCEL PARTY WAIT',
+                detail: 'KEEP ROOM - CLEAR READINESS',
+                onSelect: this.options.onCancelPartyQueue,
+              }
+            : {
+                label: localMember?.ready ? 'NOT READY' : 'READY UP',
+                detail: this.partyState.slots.some((slot) => slot.status === 'open')
+                  ? 'WAIT FOR OPEN HUMAN SLOTS'
+                  : 'LAUNCH WHEN EVERY MEMBER IS READY',
+                onSelect: () => this.options.onSetPartyReady(!localMember?.ready),
+              },
           {
             label: 'COPY JOIN LINK',
             detail: `ROOM ${this.partyState.code}`,
@@ -329,7 +347,7 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
           },
           {
             label: 'LEAVE PARTY',
-            detail: isLeader ? 'CLOSE ROOM - NO TRANSFER YET' : 'LEAVE OPEN SLOT',
+            detail: isLeader ? 'TRANSFER TO EARLIEST MEMBER' : 'LEAVE OPEN SLOT',
             onSelect: this.options.onLeaveParty,
           },
         ];
@@ -494,17 +512,21 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
       const members = this.partyState.members
         .map(
           (member) =>
-            `${member.playerId === this.partyState?.leaderId ? 'LEADER' : 'MEMBER'}  /  ${member.nickname.toUpperCase()}  /  ${fighterLabel(member.fighterId)}`,
+            `${member.playerId === this.partyState?.leaderId ? 'LEADER' : 'MEMBER'}  /  ${member.nickname.toUpperCase()}  /  ${fighterLabel(member.fighterId)}  /  ${member.ready ? 'READY' : 'NOT READY'}`,
         )
+        .join('\n');
+      const openSlots = this.partyState.slots
+        .filter((slot) => slot.status === 'open')
+        .map((slot) => `OPEN HUMAN SLOT ${slot.index + 1}`)
         .join('\n');
       return [
         `PARTY ${this.partyState.code}  /  ${this.partyState.format.toUpperCase()}  /  ${this.partyState.members.length} OF ${this.partyState.capacity} HUMAN SLOTS`,
         members,
+        openSlots,
         `${modeLabel(this.partyState.intent.mode)}  /  ${this.partyState.intent.scheduledArena.mapName.toUpperCase()}`,
         this.partyError
           ? `REQUEST REJECTED  /  ${this.partyError.toUpperCase()}`
-          : 'SERVER-OWNED PARTY STATE',
-        'READINESS AND PARTY QUEUEING ARRIVE IN BATCH 13',
+          : `SERVER-OWNED ${this.partyState.lifecycle.toUpperCase()} STATE`,
       ].join('\n');
     }
     return [

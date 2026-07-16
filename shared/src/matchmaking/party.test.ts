@@ -75,7 +75,30 @@ describe('party code and link compatibility boundary', () => {
       capacity: 2,
       leaderId: 'leader',
       version: 1,
-      members: [{ playerId: 'leader', nickname: 'Alpha', fighterId: 'mighty_man', joinedAt: 1 }],
+      lifecycle: 'assembling',
+      members: [
+        {
+          playerId: 'leader',
+          nickname: 'Alpha',
+          fighterId: 'mighty_man',
+          joinedAt: 1,
+          ready: false,
+        },
+      ],
+      slots: [
+        {
+          index: 0,
+          status: 'occupied',
+          member: {
+            playerId: 'leader',
+            nickname: 'Alpha',
+            fighterId: 'mighty_man',
+            joinedAt: 1,
+            ready: false,
+          },
+        },
+        { index: 1, status: 'open' },
+      ],
       intent: {
         intentId: 'intent_12345678',
         format: 'duel',
@@ -97,7 +120,13 @@ describe('party code and link compatibility boundary', () => {
         ...state,
         members: [
           ...state.members,
-          { playerId: 'member', nickname: 'Bravo', fighterId: 'mighty_man', joinedAt: 2 },
+          {
+            playerId: 'member',
+            nickname: 'Bravo',
+            fighterId: 'mighty_man',
+            joinedAt: 2,
+            ready: false,
+          },
         ],
       }),
     ).toBe(false);

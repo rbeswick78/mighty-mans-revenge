@@ -207,7 +207,9 @@ async function playRosterSnapshot(page: Page): Promise<{
   partyState: {
     partyId: string;
     code: string;
-    members: Array<{ nickname: string; fighterId: string }>;
+    lifecycle: string;
+    members: Array<{ nickname: string; fighterId: string; ready: boolean }>;
+    slots: Array<{ status: string }>;
   } | null;
   partyError: string | null;
 }> {
@@ -226,7 +228,9 @@ async function playRosterSnapshot(page: Page): Promise<{
         partyState: {
           partyId: string;
           code: string;
-          members: Array<{ nickname: string; fighterId: string }>;
+          lifecycle: string;
+          members: Array<{ nickname: string; fighterId: string; ready: boolean }>;
+          slots: Array<{ status: string }>;
         } | null;
         partyError: string | null;
       };
@@ -824,10 +828,11 @@ test('Play submits one server-scheduled general intent and recovery clears queue
     .toEqual([960, 720]);
 });
 
-test('Party core projects one authoritative room across two clients and leader kick', async ({
+test('Party readiness projects recovery, leadership, and server-owned slots across two clients', async ({
   page,
   browser,
 }, testInfo) => {
+  test.setTimeout(60_000);
   test.skip(
     !shellAdvertised || !schedulesAdvertised,
     'Run with both Reforged shell and schedule capabilities for party entry.',
@@ -838,11 +843,11 @@ test('Party core projects one authoritative room across two clients and leader k
     localStorage.setItem('mmr_nickname', 'Leader12');
     localStorage.setItem('mmr_fighter_selection', 'mighty_man');
   });
-  const memberContext = await browser.newContext({
+  let memberContext = await browser.newContext({
     viewport: touch ? { width: 844, height: 390 } : { width: 1280, height: 720 },
     hasTouch: touch,
   });
-  const memberPage = await memberContext.newPage();
+  let memberPage = await memberContext.newPage();
   await memberPage.addInitScript(() => {
     localStorage.setItem('mmr_nickname', 'Member12');
     localStorage.setItem('mmr_fighter_selection', 'bruce');
@@ -875,7 +880,9 @@ test('Party core projects one authoritative room across two clients and leader k
       }, leaderState.code);
       await clickLogicalPlayOption(memberPage, 2, touch);
       await expect
-        .poll(async () => (await playRosterSnapshot(page)).partyState?.members.length ?? 0)
+        .poll(async () => (await playRosterSnapshot(page)).partyState?.members.length ?? 0, {
+          timeout: 20_000,
+        })
         .toBe(2);
       await expect
         .poll(async () => (await playRosterSnapshot(memberPage)).partyState?.members.length ?? 0)
@@ -896,18 +903,45 @@ test('Party core projects one authoritative room across two clients and leader k
         capacity: 2,
         leaderId: 'staged-party-leader',
         version: 2,
+        lifecycle: 'assembling',
         members: [
           {
             playerId: 'staged-party-leader',
             nickname: 'Leader12',
             fighterId: 'mighty_man',
             joinedAt: 1,
+            ready: false,
           },
           {
             playerId: 'staged-party-member',
             nickname: 'Member12',
             fighterId: 'bruce',
             joinedAt: 2,
+            ready: false,
+          },
+        ],
+        slots: [
+          {
+            index: 0,
+            status: 'occupied',
+            member: {
+              playerId: 'staged-party-leader',
+              nickname: 'Leader12',
+              fighterId: 'mighty_man',
+              joinedAt: 1,
+              ready: false,
+            },
+          },
+          {
+            index: 1,
+            status: 'occupied',
+            member: {
+              playerId: 'staged-party-member',
+              nickname: 'Member12',
+              fighterId: 'bruce',
+              joinedAt: 2,
+              ready: false,
+            },
           },
         ],
         intent: {
@@ -946,17 +980,66 @@ test('Party core projects one authoritative room across two clients and leader k
       ['Member12', 'bruce'],
     ]);
     expect(leader.optionLabels).toContain('KICK MEMBER12');
+    expect(leader.optionLabels).toContain('READY UP');
+    expect(member.optionLabels).toContain('READY UP');
     expect(member.optionLabels).not.toContain('KICK LEADER12');
 
     if (liveChromium) {
+      const recoveryCode = leader.partyState?.code;
+      if (!recoveryCode) throw new Error('missing recovery code');
+      await memberPage.evaluate(() => {
+        const shell = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+          'ReforgedShellScene',
+        ) as unknown as { gameService: { disconnect(): void } };
+        shell.gameService.disconnect();
+      });
+      await expect
+        .poll(async () => (await playRosterSnapshot(page)).partyState?.members.length ?? 0, {
+          timeout: 10_000,
+        })
+        .toBe(1);
+      await memberContext.close();
+      expect((await playRosterSnapshot(page)).partyState?.slots.map((slot) => slot.status)).toEqual(
+        ['occupied', 'open'],
+      );
+      memberContext = await browser.newContext({
+        viewport: touch ? { width: 844, height: 390 } : { width: 1280, height: 720 },
+        hasTouch: touch,
+      });
+      memberPage = await memberContext.newPage();
+      await memberPage.addInitScript(() => {
+        localStorage.setItem('mmr_nickname', 'Member12');
+        localStorage.setItem('mmr_fighter_selection', 'bruce');
+      });
+      await memberPage.goto('/');
+      await waitForActiveScene(memberPage, 'ReforgedShellScene');
+      await reachDuelPartyReview(memberPage, touch);
+      await memberPage.evaluate((code) => {
+        window.prompt = () => code;
+      }, recoveryCode);
+      await clickLogicalPlayOption(memberPage, 2, touch);
+      await expect
+        .poll(async () => (await playRosterSnapshot(page)).partyState?.members.length ?? 0)
+        .toBe(2);
+      await waitForRenderedFrames(page);
+      expect((await playRosterSnapshot(page)).optionLabels[1]).toBe('READY UP');
+      await clickLogicalPlayOption(page, 1, false);
+      await expect
+        .poll(
+          async () =>
+            (await playRosterSnapshot(page)).partyState?.members.find(
+              (entry) => entry.nickname === 'Leader12',
+            )?.ready ?? false,
+        )
+        .toBe(true);
       await page.screenshot({ path: testInfo.outputPath('party-two-client-desktop.png') });
       await page.setViewportSize({ width: 844, height: 390 });
       await waitForRenderedFrames(page);
       await page.screenshot({ path: testInfo.outputPath('party-two-client-mobile-chromium.png') });
-      await clickLogicalPlayOption(page, 3, false);
+      await clickLogicalPlayOption(page, 4, false);
       await expect.poll(async () => (await playRosterSnapshot(memberPage)).partyState).toBeNull();
     } else {
-      await clickLogicalPlayOption(page, 3, touch);
+      await clickLogicalPlayOption(page, 4, touch);
     }
   } finally {
     await memberContext.close();

@@ -16,6 +16,7 @@ import type {
   MatchFormat,
   MatchIntent,
   PartyErrorCode,
+  PartyLifecycle,
   PartyMember,
   PartyState,
   PlayerId,
@@ -30,6 +31,8 @@ interface MutableParty {
   version: number;
   members: PartyMember[];
   intent: Readonly<MatchIntent>;
+  lifecycle: PartyLifecycle;
+  matchId: string | null;
   emptyExpiresAt: number | null;
 }
 
@@ -40,6 +43,8 @@ export interface PartyManagerOptions {
   readonly now?: () => number;
   readonly createPartyId?: () => string;
   readonly createCode?: () => string;
+  /** Enters the existing generalized match-intent authority once every slot is ready. */
+  readonly queueParty?: (state: Readonly<PartyState>) => string | null;
 }
 
 const validNickname = (value: unknown): value is string =>
@@ -112,8 +117,12 @@ export class PartyManager {
       format: intent.format,
       leaderId: playerId,
       version: 1,
-      members: [Object.freeze({ playerId, nickname: nicknameValue, fighterId, joinedAt })],
+      members: [
+        Object.freeze({ playerId, nickname: nicknameValue, fighterId, joinedAt, ready: false }),
+      ],
       intent,
+      lifecycle: 'assembling',
+      matchId: null,
       emptyExpiresAt: null,
     };
     this.partiesById.set(party.partyId, party);
@@ -148,15 +157,25 @@ export class PartyManager {
     if (!party || party.members.length === 0) {
       return this.error(playerId, requestId, 'unknown_party');
     }
-    if (party.members.length >= party.intent.composition.humanCount) {
+    if (
+      (party.lifecycle !== 'assembling' && party.lifecycle !== 'queued') ||
+      party.members.length >= party.intent.composition.humanCount
+    ) {
       return this.error(playerId, requestId, 'party_full');
     }
     if (party.members.some((member) => member.fighterId === fighterId)) {
       return this.error(playerId, requestId, 'invalid_request');
     }
     party.members.push(
-      Object.freeze({ playerId, nickname: nicknameValue, fighterId, joinedAt: this.now() }),
+      Object.freeze({
+        playerId,
+        nickname: nicknameValue,
+        fighterId,
+        joinedAt: this.now(),
+        ready: false,
+      }),
     );
+    party.lifecycle = 'assembling';
     party.version += 1;
     this.partyIdByPlayer.set(playerId, party.partyId);
     this.broadcastState(party);
@@ -177,24 +196,13 @@ export class PartyManager {
     );
     if (!mutation) return false;
     const { party } = mutation;
-    if (party.leaderId === playerId) {
-      const remaining = party.members.filter((member) => member.playerId !== playerId);
-      for (const member of remaining) {
-        this.partyIdByPlayer.delete(member.playerId);
-        this.send(member.playerId, {
-          type: 'server:partyLeft',
-          partyId: party.partyId,
-          reason: 'closed',
-        });
-      }
-      party.members = [];
-      party.version += 1;
-      party.emptyExpiresAt = this.now() + PARTY_EMPTY_EXPIRY_MS;
-    } else {
-      party.members = party.members.filter((member) => member.playerId !== playerId);
-      party.version += 1;
-      this.broadcastState(party);
+    if (party.lifecycle === 'match' || party.lifecycle === 'results') {
+      return this.error(playerId, mutation.requestId, 'invalid_request');
     }
+    this.removeMember(party, playerId);
+    party.version += 1;
+    if (party.members.length === 0) party.emptyExpiresAt = this.now() + PARTY_EMPTY_EXPIRY_MS;
+    else this.broadcastState(party);
     this.partyIdByPlayer.delete(playerId);
     this.send(playerId, { type: 'server:partyLeft', partyId: party.partyId, reason: 'left' });
     return true;
@@ -216,6 +224,9 @@ export class PartyManager {
     );
     if (!mutation) return false;
     const { party, requestId } = mutation;
+    if (party.lifecycle === 'match' || party.lifecycle === 'results') {
+      return this.error(playerId, requestId, 'invalid_request');
+    }
     if (
       typeof memberIdValue !== 'string' ||
       memberIdValue === playerId ||
@@ -224,7 +235,7 @@ export class PartyManager {
       return this.error(playerId, requestId, 'not_in_party');
     }
     const memberId = memberIdValue as PlayerId;
-    party.members = party.members.filter((member) => member.playerId !== memberId);
+    this.removeMember(party, memberId);
     party.version += 1;
     this.partyIdByPlayer.delete(memberId);
     this.send(memberId, { type: 'server:partyLeft', partyId: party.partyId, reason: 'kicked' });
@@ -248,6 +259,9 @@ export class PartyManager {
     );
     if (!mutation) return false;
     const { party, requestId } = mutation;
+    if (party.lifecycle === 'match' || party.lifecycle === 'results') {
+      return this.error(playerId, requestId, 'invalid_request');
+    }
     const intent = this.options.normalizeIntent(intentValue);
     const leader = party.members.find((member) => member.playerId === playerId);
     if (
@@ -262,6 +276,7 @@ export class PartyManager {
       return this.error(playerId, requestId, 'invalid_intent');
     }
     party.intent = intent;
+    this.resetReadiness(party);
     party.version += 1;
     this.broadcastState(party);
     return true;
@@ -282,6 +297,9 @@ export class PartyManager {
     );
     if (!mutation) return false;
     const { party, requestId } = mutation;
+    if (party.lifecycle === 'match' || party.lifecycle === 'results') {
+      return this.error(playerId, requestId, 'invalid_request');
+    }
     const fighterId = normalizePartyFighter(fighterValue);
     if (
       fighterId === null ||
@@ -295,6 +313,127 @@ export class PartyManager {
     if (party.leaderId === playerId) {
       party.intent = Object.freeze({ ...party.intent, fighterId });
     }
+    this.resetReadiness(party);
+    party.version += 1;
+    this.broadcastState(party);
+    return true;
+  }
+
+  setReady(
+    playerId: PlayerId,
+    requestIdValue: unknown,
+    partyIdValue: unknown,
+    expectedVersionValue: unknown,
+    readyValue: unknown,
+  ): boolean {
+    const mutation = this.authorizeMutation(
+      playerId,
+      requestIdValue,
+      partyIdValue,
+      expectedVersionValue,
+    );
+    if (!mutation) return false;
+    const { party, requestId } = mutation;
+    if (
+      typeof readyValue !== 'boolean' ||
+      (party.lifecycle !== 'assembling' && party.lifecycle !== 'queued')
+    ) {
+      return this.error(playerId, requestId, 'invalid_request');
+    }
+    const member = party.members.find((entry) => entry.playerId === playerId);
+    if (!member) return this.error(playerId, requestId, 'not_in_party');
+    if (member.ready === readyValue) {
+      this.send(playerId, { type: 'server:partyState', state: this.snapshot(party) });
+      return true;
+    }
+    party.members = party.members.map((entry) =>
+      entry.playerId === playerId ? Object.freeze({ ...entry, ready: readyValue }) : entry,
+    );
+    party.lifecycle = party.members.every((entry) => entry.ready) ? 'queued' : 'assembling';
+    party.matchId = null;
+    party.version += 1;
+    this.broadcastState(party);
+
+    if (
+      party.lifecycle === 'queued' &&
+      party.members.length === party.intent.composition.humanCount
+    ) {
+      const matchId = this.options.queueParty?.(this.snapshot(party)) ?? null;
+      if (matchId === null) {
+        this.resetReadiness(party);
+        party.version += 1;
+        this.error(playerId, requestId, 'invalid_intent');
+        this.broadcastState(party);
+        return false;
+      }
+      party.lifecycle = 'match';
+      party.matchId = matchId;
+      party.version += 1;
+      this.broadcastState(party);
+    }
+    return true;
+  }
+
+  cancelQueue(
+    playerId: PlayerId,
+    requestIdValue: unknown,
+    partyIdValue: unknown,
+    expectedVersionValue: unknown,
+  ): boolean {
+    const mutation = this.authorizeMutation(
+      playerId,
+      requestIdValue,
+      partyIdValue,
+      expectedVersionValue,
+    );
+    if (!mutation) return false;
+    const { party, requestId } = mutation;
+    if (party.lifecycle !== 'queued') {
+      return this.error(playerId, requestId, 'invalid_request');
+    }
+    this.resetReadiness(party);
+    party.version += 1;
+    this.broadcastState(party);
+    return true;
+  }
+
+  /** Transport cleanup is server-authored and never needs a client request id. */
+  disconnect(playerId: PlayerId): boolean {
+    const partyId = this.partyIdByPlayer.get(playerId);
+    const party = partyId ? this.partiesById.get(partyId) : undefined;
+    if (!party) {
+      this.seenRequestIds.delete(playerId);
+      return false;
+    }
+    this.removeMember(party, playerId);
+    party.version += 1;
+    if (party.members.length === 0) party.emptyExpiresAt = this.now() + PARTY_EMPTY_EXPIRY_MS;
+    else this.broadcastState(party);
+    this.seenRequestIds.delete(playerId);
+    return true;
+  }
+
+  markLifecycle(
+    partyIdValue: unknown,
+    lifecycle: 'match' | 'results' | 'assembling',
+    matchId?: string,
+  ): boolean {
+    const partyId = normalizePartyId(partyIdValue);
+    const party = partyId ? this.partiesById.get(partyId) : undefined;
+    if (!party) return false;
+    if (
+      lifecycle !== 'assembling' &&
+      (party.members.length !== party.intent.composition.humanCount ||
+        !party.members.every((member) => member.ready))
+    ) {
+      return false;
+    }
+    const normalizedMatchId = lifecycle === 'assembling' ? null : normalizePartyId(matchId);
+    if (lifecycle !== 'assembling' && normalizedMatchId === null) return false;
+    if (party.lifecycle === lifecycle && party.matchId === normalizedMatchId) return true;
+    party.lifecycle = lifecycle;
+    party.matchId = normalizedMatchId;
+    if (lifecycle === 'assembling') this.resetReadiness(party);
     party.version += 1;
     this.broadcastState(party);
     return true;
@@ -377,6 +516,12 @@ export class PartyManager {
   }
 
   private snapshot(party: MutableParty): Readonly<PartyState> {
+    const members = party.members.map((member) => Object.freeze({ ...member }));
+    const slots = Array.from({ length: party.intent.composition.humanCount }, (_, index) =>
+      members[index]
+        ? Object.freeze({ index, status: 'occupied' as const, member: members[index] })
+        : Object.freeze({ index, status: 'open' as const }),
+    );
     return Object.freeze({
       partyId: party.partyId,
       code: party.code,
@@ -386,7 +531,10 @@ export class PartyManager {
       capacity: party.intent.composition.humanCount,
       leaderId: party.leaderId,
       version: party.version,
-      members: Object.freeze(party.members.map((member) => Object.freeze({ ...member }))),
+      lifecycle: party.lifecycle,
+      ...(party.matchId === null ? {} : { matchId: party.matchId }),
+      members: Object.freeze(members),
+      slots: Object.freeze(slots),
       intent: Object.freeze({
         ...party.intent,
         composition: Object.freeze({ ...party.intent.composition }),
@@ -399,6 +547,28 @@ export class PartyManager {
     const state = this.snapshot(party);
     for (const member of party.members) {
       this.send(member.playerId, { type: 'server:partyState', state });
+    }
+  }
+
+  private resetReadiness(party: MutableParty): void {
+    party.members = party.members.map((member) =>
+      member.ready ? Object.freeze({ ...member, ready: false }) : member,
+    );
+    party.lifecycle = 'assembling';
+    party.matchId = null;
+  }
+
+  private removeMember(party: MutableParty, playerId: PlayerId): void {
+    party.members = party.members.filter((member) => member.playerId !== playerId);
+    this.partyIdByPlayer.delete(playerId);
+    this.resetReadiness(party);
+    if (party.members.length > 0 && party.leaderId === playerId) {
+      party.leaderId = [...party.members].sort(
+        (left, right) =>
+          left.joinedAt - right.joinedAt || left.playerId.localeCompare(right.playerId),
+      )[0]!.playerId;
+      const leader = party.members.find((member) => member.playerId === party.leaderId)!;
+      party.intent = Object.freeze({ ...party.intent, fighterId: leader.fighterId });
     }
   }
 

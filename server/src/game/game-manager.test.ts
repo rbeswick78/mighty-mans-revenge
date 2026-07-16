@@ -409,6 +409,89 @@ describe('GameManager party wire integration', () => {
     },
   );
 
+  it('routes readiness through generalized queue authority and retains match lifecycle state', () => {
+    const now = new Date('2026-07-15T18:00:00Z');
+    const { fake, sent, connect, message } = makeFakeServer(true, true);
+    const manager = new GameManager(fake, undefined, () => now);
+    connect('leader');
+    connect('member');
+    const config = sent.find(
+      ({ playerId, message: candidate }) =>
+        playerId === 'leader' && candidate.type === 'server:lobbyConfig',
+    )?.message;
+    if (!config || config.type !== 'server:lobbyConfig') throw new Error('missing config');
+    const arena = config.schedules.find((entry) => entry.mode === GameModeType.KOTH)!;
+    message('leader', {
+      type: 'client:createParty',
+      requestId: 'create_ready_111',
+      nickname: 'Alpha',
+      format: 'duel',
+      fighterId: 'mighty_man',
+      intent: {
+        intentId: 'party_ready_intent',
+        format: 'duel',
+        composition: { humanCount: 2, botCount: 0 },
+        mode: GameModeType.KOTH,
+        fighterId: 'mighty_man',
+        scheduledArena: arena,
+      },
+    });
+    const created = [...sent]
+      .reverse()
+      .find(
+        ({ playerId, message: candidate }) =>
+          playerId === 'leader' && candidate.type === 'server:partyState',
+      )?.message;
+    if (!created || created.type !== 'server:partyState') throw new Error('missing party');
+    message('member', {
+      type: 'client:joinParty',
+      requestId: 'join_ready_2222',
+      nickname: 'Bravo',
+      joinTarget: created.state.code,
+      fighterId: 'bruce',
+    });
+    let state = [...sent]
+      .reverse()
+      .find(
+        ({ playerId, message: candidate }) =>
+          playerId === 'leader' && candidate.type === 'server:partyState',
+      )?.message;
+    if (!state || state.type !== 'server:partyState') throw new Error('missing joined state');
+    message('leader', {
+      type: 'client:setPartyReady',
+      requestId: 'ready_leader_11',
+      partyId: state.state.partyId,
+      expectedVersion: state.state.version,
+      ready: true,
+    });
+    state = [...sent]
+      .reverse()
+      .find(
+        ({ playerId, message: candidate }) =>
+          playerId === 'member' && candidate.type === 'server:partyState',
+      )?.message;
+    if (!state || state.type !== 'server:partyState') throw new Error('missing ready state');
+    message('member', {
+      type: 'client:setPartyReady',
+      requestId: 'ready_member_11',
+      partyId: state.state.partyId,
+      expectedVersion: state.state.version,
+      ready: true,
+    });
+    expect(manager.matchmakingManager.getActiveMatches()).toHaveLength(1);
+    expect(
+      [...sent]
+        .reverse()
+        .find(
+          ({ playerId, message: candidate }) =>
+            playerId === 'leader' && candidate.type === 'server:partyState',
+        )?.message,
+    ).toMatchObject({
+      type: 'server:partyState',
+      state: { lifecycle: 'match', members: [{ ready: true }, { ready: true }] },
+    });
+  });
+
   it('keeps old/capability-off servers fail-closed and ignores malformed schedule echoes', () => {
     const now = new Date('2026-07-15T18:00:00Z');
     const disabled = makeFakeServer(true, false);

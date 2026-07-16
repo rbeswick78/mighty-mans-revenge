@@ -84,11 +84,25 @@ capability-off servers retain the established fixed preview or complete Lobby
 fallback and never invent party state. Enabled servers normalize codes and
 links, callsigns, fighters, formats, exact human capacity, scheduled intent,
 party/version ownership, leader actions, and replay ids before mutation. Rooms
-are memory-only; the creator remains leader, creator departure closes the room,
-and empty codes stay reserved for one minute before expiry. Readiness,
-leadership transfer, disconnect recovery, party queueing, Results, and rematch
-retention remain Batch 13+ work. No capability default or production exposure
-changed.
+are memory-only; Batch 12 fixed leadership to the creator and kept empty codes
+reserved for one minute before expiry. No capability default or production
+exposure changed.
+
+Batch 13 extends that same enabled boundary with additive, versioned
+`client:setPartyReady` and `client:cancelPartyQueue` requests. Complete
+`server:partyState` snapshots now carry readiness, explicit occupied/open human
+slots, deterministic earliest-member leadership, lifecycle, and optional match
+identity. A room may wait while every current member is ready but requested
+human slots remain open; it enters Batch 11's existing per-player schedule-lock
+and explicit-intent launch only when full. Intent/fighter changes, cancellation,
+leave, kick, and disconnect clear readiness. Disconnect removes only that
+connection, transfers leadership when necessary, and leaves an authoritative
+open slot that a new connection may rejoin by code/link. Party identity remains
+server-owned through match, Results, and valid rematches. Stale, replayed,
+duplicate, lifecycle-invalid, schedule-drifted, capability-off, and malformed
+requests fail closed. Batch 14's 15-second confirmed bot-fill offer is not
+present, no human slot changes source automatically, and all production defaults
+remain false.
 
 ## Server-first rollout and rollback
 

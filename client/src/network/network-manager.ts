@@ -426,6 +426,29 @@ export class NetworkManager {
     });
   }
 
+  setPartyReady(ready: boolean): void {
+    const state = this.partyState;
+    if (!state) return;
+    this.connection.send({
+      type: 'client:setPartyReady',
+      requestId: crypto.randomUUID(),
+      partyId: state.partyId,
+      expectedVersion: state.version,
+      ready,
+    });
+  }
+
+  cancelPartyQueue(): void {
+    const state = this.partyState;
+    if (!state) return;
+    this.connection.send({
+      type: 'client:cancelPartyQueue',
+      requestId: crypto.randomUUID(),
+      partyId: state.partyId,
+      expectedVersion: state.version,
+    });
+  }
+
   getPartyState(): Readonly<PartyState> | null {
     return this.partyState;
   }

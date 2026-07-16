@@ -72,7 +72,11 @@ export class GameManager {
       sendTo: (playerId, message) => this.server.sendTo(playerId, message, { reliable: true }),
       normalizeIntent: (value) => this.normalizePartyIntent(value),
       canEnterParty: (playerId) => !this.matchmaking.isPlayerBusy(playerId),
+      queueParty: (state) => this.matchmaking.handleSubmitParty(state),
       now: () => this.now().getTime(),
+    });
+    this.matchmaking.setPartyLifecycleListener((partyId, lifecycle, matchId) => {
+      this.parties.markLifecycle(partyId, lifecycle, matchId);
     });
 
     this.gameLoop = new GameLoop((dt, tick) => {
@@ -136,6 +140,7 @@ export class GameManager {
     this.server.onDisconnect((playerId: PlayerId) => {
       this.playerRTTs.delete(playerId);
       this.arenaScheduleLocks.delete(playerId);
+      this.parties.disconnect(playerId);
       this.matchmaking.handlePlayerDisconnect(playerId);
     });
 
@@ -222,6 +227,25 @@ export class GameManager {
           message.partyId,
           message.expectedVersion,
           message.fighterId,
+        );
+        break;
+
+      case 'client:setPartyReady':
+        this.parties.setReady(
+          playerId,
+          message.requestId,
+          message.partyId,
+          message.expectedVersion,
+          message.ready,
+        );
+        break;
+
+      case 'client:cancelPartyQueue':
+        this.parties.cancelQueue(
+          playerId,
+          message.requestId,
+          message.partyId,
+          message.expectedVersion,
         );
         break;
 

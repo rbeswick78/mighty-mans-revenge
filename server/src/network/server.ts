@@ -25,6 +25,8 @@ const CLIENT_MESSAGE_TYPE_FLAGS: Record<ClientMessage['type'], true> = {
   'client:kickPartyMember': true,
   'client:updatePartyIntent': true,
   'client:updatePartyFighter': true,
+  'client:setPartyReady': true,
+  'client:cancelPartyQueue': true,
   'client:startPractice': true,
   'client:cancelMatchmaking': true,
   'client:rematchRequest': true,

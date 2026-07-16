@@ -21,6 +21,7 @@ import {
   practiceGauntletChaosBounty,
   dailyChallengeKey,
   type MatchIntent,
+  type PartyState,
   type ScheduledArenaLock,
 } from '@shared/game';
 import type {
@@ -282,6 +283,96 @@ describe('MatchmakingManager generalized match intent', () => {
     expect(accepted.manager.handleSubmitMatchIntent('p1', 'Alpha', first)).toBe(false);
     accepted.manager.handlePlayerDisconnect('p1');
     expect(accepted.manager.handleSubmitMatchIntent('p1', 'Alpha', first)).toBe(true);
+  });
+
+  it.each([
+    ['duel', 2, GameModeType.DEATHMATCH],
+    ['rumble', 4, GameModeType.KOTH],
+    ['crew', 4, GameModeType.CORE_RUN],
+  ] as const)(
+    'launches one complete ready %s party through generalized authority',
+    (format, count, mode) => {
+      const { manager, sent, release } = setup();
+      const members = Array.from({ length: count }, (_, index) => ({
+        playerId: `party-player-${index + 1}` as PlayerId,
+        nickname: `Party${index + 1}`,
+        fighterId: CHARACTER_IDS[index]!,
+        joinedAt: index + 1,
+        ready: true,
+      }));
+      const baseIntent = generalIntent({
+        intentId: `party_${format}_intent`,
+        format,
+        composition: { humanCount: count, botCount: format === 'duel' ? 0 : 4 - count },
+        mode,
+        scheduledArena: { mode, mapName: listMapNames()[0], rotationEndsAt: 2_000 },
+      });
+      const state: PartyState = {
+        partyId: `party_${format}_12345678`,
+        code: 'ABCDE',
+        joinPath: '/?party=ABCDE',
+        format,
+        formatCapacity: format === 'duel' ? 2 : 4,
+        capacity: count,
+        leaderId: members[0]!.playerId,
+        version: 10,
+        lifecycle: 'queued',
+        members,
+        slots: members.map((member, index) => ({ index, status: 'occupied', member })),
+        intent: baseIntent,
+      };
+      const matchId = manager.handleSubmitParty(state);
+      expect(matchId).toEqual(expect.any(String));
+      expect(manager.getActiveMatches()).toHaveLength(1);
+      const [match] = manager.getActiveMatches();
+      expect(match.players.size).toBe(format === 'duel' ? 2 : 4);
+      expect(match.gameModeType).toBe(mode);
+      expect(sent.filter(({ message }) => message.type === 'server:matchFound')).toHaveLength(
+        count,
+      );
+      expect(release).toHaveBeenCalledTimes(count);
+    },
+  );
+
+  it('projects party Results and rematch lifecycle without client inference', () => {
+    const { manager } = setup();
+    const transitions: Array<[string, string, string | undefined]> = [];
+    manager.setPartyLifecycleListener((partyId, lifecycle, matchId) => {
+      transitions.push([partyId, lifecycle, matchId]);
+    });
+    const members = ['p1', 'p2'].map((playerId, index) => ({
+      playerId: playerId as PlayerId,
+      nickname: index === 0 ? 'Alpha' : 'Bravo',
+      fighterId: CHARACTER_IDS[index]!,
+      joinedAt: index + 1,
+      ready: true,
+    }));
+    const state: PartyState = {
+      partyId: 'party_lifecycle_123',
+      code: 'ABCDE',
+      joinPath: '/?party=ABCDE',
+      format: 'duel',
+      formatCapacity: 2,
+      capacity: 2,
+      leaderId: 'p1',
+      version: 4,
+      lifecycle: 'queued',
+      members,
+      slots: members.map((member, index) => ({ index, status: 'occupied', member })),
+      intent: generalIntent({
+        intentId: 'party_lifecycle_intent',
+        composition: { humanCount: 2, botCount: 0 },
+      }),
+    };
+    const firstMatchId = manager.handleSubmitParty(state)!;
+    const [match] = manager.getActiveMatches();
+    match.phase = MatchPhase.ENDED;
+    manager.tick(0.05, 1);
+    expect(transitions.at(-1)).toEqual([state.partyId, 'results', firstMatchId]);
+    manager.handleRematchRequest('p1');
+    manager.handleRematchRequest('p2');
+    expect(transitions.at(-1)?.slice(0, 2)).toEqual([state.partyId, 'match']);
+    expect(transitions.at(-1)?.[2]).not.toBe(firstMatchId);
   });
 });
 

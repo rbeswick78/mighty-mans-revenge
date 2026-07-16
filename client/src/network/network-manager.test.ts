@@ -703,13 +703,29 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
       capacity: 2,
       leaderId: LOCAL_ID,
       version: 3,
+      lifecycle: 'assembling' as const,
       members: [
         {
           playerId: LOCAL_ID,
           nickname: 'Alpha',
           fighterId: 'mighty_man' as const,
           joinedAt: 1,
+          ready: false,
         },
+      ],
+      slots: [
+        {
+          index: 0,
+          status: 'occupied' as const,
+          member: {
+            playerId: LOCAL_ID,
+            nickname: 'Alpha',
+            fighterId: 'mighty_man' as const,
+            joinedAt: 1,
+            ready: false,
+          },
+        },
+        { index: 1, status: 'open' as const },
       ],
       intent: {
         intentId: 'party_intent_1',
@@ -739,11 +755,22 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
       expectedVersion: 3,
       fighterId: 'bruce',
     });
+    manager.setPartyReady(true);
+    expect(hoisted.sentMessages.at(-1)).toMatchObject({
+      type: 'client:setPartyReady',
+      expectedVersion: 3,
+      ready: true,
+    });
+    manager.cancelPartyQueue();
+    expect(hoisted.sentMessages.at(-1)).toMatchObject({
+      type: 'client:cancelPartyQueue',
+      expectedVersion: 3,
+    });
     deliver({ type: 'server:partyLeft', partyId: state.partyId, reason: 'closed' });
     expect(manager.getPartyState()).toBeNull();
   });
 
-  it('clears party projection on reconnect without inventing Batch 13 recovery', () => {
+  it('clears the old connection projection so reconnect recovery starts from server truth', () => {
     deliver({
       type: 'server:partyState',
       state: {
@@ -755,13 +782,29 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
         capacity: 2,
         leaderId: LOCAL_ID,
         version: 1,
+        lifecycle: 'assembling',
         members: [
           {
             playerId: LOCAL_ID,
             nickname: 'Alpha',
             fighterId: 'mighty_man',
             joinedAt: 1,
+            ready: false,
           },
+        ],
+        slots: [
+          {
+            index: 0,
+            status: 'occupied',
+            member: {
+              playerId: LOCAL_ID,
+              nickname: 'Alpha',
+              fighterId: 'mighty_man',
+              joinedAt: 1,
+              ready: false,
+            },
+          },
+          { index: 1, status: 'open' },
         ],
         intent: {
           intentId: 'party_intent_1',

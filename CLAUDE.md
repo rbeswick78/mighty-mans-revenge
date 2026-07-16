@@ -268,6 +268,22 @@ disconnect/reconnect recovery, open slots, cancellation, and party preservation
 through queue/match/Results/rematch. All capability defaults and legacy joins
 remain unchanged.
 
+**Reforged party readiness and recovery (Batch 13):** every authoritative
+member now carries server-owned readiness and every room snapshot carries an
+explicit occupied/open slot list plus `assembling`/`queued`/`match`/`results`
+lifecycle. Readying all current members may wait with human slots still open;
+only a full ready room enters the existing Batch 11 schedule-lock and explicit
+match-intent launch path. Any roster/intent mutation, queue cancellation, leave,
+kick, or disconnect clears readiness; leadership transfers deterministically to
+the earliest remaining member, and a replacement connection may rejoin the
+preserved open room by code/link. Party identity and versioned server projection
+survive the launched match, Results, and a valid direct rematch. Party readiness
+and cancellation use their own request ids, party ids, and expected versions;
+duplicates, replays, stale state, invalid lifecycle actions, and schedule drift
+fail closed. Do not infer vacancies or recovery from member counts, do not route
+an incomplete party into generalized matchmaking, and do not add Batch 14's
+timed bot-fill offer automatically.
+
 ### Why This Matters for Agents
 
 Client prediction and server simulation **must use identical physics code** from `/shared`. If you change movement, collision, or physics logic, you must change it in `/shared` and verify both client and server still agree. A mismatch between client prediction and server authority causes visible rubber-banding.
