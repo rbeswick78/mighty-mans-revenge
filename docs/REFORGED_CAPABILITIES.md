@@ -193,6 +193,21 @@ base scroll `(0, 0)` today. Dynamic render resources, responsive HUD, minimap,
 larger arenas, physics, simulation, wire contracts, production defaults, and
 capability exposure remain unchanged.
 
+Batch 21 replaces fixed-playfield rendering resources behind the same
+default-false `largeWorlds` boundary without changing negotiation or exposure.
+The client derives actual world bounds from the selected registered map,
+partitions map and persistent decal presentation into 8x8-tile chunks, culls
+those chunks from the live Batch 19 coordinate transform, and sizes lighting
+plus storm/X-ray screen resources from the smaller of the actual world and
+logical viewport. Authoritative tile-destruction events continue to mutate the
+same client prediction grid and now rebuild affected decal masks/resources,
+including chunk seams. Pooled cosmetic effects and lights consume automatic
+full/reduced quality budgets; no quality decision changes authoritative state.
+Current maps remain 960x576 at `(0, 0)`, so capability-off and old-server
+960x720 gameplay, enabled desktop/mobile logical visibility, camera clamps,
+transitional HUD, physics, simulation, wire contracts, capability defaults,
+and production exposure remain unchanged. Batch 22 owns HUD migration.
+
 ## Server-first rollout and rollback
 
 For each capability, keep this order:

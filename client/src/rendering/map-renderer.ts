@@ -17,6 +17,13 @@ import {
   WIRE_GATE_OPEN_ANIMATION_KEY,
   wireGateScale,
 } from './wire-gate.js';
+import {
+  createWorldRenderPlan,
+  visibleWorldChunkIds,
+  WORLD_CHUNK_TILES,
+  type WorldRenderPlan,
+  type WorldViewRect,
+} from './dynamic-world-rendering.js';
 
 /**
  * Renders a MapData grid using the map's visual theme (map-themes.ts):
@@ -42,6 +49,8 @@ const SOURCE_TILE_SIZE = 16;
 export class MapRenderer {
   private scene: Phaser.Scene;
   private container: Phaser.GameObjects.Container | null = null;
+  private renderPlan: WorldRenderPlan | null = null;
+  private chunkContainers = new Map<string, Phaser.GameObjects.Container>();
   private collisionGrid: CollisionGrid | null = null;
   private theme: MapTheme = getTheme(undefined);
 
@@ -76,6 +85,16 @@ export class MapRenderer {
     const theme = getTheme(mapData.theme);
     this.theme = theme;
     this.container = this.scene.add.container(0, 0);
+    this.renderPlan = createWorldRenderPlan(mapData, {
+      width: this.scene.cameras.main.width,
+      height: this.scene.cameras.main.height,
+    });
+    for (const chunk of this.renderPlan.chunks) {
+      const chunkContainer = this.scene.add.container(0, 0);
+      chunkContainer.setName(`world-chunk-${chunk.id}`);
+      this.container.add(chunkContainer);
+      this.chunkContainers.set(chunk.id, chunkContainer);
+    }
 
     this.mapWidth = mapData.width;
     this.mapHeight = mapData.height;
@@ -119,7 +138,7 @@ export class MapRenderer {
             pickVariant(theme.floorVariants, row, col),
           );
           floorSprite.setScale(scale);
-          this.container.add(floorSprite);
+          this.addToChunkAtCell(floorSprite, col, row);
         }
 
         const { texture, frame } = this.pickTile(
@@ -142,7 +161,7 @@ export class MapRenderer {
             coverBarricadeAngle(mapData.tiles, mapData.height, mapData.width, row, col),
           );
         }
-        this.container.add(sprite);
+        this.addToChunkAtCell(sprite, col, row);
         this.tileSprites[row][col] = sprite;
       }
     }
@@ -169,7 +188,11 @@ export class MapRenderer {
       );
       sprite.setScale(isGate ? wireGateScale(tileSize) : scale);
       sprite.setFlipX(deco.flipX ?? false);
-      this.container.add(sprite);
+      this.addToChunkAtCell(
+        sprite,
+        Math.min(mapData.width - 1, Math.floor(deco.x + deco.w / 2)),
+        Math.min(mapData.height - 1, Math.floor(deco.y + deco.h / 2)),
+      );
       for (let row = deco.y; row < deco.y + deco.h; row++) {
         for (let col = deco.x; col < deco.x + deco.w; col++) {
           const key = row * mapData.width + col;
@@ -191,7 +214,7 @@ export class MapRenderer {
       marker.lineStyle(1, Wasteland.SPAWN_MARKER, 0.3);
       marker.lineBetween(x - 4, y, x + 4, y);
       marker.lineBetween(x, y - 4, x, y + 4);
-      this.container.add(marker);
+      this.addToChunkAtCell(marker, spawn.x, spawn.y);
     }
 
     // Pickup spawn locations are not drawn here — PickupRenderer owns
@@ -202,6 +225,41 @@ export class MapRenderer {
     this.collisionGrid = createCollisionGrid(mapData);
 
     return this.container;
+  }
+
+  updateVisibleChunks(view: WorldViewRect): void {
+    if (!this.renderPlan) return;
+    const visible = visibleWorldChunkIds(this.renderPlan, view);
+    for (const [id, chunk] of this.chunkContainers) {
+      chunk.setVisible(visible.has(id));
+      chunk.setActive(visible.has(id));
+    }
+  }
+
+  getRenderState(): Readonly<{
+    worldBounds: WorldRenderPlan['worldBounds'] | null;
+    chunkCount: number;
+    visibleChunkIds: readonly string[];
+  }> {
+    return Object.freeze({
+      worldBounds: this.renderPlan?.worldBounds ?? null,
+      chunkCount: this.chunkContainers.size,
+      visibleChunkIds: Object.freeze(
+        [...this.chunkContainers]
+          .filter(([, chunk]) => chunk.visible)
+          .map(([id]) => id)
+          .sort(),
+      ),
+    });
+  }
+
+  private addToChunkAtCell(object: Phaser.GameObjects.GameObject, col: number, row: number): void {
+    if (!this.renderPlan) {
+      this.container?.add(object);
+      return;
+    }
+    const id = `${Math.floor(col / WORLD_CHUNK_TILES)}:${Math.floor(row / WORLD_CHUNK_TILES)}`;
+    (this.chunkContainers.get(id) ?? this.container)?.add(object);
   }
 
   /** Resolve the texture + frame for one cell from the active theme. */
@@ -333,7 +391,11 @@ export class MapRenderer {
   private animateScavengerCacheOpen(sprite: Phaser.GameObjects.Sprite): void {
     const burst = this.scene.add.circle(sprite.x, sprite.y, 8, 0xffc857, 0.25);
     burst.setStrokeStyle(2, 0xffe29a, 0.9);
-    this.container?.add(burst);
+    this.addToChunkAtCell(
+      burst,
+      Math.floor(sprite.x / this.mapTileSize),
+      Math.floor(sprite.y / this.mapTileSize),
+    );
 
     sprite.setTint(0xffd166);
     this.scene.tweens.add({
@@ -364,6 +426,8 @@ export class MapRenderer {
     }
 
     this.collisionGrid = null;
+    this.renderPlan = null;
+    this.chunkContainers.clear();
     this.tileSprites = [];
     this.tileTypes = [];
     this.scorchedCells.clear();

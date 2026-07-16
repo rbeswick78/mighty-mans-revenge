@@ -3,6 +3,11 @@ import Phaser from 'phaser';
 import type { CollisionGrid } from '@shared/types/map.js';
 import { sampleIsWall } from './wall-sample.js';
 import { declareWorldSpace, placeInWorld, worldPoint } from './gameplay-coordinate-space.js';
+import {
+  acquirePooledEffectSlot,
+  WORLD_RENDER_QUALITY_BUDGETS,
+  type WorldRenderQualityBudget,
+} from './dynamic-world-rendering.js';
 
 /**
  * Bullet-impact sparks + dust puffs. Pooled — every transient particle is a
@@ -98,7 +103,12 @@ export class ImpactFx {
   private nextSparkSlot = 0;
   private nextDustSlot = 0;
 
-  constructor(scene: Phaser.Scene) {
+  constructor(
+    scene: Phaser.Scene,
+    private readonly qualityBudget: () => WorldRenderQualityBudget = () =>
+      WORLD_RENDER_QUALITY_BUDGETS.full,
+    private readonly isVisible: (x: number, y: number, radius: number) => boolean = () => true,
+  ) {
     this.scene = scene;
     bakeSparkTexture(scene, SPARK_TEXTURE_KEY, SPARK_TEXTURE_SIZE_PX);
     bakeDustTexture(scene, DUST_TEXTURE_KEY, DUST_TEXTURE_RADIUS_PX, DUST_TEXTURE_GRADIENT_STEPS);
@@ -126,9 +136,11 @@ export class ImpactFx {
    * `bulletAngle` is the bullet's travel direction in radians.
    */
   spawnBulletImpact(x: number, y: number, bulletAngle: number, grid: CollisionGrid | null): void {
+    if (!this.isVisible(x, y, DUST_MAX_RADIUS_PX)) return;
     const isWall = sampleIsWall(grid, x, y, bulletAngle);
-    const sparkCount = isWall ? SPARK_COUNT_WALL : SPARK_COUNT_AIR;
-    const dustCount = isWall ? DUST_COUNT_WALL : DUST_COUNT_AIR;
+    const budget = this.qualityBudget();
+    const sparkCount = Math.min(isWall ? SPARK_COUNT_WALL : SPARK_COUNT_AIR, budget.impactSparks);
+    const dustCount = Math.min(isWall ? DUST_COUNT_WALL : DUST_COUNT_AIR, budget.impactDust);
 
     // Sparks ricochet back from the surface — center the cone on the
     // reflected bullet direction.
@@ -198,7 +210,7 @@ export class ImpactFx {
   }
 
   private spawnSpark(x: number, y: number, baseAngle: number): void {
-    const slot = acquireSlot(this.sparkPool, this.nextSparkSlot);
+    const slot = acquirePooledEffectSlot(this.sparkPool, this.nextSparkSlot);
     if (slot === -1) return;
     this.nextSparkSlot = (slot + 1) % this.sparkPool.length;
     const s = this.sparkPool[slot];
@@ -224,7 +236,7 @@ export class ImpactFx {
   }
 
   private spawnDust(x: number, y: number): void {
-    const slot = acquireSlot(this.dustPool, this.nextDustSlot);
+    const slot = acquirePooledEffectSlot(this.dustPool, this.nextDustSlot);
     if (slot === -1) return;
     this.nextDustSlot = (slot + 1) % this.dustPool.length;
     const d = this.dustPool[slot];
@@ -260,20 +272,6 @@ function deactivate(p: { active: boolean; img: Phaser.GameObjects.Image }): void
 function easeOutCubic(t: number): number {
   const u = 1 - t;
   return 1 - u * u * u;
-}
-
-/**
- * Find a slot for a new particle: first inactive starting from `start`, or
- * the slot at `start` itself if the pool is full (FIFO recycling). Returns
- * -1 only for an empty pool.
- */
-function acquireSlot<T extends { active: boolean }>(pool: T[], start: number): number {
-  if (pool.length === 0) return -1;
-  for (let i = 0; i < pool.length; i++) {
-    const idx = (start + i) % pool.length;
-    if (!pool[idx].active) return idx;
-  }
-  return start;
 }
 
 function bakeSparkTexture(scene: Phaser.Scene, key: string, size: number): void {

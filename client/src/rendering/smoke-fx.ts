@@ -1,4 +1,10 @@
 import Phaser from 'phaser';
+import { declareWorldSpace } from './gameplay-coordinate-space.js';
+import {
+  acquirePooledEffectSlot,
+  WORLD_RENDER_QUALITY_BUDGETS,
+  type WorldRenderQualityBudget,
+} from './dynamic-world-rendering.js';
 
 /**
  * Lingering smoke puffs from grenade detonations. A pool of additively-
@@ -88,17 +94,18 @@ export class SmokeFx {
   private readonly pool: Smoke[] = [];
   private nextSlot = 0;
 
-  constructor(scene: Phaser.Scene) {
+  constructor(
+    scene: Phaser.Scene,
+    private readonly qualityBudget: () => WorldRenderQualityBudget = () =>
+      WORLD_RENDER_QUALITY_BUDGETS.full,
+    private readonly isVisible: (x: number, y: number, radius: number) => boolean = () => true,
+  ) {
     this.scene = scene;
-    bakeSmokeTexture(
-      scene,
-      SMOKE_TEXTURE_KEY,
-      SMOKE_TEXTURE_RADIUS_PX,
-      SMOKE_GRADIENT_STEPS,
-    );
+    bakeSmokeTexture(scene, SMOKE_TEXTURE_KEY, SMOKE_TEXTURE_RADIUS_PX, SMOKE_GRADIENT_STEPS);
 
     for (let i = 0; i < MAX_SMOKE; i++) {
       const img = scene.add.image(0, 0, SMOKE_TEXTURE_KEY);
+      declareWorldSpace(img);
       img.setDepth(SMOKE_FX_DEPTH);
       img.setBlendMode(Phaser.BlendModes.ADD);
       img.setVisible(false);
@@ -117,7 +124,9 @@ export class SmokeFx {
 
   /** Emit a layered cloud of puffs at a detonation point. */
   spawnExplosionSmoke(x: number, y: number): void {
-    for (let i = 0; i < SMOKE_PUFFS_PER_EXPLOSION; i++) {
+    if (!this.isVisible(x, y, SMOKE_FINAL_RADIUS_PX + SMOKE_SPAWN_JITTER_PX)) return;
+    const count = Math.min(SMOKE_PUFFS_PER_EXPLOSION, this.qualityBudget().smokePuffs);
+    for (let i = 0; i < count; i++) {
       this.spawnPuff(x, y);
     }
   }
@@ -161,7 +170,7 @@ export class SmokeFx {
   }
 
   private spawnPuff(x: number, y: number): void {
-    const slot = acquireSlot(this.pool, this.nextSlot);
+    const slot = acquirePooledEffectSlot(this.pool, this.nextSlot);
     if (slot === -1) return;
     this.nextSlot = (slot + 1) % this.pool.length;
     const s = this.pool[slot];
@@ -173,8 +182,7 @@ export class SmokeFx {
 
     const driftAngle = Math.random() * Math.PI * 2;
     const driftSpeed =
-      SMOKE_DRIFT_SPEED_MIN +
-      Math.random() * (SMOKE_DRIFT_SPEED_MAX - SMOKE_DRIFT_SPEED_MIN);
+      SMOKE_DRIFT_SPEED_MIN + Math.random() * (SMOKE_DRIFT_SPEED_MAX - SMOKE_DRIFT_SPEED_MIN);
     s.vx = Math.cos(driftAngle) * driftSpeed;
     s.vy = Math.sin(driftAngle) * driftSpeed + SMOKE_RISE_VY;
     s.rotationSpeed = (Math.random() * 2 - 1) * SMOKE_ROTATION_SPEED_MAX;
@@ -214,21 +222,7 @@ function smokeAlpha(t: number): number {
   return SMOKE_PEAK_ALPHA * (1 - u);
 }
 
-function acquireSlot(pool: Smoke[], start: number): number {
-  if (pool.length === 0) return -1;
-  for (let i = 0; i < pool.length; i++) {
-    const idx = (start + i) % pool.length;
-    if (!pool[idx].active) return idx;
-  }
-  return start;
-}
-
-function bakeSmokeTexture(
-  scene: Phaser.Scene,
-  key: string,
-  radius: number,
-  steps: number,
-): void {
+function bakeSmokeTexture(scene: Phaser.Scene, key: string, radius: number, steps: number): void {
   if (scene.textures.exists(key)) return;
   const g = scene.make.graphics({ x: 0, y: 0 }, false);
   // Cubic falloff — softer edge than dust/scorch's quadratic, so the puff

@@ -131,6 +131,17 @@ async function viewportSnapshot(page: Page): Promise<Record<string, unknown>> {
       getCameraController(): {
         getState(): unknown;
       } | null;
+      getDynamicWorldRenderState(): {
+        plan: {
+          worldBounds: { left: number; top: number; width: number; height: number };
+          chunks: unknown[];
+          viewportResource: { width: number; height: number };
+        } | null;
+        quality: { tier: string };
+        map: { chunkCount: number; visibleChunkIds: string[] } | null;
+        decals: { resourceCount: number; resources: unknown[] } | null;
+        lighting: { width: number; height: number; quality: string } | null;
+      };
       kothHillRenderer: { gfx: { scrollFactorX: number; scrollFactorY: number } };
       coreRunRenderer: { container: { scrollFactorX: number; scrollFactorY: number } };
       radiationStormRenderer: {
@@ -155,6 +166,7 @@ async function viewportSnapshot(page: Page): Promise<Record<string, unknown>> {
     const contract = scene.getGameplayViewportContract();
     const coordinates = scene.getGameplayCoordinateSpace();
     const cameraController = scene.getCameraController();
+    const dynamic = scene.getDynamicWorldRenderState();
     const playerMarkerOwner = scene.playerManager.getRenderer('viewport-local')?.getContainer();
     return {
       scale: [game?.scale.width, game?.scale.height],
@@ -169,6 +181,15 @@ async function viewportSnapshot(page: Page): Promise<Record<string, unknown>> {
         height: scene.cameras.main.worldView.height,
       },
       cameraController: cameraController?.getState() ?? null,
+      dynamic: {
+        worldBounds: dynamic.plan?.worldBounds ?? null,
+        viewportResource: dynamic.plan?.viewportResource ?? null,
+        chunks: dynamic.plan?.chunks.length ?? 0,
+        quality: dynamic.quality.tier,
+        map: dynamic.map,
+        decals: dynamic.decals,
+        lighting: dynamic.lighting,
+      },
       coordinates: {
         screenToWorld: coordinates.screenToWorld({ space: 'screen', x: 480, y: 288 }),
         worldToScreen: coordinates.worldToScreen({ space: 'world', x: 480, y: 288 }),
@@ -418,6 +439,98 @@ async function coordinateInputSnapshot(
   }, mobile);
 }
 
+async function dynamicWorldMutationSnapshot(page: Page): Promise<Record<string, unknown>> {
+  return page.evaluate(() => {
+    const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'GameScene',
+    ) as unknown as {
+      cameras: { main: { preRender(): void } };
+      mapRenderer: {
+        getCollisionGrid(): unknown;
+        destroyTileAt(col: number, row: number): void;
+        updateVisibleChunks(view: { x: number; y: number; width: number; height: number }): void;
+      };
+      decalRenderer: {
+        addBulletHoleIfWall(x: number, y: number, angle: number, grid: unknown): void;
+        updateDestroyedTiles(tiles: Array<{ col: number; row: number }>): void;
+        updateVisibleChunks(view: { x: number; y: number; width: number; height: number }): void;
+      };
+      lightingRenderer: {
+        addExplosionFlash(x: number, y: number): void;
+        update(positions: unknown[], delta: number, local: null, blackout: boolean): void;
+      };
+      worldRenderQuality: { sampleFrame(delta: number): void; reset(): void };
+      getDynamicWorldRenderState(): {
+        quality: { tier: string };
+        map: { visibleChunkIds: string[] };
+        decals: {
+          resources: Array<{
+            id: string;
+            stamps: number;
+            revision: number;
+            visible: boolean;
+          }>;
+        };
+        lighting: {
+          quality: string;
+          lastProjectedLight: { x: number; y: number; radius: number } | null;
+        };
+      };
+      getCameraController(): {
+        setWorldBounds(bounds: { left: number; top: number; width: number; height: number }): void;
+        setBaseZoom(zoom: number): void;
+        setTarget(target: {
+          kind: 'local-player';
+          position: { space: 'world'; x: number; y: number };
+        }): void;
+        update(delta: number): void;
+        reset(): void;
+      };
+    };
+    const grid = scene.mapRenderer.getCollisionGrid();
+    scene.decalRenderer.addBulletHoleIfWall(384, 72, 0, grid);
+    const beforeDestruction = scene.getDynamicWorldRenderState().decals.resources;
+    scene.mapRenderer.destroyTileAt(8, 1);
+    scene.decalRenderer.updateDestroyedTiles([{ col: 8, row: 1 }]);
+    const afterDestruction = scene.getDynamicWorldRenderState().decals.resources;
+
+    const edgeView = { x: 0, y: 0, width: 336, height: 336 };
+    scene.mapRenderer.updateVisibleChunks(edgeView);
+    scene.decalRenderer.updateVisibleChunks(edgeView);
+    const edgeCulling = scene.getDynamicWorldRenderState();
+
+    for (let i = 0; i < 30; i++) scene.worldRenderQuality.sampleFrame(24);
+    const controller = scene.getCameraController();
+    controller.setWorldBounds({ left: 0, top: 0, width: 2560, height: 1440 });
+    controller.setBaseZoom(1.25);
+    controller.setTarget({
+      kind: 'local-player',
+      position: { space: 'world', x: 1500, y: 900 },
+    });
+    controller.update(0);
+    scene.cameras.main.preRender();
+    scene.lightingRenderer.addExplosionFlash(1500, 900);
+    scene.lightingRenderer.update([], 16, null, false);
+    const reduced = scene.getDynamicWorldRenderState();
+
+    controller.reset();
+    controller.setWorldBounds({ left: 0, top: 0, width: 960, height: 576 });
+    scene.worldRenderQuality.reset();
+
+    return {
+      beforeDestruction,
+      afterDestruction,
+      edgeVisible: edgeCulling.map.visibleChunkIds,
+      edgeDecals: edgeCulling.decals.resources
+        .filter((resource) => resource.visible)
+        .map((resource) => resource.id),
+      reducedQuality: reduced.quality.tier,
+      lightingQuality: reduced.lighting.quality,
+      projectedLight: reduced.lighting.lastProjectedLight,
+    };
+  });
+}
+
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
   await waitForScene(page, 'LobbyScene');
@@ -448,6 +561,28 @@ test('capability-off and old-server gameplay retain the exact legacy surface', a
         roll: 0,
       },
       composed: { scrollX: 0, scrollY: 0, zoom: 1, rotation: 0 },
+    },
+    dynamic: {
+      worldBounds: { left: 0, top: 0, width: 960, height: 576 },
+      viewportResource: { width: 960, height: 576 },
+      chunks: 6,
+      quality: 'full',
+      map: {
+        worldBounds: { left: 0, top: 0, width: 960, height: 576 },
+        chunkCount: 6,
+        visibleChunkIds: ['0:0', '0:1', '1:0', '1:1', '2:0', '2:1'],
+      },
+      decals: {
+        resourceCount: 6,
+        resources: expect.any(Array),
+      },
+      lighting: {
+        width: 960,
+        height: 576,
+        timedLights: 0,
+        quality: 'full',
+        lastProjectedLight: null,
+      },
     },
     coordinates: {
       screenToWorld: { space: 'world', x: 480, y: 288 },
@@ -484,6 +619,15 @@ test('gated gameplay keeps one 16:9 logical view across desktop and mobile', asy
       target: { kind: 'local-player' },
       base: { scrollX: 0, scrollY: 0, zoom: 1 },
       composed: { scrollX: 0, scrollY: 0, zoom: 1, rotation: 0 },
+    },
+    dynamic: {
+      worldBounds: { left: 0, top: 0, width: 960, height: 576 },
+      viewportResource: { width: 960, height: 576 },
+      chunks: 6,
+      quality: 'full',
+      map: { chunkCount: 6 },
+      decals: { resourceCount: 6 },
+      lighting: { width: 960, height: 576, quality: 'full' },
     },
   });
   expect(initial.safeArea).toMatchObject({ left: 32, top: 32, right: 1248, bottom: 688 });
@@ -586,6 +730,42 @@ test('gated gameplay keeps one 16:9 logical view across desktop and mobile', asy
     });
     await page.screenshot({ path: testInfo.outputPath('gameplay-viewport-mobile-chromium.png') });
   }
+});
+
+test('dynamic chunks, destruction resources, lighting, and quality stay aligned', async ({
+  page,
+}) => {
+  test.skip(!largeWorldsAdvertised, 'Run with CAPABILITY_LARGE_WORLDS=true.');
+  await stageGameplay(page, true);
+  const state = (await dynamicWorldMutationSnapshot(page)) as {
+    beforeDestruction: Array<{ id: string; stamps: number }>;
+    afterDestruction: Array<{ id: string; stamps: number; revision: number }>;
+    edgeVisible: string[];
+    edgeDecals: string[];
+    reducedQuality: string;
+    lightingQuality: string;
+    projectedLight: { x: number; y: number; radius: number };
+  };
+  expect(
+    state.beforeDestruction
+      .filter((resource) => resource.stamps > 0)
+      .map((resource) => resource.id),
+  ).toEqual(['0:0', '1:0']);
+  expect(
+    state.afterDestruction
+      .filter((resource) => resource.revision > 0)
+      .map(({ id, stamps, revision }) => ({ id, stamps, revision })),
+  ).toEqual([
+    { id: '0:0', stamps: 0, revision: 1 },
+    { id: '1:0', stamps: 0, revision: 1 },
+  ]);
+  expect(state.edgeVisible).toEqual(['0:0']);
+  expect(state.edgeDecals).toEqual(['0:0']);
+  expect(state.reducedQuality).toBe('reduced');
+  expect(state.lightingQuality).toBe('reduced');
+  expect(state.projectedLight.x).toBeCloseTo(640, 4);
+  expect(state.projectedLight.y).toBeCloseTo(360, 4);
+  expect(state.projectedLight.radius).toBeCloseTo(187.5, 4);
 });
 
 test('Results and connection recovery restore legacy scene sizing', async ({ page }) => {

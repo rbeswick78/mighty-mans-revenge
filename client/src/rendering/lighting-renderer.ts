@@ -2,8 +2,16 @@ import Phaser from 'phaser';
 
 import type { Vec2 } from '@shared/types/common.js';
 import { Wasteland } from '@shared/config/palette.js';
-import { MAP_WIDTH_PX, MAP_HEIGHT_PX } from '../ui/layout.js';
 import { lightingProfile } from './lighting-profile.js';
+import {
+  declareScreenSpace,
+  type GameplayCoordinateSpace,
+  worldPoint,
+} from './gameplay-coordinate-space.js';
+import {
+  WORLD_RENDER_QUALITY_BUDGETS,
+  type WorldRenderQualityBudget,
+} from './dynamic-world-rendering.js';
 
 // Above gameplay sprites (0–50) and below the death/countdown overlays at
 // 2000. The HUD strip sits below the playfield rect, so its 500–2000 depth
@@ -25,7 +33,7 @@ const EXPLOSION_FLASH_DURATION_MS = 200;
 
 const PICKUP_GLOW_RADIUS = 40;
 const PICKUP_GLOW_BASE_ALPHA = 0.45;
-const PICKUP_GLOW_PULSE_AMPLITUDE = 0.20;
+const PICKUP_GLOW_PULSE_AMPLITUDE = 0.2;
 const PICKUP_GLOW_PULSE_PERIOD_MS = 1200;
 
 interface TimedLight {
@@ -39,17 +47,26 @@ interface TimedLight {
 /**
  * Additive darkness overlay over the playfield. A render texture is filled
  * with an ambient dark tint each frame, then light sources erase soft
- * cut-outs through it so the underlying scene shows brightly. Camera doesn't
- * scroll, so screen and world coords coincide.
+ * cut-outs through it so the underlying scene shows brightly. The target is
+ * screen-pinned and every world light crosses GameplayCoordinateSpace first.
  */
 export class LightingRenderer {
   private rt: Phaser.GameObjects.RenderTexture;
   private lightImage: Phaser.GameObjects.Image;
   private timedLights: TimedLight[] = [];
   private elapsedMs = 0;
+  private lastProjectedLight: Readonly<{ x: number; y: number; radius: number }> | null = null;
 
-  constructor(scene: Phaser.Scene) {
-    this.rt = scene.add.renderTexture(0, 0, MAP_WIDTH_PX, MAP_HEIGHT_PX);
+  constructor(
+    scene: Phaser.Scene,
+    private readonly coordinates: GameplayCoordinateSpace,
+    private readonly resourceSize: Readonly<{ width: number; height: number }>,
+    private readonly qualityBudget: () => WorldRenderQualityBudget = () =>
+      WORLD_RENDER_QUALITY_BUDGETS.full,
+  ) {
+    this.rt = declareScreenSpace(
+      scene.add.renderTexture(0, 0, resourceSize.width, resourceSize.height),
+    );
     this.rt.setOrigin(0, 0);
     this.rt.setDepth(LIGHTING_DEPTH);
     this.rt.setAlpha(lightingProfile(false).ambientAlpha);
@@ -57,14 +74,11 @@ export class LightingRenderer {
     bakeLightTexture(scene, LIGHT_TEXTURE_KEY, LIGHT_TEXTURE_RADIUS, LIGHT_GRADIENT_STEPS);
     // Off-display image used only as the erase source. Re-positioned and
     // re-scaled per light per frame.
-    this.lightImage = scene.make.image(
-      { x: 0, y: 0, key: LIGHT_TEXTURE_KEY, add: false },
-      false,
-    );
+    this.lightImage = scene.make.image({ x: 0, y: 0, key: LIGHT_TEXTURE_KEY, add: false }, false);
   }
 
   addMuzzleFlash(x: number, y: number): void {
-    this.timedLights.push({
+    this.addTimedLight({
       x,
       y,
       radius: MUZZLE_FLASH_RADIUS,
@@ -74,7 +88,7 @@ export class LightingRenderer {
   }
 
   addExplosionFlash(x: number, y: number): void {
-    this.timedLights.push({
+    this.addTimedLight({
       x,
       y,
       radius: EXPLOSION_FLASH_RADIUS,
@@ -101,12 +115,7 @@ export class LightingRenderer {
     // gets a soft personal pool of light around their living local player;
     // remote players do not emit one, so crossing the darkness still matters.
     if (localPlayerPosition && profile.playerLightRadius > 0) {
-      this.eraseLight(
-        localPlayerPosition.x,
-        localPlayerPosition.y,
-        profile.playerLightRadius,
-        1,
-      );
+      this.eraseLight(localPlayerPosition.x, localPlayerPosition.y, profile.playerLightRadius, 1);
     }
 
     // Decay & emit timed lights; drop expired ones via in-place compaction.
@@ -127,15 +136,51 @@ export class LightingRenderer {
       PICKUP_GLOW_BASE_ALPHA +
       PICKUP_GLOW_PULSE_AMPLITUDE *
         Math.sin((this.elapsedMs / PICKUP_GLOW_PULSE_PERIOD_MS) * Math.PI * 2);
-    for (const pos of activePickupPositions) {
+    const pickupLimit = Math.min(activePickupPositions.length, this.qualityBudget().pickupLights);
+    for (let i = 0; i < pickupLimit; i++) {
+      const pos = activePickupPositions[i];
       this.eraseLight(pos.x, pos.y, PICKUP_GLOW_RADIUS, pulse);
     }
   }
 
   private eraseLight(x: number, y: number, radius: number, alpha: number): void {
-    this.lightImage.setScale(radius / LIGHT_TEXTURE_RADIUS);
+    const screen = this.coordinates.worldToScreen(worldPoint(x, y));
+    const radiusPoint = this.coordinates.worldToScreen(worldPoint(x + radius, y));
+    const screenRadius = Math.hypot(radiusPoint.x - screen.x, radiusPoint.y - screen.y);
+    this.lastProjectedLight = Object.freeze({ x: screen.x, y: screen.y, radius: screenRadius });
+    if (
+      screen.x + screenRadius < 0 ||
+      screen.y + screenRadius < 0 ||
+      screen.x - screenRadius > this.resourceSize.width ||
+      screen.y - screenRadius > this.resourceSize.height
+    ) {
+      return;
+    }
+    this.lightImage.setScale(screenRadius / LIGHT_TEXTURE_RADIUS);
     this.lightImage.setAlpha(alpha);
-    this.rt.erase(this.lightImage, x, y);
+    this.rt.erase(this.lightImage, screen.x, screen.y);
+  }
+
+  private addTimedLight(light: TimedLight): void {
+    const limit = this.qualityBudget().timedLights;
+    if (this.timedLights.length >= limit) this.timedLights.shift();
+    this.timedLights.push(light);
+  }
+
+  getRenderState(): Readonly<{
+    width: number;
+    height: number;
+    timedLights: number;
+    quality: WorldRenderQualityBudget['tier'];
+    lastProjectedLight: Readonly<{ x: number; y: number; radius: number }> | null;
+  }> {
+    return Object.freeze({
+      width: this.resourceSize.width,
+      height: this.resourceSize.height,
+      timedLights: this.timedLights.length,
+      quality: this.qualityBudget().tier,
+      lastProjectedLight: this.lastProjectedLight,
+    });
   }
 
   destroy(): void {
@@ -148,12 +193,7 @@ export class LightingRenderer {
   }
 }
 
-function bakeLightTexture(
-  scene: Phaser.Scene,
-  key: string,
-  radius: number,
-  steps: number,
-): void {
+function bakeLightTexture(scene: Phaser.Scene, key: string, radius: number, steps: number): void {
   if (scene.textures.exists(key)) return;
   const g = scene.make.graphics({ x: 0, y: 0 }, false);
   // Concentric circles from outer (faint) to inner (opaque) form a radial

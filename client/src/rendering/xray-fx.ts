@@ -3,7 +3,6 @@ import type { SerializedPlayerState } from '@shared/types/network.js';
 import type { CollisionGrid } from '@shared/types/map.js';
 import { PLAYER } from '@shared/config/game.js';
 import { raycastAgainstGrid } from '@shared/utils/collision.js';
-import { MAP_HEIGHT_PX, MAP_WIDTH_PX } from '../ui/layout.js';
 import {
   declareScreenSpace,
   declareWorldSpace,
@@ -49,13 +48,13 @@ export class XrayFx {
   /** Drives the border pulse — accumulates ms and feeds Math.sin. */
   private pulseMs = 0;
 
-  constructor(scene: Phaser.Scene) {
+  constructor(scene: Phaser.Scene, viewport: Readonly<{ width: number; height: number }>) {
     this.scene = scene;
     this.tintRect = scene.add.rectangle(
       0,
       0,
-      MAP_WIDTH_PX,
-      MAP_HEIGHT_PX,
+      viewport.width,
+      viewport.height,
       XRAY_COLOR,
       XRAY_TINT_ALPHA,
     );
@@ -66,21 +65,21 @@ export class XrayFx {
 
     // Four solid bars hugging the gameboard edges. Brighter than the tint and
     // pulses, so it reads as an obvious "ability ON" frame even at a glance.
-    this.borderTop = scene.add.rectangle(0, 0, MAP_WIDTH_PX, BORDER_THICKNESS, XRAY_COLOR, 1);
+    this.borderTop = scene.add.rectangle(0, 0, viewport.width, BORDER_THICKNESS, XRAY_COLOR, 1);
     this.borderBottom = scene.add.rectangle(
       0,
-      MAP_HEIGHT_PX - BORDER_THICKNESS,
-      MAP_WIDTH_PX,
+      viewport.height - BORDER_THICKNESS,
+      viewport.width,
       BORDER_THICKNESS,
       XRAY_COLOR,
       1,
     );
-    this.borderLeft = scene.add.rectangle(0, 0, BORDER_THICKNESS, MAP_HEIGHT_PX, XRAY_COLOR, 1);
+    this.borderLeft = scene.add.rectangle(0, 0, BORDER_THICKNESS, viewport.height, XRAY_COLOR, 1);
     this.borderRight = scene.add.rectangle(
-      MAP_WIDTH_PX - BORDER_THICKNESS,
+      viewport.width - BORDER_THICKNESS,
       0,
       BORDER_THICKNESS,
-      MAP_HEIGHT_PX,
+      viewport.height,
       XRAY_COLOR,
       1,
     );

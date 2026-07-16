@@ -125,4 +125,18 @@ describe('gameplay coordinate space', () => {
     placeInWorld(object, worldPoint(480, 288));
     expect(object).toMatchObject({ scrollFactor: [1, 1], position: [480, 288] });
   });
+
+  it('derives the visible world AABB from all logical viewport corners', () => {
+    const coordinates = new GameplayCoordinateSpace(
+      cameraFromAffine({ x: 320, y: 144 }, [0, 0.5, -0.5, 0]),
+      WORLD_BOUNDS,
+    );
+
+    expect(coordinates.visibleWorldBounds(1280, 720)).toEqual({
+      left: 320,
+      top: -496,
+      width: 360,
+      height: 640,
+    });
+  });
 });

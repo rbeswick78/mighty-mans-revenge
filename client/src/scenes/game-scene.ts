@@ -101,6 +101,12 @@ import {
   useGameplayLogicalSize,
 } from '../ui/gameplay-viewport.js';
 import { useLegacyLogicalSize } from '../ui/reforged/responsive-menu-layout.js';
+import {
+  createWorldRenderPlan,
+  worldCircleIntersectsView,
+  WorldRenderQualityController,
+  type WorldRenderPlan,
+} from '../rendering/dynamic-world-rendering.js';
 
 const LOCAL_CORRECTION_SMOOTH_MS = 120;
 const LOCAL_CORRECTION_EPSILON = 0.01;
@@ -197,6 +203,8 @@ export class GameScene extends Phaser.Scene {
   private gameplayViewport: GameplayViewportContract = gameplayViewportForCapabilities(undefined);
   private gameplaySafeArea: GameplayOverlaySafeArea | null = null;
   private gameplayCoordinates!: GameplayCoordinateSpace;
+  private worldRenderPlan: WorldRenderPlan | null = null;
+  private readonly worldRenderQuality = new WorldRenderQualityController();
   private nickname = '';
   private matchData: MatchData | null = null;
   private currentTick = 0;
@@ -306,6 +314,8 @@ export class GameScene extends Phaser.Scene {
     this.localTauntCooldownUntil = 0;
     this.gameplayViewport = gameplayViewportForCapabilities(undefined);
     this.gameplaySafeArea = null;
+    this.worldRenderPlan = null;
+    this.worldRenderQuality.reset();
   }
 
   create(): void {
@@ -314,13 +324,18 @@ export class GameScene extends Phaser.Scene {
       this.scale,
       this.gameService.getServerCapabilities(),
     );
+    const mapData: MapData = getMap(this.matchData?.mapName ?? DEFAULT_MAP_NAME);
+    this.worldRenderPlan = createWorldRenderPlan(mapData, {
+      width: this.gameplayViewport.logicalWidth,
+      height: this.gameplayViewport.logicalHeight,
+    });
     this.gameplayCoordinates = createGameplayCoordinateSpace(
       this.cameras.main,
-      this.gameplayViewport.worldBounds,
+      this.worldRenderPlan.worldBounds,
     );
     this.cameraController = createCameraController(
       this.cameras.main,
-      this.gameplayViewport.worldBounds,
+      this.worldRenderPlan.worldBounds,
     );
     this.scale.on(Phaser.Scale.Events.RESIZE, this.layoutGameplayViewport, this);
     this.layoutGameplayViewport();
@@ -337,7 +352,6 @@ export class GameScene extends Phaser.Scene {
     // Falls back to the default map if matchData is missing (e.g., reloaded
     // mid-match before the matchFound event re-fires).
     this.mapRenderer = new MapRenderer(this);
-    const mapData: MapData = getMap(this.matchData?.mapName ?? DEFAULT_MAP_NAME);
     this.mapRenderer.renderMap(mapData);
 
     // Wire the collision grid into the network manager so client-side
@@ -355,7 +369,7 @@ export class GameScene extends Phaser.Scene {
     // above tiles and below players. See `DecalRenderer` class doc. The
     // grid is also used to bake a wall mask so decals are clipped to
     // wall pixels (no spillage onto floor at tile edges).
-    this.decalRenderer = new DecalRenderer(this, grid);
+    this.decalRenderer = new DecalRenderer(this, grid, () => this.worldRenderQuality.getBudget());
     // KOTH hill zone overlay: same insertion-order contract — above tiles
     // and decals, below the player containers created later. Draws
     // nothing until snapshots carry hill state (i.e. in DM matches it
@@ -373,21 +387,43 @@ export class GameScene extends Phaser.Scene {
     this.pickupRenderer = new PickupRenderer(this);
     this.confirmedTagRenderer = new ConfirmedTagRenderer(this);
     this.coreRunRenderer = new CoreRunRenderer(this);
-    this.radiationStormRenderer = new RadiationStormRenderer(this);
-    this.scrapstormRenderer = new ScrapstormRenderer(this);
+    this.radiationStormRenderer = new RadiationStormRenderer(
+      this,
+      this.worldRenderPlan.viewportResource,
+    );
+    this.scrapstormRenderer = new ScrapstormRenderer(this, this.worldRenderPlan.viewportResource);
     this.grenadeRenderer = new GrenadeRenderer(this);
     this.axeRenderer = new AxeRenderer(this);
-    this.lightingRenderer = new LightingRenderer(this);
+    this.lightingRenderer = new LightingRenderer(
+      this,
+      this.gameplayCoordinates,
+      this.worldRenderPlan.viewportResource,
+      () => this.worldRenderQuality.getBudget(),
+    );
     this.killJuice = new KillJuice(this);
     this.healFlash = new HealFlash(this);
     this.eventFlash = new EventFlash(this);
-    this.impactFx = new ImpactFx(this);
-    this.explosionFx = new ExplosionFx(this);
-    this.smokeFx = new SmokeFx(this);
+    this.impactFx = new ImpactFx(
+      this,
+      () => this.worldRenderQuality.getBudget(),
+      (x, y, radius) => this.isWorldEffectVisible(x, y, radius),
+    );
+    this.explosionFx = new ExplosionFx(
+      this,
+      () => this.worldRenderQuality.getBudget(),
+      (x, y, radius) => this.isWorldEffectVisible(x, y, radius),
+    );
+    this.smokeFx = new SmokeFx(
+      this,
+      () => this.worldRenderQuality.getBudget(),
+      (x, y, radius) => this.isWorldEffectVisible(x, y, radius),
+    );
     this.fireBreathFx = new FireBreathFx(this);
-    this.xrayFx = new XrayFx(this);
+    this.xrayFx = new XrayFx(this, this.worldRenderPlan.viewportResource);
     this.abilityAura = new AbilityAura(this);
-    this.shockwaveController = new ShockwaveController();
+    this.shockwaveController = new ShockwaveController(this.gameplayCoordinates, () =>
+      this.worldRenderQuality.getBudget(),
+    );
     this.hud = new HUD(this);
     // Bullseye replaces the OS cursor on desktop only — touch input
     // doesn't have a hover position to track.
@@ -425,6 +461,7 @@ export class GameScene extends Phaser.Scene {
 
   update(_time: number, delta: number): void {
     if (!this.inputManager || !this.hud) return;
+    this.worldRenderQuality.sampleFrame(delta);
     this.updateMatchMenuInput();
 
     // Decay chromatic aberration toward 0 every frame; it's pushed to the
@@ -1011,6 +1048,22 @@ export class GameScene extends Phaser.Scene {
     // mouse smoothly, not just on server-tick boundaries.
     this.updateCameraTarget(currentLocalState, networkManager);
     this.cameraController?.update(delta);
+    const worldView = this.gameplayCoordinates.visibleWorldBounds(
+      this.gameplayViewport.logicalWidth,
+      this.gameplayViewport.logicalHeight,
+    );
+    this.mapRenderer?.updateVisibleChunks({
+      x: worldView.left,
+      y: worldView.top,
+      width: worldView.width,
+      height: worldView.height,
+    });
+    this.decalRenderer?.updateVisibleChunks({
+      x: worldView.left,
+      y: worldView.top,
+      width: worldView.width,
+      height: worldView.height,
+    });
     this.updateAimLine(currentLocalState);
 
     if (this.lightingRenderer) {
@@ -1223,6 +1276,22 @@ export class GameScene extends Phaser.Scene {
     return this.cameraController;
   }
 
+  getDynamicWorldRenderState(): Readonly<{
+    plan: WorldRenderPlan | null;
+    quality: ReturnType<WorldRenderQualityController['getBudget']>;
+    map: ReturnType<MapRenderer['getRenderState']> | null;
+    decals: ReturnType<DecalRenderer['getRenderState']> | null;
+    lighting: ReturnType<LightingRenderer['getRenderState']> | null;
+  }> {
+    return Object.freeze({
+      plan: this.worldRenderPlan,
+      quality: this.worldRenderQuality.getBudget(),
+      map: this.mapRenderer?.getRenderState() ?? null,
+      decals: this.decalRenderer?.getRenderState() ?? null,
+      lighting: this.lightingRenderer?.getRenderState() ?? null,
+    });
+  }
+
   private updateCameraTarget(
     localState: ReturnType<NetworkManager['getLocalPlayerState']>,
     networkManager: NetworkManager,
@@ -1261,6 +1330,19 @@ export class GameScene extends Phaser.Scene {
     } else {
       this.cameraController.clearTarget();
     }
+  }
+
+  private isWorldEffectVisible(x: number, y: number, radius: number): boolean {
+    const view = this.gameplayCoordinates.visibleWorldBounds(
+      this.gameplayViewport.logicalWidth,
+      this.gameplayViewport.logicalHeight,
+    );
+    return worldCircleIntersectsView(
+      { x: view.left, y: view.top, width: view.width, height: view.height },
+      x,
+      y,
+      radius,
+    );
   }
 
   private layoutGameplayViewport(): void {
@@ -1887,6 +1969,7 @@ export class GameScene extends Phaser.Scene {
       for (const { col, row } of tiles) {
         this.mapRenderer.destroyTileAt(col, row);
       }
+      this.decalRenderer?.updateDestroyedTiles(tiles);
     };
 
     // Sudden-death overtime: the tie banner beat. The clock re-anchor is
@@ -2258,6 +2341,8 @@ export class GameScene extends Phaser.Scene {
       this.decalRenderer.destroy();
       this.decalRenderer = null;
     }
+    this.worldRenderPlan = null;
+    this.worldRenderQuality.reset();
     this.prevDeadStates.clear();
     if (this.hud) {
       this.hud.destroy();

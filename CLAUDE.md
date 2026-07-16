@@ -380,6 +380,23 @@ surface and the 960x720 fallback clamp base scroll to `(0, 0)` today. Dynamic
 rendering, HUD migration, minimap, larger maps, physics, wire state, capability
 defaults, and production exposure remain unchanged.
 
+**Reforged dynamic world rendering (Batch 21):** `WorldRenderPlan` derives
+client presentation bounds from the selected authoritative map dimensions and
+the owning logical gameplay viewport. `GameplayCoordinateSpace` and the sole
+`CameraController` consume those map-derived bounds; 8x8-tile presentation
+chunks cull from the live four-corner coordinate transform while the dense
+shared collision grid remains continuously resident for prediction. Bullet
+decals use chunk-local masked render textures with a bounded CPU stamp ledger,
+seam replay, and authoritative destruction rebuilds. Lighting uses a
+viewport/world-intersection target and projects every world light through the
+coordinate service; radiation, Scrapstorm, X-ray, and shockwaves retain their
+declared domains while scrolled or zoomed. Existing impact, debris, smoke, and
+shockwave pools consume frozen full/reduced cosmetic budgets selected by a
+hysteretic frame-time governor. Current maps still derive to 960x576 at
+`(0, 0)`, all capabilities remain default false, and no HUD, touch-control,
+minimap, arena, physics, simulation, wire, or production contract changed.
+Batch 22 owns responsive combat HUD.
+
 ### Why This Matters for Agents
 
 Client prediction and server simulation **must use identical physics code** from `/shared`. If you change movement, collision, or physics logic, you must change it in `/shared` and verify both client and server still agree. A mismatch between client prediction and server authority causes visible rubber-banding.

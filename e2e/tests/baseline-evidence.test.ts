@@ -14,6 +14,8 @@ interface FrameBaseline {
   fps: number;
 }
 
+const largeWorldsAdvertised = process.env.CAPABILITY_LARGE_WORLDS === 'true';
+
 async function waitForActiveScene(page: Page, sceneKey: string, timeout = 15_000): Promise<void> {
   await expect
     .poll(
@@ -106,7 +108,7 @@ async function startLivePractice(page: Page): Promise<void> {
 
 async function startStagedPractice(page: Page): Promise<void> {
   await waitForActiveScene(page, 'LobbyScene');
-  await page.evaluate(() => {
+  await page.evaluate((advertiseLargeWorlds) => {
     const lobby = (
       window as unknown as { game?: { scene: { getScene: (key: string) => unknown } } }
     ).game?.scene.getScene('LobbyScene') as {
@@ -115,10 +117,22 @@ async function startStagedPractice(page: Page): Promise<void> {
         getNetworkManager: () => {
           getPlayerId: () => string;
           getLocalPlayerState: () => unknown;
+          handleMessage: (message: unknown) => void;
         };
       };
     };
     const network = lobby.gameService.getNetworkManager();
+    network.handleMessage({
+      type: 'server:welcome',
+      playerId: 'baseline-local',
+      capabilities: {
+        newShell: false,
+        schedules: false,
+        largeWorlds: advertiseLargeWorlds,
+        modernArt: false,
+        battleRoyale: false,
+      },
+    });
     network.getPlayerId = () => 'baseline-local';
     network.getLocalPlayerState = () => ({
       id: 'baseline-local',
@@ -160,7 +174,7 @@ async function startStagedPractice(page: Page): Promise<void> {
         matchKind: 'practice',
       },
     });
-  });
+  }, largeWorldsAdvertised);
   await waitForActiveScene(page, 'GameScene');
   await page.evaluate(() => {
     const scene = (
@@ -219,6 +233,19 @@ test('captures client frame and visual baseline', async ({ gamePage }, testInfo)
   await gamePage.waitForTimeout(500);
 
   const baseline = await sampleAnimationFrames(gamePage, 3_000);
+  const dynamicRendering = await gamePage.evaluate(() => {
+    const scene = (
+      window as unknown as { game?: { scene: { getScene: (key: string) => unknown } } }
+    ).game?.scene.getScene('GameScene') as {
+      getDynamicWorldRenderState(): {
+        quality: { tier: string };
+        map: { chunkCount: number; visibleChunkIds: string[] } | null;
+        decals: { resourceCount: number } | null;
+        lighting: { width: number; height: number } | null;
+      };
+    };
+    return scene.getDynamicWorldRenderState();
+  });
   const artifactDir = process.env.BASELINE_ARTIFACT_DIR;
   const screenshotPath = artifactDir
     ? path.join(artifactDir, `${testInfo.project.name}.png`)
@@ -233,6 +260,12 @@ test('captures client frame and visual baseline', async ({ gamePage }, testInfo)
       sceneSource,
       viewport: testInfo.project.use.viewport,
       ...baseline,
+      dynamicRendering: {
+        quality: dynamicRendering.quality.tier,
+        chunks: dynamicRendering.map,
+        decalResources: dynamicRendering.decals?.resourceCount ?? 0,
+        lighting: dynamicRendering.lighting,
+      },
       screenshotPath,
     })}`,
   );

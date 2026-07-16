@@ -1,5 +1,10 @@
 import Phaser from 'phaser';
 import { declareWorldSpace, placeInWorld, worldPoint } from './gameplay-coordinate-space.js';
+import {
+  acquirePooledEffectSlot,
+  WORLD_RENDER_QUALITY_BUDGETS,
+  type WorldRenderQualityBudget,
+} from './dynamic-world-rendering.js';
 
 /**
  * Explosion debris particles. A radial burst of pooled `Phaser.GameObjects.Image`
@@ -70,7 +75,12 @@ export class ExplosionFx {
   private readonly pool: Debris[] = [];
   private nextSlot = 0;
 
-  constructor(scene: Phaser.Scene) {
+  constructor(
+    scene: Phaser.Scene,
+    private readonly qualityBudget: () => WorldRenderQualityBudget = () =>
+      WORLD_RENDER_QUALITY_BUDGETS.full,
+    private readonly isVisible: (x: number, y: number, radius: number) => boolean = () => true,
+  ) {
     this.scene = scene;
     bakeDebrisTexture(scene, DEBRIS_TEXTURE_KEY, DEBRIS_TEXTURE_SIZE_PX);
 
@@ -94,7 +104,9 @@ export class ExplosionFx {
 
   /** Emit a radial debris burst at a detonation point. */
   spawnExplosion(x: number, y: number): void {
-    for (let i = 0; i < DEBRIS_PER_EXPLOSION; i++) {
+    if (!this.isVisible(x, y, DEBRIS_SPEED_MAX)) return;
+    const count = Math.min(DEBRIS_PER_EXPLOSION, this.qualityBudget().explosionDebris);
+    for (let i = 0; i < count; i++) {
       this.spawnDebris(x, y);
     }
   }
@@ -131,7 +143,7 @@ export class ExplosionFx {
   }
 
   private spawnDebris(x: number, y: number): void {
-    const slot = acquireSlot(this.pool, this.nextSlot);
+    const slot = acquirePooledEffectSlot(this.pool, this.nextSlot);
     if (slot === -1) return;
     this.nextSlot = (slot + 1) % this.pool.length;
     const d = this.pool[slot];
@@ -162,20 +174,6 @@ function deactivate(d: Debris): void {
   d.active = false;
   d.img.setVisible(false);
   d.img.setActive(false);
-}
-
-/**
- * Find a slot for a new particle: first inactive starting from `start`, or
- * the slot at `start` itself if the pool is full (FIFO recycling). Returns
- * -1 only for an empty pool.
- */
-function acquireSlot(pool: Debris[], start: number): number {
-  if (pool.length === 0) return -1;
-  for (let i = 0; i < pool.length; i++) {
-    const idx = (start + i) % pool.length;
-    if (!pool[idx].active) return idx;
-  }
-  return start;
 }
 
 function bakeDebrisTexture(scene: Phaser.Scene, key: string, size: number): void {

@@ -2,6 +2,13 @@ import Phaser from 'phaser';
 
 import type { CollisionGrid } from '@shared/types/map.js';
 
+interface GridMaskRegion {
+  readonly firstCol: number;
+  readonly firstRow: number;
+  readonly columnCount: number;
+  readonly rowCount: number;
+}
+
 /**
  * Bake a binary alpha mask texture from a collision grid. White rects are
  * drawn on every tile whose `solid` flag matches `wantSolid`; everything
@@ -20,18 +27,23 @@ export function bakeGridMaskTexture(
   key: string,
   grid: CollisionGrid,
   wantSolid: boolean,
+  region?: GridMaskRegion,
 ): void {
   if (scene.textures.exists(key)) return;
-  const widthPx = grid.width * grid.tileSize;
-  const heightPx = grid.height * grid.tileSize;
+  const firstCol = region?.firstCol ?? 0;
+  const firstRow = region?.firstRow ?? 0;
+  const columnCount = region?.columnCount ?? grid.width;
+  const rowCount = region?.rowCount ?? grid.height;
+  const widthPx = columnCount * grid.tileSize;
+  const heightPx = rowCount * grid.tileSize;
   const g = scene.make.graphics({ x: 0, y: 0 }, false);
   g.fillStyle(0xffffff, 1);
-  for (let row = 0; row < grid.height; row++) {
-    for (let col = 0; col < grid.width; col++) {
+  for (let row = firstRow; row < firstRow + rowCount; row++) {
+    for (let col = firstCol; col < firstCol + columnCount; col++) {
       if (grid.solid[row][col] === wantSolid) {
         g.fillRect(
-          col * grid.tileSize,
-          row * grid.tileSize,
+          (col - firstCol) * grid.tileSize,
+          (row - firstRow) * grid.tileSize,
           grid.tileSize,
           grid.tileSize,
         );

@@ -136,6 +136,25 @@ export class GameplayCoordinateSpace {
     );
   }
 
+  visibleWorldBounds(screenWidth: number, screenHeight: number): WorldBounds {
+    const corners = [
+      this.screenToWorld(screenPoint(0, 0)),
+      this.screenToWorld(screenPoint(screenWidth, 0)),
+      this.screenToWorld(screenPoint(0, screenHeight)),
+      this.screenToWorld(screenPoint(screenWidth, screenHeight)),
+    ];
+    const xs = corners.map((point) => point.x);
+    const ys = corners.map((point) => point.y);
+    const left = Math.min(...xs);
+    const top = Math.min(...ys);
+    return Object.freeze({
+      left,
+      top,
+      width: Math.max(...xs) - left,
+      height: Math.max(...ys) - top,
+    });
+  }
+
   placeOnScreen<T extends CoordinateDomainObject & PositionableObject>(
     object: T,
     point: ScreenPoint,

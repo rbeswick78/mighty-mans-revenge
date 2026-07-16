@@ -5,9 +5,9 @@ Read this file and `CLAUDE.md` completely at the start of every batch. The
 completed `docs/REPLAYABILITY_ROADMAP.md` remains the historical record for the
 systems this program preserves and reorganizes.
 
-- **Status:** Batch 20 complete on 2026-07-16; world/camera foundation active
+- **Status:** Batch 21 complete on 2026-07-16; dynamic world rendering active
   behind default-false capabilities.
-- **Next batch:** Batch 21 — Dynamic world rendering.
+- **Next batch:** Batch 22 — Responsive combat HUD.
 - **Public releases:** Reforged Arena, then Battle Royale.
 - **Working model:** one numbered batch per session, direct commits and pushes
   to `main`, milestone-gated production deployments.
@@ -174,7 +174,7 @@ Production deployment happens only at a gate or for an urgent live fix.
 |  18 | Gameplay viewport cutover              | World/camera  | **DONE — 2026-07-16** |
 |  19 | Coordinate separation                  | World/camera  | **DONE — 2026-07-16** |
 |  20 | Camera controller                      | World/camera  | **DONE — 2026-07-16** |
-|  21 | Dynamic world rendering                | World/camera  | Pending               |
+|  21 | Dynamic world rendering                | World/camera  | **DONE — 2026-07-16** |
 |  22 | Responsive combat HUD                  | World/camera  | Pending               |
 |  23 | Minimap foundation                     | World/camera  | Pending               |
 |  24 | Camera regression gate                 | World/camera  | Pending               |
@@ -769,6 +769,33 @@ Acceptance:
 Make maps, collision, destruction, lighting, decals, storms, and effects use
 actual dimensions, chunks, culling, pools, and quality budgets rather than
 960×576 full-playfield assumptions.
+
+Acceptance:
+
+- [x] The selected registered map derives the one client world-bounds and
+      render-plan contract consumed by Batch 19 coordinates, Batch 20 camera,
+      map chunks, decals, lighting, storms, X-ray, and shader shockwaves.
+- [x] Map presentation uses clipped 8x8-tile chunks with live four-corner
+      camera culling; the complete mutable collision grid remains resident and
+      shared with prediction/reconciliation without changing authority.
+- [x] Persistent decals use chunk-local masked resources, preserve the existing
+      full-quality 512-stamp cap, replay across seams, and rebuild every
+      affected ledger/mask after authoritative destruction. Live scorch remains
+      a map-derived tile mutation and the obsolete fixed RT implementation is gone.
+- [x] Lighting and screen effects consume the actual world/viewport resource
+      extent, world lights/shockwaves cross only the Batch 19 transform, and
+      storms/decals remain aligned while scrolled, zoomed, or rolled.
+- [x] Frozen full/reduced budgets govern impact, debris, smoke, light, decal,
+      and shockwave pools with deterministic exhaustion and hysteretic cosmetic
+      fallback; quality never changes gameplay or authoritative state.
+- [x] Current 960x576 maps remain at `(0, 0)` with identical small-world camera
+      behavior, equal desktop/mobile logical visibility, exact capability-off
+      fallback, Results/rematch and recovery restoration, transitional HUD,
+      capability defaults, wire/server/physics/simulation, and production state.
+- [x] Focused deterministic/static/build gates, enabled/default-false desktop
+      Chromium/mobile-landscape object/interaction evidence, the Batch 21 frame
+      recorder, and inspected live plus mobile-sized Chromium captures pass.
+      No Batch 22 HUD, minimap, arena, art, Battle Royale, or deployment began.
 
 #### Batch 22 — Responsive combat HUD
 
@@ -2080,6 +2107,71 @@ WebKit live WebRTC and black staged canvas captures. The Batch 2 254.279ms host
 scheduling drift reset and 15.932 effective-Hz sample remain unchanged; no
 simulation code changed.
 
+### Batch 21 — 2026-07-16 — Dynamic world rendering
+
+**Shipped:** Added one map-derived `WorldRenderPlan` for actual world bounds,
+clipped 8x8-tile chunks, viewport/world-intersection resources, visible-chunk
+culling, frozen full/reduced cosmetic budgets, hysteretic quality fallback, and
+deterministic FIFO pool acquisition. `GameScene` now selects the authoritative
+registered map before constructing the Batch 19 coordinate service and Batch 20
+camera controller, so both consume the actual world. Map presentation and
+chunk-local masked decal resources cull from the coordinate-derived four-corner
+view; the dense client collision grid remains resident for shared prediction.
+Seam-crossing decals retain their style ledger and authoritative destruction
+rebuilds every affected mask/resource. Lighting, storm/X-ray overlays, and
+shockwaves use derived dimensions or the live coordinate transform. Existing
+impact/debris/smoke/shockwave pools and lights consume quality budgets. Removed
+the unused fixed-size scorch RT; live tile scorch remains unchanged.
+
+**Verification:** Selected the camera/world/performance/visual tier because all
+runtime changes are isolated to client presentation and test instrumentation;
+shared, server, wire, persistence, input, recovery authority, capability
+defaults, and production are unchanged. Focused Vitest passed 36 camera,
+coordinate, chunk/resource, pool/quality, storm, and historical camera tests
+across six files. `corepack pnpm typecheck`, `corepack pnpm lint`, the affected
+client build, and full production build passed; Vite's established chunk-size
+advisory remains. With `largeWorlds` enabled, desktop Chromium/mobile-landscape
+viewport evidence passed six applicable tests with two intentional inverse-gate
+skips, including seam destruction, edge culling, transformed lighting, quality
+fallback, equal visibility, Results, and recovery. With defaults false, exact
+legacy 960x720 fallback passed both projects with six gated skips. The first
+default-false attempt exposed first-frame mobile `camera.worldView` staleness;
+four-corner Batch 19 view derivation fixed the test-coupled culling input and the
+rerun passed. The targeted frame recorder passed desktop Chromium and mobile
+landscape, logging six visible chunks/decal resources and derived 960x576
+lighting. The complete unit and three-project browser inventories were omitted
+because no shared/server/wire/recovery/input foundation changed, this is not the
+Batch 24 gate, and focused evidence showed no broader risk.
+
+**Performance/visual:** The recorder observed live headless Chromium at 3.658
+FPS / 273.375ms mean at full quality and staged mobile at 30.202 FPS / 33.110ms
+mean at reduced quality. These are host/software-renderer observations, not pass
+thresholds; >250ms host stalls do not force a cosmetic tier change. Inspected
+live Chromium retained the complete map, lighting, transient HUD, and world
+effects. Mobile-sized Chromium retained the same logical view; the staged
+mobile WebKit recorder PNG remains black under RFG-003 and is not visual
+evidence.
+
+**Deployment:** Skipped. Batch 21 remains unfinished world/camera milestone
+work behind default-false `largeWorlds`. No production environment, capability,
+server, or client deployment changed, and this task did not authorize one.
+
+**Deviations:** No product-scope deviation. The viewport contract still reports
+its compatibility-era 960x576 current-world field while the live coordinate,
+camera, and rendering path now derives the selected map's actual dimensions;
+all current maps make those values identical. The transitional combat HUD and
+touch positions remain intentionally untouched for Batch 22. A final attempt
+to run the affected and full Vite builds concurrently raced while both cleaned
+`client/dist/assets`; the full build passed and the affected build passed when
+rerun alone, confirming a verification-process collision rather than a runtime
+or build defect.
+
+**Known issues:** No bug-ledger entry was added. RFG-001 and RFG-002 remain
+resolved historical proofs for Batch 24. RFG-003 remains open for headless
+Firefox/WebKit live WebRTC and black staged canvas captures. The Batch 2
+254.279ms host scheduling drift reset and 15.932 effective-Hz sample remain
+unchanged; no authoritative simulation code changed.
+
 ## Next-session prompt
 
 ```text
@@ -2087,78 +2179,82 @@ Continue the Reforged build for Mighty Man's Revenge.
 
 Read docs/REIMAGINING_ROADMAP.md and CLAUDE.md completely first. Read
 docs/REFORGED_BASELINE.md and docs/REFORGED_CAPABILITIES.md before
-implementation. Batch 20 — Camera controller is complete. Implement Batch 21 —
-Dynamic world rendering exactly as specified and do not begin Batch 22 —
-Responsive combat HUD.
+implementation. Batch 21 — Dynamic world rendering is complete. Implement
+Batch 22 — Responsive combat HUD exactly as specified and do not begin Batch
+23 — Minimap foundation.
 
-Make maps, collision presentation, destruction, lighting, decals, storms, and
-effects consume actual world and viewport dimensions instead of fixed 960x576
-full-playfield assumptions. Introduce only the chunking, culling, pooled-effect,
-dynamic render-resource, and quality-budget foundations required by Batch 21.
-Keep all rendering state client-derived from authoritative world state and the
-live Batch 19 coordinate boundary. Preserve Batch 20's one camera controller,
-exact local/respawn/spectator follow, edge clamps, small-world origin anchoring,
-and composed kick/shake/zoom/roll. Preserve Batch 18's capability-owned
-1280x720 logical 16:9 gameplay viewport and safe-area contract, equal desktop/
-mobile logical visibility, all current 960x576 maps at `(0, 0)`, shared/server
-physics, the authoritative 20Hz simulation, every gameplay rule and menu/
-challenge journey, Results/rematches, compatibility scenes/messages, and
-production configuration. Capability-off, old-server, and old-client paths
-must retain the exact established 960x720 gameplay/Lobby behavior through
-Batch 54.
+Rebuild health, armor, stamina, ammo, grenades, ability, score/mode status,
+timer, kill feed, contracts, countdown/briefings, death/connection/event/combat
+callouts, live-match menu, and touch actions as prioritized screen-space
+overlays inside Batch 18's logical safe-area contract. Preserve each existing
+authoritative snapshot/event source, mode-specific unit and visibility rule,
+input action, menu confirmation, and challenge/standard journey. Use one
+responsive HUD layout/model shared by desktop and mobile logical coordinates;
+safe-area movement may not widen world visibility or derive gameplay state from
+screen coordinates. Keep pointer, keyboard, standard gamepad, and touch paths
+equivalent and retain readable priority when simultaneous messages compete.
 
-Do not begin Batch 22 responsive combat HUD: no combat-HUD migration, touch-
-control relocation, minimap, tactical map, larger arena authoring, movement or
-balance tuning, modern art, or Battle Royale work. Do not change map content,
-dimensions, origin, collision authority, physics, simulation, wire contracts,
-capability defaults, or production configuration. Never derive world state
-from screen coordinates, widen one device's logical view, enable a capability
-by default, or deploy without explicit authorization.
+Preserve Batch 21's map-derived world bounds, 8x8 chunks, live coordinate-
+derived culling, chunk-local destruction-safe decals, viewport-derived lighting
+and storms/X-ray resources, transformed shockwaves, pooled effects, and frozen
+quality budgets. Preserve Batch 20's sole camera controller and composed follow/
+kick/shake/zoom/roll, Batch 19's sole coordinate transform, and Batch 18's fixed
+1280x720 logical 16:9 capability-owned gameplay view with equal desktop/mobile
+visibility. Current maps remain 960x576 at `(0, 0)` with unchanged shared/server
+physics, authoritative 20Hz simulation, gameplay rules, menus/challenges,
+Results/rematches, compatibility scenes/messages, and production configuration.
+Capability-off, old-server, and old-client paths must retain the exact
+established 960x720 gameplay/Lobby behavior through Batch 54.
 
-Batch 20 is complete and pushed on main as `feat(play): add composed camera
-controller`. `CameraController` is the only gameplay camera mutation boundary.
-It follows branded world-space local-player, respawn, and spectator targets,
-clamps all edges, anchors small worlds at their authored origin, and composes
-recoil, every shake path, zoom pulse, and roll over sustained base state.
-RFG-001 and RFG-002 are resolved; retain their deterministic proofs for Batch
-24. Focused camera/coordinate/viewport tests (29), typecheck, lint, affected
-and full builds, enabled and default-false desktop Chromium/mobile-landscape
-object/input/Results/recovery evidence, final Chromium evidence, and inspected
-desktop plus mobile-sized Chromium captures are green. The full unit and
-three-project browser inventories were omitted under the documented client-
-only camera/world/visual tier. All capabilities remain default false, wire and
-server behavior are intact, production has not been deployed, and HEAD matched
-origin/main with a clean worktree at handoff.
+Do not begin Batch 23 minimap work: no minimap, tactical map, landmark/map
+projection, larger arena authoring, camera change, rendering-resource redesign,
+movement or balance tuning, modern art, or Battle Royale work. Do not change map
+content/dimensions/origin, collision authority, physics, simulation, wire
+contracts, capability defaults, or production configuration. Never enable a
+capability by default or deploy without explicit authorization.
 
-Choose and document the risk tier for Batch 21. Add deterministic coverage for
-actual world dimensions, viewport-derived resources, chunk boundaries and edge
-culling, destruction updates across chunk/resource boundaries, pooled effects
-and exhaustion cleanup, lighting/decals/storm alignment while scrolled/zoomed,
-quality budgets, current small-world behavior, equal desktop/mobile logical
-visibility, capability-off fallback, Results/rematch, and recovery restoration.
-Run focused tests, `corepack pnpm typecheck`, `corepack pnpm lint`, affected and
-full production builds, and targeted desktop Chromium/mobile-landscape object,
-interaction, performance-recorder, and visual evidence. Escalate to the full
-unit or three-project browser suites if shared, server, wire, recovery, input
-foundations, or broader scene behavior changes. Update roadmap acceptance
-evidence, architecture/baseline/capability docs when contracts change, update
-the bug ledger only with proven evidence, and update the Session Log. Run the
-complete end-of-batch ritual, commit and push directly to main, and skip
-deployment unless explicitly authorized.
+Batch 21 is complete and pushed on main as `feat(play): add dynamic world
+rendering`. Actual map dimensions now feed the Batch 19/20 boundaries; current
+maps produce six clipped/visible chunks and six seam-safe decal resources.
+Authoritative destruction rebuilds affected masks/resources. Lighting and
+shockwaves project through the coordinate service, storms/X-ray consume the
+derived viewport/world extent, and pooled cosmetics use hysteretic full/reduced
+budgets. Focused deterministic tests (36), typecheck, lint, affected/full
+builds, enabled and default-false desktop Chromium/mobile-landscape object,
+interaction, Results/recovery, performance-recorder, and inspected Chromium
+visual evidence are green. The complete unit and three-project browser
+inventories were omitted under the documented client-only world/performance/
+visual tier. All capabilities remain default false, wire/server behavior is
+intact, production has not been deployed, and HEAD matched origin/main with a
+clean worktree at handoff.
 
-Carry-over warnings: RFG-001 and RFG-002 are fixed but Batch 24 still owns their
+Choose and document the risk tier for Batch 22. Add deterministic coverage for
+safe-area prioritization, every combat resource and mode status, kill feed and
+simultaneous callout lanes, touch actions, match menu, current small-world
+behavior, equal desktop/mobile logical visibility, capability-off fallback,
+Results/rematch, and recovery restoration. Run focused tests, `corepack pnpm
+typecheck`, `corepack pnpm lint`, affected and full production builds, and
+targeted desktop Chromium/mobile-landscape object, interaction, and visual
+evidence. Escalate to full unit or three-project browser suites if shared,
+server, wire, recovery, input foundations, or broader scene behavior changes.
+Update roadmap acceptance evidence, architecture/baseline/capability docs when
+contracts change, update the bug ledger only with proven evidence, and update
+the Session Log. Run the complete end-of-batch ritual, commit and push directly
+to main, and skip deployment unless explicitly authorized.
+
+Carry-over warnings: RFG-001 and RFG-002 are fixed but Batch 24 owns their
 regression gate. RFG-003 means headless Firefox/WebKit cannot use the live local
 WebRTC practice path and staged gameplay screenshots are black; staged frame
 numbers are not hardware-comparable. Use mobile-sized Chromium for visual
-evidence while retaining staged WebKit object/input assertions. The local Batch
-2 live-loop sample recorded a 254.279ms host scheduling drift reset and 15.932
-effective Hz while simulation processing remained far below the 50ms budget.
-Use Corepack pnpm 10.33.0 if the local pnpm shim selects a mismatched version.
-Current maps remain smaller than the 1280x720 logical viewport, so Batch 20
-correctly clamps them to `(0, 0)` without centering or resizing. The transitional
-HUD intentionally remains in its established 960x720 region until Batch 22.
-Batch 19's coordinate service and Batch 20's camera controller are the only
-transform/composition boundaries; extend them rather than adding parallel
-camera math. Batch 21 may prepare dynamic rendering for future worlds but must
-not author or enable a larger arena. Batch 22 owns responsive HUD migration.
+evidence while retaining staged WebKit object/input assertions. The Batch 21
+recorder observed host-limited live Chromium at 3.658 FPS / 273.375ms mean at
+full quality and staged mobile at 30.202 FPS / 33.110ms mean at reduced quality;
+neither is a hardware gate. The Batch 2 live-loop sample recorded a 254.279ms
+host scheduling drift reset and
+15.932 effective Hz while simulation processing remained far below 50ms. Use
+Corepack pnpm 10.33.0 if the local shim mismatches. Current maps remain smaller
+than the 1280x720 logical viewport and anchor at origin. Batch 19 coordinates,
+Batch 20 camera composition, and Batch 21 rendering are the only transform,
+camera, and world-resource boundaries. Batch 22 owns responsive HUD migration;
+Batch 23 owns the minimap.
 ```

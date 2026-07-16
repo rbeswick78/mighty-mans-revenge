@@ -163,6 +163,40 @@ scrolled and zoomed through the Batch 19 coordinate service, then restores the
 real fixed-map contract. Current maps, render targets, HUD, physics,
 simulation, wire state, capability defaults, and production remain unchanged.
 
+### Batch 21 dynamic world rendering evidence
+
+`client/src/rendering/dynamic-world-rendering.ts` now derives world bounds,
+8x8-tile clipped chunks, viewport/world-intersection resources, visible chunk
+sets, frozen full/reduced cosmetic budgets, hysteretic quality selection, and
+deterministic FIFO pool exhaustion. `GameScene` selects the map before creating
+the Batch 19 coordinate service and Batch 20 camera controller so both consume
+the actual map bounds. The current six 20x12 maps still resolve to 960x576 at
+origin and therefore preserve exact small-world anchoring on both logical
+surfaces.
+
+Map tiles, underlays, decorations, and spawn presentation now live in culled
+chunk containers while the full mutable collision grid stays resident for
+shared prediction/reconciliation. Decals use six chunk-local masked resources
+on current maps, replay seam-crossing stamps, and rebuild every affected mask
+and ledger after authoritative destruction. Lighting is screen-pinned to the
+derived 960x576 current-world/viewport intersection and projects world lights
+through `GameplayCoordinateSpace`; storm washes/warnings, X-ray framing, and
+shader shockwaves likewise consume derived dimensions or the live transform.
+Impact sparks/dust, explosion debris, smoke, lights, decals, and shockwaves
+consume automatic full/reduced cosmetic budgets without changing gameplay.
+The obsolete unused fixed-size `ScorchRenderer` was removed; live scorch
+remains the map-derived tile-frame mutation.
+
+Focused desktop Chromium/mobile-landscape evidence proves current dimensions,
+six resources/chunks, exact seam destruction rebuilds, edge culling, reduced-
+quality transition, transformed lighting, equal logical visibility, fallback,
+Results, and recovery restoration. The Batch 21 frame recorder observed a
+host-limited live Chromium 3.658 FPS / 273.375ms mean sample at full quality and
+staged mobile 30.202 FPS / 33.110ms mean sample at reduced quality. These remain
+non-hardware pass thresholds; the mobile staged PNG is still black under
+RFG-003, while inspected live and mobile-sized Chromium gameplay captures
+remain the visual evidence.
+
 ## Adjacent bug reproductions
 
 `client/src/rendering/camera-baseline.test.ts` now asserts the repaired

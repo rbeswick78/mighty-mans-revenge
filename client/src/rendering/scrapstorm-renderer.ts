@@ -2,7 +2,6 @@ import type Phaser from 'phaser';
 import type { PlayerId } from '@shared/types/common.js';
 import type { ScrapstormState } from '@shared/types/game.js';
 import { MUTATORS } from '@shared/config/game.js';
-import { MAP_HEIGHT_PX, MAP_WIDTH_PX } from '../ui/layout.js';
 import { declareScreenSpace, declareWorldSpace } from './gameplay-coordinate-space.js';
 
 const SCRAPSTORM_COLOR = 0xff6b35;
@@ -54,7 +53,7 @@ export class ScrapstormRenderer {
   private readonly countdown: Phaser.GameObjects.Text;
   private readonly localWarning: Phaser.GameObjects.Text;
 
-  constructor(scene: Phaser.Scene) {
+  constructor(scene: Phaser.Scene, viewport: Readonly<{ width: number; height: number }>) {
     this.scene = scene;
     this.warning = declareWorldSpace(scene.add.graphics()).setDepth(1402);
     this.countdown = declareWorldSpace(
@@ -72,7 +71,7 @@ export class ScrapstormRenderer {
       .setVisible(false);
     this.localWarning = declareScreenSpace(
       scene.add
-        .text(MAP_WIDTH_PX / 2, MAP_HEIGHT_PX - 28, 'SCRAPSTORM - MOVE!', {
+        .text(viewport.width / 2, viewport.height - 28, 'SCRAPSTORM - MOVE!', {
           fontFamily: 'monospace',
           fontSize: '15px',
           color: '#fff0c2',

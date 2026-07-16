@@ -2,7 +2,6 @@ import Phaser from 'phaser';
 import type { Vec2 } from '@shared/types/common.js';
 import type { RadiationStormState } from '@shared/types/game.js';
 import { isOutsideRadiationStorm } from '@shared/utils/radiation-storm.js';
-import { MAP_HEIGHT_PX, MAP_WIDTH_PX } from '../ui/layout.js';
 import { declareScreenSpace, declareWorldSpace } from './gameplay-coordinate-space.js';
 
 const RADIATION_COLOR = 0x8cff2f;
@@ -38,17 +37,19 @@ export class RadiationStormRenderer {
   private readonly wash: Phaser.GameObjects.Rectangle;
   private readonly warning: Phaser.GameObjects.Text;
 
-  constructor(scene: Phaser.Scene) {
+  constructor(scene: Phaser.Scene, viewport: Readonly<{ width: number; height: number }>) {
     this.scene = scene;
     this.boundary = declareWorldSpace(scene.add.graphics()).setDepth(1400);
     this.wash = declareScreenSpace(
-      scene.add.rectangle(0, 0, MAP_WIDTH_PX, MAP_HEIGHT_PX, RADIATION_COLOR, 0).setOrigin(0, 0),
+      scene.add
+        .rectangle(0, 0, viewport.width, viewport.height, RADIATION_COLOR, 0)
+        .setOrigin(0, 0),
     )
       .setDepth(1450)
       .setVisible(false);
     this.warning = declareScreenSpace(
       scene.add
-        .text(MAP_WIDTH_PX / 2, MAP_HEIGHT_PX - 28, 'RADIATION - MOVE INSIDE', {
+        .text(viewport.width / 2, viewport.height - 28, 'RADIATION - MOVE INSIDE', {
           fontFamily: 'monospace',
           fontSize: '15px',
           color: '#d8ff9b',
