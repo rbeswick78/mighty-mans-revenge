@@ -14,6 +14,12 @@ import {
   MATCH_MENU_LAUNCHER_Y,
 } from './layout.js';
 import type { ResponsiveCombatHudLayout } from './responsive-combat-hud.js';
+import {
+  createModernUiNineSlice,
+  menuBodyFont,
+  menuHeaderFont,
+  modernUiEnabledForScene,
+} from './modern-ui-runtime.js';
 
 export type MatchMenuView = 'menu' | 'confirm';
 
@@ -22,6 +28,7 @@ export class MatchMenu {
   private readonly overlay: Phaser.GameObjects.Container;
   private readonly scrim: Phaser.GameObjects.Rectangle;
   private readonly panel: Phaser.GameObjects.Graphics;
+  private readonly modernPanel: Phaser.GameObjects.NineSlice | null;
   private readonly title: Phaser.GameObjects.Text;
   private readonly headline: Phaser.GameObjects.Text;
   private readonly detail: Phaser.GameObjects.Text;
@@ -72,24 +79,28 @@ export class MatchMenu {
       .setOrigin(0)
       .setInteractive();
     this.panel = scene.add.graphics();
-    drawBeveledChrome(this.panel, 210, 145, 540, 430, {
-      fillColor: Wasteland.HUD_STRIP_BG,
-      fillAlpha: 0.98,
-      strokeColor: Wasteland.CANVAS_BG,
-      highlightColor: Wasteland.COVER_FILL,
-      shadowColor: Wasteland.WALL_LINE,
-    });
+    const modern = modernUiEnabledForScene(scene);
+    this.modernPanel = modern ? createModernUiNineSlice(scene, 'panel', 210, 145, 540, 430) : null;
+    if (!modern) {
+      drawBeveledChrome(this.panel, 210, 145, 540, 430, {
+        fillColor: Wasteland.HUD_STRIP_BG,
+        fillAlpha: 0.98,
+        strokeColor: Wasteland.CANVAS_BG,
+        highlightColor: Wasteland.COVER_FILL,
+        shadowColor: Wasteland.WALL_LINE,
+      });
+    }
 
     this.title = scene.add
       .text(480, 190, 'MATCH MENU', {
-        fontFamily: MENU_FONTS.HEADER,
+        fontFamily: modern ? menuHeaderFont(scene) : MENU_FONTS.HEADER,
         fontSize: '22px',
         color: cssHex(Wasteland.TEXT_PRIMARY),
       })
       .setOrigin(0.5);
     this.headline = scene.add
       .text(480, 242, '', {
-        fontFamily: MENU_FONTS.HEADER,
+        fontFamily: modern ? menuHeaderFont(scene) : MENU_FONTS.HEADER,
         fontSize: '13px',
         color: cssHex(Wasteland.TEXT_RELOAD_WARNING),
         align: 'center',
@@ -97,7 +108,7 @@ export class MatchMenu {
       .setOrigin(0.5);
     this.detail = scene.add
       .text(480, 286, '', {
-        fontFamily: MENU_FONTS.BODY,
+        fontFamily: modern ? menuBodyFont(scene) : MENU_FONTS.BODY,
         fontSize: '16px',
         color: cssHex(Wasteland.COVER_FILL),
         align: 'center',
@@ -124,7 +135,7 @@ export class MatchMenu {
         535,
         touch ? 'TAP A CHOICE  |  COMBAT STAYS LIVE' : 'ESC / B BACK  |  ENTER / A SELECT',
         {
-          fontFamily: MENU_FONTS.BODY,
+          fontFamily: modern ? menuBodyFont(scene) : MENU_FONTS.BODY,
           fontSize: '12px',
           color: cssHex(Wasteland.COVER_FILL),
         },
@@ -134,6 +145,7 @@ export class MatchMenu {
     this.overlay = scene.add.container(0, 0, [
       this.scrim,
       this.panel,
+      ...(this.modernPanel ? [this.modernPanel] : []),
       this.title,
       this.headline,
       this.detail,
@@ -154,13 +166,17 @@ export class MatchMenu {
     const panel = layout.menu.panel;
     const centerX = panel.x + panel.width / 2;
     this.panel.clear();
-    drawBeveledChrome(this.panel, panel.x, panel.y, panel.width, panel.height, {
-      fillColor: Wasteland.HUD_STRIP_BG,
-      fillAlpha: 0.98,
-      strokeColor: Wasteland.CANVAS_BG,
-      highlightColor: Wasteland.COVER_FILL,
-      shadowColor: Wasteland.WALL_LINE,
-    });
+    if (this.modernPanel) {
+      this.modernPanel.setPosition(panel.x, panel.y).setSize(panel.width, panel.height);
+    } else {
+      drawBeveledChrome(this.panel, panel.x, panel.y, panel.width, panel.height, {
+        fillColor: Wasteland.HUD_STRIP_BG,
+        fillAlpha: 0.98,
+        strokeColor: Wasteland.CANVAS_BG,
+        highlightColor: Wasteland.COVER_FILL,
+        shadowColor: Wasteland.WALL_LINE,
+      });
+    }
     this.title.setPosition(centerX, panel.y + 45);
     this.headline.setPosition(centerX, panel.y + 97);
     this.detail

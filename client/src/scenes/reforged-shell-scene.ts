@@ -18,6 +18,13 @@ import type { ConnectionState } from '../network/types.js';
 import { GameService, type MatchData } from '../services/game-service.js';
 import { isCallsignReady, readCallsign } from '../ui/callsign.js';
 import { MENU_FONTS } from '../ui/menu/fonts.js';
+import {
+  configureModernUiScene,
+  createModernUiNineSlice,
+  menuBodyFont,
+  menuHeaderFont,
+  modernUiEnabledForScene,
+} from '../ui/modern-ui-runtime.js';
 import type { ReforgedChallengeStartRequest } from '../ui/reforged/challenge-menu.js';
 import { ChallengesPanel, type ChallengesPanelSnapshot } from '../ui/reforged/challenges-panel.js';
 import { ReforgedMenuTokens } from '../ui/reforged/design-tokens.js';
@@ -43,11 +50,11 @@ import {
 } from '../ui/reforged/responsive-menu-layout.js';
 
 export const REFORGED_TABS = Object.freeze([
-  Object.freeze({ id: 'play', label: 'PLAY' }),
-  Object.freeze({ id: 'fighters', label: 'FIGHTERS' }),
-  Object.freeze({ id: 'challenges', label: 'CHALLENGES' }),
-  Object.freeze({ id: 'records', label: 'RECORDS' }),
-  Object.freeze({ id: 'settings', label: 'SETTINGS' }),
+  Object.freeze({ id: 'play', label: 'PLAY', icon: 'play' }),
+  Object.freeze({ id: 'fighters', label: 'FIGHTERS', icon: 'fighters' }),
+  Object.freeze({ id: 'challenges', label: 'CHALLENGES', icon: 'challenges' }),
+  Object.freeze({ id: 'records', label: 'RECORDS', icon: 'records' }),
+  Object.freeze({ id: 'settings', label: 'SETTINGS', icon: 'settings' }),
 ] as const);
 
 export type ReforgedTabId = (typeof REFORGED_TABS)[number]['id'];
@@ -79,6 +86,7 @@ export class ReforgedShellScene extends Phaser.Scene {
   private eyebrow!: Phaser.GameObjects.Text;
   private title!: Phaser.GameObjects.Text;
   private contentPanel!: Phaser.GameObjects.Graphics;
+  private contentModernPanel: Phaser.GameObjects.NineSlice | null = null;
   private contentTitle!: Phaser.GameObjects.Text;
   private contentState!: Phaser.GameObjects.Text;
   private inputHint!: Phaser.GameObjects.Text;
@@ -104,11 +112,13 @@ export class ReforgedShellScene extends Phaser.Scene {
 
   create(): void {
     this.gameService = GameService.getInstance();
-    if (menuSceneForCapabilities(this.gameService.getServerCapabilities()) !== this.scene.key) {
+    const capabilities = this.gameService.getServerCapabilities();
+    if (menuSceneForCapabilities(capabilities) !== this.scene.key) {
       useLegacyLogicalSize(this.scale);
       this.scene.start('LobbyScene');
       return;
     }
+    configureModernUiScene(this, capabilities.modernArt);
 
     useReforgedMenuLogicalSize(this.scale);
     this.cameras.main.setViewport(0, 0, MENU_LOGICAL_WIDTH, MENU_LOGICAL_HEIGHT);
@@ -127,36 +137,39 @@ export class ReforgedShellScene extends Phaser.Scene {
       .setDepth(SHELL_DEPTH.background);
     this.eyebrow = this.add
       .text(0, 0, "MIGHTY MAN'S REVENGE  /  REFORGED", {
-        fontFamily: MENU_FONTS.HEADER,
+        fontFamily: modernUiEnabledForScene(this) ? menuHeaderFont(this) : MENU_FONTS.HEADER,
         fontSize: `${tokens.type.eyebrow}px`,
         color: cssHex(tokens.color.accentActive),
       })
       .setDepth(SHELL_DEPTH.chrome);
     this.title = this.add
       .text(0, 0, 'WASTELAND COMMAND', {
-        fontFamily: MENU_FONTS.HEADER,
+        fontFamily: modernUiEnabledForScene(this) ? menuHeaderFont(this) : MENU_FONTS.HEADER,
         fontSize: `${tokens.type.title}px`,
         color: cssHex(tokens.color.text),
       })
       .setDepth(SHELL_DEPTH.chrome);
     this.contentPanel = this.add.graphics().setDepth(SHELL_DEPTH.chrome);
+    this.contentModernPanel = modernUiEnabledForScene(this)
+      ? createModernUiNineSlice(this, 'panel', 0, 0, 64, 64).setDepth(SHELL_DEPTH.chrome)
+      : null;
     this.contentTitle = this.add
       .text(0, 0, 'PLAY', {
-        fontFamily: MENU_FONTS.HEADER,
+        fontFamily: modernUiEnabledForScene(this) ? menuHeaderFont(this) : MENU_FONTS.HEADER,
         fontSize: `${tokens.type.section}px`,
         color: cssHex(tokens.color.text),
       })
       .setDepth(SHELL_DEPTH.chrome);
     this.contentState = this.add
       .text(0, 0, 'NAVIGATION FOUNDATION READY', {
-        fontFamily: MENU_FONTS.BODY,
+        fontFamily: modernUiEnabledForScene(this) ? menuBodyFont(this) : MENU_FONTS.BODY,
         fontSize: `${tokens.type.body}px`,
         color: cssHex(tokens.color.textMuted),
       })
       .setDepth(SHELL_DEPTH.chrome);
     this.inputHint = this.add
       .text(0, 0, 'POINTER / TOUCH  /  ARROWS + ENTER  /  D-PAD + A', {
-        fontFamily: MENU_FONTS.BODY,
+        fontFamily: modernUiEnabledForScene(this) ? menuBodyFont(this) : MENU_FONTS.BODY,
         fontSize: `${tokens.type.eyebrow}px`,
         color: cssHex(tokens.color.textMuted),
       })
@@ -219,6 +232,7 @@ export class ReforgedShellScene extends Phaser.Scene {
 
     this.tabButtons = REFORGED_TABS.map((tab) =>
       new ReforgedTabButton(this, tab.label, {
+        icon: tab.icon,
         onPointerIntent: () => {
           this.inputRegion = 'tabs';
           this.playRosterPanel?.clearFocus();
@@ -361,6 +375,18 @@ export class ReforgedShellScene extends Phaser.Scene {
 
   isPlayRosterVisible(): boolean {
     return this.activeTabId === 'play' && (this.playRosterPanel?.visible ?? false);
+  }
+
+  getModernUiRenderState(): Readonly<{
+    enabled: boolean;
+    contentFrame: string | null;
+    tabFrames: readonly (string | null)[];
+  }> {
+    return Object.freeze({
+      enabled: modernUiEnabledForScene(this),
+      contentFrame: this.contentModernPanel?.frame.name ?? null,
+      tabFrames: Object.freeze(this.tabButtons.map((button) => button.getChromeFrame())),
+    });
   }
 
   private bindInput(): void {
@@ -540,11 +566,15 @@ export class ReforgedShellScene extends Phaser.Scene {
     const panelTop = tabTop + tokens.control.tabHeight + tokens.space.md;
     const panelHeight = safe.bottom - panelTop - 46;
     this.contentPanel.clear();
-    this.contentPanel
-      .fillStyle(tokens.color.surface, 1)
-      .fillRect(safe.left, panelTop, safe.width, panelHeight)
-      .lineStyle(tokens.control.borderStroke, tokens.color.border, 1)
-      .strokeRect(safe.left + 1, panelTop + 1, safe.width - 2, panelHeight - 2);
+    if (this.contentModernPanel) {
+      this.contentModernPanel.setPosition(safe.left, panelTop).setSize(safe.width, panelHeight);
+    } else {
+      this.contentPanel
+        .fillStyle(tokens.color.surface, 1)
+        .fillRect(safe.left, panelTop, safe.width, panelHeight)
+        .lineStyle(tokens.control.borderStroke, tokens.color.border, 1)
+        .strokeRect(safe.left + 1, panelTop + 1, safe.width - 2, panelHeight - 2);
+    }
     this.contentTitle.setPosition(safe.left + tokens.space.lg, panelTop + tokens.space.lg);
     this.contentState.setPosition(safe.left + tokens.space.lg, panelTop + tokens.space.lg + 52);
     this.playRosterPanel?.layout(

@@ -36,6 +36,12 @@ import {
   type MatchTimerTone,
 } from './match-status-presentation.js';
 import type { ResponsiveCombatHudLayout } from './responsive-combat-hud.js';
+import {
+  createModernUiNineSlice,
+  menuBodyFont,
+  menuHeaderFont,
+  modernUiEnabledForScene,
+} from './modern-ui-runtime.js';
 
 // Press Start 2P is much wider per glyph than Courier, so the final-minute
 // banner size drops to compensate (Courier 40px ≈ PS2P 22-24px in width).
@@ -84,6 +90,7 @@ export class HUD {
   private stripBg: Phaser.GameObjects.Rectangle;
   private stripBorder: Phaser.GameObjects.Rectangle;
   private stripBevel: Phaser.GameObjects.Rectangle;
+  private readonly modernStripFrame: Phaser.GameObjects.NineSlice | null;
 
   // Left column: player stats
   private healthBarBg: Phaser.GameObjects.Rectangle;
@@ -220,6 +227,16 @@ export class HUD {
     this.stripBevel.setOrigin(0, 0);
     this.stripBevel.setScrollFactor(0);
     this.stripBevel.setDepth(501);
+    this.modernStripFrame = modernUiEnabledForScene(scene)
+      ? createModernUiNineSlice(scene, 'hud', 0, stripTop, MAP_WIDTH_PX, HUD_STRIP_HEIGHT)
+          .setScrollFactor(0)
+          .setDepth(502)
+      : null;
+    if (this.modernStripFrame) {
+      this.stripBg.setVisible(false);
+      this.stripBorder.setVisible(false);
+      this.stripBevel.setVisible(false);
+    }
 
     // --- Left column: health, stamina, ammo, grenades ---
     const hbX = margin;
@@ -704,6 +721,7 @@ export class HUD {
     this.contractCalloutText.setDepth(2001);
     this.contractCalloutText.setVisible(false);
 
+    if (modernUiEnabledForScene(scene)) this.applyModernTypography();
     if (layout) this.setLayout(layout);
   }
 
@@ -716,6 +734,7 @@ export class HUD {
       .setFillStyle(Wasteland.HUD_STRIP_BG, layout.mode === 'legacy' ? 1 : 0.9);
     this.stripBorder.setPosition(panel.x, panel.y).setSize(panel.width, 2);
     this.stripBevel.setPosition(panel.x, panel.y + 2).setSize(panel.width, 1);
+    this.modernStripFrame?.setPosition(panel.x, panel.y).setSize(panel.width, panel.height);
 
     const health = layout.healthBar;
     this.healthBarBg.setPosition(health.x, health.y).setSize(health.width, health.height);
@@ -800,6 +819,47 @@ export class HUD {
 
   getLayoutState(): ResponsiveCombatHudLayout | null {
     return this.responsiveLayout;
+  }
+
+  getModernChromeFrame(): string | null {
+    return this.modernStripFrame?.frame.name ?? null;
+  }
+
+  private applyModernTypography(): void {
+    const header = menuHeaderFont(this.scene);
+    const body = menuBodyFont(this.scene);
+    for (const text of [
+      this.healthText,
+      this.staminaText,
+      this.ammoText,
+      this.grenadeText,
+      this.specialWeaponLabel,
+      this.specialReserveText,
+      this.kothLabel,
+      this.gunGameLadderText,
+      this.lastStandText,
+      this.killConfirmedText,
+      this.oneInTheChamberText,
+      this.coreRunText,
+      this.bountyHuntText,
+      this.controlBriefingDetail,
+      this.abilityCountdownText,
+    ]) {
+      text.setFontFamily(body);
+    }
+    for (const text of [
+      this.scoreText,
+      this.timerText,
+      this.contractTitleText,
+      this.contractProgressText,
+      this.modeBriefingTitle,
+      this.modeBriefingObjective,
+      this.controlBriefingTitle,
+      this.activeEventLabel,
+      this.abilityNameText,
+    ]) {
+      text.setFontFamily(header);
+    }
   }
 
   updateHealth(current: number, max: number, armor: number): void {
@@ -1630,6 +1690,7 @@ export class HUD {
   }
 
   destroy(): void {
+    this.modernStripFrame?.destroy();
     this.stripBg.destroy();
     this.stripBorder.destroy();
     this.stripBevel.destroy();

@@ -7,6 +7,7 @@ import type { Page, TestInfo } from '@playwright/test';
 import { expect, test } from '../fixtures';
 
 const largeWorldsAdvertised = process.env.CAPABILITY_LARGE_WORLDS === 'true';
+const modernArtAdvertised = process.env.CAPABILITY_MODERN_ART === 'true';
 
 function batch24ArtifactPath(testInfo: TestInfo, name: string): string | null {
   const artifactDir = process.env.BATCH24_ARTIFACT_DIR;
@@ -78,84 +79,87 @@ async function rendererSnapshot(page: Page): Promise<{
   );
 }
 
-async function stageGameplay(page: Page, largeWorlds: boolean): Promise<void> {
-  await page.evaluate((advertiseLargeWorlds) => {
-    const game = (window as unknown as { game?: Phaser.Game }).game;
-    const lobby = game?.scene.getScene('LobbyScene') as unknown as {
-      gameService: {
-        getNetworkManager(): {
-          connection: {
-            disconnect(): void;
-            send(message: unknown): void;
-            setState(state: string): void;
+async function stageGameplay(page: Page, largeWorlds: boolean, modernArt = false): Promise<void> {
+  await page.evaluate(
+    ({ advertiseLargeWorlds, advertiseModernArt }) => {
+      const game = (window as unknown as { game?: Phaser.Game }).game;
+      const lobby = game?.scene.getScene('LobbyScene') as unknown as {
+        gameService: {
+          getNetworkManager(): {
+            connection: {
+              disconnect(): void;
+              send(message: unknown): void;
+              setState(state: string): void;
+            };
+            getPlayerId(): string;
+            getLocalPlayerState(): unknown;
+            handleMessage(message: unknown): void;
           };
-          getPlayerId(): string;
-          getLocalPlayerState(): unknown;
-          handleMessage(message: unknown): void;
         };
       };
-    };
-    const active = game?.scene.getScenes(true)[0];
-    if (!active || !lobby.gameService) throw new Error('active menu scene is not ready');
+      const active = game?.scene.getScenes(true)[0];
+      if (!active || !lobby.gameService) throw new Error('active menu scene is not ready');
 
-    const manager = lobby.gameService.getNetworkManager();
-    manager.connection.disconnect();
-    manager.connection.setState('connected');
-    manager.connection.send = () => undefined;
-    manager.handleMessage({
-      type: 'server:welcome',
-      playerId: 'viewport-local',
-      capabilities: {
-        newShell: false,
-        schedules: false,
-        largeWorlds: advertiseLargeWorlds,
-        modernArt: false,
-        battleRoyale: false,
-      },
-    });
-    manager.getPlayerId = () => 'viewport-local';
-    manager.getLocalPlayerState = () => ({
-      id: 'viewport-local',
-      nickname: 'VIEWPORT',
-      characterId: 'mighty_man',
-      position: { x: 144, y: 144 },
-      velocity: { x: 0, y: 0 },
-      aimAngle: 0,
-      health: 100,
-      maxHealth: 100,
-      armor: 0,
-      ammo: 30,
-      weaponId: 'rifle',
-      specialAmmo: 0,
-      specialReserve: 0,
-      grenades: 2,
-      isReloading: false,
-      isSprinting: false,
-      stamina: 100,
-      isDead: false,
-      respawnTimer: 0,
-      invulnerableTimer: 0,
-      lastProcessedInput: 0,
-      score: 0,
-      deaths: 0,
-      abilityActiveSeconds: 0,
-      abilityCooldownSeconds: 0,
-      frozenTimer: 0,
-      secondWindTimer: 0,
-      spawnRushTimer: 0,
-    });
+      const manager = lobby.gameService.getNetworkManager();
+      manager.connection.disconnect();
+      manager.connection.setState('connected');
+      manager.connection.send = () => undefined;
+      manager.handleMessage({
+        type: 'server:welcome',
+        playerId: 'viewport-local',
+        capabilities: {
+          newShell: false,
+          schedules: false,
+          largeWorlds: advertiseLargeWorlds,
+          modernArt: advertiseModernArt,
+          battleRoyale: false,
+        },
+      });
+      manager.getPlayerId = () => 'viewport-local';
+      manager.getLocalPlayerState = () => ({
+        id: 'viewport-local',
+        nickname: 'VIEWPORT',
+        characterId: 'mighty_man',
+        position: { x: 144, y: 144 },
+        velocity: { x: 0, y: 0 },
+        aimAngle: 0,
+        health: 100,
+        maxHealth: 100,
+        armor: 0,
+        ammo: 30,
+        weaponId: 'rifle',
+        specialAmmo: 0,
+        specialReserve: 0,
+        grenades: 2,
+        isReloading: false,
+        isSprinting: false,
+        stamina: 100,
+        isDead: false,
+        respawnTimer: 0,
+        invulnerableTimer: 0,
+        lastProcessedInput: 0,
+        score: 0,
+        deaths: 0,
+        abilityActiveSeconds: 0,
+        abilityCooldownSeconds: 0,
+        frozenTimer: 0,
+        secondWindTimer: 0,
+        spawnRushTimer: 0,
+      });
 
-    game.scene.getScenes(true)[0]?.scene.start('GameScene', {
-      nickname: 'VIEWPORT',
-      matchData: {
-        matchId: 'batch-18-viewport',
-        opponents: [{ id: 'viewport-rival', nickname: 'RIVAL' }],
-        mapName: 'Scrapyard',
-        gameMode: 'deathmatch',
-        matchKind: 'practice',
-      },
-    });
-  }, largeWorlds);
+      game.scene.getScenes(true)[0]?.scene.start('GameScene', {
+        nickname: 'VIEWPORT',
+        matchData: {
+          matchId: 'batch-18-viewport',
+          opponents: [{ id: 'viewport-rival', nickname: 'RIVAL' }],
+          mapName: 'Scrapyard',
+          gameMode: 'deathmatch',
+          matchKind: 'practice',
+        },
+      });
+    },
+    { advertiseLargeWorlds: largeWorlds, advertiseModernArt: modernArt },
+  );
   await waitForScene(page, 'GameScene');
 }
 
@@ -1152,6 +1156,19 @@ test('gated gameplay keeps one 16:9 logical view across desktop and mobile', asy
   await stageGameplay(page, true);
 
   const initial = await viewportSnapshot(page);
+  const modernFallback = await page.evaluate(() => {
+    const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'GameScene',
+    ) as unknown as {
+      getModernUiRenderState(): {
+        enabled: boolean;
+        hudFrame: string | null;
+        minimapFrame: string | null;
+      };
+    };
+    return scene.getModernUiRenderState();
+  });
+  expect(modernFallback).toMatchObject({ enabled: false, hudFrame: null, minimapFrame: null });
   expect(initial).toMatchObject({
     scale: [1280, 720],
     mode: 'large-world',
@@ -1588,6 +1605,87 @@ test('dynamic chunks, destruction resources, lighting, and quality stay aligned'
   expect(state.projectedLight.x).toBeCloseTo(640, 4);
   expect(state.projectedLight.y).toBeCloseTo(360, 4);
   expect(state.projectedLight.radius).toBeCloseTo(187.5, 4);
+});
+
+test('modern UI frames preserve the current small world, HUD/minimap priorities, and Results focus', async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    !largeWorldsAdvertised || !modernArtAdvertised,
+    'Run with CAPABILITY_LARGE_WORLDS=true and CAPABILITY_MODERN_ART=true.',
+  );
+  await stageGameplay(page, true, true);
+  const gameplay = await page.evaluate(() => {
+    const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'GameScene',
+    ) as unknown as {
+      getModernUiRenderState(): {
+        enabled: boolean;
+        hudFrame: string | null;
+        minimapFrame: string | null;
+        worldBounds: { width: number; height: number } | null;
+      };
+      getResponsiveHudLayout(): { vitalsPanel: unknown; killFeed: unknown; menu: unknown };
+      getMinimapRenderState(): { layout: unknown };
+    };
+    return {
+      modern: scene.getModernUiRenderState(),
+      hud: scene.getResponsiveHudLayout(),
+      minimap: scene.getMinimapRenderState(),
+    };
+  });
+  expect(gameplay.modern).toEqual({
+    enabled: true,
+    hudFrame: 'ui.chrome.states/001',
+    minimapFrame: 'ui.chrome.states/003',
+    worldBounds: { width: 960, height: 576 },
+  });
+  expect(gameplay.hud).not.toBeNull();
+  expect(gameplay.minimap).not.toBeNull();
+  await page.screenshot({ path: testInfo.outputPath('batch-27-modern-hud-minimap.png') });
+  if (testInfo.project.name === 'desktop-chromium') {
+    await page.setViewportSize({ width: 844, height: 390 });
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        ),
+    );
+    await page.screenshot({
+      path: testInfo.outputPath('batch-27-modern-hud-minimap-mobile-size.png'),
+    });
+  }
+
+  await page.evaluate(() => {
+    const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'GameScene',
+    ) as unknown as {
+      shutdown(): void;
+      scene: { start(key: string, data: unknown): void };
+    };
+    scene.shutdown();
+    scene.scene.start('ResultsScene', { nickname: 'MODERN UI' });
+  });
+  await waitForScene(page, 'ResultsScene');
+  await page.keyboard.press('ArrowRight');
+  const results = await page.evaluate(() => {
+    const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'ResultsScene',
+    ) as unknown as {
+      getModernUiRenderState(): {
+        enabled: boolean;
+        panelFrame: string | null;
+        actionFrames: (string | null)[];
+      };
+    };
+    return scene.getModernUiRenderState();
+  });
+  expect(results).toEqual({
+    enabled: true,
+    panelFrame: 'ui.chrome.states/002',
+    actionFrames: ['ui.chrome.states/019', null, 'ui.chrome.states/014'],
+  });
+  await page.screenshot({ path: testInfo.outputPath('batch-27-modern-results.png') });
 });
 
 test('Results and connection recovery restore legacy scene sizing', async ({ page }) => {

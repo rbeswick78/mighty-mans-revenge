@@ -78,6 +78,8 @@ import {
   type PartyResultsPresentation,
 } from '../ui/reforged/party-results.js';
 import { useLegacyLogicalSize } from '../ui/reforged/responsive-menu-layout.js';
+import { configureModernUiScene, modernUiEnabledForScene } from '../ui/modern-ui-runtime.js';
+import { MODERN_UI_TEXTURE_KEY, modernUiIconFrame } from '../ui/modern-ui-contract.js';
 
 interface ResultsSceneData {
   result?: MatchResult;
@@ -134,6 +136,7 @@ export class ResultsScene extends Phaser.Scene {
   private rematchButton: PixelButton | null = null;
   private alternateRouteButton: PixelButton | null = null;
   private lobbyButton: PixelButton | null = null;
+  private statsPanel: MenuPanel | null = null;
   private rematchUnavailable = false;
   private menuGamepad: MenuGamepadInput | null = null;
   private gamepadFocusActive = false;
@@ -178,6 +181,7 @@ export class ResultsScene extends Phaser.Scene {
     this.rematchButton = null;
     this.alternateRouteButton = null;
     this.lobbyButton = null;
+    this.statsPanel = null;
     this.menuGamepad = null;
     this.gamepadFocusActive = false;
     this.gamepadFocusIndex = 0;
@@ -273,6 +277,7 @@ export class ResultsScene extends Phaser.Scene {
     const camHeight = this.cameras.main.height;
     const localPlayerId = this.gameService.getPlayerId();
     const capabilities = this.gameService.getServerCapabilities();
+    configureModernUiScene(this, capabilities.modernArt);
     this.partyState =
       capabilities.newShell && capabilities.schedules && !this.result?.isPractice
         ? this.gameService.getPartyState()
@@ -320,6 +325,12 @@ export class ResultsScene extends Phaser.Scene {
       fillColor: titleColor,
       strokeThickness: 4,
     }).setDepth(WastelandStreet.DEPTH.UI);
+    if (modernUiEnabledForScene(this)) {
+      this.add
+        .image(centerX - 150, 70, MODERN_UI_TEXTURE_KEY, modernUiIconFrame('results'))
+        .setDisplaySize(34, 34)
+        .setDepth(WastelandStreet.DEPTH.UI);
+    }
 
     // Mode label above the banner: what was just played, plus a sudden-
     // death callout when the match needed overtime to settle.
@@ -409,7 +420,9 @@ export class ResultsScene extends Phaser.Scene {
     const panelY = 130;
     const panel = new MenuPanel(this, panelX, panelY, panelW, panelH, {
       fillAlpha: 0.92,
+      modernRole: 'results',
     });
+    this.statsPanel = panel;
     panel.setName('result-stats-panel');
     panel.setDepth(WastelandStreet.DEPTH.UI);
 
@@ -619,6 +632,22 @@ export class ResultsScene extends Phaser.Scene {
     } else if (actions.confirm || actions.alternate) {
       actionButtons[this.gamepadFocusIndex]?.activate();
     }
+  }
+
+  getModernUiRenderState(): Readonly<{
+    enabled: boolean;
+    panelFrame: string | null;
+    actionFrames: readonly (string | null)[];
+  }> {
+    return Object.freeze({
+      enabled: modernUiEnabledForScene(this),
+      panelFrame: this.statsPanel?.getChromeFrame() ?? null,
+      actionFrames: Object.freeze([
+        this.rematchButton?.getChromeFrame() ?? null,
+        this.alternateRouteButton?.getChromeFrame() ?? null,
+        this.lobbyButton?.getChromeFrame() ?? null,
+      ]),
+    });
   }
 
   private syncGamepadFocus(): void {

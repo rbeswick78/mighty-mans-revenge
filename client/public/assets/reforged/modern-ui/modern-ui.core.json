@@ -1,0 +1,568 @@
+{
+  "assets": {
+    "ui.chrome.states": {
+      "columns": 8,
+      "frameCount": 32,
+      "frameHeight": 64,
+      "frames": [
+        "ui.chrome.states/000",
+        "ui.chrome.states/001",
+        "ui.chrome.states/002",
+        "ui.chrome.states/003",
+        "ui.chrome.states/004",
+        "ui.chrome.states/005",
+        "ui.chrome.states/006",
+        "ui.chrome.states/007",
+        "ui.chrome.states/008",
+        "ui.chrome.states/009",
+        "ui.chrome.states/010",
+        "ui.chrome.states/011",
+        "ui.chrome.states/012",
+        "ui.chrome.states/013",
+        "ui.chrome.states/014",
+        "ui.chrome.states/015",
+        "ui.chrome.states/016",
+        "ui.chrome.states/017",
+        "ui.chrome.states/018",
+        "ui.chrome.states/019",
+        "ui.chrome.states/020",
+        "ui.chrome.states/021",
+        "ui.chrome.states/022",
+        "ui.chrome.states/023",
+        "ui.chrome.states/024",
+        "ui.chrome.states/025",
+        "ui.chrome.states/026",
+        "ui.chrome.states/027",
+        "ui.chrome.states/028",
+        "ui.chrome.states/029",
+        "ui.chrome.states/030",
+        "ui.chrome.states/031"
+      ],
+      "frameWidth": 64,
+      "sheetHeight": 256,
+      "sheetWidth": 512
+    },
+    "ui.icon.language": {
+      "columns": 16,
+      "frameCount": 16,
+      "frameHeight": 32,
+      "frames": [
+        "ui.icon.language/000",
+        "ui.icon.language/001",
+        "ui.icon.language/002",
+        "ui.icon.language/003",
+        "ui.icon.language/004",
+        "ui.icon.language/005",
+        "ui.icon.language/006",
+        "ui.icon.language/007",
+        "ui.icon.language/008",
+        "ui.icon.language/009",
+        "ui.icon.language/010",
+        "ui.icon.language/011",
+        "ui.icon.language/012",
+        "ui.icon.language/013",
+        "ui.icon.language/014",
+        "ui.icon.language/015"
+      ],
+      "frameWidth": 32,
+      "sheetHeight": 32,
+      "sheetWidth": 512
+    }
+  },
+  "atlas": {
+    "extrude": 2,
+    "format": "RGBA8888",
+    "height": 256,
+    "id": "modern-ui.core",
+    "image": "modern-ui.core.png",
+    "padding": 3,
+    "premultipliedAlpha": false,
+    "width": 1024
+  },
+  "frames": {
+    "ui.chrome.states/000": {
+      "assetId": "ui.chrome.states",
+      "frameIndex": 0,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 5,
+      "y": 5
+    },
+    "ui.chrome.states/001": {
+      "assetId": "ui.chrome.states",
+      "frameIndex": 1,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 76,
+      "y": 5
+    },
+    "ui.chrome.states/002": {
+      "assetId": "ui.chrome.states",
+      "frameIndex": 2,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 147,
+      "y": 5
+    },
+    "ui.chrome.states/003": {
+      "assetId": "ui.chrome.states",
+      "frameIndex": 3,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 218,
+      "y": 5
+    },
+    "ui.chrome.states/004": {
+      "assetId": "ui.chrome.states",
+      "frameIndex": 4,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 289,
+      "y": 5
+    },
+    "ui.chrome.states/005": {
+      "assetId": "ui.chrome.states",
+      "frameIndex": 5,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 360,
+      "y": 5
+    },
+    "ui.chrome.states/006": {
+      "assetId": "ui.chrome.states",
+      "frameIndex": 6,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 431,
+      "y": 5
+    },
+    "ui.chrome.states/007": {
+      "assetId": "ui.chrome.states",
+      "frameIndex": 7,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 502,
+      "y": 5
+    },
+    "ui.chrome.states/008": {
+      "assetId": "ui.chrome.states",
+      "frameIndex": 8,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 573,
+      "y": 5
+    },
+    "ui.chrome.states/009": {
+      "assetId": "ui.chrome.states",
+      "frameIndex": 9,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 644,
+      "y": 5
+    },
+    "ui.chrome.states/010": {
+      "assetId": "ui.chrome.states",
+      "frameIndex": 10,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 715,
+      "y": 5
+    },
+    "ui.chrome.states/011": {
+      "assetId": "ui.chrome.states",
+      "frameIndex": 11,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 786,
+      "y": 5
+    },
+    "ui.chrome.states/012": {
+      "assetId": "ui.chrome.states",
+      "frameIndex": 12,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 857,
+      "y": 5
+    },
+    "ui.chrome.states/013": {
+      "assetId": "ui.chrome.states",
+      "frameIndex": 13,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 928,
+      "y": 5
+    },
+    "ui.chrome.states/014": {
+      "assetId": "ui.chrome.states",
+      "frameIndex": 14,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 5,
+      "y": 76
+    },
+    "ui.chrome.states/015": {
+      "assetId": "ui.chrome.states",
+      "frameIndex": 15,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 76,
+      "y": 76
+    },
+    "ui.chrome.states/016": {
+      "assetId": "ui.chrome.states",
+      "frameIndex": 16,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 147,
+      "y": 76
+    },
+    "ui.chrome.states/017": {
+      "assetId": "ui.chrome.states",
+      "frameIndex": 17,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 218,
+      "y": 76
+    },
+    "ui.chrome.states/018": {
+      "assetId": "ui.chrome.states",
+      "frameIndex": 18,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 289,
+      "y": 76
+    },
+    "ui.chrome.states/019": {
+      "assetId": "ui.chrome.states",
+      "frameIndex": 19,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 360,
+      "y": 76
+    },
+    "ui.chrome.states/020": {
+      "assetId": "ui.chrome.states",
+      "frameIndex": 20,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 431,
+      "y": 76
+    },
+    "ui.chrome.states/021": {
+      "assetId": "ui.chrome.states",
+      "frameIndex": 21,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 502,
+      "y": 76
+    },
+    "ui.chrome.states/022": {
+      "assetId": "ui.chrome.states",
+      "frameIndex": 22,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 573,
+      "y": 76
+    },
+    "ui.chrome.states/023": {
+      "assetId": "ui.chrome.states",
+      "frameIndex": 23,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 644,
+      "y": 76
+    },
+    "ui.chrome.states/024": {
+      "assetId": "ui.chrome.states",
+      "frameIndex": 24,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 715,
+      "y": 76
+    },
+    "ui.chrome.states/025": {
+      "assetId": "ui.chrome.states",
+      "frameIndex": 25,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 786,
+      "y": 76
+    },
+    "ui.chrome.states/026": {
+      "assetId": "ui.chrome.states",
+      "frameIndex": 26,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 857,
+      "y": 76
+    },
+    "ui.chrome.states/027": {
+      "assetId": "ui.chrome.states",
+      "frameIndex": 27,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 928,
+      "y": 76
+    },
+    "ui.chrome.states/028": {
+      "assetId": "ui.chrome.states",
+      "frameIndex": 28,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 5,
+      "y": 147
+    },
+    "ui.chrome.states/029": {
+      "assetId": "ui.chrome.states",
+      "frameIndex": 29,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 76,
+      "y": 147
+    },
+    "ui.chrome.states/030": {
+      "assetId": "ui.chrome.states",
+      "frameIndex": 30,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 147,
+      "y": 147
+    },
+    "ui.chrome.states/031": {
+      "assetId": "ui.chrome.states",
+      "frameIndex": 31,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 218,
+      "y": 147
+    },
+    "ui.icon.language/000": {
+      "assetId": "ui.icon.language",
+      "frameIndex": 0,
+      "height": 32,
+      "rotated": false,
+      "trimmed": false,
+      "width": 32,
+      "x": 289,
+      "y": 147
+    },
+    "ui.icon.language/001": {
+      "assetId": "ui.icon.language",
+      "frameIndex": 1,
+      "height": 32,
+      "rotated": false,
+      "trimmed": false,
+      "width": 32,
+      "x": 328,
+      "y": 147
+    },
+    "ui.icon.language/002": {
+      "assetId": "ui.icon.language",
+      "frameIndex": 2,
+      "height": 32,
+      "rotated": false,
+      "trimmed": false,
+      "width": 32,
+      "x": 367,
+      "y": 147
+    },
+    "ui.icon.language/003": {
+      "assetId": "ui.icon.language",
+      "frameIndex": 3,
+      "height": 32,
+      "rotated": false,
+      "trimmed": false,
+      "width": 32,
+      "x": 406,
+      "y": 147
+    },
+    "ui.icon.language/004": {
+      "assetId": "ui.icon.language",
+      "frameIndex": 4,
+      "height": 32,
+      "rotated": false,
+      "trimmed": false,
+      "width": 32,
+      "x": 445,
+      "y": 147
+    },
+    "ui.icon.language/005": {
+      "assetId": "ui.icon.language",
+      "frameIndex": 5,
+      "height": 32,
+      "rotated": false,
+      "trimmed": false,
+      "width": 32,
+      "x": 484,
+      "y": 147
+    },
+    "ui.icon.language/006": {
+      "assetId": "ui.icon.language",
+      "frameIndex": 6,
+      "height": 32,
+      "rotated": false,
+      "trimmed": false,
+      "width": 32,
+      "x": 523,
+      "y": 147
+    },
+    "ui.icon.language/007": {
+      "assetId": "ui.icon.language",
+      "frameIndex": 7,
+      "height": 32,
+      "rotated": false,
+      "trimmed": false,
+      "width": 32,
+      "x": 562,
+      "y": 147
+    },
+    "ui.icon.language/008": {
+      "assetId": "ui.icon.language",
+      "frameIndex": 8,
+      "height": 32,
+      "rotated": false,
+      "trimmed": false,
+      "width": 32,
+      "x": 601,
+      "y": 147
+    },
+    "ui.icon.language/009": {
+      "assetId": "ui.icon.language",
+      "frameIndex": 9,
+      "height": 32,
+      "rotated": false,
+      "trimmed": false,
+      "width": 32,
+      "x": 640,
+      "y": 147
+    },
+    "ui.icon.language/010": {
+      "assetId": "ui.icon.language",
+      "frameIndex": 10,
+      "height": 32,
+      "rotated": false,
+      "trimmed": false,
+      "width": 32,
+      "x": 679,
+      "y": 147
+    },
+    "ui.icon.language/011": {
+      "assetId": "ui.icon.language",
+      "frameIndex": 11,
+      "height": 32,
+      "rotated": false,
+      "trimmed": false,
+      "width": 32,
+      "x": 718,
+      "y": 147
+    },
+    "ui.icon.language/012": {
+      "assetId": "ui.icon.language",
+      "frameIndex": 12,
+      "height": 32,
+      "rotated": false,
+      "trimmed": false,
+      "width": 32,
+      "x": 757,
+      "y": 147
+    },
+    "ui.icon.language/013": {
+      "assetId": "ui.icon.language",
+      "frameIndex": 13,
+      "height": 32,
+      "rotated": false,
+      "trimmed": false,
+      "width": 32,
+      "x": 796,
+      "y": 147
+    },
+    "ui.icon.language/014": {
+      "assetId": "ui.icon.language",
+      "frameIndex": 14,
+      "height": 32,
+      "rotated": false,
+      "trimmed": false,
+      "width": 32,
+      "x": 835,
+      "y": 147
+    },
+    "ui.icon.language/015": {
+      "assetId": "ui.icon.language",
+      "frameIndex": 15,
+      "height": 32,
+      "rotated": false,
+      "trimmed": false,
+      "width": 32,
+      "x": 874,
+      "y": 147
+    }
+  },
+  "integrity": {
+    "textureSha256": "ae049c99db6001d8b7aa93714ebfb71ef85ced70392499e0150ba23a02d817b4"
+  },
+  "schemaVersion": 1
+}

@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "atlas": {
+    "id": "modern-ui.core",
+    "maxWidth": 1024,
+    "maxHeight": 512,
+    "padding": 3,
+    "extrude": 2,
+    "limits": {
+      "maxSourceBytes": 262144,
+      "maxDecodedBytes": 3145728,
+      "maxAtlasBytes": 524288
+    }
+  },
+  "assets": [
+    {
+      "id": "ui.chrome.states",
+      "source": "chrome-states.png",
+      "width": 512,
+      "height": 256,
+      "frames": {
+        "width": 64,
+        "height": 64,
+        "count": 32,
+        "columns": 8
+      },
+      "provenance": {
+        "origin": "original",
+        "creator": "Mighty Man's Revenge Reforged UI geometry",
+        "license": "LicenseRef-MMR-Project-Owned",
+        "attribution": "none-required",
+        "sourceReference": "tools/reforged-assets/create-modern-ui-sources.mjs"
+      }
+    },
+    {
+      "id": "ui.icon.language",
+      "source": "icon-language.png",
+      "width": 512,
+      "height": 32,
+      "frames": {
+        "width": 32,
+        "height": 32,
+        "count": 16,
+        "columns": 16
+      },
+      "provenance": {
+        "origin": "original",
+        "creator": "Mighty Man's Revenge Reforged UI geometry",
+        "license": "LicenseRef-MMR-Project-Owned",
+        "attribution": "none-required",
+        "sourceReference": "tools/reforged-assets/create-modern-ui-sources.mjs"
+      }
+    }
+  ]
+}

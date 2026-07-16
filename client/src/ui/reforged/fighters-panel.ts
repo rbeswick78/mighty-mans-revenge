@@ -3,7 +3,7 @@ import { CHARACTERS, CHARACTER_IDS, type CharacterId } from '@shared/config/game
 import { cssHex } from '@shared/config/palette.js';
 import { characterMasteryLabel } from '../character-mastery.js';
 import { fighterAbilityName, fighterBriefing } from '../fighter-briefing.js';
-import { MENU_FONTS } from '../menu/fonts.js';
+import { menuBodyFont, menuHeaderFont } from '../modern-ui-runtime.js';
 import { ReforgedMenuTokens } from './design-tokens.js';
 import { MenuFocusNavigator } from './focus-navigation.js';
 import { ReforgedChoiceButton } from './reforged-choice-button.js';
@@ -39,19 +39,19 @@ export class FightersPanel extends Phaser.GameObjects.Container {
     const tokens = ReforgedMenuTokens;
     this.selectedFighterId = options.initialFighterId;
     this.prompt = scene.add.text(0, 0, 'BROWSE THE ROSTER', {
-      fontFamily: MENU_FONTS.HEADER,
+      fontFamily: menuHeaderFont(scene),
       fontSize: `${tokens.type.body}px`,
       color: cssHex(tokens.color.text),
     });
     this.authorityNote = scene.add
       .text(0, 2, 'SELECT YOUR PLAY FIGHTER  /  SERVER LOCK REMAINS AUTHORITATIVE', {
-        fontFamily: MENU_FONTS.BODY,
+        fontFamily: menuBodyFont(scene),
         fontSize: `${tokens.type.eyebrow}px`,
         color: cssHex(tokens.color.textMuted),
       })
       .setOrigin(1, 0);
     this.selectedDetail = scene.add.text(0, 0, '', {
-      fontFamily: MENU_FONTS.HEADER,
+      fontFamily: menuHeaderFont(scene),
       fontSize: `${tokens.type.eyebrow}px`,
       color: cssHex(tokens.color.accentActive),
       lineSpacing: 5,

@@ -9,7 +9,7 @@ import {
   sanitizeCallsignInput,
 } from '../callsign.js';
 import { lobbyConnectionPresentation } from '../lobby-connection.js';
-import { MENU_FONTS } from '../menu/fonts.js';
+import { menuBodyFont, menuHeaderFont } from '../modern-ui-runtime.js';
 import { ReforgedMenuTokens } from './design-tokens.js';
 import { MenuFocusNavigator } from './focus-navigation.js';
 import { ReforgedChoiceButton } from './reforged-choice-button.js';
@@ -86,32 +86,32 @@ export class SettingsPanel extends Phaser.GameObjects.Container {
     this.editingCallsign = this.callsign.length === 0;
 
     this.prompt = scene.add.text(0, 0, 'TUNE THE LOCAL RIG', {
-      fontFamily: MENU_FONTS.HEADER,
+      fontFamily: menuHeaderFont(scene),
       fontSize: `${tokens.type.body}px`,
       color: cssHex(tokens.color.text),
     });
     this.authorityNote = scene.add
       .text(0, 2, 'ESTABLISHED DEVICE SETTINGS / SERVER RECOVERY REMAINS AUTHORITATIVE', {
-        fontFamily: MENU_FONTS.BODY,
+        fontFamily: menuBodyFont(scene),
         fontSize: `${tokens.type.eyebrow}px`,
         color: cssHex(tokens.color.textMuted),
       })
       .setOrigin(1, 0);
     this.detailBackground = scene.add.graphics();
     this.detailHeading = scene.add.text(0, 0, '', {
-      fontFamily: MENU_FONTS.HEADER,
+      fontFamily: menuHeaderFont(scene),
       fontSize: `${tokens.type.body}px`,
       color: cssHex(tokens.color.accentActive),
     });
     this.detailAuthority = scene.add
       .text(0, 0, '', {
-        fontFamily: MENU_FONTS.BODY,
+        fontFamily: menuBodyFont(scene),
         fontSize: '10px',
         color: cssHex(tokens.color.textMuted),
       })
       .setOrigin(1, 0);
     const columnStyle: Phaser.Types.GameObjects.Text.TextStyle = {
-      fontFamily: MENU_FONTS.HEADER,
+      fontFamily: menuHeaderFont(scene),
       fontSize: '12px',
       color: cssHex(tokens.color.text),
       lineSpacing: 7,
@@ -121,7 +121,7 @@ export class SettingsPanel extends Phaser.GameObjects.Container {
     this.callsignBackground = scene.add.graphics();
     this.callsignText = scene.add
       .text(0, 0, '', {
-        fontFamily: MENU_FONTS.BODY,
+        fontFamily: menuBodyFont(scene),
         fontSize: '20px',
         color: cssHex(tokens.color.text),
       })

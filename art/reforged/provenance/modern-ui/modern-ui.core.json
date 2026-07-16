@@ -1,0 +1,30 @@
+{
+  "assets": [
+    {
+      "id": "ui.chrome.states",
+      "provenance": {
+        "attribution": "none-required",
+        "creator": "Mighty Man's Revenge Reforged UI geometry",
+        "license": "LicenseRef-MMR-Project-Owned",
+        "origin": "original",
+        "sourceReference": "tools/reforged-assets/create-modern-ui-sources.mjs"
+      },
+      "sourceSha256": "54caec4b4db4c76a6899823848d35dd90d35db8919b7ae227c7133071be8b57e"
+    },
+    {
+      "id": "ui.icon.language",
+      "provenance": {
+        "attribution": "none-required",
+        "creator": "Mighty Man's Revenge Reforged UI geometry",
+        "license": "LicenseRef-MMR-Project-Owned",
+        "origin": "original",
+        "sourceReference": "tools/reforged-assets/create-modern-ui-sources.mjs"
+      },
+      "sourceSha256": "411f77c749330db531126fbd8ea4b16c1744ce94e2c6fe29a84c07d88f218eef"
+    }
+  ],
+  "atlasId": "modern-ui.core",
+  "manifestSha256": "8cc4e96db84f0d994d135a6ff9620d20a5e6d6af9a31c347ba5ff9f1029c3c7f",
+  "schemaVersion": 1,
+  "textureSha256": "ae049c99db6001d8b7aa93714ebfb71ef85ced70392499e0150ba23a02d817b4"
+}

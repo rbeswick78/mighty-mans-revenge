@@ -1,15 +1,26 @@
 import Phaser from 'phaser';
 import { AudioManager } from '../../audio/audio-manager.js';
 import { MENU_FONTS } from '../menu/fonts.js';
+import {
+  MODERN_UI_TEXTURE_KEY,
+  modernUiIconFrame,
+  modernUiTabFrame,
+  type ModernUiControlState,
+  type ModernUiIcon,
+} from '../modern-ui-contract.js';
+import { menuHeaderFont, modernUiEnabledForScene } from '../modern-ui-runtime.js';
 import { ReforgedMenuTokens } from './design-tokens.js';
 
 export interface ReforgedTabButtonOptions {
   readonly onSelect: () => void;
   readonly onPointerIntent: () => void;
+  readonly icon?: ModernUiIcon;
 }
 
 export class ReforgedTabButton extends Phaser.GameObjects.Container {
   private readonly chrome: Phaser.GameObjects.Graphics;
+  private readonly modernChrome: Phaser.GameObjects.NineSlice | null;
+  private readonly icon: Phaser.GameObjects.Image | null;
   private readonly label: Phaser.GameObjects.Text;
   private readonly hitZone: Phaser.GameObjects.Zone;
   private visualWidth = 1;
@@ -25,17 +36,30 @@ export class ReforgedTabButton extends Phaser.GameObjects.Container {
     private readonly options: ReforgedTabButtonOptions,
   ) {
     super(scene, 0, 0);
-    this.chrome = scene.add.graphics();
+    const modern = modernUiEnabledForScene(scene);
+    this.chrome = scene.add.graphics().setVisible(!modern);
+    this.modernChrome = modern
+      ? scene.add
+          .nineslice(0, 0, MODERN_UI_TEXTURE_KEY, modernUiTabFrame('idle'), 64, 64, 12, 12, 12, 12)
+          .setOrigin(0)
+      : null;
+    this.icon =
+      modern && options.icon
+        ? scene.add.image(0, 0, MODERN_UI_TEXTURE_KEY, modernUiIconFrame(options.icon))
+        : null;
     this.label = scene.add
       .text(0, 0, label, {
-        fontFamily: MENU_FONTS.HEADER,
+        fontFamily: modern ? menuHeaderFont(scene) : MENU_FONTS.HEADER,
         fontSize: `${ReforgedMenuTokens.type.tab}px`,
         color: Phaser.Display.Color.IntegerToColor(ReforgedMenuTokens.color.text).rgba,
         align: 'center',
       })
       .setOrigin(0.5);
     this.hitZone = scene.add.zone(0, 0, 1, 1).setInteractive({ useHandCursor: true });
-    this.add([this.chrome, this.label, this.hitZone]);
+    this.add(this.chrome);
+    if (this.modernChrome) this.add(this.modernChrome);
+    if (this.icon) this.add(this.icon);
+    this.add([this.label, this.hitZone]);
 
     this.hitZone.on('pointerover', () => {
       this.hovered = true;
@@ -71,7 +95,9 @@ export class ReforgedTabButton extends Phaser.GameObjects.Container {
     this.setSize(width, height);
     this.visualWidth = width;
     this.visualHeight = height;
-    this.label.setPosition(width / 2, height / 2);
+    this.modernChrome?.setSize(width, height);
+    this.icon?.setPosition(28, height / 2).setDisplaySize(28, 28);
+    this.label.setPosition(this.icon ? width / 2 + 10 : width / 2, height / 2);
     this.hitZone.setPosition(width / 2, height / 2).setSize(width, height);
     this.redraw();
     return this;
@@ -106,6 +132,10 @@ export class ReforgedTabButton extends Phaser.GameObjects.Container {
     return true;
   }
 
+  getChromeFrame(): string | null {
+    return this.modernChrome?.frame.name ?? null;
+  }
+
   private redraw(): void {
     const tokens = ReforgedMenuTokens;
     const fill = this.selected
@@ -115,6 +145,26 @@ export class ReforgedTabButton extends Phaser.GameObjects.Container {
         : tokens.color.surface;
     const border = this.selected ? tokens.color.accentActive : tokens.color.border;
     const inset = this.pressed ? 3 : 0;
+
+    if (this.modernChrome) {
+      const state: ModernUiControlState = this.pressed
+        ? 'pressed'
+        : this.selected
+          ? 'selected'
+          : this.hovered || this.focused
+            ? 'focus'
+            : 'idle';
+      this.modernChrome.setFrame(modernUiTabFrame(state)).setPosition(0, inset);
+      this.label
+        .setColor(
+          Phaser.Display.Color.IntegerToColor(
+            state === 'selected' || state === 'pressed' ? tokens.color.canvas : tokens.color.text,
+          ).rgba,
+        )
+        .setY(this.visualHeight / 2 + inset);
+      this.icon?.setY(this.visualHeight / 2 + inset);
+      return;
+    }
 
     this.chrome.clear();
     this.chrome.fillStyle(fill, 1).fillRect(0, inset, this.visualWidth, this.visualHeight - inset);

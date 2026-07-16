@@ -1,5 +1,7 @@
 import Phaser from 'phaser';
 import { Wasteland } from '@shared/config/palette.js';
+import { createModernUiNineSlice, modernUiEnabledForScene } from '../modern-ui-runtime.js';
+import type { ModernUiPanelRole } from '../modern-ui-contract.js';
 
 export interface BeveledChromeOpts {
   fillColor: number;
@@ -15,6 +17,7 @@ export interface MenuPanelOpts {
   strokeColor?: number;
   highlightColor?: number;
   shadowColor?: number;
+  modernRole?: ModernUiPanelRole;
 }
 
 const DEFAULT_OPTS: BeveledChromeOpts = {
@@ -45,10 +48,10 @@ export function drawBeveledChrome(
 
   // 2px outer stroke — drawn as 4 fillRects so corners stay crisp
   gfx.fillStyle(opts.strokeColor, 1);
-  gfx.fillRect(x, y, w, 2);              // top
-  gfx.fillRect(x, y + h - 2, w, 2);      // bottom
-  gfx.fillRect(x, y, 2, h);              // left
-  gfx.fillRect(x + w - 2, y, 2, h);      // right
+  gfx.fillRect(x, y, w, 2); // top
+  gfx.fillRect(x, y + h - 2, w, 2); // bottom
+  gfx.fillRect(x, y, 2, h); // left
+  gfx.fillRect(x + w - 2, y, 2, h); // right
 
   // 1px highlight and shadow inside the outer stroke
   const hi = inverted ? opts.shadowColor : opts.highlightColor;
@@ -57,13 +60,13 @@ export function drawBeveledChrome(
 
   // Highlight: inside-top + inside-left
   gfx.fillStyle(hi, hiAlpha);
-  gfx.fillRect(x + 2, y + 2, w - 4, 1);          // top inside
-  gfx.fillRect(x + 2, y + 2, 1, h - 4);          // left inside
+  gfx.fillRect(x + 2, y + 2, w - 4, 1); // top inside
+  gfx.fillRect(x + 2, y + 2, 1, h - 4); // left inside
 
   // Shadow: inside-bottom + inside-right
   gfx.fillStyle(sh, 1);
-  gfx.fillRect(x + 2, y + h - 3, w - 4, 1);      // bottom inside
-  gfx.fillRect(x + w - 3, y + 2, 1, h - 4);      // right inside
+  gfx.fillRect(x + 2, y + h - 3, w - 4, 1); // bottom inside
+  gfx.fillRect(x + w - 3, y + 2, 1, h - 4); // right inside
 }
 
 // Beveled pixel-art frame container. Lives at scene coords (x, y) with the
@@ -72,7 +75,7 @@ export function drawBeveledChrome(
 export class MenuPanel extends Phaser.GameObjects.Container {
   readonly contentWidth: number;
   readonly contentHeight: number;
-  private readonly chrome: Phaser.GameObjects.Graphics;
+  private readonly chrome: Phaser.GameObjects.Graphics | Phaser.GameObjects.NineSlice;
   private readonly opts: BeveledChromeOpts;
 
   constructor(
@@ -91,8 +94,19 @@ export class MenuPanel extends Phaser.GameObjects.Container {
       ...(opts ?? {}),
     };
 
-    this.chrome = scene.add.graphics();
-    drawBeveledChrome(this.chrome, 0, 0, width, height, this.opts);
+    this.chrome = modernUiEnabledForScene(scene)
+      ? createModernUiNineSlice(
+          scene,
+          opts?.modernRole ?? (scene.scene.key === 'ResultsScene' ? 'results' : 'panel'),
+          0,
+          0,
+          width,
+          height,
+        )
+      : scene.add.graphics();
+    if (this.chrome instanceof Phaser.GameObjects.Graphics) {
+      drawBeveledChrome(this.chrome, 0, 0, width, height, this.opts);
+    }
     this.add(this.chrome);
 
     scene.add.existing(this);
@@ -104,5 +118,9 @@ export class MenuPanel extends Phaser.GameObjects.Container {
 
   get centerY(): number {
     return this.contentHeight / 2;
+  }
+
+  getChromeFrame(): string | null {
+    return this.chrome instanceof Phaser.GameObjects.NineSlice ? this.chrome.frame.name : null;
   }
 }

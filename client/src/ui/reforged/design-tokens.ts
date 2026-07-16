@@ -1,7 +1,7 @@
 /**
- * Procedural UI tokens for the Reforged menu foundation. Production art is
- * intentionally out of scope until the visual-system milestone; these values
- * keep layout, contrast, motion, and control sizing consistent in the meantime.
+ * Semantic UI tokens shared by the procedural compatibility path and Batch 27
+ * modern atlas chrome. Asset frames may refine material treatment, but these
+ * roles remain the contrast, spacing, focus, and touch-authority source.
  */
 export const ReforgedMenuTokens = Object.freeze({
   color: Object.freeze({
@@ -15,6 +15,7 @@ export const ReforgedMenuTokens = Object.freeze({
     accent: 0xff8a3d,
     accentActive: 0xffb15c,
     focus: 0x72d6c9,
+    danger: 0xe83b3b,
   }),
   space: Object.freeze({
     safeEdge: 32,
@@ -36,6 +37,7 @@ export const ReforgedMenuTokens = Object.freeze({
     tabGap: 12,
     focusStroke: 4,
     borderStroke: 2,
+    minTouchTarget: 48,
   }),
   motion: Object.freeze({
     activationMs: 80,

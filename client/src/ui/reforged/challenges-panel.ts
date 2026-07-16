@@ -14,7 +14,7 @@ import {
   gauntletBuildCodexLabel,
   normalizeGauntletBuildCodex,
 } from '../gauntlet-build-codex.js';
-import { MENU_FONTS } from '../menu/fonts.js';
+import { menuBodyFont, menuHeaderFont } from '../modern-ui-runtime.js';
 import {
   GAUNTLET_BEST_CLEAR_STORAGE_KEY,
   gauntletBestClearLabel,
@@ -91,19 +91,19 @@ export class ChallengesPanel extends Phaser.GameObjects.Container {
     this.nickname = options.nickname;
     this.preferences = readReforgedChallengePreferences(options.storage);
     this.prompt = scene.add.text(0, 0, '', {
-      fontFamily: MENU_FONTS.HEADER,
+      fontFamily: menuHeaderFont(scene),
       fontSize: `${tokens.type.body}px`,
       color: cssHex(tokens.color.text),
     });
     this.authorityNote = scene.add
       .text(0, 2, '', {
-        fontFamily: MENU_FONTS.BODY,
+        fontFamily: menuBodyFont(scene),
         fontSize: `${tokens.type.eyebrow}px`,
         color: cssHex(tokens.color.textMuted),
       })
       .setOrigin(1, 0);
     this.statusText = scene.add.text(0, 0, '', {
-      fontFamily: MENU_FONTS.BODY,
+      fontFamily: menuBodyFont(scene),
       fontSize: `${tokens.type.eyebrow}px`,
       color: cssHex(tokens.color.accentActive),
     });
@@ -373,13 +373,13 @@ export class ChallengesPanel extends Phaser.GameObjects.Container {
         0,
         `${String(index + 1).padStart(2, '0')}  /  ${entry.discovered ? entry.name.toUpperCase() : 'LOCKED BUILD'}`,
         {
-          fontFamily: MENU_FONTS.HEADER,
+          fontFamily: menuHeaderFont(this.scene),
           fontSize: `${tokens.type.eyebrow}px`,
           color: cssHex(entry.discovered ? tokens.color.accentActive : tokens.color.textMuted),
         },
       );
       const recipe = this.scene.add.text(0, 0, entry.recipe, {
-        fontFamily: MENU_FONTS.HEADER,
+        fontFamily: menuHeaderFont(this.scene),
         fontSize: '10px',
         color: cssHex(tokens.color.text),
       });
@@ -388,7 +388,7 @@ export class ChallengesPanel extends Phaser.GameObjects.Container {
         0,
         entry.discovered ? entry.description : 'CLEAR THIS PAIR TO DISCOVER',
         {
-          fontFamily: MENU_FONTS.BODY,
+          fontFamily: menuBodyFont(this.scene),
           fontSize: '9px',
           color: cssHex(tokens.color.textMuted),
         },
@@ -400,7 +400,7 @@ export class ChallengesPanel extends Phaser.GameObjects.Container {
           ? 'BEST CLEAR --'
           : `BEST CLEAR ${entry.bestScore.toLocaleString('en-US')}`,
         {
-          fontFamily: MENU_FONTS.BODY,
+          fontFamily: menuBodyFont(this.scene),
           fontSize: '10px',
           color: cssHex(tokens.color.textMuted),
         },

@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 const shellAdvertised = process.env.CAPABILITY_NEW_SHELL === 'true';
 const schedulesAdvertised = process.env.CAPABILITY_SCHEDULES === 'true';
+const modernArtAdvertised = process.env.CAPABILITY_MODERN_ART === 'true';
 
 async function waitForActiveScene(page: Page, key: string): Promise<void> {
   await expect
@@ -138,7 +139,7 @@ async function clickLogicalSettingsOption(
 async function stageNonChromiumShell(page: Page, playerId = 'staged-shell-player'): Promise<void> {
   await waitForActiveScene(page, 'LobbyScene');
   await page.evaluate(
-    ({ advertiseSchedules, stagedPlayerId }) => {
+    ({ advertiseSchedules, advertiseModernArt, stagedPlayerId }) => {
       const lobby = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
         'LobbyScene',
       ) as unknown as {
@@ -160,7 +161,7 @@ async function stageNonChromiumShell(page: Page, playerId = 'staged-shell-player
           newShell: true,
           schedules: advertiseSchedules,
           largeWorlds: false,
-          modernArt: false,
+          modernArt: advertiseModernArt,
           battleRoyale: false,
         },
       });
@@ -192,7 +193,11 @@ async function stageNonChromiumShell(page: Page, playerId = 'staged-shell-player
         });
       }
     },
-    { advertiseSchedules: schedulesAdvertised, stagedPlayerId: playerId },
+    {
+      advertiseSchedules: schedulesAdvertised,
+      advertiseModernArt: modernArtAdvertised,
+      stagedPlayerId: playerId,
+    },
   );
 }
 
@@ -476,8 +481,14 @@ test('advertised shell is 16:9, safe-area bounded, and navigable across inputs',
     const game = (window as unknown as { game?: Phaser.Game }).game;
     const scene = game?.scene.getScene('ReforgedShellScene') as unknown as {
       getSafeArea(): { left: number; top: number; right: number; bottom: number } | null;
+      getModernUiRenderState(): { enabled: boolean };
     };
-    return { width: game?.scale.width, height: game?.scale.height, safe: scene.getSafeArea() };
+    return {
+      width: game?.scale.width,
+      height: game?.scale.height,
+      safe: scene.getSafeArea(),
+      modernUi: scene.getModernUiRenderState().enabled,
+    };
   });
   expect(layout.width).toBe(1280);
   expect(layout.height).toBe(720);
@@ -485,6 +496,7 @@ test('advertised shell is 16:9, safe-area bounded, and navigable across inputs',
   expect(layout.safe?.top).toBeGreaterThanOrEqual(32);
   expect(layout.safe?.right).toBeLessThanOrEqual(1248);
   expect(layout.safe?.bottom).toBeLessThanOrEqual(688);
+  expect(layout.modernUi).toBe(modernArtAdvertised);
 
   await clickLogicalTab(page, 'fighters', touch);
   await expect.poll(() => activeTab(page)).toBe('fighters');
@@ -556,6 +568,99 @@ test('advertised shell is 16:9, safe-area bounded, and navigable across inputs',
     return manager.getArenaSchedule();
   });
   expect(resetState).toBeNull();
+  await waitForActiveScene(page, 'LobbyScene');
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const game = (window as unknown as { game?: Phaser.Game }).game;
+        return [game?.scale.width, game?.scale.height];
+      }),
+    )
+    .toEqual([960, 720]);
+});
+
+test('modern UI atlas maps shell, queue, focus, and mobile-safe chrome without changing recovery', async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    !shellAdvertised || !modernArtAdvertised,
+    'Run with CAPABILITY_NEW_SHELL=true and CAPABILITY_MODERN_ART=true.',
+  );
+  await page.goto('/');
+  const touch = testInfo.project.name === 'mobile-landscape';
+  if (testInfo.project.name !== 'desktop-chromium') await stageNonChromiumShell(page);
+  await waitForActiveScene(page, 'ReforgedShellScene');
+  await waitForRenderedFrames(page);
+
+  const initial = await page.evaluate(() => {
+    const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'ReforgedShellScene',
+    ) as unknown as {
+      getModernUiRenderState(): {
+        enabled: boolean;
+        contentFrame: string | null;
+        tabFrames: (string | null)[];
+      };
+      getSafeArea(): { left: number; top: number; right: number; bottom: number };
+    };
+    return { chrome: scene.getModernUiRenderState(), safe: scene.getSafeArea() };
+  });
+  expect(initial.chrome).toEqual({
+    enabled: true,
+    contentFrame: 'ui.chrome.states/000',
+    tabFrames: [
+      'ui.chrome.states/006',
+      'ui.chrome.states/004',
+      'ui.chrome.states/004',
+      'ui.chrome.states/004',
+      'ui.chrome.states/004',
+    ],
+  });
+  expect(initial.safe.left).toBeGreaterThanOrEqual(32);
+  expect(initial.safe.top).toBeGreaterThanOrEqual(32);
+  expect(initial.safe.right).toBeLessThanOrEqual(1248);
+  expect(initial.safe.bottom).toBeLessThanOrEqual(688);
+
+  await clickLogicalTab(page, 'fighters', touch);
+  await expect.poll(() => activeTab(page)).toBe('fighters');
+  const selectedFrames = await page.evaluate(() => {
+    const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'ReforgedShellScene',
+    ) as unknown as { getModernUiRenderState(): { tabFrames: (string | null)[] } };
+    return scene.getModernUiRenderState().tabFrames;
+  });
+  expect(selectedFrames[1]).toBe('ui.chrome.states/006');
+
+  await clickLogicalTab(page, 'play', touch);
+  const queueIcon = await page.evaluate(() => {
+    const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'ReforgedShellScene',
+    ) as unknown as {
+      playRosterPanel: {
+        setQueued(queued: boolean): void;
+        getSnapshot(): { statusIcon: string | null };
+      };
+    };
+    scene.playRosterPanel.setQueued(true);
+    return scene.playRosterPanel.getSnapshot().statusIcon;
+  });
+  expect(queueIcon).toBe('queue');
+
+  await page.screenshot({ path: testInfo.outputPath('batch-27-modern-shell.png') });
+  if (testInfo.project.name === 'desktop-chromium') {
+    await page.setViewportSize({ width: 844, height: 390 });
+    await waitForRenderedFrames(page);
+    await page.screenshot({ path: testInfo.outputPath('batch-27-modern-shell-mobile-size.png') });
+  }
+
+  await page.evaluate(() => {
+    const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'ReforgedShellScene',
+    ) as unknown as {
+      gameService: { getNetworkManager(): { connection: { setState(state: string): void } } };
+    };
+    scene.gameService.getNetworkManager().connection.setState('reconnecting');
+  });
   await waitForActiveScene(page, 'LobbyScene');
   await expect
     .poll(() =>

@@ -125,9 +125,27 @@ generated import/provenance diff, verify source and texture hashes, and inspect
 the atlas at gameplay/mobile scale. Loader/runtime integration then follows the
 roadmap's applicable typecheck, lint, build, browser, fallback, and visual tier.
 
+## Batch 27 modern UI disposition
+
+`art/reforged/sources/modern-ui/manifest.json` is the first production manifest.
+Its durable original geometry source is
+`tools/reforged-assets/create-modern-ui-sources.mjs`; it emits exactly two
+canonical PNG sheets containing 32 chrome states and 16 semantic icons. The
+Batch 26 packer emits one 1024x256 `modern-ui.core` atlas and runtime import JSON
+under `client/public/assets/reforged/modern-ui/`, while the complete report stays
+under `art/reforged/provenance/modern-ui/`.
+
+The client validates the import schema and required frames before registering
+named Phaser frames. Literal server-owned `modernArt` selects those frames only
+on the owning UI surfaces; missing assets or a false/absent capability preserve
+procedural compatibility chrome. Both full and reduced cosmetic tiers keep the
+same essential frame/icon/focus treatment. The set contains no raster text,
+source archive, license detail, golden pixel, fighter, weapon, pickup, biome,
+combat effect, or map art.
+
 ## Scope boundary
 
-Batch 26 owns this contract and tooling only. Batch 27 owns modern UI production
-assets. Batches 28-32 own fighter, weapon/pickup, biome, and combat-feedback
+Batch 26 owns this contract and tooling; Batch 27 owns the completed modern UI
+production set. Batches 28-32 own fighter, weapon/pickup, biome, and combat-feedback
 production sets. Batch 33 owns coherent live cutover. No pipeline output can
 enable `modernArt`, change fallback behavior, or authorize deployment.

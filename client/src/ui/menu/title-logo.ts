@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { Wasteland, cssHex } from '@shared/config/palette.js';
 import { MENU_FONTS } from './fonts.js';
+import { menuHeaderFont, modernUiEnabledForScene } from '../modern-ui-runtime.js';
 
 export interface TitleLogoOpts {
   fontSize?: number;
@@ -20,13 +21,7 @@ export interface TitleLogoOpts {
 // CRT/old-TV feel. Used for both the lobby title (MIGHTY MAN'S / REVENGE)
 // and the end-screen banner (VICTORY / DEFEAT / DRAW).
 export class TitleLogo extends Phaser.GameObjects.Container {
-  constructor(
-    scene: Phaser.Scene,
-    x: number,
-    y: number,
-    lines: string[],
-    opts?: TitleLogoOpts,
-  ) {
+  constructor(scene: Phaser.Scene, x: number, y: number, lines: string[], opts?: TitleLogoOpts) {
     super(scene, x, y);
 
     const fontSize = opts?.fontSize ?? 36;
@@ -40,6 +35,24 @@ export class TitleLogo extends Phaser.GameObjects.Container {
     const chromaticAlpha = opts?.chromaticAlpha ?? 0.4;
     const lineSpacing = opts?.lineSpacing ?? 8;
     const text = lines.join('\n');
+
+    if (modernUiEnabledForScene(scene)) {
+      const main = scene.add
+        .text(0, 0, text, {
+          fontFamily: menuHeaderFont(scene),
+          fontSize: `${fontSize}px`,
+          fontStyle: 'bold',
+          align: 'center',
+          lineSpacing,
+          color: cssHex(fillColor),
+          stroke: cssHex(strokeColor),
+          strokeThickness: Math.min(2, strokeThickness),
+        })
+        .setOrigin(0.5);
+      this.add(main);
+      scene.add.existing(this);
+      return;
+    }
 
     const baseStyle: Phaser.Types.GameObjects.Text.TextStyle = {
       fontFamily: MENU_FONTS.LOGO,

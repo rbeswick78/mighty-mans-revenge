@@ -3,6 +3,12 @@ import { Wasteland, cssHex } from '@shared/config/palette.js';
 import { AudioManager } from '../../audio/audio-manager.js';
 import { drawBeveledChrome, type BeveledChromeOpts } from './menu-panel.js';
 import { MENU_FONTS } from './fonts.js';
+import {
+  MODERN_UI_TEXTURE_KEY,
+  modernUiButtonFrame,
+  type ModernUiButtonVariant,
+} from '../modern-ui-contract.js';
+import { menuBodyFont, menuHeaderFont, modernUiEnabledForScene } from '../modern-ui-runtime.js';
 
 const HOVER_LIGHTEN = 20;
 
@@ -30,6 +36,7 @@ const lighten = (hex: number, amount: number): number =>
 // Square corners — no rounding — matches the chunky pixel-art aesthetic.
 export class PixelButton extends Phaser.GameObjects.Container {
   private readonly gfx: Phaser.GameObjects.Graphics;
+  private readonly modernChrome: Phaser.GameObjects.NineSlice | null;
   private readonly label: Phaser.GameObjects.Text;
   private readonly subtitle: Phaser.GameObjects.Text | null;
   private readonly zone: Phaser.GameObjects.Zone;
@@ -38,6 +45,7 @@ export class PixelButton extends Phaser.GameObjects.Container {
   private readonly btnWidth: number;
   private readonly btnHeight: number;
   private readonly chromeOpts: BeveledChromeOpts;
+  private readonly variant: ModernUiButtonVariant;
   private readonly onClick?: () => void;
   private readonly sound: 'menuSelect' | null;
   private btnState: 'idle' | 'hover' | 'pressed' = 'idle';
@@ -61,6 +69,7 @@ export class PixelButton extends Phaser.GameObjects.Container {
     this.sound = opts?.sound === undefined ? 'menuSelect' : opts.sound;
 
     const variant = opts?.variant ?? 'primary';
+    this.variant = variant;
     this.baseColor =
       variant === 'primary'
         ? Wasteland.LOADING_BAR_FILL
@@ -77,11 +86,28 @@ export class PixelButton extends Phaser.GameObjects.Container {
       shadowColor: Wasteland.WALL_LINE,
     };
 
-    this.gfx = scene.add.graphics();
+    const modern = modernUiEnabledForScene(scene);
+    this.gfx = scene.add.graphics().setVisible(!modern);
+    this.modernChrome = modern
+      ? scene.add
+          .nineslice(
+            0,
+            0,
+            MODERN_UI_TEXTURE_KEY,
+            modernUiButtonFrame(variant, this.disabled ? 'disabled' : 'idle'),
+            width,
+            height,
+            12,
+            12,
+            12,
+            12,
+          )
+          .setOrigin(0)
+      : null;
     const hasSubtitle = opts?.subtitle !== undefined;
     this.label = scene.add
       .text(width / 2, hasSubtitle ? height * 0.34 : height / 2, labelText, {
-        fontFamily: MENU_FONTS.HEADER,
+        fontFamily: modern ? menuHeaderFont(scene) : MENU_FONTS.HEADER,
         fontSize: `${opts?.fontSize ?? 11}px`,
         color: cssHex(Wasteland.TEXT_PRIMARY),
       })
@@ -92,7 +118,7 @@ export class PixelButton extends Phaser.GameObjects.Container {
     this.subtitle = hasSubtitle
       ? scene.add
           .text(width / 2, height * 0.72, opts.subtitle ?? '', {
-            fontFamily: MENU_FONTS.HEADER,
+            fontFamily: modern ? menuBodyFont(scene) : MENU_FONTS.HEADER,
             fontSize: `${opts.subtitleFontSize ?? 7}px`,
             color: cssHex(Wasteland.COVER_FILL),
           })
@@ -104,11 +130,11 @@ export class PixelButton extends Phaser.GameObjects.Container {
       .zone(width / 2, height / 2, width, height + hitPaddingY * 2)
       .setInteractive({ useHandCursor: true });
 
-    this.add(
-      this.subtitle
-        ? [this.gfx, this.label, this.subtitle, this.zone]
-        : [this.gfx, this.label, this.zone],
-    );
+    this.add(this.gfx);
+    if (this.modernChrome) this.add(this.modernChrome);
+    this.add(this.label);
+    if (this.subtitle) this.add(this.subtitle);
+    this.add(this.zone);
 
     this.zone.on('pointerover', () => {
       // Touch browsers may synthesize pointerover after pointerdown. Keep
@@ -147,7 +173,7 @@ export class PixelButton extends Phaser.GameObjects.Container {
     });
 
     this.redraw();
-    if (this.disabled) this.setAlpha(0.5);
+    if (this.disabled && !this.modernChrome) this.setAlpha(0.5);
 
     scene.add.existing(this);
   }
@@ -156,7 +182,7 @@ export class PixelButton extends Phaser.GameObjects.Container {
     if (this.disabled === disabled) return this;
     this.disabled = disabled;
     if (disabled) this.focused = false;
-    this.setAlpha(disabled ? 0.5 : 1);
+    this.setAlpha(disabled && !this.modernChrome ? 0.5 : 1);
     if (disabled) {
       this.zone.disableInteractive();
     } else {
@@ -204,7 +230,33 @@ export class PixelButton extends Phaser.GameObjects.Container {
     return true;
   }
 
+  getChromeFrame(): string | null {
+    return this.modernChrome?.frame.name ?? null;
+  }
+
   private redraw(): void {
+    if (this.modernChrome) {
+      const state = this.disabled
+        ? 'disabled'
+        : this.btnState === 'pressed'
+          ? 'pressed'
+          : this.btnState === 'hover' || this.focused
+            ? 'focus'
+            : 'idle';
+      this.modernChrome.setFrame(modernUiButtonFrame(this.variant, state));
+      const darkText = this.variant === 'primary' && state !== 'disabled';
+      this.label
+        .setColor(cssHex(darkText ? 0x090d14 : state === 'disabled' ? 0x9eafbd : 0xf3f0df))
+        .setY(
+          (this.subtitle ? this.btnHeight * 0.34 : this.btnHeight / 2) +
+            (state === 'pressed' ? 3 : 0) -
+            1,
+        );
+      this.subtitle
+        ?.setColor(cssHex(darkText ? 0x121a26 : state === 'disabled' ? 0x9eafbd : 0x9eafbd))
+        .setY(this.btnHeight * 0.72 + (state === 'pressed' ? 3 : 0));
+      return;
+    }
     this.gfx.clear();
     const fill = this.btnState === 'hover' || this.focused ? this.hoverColor : this.baseColor;
     drawBeveledChrome(

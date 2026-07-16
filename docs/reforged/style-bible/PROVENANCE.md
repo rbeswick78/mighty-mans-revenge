@@ -169,3 +169,14 @@ per-asset provenance under the contract in
 license/source/generation detail; deterministic provenance reports stay under
 `art/reforged/provenance/` and third-party source archives stay outside runtime
 redistribution.
+
+## Batch 27 production disposition
+
+Batch 27 leaves every artifact and hash in this Batch 25 manifest unchanged.
+The approved UI sheet remains visual authority only and is not copied, cropped,
+sampled, or packed. The original project-owned production geometry, manifest,
+reference notes, source PNGs, complete machine provenance, and generated runtime
+outputs live in the separate Batch 26 boundaries under
+`tools/reforged-assets/`, `art/reforged/`, and
+`client/public/assets/reforged/modern-ui/`. No external image, font file,
+third-party archive, or generated-image cache is a Batch 27 production input.

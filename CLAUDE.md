@@ -473,6 +473,20 @@ remain ignored and may never enter runtime redistribution. The Batch 25 golden
 sheets stay documentation references and are never atlas inputs. Batch 26 adds
 no production art or loader behavior; Batch 27 owns modern UI assets.
 
+**Reforged modern UI assets (Batch 27):** one project-owned `modern-ui.core`
+manifest packs two deterministic canonical sheets into a 48-frame, mip-safe
+RGBA8888 atlas: 32 tab/card/button/panel/HUD/Results/tactical states and 16
+semantic icons. Boot registers only runtime-safe frame metadata; complete source
+hashes and lineage stay under `art/reforged/provenance/`. Literal server-owned
+`modernArt: true` selects atlas chrome on the Reforged shell, capability-owned
+large-world HUD/minimap/match menu, and Results. Teal focus, amber primary and
+pressed state, visible disabled state, red-only danger, 48px minimum modern
+targets, condensed system typography, and full/reduced essential treatment are
+frozen client mappings. False/absent/old-server paths retain procedural chrome
+and exact established behavior. The UI atlas contains no fighter, weapon,
+pickup, biome, combat-effect, or map art; Batch 28 owns fighter art I and Batch
+33 still owns the coherent full-journey visual cutover.
+
 ### Why This Matters for Agents
 
 Client prediction and server simulation **must use identical physics code** from `/shared`. If you change movement, collision, or physics logic, you must change it in `/shared` and verify both client and server still agree. A mismatch between client prediction and server authority causes visible rubber-banding.

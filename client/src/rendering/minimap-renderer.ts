@@ -4,6 +4,12 @@ import { Wasteland, cssHex } from '@shared/config/palette.js';
 import type { CollisionGrid, MapData } from '@shared/types/map.js';
 
 import { MENU_FONTS } from '../ui/menu/fonts.js';
+import { MODERN_UI_TEXTURE_KEY, modernUiIconFrame } from '../ui/modern-ui-contract.js';
+import {
+  createModernUiNineSlice,
+  menuHeaderFont,
+  modernUiEnabledForScene,
+} from '../ui/modern-ui-runtime.js';
 import {
   createMinimapDynamicProjection,
   createMinimapStaticProjection,
@@ -28,6 +34,8 @@ const LANDMARK_COLORS: Readonly<Record<MinimapLandmarkKind, number>> = Object.fr
 export class MinimapRenderer {
   private readonly staticGraphics: Phaser.GameObjects.Graphics;
   private readonly dynamicGraphics: Phaser.GameObjects.Graphics;
+  private readonly modernPanel: Phaser.GameObjects.NineSlice | null;
+  private readonly modernIcon: Phaser.GameObjects.Image | null;
   private readonly title: Phaser.GameObjects.Text;
   private staticProjection: MinimapStaticProjection;
   private dynamicProjection: MinimapDynamicProjection = Object.freeze({
@@ -41,6 +49,31 @@ export class MinimapRenderer {
     private readonly collisionGrid: CollisionGrid,
     private layout: MinimapLayout,
   ) {
+    const modern = modernUiEnabledForScene(scene);
+    this.modernPanel = modern
+      ? createModernUiNineSlice(
+          scene,
+          'tactical',
+          layout.panel.x,
+          layout.panel.y,
+          layout.panel.width,
+          layout.panel.height,
+        )
+          .setScrollFactor(0)
+          .setDepth(MINIMAP_STATIC_DEPTH - 1)
+      : null;
+    this.modernIcon = modern
+      ? scene.add
+          .image(
+            layout.panel.x + 16,
+            layout.title.y + 7,
+            MODERN_UI_TEXTURE_KEY,
+            modernUiIconFrame('minimap'),
+          )
+          .setDisplaySize(20, 20)
+          .setScrollFactor(0)
+          .setDepth(MINIMAP_TITLE_DEPTH)
+      : null;
     this.staticGraphics = scene.add.graphics();
     this.staticGraphics.setName('minimap-static');
     this.staticGraphics.setScrollFactor(0);
@@ -51,13 +84,18 @@ export class MinimapRenderer {
     this.dynamicGraphics.setScrollFactor(0);
     this.dynamicGraphics.setDepth(MINIMAP_DYNAMIC_DEPTH);
 
-    this.title = scene.add.text(layout.title.x, layout.title.y, 'MINIMAP', {
-      fontFamily: MENU_FONTS.BODY,
-      fontSize: '10px',
-      color: cssHex(Wasteland.TEXT_PRIMARY),
-      stroke: '#000000',
-      strokeThickness: 2,
-    });
+    this.title = scene.add.text(
+      modern ? layout.title.x + 24 : layout.title.x,
+      layout.title.y,
+      modern ? 'TACTICAL / MINIMAP' : 'MINIMAP',
+      {
+        fontFamily: modern ? menuHeaderFont(scene) : MENU_FONTS.BODY,
+        fontSize: '10px',
+        color: cssHex(Wasteland.TEXT_PRIMARY),
+        stroke: '#000000',
+        strokeThickness: 2,
+      },
+    );
     this.title.setScrollFactor(0);
     this.title.setDepth(MINIMAP_TITLE_DEPTH);
 
@@ -67,7 +105,11 @@ export class MinimapRenderer {
 
   setLayout(layout: MinimapLayout): void {
     this.layout = layout;
-    this.title.setPosition(layout.title.x, layout.title.y);
+    this.modernPanel
+      ?.setPosition(layout.panel.x, layout.panel.y)
+      .setSize(layout.panel.width, layout.panel.height);
+    this.modernIcon?.setPosition(layout.panel.x + 16, layout.title.y + 7);
+    this.title.setPosition(this.modernPanel ? layout.title.x + 24 : layout.title.x, layout.title.y);
     this.refreshStatic();
   }
 
@@ -117,9 +159,15 @@ export class MinimapRenderer {
   }
 
   destroy(): void {
+    this.modernPanel?.destroy();
+    this.modernIcon?.destroy();
     this.staticGraphics.destroy();
     this.dynamicGraphics.destroy();
     this.title.destroy();
+  }
+
+  getChromeFrame(): string | null {
+    return this.modernPanel?.frame.name ?? null;
   }
 
   private drawStatic(): void {
@@ -128,10 +176,12 @@ export class MinimapRenderer {
     const map = this.layout.map;
     gfx.clear();
 
-    gfx.fillStyle(Wasteland.HUD_STRIP_BG, 0.9);
-    gfx.fillRoundedRect(panel.x, panel.y, panel.width, panel.height, 4);
-    gfx.lineStyle(1, 0x65737e, 0.95);
-    gfx.strokeRoundedRect(panel.x, panel.y, panel.width, panel.height, 4);
+    if (!this.modernPanel) {
+      gfx.fillStyle(Wasteland.HUD_STRIP_BG, 0.9);
+      gfx.fillRoundedRect(panel.x, panel.y, panel.width, panel.height, 4);
+      gfx.lineStyle(1, 0x65737e, 0.95);
+      gfx.strokeRoundedRect(panel.x, panel.y, panel.width, panel.height, 4);
+    }
 
     gfx.fillStyle(0x121820, 0.96);
     gfx.fillRect(map.x, map.y, map.width, map.height);

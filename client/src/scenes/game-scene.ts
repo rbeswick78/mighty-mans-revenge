@@ -94,6 +94,7 @@ import type { LocalCorrection, NetworkManager } from '../network/network-manager
 import { getMap, DEFAULT_MAP_NAME } from '@shared/maps/registry.js';
 import { MENU_FONTS } from '../ui/menu/fonts.js';
 import { MatchMenu } from '../ui/match-menu.js';
+import { configureModernUiScene, modernUiEnabledForScene } from '../ui/modern-ui-runtime.js';
 import {
   currentGameplayOverlaySafeArea,
   gameplayViewportForCapabilities,
@@ -329,10 +330,9 @@ export class GameScene extends Phaser.Scene {
 
   create(): void {
     this.gameService = GameService.getInstance();
-    this.gameplayViewport = useGameplayLogicalSize(
-      this.scale,
-      this.gameService.getServerCapabilities(),
-    );
+    const capabilities = this.gameService.getServerCapabilities();
+    configureModernUiScene(this, capabilities.modernArt && capabilities.largeWorlds);
+    this.gameplayViewport = useGameplayLogicalSize(this.scale, capabilities);
     const mapData: MapData = getMap(this.matchData?.mapName ?? DEFAULT_MAP_NAME);
     this.worldRenderPlan = createWorldRenderPlan(mapData, {
       width: this.gameplayViewport.logicalWidth,
@@ -1148,6 +1148,25 @@ export class GameScene extends Phaser.Scene {
       );
     }
     this.crosshair?.update(!controllerActive);
+  }
+
+  getModernUiRenderState(): Readonly<{
+    enabled: boolean;
+    hudFrame: string | null;
+    minimapFrame: string | null;
+    worldBounds: { readonly width: number; readonly height: number } | null;
+  }> {
+    return Object.freeze({
+      enabled: modernUiEnabledForScene(this),
+      hudFrame: this.hud?.getModernChromeFrame() ?? null,
+      minimapFrame: this.minimapRenderer?.getChromeFrame() ?? null,
+      worldBounds: this.worldRenderPlan
+        ? Object.freeze({
+            width: this.worldRenderPlan.worldBounds.width,
+            height: this.worldRenderPlan.worldBounds.height,
+          })
+        : null,
+    });
   }
 
   private updateAimLine(localState: ReturnType<NetworkManager['getLocalPlayerState']>): void {

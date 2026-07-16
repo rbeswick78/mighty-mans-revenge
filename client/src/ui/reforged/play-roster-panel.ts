@@ -4,7 +4,7 @@ import type { PartyState } from '@shared/matchmaking/party.js';
 import type { GameModeType } from '@shared/types/game.js';
 import type { PlayerId } from '@shared/types/common.js';
 import { cssHex } from '@shared/config/palette.js';
-import { MENU_FONTS } from '../menu/fonts.js';
+import { menuBodyFont, menuHeaderFont } from '../modern-ui-runtime.js';
 import { ReforgedMenuTokens } from './design-tokens.js';
 import { MenuFocusNavigator } from './focus-navigation.js';
 import {
@@ -28,6 +28,12 @@ import {
   type SerializedPlayRosterDraft,
 } from './play-roster-builder.js';
 import { ReforgedChoiceButton } from './reforged-choice-button.js';
+import {
+  MODERN_UI_TEXTURE_KEY,
+  modernUiIconFrame,
+  type ModernUiIcon,
+} from '../modern-ui-contract.js';
+import { modernUiEnabledForScene } from '../modern-ui-runtime.js';
 
 interface PlayRosterPanelOptions {
   readonly availability: PlayRosterAvailability;
@@ -65,6 +71,7 @@ export interface PlayRosterPanelSnapshot {
   readonly queued: boolean;
   readonly partyState: Readonly<PartyState> | null;
   readonly partyError: string | null;
+  readonly statusIcon: ModernUiIcon | null;
   readonly reviewBottom: number | null;
   readonly optionsTop: number | null;
 }
@@ -83,6 +90,7 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
   private readonly prompt: Phaser.GameObjects.Text;
   private readonly trail: Phaser.GameObjects.Text;
   private readonly reviewText: Phaser.GameObjects.Text;
+  private readonly statusIcon: Phaser.GameObjects.Image | null;
   private builderState: PlayRosterBuilderState = EMPTY_PLAY_ROSTER_STATE;
   private optionButtons: ReforgedChoiceButton[] = [];
   private optionLabels: string[] = [];
@@ -108,27 +116,34 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
     this.arenaStatusByMode = options.arenaStatusByMode ?? Object.freeze({});
     this.entryEnabled = options.entryEnabled;
     const tokens = ReforgedMenuTokens;
+    this.statusIcon = modernUiEnabledForScene(scene)
+      ? scene.add
+          .image(0, 0, MODERN_UI_TEXTURE_KEY, modernUiIconFrame('play'))
+          .setOrigin(0)
+          .setDisplaySize(24, 24)
+      : null;
     this.stageLabel = scene.add.text(0, 0, '', {
-      fontFamily: MENU_FONTS.HEADER,
+      fontFamily: menuHeaderFont(scene),
       fontSize: `${tokens.type.eyebrow}px`,
       color: cssHex(tokens.color.accentActive),
     });
     this.prompt = scene.add.text(0, 0, '', {
-      fontFamily: MENU_FONTS.HEADER,
+      fontFamily: menuHeaderFont(scene),
       fontSize: `${tokens.type.body}px`,
       color: cssHex(tokens.color.text),
     });
     this.trail = scene.add.text(0, 0, '', {
-      fontFamily: MENU_FONTS.BODY,
+      fontFamily: menuBodyFont(scene),
       fontSize: `${tokens.type.eyebrow}px`,
       color: cssHex(tokens.color.textMuted),
     });
     this.reviewText = scene.add.text(0, 0, '', {
-      fontFamily: MENU_FONTS.HEADER,
+      fontFamily: menuHeaderFont(scene),
       fontSize: `${tokens.type.body}px`,
       color: cssHex(tokens.color.text),
       lineSpacing: 8,
     });
+    if (this.statusIcon) this.add(this.statusIcon);
     this.add([this.stageLabel, this.prompt, this.trail, this.reviewText]);
     scene.add.existing(this);
     this.rebuild();
@@ -138,8 +153,9 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
     this.setPosition(x, y);
     this.panelWidth = width;
     this.panelHeight = height;
-    this.stageLabel.setPosition(0, 0);
-    this.prompt.setPosition(0, 18);
+    this.statusIcon?.setPosition(0, 0);
+    this.stageLabel.setPosition(this.statusIcon ? 32 : 0, 0);
+    this.prompt.setPosition(this.statusIcon ? 32 : 0, 18);
     this.trail.setPosition(width, 2).setOrigin(1, 0);
     this.reviewText.setPosition(0, this.partyState ? 56 : 62);
     this.layoutOptions();
@@ -200,6 +216,13 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
       queued: this.queued,
       partyState: this.partyState,
       partyError: this.partyError,
+      statusIcon: this.statusIcon
+        ? this.partyState
+          ? 'party'
+          : this.queued
+            ? 'queue'
+            : 'play'
+        : null,
       reviewBottom: this.reviewText.visible ? this.reviewText.y + this.reviewText.height : null,
       optionsTop:
         this.optionButtons.length === 0
@@ -295,6 +318,9 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
 
   private choiceDefinitions(): readonly ChoiceDefinition[] {
     const step = playRosterBuilderStep(this.builderState);
+    this.statusIcon?.setFrame(
+      modernUiIconFrame(this.partyState ? 'party' : this.queued ? 'queue' : 'play'),
+    );
     if (step === 'format') {
       return PLAY_FORMATS.map((format) => ({
         label: format.label,

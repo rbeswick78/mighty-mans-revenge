@@ -1,6 +1,13 @@
 import Phaser from 'phaser';
 import { AudioManager } from '../../audio/audio-manager.js';
 import { MENU_FONTS } from '../menu/fonts.js';
+import {
+  MODERN_UI_TEXTURE_KEY,
+  MODERN_UI_MIN_TOUCH_TARGET,
+  modernUiCardFrame,
+  type ModernUiControlState,
+} from '../modern-ui-contract.js';
+import { menuBodyFont, menuHeaderFont, modernUiEnabledForScene } from '../modern-ui-runtime.js';
 import { ReforgedMenuTokens } from './design-tokens.js';
 
 export interface ReforgedChoiceButtonOptions {
@@ -11,6 +18,7 @@ export interface ReforgedChoiceButtonOptions {
 
 export class ReforgedChoiceButton extends Phaser.GameObjects.Container {
   private readonly chrome: Phaser.GameObjects.Graphics;
+  private readonly modernChrome: Phaser.GameObjects.NineSlice | null;
   private readonly label: Phaser.GameObjects.Text;
   private readonly detail: Phaser.GameObjects.Text;
   private readonly hitZone: Phaser.GameObjects.Zone;
@@ -31,10 +39,16 @@ export class ReforgedChoiceButton extends Phaser.GameObjects.Container {
   ) {
     super(scene, 0, 0);
     const tokens = ReforgedMenuTokens;
-    this.chrome = scene.add.graphics();
+    const modern = modernUiEnabledForScene(scene);
+    this.chrome = scene.add.graphics().setVisible(!modern);
+    this.modernChrome = modern
+      ? scene.add
+          .nineslice(0, 0, MODERN_UI_TEXTURE_KEY, modernUiCardFrame('idle'), 64, 64, 12, 12, 12, 12)
+          .setOrigin(0)
+      : null;
     this.label = scene.add
       .text(0, 0, label, {
-        fontFamily: MENU_FONTS.HEADER,
+        fontFamily: modern ? menuHeaderFont(scene) : MENU_FONTS.HEADER,
         fontSize: `${tokens.type.tab}px`,
         color: Phaser.Display.Color.IntegerToColor(tokens.color.text).rgba,
         align: 'center',
@@ -42,7 +56,7 @@ export class ReforgedChoiceButton extends Phaser.GameObjects.Container {
       .setOrigin(0.5);
     this.detail = scene.add
       .text(0, 0, detail, {
-        fontFamily: MENU_FONTS.BODY,
+        fontFamily: modern ? menuBodyFont(scene) : MENU_FONTS.BODY,
         fontSize: `${options.detailFontSize ?? tokens.type.eyebrow}px`,
         color: Phaser.Display.Color.IntegerToColor(tokens.color.textMuted).rgba,
         align: 'center',
@@ -50,7 +64,9 @@ export class ReforgedChoiceButton extends Phaser.GameObjects.Container {
       })
       .setOrigin(0.5);
     this.hitZone = scene.add.zone(0, 0, 1, 1).setInteractive({ useHandCursor: true });
-    this.add([this.chrome, this.label, this.detail, this.hitZone]);
+    this.add(this.chrome);
+    if (this.modernChrome) this.add(this.modernChrome);
+    this.add([this.label, this.detail, this.hitZone]);
 
     this.hitZone.on('pointerover', () => {
       this.hovered = true;
@@ -87,10 +103,16 @@ export class ReforgedChoiceButton extends Phaser.GameObjects.Container {
     this.setSize(width, height);
     this.visualWidth = width;
     this.visualHeight = height;
+    this.modernChrome?.setSize(width, height);
     const hasDetail = this.detail.text.length > 0;
     this.label.setPosition(width / 2, hasDetail ? height / 2 - 9 : height / 2);
     this.detail.setPosition(width / 2, height / 2 + 10).setVisible(hasDetail);
-    this.hitZone.setPosition(width / 2, height / 2).setSize(width, height);
+    this.hitZone
+      .setPosition(width / 2, height / 2)
+      .setSize(
+        this.modernChrome ? Math.max(width, MODERN_UI_MIN_TOUCH_TARGET) : width,
+        this.modernChrome ? Math.max(height, MODERN_UI_MIN_TOUCH_TARGET) : height,
+      );
     this.redraw();
     return this;
   }
@@ -143,6 +165,10 @@ export class ReforgedChoiceButton extends Phaser.GameObjects.Container {
     return true;
   }
 
+  getChromeFrame(): string | null {
+    return this.modernChrome?.frame.name ?? null;
+  }
+
   private redraw(): void {
     const tokens = ReforgedMenuTokens;
     const fill =
@@ -159,6 +185,34 @@ export class ReforgedChoiceButton extends Phaser.GameObjects.Container {
     const inset = this.pressed ? 3 : 0;
     this.label.setAlpha(this.disabled ? 0.5 : 1);
     this.detail.setAlpha(this.disabled ? 0.5 : 1);
+    if (this.modernChrome) {
+      const state: ModernUiControlState = this.disabled
+        ? 'disabled'
+        : this.pressed
+          ? 'pressed'
+          : this.selected
+            ? 'selected'
+            : this.hovered || this.focused
+              ? 'focus'
+              : 'idle';
+      this.modernChrome.setFrame(modernUiCardFrame(state)).setPosition(0, inset);
+      const foreground =
+        state === 'pressed'
+          ? tokens.color.canvas
+          : state === 'disabled'
+            ? tokens.color.textMuted
+            : tokens.color.text;
+      this.label.setColor(Phaser.Display.Color.IntegerToColor(foreground).rgba);
+      this.detail.setColor(
+        Phaser.Display.Color.IntegerToColor(
+          state === 'pressed' ? tokens.color.canvas : tokens.color.textMuted,
+        ).rgba,
+      );
+      const labelY = this.detail.visible ? this.visualHeight / 2 - 9 : this.visualHeight / 2;
+      this.label.setY(labelY + inset);
+      this.detail.setY(this.visualHeight / 2 + 10 + inset);
+      return;
+    }
     this.chrome.clear();
     this.chrome
       .fillStyle(fill, 1)
