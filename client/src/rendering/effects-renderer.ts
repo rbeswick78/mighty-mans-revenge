@@ -3,6 +3,7 @@ import type { Vec2 } from '@shared/types/common.js';
 import { Wasteland, cssHex } from '@shared/config/palette.js';
 import { bucketAimAngle } from './sprite-direction.js';
 import { declareWorldSpace, worldPoint } from './gameplay-coordinate-space.js';
+import type { CameraEffectsSink } from './camera-controller.js';
 
 const AIM_LINE_ALPHA = 0.6;
 const AIM_LINE_THICKNESS = 2;
@@ -29,7 +30,10 @@ export class EffectsRenderer {
   /** Persistent aim graphic; recreated each frame while aiming, cleared otherwise. */
   private aimGraphic: Phaser.GameObjects.Graphics | null = null;
 
-  constructor(scene: Phaser.Scene) {
+  constructor(
+    scene: Phaser.Scene,
+    private readonly cameraEffects: CameraEffectsSink,
+  ) {
     this.scene = scene;
   }
 
@@ -190,7 +194,7 @@ export class EffectsRenderer {
     // game-scene alongside this call.
 
     // Screen shake
-    this.scene.cameras.main.shake(200, 0.01);
+    this.cameraEffects.triggerShake(200, 0.01);
   }
 
   /** Fast under-player streak and arrival ring for Rook's predicted dash. */
@@ -228,7 +232,7 @@ export class EffectsRenderer {
       ease: 'Quad.easeOut',
       onComplete: () => arrival.destroy(),
     });
-    this.scene.cameras.main.shake(80, 0.002);
+    this.cameraEffects.triggerShake(80, 0.002);
   }
 
   /**

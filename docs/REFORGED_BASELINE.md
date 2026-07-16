@@ -142,18 +142,38 @@ target, HUD, physics, simulation, wire, or server behavior changed. Mobile-
 sized Chromium remains the trusted visual source; staged mobile WebKit remains
 black under RFG-003.
 
+### Batch 20 camera controller evidence
+
+`client/src/rendering/camera-controller.ts` is the sole gameplay-camera
+mutation boundary. It calculates exact world-space target follow and clamps
+the base view on all edges, including deterministic origin anchoring when a
+world is smaller than the logical viewport. Local-player, respawn, and
+spectator targets are explicit. Recoil kick, shake, zoom pulse, and roll are
+sampled separately and composed over base scroll/zoom once per frame; every
+former direct Phaser shake call now requests the controller's shake layer.
+
+The former RFG-001 and RFG-002 reproduction file now proves the repairs: idle
+recoil preserves sustained base scroll `(320, 144)`, and idle zoom pulse
+preserves a sustained base zoom of `0.9`. Deterministic controller coverage
+also proves center follow, all eight edge/corner clamps, current small-world
+behavior, respawn/spectator changes, simultaneous transient composition,
+equal desktop/mobile logical visibility, and identity restoration. Targeted
+Phaser evidence exercises screen/world round trips and aim while synthetically
+scrolled and zoomed through the Batch 19 coordinate service, then restores the
+real fixed-map contract. Current maps, render targets, HUD, physics,
+simulation, wire state, capability defaults, and production remain unchanged.
+
 ## Adjacent bug reproductions
 
-`client/src/rendering/camera-baseline.test.ts` intentionally asserts current
-broken composition behavior so later camera work has deterministic evidence:
+`client/src/rendering/camera-baseline.test.ts` now asserts the repaired
+composition behavior at the original deterministic reproduction values:
 
-- An idle `CameraKick.update()` changes a sustained base scroll of `(320, 144)`
-  to `(0, 0)`.
-- An idle `ZoomPulse.update()` changes a sustained base zoom of `0.9` to `1`.
+- An idle recoil layer preserves sustained base scroll `(320, 144)`.
+- An idle zoom-pulse layer preserves sustained base zoom `0.9`.
 
 Run `corepack pnpm exec vitest run client/src/rendering/camera-baseline.test.ts`;
-both reproductions pass. They document behavior to replace in Batch 20, not
-desired long-term behavior.
+both repair assertions pass. The roadmap retains RFG-001 and RFG-002 as
+resolved historical evidence for the Batch 24 regression gate.
 
 The baseline E2E helper also reproduced the existing non-Chromium headless
 network limitation: Firefox and mobile WebKit did not obtain a local player ID

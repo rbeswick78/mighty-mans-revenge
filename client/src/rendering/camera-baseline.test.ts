@@ -1,22 +1,23 @@
-import type Phaser from 'phaser';
 import { describe, expect, it } from 'vitest';
 
-import { CameraKick } from './camera-kick.js';
-import { ZoomPulse } from './zoom-pulse.js';
+import { CameraController, type CameraPort } from './camera-controller.js';
+import { worldPoint } from './gameplay-coordinate-space.js';
 
-interface FakeCameraState {
+interface FakeCamera extends CameraPort {
   scrollX: number;
   scrollY: number;
   zoom: number;
-  setScroll: (x: number, y: number) => void;
-  setZoom: (zoom: number) => void;
+  rotation: number;
 }
 
-function fakeCamera(overrides: Partial<FakeCameraState> = {}): FakeCameraState {
-  const camera: FakeCameraState = {
+function fakeCamera(width = 960, height = 720): FakeCamera {
+  const camera: FakeCamera = {
+    width,
+    height,
     scrollX: 0,
     scrollY: 0,
     zoom: 1,
+    rotation: 0,
     setScroll(x, y) {
       camera.scrollX = x;
       camera.scrollY = y;
@@ -24,30 +25,48 @@ function fakeCamera(overrides: Partial<FakeCameraState> = {}): FakeCameraState {
     setZoom(zoom) {
       camera.zoom = zoom;
     },
-    ...overrides,
+    setRotation(rotation) {
+      camera.rotation = rotation;
+    },
   };
   return camera;
 }
 
-describe('camera baseline limitations', () => {
-  it('reproduces recoil clearing a sustained base-camera scroll', () => {
-    const state = fakeCamera({ scrollX: 320, scrollY: 144 });
-    const camera = state as unknown as Phaser.Cameras.Scene2D.Camera;
+describe('camera composition repairs', () => {
+  it('RFG-001 keeps sustained base follow when recoil is idle', () => {
+    const camera = fakeCamera();
+    const controller = new CameraController(camera, {
+      left: 0,
+      top: 0,
+      width: 1920,
+      height: 1008,
+    });
+    controller.setTarget({ kind: 'local-player', position: worldPoint(800, 504) });
 
-    new CameraKick().update(16, camera);
+    controller.update(16);
 
-    expect({ scrollX: state.scrollX, scrollY: state.scrollY }).toEqual({
-      scrollX: 0,
-      scrollY: 0,
+    expect(controller.getState().base).toEqual({ scrollX: 320, scrollY: 144, zoom: 1 });
+    expect({ scrollX: camera.scrollX, scrollY: camera.scrollY }).toEqual({
+      scrollX: 320,
+      scrollY: 144,
     });
   });
 
-  it('reproduces the zoom pulse clearing a sustained base-camera zoom', () => {
-    const state = fakeCamera({ zoom: 0.9 });
-    const camera = state as unknown as Phaser.Cameras.Scene2D.Camera;
+  it('RFG-002 keeps a sustained base zoom when the pulse is idle', () => {
+    const camera = fakeCamera();
+    const controller = new CameraController(camera, {
+      left: 0,
+      top: 0,
+      width: 1920,
+      height: 1440,
+    });
+    controller.setBaseZoom(0.9);
+    controller.setTarget({ kind: 'local-player', position: worldPoint(960, 720) });
 
-    new ZoomPulse().update(16, camera);
+    controller.update(16);
 
-    expect(state.zoom).toBe(1);
+    expect(controller.getState().base.zoom).toBe(0.9);
+    expect(controller.getState().transient.zoomMultiplier).toBe(1);
+    expect(camera.zoom).toBe(0.9);
   });
 });

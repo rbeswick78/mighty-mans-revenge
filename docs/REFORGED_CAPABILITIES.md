@@ -179,6 +179,20 @@ behavior while enabled desktop and mobile keep one 1280x720 logical view.
 Camera follow, clamping, transient composition, scrolling, dynamic rendering,
 HUD migration, and capability exposure remain later-batch work.
 
+Batch 20 adds one client-only gameplay camera controller behind the same
+default-false `largeWorlds` boundary without changing negotiation or exposure.
+The controller follows explicit world-space local-player, respawn, and
+spectator targets, clamps its base view to every world edge, and keeps worlds
+smaller than the logical viewport anchored at their authored origin. Recoil,
+shake, zoom, and roll compose as transient layers and cannot overwrite base
+scroll or zoom. The Batch 19 coordinate service remains the sole transform for
+aim and presentation while camera state changes. Because all current maps stay
+960x576 at `(0, 0)`, both enabled 1280x720 gameplay and old-server, false,
+absent, malformed, reconnect, and disconnect 960x720 fallback paths retain
+base scroll `(0, 0)` today. Dynamic render resources, responsive HUD, minimap,
+larger arenas, physics, simulation, wire contracts, production defaults, and
+capability exposure remain unchanged.
+
 ## Server-first rollout and rollback
 
 For each capability, keep this order:

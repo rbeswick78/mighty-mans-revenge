@@ -53,9 +53,11 @@ import { DecalRenderer } from '../rendering/decal-renderer.js';
 import { KothHillRenderer } from '../rendering/koth-hill-renderer.js';
 import { RadiationStormRenderer } from '../rendering/radiation-storm-renderer.js';
 import { ScrapstormRenderer } from '../rendering/scrapstorm-renderer.js';
-import { CameraKick } from '../rendering/camera-kick.js';
-import { ZoomPulse } from '../rendering/zoom-pulse.js';
-import { CameraRoll, ROLL_DAMAGE_THRESHOLD } from '../rendering/camera-roll.js';
+import {
+  CameraController,
+  ROLL_DAMAGE_THRESHOLD,
+  createCameraController,
+} from '../rendering/camera-controller.js';
 import {
   CHROMATIC_DECAY_MS,
   CHROMATIC_INITIAL_PIXELS,
@@ -75,6 +77,7 @@ import {
   type GameplayCoordinateSpace,
   createGameplayCoordinateSpace,
   declareScreenSpace,
+  worldPointFrom,
 } from '../rendering/gameplay-coordinate-space.js';
 import { combatCalloutFor, withGauntletStyle } from '../ui/combat-callout.js';
 import { confirmedTagCallout } from '../ui/confirmed-tag.js';
@@ -171,9 +174,7 @@ export class GameScene extends Phaser.Scene {
   private prevAbilityCoolingDown = false;
   private decalRenderer: DecalRenderer | null = null;
   private kothHillRenderer: KothHillRenderer | null = null;
-  private cameraKick: CameraKick | null = null;
-  private zoomPulse: ZoomPulse | null = null;
-  private cameraRoll: CameraRoll | null = null;
+  private cameraController: CameraController | null = null;
   /** Tracks last-seen isDead per player so we can detect the false→true edge. */
   private prevDeadStates: Map<string, boolean> = new Map();
   /** Chromatic-aberration offset in pixels; decays toward 0, kicks back up on local damage. */
@@ -317,6 +318,10 @@ export class GameScene extends Phaser.Scene {
       this.cameras.main,
       this.gameplayViewport.worldBounds,
     );
+    this.cameraController = createCameraController(
+      this.cameras.main,
+      this.gameplayViewport.worldBounds,
+    );
     this.scale.on(Phaser.Scale.Events.RESIZE, this.layoutGameplayViewport, this);
     this.layoutGameplayViewport();
     this.cameras.main.fadeIn(300, 0, 0, 0);
@@ -364,7 +369,7 @@ export class GameScene extends Phaser.Scene {
     // Create subsystems
     this.playerManager = new ClientPlayerManager(this);
     this.tauntRenderer = new TauntRenderer(this);
-    this.effectsRenderer = new EffectsRenderer(this);
+    this.effectsRenderer = new EffectsRenderer(this, this.cameraController);
     this.pickupRenderer = new PickupRenderer(this);
     this.confirmedTagRenderer = new ConfirmedTagRenderer(this);
     this.coreRunRenderer = new CoreRunRenderer(this);
@@ -383,9 +388,6 @@ export class GameScene extends Phaser.Scene {
     this.xrayFx = new XrayFx(this);
     this.abilityAura = new AbilityAura(this);
     this.shockwaveController = new ShockwaveController();
-    this.cameraKick = new CameraKick();
-    this.zoomPulse = new ZoomPulse();
-    this.cameraRoll = new CameraRoll();
     this.hud = new HUD(this);
     // Bullseye replaces the OS cursor on desktop only — touch input
     // doesn't have a hover position to track.
@@ -528,7 +530,7 @@ export class GameScene extends Phaser.Scene {
         (input.firePressed && heldMagEmpty) ||
         (input.throwPressed && localState.grenades === 0)
       ) {
-        this.cameras.main.shake(120, 0.004);
+        this.cameraController?.triggerShake(120, 0.004);
         AudioManager.getInstance()?.play('outOfAmmo');
       }
 
@@ -660,7 +662,7 @@ export class GameScene extends Phaser.Scene {
             damage >= ROLL_DAMAGE_THRESHOLD ? 130 : 75,
           );
           if (damage >= ROLL_DAMAGE_THRESHOLD) {
-            this.cameraRoll?.trigger();
+            this.cameraController?.triggerRoll();
           }
         }
         this.prevLocalHealth = currentLocalState.health;
@@ -727,7 +729,7 @@ export class GameScene extends Phaser.Scene {
           } else if (currentLocalState.characterId === 'bubba') {
             this.hud.showAbilityActivation('IRON HIDE!', 0xb8c4d0);
           }
-          this.zoomPulse?.trigger();
+          this.cameraController?.triggerZoomPulse();
         }
         this.prevAbilityActive = localAbilityActive;
 
@@ -740,13 +742,13 @@ export class GameScene extends Phaser.Scene {
         if (localCoolingDown && !this.prevAbilityCoolingDown) {
           if (currentLocalState.characterId === 'frost_wizard') {
             this.hud.showAbilityActivation('FROST LOCK!', 0xaaddff);
-            this.zoomPulse?.trigger();
+            this.cameraController?.triggerZoomPulse();
           } else if (currentLocalState.characterId === 'jack') {
             this.hud.showAbilityActivation('AXE THROW!', 0xffb347);
-            this.zoomPulse?.trigger();
+            this.cameraController?.triggerZoomPulse();
           } else if (currentLocalState.characterId === 'rook') {
             this.hud.showAbilityActivation('BREACH DASH!', 0x70e6ff);
-            this.zoomPulse?.trigger();
+            this.cameraController?.triggerZoomPulse();
           }
         }
         this.prevAbilityCoolingDown = localCoolingDown;
@@ -797,7 +799,7 @@ export class GameScene extends Phaser.Scene {
             );
             AudioManager.getInstance()?.play('menuSelect', { rate: 1.12 });
           }
-          this.zoomPulse?.trigger();
+          this.cameraController?.triggerZoomPulse();
         }
         this.lastBountyTargetId = bountyHuntState?.targetId;
         this.hud.updateAmmo(
@@ -913,7 +915,7 @@ export class GameScene extends Phaser.Scene {
           if (didWastelandWarp(this.lastWastelandWarpSequence, warpState)) {
             this.hud.showEventBanner('POSITIONS WARPED!', 'REASSESS THE FIGHT', 0xb56cff);
             this.eventFlash?.trigger('wasteland_warp');
-            this.zoomPulse?.trigger();
+            this.cameraController?.triggerZoomPulse();
             AudioManager.getInstance()?.play('menuSelect', { rate: 0.55 });
           }
           this.lastWastelandWarpSequence = warpState.sequence;
@@ -936,7 +938,7 @@ export class GameScene extends Phaser.Scene {
           if (rouletteCallout) {
             this.hud.showEventBanner(rouletteCallout, 'WEAPON ROULETTE', 0x5ce1e6);
             AudioManager.getInstance()?.play('pickupCollect', { rate: 1.25 });
-            this.zoomPulse?.trigger();
+            this.cameraController?.triggerZoomPulse();
           }
           this.lastRouletteWeapon = rouletteActive ? currentLocalState.weaponId : null;
         }
@@ -1007,6 +1009,8 @@ export class GameScene extends Phaser.Scene {
 
     // Aim line preview (white) — re-drawn each render frame so it tracks the
     // mouse smoothly, not just on server-tick boundaries.
+    this.updateCameraTarget(currentLocalState, networkManager);
+    this.cameraController?.update(delta);
     this.updateAimLine(currentLocalState);
 
     if (this.lightingRenderer) {
@@ -1049,9 +1053,6 @@ export class GameScene extends Phaser.Scene {
 
     this.crtPipeline?.setChromaticPixels(this.aberrationPixels);
     this.shockwaveController?.update(delta, this.crtPipeline);
-    this.cameraKick?.update(delta, this.cameras.main);
-    this.zoomPulse?.update(delta, this.cameras.main);
-    this.cameraRoll?.update(delta, this.cameras.main);
     const controllerActive = this.inputManager.getActiveMode() === 'gamepad';
     if (controllerActive && !this.controllerAnnounced) {
       this.controllerAnnounced = true;
@@ -1216,6 +1217,50 @@ export class GameScene extends Phaser.Scene {
 
   getGameplayCoordinateSpace(): GameplayCoordinateSpace {
     return this.gameplayCoordinates;
+  }
+
+  getCameraController(): CameraController | null {
+    return this.cameraController;
+  }
+
+  private updateCameraTarget(
+    localState: ReturnType<NetworkManager['getLocalPlayerState']>,
+    networkManager: NetworkManager,
+  ): void {
+    if (!this.cameraController) return;
+
+    const localEliminated =
+      localState?.isDead === true &&
+      this.matchData?.gameMode === GameModeType.LAST_STAND &&
+      localState.score <= 0;
+
+    if (localState && !localEliminated) {
+      this.cameraController.setTarget({
+        kind: localState.isDead ? 'respawn' : 'local-player',
+        position: worldPointFrom(this.lastRenderedLocalPos ?? localState.position),
+      });
+      return;
+    }
+
+    const spectator = [...networkManager.getInterpolatedPlayers().entries()]
+      .filter(([, state]) => !state.isDead)
+      .sort(([leftId], [rightId]) => leftId.localeCompare(rightId))[0]?.[1];
+    if (spectator) {
+      this.cameraController.setTarget({
+        kind: 'spectator',
+        position: worldPointFrom(spectator.position),
+      });
+      return;
+    }
+
+    if (localState) {
+      this.cameraController.setTarget({
+        kind: 'respawn',
+        position: worldPointFrom(this.lastRenderedLocalPos ?? localState.position),
+      });
+    } else {
+      this.cameraController.clearTarget();
+    }
   }
 
   private layoutGameplayViewport(): void {
@@ -1480,7 +1525,7 @@ export class GameScene extends Phaser.Scene {
       // Recoil kick — only the local player's shot moves the local camera.
       // Watching a remote player fire must not jitter your view.
       if (primaryOfBlast && trail.shooterId === localPlayerId) {
-        this.cameraKick?.trigger(bulletAngle + Math.PI);
+        this.cameraController?.triggerKick(bulletAngle + Math.PI);
       }
     };
 
@@ -1515,7 +1560,7 @@ export class GameScene extends Phaser.Scene {
       const callout = withGauntletStyle(baseCallout, stylePoints);
       if (callout) {
         this.hud?.showCombatCallout(callout.headline, callout.detail, callout.tint);
-        if (callout.pulse) this.zoomPulse?.trigger();
+        if (callout.pulse) this.cameraController?.triggerZoomPulse();
       }
       const audio = AudioManager.getInstance();
       if (!audio) return;
@@ -1567,7 +1612,7 @@ export class GameScene extends Phaser.Scene {
         sfxOptions = { rate: 1.65 };
         if (collectorId === localId) {
           this.hud?.showEventBanner('OVERCHARGED', 'ABILITY READY', 0xc77dff);
-          this.zoomPulse?.trigger();
+          this.cameraController?.triggerZoomPulse();
         }
       }
 
@@ -1603,7 +1648,7 @@ export class GameScene extends Phaser.Scene {
       const callout = rumbleLeadCallout(state, players, localId);
       if (!callout) return;
       this.hud?.showCombatCallout(callout.headline, callout.detail, callout.tint);
-      if (callout.pulse) this.zoomPulse?.trigger();
+      if (callout.pulse) this.cameraController?.triggerZoomPulse();
       AudioManager.getInstance()?.play('menuSelect', {
         rate: state.leaderIds.includes(localId) ? 1.2 : 0.82,
       });
@@ -1742,7 +1787,7 @@ export class GameScene extends Phaser.Scene {
       // to the grid.
       this.mapRenderer?.scorchTileAt(pos.x, pos.y);
       this.shockwaveController?.trigger(pos.x, pos.y);
-      this.zoomPulse?.trigger();
+      this.cameraController?.triggerZoomPulse();
     };
 
     this.onLocalCorrection = (correction: LocalCorrection) => {
@@ -1814,8 +1859,8 @@ export class GameScene extends Phaser.Scene {
         this.awaitingRouletteOpeningWeapon = true;
       }
       if (payload.event === 'demolition_wave') {
-        this.cameras.main.shake(450, 0.012);
-        this.zoomPulse?.trigger();
+        this.cameraController?.triggerShake(450, 0.012);
+        this.cameraController?.triggerZoomPulse();
       }
       this.hud?.showEventBanner(
         `${name}!`,
@@ -1850,7 +1895,7 @@ export class GameScene extends Phaser.Scene {
     this.onOvertimeStart = () => {
       this.hud?.showEventBanner('OVERTIME!', 'SUDDEN DEATH - FIRST KILL WINS', 0xb33831);
       AudioManager.getInstance()?.play('matchStartHorn', { detune: -800, rate: 0.7 });
-      this.zoomPulse?.trigger();
+      this.cameraController?.triggerZoomPulse();
       // After the sting reads, restart the gameplay track at its final
       // stretch so the already-tuned finale lands at 0:00 again. Seeking
       // by the clock's REMAINING seconds (re-anchored to overtime by
@@ -2205,17 +2250,9 @@ export class GameScene extends Phaser.Scene {
     this.prevAbilityActive = false;
     this.prevAbilityCoolingDown = false;
     this.shockwaveController = null;
-    if (this.cameraKick) {
-      this.cameraKick.reset(this.cameras.main);
-      this.cameraKick = null;
-    }
-    if (this.zoomPulse) {
-      this.zoomPulse.reset(this.cameras.main);
-      this.zoomPulse = null;
-    }
-    if (this.cameraRoll) {
-      this.cameraRoll.reset(this.cameras.main);
-      this.cameraRoll = null;
+    if (this.cameraController) {
+      this.cameraController.reset();
+      this.cameraController = null;
     }
     if (this.decalRenderer) {
       this.decalRenderer.destroy();

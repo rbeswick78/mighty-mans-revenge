@@ -128,6 +128,9 @@ async function viewportSnapshot(page: Page): Promise<Record<string, unknown>> {
           y: number;
         };
       };
+      getCameraController(): {
+        getState(): unknown;
+      } | null;
       kothHillRenderer: { gfx: { scrollFactorX: number; scrollFactorY: number } };
       coreRunRenderer: { container: { scrollFactorX: number; scrollFactorY: number } };
       radiationStormRenderer: {
@@ -151,6 +154,7 @@ async function viewportSnapshot(page: Page): Promise<Record<string, unknown>> {
     };
     const contract = scene.getGameplayViewportContract();
     const coordinates = scene.getGameplayCoordinateSpace();
+    const cameraController = scene.getCameraController();
     const playerMarkerOwner = scene.playerManager.getRenderer('viewport-local')?.getContainer();
     return {
       scale: [game?.scale.width, game?.scale.height],
@@ -164,6 +168,7 @@ async function viewportSnapshot(page: Page): Promise<Record<string, unknown>> {
         width: scene.cameras.main.worldView.width,
         height: scene.cameras.main.worldView.height,
       },
+      cameraController: cameraController?.getState() ?? null,
       coordinates: {
         screenToWorld: coordinates.screenToWorld({ space: 'screen', x: 480, y: 288 }),
         worldToScreen: coordinates.worldToScreen({ space: 'world', x: 480, y: 288 }),
@@ -205,6 +210,133 @@ async function viewportSnapshot(page: Page): Promise<Record<string, unknown>> {
           scene.scrapstormRenderer.localWarning.scrollFactorY,
         ],
         xrayOverlay: [scene.xrayFx.tintRect.scrollFactorX, scene.xrayFx.tintRect.scrollFactorY],
+      },
+    };
+  });
+}
+
+async function transformedCameraSnapshot(page: Page): Promise<Record<string, unknown>> {
+  return page.evaluate(() => {
+    const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'GameScene',
+    ) as unknown as {
+      cameras: {
+        main: {
+          scrollX: number;
+          scrollY: number;
+          zoom: number;
+          rotation: number;
+          preRender(): void;
+        };
+      };
+      getGameplayViewportContract(): {
+        viewport: { worldBounds: { left: number; top: number; width: number; height: number } };
+      };
+      getGameplayCoordinateSpace(): {
+        screenToWorld(point: { space: 'screen'; x: number; y: number }): {
+          space: 'world';
+          x: number;
+          y: number;
+        };
+        worldToScreen(point: { space: 'world'; x: number; y: number }): {
+          space: 'screen';
+          x: number;
+          y: number;
+        };
+        aimAngle(
+          player: { space: 'world'; x: number; y: number },
+          target: { space: 'screen'; x: number; y: number },
+        ): number;
+      };
+      getCameraController(): {
+        setWorldBounds(bounds: { left: number; top: number; width: number; height: number }): void;
+        setBaseZoom(zoom: number): void;
+        setTarget(target: {
+          kind: 'local-player' | 'respawn' | 'spectator';
+          position: { space: 'world'; x: number; y: number };
+        }): void;
+        triggerKick(angle: number): void;
+        triggerShake(durationMs: number, intensity: number): void;
+        triggerZoomPulse(): void;
+        triggerRoll(sign: -1 | 1): void;
+        update(deltaMs: number): void;
+        getState(): {
+          base: { scrollX: number; scrollY: number; zoom: number };
+          transient: {
+            kickX: number;
+            kickY: number;
+            shakeX: number;
+            shakeY: number;
+            zoomMultiplier: number;
+            roll: number;
+          };
+          composed: { scrollX: number; scrollY: number; zoom: number; rotation: number };
+        };
+        reset(): void;
+      } | null;
+    };
+    const controller = scene.getCameraController();
+    if (!controller) throw new Error('camera controller is not ready');
+    const coordinates = scene.getGameplayCoordinateSpace();
+    const originalBounds = scene.getGameplayViewportContract().viewport.worldBounds;
+    const syntheticLargeBounds = { left: 0, top: 0, width: 2560, height: 1440 };
+
+    controller.setWorldBounds(syntheticLargeBounds);
+    controller.setBaseZoom(1.25);
+    controller.setTarget({
+      kind: 'local-player',
+      position: { space: 'world', x: 1500, y: 900 },
+    });
+    controller.update(0);
+    scene.cameras.main.preRender();
+
+    const screen = { space: 'screen', x: 800, y: 300 } as const;
+    const targetWorld = coordinates.screenToWorld(screen);
+    const roundTrip = coordinates.worldToScreen(targetWorld);
+    const aim = coordinates.aimAngle({ space: 'world', x: 1500, y: 900 }, screen);
+    const expectedAim = Math.atan2(targetWorld.y - 900, targetWorld.x - 1500);
+    const targetScreen = coordinates.worldToScreen({
+      space: 'world',
+      x: 1500,
+      y: 900,
+    });
+    const base = controller.getState();
+
+    controller.setTarget({
+      kind: 'respawn',
+      position: { space: 'world', x: 100, y: 80 },
+    });
+    controller.update(0);
+    const respawn = controller.getState();
+    controller.setTarget({
+      kind: 'spectator',
+      position: { space: 'world', x: 2400, y: 1300 },
+    });
+    controller.triggerKick(0);
+    controller.triggerShake(200, 0.01);
+    controller.triggerZoomPulse();
+    controller.triggerRoll(1);
+    controller.update(16);
+    const composed = controller.getState();
+
+    controller.reset();
+    controller.setWorldBounds(originalBounds);
+    controller.setTarget({
+      kind: 'local-player',
+      position: { space: 'world', x: 144, y: 144 },
+    });
+    controller.update(0);
+
+    return {
+      base,
+      respawn,
+      composed,
+      transform: { targetWorld, targetScreen, roundTrip, aim, expectedAim },
+      restoredCamera: {
+        scrollX: scene.cameras.main.scrollX,
+        scrollY: scene.cameras.main.scrollY,
+        zoom: scene.cameras.main.zoom,
+        rotation: scene.cameras.main.rotation,
       },
     };
   });
@@ -301,6 +433,22 @@ test('capability-off and old-server gameplay retain the exact legacy surface', a
     worldBounds: { left: 0, top: 0, width: 960, height: 576 },
     safeArea: null,
     camera: { scrollX: 0, scrollY: 0, zoom: 1, width: 960, height: 720 },
+    cameraController: {
+      target: {
+        kind: 'local-player',
+        position: { space: 'world', x: 144, y: 144 },
+      },
+      base: { scrollX: 0, scrollY: 0, zoom: 1 },
+      transient: {
+        kickX: 0,
+        kickY: 0,
+        shakeX: 0,
+        shakeY: 0,
+        zoomMultiplier: 1,
+        roll: 0,
+      },
+      composed: { scrollX: 0, scrollY: 0, zoom: 1, rotation: 0 },
+    },
     coordinates: {
       screenToWorld: { space: 'world', x: 480, y: 288 },
       worldToScreen: { space: 'screen', x: 480, y: 288 },
@@ -332,6 +480,11 @@ test('gated gameplay keeps one 16:9 logical view across desktop and mobile', asy
     mode: 'large-world',
     worldBounds: { left: 0, top: 0, width: 960, height: 576 },
     camera: { scrollX: 0, scrollY: 0, zoom: 1, width: 1280, height: 720 },
+    cameraController: {
+      target: { kind: 'local-player' },
+      base: { scrollX: 0, scrollY: 0, zoom: 1 },
+      composed: { scrollX: 0, scrollY: 0, zoom: 1, rotation: 0 },
+    },
   });
   expect(initial.safeArea).toMatchObject({ left: 32, top: 32, right: 1248, bottom: 688 });
   expect(initial.coordinates).toEqual({
@@ -350,6 +503,52 @@ test('gated gameplay keeps one 16:9 logical view across desktop and mobile', asy
     scrapOverlay: [0, 0],
     xrayOverlay: [0, 0],
   });
+
+  const transformed = await transformedCameraSnapshot(page);
+  expect(transformed).toMatchObject({
+    base: {
+      target: { kind: 'local-player' },
+      base: { scrollX: 860, scrollY: 540, zoom: 1.25 },
+    },
+    respawn: {
+      target: { kind: 'respawn' },
+      base: { scrollX: -128, scrollY: -72, zoom: 1.25 },
+    },
+    composed: {
+      target: { kind: 'spectator' },
+      base: { scrollX: 1408, scrollY: 792, zoom: 1.25 },
+    },
+    restoredCamera: { scrollX: 0, scrollY: 0, zoom: 1, rotation: 0 },
+  });
+  const transformedDetail = transformed as {
+    composed: {
+      transient: {
+        kickX: number;
+        shakeX: number;
+        shakeY: number;
+        zoomMultiplier: number;
+        roll: number;
+      };
+    };
+    transform: {
+      targetScreen: { x: number; y: number };
+      roundTrip: { x: number; y: number };
+      aim: number;
+      expectedAim: number;
+    };
+  };
+  expect(transformedDetail.composed.transient.kickX).toBeGreaterThan(0);
+  expect(
+    Math.abs(transformedDetail.composed.transient.shakeX) +
+      Math.abs(transformedDetail.composed.transient.shakeY),
+  ).toBeGreaterThan(0);
+  expect(transformedDetail.composed.transient.zoomMultiplier).toBeGreaterThan(1);
+  expect(transformedDetail.composed.transient.roll).toBeGreaterThan(0);
+  expect(transformedDetail.transform.targetScreen.x).toBeCloseTo(640, 6);
+  expect(transformedDetail.transform.targetScreen.y).toBeCloseTo(360, 6);
+  expect(transformedDetail.transform.roundTrip.x).toBeCloseTo(800, 6);
+  expect(transformedDetail.transform.roundTrip.y).toBeCloseTo(300, 6);
+  expect(transformedDetail.transform.aim).toBeCloseTo(transformedDetail.transform.expectedAim, 6);
 
   const canvas = page.locator('canvas');
   await expect(canvas).toBeVisible();

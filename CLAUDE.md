@@ -362,6 +362,24 @@ zoom `1`, fixed maps/render targets/HUD geometry, physics, simulation, wire
 state, and every capability-off compatibility path remain unchanged. Batch 20
 owns follow, clamping, targets, and repair of transient camera composition.
 
+**Reforged camera controller (Batch 20):** `CameraController` is now the only
+owner of gameplay camera scroll, zoom, and rotation. Its base layer follows an
+explicit branded world-space local-player, respawn, or spectator target and
+clamps every edge; a world smaller than the logical viewport stays anchored at
+its authored origin rather than being centered or resized. Recoil, shake, zoom
+pulse, and roll are independent transient samples composed over that sustained
+base once per frame. Renderers request shake through the controller and may not
+mutate the Phaser gameplay camera directly. `GameScene` follows the rendered
+local prediction, keeps a respawning local corpse as target, and uses the
+stable first living remote only when the local fighter is eliminated or absent;
+target cycling remains later spectator work. Camera cleanup restores identity
+before Results, Lobby recovery, and rematches. The Batch 19 coordinate service
+remains the only aim/presentation transform while scroll, zoom, or roll changes.
+Current 960x576 maps stay at `(0, 0)`, so both the capability-owned 1280x720
+surface and the 960x720 fallback clamp base scroll to `(0, 0)` today. Dynamic
+rendering, HUD migration, minimap, larger maps, physics, wire state, capability
+defaults, and production exposure remain unchanged.
+
 ### Why This Matters for Agents
 
 Client prediction and server simulation **must use identical physics code** from `/shared`. If you change movement, collision, or physics logic, you must change it in `/shared` and verify both client and server still agree. A mismatch between client prediction and server authority causes visible rubber-banding.
