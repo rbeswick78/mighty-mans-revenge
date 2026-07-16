@@ -5,8 +5,10 @@ Read this file and `CLAUDE.md` completely at the start of every batch. The
 completed `docs/REPLAYABILITY_ROADMAP.md` remains the historical record for the
 systems this program preserves and reorganizes.
 
-- **Status:** Batch 16 complete on 2026-07-15.
-- **Next batch:** Batch 17 — Journey verification.
+- **Status:** Batch 17 complete on 2026-07-16; navigation milestone awaiting
+  user review.
+- **Next batch:** Batch 18 — Gameplay viewport cutover, only after explicit
+  milestone-review approval.
 - **Public releases:** Reforged Arena, then Battle Royale.
 - **Working model:** one numbered batch per session, direct commits and pushes
   to `main`, milestone-gated production deployments.
@@ -168,9 +170,9 @@ Production deployment happens only at a gate or for an urgent live fix.
 |  13 | Party readiness and recovery           | Navigation    | **DONE — 2026-07-15** |
 |  14 | Queue fallback                         | Navigation    | **DONE — 2026-07-15** |
 |  15 | Results and rematches                  | Navigation    | **DONE — 2026-07-15** |
-|  16 | Legacy flow retirement                 | Navigation    | NEXT                  |
-|  17 | Journey verification                   | Navigation    | Pending               |
-|  18 | Gameplay viewport cutover              | World/camera  | Pending               |
+|  16 | Legacy flow retirement                 | Navigation    | **DONE — 2026-07-15** |
+|  17 | Journey verification                   | Navigation    | **DONE — 2026-07-16** |
+|  18 | Gameplay viewport cutover              | World/camera  | Review gate           |
 |  19 | Coordinate separation                  | World/camera  | Pending               |
 |  20 | Camera controller                      | World/camera  | Pending               |
 |  21 | Dynamic world rendering                | World/camera  | Pending               |
@@ -641,6 +643,37 @@ Acceptance:
 Exercise every tab, preserved activity, standard roster, party path, queue,
 schedule boundary, rematch, disconnect, and old-client fallback using pointer,
 keyboard, gamepad, and touch.
+
+Acceptance:
+
+- [x] The cumulative deterministic audit covers every legal Duel, Rumble, and
+      Crew format/composition/mode/fighter product, exact scheduled-arena and
+      fighter locks, human/standard-bot sources, Crew teams, Rumble state,
+      contracts/mutators, malformed launches, and fail-closed cleanup without
+      client-authored roster, mode, map, team, source, schedule, or bypass state.
+- [x] The complete enabled journey reaches all five tabs, Fighters persistence,
+      every preserved Challenge, Records, Settings, parties, readiness,
+      confirmed bot fill, direct countdown/gameplay, Results, retained-party
+      rematch consensus, cancellation, leave, disconnect/reconnect, recovery,
+      and cleanup across desktop Chromium, desktop Firefox, and mobile landscape.
+- [x] Schedule locks and boundary changes retain the explicit mode, use the
+      exact server-owned active arena, clear stale consensus, and revalidate a
+      valid rematch; stale, duplicate, replayed, incompatible, cancelled,
+      disconnected, and capability-drifted paths leave no phantom state.
+- [x] Capability-off, missing/partial old-server advertisements, legacy joins,
+      Lobby, Draft, Character Select, Practice, Results/rematch, FORCE
+      diagnostics, scenes, messages, and transitional wire behavior remain
+      intact with all five capability defaults false.
+- [x] Pointer, keyboard, standard gamepad, and touch evidence passes on desktop
+      and mobile-sized layouts. Inspected Chromium captures are readable and
+      contained; staged Firefox/WebKit object/input assertions remain the
+      documented RFG-003 evidence rather than trusted pixel captures.
+- [x] The full unit/static/build gates, default-false complete Playwright
+      inventory, enabled Reforged/party matrix, and focused post-fix visual
+      rerun pass. The only demonstrated gap—party status copy colliding with
+      action rows—has a measured-layout regression assertion and is fixed.
+      No capability default, production configuration, viewport/camera, art,
+      Battle Royale behavior, deployment, or Batch 18 work changed.
 
 ### Milestone 2 — Scrolling-world and HUD foundation
 
@@ -1771,6 +1804,60 @@ assertions plus mobile-sized Chromium visual evidence remain required. The
 Batch 2 scheduling-drift sample and 15.932 effective Hz observation also remain
 unchanged. None blocks Batch 17.
 
+### Batch 17 — 2026-07-16 — Journey verification
+
+**Shipped:** Completed the navigation-milestone verification gate across every
+Batch 1–16 authority, compatibility, interaction, and recovery boundary. The
+existing deterministic inventory already exhaustively covered all 624 legal
+Play products plus every standard-match format/composition/mode and six
+fighter-lock offsets, malformed and capability-drifted launch rejection,
+schedule locking/boundaries, party lifecycle, retained rematches, FORCE paths,
+old-client compatibility, and every preserved challenge. Visual review exposed
+one tightly coupled acceptance gap: a two-human party's final server-owned
+status line could sit beneath its action row. Party review copy now omits empty
+rows, uses compact party-only line spacing, and positions actions below measured
+copy height. The focused browser snapshot records both bounds and rejects any
+future overlap for full-human and confirmed-bot-fill states. No other runtime,
+wire, gameplay, capability, art, viewport, camera, or production behavior changed.
+
+**Verification:** Selected the complete verification-gate tier because Batch 17
+is one of the roadmap's explicit full-matrix gates. On the final code,
+`corepack pnpm test` passed 127 files and 1,514 tests; `corepack pnpm typecheck`,
+`corepack pnpm lint`, and the full `corepack pnpm build` passed, with only the
+established TypeScript-ESLint support notice and Vite chunk-size advisory. The
+explicitly default-false complete three-project Playwright inventory passed 136
+tests with 50 documented capability/live-channel skips in 16.2 minutes. With
+only `newShell` and `schedules` enabled, the Reforged shell plus party Results
+matrix passed 34 tests with five intentional inverse-gate/project skips in 5.6
+minutes. After the layout correction, the affected party recovery/readiness and
+confirmed bot-fill cases passed all six desktop Chromium, desktop Firefox, and
+mobile-landscape runs in 1.7 minutes, including the new measured non-overlap
+assertions. Manual inspection of refreshed 1280×720 and 844×390 Chromium
+captures confirmed direct launch, fixed party state, bot fill, Records, and
+Settings are readable and contained. Staged Firefox/WebKit assertions retained
+their established non-pixel role under RFG-003.
+
+**Deployment:** Skipped. Batch 17 is a verification gate inside the unfinished
+navigation milestone, not a production release gate. All five capabilities and
+production configuration remain unchanged and default false. User review is
+required before Batch 18 or any deployment.
+
+**Deviations:** No product-scope deviation. The first default-false Playwright
+attempt was detached when the active Codex turn was steered; it was discarded
+and replaced by the complete logged 16.2-minute run above. The first full
+visual inspection found the party-copy overlap, which was fixed in-scope under
+the dynamic bug rule and rerun across every project. No separate bug-ledger ID
+was needed because the defect was tightly coupled, low risk, and closed inside
+this batch.
+
+**Known issues:** No new open issue was added. RFG-001 CameraKick and RFG-002
+ZoomPulse remain assigned to Batches 20/24 and were untouched. RFG-003 remains
+open: headless Firefox/WebKit cannot use the live local WebRTC practice path,
+and staged gameplay/Reforged-shell WebKit PNGs remain black, so staged object/
+input assertions plus Chromium visual evidence are still required. The Batch 2
+254.279ms host scheduling drift reset and 15.932 effective-Hz local sample also
+remain unchanged; simulation processing stayed far below the 50ms budget.
+
 ## Next-session prompt
 
 ```text
@@ -1778,59 +1865,53 @@ Continue the Reforged build for Mighty Man's Revenge.
 
 Read docs/REIMAGINING_ROADMAP.md and CLAUDE.md completely first. Read
 docs/REFORGED_BASELINE.md and docs/REFORGED_CAPABILITIES.md before
-implementation. Implement Batch 17 — Journey verification exactly as
-specified. Preserve unrelated changes and do not begin Batch 18 — Gameplay
-viewport cutover.
+implementation. Batch 17 — Journey verification is complete and is the
+navigation-milestone review gate. Do not begin Batch 18 — Gameplay viewport
+cutover unless the user has explicitly approved crossing that gate. After that
+approval, implement Batch 18 exactly as specified and do not begin Batch 19 —
+Coordinate separation.
 
-Verify the complete Reforged Arena navigation milestone as one continuous,
-server-authoritative journey. Exercise every Play format and composition,
-Fighters persistence and locks, all Challenges, Records, Settings, scheduled
-arena boundaries, parties, readiness, confirmed bot fill, standard direct
-launch, Results, retained-party rematches, cancellation, leave, disconnect/
-reconnect, recovery, and cleanup. Cover pointer, keyboard, gamepad, and touch
-on desktop and mobile-sized layouts, including focused multi-client evidence.
+Replace the fixed 4:3 gameplay board plus bottom strip with the roadmap's fixed
+logical 16:9 world view and responsive safe-area overlay contract only behind
+the default-false `largeWorlds` capability. Preserve equal logical world
+visibility across devices, shared/server physics, the authoritative 20Hz
+simulation, all current map dimensions and gameplay rules, every menu and
+challenge flow, the five-tab shell, scheduled arenas, parties, direct standard
+launches, Results/rematches, compatibility scenes/messages, and production
+configuration. Capability-off, old-server, and old-client paths must retain the
+exact established 960×720 gameplay/Lobby behavior through Batch 54.
 
-Prove the Batch 16 cutover preserves the exact explicit mode, current locked
-scheduled arena, human/standard-bot composition, fighter locks, Crew teams,
-Rumble state, contracts/mutators, and retained-party rematch authority from
-queue through countdown, gameplay, Results, and a valid rematch. The client
-must never invent roster, fighter, map, mode, team, source, readiness,
-eligibility, schedule, or bypass state. Malformed, partial, stale, duplicate,
-replayed, incompatible, cancelled, disconnected, old-client, and capability-
-drift paths must continue to fail closed without phantom state.
+Do not begin Batch 19 coordinate centralization, camera follow or transient
+composition, scrolling worlds, dynamic render targets, responsive combat-HUD
+redesign, minimaps, large arenas, modern art, or Battle Royale. Do not repair
+RFG-001/RFG-002 early except where a narrow capability-off preservation fix is
+strictly required by Batch 18 evidence. Never move authority or physics to the
+client, widen a device's competitive view, enable any capability by default, or
+deploy without explicit authorization.
 
-Retain every Gauntlet, Daily, Spar, Scrap Pit, Crew Battle, and Practice setup
-surface. Verify the complete capability-off and old-server Lobby, legacy join,
-Draft, Character Select, Results, rematch, FORCE diagnostics, and transitional
-wire fallbacks remain intact through Batch 54. Do not delete compatibility
-scenes or messages. Preserve every completed Batch 1–16 boundary, all five
-default-false capabilities, the fixed gameplay viewport/camera, existing art,
-and production configuration. Do not add Battle Royale gameplay, begin Batch
-18, or deploy without explicit authorization.
+Batch 17 is complete and pushed on main as `fix(play): close Reforged journey
+gate`. The full 127-file/1,514-test suite, typecheck, lint, production build,
+default-false three-project inventory (136 passed/50 documented skips), enabled
+Reforged/party matrix (34 passed/5 intentional skips), and focused post-fix
+party matrix (6 passed) are green. The only acceptance gap found was party
+status copy colliding with action rows; measured dynamic layout and E2E
+non-overlap assertions now close it. All five capabilities remain default false,
+wire compatibility is intact, production has not been deployed, and the user
+must review the navigation milestone before Batch 18 begins.
 
-Batch 16 is complete and pushed on main as
-`feat(play): retire legacy setup routing`. Enabled test servers now launch only
-validated capability-owned Duel, Rumble, and Crew standard matches directly
-into the existing countdown/gameplay path, while Practice/challenges and all
-capability-off/old-server paths retain their established setup. The additive
-standard-match projection preserves server-owned roster, sources, fighters,
-mode, scheduled arena, and Crew teams; invalid contracts fail closed. All five
-capability flags remain default false, and no production deployment has run.
-
-Choose and document the release/verification-gate tier from the roadmap's
-risk-based matrix. Add only verification coverage or tightly coupled fixes
-needed to close a demonstrated Batch 1–16 acceptance gap. Run the full
-`corepack pnpm test` suite, typecheck, lint, full production build, and complete
-three-project Playwright matrix with both default-false legacy coverage and the
-capability-enabled Reforged journey. Include pointer, keyboard, gamepad, touch,
-desktop/mobile Chromium visuals, focused multi-client party/recovery/rematch,
-schedule-boundary, malformed-contract, and old-client fallback evidence. Audit
-all Batch 1–16 acceptance items, capability defaults, wire compatibility,
-documentation, and the dynamic bug ledger. Update roadmap acceptance evidence,
-capability and architecture docs if verification changes them, and the Session
-Log. Run the end-of-batch ritual, commit and push directly to main, skip
-deployment unless explicitly authorized, then stop the chain and request user
-review. Do not create or begin Batch 18.
+Choose and document the roadmap's camera/world/visual verification tier for
+Batch 18. Add deterministic coverage for the gated 16:9 viewport and safe-area
+contract, capability-off/old-server fallbacks, equal desktop/mobile logical
+visibility, scene-size restoration across menu/gameplay/Results/recovery, and
+unchanged fixed-world rendering assumptions. Run focused tests, `corepack pnpm
+typecheck`, `corepack pnpm lint`, the affected and full production build, and
+the desktop Chromium/mobile-landscape interaction and visual evidence required
+by the risk matrix. Escalate to the full unit or three-project browser suites if
+shared, server, wire, recovery, or broader scene foundations change. Update the
+roadmap acceptance evidence, baseline/capability/architecture docs when their
+contracts change, the dynamic bug ledger, and the Session Log. Run the complete
+end-of-batch ritual, commit and push directly to main, and skip deployment unless
+explicitly authorized.
 
 Carry-over warnings: RFG-001 CameraKick and RFG-002 ZoomPulse overwrite future
 base camera state and remain assigned to Batches 20/24. RFG-003 means headless
@@ -1842,6 +1923,6 @@ remained far below the 50ms budget. Batch 4 broadened RFG-003 evidence: the
 staged mobile WebKit Reforged-shell PNG is also black, so use mobile-sized
 Chromium for visual evidence while retaining staged WebKit object/input
 assertions. Use Corepack pnpm 10.33.0 if the local pnpm shim selects a mismatched
-version. Batch 17 is the navigation milestone verification gate; after it
-passes, stop and request user review before Batch 18 or any deployment.
+version. The Batch 17 gate passed without enabling or deploying any capability;
+Batch 18 may begin only after explicit user milestone approval.
 ```

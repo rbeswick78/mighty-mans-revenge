@@ -65,6 +65,8 @@ export interface PlayRosterPanelSnapshot {
   readonly queued: boolean;
   readonly partyState: Readonly<PartyState> | null;
   readonly partyError: string | null;
+  readonly reviewBottom: number | null;
+  readonly optionsTop: number | null;
 }
 
 const STEP_NUMBER: Readonly<Record<PlayRosterBuilderStep, number>> = Object.freeze({
@@ -198,6 +200,11 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
       queued: this.queued,
       partyState: this.partyState,
       partyError: this.partyError,
+      reviewBottom: this.reviewText.visible ? this.reviewText.y + this.reviewText.height : null,
+      optionsTop:
+        this.optionButtons.length === 0
+          ? null
+          : Math.min(...this.optionButtons.map((button) => button.y)),
     };
   }
 
@@ -431,6 +438,7 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
     this.trail.setText(this.trailText());
     const serialized = serializePlayRosterDraft(this.builderState, this.availability);
     this.reviewText
+      .setLineSpacing(this.partyState ? 2 : 8)
       .setText(serialized ? this.reviewCopy(serialized) : '')
       .setVisible(serialized !== null);
 
@@ -475,7 +483,9 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
     const columns = Math.min(3, this.optionButtons.length);
     const rows = Math.ceil(this.optionButtons.length / columns);
     const gap = 8;
-    const top = this.partyState ? 210 : 56;
+    const top = this.partyState
+      ? Math.max(210, this.reviewText.y + this.reviewText.height + 12)
+      : 56;
     const availableHeight = Math.max(1, this.panelHeight - top);
     const buttonHeight = Math.min(78, (availableHeight - gap * (rows - 1)) / rows);
     const buttonWidth = (this.panelWidth - gap * (columns - 1)) / columns;
@@ -542,7 +552,9 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
         this.partyError
           ? `REQUEST REJECTED  /  ${this.partyError.toUpperCase()}`
           : `SERVER-OWNED ${this.partyState.lifecycle.toUpperCase()} STATE`,
-      ].join('\n');
+      ]
+        .filter((line) => line.length > 0)
+        .join('\n');
     }
     return [
       `${draft.format.toUpperCase()}  /  ${compositionLabel(draft.composition)}`,

@@ -213,6 +213,8 @@ async function playRosterSnapshot(page: Page): Promise<{
     botFillOffer?: { status: string; openSlotCount: number };
   } | null;
   partyError: string | null;
+  reviewBottom: number | null;
+  optionsTop: number | null;
 }> {
   return page.evaluate(() => {
     const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
@@ -235,6 +237,8 @@ async function playRosterSnapshot(page: Page): Promise<{
           botFillOffer?: { status: string; openSlotCount: number };
         } | null;
         partyError: string | null;
+        reviewBottom: number | null;
+        optionsTop: number | null;
       };
     };
     return scene.getPlayRosterSnapshot();
@@ -1122,6 +1126,8 @@ test('Party readiness projects recovery, leadership, and server-owned slots acro
     expect(leader.optionLabels).toContain('READY UP');
     expect(member.optionLabels).toContain('READY UP');
     expect(member.optionLabels).not.toContain('KICK LEADER12');
+    expect(leader.reviewBottom).not.toBeNull();
+    expect(leader.optionsTop).toBeGreaterThan((leader.reviewBottom ?? 0) + 8);
 
     if (liveChromium) {
       const recoveryCode = leader.partyState?.code;
@@ -1222,6 +1228,7 @@ test('Party bot fill remains server-offered and requires explicit leader confirm
     expect(offered.optionLabels).toContain('FILL WITH BOTS');
     expect(offered.partyState?.members).toHaveLength(1);
     expect(offered.partyState?.slots.map((slot) => slot.status)).toEqual(['occupied', 'open']);
+    expect(offered.optionsTop).toBeGreaterThan((offered.reviewBottom ?? 0) + 8);
     await page.screenshot({ path: testInfo.outputPath('party-bot-fill-desktop.png') });
     await page.setViewportSize({ width: 844, height: 390 });
     await waitForRenderedFrames(page);
