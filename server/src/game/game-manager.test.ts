@@ -8,7 +8,7 @@ import {
   DISABLED_SERVER_CAPABILITIES,
   GameModeType,
 } from '@shared/game';
-import type { ClientMessage, PlayerId, ServerMessage } from '@shared/game';
+import type { ClientMessage, MatchFormat, PlayerId, ServerMessage } from '@shared/game';
 import { GameManager } from './game-manager.js';
 import { PersistentStatsStore } from '../persistence/persistent-stats-store.js';
 import type { GameServer } from '../network/server.js';
@@ -23,7 +23,7 @@ interface SentMessage {
  * Fake GameServer that captures the handlers GameManager wires up, so a
  * test can simulate a connection without real geckos networking.
  */
-function makeFakeServer(schedules = false) {
+function makeFakeServer(schedules = false, newShell = false) {
   const sent: SentMessage[] = [];
   const connected: PlayerId[] = [];
   let connectHandler: ((playerId: PlayerId) => void) | null = null;
@@ -34,7 +34,7 @@ function makeFakeServer(schedules = false) {
       sent.push({ playerId, message, reliable: !!opts?.reliable });
     }),
     getConnectedPlayerIds: vi.fn(() => [...connected]),
-    getCapabilities: vi.fn(() => ({ ...DISABLED_SERVER_CAPABILITIES, schedules })),
+    getCapabilities: vi.fn(() => ({ ...DISABLED_SERVER_CAPABILITIES, schedules, newShell })),
     broadcast: vi.fn((message: ServerMessage) => {
       for (const playerId of connected) {
         sent.push({ playerId, message, reliable: false });
@@ -339,5 +339,105 @@ describe('GameManager connection leaderboard', () => {
       intent: { ...valid.intent, intentId: 'intent_wait_0004' },
     });
     expect(disabledManager.matchmakingManager.getQueueLength()).toBe(0);
+  });
+});
+
+describe('GameManager party wire integration', () => {
+  it.each([
+    ['duel', 2, 0, GameModeType.KOTH],
+    ['rumble', 2, 2, GameModeType.GUN_GAME],
+    ['crew', 2, 2, GameModeType.DEATHMATCH],
+  ] as const)(
+    'routes authoritative create/join/leave for %s',
+    (format, humanCount, botCount, mode) => {
+      const now = new Date('2026-07-15T18:00:00Z');
+      const { fake, sent, connect, message } = makeFakeServer(true, true);
+      new GameManager(fake, undefined, () => now);
+      connect('leader');
+      connect('member');
+      const config = sent.find(
+        ({ playerId, message: candidate }) =>
+          playerId === 'leader' && candidate.type === 'server:lobbyConfig',
+      )?.message;
+      if (!config || config.type !== 'server:lobbyConfig') throw new Error('missing config');
+      const arena = config.schedules.find((entry) => entry.mode === mode);
+      if (!arena) throw new Error('missing scheduled arena');
+      message('leader', {
+        type: 'client:createParty',
+        requestId: `create_${format}_1111`,
+        nickname: 'Alpha',
+        format: format as MatchFormat,
+        fighterId: 'mighty_man',
+        intent: {
+          intentId: `party_intent_${format}`,
+          format: format as MatchFormat,
+          composition: { humanCount, botCount },
+          mode,
+          fighterId: 'mighty_man',
+          scheduledArena: arena,
+        },
+      });
+      const created = [...sent]
+        .reverse()
+        .find(
+          ({ playerId, message: candidate }) =>
+            playerId === 'leader' && candidate.type === 'server:partyState',
+        )?.message;
+      if (!created || created.type !== 'server:partyState') throw new Error('missing party');
+      message('member', {
+        type: 'client:joinParty',
+        requestId: `join_${format}_111111`,
+        nickname: 'Bravo',
+        joinTarget: `https://game.test${created.state.joinPath}`,
+        fighterId: 'bruce',
+      });
+      const joined = [...sent]
+        .reverse()
+        .find(
+          ({ playerId, message: candidate }) =>
+            playerId === 'leader' && candidate.type === 'server:partyState',
+        )?.message;
+      if (!joined || joined.type !== 'server:partyState') throw new Error('missing joined state');
+      expect(joined.state.members.map((member) => member.nickname)).toEqual(['Alpha', 'Bravo']);
+      message('member', {
+        type: 'client:leaveParty',
+        requestId: `leave_${format}_11111`,
+        partyId: joined.state.partyId,
+        expectedVersion: joined.state.version,
+      });
+      expect(sent.at(-1)?.message).toMatchObject({ type: 'server:partyLeft', reason: 'left' });
+    },
+  );
+
+  it('keeps old/capability-off servers fail-closed and ignores malformed schedule echoes', () => {
+    const now = new Date('2026-07-15T18:00:00Z');
+    const disabled = makeFakeServer(true, false);
+    new GameManager(disabled.fake, undefined, () => now);
+    disabled.connect('p1');
+    const config = disabled.sent.find(
+      ({ message }) => message.type === 'server:lobbyConfig',
+    )?.message;
+    if (!config || config.type !== 'server:lobbyConfig') throw new Error('missing config');
+    const arena = config.schedules.find((entry) => entry.mode === GameModeType.KOTH)!;
+    disabled.message('p1', {
+      type: 'client:createParty',
+      requestId: 'create_disabled_1',
+      nickname: 'Alpha',
+      format: 'duel',
+      fighterId: 'mighty_man',
+      intent: {
+        intentId: 'intent_disabled_1',
+        format: 'duel',
+        composition: { humanCount: 2, botCount: 0 },
+        mode: GameModeType.KOTH,
+        fighterId: 'mighty_man',
+        scheduledArena: { ...arena, mapName: 'not-authoritative' },
+      },
+    });
+    expect(disabled.sent.some(({ message }) => message.type === 'server:partyState')).toBe(false);
+    expect(disabled.sent.at(-1)?.message).toMatchObject({
+      type: 'server:partyError',
+      code: 'invalid_intent',
+    });
   });
 });

@@ -7,8 +7,11 @@ import type {
   ServerCapabilities,
   ServerDailyGauntletLeaderboardMessage,
   ServerMatchmakingStatusMessage,
+  ServerPartyErrorMessage,
+  ServerPartyLeftMessage,
 } from '@shared/types/network.js';
 import type { MatchIntent } from '@shared/matchmaking/match-intent.js';
+import type { PartyState } from '@shared/matchmaking/party.js';
 import { MenuGamepadInput } from '../input/menu-gamepad.js';
 import type { NormalizedArenaSchedule } from '../network/arena-schedule.js';
 import type { ConnectionState } from '../network/types.js';
@@ -86,6 +89,9 @@ export class ReforgedShellScene extends Phaser.Scene {
     null;
   private onLobbyConfig: ((schedule: NormalizedArenaSchedule | null) => void) | null = null;
   private onMatchmakingStatus: ((status: ServerMatchmakingStatusMessage) => void) | null = null;
+  private onPartyState: ((state: Readonly<PartyState> | null) => void) | null = null;
+  private onPartyLeft: ((message: ServerPartyLeftMessage) => void) | null = null;
+  private onPartyError: ((message: ServerPartyErrorMessage) => void) | null = null;
   private onReconnecting: (() => void) | null = null;
   private onDisconnected: (() => void) | null = null;
   private onFullscreenChange: (() => void) | null = null;
@@ -168,8 +174,18 @@ export class ReforgedShellScene extends Phaser.Scene {
       entryEnabled: this.canSubmitMatchIntent(),
       onPointerIntent: () => this.enterPlayInput(false),
       onSubmit: (draft) => this.submitPlayIntent(draft),
+      onCreateParty: (draft) => this.createParty(draft),
+      onJoinParty: () => this.joinParty(),
+      onCopyPartyLink: (joinPath) => this.copyPartyLink(joinPath),
+      onLeaveParty: () => this.gameService.leaveParty(),
+      onKickPartyMember: (memberId) => this.gameService.kickPartyMember(memberId),
+      onUpdatePartyIntent: (draft) => this.updatePartyIntent(draft),
       onCancel: () => this.gameService.cancelMatchmaking(),
     }).setDepth(SHELL_DEPTH.panel);
+    this.playRosterPanel.setPartyState(
+      this.gameService.getPartyState(),
+      this.gameService.getPlayerId(),
+    );
     this.fightersPanel = new FightersPanel(this, {
       initialFighterId: this.selectedFighterId,
       characterWins: this.gameService.getLatestCharacterWins(),
@@ -421,6 +437,11 @@ export class ReforgedShellScene extends Phaser.Scene {
       if (status.status === 'queued') this.playRosterPanel?.setQueued(true);
       if (status.status === 'cancelled') this.playRosterPanel?.setQueued(false);
     };
+    this.onPartyState = (state) =>
+      this.playRosterPanel?.setPartyState(state, this.gameService.getPlayerId());
+    this.onPartyLeft = () =>
+      this.playRosterPanel?.setPartyState(null, this.gameService.getPlayerId());
+    this.onPartyError = (message) => this.playRosterPanel?.setPartyError(message.code);
     this.onReconnecting = () => this.handleShellConnectionLoss('reconnecting');
     this.onDisconnected = () => this.handleShellConnectionLoss('disconnected');
     this.onFullscreenChange = () =>
@@ -431,6 +452,9 @@ export class ReforgedShellScene extends Phaser.Scene {
     this.gameService.on('capabilitiesChanged', this.onCapabilitiesChanged);
     this.gameService.on('lobbyConfig', this.onLobbyConfig);
     this.gameService.on('matchmakingStatus', this.onMatchmakingStatus);
+    this.gameService.on('partyState', this.onPartyState);
+    this.gameService.on('partyLeft', this.onPartyLeft);
+    this.gameService.on('partyError', this.onPartyError);
     this.gameService.on('reconnecting', this.onReconnecting);
     this.gameService.on('disconnected', this.onDisconnected);
     document.addEventListener('fullscreenchange', this.onFullscreenChange);
@@ -682,6 +706,8 @@ export class ReforgedShellScene extends Phaser.Scene {
   private selectFighter(fighterId: CharacterId): void {
     this.selectedFighterId = persistFighterSelection(localStorage, fighterId);
     this.playRosterPanel?.setPersistedFighterSelection(this.selectedFighterId);
+    if (this.gameService.getPartyState())
+      this.gameService.updatePartyFighter(this.selectedFighterId);
   }
 
   private canSubmitMatchIntent(
@@ -699,7 +725,15 @@ export class ReforgedShellScene extends Phaser.Scene {
   }
 
   private submitPlayIntent(draft: SerializedPlayRosterDraft): boolean {
-    if (this.leaving || !this.canSubmitMatchIntent()) return false;
+    const intent = this.matchIntentForDraft(draft);
+    if (!intent) return false;
+    this.tryStartFullscreen();
+    this.gameService.submitMatchIntent(this.nickname, intent);
+    return true;
+  }
+
+  private matchIntentForDraft(draft: SerializedPlayRosterDraft): MatchIntent | null {
+    if (this.leaving || !this.canSubmitMatchIntent()) return null;
     const schedule = this.gameService.getArenaSchedule();
     const scheduledArena = schedule?.schedules.find((entry) => entry.mode === draft.mode);
     if (
@@ -708,9 +742,9 @@ export class ReforgedShellScene extends Phaser.Scene {
       scheduledArena.mapName !== draft.arenaName ||
       scheduledArena.rotationEndsAt <= schedule.serverTime
     ) {
-      return false;
+      return null;
     }
-    const intent: MatchIntent = Object.freeze({
+    return Object.freeze({
       intentId: crypto.randomUUID(),
       format: draft.format,
       composition: Object.freeze({ ...draft.composition }),
@@ -718,9 +752,36 @@ export class ReforgedShellScene extends Phaser.Scene {
       fighterId: draft.fighterId,
       scheduledArena: Object.freeze({ ...scheduledArena }),
     });
-    this.tryStartFullscreen();
-    this.gameService.submitMatchIntent(this.nickname, intent);
+  }
+
+  private createParty(draft: SerializedPlayRosterDraft): boolean {
+    const intent = this.matchIntentForDraft(draft);
+    if (!intent || intent.composition.humanCount < 2) return false;
+    this.gameService.createParty(this.nickname, intent);
     return true;
+  }
+
+  private updatePartyIntent(draft: SerializedPlayRosterDraft): boolean {
+    const intent = this.matchIntentForDraft(draft);
+    if (!intent) return false;
+    this.gameService.updatePartyIntent(intent);
+    return true;
+  }
+
+  private joinParty(): void {
+    if (!this.canSubmitMatchIntent()) return;
+    const fromLink = new URLSearchParams(window.location.search).get('party') ?? '';
+    const target = window.prompt('Enter a party code or share link', fromLink);
+    if (!target) return;
+    this.gameService.joinParty(this.nickname, target, this.selectedFighterId);
+  }
+
+  private copyPartyLink(joinPath: string): void {
+    if (!joinPath) return;
+    const link = new URL(joinPath, window.location.origin).toString();
+    void navigator.clipboard?.writeText(link).catch(() => {
+      // Clipboard permission is best effort; the visible room code remains shareable.
+    });
   }
 
   private startChallenge(request: ReforgedChallengeStartRequest): void {
@@ -795,6 +856,18 @@ export class ReforgedShellScene extends Phaser.Scene {
     if (this.onMatchmakingStatus) {
       this.gameService.off('matchmakingStatus', this.onMatchmakingStatus);
       this.onMatchmakingStatus = null;
+    }
+    if (this.onPartyState) {
+      this.gameService.off('partyState', this.onPartyState);
+      this.onPartyState = null;
+    }
+    if (this.onPartyLeft) {
+      this.gameService.off('partyLeft', this.onPartyLeft);
+      this.onPartyLeft = null;
+    }
+    if (this.onPartyError) {
+      this.gameService.off('partyError', this.onPartyError);
+      this.onPartyError = null;
     }
     if (this.onReconnecting) {
       this.gameService.off('reconnecting', this.onReconnecting);

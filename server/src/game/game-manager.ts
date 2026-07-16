@@ -6,18 +6,26 @@ import {
   listMapNames,
   normalizeMatchIntent,
 } from '@shared/game';
-import type { PlayerId, ClientMessage, GameModeType, ScheduledArenaLock } from '@shared/game';
+import type {
+  PlayerId,
+  ClientMessage,
+  GameModeType,
+  MatchIntent,
+  ScheduledArenaLock,
+} from '@shared/game';
 import { GameLoop } from './game-loop.js';
 import { GameServer } from '../network/server.js';
 import { MatchmakingManager } from '../matchmaking/matchmaking-manager.js';
 import { logger } from '../utils/logger.js';
 import type { PersistentStatsStore } from '../persistence/persistent-stats-store.js';
 import { createArenaScheduleMessage, lockScheduledArena } from '../matchmaking/arena-schedule.js';
+import { PartyManager } from '../matchmaking/party-manager.js';
 
 export class GameManager {
   private readonly gameLoop: GameLoop;
   private readonly server: GameServer;
   private readonly matchmaking: MatchmakingManager;
+  private readonly parties: PartyManager;
   /**
    * Most recent measured round-trip time per connected player, in ms,
    * derived from the client:ping/server:pong cycle. Used by lag
@@ -60,6 +68,12 @@ export class GameManager {
         release: (playerId) => this.releaseArenaScheduleLock(playerId),
       },
     );
+    this.parties = new PartyManager({
+      sendTo: (playerId, message) => this.server.sendTo(playerId, message, { reliable: true }),
+      normalizeIntent: (value) => this.normalizePartyIntent(value),
+      canEnterParty: (playerId) => !this.matchmaking.isPlayerBusy(playerId),
+      now: () => this.now().getTime(),
+    });
 
     this.gameLoop = new GameLoop((dt, tick) => {
       this.tick(dt, tick);
@@ -156,6 +170,61 @@ export class GameManager {
         break;
       }
 
+      case 'client:createParty':
+        this.parties.create(
+          playerId,
+          message.requestId,
+          message.nickname,
+          message.format,
+          message.fighterId,
+          message.intent,
+        );
+        break;
+
+      case 'client:joinParty':
+        this.parties.join(
+          playerId,
+          message.requestId,
+          message.nickname,
+          message.joinTarget,
+          message.fighterId,
+        );
+        break;
+
+      case 'client:leaveParty':
+        this.parties.leave(playerId, message.requestId, message.partyId, message.expectedVersion);
+        break;
+
+      case 'client:kickPartyMember':
+        this.parties.kick(
+          playerId,
+          message.requestId,
+          message.partyId,
+          message.expectedVersion,
+          message.memberId,
+        );
+        break;
+
+      case 'client:updatePartyIntent':
+        this.parties.updateIntent(
+          playerId,
+          message.requestId,
+          message.partyId,
+          message.expectedVersion,
+          message.intent,
+        );
+        break;
+
+      case 'client:updatePartyFighter':
+        this.parties.updateFighter(
+          playerId,
+          message.requestId,
+          message.partyId,
+          message.expectedVersion,
+          message.fighterId,
+        );
+        break;
+
       case 'client:startPractice':
         this.matchmaking.handleStartPractice(
           playerId,
@@ -215,6 +284,7 @@ export class GameManager {
 
   private tick(dt: number, tick: number): void {
     this.matchmaking.tick(dt, tick);
+    this.parties.expireEmptyRooms();
     this.broadcastArenaScheduleClock();
     if (!this.statsStore || tick % SERVER.TICK_RATE !== 0) return;
     const challengeKey = dailyChallengeKey(this.now());
@@ -223,6 +293,36 @@ export class GameManager {
     for (const playerId of this.server.getConnectedPlayerIds()) {
       this.sendDailyGauntletLeaderboard(playerId, challengeKey);
     }
+  }
+
+  private normalizePartyIntent(value: unknown): Readonly<MatchIntent> | null {
+    const serverTime = this.now().getTime();
+    const intent = normalizeMatchIntent(value, {
+      serverTime,
+      allowedArenaNames: listMapNames(),
+    });
+    if (
+      intent === null ||
+      !this.server.getCapabilities().newShell ||
+      !this.server.getCapabilities().schedules
+    ) {
+      return null;
+    }
+    const schedule = createArenaScheduleMessage(serverTime);
+    if (schedule.forcedMode !== undefined && schedule.forcedMode !== intent.mode) return null;
+    const authoritativeArena = schedule.schedules.find((entry) => entry.mode === intent.mode);
+    if (
+      !authoritativeArena ||
+      authoritativeArena.mapName !== intent.scheduledArena.mapName ||
+      authoritativeArena.rotationEndsAt !== intent.scheduledArena.rotationEndsAt
+    ) {
+      return null;
+    }
+    return Object.freeze({
+      ...intent,
+      composition: Object.freeze({ ...intent.composition }),
+      scheduledArena: Object.freeze({ ...authoritativeArena }),
+    });
   }
 
   private broadcastArenaScheduleClock(): void {

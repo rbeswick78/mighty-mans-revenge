@@ -30,7 +30,8 @@ import type {
   MutatorId,
   TauntId,
 } from '../config/game.js';
-import type { MatchIntent } from '../matchmaking/match-intent.js';
+import type { MatchFormat, MatchIntent } from '../matchmaking/match-intent.js';
+import type { PartyErrorCode, PartyState } from '../matchmaking/party.js';
 
 // === Client -> Server Messages ===
 
@@ -39,6 +40,12 @@ export type ClientMessage =
   | ClientJoinMatchmakingMessage
   | ClientJoinRumbleMessage
   | ClientSubmitMatchIntentMessage
+  | ClientCreatePartyMessage
+  | ClientJoinPartyMessage
+  | ClientLeavePartyMessage
+  | ClientKickPartyMemberMessage
+  | ClientUpdatePartyIntentMessage
+  | ClientUpdatePartyFighterMessage
   | ClientStartPracticeMessage
   | ClientCancelMatchmakingMessage
   | ClientRematchRequestMessage
@@ -69,6 +76,54 @@ export interface ClientSubmitMatchIntentMessage {
   type: 'client:submitMatchIntent';
   nickname: string;
   intent: MatchIntent;
+}
+
+export interface ClientCreatePartyMessage {
+  type: 'client:createParty';
+  requestId: string;
+  nickname: string;
+  format: MatchFormat;
+  fighterId: CharacterId;
+  intent: MatchIntent;
+}
+
+export interface ClientJoinPartyMessage {
+  type: 'client:joinParty';
+  requestId: string;
+  nickname: string;
+  joinTarget: string;
+  fighterId: CharacterId;
+}
+
+export interface ClientLeavePartyMessage {
+  type: 'client:leaveParty';
+  requestId: string;
+  partyId: string;
+  expectedVersion: number;
+}
+
+export interface ClientKickPartyMemberMessage {
+  type: 'client:kickPartyMember';
+  requestId: string;
+  partyId: string;
+  expectedVersion: number;
+  memberId: PlayerId;
+}
+
+export interface ClientUpdatePartyIntentMessage {
+  type: 'client:updatePartyIntent';
+  requestId: string;
+  partyId: string;
+  expectedVersion: number;
+  intent: MatchIntent;
+}
+
+export interface ClientUpdatePartyFighterMessage {
+  type: 'client:updatePartyFighter';
+  requestId: string;
+  partyId: string;
+  expectedVersion: number;
+  fighterId: CharacterId;
 }
 
 export interface ClientStartPracticeMessage {
@@ -143,6 +198,9 @@ export interface ClientPingMessage {
 export type ServerMessage =
   | ServerWelcomeMessage
   | ServerLobbyConfigMessage
+  | ServerPartyStateMessage
+  | ServerPartyLeftMessage
+  | ServerPartyErrorMessage
   | ServerGameStateMessage
   | ServerMatchFoundMessage
   | ServerDraftStateMessage
@@ -215,6 +273,24 @@ export interface ServerLobbyConfigMessage {
   forcedMode?: GameModeType;
   /** Present only after a server-authoritative queue entry has locked an arena. */
   lockedArena?: ScheduledArenaLock;
+}
+
+/** Complete authoritative party projection; clients never merge local membership state. */
+export interface ServerPartyStateMessage {
+  type: 'server:partyState';
+  state: PartyState;
+}
+
+export interface ServerPartyLeftMessage {
+  type: 'server:partyLeft';
+  partyId: string;
+  reason: 'left' | 'kicked' | 'closed';
+}
+
+export interface ServerPartyErrorMessage {
+  type: 'server:partyError';
+  requestId?: string;
+  code: PartyErrorCode;
 }
 
 export interface ServerGameStateMessage {

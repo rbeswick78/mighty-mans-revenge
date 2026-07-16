@@ -5,3 +5,4 @@ export * from './types/index.js';
 export * from './utils/index.js';
 export * from './maps/registry.js';
 export * from './matchmaking/match-intent.js';
+export * from './matchmaking/party.js';

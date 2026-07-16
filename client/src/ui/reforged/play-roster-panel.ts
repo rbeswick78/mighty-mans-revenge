@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import { GAME_MODE_ROTATION, type CharacterId } from '@shared/config/game.js';
+import type { PartyState } from '@shared/matchmaking/party.js';
 import type { GameModeType } from '@shared/types/game.js';
+import type { PlayerId } from '@shared/types/common.js';
 import { cssHex } from '@shared/config/palette.js';
 import { MENU_FONTS } from '../menu/fonts.js';
 import { ReforgedMenuTokens } from './design-tokens.js';
@@ -34,6 +36,12 @@ interface PlayRosterPanelOptions {
   readonly entryEnabled: boolean;
   readonly onPointerIntent: () => void;
   readonly onSubmit: (draft: SerializedPlayRosterDraft) => boolean;
+  readonly onCreateParty: (draft: SerializedPlayRosterDraft) => boolean;
+  readonly onJoinParty: () => void;
+  readonly onCopyPartyLink: (joinPath: string) => void;
+  readonly onLeaveParty: () => void;
+  readonly onKickPartyMember: (memberId: PlayerId) => void;
+  readonly onUpdatePartyIntent: (draft: SerializedPlayRosterDraft) => boolean;
   readonly onCancel: () => void;
 }
 
@@ -41,6 +49,7 @@ interface ChoiceDefinition {
   readonly label: string;
   readonly detail: string;
   readonly onSelect: () => void;
+  readonly disabled?: boolean;
 }
 
 export interface PlayRosterPanelSnapshot {
@@ -51,6 +60,8 @@ export interface PlayRosterPanelSnapshot {
   readonly arenaStatus: string | null;
   readonly entryEnabled: boolean;
   readonly queued: boolean;
+  readonly partyState: Readonly<PartyState> | null;
+  readonly partyError: string | null;
 }
 
 const STEP_NUMBER: Readonly<Record<PlayRosterBuilderStep, number>> = Object.freeze({
@@ -76,6 +87,9 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
   private arenaStatusByMode: Readonly<Partial<Record<GameModeType, string>>>;
   private entryEnabled: boolean;
   private queued = false;
+  private partyState: Readonly<PartyState> | null = null;
+  private localPlayerId: PlayerId | null = null;
+  private partyError: string | null = null;
   private panelWidth = 1;
   private panelHeight = 1;
 
@@ -122,7 +136,7 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
     this.stageLabel.setPosition(0, 0);
     this.prompt.setPosition(0, 18);
     this.trail.setPosition(width, 2).setOrigin(1, 0);
-    this.reviewText.setPosition(0, 62);
+    this.reviewText.setPosition(0, this.partyState ? 56 : 62);
     this.layoutOptions();
     return this;
   }
@@ -153,7 +167,7 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
   }
 
   back(): boolean {
-    if (this.queued) return false;
+    if (this.queued || this.partyState) return false;
     let next = backPlayRosterBuilder(this.builderState);
     // Fighter choice now belongs to Fighters. Editing a reviewed Play draft
     // skips that internal pure-reducer dependency and returns to arena.
@@ -179,6 +193,8 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
           : (this.arenaStatusByMode[this.builderState.mode] ?? null),
       entryEnabled: this.entryEnabled,
       queued: this.queued,
+      partyState: this.partyState,
+      partyError: this.partyError,
     };
   }
 
@@ -191,6 +207,18 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
   setQueued(queued: boolean): void {
     if (this.queued === queued) return;
     this.queued = queued;
+    this.rebuild();
+  }
+
+  setPartyState(state: Readonly<PartyState> | null, localPlayerId: PlayerId | null): void {
+    this.partyState = state;
+    this.localPlayerId = localPlayerId;
+    this.partyError = null;
+    this.rebuild();
+  }
+
+  setPartyError(error: string | null): void {
+    this.partyError = error;
     this.rebuild();
   }
 
@@ -291,6 +319,40 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
           ];
     }
     if (step === 'review') {
+      if (this.partyState) {
+        const isLeader = this.partyState.leaderId === this.localPlayerId;
+        const definitions: ChoiceDefinition[] = [
+          {
+            label: 'COPY JOIN LINK',
+            detail: `ROOM ${this.partyState.code}`,
+            onSelect: () => this.options.onCopyPartyLink(this.partyState?.joinPath ?? ''),
+          },
+          {
+            label: 'LEAVE PARTY',
+            detail: isLeader ? 'CLOSE ROOM - NO TRANSFER YET' : 'LEAVE OPEN SLOT',
+            onSelect: this.options.onLeaveParty,
+          },
+        ];
+        if (isLeader) {
+          definitions.unshift({
+            label: 'UPDATE PARTY',
+            detail: 'SERVER REVALIDATES INTENT',
+            onSelect: () => {
+              const draft = serializePlayRosterDraft(this.builderState, this.availability);
+              if (draft) this.options.onUpdatePartyIntent(draft);
+            },
+          });
+          for (const member of this.partyState.members) {
+            if (member.playerId === this.localPlayerId) continue;
+            definitions.push({
+              label: `KICK ${member.nickname.toUpperCase()}`,
+              detail: fighterLabel(member.fighterId),
+              onSelect: () => this.options.onKickPartyMember(member.playerId),
+            });
+          }
+        }
+        return definitions;
+      }
       return [
         {
           label: this.queued ? 'CANCEL QUEUE' : 'ENTER MATCH',
@@ -308,6 +370,21 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
             if (this.entryEnabled && draft) this.options.onSubmit(draft);
           },
         },
+        {
+          label: 'CREATE PARTY',
+          detail: 'SERVER-OWNED ROOM CODE',
+          disabled: !this.entryEnabled || (this.builderState.composition?.humanCount ?? 0) < 2,
+          onSelect: () => {
+            const draft = serializePlayRosterDraft(this.builderState, this.availability);
+            if (draft) this.options.onCreateParty(draft);
+          },
+        },
+        {
+          label: 'JOIN PARTY',
+          detail: 'ENTER CODE OR SHARE LINK',
+          disabled: !this.entryEnabled,
+          onSelect: this.options.onJoinParty,
+        },
       ];
     }
     return [];
@@ -320,6 +397,7 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
     this.focusNavigator = null;
 
     const step = playRosterBuilderStep(this.builderState);
+    this.reviewText.setPosition(0, this.partyState ? 56 : 62);
     const number = STEP_NUMBER[step];
     this.stageLabel.setText(`PLAY ROSTER  /  STEP ${number} OF 5`);
     this.prompt.setText(this.promptFor(step));
@@ -336,7 +414,15 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
         onPointerIntent: this.options.onPointerIntent,
         onSelect: definition.onSelect,
       });
-      if (step === 'review' && !this.queued) button.setDisabled(!this.entryEnabled);
+      if (
+        definition.disabled ||
+        (step === 'review' &&
+          !this.queued &&
+          !this.partyState &&
+          definition.label === 'ENTER MATCH')
+      ) {
+        button.setDisabled(definition.disabled ?? !this.entryEnabled);
+      }
       this.add(button);
       return button;
     });
@@ -362,7 +448,7 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
     const columns = Math.min(3, this.optionButtons.length);
     const rows = Math.ceil(this.optionButtons.length / columns);
     const gap = 8;
-    const top = 56;
+    const top = this.partyState ? 210 : 56;
     const availableHeight = Math.max(1, this.panelHeight - top);
     const buttonHeight = Math.min(78, (availableHeight - gap * (rows - 1)) / rows);
     const buttonWidth = (this.panelWidth - gap * (columns - 1)) / columns;
@@ -404,6 +490,23 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
   }
 
   private reviewCopy(draft: SerializedPlayRosterDraft): string {
+    if (this.partyState) {
+      const members = this.partyState.members
+        .map(
+          (member) =>
+            `${member.playerId === this.partyState?.leaderId ? 'LEADER' : 'MEMBER'}  /  ${member.nickname.toUpperCase()}  /  ${fighterLabel(member.fighterId)}`,
+        )
+        .join('\n');
+      return [
+        `PARTY ${this.partyState.code}  /  ${this.partyState.format.toUpperCase()}  /  ${this.partyState.members.length} OF ${this.partyState.capacity} HUMAN SLOTS`,
+        members,
+        `${modeLabel(this.partyState.intent.mode)}  /  ${this.partyState.intent.scheduledArena.mapName.toUpperCase()}`,
+        this.partyError
+          ? `REQUEST REJECTED  /  ${this.partyError.toUpperCase()}`
+          : 'SERVER-OWNED PARTY STATE',
+        'READINESS AND PARTY QUEUEING ARRIVE IN BATCH 13',
+      ].join('\n');
+    }
     return [
       `${draft.format.toUpperCase()}  /  ${compositionLabel(draft.composition)}`,
       `${modeLabel(draft.mode)}  /  ${draft.arenaName.toUpperCase()}`,
@@ -415,6 +518,7 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
         : this.entryEnabled
           ? 'ROSTER INTENT READY  -  SERVER VALIDATES EVERY FIELD'
           : 'ROSTER DRAFT VALID  -  MATCH ENTRY REMAINS DISABLED',
+      this.partyError ? `PARTY REQUEST REJECTED  /  ${this.partyError.toUpperCase()}` : '',
       'ESC / BACKSPACE / GAMEPAD B TO EDIT',
     ].join('\n');
   }

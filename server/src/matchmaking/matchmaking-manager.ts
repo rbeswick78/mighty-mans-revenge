@@ -302,6 +302,17 @@ export class MatchmakingManager {
     this.matchIntentArenaAuthority = matchIntentArenaAuthority;
   }
 
+  /** Party creation/joining is mutually exclusive with every queue or match. */
+  isPlayerBusy(playerId: PlayerId): boolean {
+    return (
+      this.playerMatchMap.has(playerId) ||
+      this.queue.isPlayerQueued(playerId) ||
+      this.rumbleQueue.isPlayerQueued(playerId) ||
+      this.crewQueue.isPlayerQueued(playerId) ||
+      this.matchIntentQueue.isPlayerQueued(playerId)
+    );
+  }
+
   handleJoinMatchmaking(playerId: PlayerId, nickname: string): void {
     // If player is already in a match, ignore
     if (

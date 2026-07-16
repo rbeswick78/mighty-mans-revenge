@@ -22,6 +22,8 @@ import type {
   ServerCharacterSelectStateMessage,
   ServerCapabilities,
   SerializedPlayerState,
+  ServerPartyErrorMessage,
+  ServerPartyLeftMessage,
 } from '@shared/types/network.js';
 import type { ArenaWins } from '@shared/types/map.js';
 import { createEmptyCharacterWins } from '@shared/config/game.js';
@@ -30,6 +32,7 @@ import type { CharacterId, WeaponId, MutatorId, TauntId } from '@shared/config/g
 import { NetworkManager, type LocalCorrection } from '../network/network-manager.js';
 import type { NormalizedArenaSchedule } from '../network/arena-schedule.js';
 import type { MatchIntent } from '@shared/matchmaking/match-intent.js';
+import type { PartyState } from '@shared/matchmaking/party.js';
 import { localArenaWinsFromDraft, mergeArenaWinsFromResult } from './record-snapshots.js';
 
 export interface EventWarningPayload {
@@ -77,6 +80,9 @@ type GameServiceEvent =
   | 'connected'
   | 'capabilitiesChanged'
   | 'lobbyConfig'
+  | 'partyState'
+  | 'partyLeft'
+  | 'partyError'
   | 'reconnecting'
   | 'disconnected'
   | 'matchFound'
@@ -245,6 +251,34 @@ export class GameService {
     this.networkManager.submitMatchIntent(nickname, intent);
   }
 
+  createParty(nickname: string, intent: Readonly<MatchIntent>): void {
+    this.networkManager.createParty(nickname, intent);
+  }
+
+  joinParty(nickname: string, joinTarget: string, fighterId: CharacterId): void {
+    this.networkManager.joinParty(nickname, joinTarget, fighterId);
+  }
+
+  leaveParty(): void {
+    this.networkManager.leaveParty();
+  }
+
+  kickPartyMember(memberId: PlayerId): void {
+    this.networkManager.kickPartyMember(memberId);
+  }
+
+  updatePartyIntent(intent: Readonly<MatchIntent>): void {
+    this.networkManager.updatePartyIntent(intent);
+  }
+
+  updatePartyFighter(fighterId: CharacterId): void {
+    this.networkManager.updatePartyFighter(fighterId);
+  }
+
+  getPartyState(): Readonly<PartyState> | null {
+    return this.networkManager.getPartyState();
+  }
+
   startPractice(
     nickname: string,
     difficulty: BotDifficulty,
@@ -330,6 +364,15 @@ export class GameService {
 
     this.networkManager.on('lobbyConfig', (schedule: NormalizedArenaSchedule | null) => {
       this.emit('lobbyConfig', schedule);
+    });
+    this.networkManager.on('partyState', (state: Readonly<PartyState> | null) => {
+      this.emit('partyState', state);
+    });
+    this.networkManager.on('partyLeft', (message: ServerPartyLeftMessage) => {
+      this.emit('partyLeft', message);
+    });
+    this.networkManager.on('partyError', (message: ServerPartyErrorMessage) => {
+      this.emit('partyError', message);
     });
 
     this.networkManager.on('reconnecting', () => {

@@ -251,6 +251,23 @@ messages, Draft, Character Select, Practice, Results, and legacy Lobby intact
 until their owning batches. Parties, readiness, bot fallback offers, and
 Reforged rematches do not belong in this boundary.
 
+**Reforged party core (Batch 12):** additive party messages now assemble
+server-owned ephemeral Duel, Rumble, and Crew rooms around the unchanged
+Batch 11 `MatchIntent` authority. Five-character codes use an unambiguous
+alphabet, share links reduce only to a normalized `party` query value, and
+collision retries plus a one-minute empty-room reservation prevent code reuse
+while a room is still live. The server owns format ceilings, exact intent human
+capacity, membership, fixed creator leadership, versioned mutations, member
+fighter projection, kick/leave/close behavior, and schedule revalidation; every
+client request has a per-connection replay id and stale versions receive a
+fresh authoritative snapshot. Creator departure closes the room in this batch
+rather than transferring leadership. The client replaces party state atomically
+from `server:partyState`, exposes code/link sharing and visible fighters, and
+never queues a party yet. Batch 13 owns readiness, leadership transfer,
+disconnect/reconnect recovery, open slots, cancellation, and party preservation
+through queue/match/Results/rematch. All capability defaults and legacy joins
+remain unchanged.
+
 ### Why This Matters for Agents
 
 Client prediction and server simulation **must use identical physics code** from `/shared`. If you change movement, collision, or physics logic, you must change it in `/shared` and verify both client and server still agree. A mismatch between client prediction and server authority causes visible rubber-banding.

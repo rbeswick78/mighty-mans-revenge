@@ -687,4 +687,97 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
       },
     });
   });
+
+  it('sends party mutations from the latest authoritative version and replaces state atomically', () => {
+    deliver({
+      type: 'server:welcome',
+      playerId: LOCAL_ID,
+      capabilities: { newShell: true, schedules: true },
+    });
+    const state = {
+      partyId: 'party_12345678',
+      code: 'ABCDE',
+      joinPath: '/?party=ABCDE',
+      format: 'duel' as const,
+      formatCapacity: 2,
+      capacity: 2,
+      leaderId: LOCAL_ID,
+      version: 3,
+      members: [
+        {
+          playerId: LOCAL_ID,
+          nickname: 'Alpha',
+          fighterId: 'mighty_man' as const,
+          joinedAt: 1,
+        },
+      ],
+      intent: {
+        intentId: 'party_intent_1',
+        format: 'duel' as const,
+        composition: { humanCount: 2, botCount: 0 },
+        mode: GameModeType.KOTH,
+        fighterId: 'mighty_man' as const,
+        scheduledArena: {
+          mode: GameModeType.KOTH,
+          mapName: 'Wasteland Outpost',
+          rotationEndsAt: 2_000,
+        },
+      },
+    };
+    deliver({ type: 'server:partyState', state });
+    expect(manager.getPartyState()).toEqual(state);
+    manager.kickPartyMember(REMOTE_ID);
+    expect(hoisted.sentMessages.at(-1)).toMatchObject({
+      type: 'client:kickPartyMember',
+      partyId: state.partyId,
+      expectedVersion: 3,
+      memberId: REMOTE_ID,
+    });
+    manager.updatePartyFighter('bruce');
+    expect(hoisted.sentMessages.at(-1)).toMatchObject({
+      type: 'client:updatePartyFighter',
+      expectedVersion: 3,
+      fighterId: 'bruce',
+    });
+    deliver({ type: 'server:partyLeft', partyId: state.partyId, reason: 'closed' });
+    expect(manager.getPartyState()).toBeNull();
+  });
+
+  it('clears party projection on reconnect without inventing Batch 13 recovery', () => {
+    deliver({
+      type: 'server:partyState',
+      state: {
+        partyId: 'party_12345678',
+        code: 'ABCDE',
+        joinPath: '/?party=ABCDE',
+        format: 'duel',
+        formatCapacity: 2,
+        capacity: 2,
+        leaderId: LOCAL_ID,
+        version: 1,
+        members: [
+          {
+            playerId: LOCAL_ID,
+            nickname: 'Alpha',
+            fighterId: 'mighty_man',
+            joinedAt: 1,
+          },
+        ],
+        intent: {
+          intentId: 'party_intent_1',
+          format: 'duel',
+          composition: { humanCount: 2, botCount: 0 },
+          mode: GameModeType.KOTH,
+          fighterId: 'mighty_man',
+          scheduledArena: {
+            mode: GameModeType.KOTH,
+            mapName: 'Wasteland Outpost',
+            rotationEndsAt: 2_000,
+          },
+        },
+      },
+    });
+    hoisted.stateCb?.('reconnecting');
+    expect(manager.getPartyState()).toBeNull();
+  });
 });

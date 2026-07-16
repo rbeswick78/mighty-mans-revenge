@@ -75,6 +75,21 @@ client-authored replacements. The legacy Duel/Rumble/Crew join messages remain
 available for compatibility, and all production capability defaults remain
 false.
 
+Batch 12 adds additive create/join/leave/kick/intent/fighter party messages and
+complete authoritative `server:partyState`, `server:partyLeft`, and
+`server:partyError` projections behind the same enabled `newShell` plus
+`schedules` boundary. Old clients ignore those server messages and continue to
+use legacy or generalized solo entry. New clients against old, partial, or
+capability-off servers retain the established fixed preview or complete Lobby
+fallback and never invent party state. Enabled servers normalize codes and
+links, callsigns, fighters, formats, exact human capacity, scheduled intent,
+party/version ownership, leader actions, and replay ids before mutation. Rooms
+are memory-only; the creator remains leader, creator departure closes the room,
+and empty codes stay reserved for one minute before expiry. Readiness,
+leadership transfer, disconnect recovery, party queueing, Results, and rematch
+retention remain Batch 13+ work. No capability default or production exposure
+changed.
+
 ## Server-first rollout and rollback
 
 For each capability, keep this order:

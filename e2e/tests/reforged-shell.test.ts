@@ -59,6 +59,14 @@ async function clickLogicalPlayOption(page: Page, index: number, touch: boolean)
   else await page.mouse.click(x, y);
 }
 
+async function reachDuelPartyReview(page: Page, touch: boolean): Promise<void> {
+  await clickLogicalPlayOption(page, 0, touch);
+  await clickLogicalPlayOption(page, 1, touch);
+  await clickLogicalPlayOption(page, 0, touch);
+  await clickLogicalPlayOption(page, 0, touch);
+  await expect.poll(async () => (await playRosterSnapshot(page)).step).toBe('review');
+}
+
 async function clickLogicalFighterOption(page: Page, index: number, touch: boolean): Promise<void> {
   const center = await page.evaluate((optionIndex) => {
     const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
@@ -127,62 +135,65 @@ async function clickLogicalSettingsOption(
   else await page.mouse.click(x, y);
 }
 
-async function stageNonChromiumShell(page: Page): Promise<void> {
+async function stageNonChromiumShell(page: Page, playerId = 'staged-shell-player'): Promise<void> {
   await waitForActiveScene(page, 'LobbyScene');
-  await page.evaluate((advertiseSchedules) => {
-    const lobby = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
-      'LobbyScene',
-    ) as unknown as {
-      gameService: {
-        getNetworkManager(): {
-          handleMessage(message: unknown): void;
-          connection: { setState(state: string): void };
+  await page.evaluate(
+    ({ advertiseSchedules, stagedPlayerId }) => {
+      const lobby = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+        'LobbyScene',
+      ) as unknown as {
+        gameService: {
+          getNetworkManager(): {
+            handleMessage(message: unknown): void;
+            connection: { setState(state: string): void };
+          };
         };
       };
-    };
-    const manager = lobby.gameService.getNetworkManager();
-    // Keep the staged boundary alive past the real five-second WebRTC timeout.
-    // Set this before the welcome so the Lobby opens the shell exactly once.
-    manager.connection.setState('connected');
-    manager.handleMessage({
-      type: 'server:welcome',
-      playerId: 'staged-shell-player',
-      capabilities: {
-        newShell: true,
-        schedules: advertiseSchedules,
-        largeWorlds: false,
-        modernArt: false,
-        battleRoyale: false,
-      },
-    });
-    if (advertiseSchedules) {
+      const manager = lobby.gameService.getNetworkManager();
+      // Keep the staged boundary alive past the real five-second WebRTC timeout.
+      // Set this before the welcome so the Lobby opens the shell exactly once.
+      manager.connection.setState('connected');
       manager.handleMessage({
-        type: 'server:lobbyConfig',
-        serverTime: 1_000_000,
-        schedules: [
-          'deathmatch',
-          'koth',
-          'gun_game',
-          'last_stand',
-          'kill_confirmed',
-          'one_in_the_chamber',
-          'core_run',
-          'bounty_hunt',
-        ].map((mode, index) => ({
-          mode,
-          mapName: [
-            'Wasteland Outpost',
-            'Overgrown Suburb',
-            'Scrapyard',
-            'Collapsed Overpass',
-            'Checkpoint Zero',
-            'Rusted Refinery',
-          ][index % 6],
-          rotationEndsAt: 1_240_000,
-        })),
+        type: 'server:welcome',
+        playerId: stagedPlayerId,
+        capabilities: {
+          newShell: true,
+          schedules: advertiseSchedules,
+          largeWorlds: false,
+          modernArt: false,
+          battleRoyale: false,
+        },
       });
-    }
-  }, schedulesAdvertised);
+      if (advertiseSchedules) {
+        manager.handleMessage({
+          type: 'server:lobbyConfig',
+          serverTime: 1_000_000,
+          schedules: [
+            'deathmatch',
+            'koth',
+            'gun_game',
+            'last_stand',
+            'kill_confirmed',
+            'one_in_the_chamber',
+            'core_run',
+            'bounty_hunt',
+          ].map((mode, index) => ({
+            mode,
+            mapName: [
+              'Wasteland Outpost',
+              'Overgrown Suburb',
+              'Scrapyard',
+              'Collapsed Overpass',
+              'Checkpoint Zero',
+              'Rusted Refinery',
+            ][index % 6],
+            rotationEndsAt: 1_240_000,
+          })),
+        });
+      }
+    },
+    { advertiseSchedules: schedulesAdvertised, stagedPlayerId: playerId },
+  );
 }
 
 async function playRosterSnapshot(page: Page): Promise<{
@@ -193,6 +204,12 @@ async function playRosterSnapshot(page: Page): Promise<{
   arenaStatus: string | null;
   entryEnabled: boolean;
   queued: boolean;
+  partyState: {
+    partyId: string;
+    code: string;
+    members: Array<{ nickname: string; fighterId: string }>;
+  } | null;
+  partyError: string | null;
 }> {
   return page.evaluate(() => {
     const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
@@ -206,6 +223,12 @@ async function playRosterSnapshot(page: Page): Promise<{
         arenaStatus: string | null;
         entryEnabled: boolean;
         queued: boolean;
+        partyState: {
+          partyId: string;
+          code: string;
+          members: Array<{ nickname: string; fighterId: string }>;
+        } | null;
+        partyError: string | null;
       };
     };
     return scene.getPlayRosterSnapshot();
@@ -600,7 +623,7 @@ test('Play roster builder reaches only a valid review across pointer, keyboard, 
     expect(review.serialized?.arenaName).toBe('Overgrown Suburb');
     expect(review.arenaStatus).toBeNull();
   }
-  expect(review.optionLabels).toEqual(['ENTER MATCH']);
+  expect(review.optionLabels).toEqual(['ENTER MATCH', 'CREATE PARTY', 'JOIN PARTY']);
   expect(review.entryEnabled).toBe(schedulesAdvertised);
   expect(review.queued).toBe(false);
 
@@ -705,7 +728,11 @@ test('Play submits one server-scheduled general intent and recovery clears queue
   await clickLogicalPlayOption(page, 1, touch);
   await clickLogicalPlayOption(page, 0, touch);
   await expect.poll(async () => (await playRosterSnapshot(page)).step).toBe('review');
-  expect((await playRosterSnapshot(page)).optionLabels).toEqual(['ENTER MATCH']);
+  expect((await playRosterSnapshot(page)).optionLabels).toEqual([
+    'ENTER MATCH',
+    'CREATE PARTY',
+    'JOIN PARTY',
+  ]);
   await clickLogicalPlayOption(page, 0, touch);
 
   await expect
@@ -795,6 +822,145 @@ test('Play submits one server-scheduled general intent and recovery clears queue
       }),
     )
     .toEqual([960, 720]);
+});
+
+test('Party core projects one authoritative room across two clients and leader kick', async ({
+  page,
+  browser,
+}, testInfo) => {
+  test.skip(
+    !shellAdvertised || !schedulesAdvertised,
+    'Run with both Reforged shell and schedule capabilities for party entry.',
+  );
+  const touch = testInfo.project.name === 'mobile-landscape';
+  const liveChromium = testInfo.project.name === 'desktop-chromium';
+  await page.addInitScript(() => {
+    localStorage.setItem('mmr_nickname', 'Leader12');
+    localStorage.setItem('mmr_fighter_selection', 'mighty_man');
+  });
+  const memberContext = await browser.newContext({
+    viewport: touch ? { width: 844, height: 390 } : { width: 1280, height: 720 },
+    hasTouch: touch,
+  });
+  const memberPage = await memberContext.newPage();
+  await memberPage.addInitScript(() => {
+    localStorage.setItem('mmr_nickname', 'Member12');
+    localStorage.setItem('mmr_fighter_selection', 'bruce');
+  });
+  try {
+    await Promise.all([page.goto('/'), memberPage.goto('/')]);
+    if (!liveChromium) {
+      await Promise.all([
+        stageNonChromiumShell(page, 'staged-party-leader'),
+        stageNonChromiumShell(memberPage, 'staged-party-member'),
+      ]);
+    }
+    await Promise.all([
+      waitForActiveScene(page, 'ReforgedShellScene'),
+      waitForActiveScene(memberPage, 'ReforgedShellScene'),
+    ]);
+    await reachDuelPartyReview(page, touch);
+    await reachDuelPartyReview(memberPage, touch);
+
+    await clickLogicalPlayOption(page, 1, touch);
+    let leaderState = (await playRosterSnapshot(page)).partyState;
+    if (liveChromium) {
+      await expect
+        .poll(async () => (await playRosterSnapshot(page)).partyState?.code ?? null)
+        .not.toBeNull();
+      leaderState = (await playRosterSnapshot(page)).partyState;
+      if (!leaderState) throw new Error('leader party missing');
+      await memberPage.evaluate((code) => {
+        window.prompt = () => code;
+      }, leaderState.code);
+      await clickLogicalPlayOption(memberPage, 2, touch);
+      await expect
+        .poll(async () => (await playRosterSnapshot(page)).partyState?.members.length ?? 0)
+        .toBe(2);
+      await expect
+        .poll(async () => (await playRosterSnapshot(memberPage)).partyState?.members.length ?? 0)
+        .toBe(2);
+    } else {
+      await memberPage.evaluate(() => {
+        window.prompt = () => 'ABCDE';
+      });
+      await clickLogicalPlayOption(memberPage, 2, touch);
+      const reviewed = (await playRosterSnapshot(page)).serialized;
+      if (!reviewed) throw new Error('missing reviewed roster');
+      const state = {
+        partyId: 'party_staged_12345678',
+        code: 'ABCDE',
+        joinPath: '/?party=ABCDE',
+        format: 'duel',
+        formatCapacity: 2,
+        capacity: 2,
+        leaderId: 'staged-party-leader',
+        version: 2,
+        members: [
+          {
+            playerId: 'staged-party-leader',
+            nickname: 'Leader12',
+            fighterId: 'mighty_man',
+            joinedAt: 1,
+          },
+          {
+            playerId: 'staged-party-member',
+            nickname: 'Member12',
+            fighterId: 'bruce',
+            joinedAt: 2,
+          },
+        ],
+        intent: {
+          intentId: 'intent_staged_party_12',
+          format: 'duel',
+          composition: { humanCount: 2, botCount: 0 },
+          mode: reviewed.mode,
+          fighterId: 'mighty_man',
+          scheduledArena: {
+            mode: reviewed.mode,
+            mapName: reviewed.arenaName,
+            rotationEndsAt: 2_000_000,
+          },
+        },
+      };
+      await Promise.all(
+        [page, memberPage].map((target) =>
+          target.evaluate((partyState) => {
+            const shell = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+              'ReforgedShellScene',
+            ) as unknown as {
+              gameService: { getNetworkManager(): { handleMessage(message: unknown): void } };
+            };
+            shell.gameService
+              .getNetworkManager()
+              .handleMessage({ type: 'server:partyState', state: partyState });
+          }, state),
+        ),
+      );
+    }
+
+    const leader = await playRosterSnapshot(page);
+    const member = await playRosterSnapshot(memberPage);
+    expect(leader.partyState?.members.map((entry) => [entry.nickname, entry.fighterId])).toEqual([
+      ['Leader12', 'mighty_man'],
+      ['Member12', 'bruce'],
+    ]);
+    expect(leader.optionLabels).toContain('KICK MEMBER12');
+    expect(member.optionLabels).not.toContain('KICK LEADER12');
+
+    if (liveChromium) {
+      await page.screenshot({ path: testInfo.outputPath('party-two-client-desktop.png') });
+      await page.setViewportSize({ width: 844, height: 390 });
+      await waitForRenderedFrames(page);
+      await page.screenshot({ path: testInfo.outputPath('party-two-client-mobile-chromium.png') });
+      await clickLogicalPlayOption(page, 3, false);
+      await expect.poll(async () => (await playRosterSnapshot(memberPage)).partyState).toBeNull();
+    } else {
+      await clickLogicalPlayOption(page, 3, touch);
+    }
+  } finally {
+    await memberContext.close();
+  }
 });
 
 test('Fighters owns roster detail, mastery, persistent selection, and Play handoff', async ({

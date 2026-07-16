@@ -38,6 +38,7 @@ import {
 import { playerMovementModifiers } from '@shared/utils/event-modifiers.js';
 import { listMapNames } from '@shared/maps/registry.js';
 import type { MatchIntent } from '@shared/matchmaking/match-intent.js';
+import { isPartyState, type PartyState } from '@shared/matchmaking/party.js';
 import { NetworkConnection } from './connection.js';
 import { normalizeArenaSchedule, type NormalizedArenaSchedule } from './arena-schedule.js';
 import { ClientPrediction } from './prediction.js';
@@ -52,6 +53,9 @@ type EventName =
   | 'reconnecting'
   | 'welcome'
   | 'lobbyConfig'
+  | 'partyState'
+  | 'partyLeft'
+  | 'partyError'
   | 'matchFound'
   | 'draftState'
   | 'matchCountdown'
@@ -103,6 +107,7 @@ export class NetworkManager {
   private localPlayerId: PlayerId | null = null;
   private serverCapabilities: Readonly<ServerCapabilities> = DISABLED_SERVER_CAPABILITIES;
   private arenaSchedule: NormalizedArenaSchedule | null = null;
+  private partyState: Readonly<PartyState> | null = null;
   private localPlayerState: PlayerState | null = null;
   private collisionGrid: CollisionGrid | null = null;
   private lastCountdownEmitted = -1;
@@ -189,18 +194,21 @@ export class NetworkManager {
       if (state === 'connecting') {
         this.serverCapabilities = DISABLED_SERVER_CAPABILITIES;
         this.arenaSchedule = null;
+        this.partyState = null;
         this.emit('connecting');
       } else if (state === 'connected') this.emit('connected');
       else if (state === 'disconnected') {
         this.localPlayerId = null;
         this.serverCapabilities = DISABLED_SERVER_CAPABILITIES;
         this.arenaSchedule = null;
+        this.partyState = null;
         this.resetMatchState();
         this.emit('disconnected');
       } else if (state === 'reconnecting') {
         this.localPlayerId = null;
         this.serverCapabilities = DISABLED_SERVER_CAPABILITIES;
         this.arenaSchedule = null;
+        this.partyState = null;
         this.resetMatchState();
         this.emit('reconnecting');
       }
@@ -228,6 +236,7 @@ export class NetworkManager {
     this.localPlayerId = null;
     this.serverCapabilities = DISABLED_SERVER_CAPABILITIES;
     this.arenaSchedule = null;
+    this.partyState = null;
     this.resetMatchState();
   }
 
@@ -347,6 +356,78 @@ export class NetworkManager {
   /** Submit the additive server-validated standard-match contract. */
   submitMatchIntent(nickname: string, intent: Readonly<MatchIntent>): void {
     this.connection.send({ type: 'client:submitMatchIntent', nickname, intent });
+  }
+
+  createParty(nickname: string, intent: Readonly<MatchIntent>): void {
+    this.connection.send({
+      type: 'client:createParty',
+      requestId: crypto.randomUUID(),
+      nickname,
+      format: intent.format,
+      fighterId: intent.fighterId,
+      intent,
+    });
+  }
+
+  joinParty(nickname: string, joinTarget: string, fighterId: CharacterId): void {
+    this.connection.send({
+      type: 'client:joinParty',
+      requestId: crypto.randomUUID(),
+      nickname,
+      joinTarget,
+      fighterId,
+    });
+  }
+
+  leaveParty(): void {
+    const state = this.partyState;
+    if (!state) return;
+    this.connection.send({
+      type: 'client:leaveParty',
+      requestId: crypto.randomUUID(),
+      partyId: state.partyId,
+      expectedVersion: state.version,
+    });
+  }
+
+  kickPartyMember(memberId: PlayerId): void {
+    const state = this.partyState;
+    if (!state) return;
+    this.connection.send({
+      type: 'client:kickPartyMember',
+      requestId: crypto.randomUUID(),
+      partyId: state.partyId,
+      expectedVersion: state.version,
+      memberId,
+    });
+  }
+
+  updatePartyIntent(intent: Readonly<MatchIntent>): void {
+    const state = this.partyState;
+    if (!state) return;
+    this.connection.send({
+      type: 'client:updatePartyIntent',
+      requestId: crypto.randomUUID(),
+      partyId: state.partyId,
+      expectedVersion: state.version,
+      intent,
+    });
+  }
+
+  updatePartyFighter(fighterId: CharacterId): void {
+    const state = this.partyState;
+    if (!state) return;
+    this.connection.send({
+      type: 'client:updatePartyFighter',
+      requestId: crypto.randomUUID(),
+      partyId: state.partyId,
+      expectedVersion: state.version,
+      fighterId,
+    });
+  }
+
+  getPartyState(): Readonly<PartyState> | null {
+    return this.partyState;
   }
 
   getContractState(): MatchContractHudState | null {
@@ -552,6 +633,20 @@ export class NetworkManager {
           ? normalizeArenaSchedule(msg, listMapNames())
           : null;
         this.emit('lobbyConfig', this.arenaSchedule);
+        break;
+
+      case 'server:partyState':
+        this.partyState = isPartyState(msg.state) ? msg.state : null;
+        this.emit('partyState', this.partyState);
+        break;
+
+      case 'server:partyLeft':
+        if (this.partyState?.partyId === msg.partyId) this.partyState = null;
+        this.emit('partyLeft', msg);
+        break;
+
+      case 'server:partyError':
+        this.emit('partyError', msg);
         break;
 
       case 'server:gameState':
