@@ -5,10 +5,9 @@ Read this file and `CLAUDE.md` completely at the start of every batch. The
 completed `docs/REPLAYABILITY_ROADMAP.md` remains the historical record for the
 systems this program preserves and reorganizes.
 
-- **Status:** Batch 17 complete on 2026-07-16; navigation milestone awaiting
-  user review.
-- **Next batch:** Batch 18 — Gameplay viewport cutover, only after explicit
-  milestone-review approval.
+- **Status:** Batch 18 complete on 2026-07-16; world/camera foundation active
+  behind default-false capabilities.
+- **Next batch:** Batch 19 — Coordinate separation.
 - **Public releases:** Reforged Arena, then Battle Royale.
 - **Working model:** one numbered batch per session, direct commits and pushes
   to `main`, milestone-gated production deployments.
@@ -172,7 +171,7 @@ Production deployment happens only at a gate or for an urgent live fix.
 |  15 | Results and rematches                  | Navigation    | **DONE — 2026-07-15** |
 |  16 | Legacy flow retirement                 | Navigation    | **DONE — 2026-07-15** |
 |  17 | Journey verification                   | Navigation    | **DONE — 2026-07-16** |
-|  18 | Gameplay viewport cutover              | World/camera  | Review gate           |
+|  18 | Gameplay viewport cutover              | World/camera  | **DONE — 2026-07-16** |
 |  19 | Coordinate separation                  | World/camera  | Pending               |
 |  20 | Camera controller                      | World/camera  | Pending               |
 |  21 | Dynamic world rendering                | World/camera  | Pending               |
@@ -681,6 +680,29 @@ Acceptance:
 
 Replace the fixed 4:3 board plus bottom strip with a fixed logical 16:9 world
 view and safe-area overlay contract behind the large-world capability.
+
+Acceptance:
+
+- [x] Only literal normalized `largeWorlds: true` selects the fixed 1280x720
+      logical 16:9 gameplay surface; false, absent, malformed, reconnecting,
+      disconnected, and old-server paths retain the exact 960x720 behavior.
+- [x] Browser safe-area intrusions convert into frozen logical overlay bounds
+      after FIT letterboxing, while desktop and mobile landscape expose the
+      same 1280x720 logical world view without competitive widening.
+- [x] Menu/gameplay, Character Select/gameplay, gameplay/Results, rematch, and
+      connection-recovery transitions restore each scene's owning logical size.
+- [x] Every current arena remains 960x576 at world origin with camera scroll
+      `(0, 0)`, zoom `1`, fixed render targets, shared/server physics,
+      authoritative 20Hz simulation, gameplay rules, and transitional HUD
+      geometry unchanged.
+- [x] Deterministic viewport/camera coverage, the complete unit inventory,
+      typecheck, lint, affected/full builds, capability-off Chromium, enabled
+      desktop Chromium/mobile-landscape interaction, and inspected desktop plus
+      mobile-sized Chromium captures pass with all capability defaults false.
+- [x] No coordinate centralization, camera follow/composition, scrolling,
+      dynamic rendering, responsive combat-HUD, minimap, large arena, modern
+      art, Battle Royale, capability exposure, production change, or deployment
+      began.
 
 #### Batch 19 — Coordinate separation
 
@@ -1858,6 +1880,54 @@ input assertions plus Chromium visual evidence are still required. The Batch 2
 254.279ms host scheduling drift reset and 15.932 effective-Hz local sample also
 remain unchanged; simulation processing stayed far below the 50ms budget.
 
+### Batch 18 — 2026-07-16 — Gameplay viewport cutover
+
+**Shipped:** Added a pure, fail-closed gameplay viewport contract and connected
+it only to `GameScene`. Literal normalized `largeWorlds: true` now selects a
+fixed 1280x720 logical 16:9 FIT surface with viewport-to-logical browser safe-
+area conversion. False, absent, malformed, old-server, reconnecting, and
+disconnected states retain or restore the exact 960x720 surface. GameScene
+shutdown and Results creation restore legacy sizing, while a rematch reapplies
+the current capability contract. The signal-loss beat now covers whichever
+gameplay surface is active. Current 960x576 maps, origin, camera scroll/zoom,
+fixed render targets, HUD/touch geometry, input transforms, shared/server
+physics, 20Hz authority, game rules, wire state, and every menu/challenge route
+remain unchanged.
+
+**Verification:** Selected the roadmap camera/world/visual tier because this is
+an isolated client viewport and scene-size boundary. Focused viewport plus
+unchanged-camera Vitest passed 8 tests across two files. An early focused-command
+separator expanded to the complete inventory, which also passed 128 files and
+1,520 tests; this stronger result found no shared/server coupling. `corepack
+pnpm typecheck`, `corepack pnpm lint`, the affected client build, and full
+production build passed with only the established Vite chunk-size advisory.
+Default-false desktop Chromium passed the exact 960x720 fallback (one pass, two
+intentional inverse-gate skips). With only `largeWorlds` enabled, final desktop
+Chromium and mobile-landscape object/interaction/restoration evidence passed
+four tests with two inverse-gate skips. Inspected 1280x720 and resized 844x390
+Chromium captures showed the same complete fixed arena and transitional HUD
+inside the 16:9 surface; staged mobile WebKit retained its non-pixel role under
+RFG-003. The full Playwright inventory was not rerun because no shared, server,
+wire, capability-default, broad recovery, or release-gate foundation changed,
+and focused evidence showed no wider regression.
+
+**Deployment:** Skipped. Batch 18 is unfinished world/camera milestone work
+behind the default-false `largeWorlds` capability. No production environment,
+flag, server, or client deployment changed, and this task did not authorize one.
+
+**Deviations:** No product-scope deviation. The first enabled mobile fixture
+also advertised `newShell`, racing its synthetic gameplay start against shell
+entry under RFG-003. The fixture was narrowed to the independently owned
+`largeWorlds` capability and final desktop/mobile runs passed. The retained map
+and HUD occupy the established 960x720 region of the wider surface by design;
+centering, scrolling, dynamic targets, and HUD migration remain Batches 19-22.
+
+**Known issues:** No bug-ledger entry was added. RFG-001 CameraKick and RFG-002
+ZoomPulse remain assigned to Batches 20/24 and still reproduce in their passing
+baseline tests. RFG-003 remains open for headless Firefox/WebKit live WebRTC and
+black staged canvas captures. The Batch 2 254.279ms host scheduling drift reset
+and 15.932 effective-Hz sample remain unchanged; no simulation code changed.
+
 ## Next-session prompt
 
 ```text
@@ -1865,53 +1935,52 @@ Continue the Reforged build for Mighty Man's Revenge.
 
 Read docs/REIMAGINING_ROADMAP.md and CLAUDE.md completely first. Read
 docs/REFORGED_BASELINE.md and docs/REFORGED_CAPABILITIES.md before
-implementation. Batch 17 — Journey verification is complete and is the
-navigation-milestone review gate. Do not begin Batch 18 — Gameplay viewport
-cutover unless the user has explicitly approved crossing that gate. After that
-approval, implement Batch 18 exactly as specified and do not begin Batch 19 —
-Coordinate separation.
+implementation. Batch 18 — Gameplay viewport cutover is complete. Implement
+Batch 19 — Coordinate separation exactly as specified and do not begin Batch
+20 — Camera controller.
 
-Replace the fixed 4:3 gameplay board plus bottom strip with the roadmap's fixed
-logical 16:9 world view and responsive safe-area overlay contract only behind
-the default-false `largeWorlds` capability. Preserve equal logical world
-visibility across devices, shared/server physics, the authoritative 20Hz
-simulation, all current map dimensions and gameplay rules, every menu and
-challenge flow, the five-tab shell, scheduled arenas, parties, direct standard
-launches, Results/rematches, compatibility scenes/messages, and production
-configuration. Capability-off, old-server, and old-client paths must retain the
-exact established 960×720 gameplay/Lobby behavior through Batch 54.
+Centralize explicit screen-space and world-space transforms for gameplay aim,
+touch, cursor/crosshair, particles, objectives, markers, and overlays before
+any scrolling begins. Preserve the Batch 18 capability-owned 1280×720 logical
+16:9 gameplay viewport and safe-area contract, equal desktop/mobile logical
+visibility, current 960×576 maps at `(0, 0)`, camera scroll `(0, 0)` and zoom
+`1`, shared/server physics, the authoritative 20Hz simulation, every gameplay
+rule and menu/challenge journey, Results/rematches, compatibility scenes and
+messages, and production configuration. Capability-off, old-server, and old-
+client paths must retain the exact established 960×720 gameplay/Lobby behavior
+through Batch 54.
 
-Do not begin Batch 19 coordinate centralization, camera follow or transient
-composition, scrolling worlds, dynamic render targets, responsive combat-HUD
-redesign, minimaps, large arenas, modern art, or Battle Royale. Do not repair
-RFG-001/RFG-002 early except where a narrow capability-off preservation fix is
-strictly required by Batch 18 evidence. Never move authority or physics to the
-client, widen a device's competitive view, enable any capability by default, or
-deploy without explicit authorization.
+Do not add camera follow, clamping, transient camera composition, scrolling
+worlds, dynamic render targets, responsive combat-HUD redesign, minimaps, large
+arenas, modern art, or Battle Royale. Do not repair RFG-001/RFG-002 early;
+Batch 20 owns those camera layers. Never move authority or physics to the
+client, derive world state from screen coordinates, widen one device's view,
+enable any capability by default, or deploy without explicit authorization.
 
-Batch 17 is complete and pushed on main as `fix(play): close Reforged journey
-gate`. The full 127-file/1,514-test suite, typecheck, lint, production build,
-default-false three-project inventory (136 passed/50 documented skips), enabled
-Reforged/party matrix (34 passed/5 intentional skips), and focused post-fix
-party matrix (6 passed) are green. The only acceptance gap found was party
-status copy colliding with action rows; measured dynamic layout and E2E
-non-overlap assertions now close it. All five capabilities remain default false,
-wire compatibility is intact, production has not been deployed, and the user
-must review the navigation milestone before Batch 18 begins.
+Batch 18 is complete and pushed on main as `feat(play): add gated 16:9 gameplay
+viewport`. It adds a pure fail-closed viewport/safe-area contract, uses the
+1280×720 GameScene only for literal `largeWorlds: true`, restores legacy size
+for Results/recovery, and leaves all map, camera, render-target, HUD, input,
+physics, wire, and server assumptions unchanged. Focused viewport/camera tests
+(8), the full 128-file/1,520-test suite, typecheck, lint, affected/full builds,
+default-false Chromium fallback, enabled desktop Chromium/mobile-landscape
+interaction/restoration, and inspected desktop plus mobile-sized Chromium
+captures are green. All five capabilities remain default false, wire
+compatibility is intact, production has not been deployed, and HEAD matched
+origin/main with a clean worktree at handoff.
 
-Choose and document the roadmap's camera/world/visual verification tier for
-Batch 18. Add deterministic coverage for the gated 16:9 viewport and safe-area
-contract, capability-off/old-server fallbacks, equal desktop/mobile logical
-visibility, scene-size restoration across menu/gameplay/Results/recovery, and
-unchanged fixed-world rendering assumptions. Run focused tests, `corepack pnpm
-typecheck`, `corepack pnpm lint`, the affected and full production build, and
-the desktop Chromium/mobile-landscape interaction and visual evidence required
-by the risk matrix. Escalate to the full unit or three-project browser suites if
-shared, server, wire, recovery, or broader scene foundations change. Update the
-roadmap acceptance evidence, baseline/capability/architecture docs when their
-contracts change, the dynamic bug ledger, and the Session Log. Run the complete
-end-of-batch ritual, commit and push directly to main, and skip deployment unless
-explicitly authorized.
+Choose and document the risk tier for Batch 19. Add deterministic coverage for
+every new screen/world conversion, round trips, camera-origin identity,
+desktop/mobile equivalence, pointer/touch aim, fixed-map objectives/markers,
+screen-pinned overlays, capability-off fallback, and scene restoration. Run
+focused tests, `corepack pnpm typecheck`, `corepack pnpm lint`, the affected and
+full production build, and targeted desktop Chromium/mobile-landscape object,
+interaction, and visual evidence. Escalate to the full unit or three-project
+browser suites if shared, server, wire, recovery, input foundations, or broader
+scene behavior changes. Update roadmap acceptance evidence, architecture/
+baseline/capability docs when contracts change, the dynamic bug ledger, and the
+Session Log. Run the complete end-of-batch ritual, commit and push directly to
+main, and skip deployment unless explicitly authorized.
 
 Carry-over warnings: RFG-001 CameraKick and RFG-002 ZoomPulse overwrite future
 base camera state and remain assigned to Batches 20/24. RFG-003 means headless
@@ -1923,6 +1992,8 @@ remained far below the 50ms budget. Batch 4 broadened RFG-003 evidence: the
 staged mobile WebKit Reforged-shell PNG is also black, so use mobile-sized
 Chromium for visual evidence while retaining staged WebKit object/input
 assertions. Use Corepack pnpm 10.33.0 if the local pnpm shim selects a mismatched
-version. The Batch 17 gate passed without enabling or deploying any capability;
-Batch 18 may begin only after explicit user milestone approval.
+version. The Batch 18 transition intentionally leaves the fixed arena and
+transitional HUD in their established 960×720 region of the wider surface;
+Batch 19 must make coordinate domains explicit without centering or scrolling
+them, and Batch 22 still owns HUD migration.
 ```

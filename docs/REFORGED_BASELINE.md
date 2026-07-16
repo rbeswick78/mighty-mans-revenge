@@ -103,6 +103,23 @@ viewport bounds. HUD/touch elements must stay screen-space through a safe-area
 API. Aiming must preserve the existing mouse transform and give every future
 pointer/marker/effect path an explicit domain.
 
+### Batch 18 viewport cutover evidence
+
+Batch 18 preserves the table above as the fixed-world inventory while adding a
+capability-owned outer surface. Literal normalized `largeWorlds: true` selects
+a 1280x720 logical 16:9 `GameScene` with a 32px logical safe-area overlay
+boundary; false, absent, partial, malformed, reconnecting, disconnected, and
+old-server paths remain exactly 960x720. Both 1280x720 desktop and 844x390
+mobile-landscape FIT evidence report the same 1280x720 camera world view.
+
+This cutover deliberately leaves every registered map at 960x576 and origin
+`(0, 0)`, camera scroll `(0, 0)`, zoom `1`, full-map render targets, and the
+transitional HUD coordinates unchanged. The resulting unused large-world
+surface is expected until Batches 19-22 add explicit coordinate domains,
+camera ownership, dynamic rendering, and responsive HUD placement. Mobile-
+sized Chromium is the trusted visual source; staged WebKit remains object/input
+evidence under RFG-003.
+
 ## Adjacent bug reproductions
 
 `client/src/rendering/camera-baseline.test.ts` intentionally asserts current

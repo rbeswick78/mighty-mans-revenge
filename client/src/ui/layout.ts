@@ -1,7 +1,7 @@
-// Shared UI layout constants. The canvas is split vertically into the
-// gameboard (top) and a dedicated HUD strip (bottom). Both hud.ts and
-// touch-input.ts need to know the boundary so UI never overlays the
-// playfield and touches in the HUD strip don't spawn joysticks.
+// Established fixed-world and legacy overlay geometry. Capability-off play
+// still splits the 960x720 canvas into the gameboard and dedicated HUD strip.
+// Behind largeWorlds, the same 960x576 map and transitional HUD coordinates
+// sit inside the 1280x720 gameplay surface until Batch 22 owns HUD migration.
 
 export const MAP_WIDTH_PX = 960;
 export const MAP_HEIGHT_PX = 576; // 20 cols x 12 rows @ 48px
@@ -17,7 +17,4 @@ export const MATCH_MENU_LAUNCHER_WIDTH = 128;
 export const MATCH_MENU_LAUNCHER_HEIGHT = 42;
 export const MATCH_MENU_LAUNCHER_HIT_PADDING_Y = 8;
 export const TOUCH_ACTION_TOP_PX =
-  MATCH_MENU_LAUNCHER_Y +
-  MATCH_MENU_LAUNCHER_HEIGHT +
-  MATCH_MENU_LAUNCHER_HIT_PADDING_Y +
-  12;
+  MATCH_MENU_LAUNCHER_Y + MATCH_MENU_LAUNCHER_HEIGHT + MATCH_MENU_LAUNCHER_HIT_PADDING_Y + 12;

@@ -77,6 +77,7 @@ import {
   partyResultsPresentation,
   type PartyResultsPresentation,
 } from '../ui/reforged/party-results.js';
+import { useLegacyLogicalSize } from '../ui/reforged/responsive-menu-layout.js';
 
 interface ResultsSceneData {
   result?: MatchResult;
@@ -201,6 +202,7 @@ export class ResultsScene extends Phaser.Scene {
   }
 
   create(): void {
+    useLegacyLogicalSize(this.scale);
     this.cameras.main.fadeIn(300, 0, 0, 0);
     this.gameService = GameService.getInstance();
     this.menuGamepad = new MenuGamepadInput();

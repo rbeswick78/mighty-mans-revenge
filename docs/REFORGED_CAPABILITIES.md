@@ -153,6 +153,20 @@ inventing match state. Legacy scene code and transitional messages remain for
 fallback compatibility through Batch 54. All capability defaults remain false
 and no production capability changed.
 
+Batch 18 gives `largeWorlds` its first client-owned presentation boundary
+without enabling scrolling or large arenas. A literal normalized
+`largeWorlds: true` welcome makes `GameScene` use a fixed 1280×720 logical 16:9
+FIT surface and exposes a browser-safe-area overlay contract in those same
+logical coordinates. Desktop and mobile receive exactly the same logical world
+view. Missing, partial, malformed, false, reconnecting, disconnected, and old-
+server advertisements retain or restore the established 960×720 gameplay
+surface. Results and every compatibility/menu setup scene retain their owning
+legacy or Reforged-menu size. Current 960×576 maps, coordinates, camera state,
+render targets, HUD geometry, physics, simulation, and wire contracts do not
+change in this batch. The capability remains strict, server-owned, and default
+false; Batches 19-24 own transforms, camera, dynamic rendering, HUD, minimap,
+and the regression gate before any large arena can be exposed.
+
 ## Server-first rollout and rollback
 
 For each capability, keep this order:

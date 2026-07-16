@@ -85,6 +85,14 @@ import type { LocalCorrection, NetworkManager } from '../network/network-manager
 import { getMap, DEFAULT_MAP_NAME } from '@shared/maps/registry.js';
 import { MENU_FONTS } from '../ui/menu/fonts.js';
 import { MatchMenu } from '../ui/match-menu.js';
+import {
+  currentGameplayOverlaySafeArea,
+  gameplayViewportForCapabilities,
+  type GameplayOverlaySafeArea,
+  type GameplayViewportContract,
+  useGameplayLogicalSize,
+} from '../ui/gameplay-viewport.js';
+import { useLegacyLogicalSize } from '../ui/reforged/responsive-menu-layout.js';
 
 const LOCAL_CORRECTION_SMOOTH_MS = 120;
 const LOCAL_CORRECTION_EPSILON = 0.01;
@@ -180,6 +188,8 @@ export class GameScene extends Phaser.Scene {
   private nextTauntIndex = 0;
   private localTauntCooldownUntil = 0;
   private gameService!: GameService;
+  private gameplayViewport: GameplayViewportContract = gameplayViewportForCapabilities(undefined);
+  private gameplaySafeArea: GameplayOverlaySafeArea | null = null;
   private nickname = '';
   private matchData: MatchData | null = null;
   private currentTick = 0;
@@ -287,13 +297,21 @@ export class GameScene extends Phaser.Scene {
     this.controllerAnnounced = false;
     this.nextTauntIndex = 0;
     this.localTauntCooldownUntil = 0;
+    this.gameplayViewport = gameplayViewportForCapabilities(undefined);
+    this.gameplaySafeArea = null;
   }
 
   create(): void {
+    this.gameService = GameService.getInstance();
+    this.gameplayViewport = useGameplayLogicalSize(
+      this.scale,
+      this.gameService.getServerCapabilities(),
+    );
+    this.scale.on(Phaser.Scale.Events.RESIZE, this.layoutGameplayViewport, this);
+    this.layoutGameplayViewport();
     this.cameras.main.fadeIn(300, 0, 0, 0);
     this.installCrtPipeline();
     this.installBloomFX();
-    this.gameService = GameService.getInstance();
 
     // Lobby music plays into the lobby; the countdown phase is silent and
     // the gameplay track starts on match start (see onMatchStart below).
@@ -1175,6 +1193,21 @@ export class GameScene extends Phaser.Scene {
 
   shutdown(): void {
     this.cleanup();
+    useLegacyLogicalSize(this.scale);
+  }
+
+  getGameplayViewportContract(): Readonly<{
+    viewport: GameplayViewportContract;
+    safeArea: GameplayOverlaySafeArea | null;
+  }> {
+    return Object.freeze({ viewport: this.gameplayViewport, safeArea: this.gameplaySafeArea });
+  }
+
+  private layoutGameplayViewport(): void {
+    this.gameplaySafeArea =
+      this.gameplayViewport.mode === 'large-world'
+        ? currentGameplayOverlaySafeArea(this.game.canvas)
+        : null;
   }
 
   private updateMatchMenuInput(): void {
@@ -1884,9 +1917,13 @@ export class GameScene extends Phaser.Scene {
   private returnToLobbyAfterConnectionLoss(): void {
     if (this.connectionLostTransitionStarted) return;
     this.connectionLostTransitionStarted = true;
-    this.add.rectangle(480, 360, 960, 720, Wasteland.CANVAS_BG, 0.82).setDepth(20_000);
+    const centerX = this.scale.width / 2;
+    const centerY = this.scale.height / 2;
     this.add
-      .text(480, 340, 'SIGNAL LOST', {
+      .rectangle(centerX, centerY, this.scale.width, this.scale.height, Wasteland.CANVAS_BG, 0.82)
+      .setDepth(20_000);
+    this.add
+      .text(centerX, centerY - 20, 'SIGNAL LOST', {
         fontFamily: MENU_FONTS.HEADER,
         fontSize: '24px',
         color: cssHex(Wasteland.HIT_FLASH),
@@ -1894,7 +1931,7 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(20_001);
     this.add
-      .text(480, 382, 'RETURNING TO THE OUTPOST...', {
+      .text(centerX, centerY + 22, 'RETURNING TO THE OUTPOST...', {
         fontFamily: MENU_FONTS.BODY,
         fontSize: '18px',
         color: cssHex(Wasteland.COVER_FILL),
@@ -2029,6 +2066,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private cleanup(): void {
+    this.scale.off(Phaser.Scale.Events.RESIZE, this.layoutGameplayViewport, this);
     this.cleanupEvents();
     if (this.onMatchMenuEscape) {
       this.input.keyboard?.off('keydown-ESC', this.onMatchMenuEscape);

@@ -334,6 +334,19 @@ client inference. Practice and all challenge setup, capability-off/old-server
 Draft and Character Select, legacy messages/scenes, Results, FORCE diagnostics,
 and wire compatibility remain intact. Capability defaults remain false.
 
+**Reforged gameplay viewport (Batch 18):** `GameScene` selects a fixed
+1280×720 logical 16:9 FIT surface only when the normalized server welcome
+advertises literal `largeWorlds: true`. The gameplay viewport contract converts
+browser safe-area intrusions into logical overlay bounds without changing the
+logical view across desktop and mobile. Capability-off, old-server, malformed,
+reconnecting, and disconnected paths retain or restore the exact 960×720
+surface. Results, Lobby, Draft, Character Select, and compatibility scenes
+remain legacy-sized; the Reforged menu retains its independent 1280×720
+contract. Current arenas, world coordinates, camera scroll/zoom, fixed
+960×576 render targets, and transitional HUD geometry are intentionally
+unchanged until Batches 19-22. Do not center or scroll the world, migrate the
+HUD, or repair transient camera composition inside this boundary.
+
 ### Why This Matters for Agents
 
 Client prediction and server simulation **must use identical physics code** from `/shared`. If you change movement, collision, or physics logic, you must change it in `/shared` and verify both client and server still agree. A mismatch between client prediction and server authority causes visible rubber-banding.
@@ -497,7 +510,7 @@ Modes otherwise rotate DM → KOTH → GUN GAME → LAST STAND → KILL CONFIRME
 
 ### Map System
 
-Tile-based maps stored as JSON in `/shared/maps/`. Tile types: `floor`, `wall`, `cover_low`, `spawn_point`, `pickup_spawn`. Map fits entirely in viewport (no scrolling). Collision grid generated from tile data and used by both client (prediction) and server (authority). `cover_low` blocks movement, bullets, and explosion LOS. A grenade resolves damage against that intact grid, then destroys exposed low cover and decoration-backed interior solids inside `GRENADE.BLAST_RADIUS`; ordinary/perimeter walls remain immune, and Bruce's fire breath still destroys interior walls only. Both paths reuse the reliable `server:tilesDestroyed` event and mutate only the match-local collision grid.
+Tile-based maps stored as JSON in `/shared/maps/`. Tile types: `floor`, `wall`, `cover_low`, `spawn_point`, `pickup_spawn`. Every current 960×576 map still fits entirely in either gameplay surface with no scrolling; Batch 18 does not change map dimensions or origin. Collision grid generated from tile data and used by both client (prediction) and server (authority). `cover_low` blocks movement, bullets, and explosion LOS. A grenade resolves damage against that intact grid, then destroys exposed low cover and decoration-backed interior solids inside `GRENADE.BLAST_RADIUS`; ordinary/perimeter walls remain immune, and Bruce's fire breath still destroys interior walls only. Both paths reuse the reliable `server:tilesDestroyed` event and mutate only the match-local collision grid.
 
 Maps are visually themed: map JSON carries an optional `theme` id resolved client-side in `client/src/rendering/map-themes.ts` (floor/cover variant pools + auto-tiled wall styles; unknown ids fall back to the wasteland look), plus optional `decorations` — sprites (wrecked cars, containers, explosive barrels, wire gates, scavenger caches) centered on tile rects whose underlying tiles carry collision. Theme and decoration art stay client-only; the server uses each decoration rect to group its backing solid cells as one atomic destructible prop, recognizes `hazard: "explosive_barrel"` as a one-cell shot-triggered chain reaction, and recognizes `interaction: "shootable_gate"` as a one-cell interior wall that bullets, blasts, or Bruce's fire breath permanently open. Gates reuse the reliable tile-destruction event and live collision grid; the client reverses the seven-frame closing strip and leaves its open frame visible.
 
