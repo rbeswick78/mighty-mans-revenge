@@ -5,9 +5,9 @@ Read this file and `CLAUDE.md` completely at the start of every batch. The
 completed `docs/REPLAYABILITY_ROADMAP.md` remains the historical record for the
 systems this program preserves and reorganizes.
 
-- **Status:** Batch 22 complete on 2026-07-16; responsive combat HUD active
+- **Status:** Batch 23 complete on 2026-07-16; minimap foundation active
   behind default-false capabilities.
-- **Next batch:** Batch 23 — Minimap foundation.
+- **Next batch:** Batch 24 — Camera regression gate.
 - **Public releases:** Reforged Arena, then Battle Royale.
 - **Working model:** one numbered batch per session, direct commits and pushes
   to `main`, milestone-gated production deployments.
@@ -176,7 +176,7 @@ Production deployment happens only at a gate or for an urgent live fix.
 |  20 | Camera controller                      | World/camera  | **DONE — 2026-07-16** |
 |  21 | Dynamic world rendering                | World/camera  | **DONE — 2026-07-16** |
 |  22 | Responsive combat HUD                  | World/camera  | **DONE — 2026-07-16** |
-|  23 | Minimap foundation                     | World/camera  | Pending               |
+|  23 | Minimap foundation                     | World/camera  | **DONE — 2026-07-16** |
 |  24 | Camera regression gate                 | World/camera  | Pending               |
 |  25 | Style bible                            | Visual system | Pending               |
 |  26 | Asset pipeline                         | Visual system | Pending               |
@@ -831,6 +831,31 @@ Acceptance:
 
 Project map bounds, solids, landmarks, objectives, local player, and allies
 where applicable without depending on camera culling or client authority.
+
+Acceptance:
+
+- [x] Capability-owned gameplay projects the selected map's actual bounds,
+      complete live collision solids, and authored decoration landmarks from
+      map/collision truth independently of camera, chunk culling, viewport
+      resources, and screen-derived gameplay state.
+- [x] Authoritative destruction removes affected solids and authored
+      landmarks, while current 960x576 maps retain origin `(0, 0)` and the
+      complete mutable prediction grid remains the existing authority seam.
+- [x] KOTH current/next zones, every live Kill Confirmed tag, the Core Run
+      core, and the Bounty Hunt target project only in their owning mode from
+      live snapshot state; modes without a world objective show none.
+- [x] The local fighter and any number of exact server-authored Crew allies
+      project from gameplay positions. Generic rivals stay hidden, no team is
+      inferred from callsign/order, and a Bounty target appears only as that
+      mode's objective.
+- [x] One non-interactive screen-pinned minimap layout is safe-area bounded,
+      reserves the complete Batch 22 menu/kill-feed/touch/vitals priorities,
+      and keeps equal 1280x720 desktop/mobile logical visibility. This batch
+      adds no tactical-map or input action.
+- [x] Capability-off/old-server play retains the exact 960x720 fallback with
+      no minimap. Focused deterministic/static/build gates and targeted
+      desktop Chromium/mobile-landscape object, visual, Results/rematch, and
+      recovery evidence pass without beginning Batch 24 gate work.
 
 #### Batch 24 — Camera regression gate
 
@@ -2252,6 +2277,59 @@ Firefox/WebKit live WebRTC and black staged canvas captures. The Batch 21
 non-hardware evidence; no rendering recorder, simulation, or server code
 changed.
 
+### Batch 23 — 2026-07-16 — Minimap foundation
+
+**Shipped:** Added a pure minimap layout/projection boundary and a thin
+screen-pinned Phaser renderer only for literal capability-owned large-world
+gameplay. Static projection consumes the selected map's actual bounds, the
+complete mutable collision grid, and authored decoration metadata; authoritative
+tile destruction refreshes both solids and surviving landmarks. Dynamic
+projection consumes the owning mode plus live KOTH current/next zones, Kill
+Confirmed tags, Core Run state, Bounty Hunt target, local gameplay position,
+and exact server-authored Crew teams. Generic rivals remain hidden, allies are
+N-player-safe and id-sorted, and no team/objective/visibility state comes from
+callsigns, screen coordinates, camera, chunks, or viewport resources. The
+non-interactive 216x154 safe-area panel reserves Batch 22's complete five-row
+kill feed, match-menu launcher, touch cluster, and other HUD regions. The exact
+legacy path creates no minimap.
+
+**Verification:** Selected the camera/world/visual plus isolated client-UI
+tier because source changes remain inside client presentation and focused E2E
+instrumentation; no shared/server/wire/persistence/recovery/input authority,
+capability default, or production boundary changed. Final focused Vitest passed
+29 tests across minimap, responsive HUD, gameplay viewport, dynamic world
+rendering, and the historical camera reproductions. `corepack pnpm typecheck`,
+`corepack pnpm lint`, `corepack pnpm --filter @game/client build`, and the full
+`corepack pnpm build` passed; Vite's established chunk-size advisory remains.
+With `largeWorlds` enabled, targeted desktop Chromium/mobile-landscape equal-
+visibility/camera, minimap objective/Crew/destruction, and Results/rematch/
+recovery evidence passed six tests. Exact default-false fallback passed both
+projects, and a final desktop Chromium minimap rerun passed with attached
+1280x720 and resized 844x390 frames. Direct inspection found both frames
+readable, complete, and clear of the HUD. The complete unit inventory and
+three-project browser matrix were omitted because this is isolated client
+presentation, not the Batch 24 gate, and focused evidence showed no broader
+risk.
+
+**Deployment:** Skipped. Batch 23 remains unfinished world/camera milestone
+work behind default-false `largeWorlds`. No production environment, capability,
+server, client deployment, or exposure changed, and this task did not authorize
+one.
+
+**Deviations:** No product-scope deviation. The client-only `tsc` shortcut was
+not exposed by this workspace, so the required root typecheck was used. The
+in-app browser could not reach the host localhost service; the already-green
+Playwright Chromium path therefore attached its exact desktop and mobile-sized
+frames for local inspection. Staged mobile WebKit retained object assertions
+under RFG-003 and was not treated as pixel evidence. No runtime correction was
+required after visual review.
+
+**Known issues:** No bug-ledger entry was added. RFG-001 and RFG-002 remain
+resolved historical proofs owned by the Batch 24 regression gate. RFG-003
+remains open for headless Firefox/WebKit live WebRTC and black staged canvas
+captures. The Batch 21 host-limited frame observations and Batch 2 scheduling-
+drift sample remain non-hardware evidence; no simulation or server code changed.
+
 ## Batch 22 input prompt (historical)
 
 ```text
@@ -2339,7 +2417,7 @@ camera, and world-resource boundaries. Batch 22 owns responsive HUD migration;
 Batch 23 owns the minimap.
 ```
 
-## Next-session prompt
+## Batch 23 input prompt (historical)
 
 ```text
 Continue the Reforged build for Mighty Man's Revenge.
@@ -2426,4 +2504,91 @@ origin. Batch 19 coordinates, Batch 20 camera composition, Batch 21 rendering,
 and Batch 22 responsive HUD are the only transform, camera, world-resource, and
 combat-overlay boundaries. Batch 23 owns the minimap; Batch 24 owns the camera
 regression gate.
+```
+
+## Next-session prompt
+
+```text
+Continue the Reforged build for Mighty Man's Revenge.
+
+Read docs/REIMAGINING_ROADMAP.md and CLAUDE.md completely first. Read
+docs/REFORGED_BASELINE.md and docs/REFORGED_CAPABILITIES.md before
+implementation. Batch 23 — Minimap foundation is complete. Implement Batch 24
+— Camera regression gate exactly as specified and do not begin Batch 25 —
+Style bible.
+
+Run the complete scrolling-world/camera regression gate across Batch 18's
+fixed 1280x720 logical gameplay surface and safe-area contract, Batch 19's sole
+screen/world transform, Batch 20's sole composed camera controller, Batch 21's
+dynamic world resources/quality tiers, Batch 22's responsive combat HUD, and
+Batch 23's minimap. Verify exact local-player follow, respawn and spectator
+targets, every world edge and corner, aim and touch while scrolled/zoomed/
+rolled, screen-pinned effects and HUD, map/objective/player/ally minimap
+accuracy independent of culling/transients, destruction, quality fallback,
+Results/rematch/recovery restoration, and representative frame pacing. Retain
+RFG-001 and RFG-002's repaired values as mandatory regression proofs. Resolve
+or explicitly gate-disposition RFG-003 so non-Chromium object/input and visual
+evidence are trustworthy enough for this verification milestone.
+
+Preserve current map/snapshot authority, N-player and Crew visibility, all
+eight modes, every challenge/standard journey, pointer, keyboard, standard
+gamepad, and touch behavior. Current maps remain 960x576 at `(0, 0)` with
+unchanged collision, shared/server physics, authoritative 20Hz simulation,
+gameplay rules, wire contracts, menus, Results/rematches, and production
+configuration. Capability-off, old-server, and old-client paths must retain the
+exact established 960x720 gameplay/Lobby behavior through Batch 54. All
+capabilities remain strict server-owned opt-ins and default false.
+
+Do not begin Batch 25 or later work: no style-bible/reference generation,
+modern art, asset pipeline, larger arena authoring, tactical map, movement or
+balance tuning, Battle Royale work, capability exposure, or deployment. Do not
+change camera/minimap/rendering/HUD behavior merely to make the gate easier;
+fix only proven tightly coupled regressions, record evidence, and insert or log
+larger blockers under the roadmap bug rules. Never enable a capability by
+default or deploy without explicit authorization.
+
+Batch 23 is complete and pushed on main as `feat(play): add minimap foundation`.
+The capability-owned path now projects actual map bounds, the complete live
+collision solids, surviving authored decoration landmarks, KOTH current/next
+zones, Kill Confirmed tags, Core Run, Bounty Hunt, the local fighter, and exact
+server-authored Crew allies into one non-interactive safe-area minimap. It is
+independent of camera/chunk/resource authority; generic rivals remain hidden,
+and authoritative destruction refreshes solids/landmarks. The exact legacy
+path creates no minimap. Focused deterministic coverage (29 tests across five
+files), typecheck, lint, affected/full builds, six enabled desktop Chromium/
+mobile-landscape camera/minimap/Results/rematch/recovery cases, two exact
+default-false fallback cases, and inspected 1280x720 plus 844x390 Chromium
+frames are green. The complete unit and three-project browser inventories were
+omitted under the documented isolated client camera/world/visual tier because
+Batch 24 is the explicit full gate. Production has not been deployed.
+
+Choose and document the Batch 24 verification-gate tier. Run the complete unit
+and integration inventory, `corepack pnpm typecheck`, `corepack pnpm lint`,
+affected and full production builds, the complete default-false three-project
+Playwright inventory, the complete enabled camera/world/HUD/minimap journey
+matrix across desktop Chromium, desktop Firefox, and mobile landscape, the
+server/client recorders and representative performance probes, and inspected
+desktop plus mobile-sized Chromium visual evidence. Exercise real/staged paths
+according to the resolved RFG-003 disposition and escalate every focused
+failure narrowly before rerunning the gate. Update roadmap acceptance, status,
+bug ledger, architecture/baseline/capability docs, and Session Log. Run the
+complete end-of-batch ritual, commit and push directly to main, verify a clean
+worktree with HEAD exactly matching origin/main, and skip deployment unless
+explicitly authorized.
+
+Carry-over warnings: RFG-001 and RFG-002 are fixed but this gate owns their
+historical sustained-scroll `(320, 144)` and sustained-zoom `0.9` proofs.
+RFG-003 means headless Firefox/WebKit cannot use the live local WebRTC practice
+path and staged gameplay screenshots are black; staged frame numbers are not
+hardware-comparable. Mobile-sized Chromium remains the trusted visual source
+until the gate records a stronger disposition. The Batch 21 recorder observed
+host-limited live Chromium at 3.658 FPS / 273.375ms mean at full quality and
+staged mobile at 30.202 FPS / 33.110ms mean at reduced quality; neither is a
+hardware threshold. The Batch 2 live-loop sample recorded a 254.279ms host
+scheduling drift reset and 15.932 effective Hz while simulation processing
+remained far below 50ms. Use Corepack pnpm 10.33.0 if the local shim mismatches.
+Current maps remain smaller than the logical viewport and anchor at origin.
+Batch 24 is a verification gate, not authorization for larger maps or visual
+cutover. When Batch 24 completes, stop the user-authorized chain and request
+review; do not create Batch 25.
 ```

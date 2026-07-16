@@ -219,6 +219,33 @@ kill feed, contracts, touch actions, menu confirmation, current small-world
 anchoring, equal logical visibility, fallback, rematch, and recovery. Mobile-
 sized Chromium remains the trusted mobile visual source under RFG-003.
 
+### Batch 23 minimap foundation evidence
+
+`minimapLayoutForGameplay()` and the pure static/dynamic projection helpers now
+own the capability path's non-interactive map overlay. The static projection
+uses the selected registered map's actual 960x576 current bounds, complete live
+collision grid, and authored decorations rather than camera-visible chunks or
+viewport resources. Reliable tile destruction refreshes the projection so
+destroyed solids and their no-longer-backed landmarks disappear together.
+
+The dynamic projection consumes only owning-mode snapshot state: live KOTH and
+next-hill zones, every Kill Confirmed tag, Core Run position, Bounty Hunt target
+position, the local gameplay position, and exact server-authored Crew team
+assignments. It hides generic rivals, supports any number of allies, and never
+infers teams, objectives, or visibility from callsigns, player order, screen
+coordinates, camera state, or culling. Modes without a live world objective
+show none. The 216x154 panel stays screen-pinned inside the same logical safe
+area while reserving Batch 22's five-row kill feed, menu, touch controls, and
+vitals; desktop and mobile retain one 1280x720 logical view.
+
+Focused deterministic and desktop Chromium/mobile-landscape evidence covers
+actual bounds, complete solids, authored landmarks, authoritative destruction,
+all supported objective projections, local/Crew/N-player visibility, camera and
+culling independence, safe-area coexistence, equal logical visibility, exact
+legacy no-minimap fallback, Results/rematch, and recovery. Inspected attached
+1280x720 and resized 844x390 Chromium frames are readable and unclipped. Staged
+mobile WebKit remains object evidence rather than trusted pixels under RFG-003.
+
 ## Adjacent bug reproductions
 
 `client/src/rendering/camera-baseline.test.ts` now asserts the repaired

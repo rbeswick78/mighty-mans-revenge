@@ -53,6 +53,7 @@ import { DecalRenderer } from '../rendering/decal-renderer.js';
 import { KothHillRenderer } from '../rendering/koth-hill-renderer.js';
 import { RadiationStormRenderer } from '../rendering/radiation-storm-renderer.js';
 import { ScrapstormRenderer } from '../rendering/scrapstorm-renderer.js';
+import { MinimapRenderer } from '../rendering/minimap-renderer.js';
 import {
   CameraController,
   ROLL_DAMAGE_THRESHOLD,
@@ -104,6 +105,7 @@ import {
   responsiveCombatHudLayout,
   type ResponsiveCombatHudLayout,
 } from '../ui/responsive-combat-hud.js';
+import { minimapLayoutForGameplay } from '../ui/minimap-foundation.js';
 import { useLegacyLogicalSize } from '../ui/reforged/responsive-menu-layout.js';
 import {
   createWorldRenderPlan,
@@ -157,6 +159,7 @@ export class GameScene extends Phaser.Scene {
   private coreRunRenderer: CoreRunRenderer | null = null;
   private radiationStormRenderer: RadiationStormRenderer | null = null;
   private scrapstormRenderer: ScrapstormRenderer | null = null;
+  private minimapRenderer: MinimapRenderer | null = null;
   private grenadeRenderer: GrenadeRenderer | null = null;
   private axeRenderer: AxeRenderer | null = null;
   private lightingRenderer: LightingRenderer | null = null;
@@ -431,6 +434,14 @@ export class GameScene extends Phaser.Scene {
       this.worldRenderQuality.getBudget(),
     );
     this.combatHudLayout = responsiveCombatHudLayout(this.gameplayViewport, this.gameplaySafeArea);
+    const minimapLayout = minimapLayoutForGameplay(
+      this.gameplayViewport,
+      this.combatHudLayout,
+      this.worldRenderPlan.worldBounds,
+    );
+    if (grid && minimapLayout) {
+      this.minimapRenderer = new MinimapRenderer(this, mapData, grid, minimapLayout);
+    }
     this.hud = new HUD(this, this.combatHudLayout);
     // Bullseye replaces the OS cursor on desktop only — touch input
     // doesn't have a hover position to track.
@@ -597,6 +608,7 @@ export class GameScene extends Phaser.Scene {
     // Re-read latest local state after any input ticks that ran this frame.
     const currentLocalState = networkManager.getLocalPlayerState();
     this.decayLocalCorrectionOffset(delta);
+    let minimapPlayers: SerializedPlayerState[] = [];
 
     // Update local player rendering
     if (currentLocalState && this.playerManager) {
@@ -695,6 +707,7 @@ export class GameScene extends Phaser.Scene {
             secondWindTimer: interpState.secondWindTimer,
           });
         }
+        minimapPlayers = allPlayers;
 
         // Detect local-player damage (health decreased since last frame)
         // and kick chromatic aberration to peak. Respawns (0 → MAX) are
@@ -1035,6 +1048,16 @@ export class GameScene extends Phaser.Scene {
     );
     const coreRunState = networkManager.getCoreRunState();
     this.coreRunRenderer?.update(coreRunState, networkManager.getPlayerId());
+    this.minimapRenderer?.update({
+      gameMode: this.matchData?.gameMode ?? null,
+      players: minimapPlayers,
+      localPlayerId: networkManager.getPlayerId(),
+      playerTeams: this.matchData?.playerTeams,
+      koth: networkManager.getKothState(),
+      confirmedTags: networkManager.getConfirmedTags(),
+      coreRun: coreRunState,
+      bountyHunt: networkManager.getBountyHuntState(),
+    });
     if (coreRunState) {
       const carrierId = coreRunState.carrierId;
       if (this.lastCoreCarrierId !== undefined && carrierId !== this.lastCoreCarrierId) {
@@ -1285,6 +1308,10 @@ export class GameScene extends Phaser.Scene {
     return this.combatHudLayout;
   }
 
+  getMinimapRenderState(): ReturnType<MinimapRenderer['getRenderState']> | null {
+    return this.minimapRenderer?.getRenderState() ?? null;
+  }
+
   getCameraController(): CameraController | null {
     return this.cameraController;
   }
@@ -1367,6 +1394,14 @@ export class GameScene extends Phaser.Scene {
     this.hud?.setLayout(this.combatHudLayout);
     this.matchMenu?.setLayout(this.combatHudLayout);
     this.inputManager?.setTouchActionLayout(this.combatHudLayout.touchActions);
+    if (this.minimapRenderer && this.worldRenderPlan) {
+      const minimapLayout = minimapLayoutForGameplay(
+        this.gameplayViewport,
+        this.combatHudLayout,
+        this.worldRenderPlan.worldBounds,
+      );
+      if (minimapLayout) this.minimapRenderer.setLayout(minimapLayout);
+    }
   }
 
   private updateMatchMenuInput(): void {
@@ -1986,6 +2021,7 @@ export class GameScene extends Phaser.Scene {
         this.mapRenderer.destroyTileAt(col, row);
       }
       this.decalRenderer?.updateDestroyedTiles(tiles);
+      this.minimapRenderer?.refreshStatic();
     };
 
     // Sudden-death overtime: the tie banner beat. The clock re-anchor is
@@ -2260,6 +2296,10 @@ export class GameScene extends Phaser.Scene {
     if (this.mapRenderer) {
       this.mapRenderer.destroy();
       this.mapRenderer = null;
+    }
+    if (this.minimapRenderer) {
+      this.minimapRenderer.destroy();
+      this.minimapRenderer = null;
     }
     if (this.kothHillRenderer) {
       this.kothHillRenderer.destroy();

@@ -149,6 +149,7 @@ async function viewportSnapshot(page: Page): Promise<Record<string, unknown>> {
         decals: { resourceCount: number; resources: unknown[] } | null;
         lighting: { width: number; height: number; quality: string } | null;
       };
+      getMinimapRenderState(): unknown;
       kothHillRenderer: { gfx: { scrollFactorX: number; scrollFactorY: number } };
       coreRunRenderer: { container: { scrollFactorX: number; scrollFactorY: number } };
       radiationStormRenderer: {
@@ -175,6 +176,7 @@ async function viewportSnapshot(page: Page): Promise<Record<string, unknown>> {
     const cameraController = scene.getCameraController();
     const hudLayout = scene.getResponsiveHudLayout();
     const dynamic = scene.getDynamicWorldRenderState();
+    const minimap = scene.getMinimapRenderState();
     const playerMarkerOwner = scene.playerManager.getRenderer('viewport-local')?.getContainer();
     return {
       scale: [game?.scale.width, game?.scale.height],
@@ -207,6 +209,7 @@ async function viewportSnapshot(page: Page): Promise<Record<string, unknown>> {
         decals: dynamic.decals,
         lighting: dynamic.lighting,
       },
+      minimap,
       coordinates: {
         screenToWorld: coordinates.screenToWorld({ space: 'screen', x: 480, y: 288 }),
         worldToScreen: coordinates.worldToScreen({ space: 'world', x: 480, y: 288 }),
@@ -830,6 +833,175 @@ async function dynamicWorldMutationSnapshot(page: Page): Promise<Record<string, 
   });
 }
 
+async function minimapScenarioSnapshot(page: Page): Promise<Record<string, unknown>> {
+  return page.evaluate(async () => {
+    type RemoteState = {
+      characterId: 'bruce';
+      position: { x: number; y: number };
+      velocity: { x: number; y: number };
+      aimAngle: number;
+      health: number;
+      maxHealth: number;
+      armor: number;
+      ammo: number;
+      weaponId: 'rifle';
+      specialAmmo: number;
+      specialReserve: number;
+      grenades: number;
+      isReloading: boolean;
+      isSprinting: boolean;
+      stamina: number;
+      isDead: boolean;
+      respawnTimer: number;
+      invulnerableTimer: number;
+      score: number;
+      deaths: number;
+      nickname: string;
+      abilityActiveSeconds: number;
+      abilityCooldownSeconds: number;
+      frozenTimer: number;
+      secondWindTimer: number;
+    };
+    const remote = (x: number, y: number, nickname: string, isDead = false): RemoteState => ({
+      characterId: 'bruce',
+      position: { x, y },
+      velocity: { x: 0, y: 0 },
+      aimAngle: 0,
+      health: isDead ? 0 : 100,
+      maxHealth: 100,
+      armor: 0,
+      ammo: 30,
+      weaponId: 'rifle',
+      specialAmmo: 0,
+      specialReserve: 0,
+      grenades: 2,
+      isReloading: false,
+      isSprinting: false,
+      stamina: 100,
+      isDead,
+      respawnTimer: isDead ? 2 : 0,
+      invulnerableTimer: 0,
+      score: 0,
+      deaths: isDead ? 1 : 0,
+      nickname,
+      abilityActiveSeconds: 0,
+      abilityCooldownSeconds: 0,
+      frozenTimer: 0,
+      secondWindTimer: 0,
+    });
+
+    const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'GameScene',
+    ) as unknown as {
+      matchData: {
+        gameMode: string;
+        playerTeams?: Record<string, 'blue' | 'red'>;
+      };
+      gameService: {
+        getNetworkManager(): {
+          getInterpolatedPlayers(): Map<string, RemoteState>;
+          getKothState(): unknown;
+          getConfirmedTags(): unknown[];
+          getCoreRunState(): unknown;
+          getBountyHuntState(): unknown;
+        };
+      };
+      onTilesDestroyed: ((tiles: Array<{ col: number; row: number }>) => void) | null;
+      getMinimapRenderState(): Record<string, unknown> | null;
+    };
+    const manager = scene.gameService.getNetworkManager();
+    manager.getInterpolatedPlayers = () =>
+      new Map([
+        ['ally-b', remote(240, 192, 'ALLY B', true)],
+        ['rival', remote(720, 384, 'RIVAL')],
+        ['ally-a', remote(336, 240, 'ALLY A')],
+      ]);
+    scene.matchData.playerTeams = {
+      'viewport-local': 'blue',
+      'ally-a': 'blue',
+      'ally-b': 'blue',
+      rival: 'red',
+    };
+
+    let koth: unknown = null;
+    let tags: unknown[] = [];
+    let core: unknown = null;
+    let bounty: unknown = null;
+    manager.getKothState = () => koth;
+    manager.getConfirmedTags = () => tags;
+    manager.getCoreRunState = () => core;
+    manager.getBountyHuntState = () => bounty;
+    const settle = () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      );
+
+    scene.matchData.gameMode = 'koth';
+    koth = {
+      hill: { x: 9, y: 5 },
+      nextHill: { x: 7, y: 2 },
+      occupantId: 'viewport-local',
+      contested: false,
+      captureFraction: 0.5,
+    };
+    await settle();
+    const kothState = scene.getMinimapRenderState();
+
+    scene.matchData.gameMode = 'kill_confirmed';
+    koth = null;
+    tags = [
+      { id: 'tag-a', ownerId: 'viewport-local', position: { x: 96, y: 96 }, expiresInSeconds: 10 },
+      { id: 'tag-b', ownerId: 'rival', position: { x: 800, y: 480 }, expiresInSeconds: 8 },
+    ];
+    await settle();
+    const tagState = scene.getMinimapRenderState();
+
+    scene.matchData.gameMode = 'core_run';
+    tags = [];
+    core = {
+      position: { x: 480, y: 288 },
+      carrierId: 'ally-a',
+      returnInSeconds: null,
+      carryFraction: 0.2,
+    };
+    await settle();
+    const coreState = scene.getMinimapRenderState();
+
+    scene.matchData.gameMode = 'bounty_hunt';
+    core = null;
+    bounty = { targetId: 'rival' };
+    await settle();
+    const bountyState = scene.getMinimapRenderState();
+
+    const beforeDestruction = scene.getMinimapRenderState();
+    scene.onTilesDestroyed?.([{ col: 7, row: 5 }]);
+    await settle();
+    const afterDestruction = scene.getMinimapRenderState();
+
+    scene.matchData.gameMode = 'koth';
+    bounty = null;
+    koth = {
+      hill: { x: 9, y: 5 },
+      nextHill: { x: 7, y: 2 },
+      occupantId: 'ally-a',
+      contested: false,
+      captureFraction: 0.75,
+    };
+    await settle();
+    const crewKoth = scene.getMinimapRenderState();
+
+    return {
+      koth: kothState,
+      tags: tagState,
+      core: coreState,
+      bounty: bountyState,
+      beforeDestruction,
+      afterDestruction,
+      crewKoth,
+    };
+  });
+}
+
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
   await waitForScene(page, 'LobbyScene');
@@ -894,6 +1066,7 @@ test('capability-off and old-server gameplay retain the exact legacy surface', a
         lastProjectedLight: null,
       },
     },
+    minimap: null,
     coordinates: {
       screenToWorld: { space: 'world', x: 480, y: 288 },
       worldToScreen: { space: 'screen', x: 480, y: 288 },
@@ -943,6 +1116,16 @@ test('gated gameplay keeps one 16:9 logical view across desktop and mobile', asy
       map: { chunkCount: 6 },
       decals: { resourceCount: 6 },
       lighting: { width: 960, height: 576, quality: 'full' },
+    },
+    minimap: {
+      layout: {
+        panel: { x: 1032, y: 232, width: 216, height: 154 },
+        map: { x: 1040, y: 258, width: 200, height: 120 },
+      },
+      worldBounds: { left: 0, top: 0, width: 960, height: 576 },
+      landmarkCount: 10,
+      scrollFactors: [0, 0, 0, 0, 0, 0],
+      interactive: false,
     },
   });
   expect(initial.safeArea).toMatchObject({ left: 32, top: 32, right: 1248, bottom: 688 });
@@ -1008,6 +1191,7 @@ test('gated gameplay keeps one 16:9 logical view across desktop and mobile', asy
   expect(transformedDetail.transform.roundTrip.x).toBeCloseTo(800, 6);
   expect(transformedDetail.transform.roundTrip.y).toBeCloseTo(300, 6);
   expect(transformedDetail.transform.aim).toBeCloseTo(transformedDetail.transform.expectedAim, 6);
+  expect((await viewportSnapshot(page)).minimap).toEqual(initial.minimap);
 
   const canvas = page.locator('canvas');
   await expect(canvas).toBeVisible();
@@ -1195,6 +1379,87 @@ test('responsive combat HUD prioritizes resources, statuses, callouts, touch, an
   await page.screenshot({ path: testInfo.outputPath('responsive-match-menu.png') });
 });
 
+test('minimap projects map truth, objectives, local and Crew allies without camera authority', async ({
+  page,
+}, testInfo) => {
+  test.skip(!largeWorldsAdvertised, 'Run with CAPABILITY_LARGE_WORLDS=true.');
+  await stageGameplay(page, true);
+
+  type MinimapState = {
+    layout: {
+      panel: { x: number; y: number; width: number; height: number };
+      map: { x: number; y: number; width: number; height: number };
+    };
+    worldBounds: { left: number; top: number; width: number; height: number };
+    solidCount: number;
+    landmarkCount: number;
+    objectives: Array<{ kind: string; playerId?: string }>;
+    players: Array<{ kind: string; playerId: string; isDead: boolean }>;
+    scrollFactors: number[];
+    interactive: boolean;
+  };
+  const snapshot = (await minimapScenarioSnapshot(page)) as {
+    koth: MinimapState;
+    tags: MinimapState;
+    core: MinimapState;
+    bounty: MinimapState;
+    beforeDestruction: MinimapState;
+    afterDestruction: MinimapState;
+    crewKoth: MinimapState;
+  };
+
+  expect(snapshot.koth.objectives.map(({ kind }) => kind)).toEqual(['koth', 'next-koth']);
+  expect(snapshot.tags.objectives.map(({ kind }) => kind)).toEqual(['tag', 'tag']);
+  expect(snapshot.core.objectives.map(({ kind }) => kind)).toEqual(['core']);
+  expect(snapshot.bounty.objectives.map(({ kind, playerId }) => ({ kind, playerId }))).toEqual([
+    { kind: 'bounty', playerId: 'rival' },
+  ]);
+  expect(snapshot.afterDestruction.solidCount).toBe(snapshot.beforeDestruction.solidCount - 1);
+  expect(snapshot.afterDestruction.landmarkCount).toBe(
+    snapshot.beforeDestruction.landmarkCount - 1,
+  );
+  expect(snapshot.crewKoth).toMatchObject({
+    layout: {
+      panel: { x: 1032, y: 232, width: 216, height: 154 },
+      map: { x: 1040, y: 258, width: 200, height: 120 },
+    },
+    worldBounds: { left: 0, top: 0, width: 960, height: 576 },
+    landmarkCount: 9,
+    scrollFactors: [0, 0, 0, 0, 0, 0],
+    interactive: false,
+  });
+  expect(
+    snapshot.crewKoth.players.map(({ kind, playerId, isDead }) => ({
+      kind,
+      playerId,
+      isDead,
+    })),
+  ).toEqual([
+    { kind: 'local', playerId: 'viewport-local', isDead: false },
+    { kind: 'ally', playerId: 'ally-a', isDead: false },
+    { kind: 'ally', playerId: 'ally-b', isDead: true },
+  ]);
+  expect(snapshot.crewKoth.players.some(({ playerId }) => playerId === 'rival')).toBe(false);
+
+  await testInfo.attach('minimap-foundation', {
+    body: await page.screenshot(),
+    contentType: 'image/png',
+  });
+  if (testInfo.project.name === 'desktop-chromium') {
+    await page.setViewportSize({ width: 844, height: 390 });
+    await expect
+      .poll(async () => {
+        const state = (await viewportSnapshot(page)).minimap as MinimapState | null;
+        return state?.layout.panel ?? null;
+      })
+      .toEqual(snapshot.crewKoth.layout.panel);
+    await testInfo.attach('minimap-foundation-mobile-chromium', {
+      body: await page.screenshot(),
+      contentType: 'image/png',
+    });
+  }
+});
+
 test('dynamic chunks, destruction resources, lighting, and quality stay aligned', async ({
   page,
 }) => {
@@ -1276,14 +1541,16 @@ test('Results and connection recovery restore legacy scene sizing', async ({ pag
         const game = (window as unknown as { game?: Phaser.Game }).game;
         const scene = game?.scene.getScene('GameScene') as unknown as {
           getResponsiveHudLayout(): { mode: string } | null;
+          getMinimapRenderState(): unknown;
         };
         return {
           size: [game?.scale.width, game?.scale.height],
           hudMode: scene.getResponsiveHudLayout()?.mode ?? null,
+          minimap: scene.getMinimapRenderState() !== null,
         };
       }),
     )
-    .toEqual({ size: [1280, 720], hudMode: 'large-world' });
+    .toEqual({ size: [1280, 720], hudMode: 'large-world', minimap: true });
   await page.evaluate(() => {
     const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
       'GameScene',

@@ -412,6 +412,23 @@ geometry and routes. Batch 19 remains the sole coordinate transform, Batch 20
 the sole camera owner, and Batch 21 the sole world-resource plan; no minimap,
 wire, simulation, balance, capability default, or production behavior changed.
 
+**Reforged minimap foundation (Batch 23):** capability-owned gameplay now adds
+one non-interactive safe-area minimap beside the complete Batch 22 HUD. Its
+pure static projection consumes the selected registered map's actual bounds,
+the complete live collision grid, and authored decoration metadata; reliable
+tile destruction refreshes solids and surviving landmarks. Its dynamic
+projection consumes only the owning mode plus live KOTH current/next zones,
+Kill Confirmed tags, Core Run state, Bounty Hunt target, local gameplay
+position, and exact server-authored Crew team assignments. Generic rivals stay
+hidden, allies remain N-player-safe, and no team, objective, or visibility
+state is inferred from callsigns, screen coordinates, camera state, visible
+chunks, or render resources. The panel reserves the full kill-feed, match-menu,
+touch-action, and vitality priorities without changing logical visibility.
+Capability-off, old-server, reconnecting, and disconnected paths retain exact
+960x720 behavior with no minimap. Batch 24 owns the cumulative camera gate; no
+tactical map, wire, simulation, capability default, or production behavior
+changed.
+
 ### Why This Matters for Agents
 
 Client prediction and server simulation **must use identical physics code** from `/shared`. If you change movement, collision, or physics logic, you must change it in `/shared` and verify both client and server still agree. A mismatch between client prediction and server authority causes visible rubber-banding.

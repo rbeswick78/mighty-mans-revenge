@@ -219,6 +219,21 @@ False, absent, partial, malformed, reconnecting, disconnected, and old-server
 paths retain the exact 960x720 HUD and Lobby behavior. The capability remains
 strict, server-owned, and default false; Batch 23 owns minimap work.
 
+Batch 23 adds the capability path's non-interactive minimap without changing
+negotiation or exposure. It projects the selected registered map's actual
+bounds, the complete mutable collision grid, surviving authored decoration
+landmarks, owning-mode KOTH/Kill Confirmed/Core Run/Bounty Hunt snapshot state,
+the local gameplay position, and exact server-authored Crew allies. Generic
+rivals stay hidden and no team, objective, or visibility rule comes from
+callsigns, screen coordinates, camera state, visible chunks, or viewport
+resources. Reliable tile destruction refreshes solids and landmarks. The map
+overlay consumes the existing logical safe area without widening desktop/mobile
+visibility or adding a tactical-map/input action. False, absent, partial,
+malformed, reconnecting, disconnected, and old-server paths retain exact
+960x720 gameplay and Lobby behavior with no minimap. The capability remains
+strict, server-owned, and default false; Batch 24 owns the cumulative camera
+regression gate.
+
 ## Server-first rollout and rollback
 
 For each capability, keep this order:
