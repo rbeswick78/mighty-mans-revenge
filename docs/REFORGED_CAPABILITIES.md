@@ -104,6 +104,20 @@ requests fail closed. Batch 14's 15-second confirmed bot-fill offer is not
 present, no human slot changes source automatically, and all production defaults
 remain false.
 
+Batch 14 adds the leader-only, versioned `client:confirmPartyBotFill` mutation
+behind the same enabled boundary. When all connected party humans are ready and
+requested human slots remain open, the server projects a complete waiting offer
+and advances it to available from a monotonic 15-second clock. The client does
+not calculate availability, and the server never changes participant sources
+without confirmation. A valid confirmation revalidates the normalized intent
+and current schedule lock, replaces only those still-open requested human slots
+with the established standard Scrapper bots, and launches through Batch 11's
+existing authority. Cancellation, roster/readiness/intent/fighter mutation,
+disconnect, and reconnect remove the offer. Early, unauthorized, malformed,
+stale, duplicate, replayed, expired-schedule, old-server, and capability-off
+paths fail closed without queue residue. Results/rematch presentation remains
+Batch 15 scope, and all production defaults remain false.
+
 ## Server-first rollout and rollback
 
 For each capability, keep this order:

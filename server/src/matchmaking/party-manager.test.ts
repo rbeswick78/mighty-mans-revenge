@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { GameModeType } from '@shared/game';
+import { GameModeType, normalizeMatchIntent } from '@shared/game';
 import type { MatchFormat, MatchIntent, PartyState, PlayerId, ServerMessage } from '@shared/game';
-import { PARTY_EMPTY_EXPIRY_MS } from '@shared/game';
+import { PARTY_BOT_FILL_WAIT_MS, PARTY_EMPTY_EXPIRY_MS } from '@shared/game';
 import { PartyManager } from './party-manager.js';
 
 const id = (value: string) => value as PlayerId;
@@ -26,14 +26,21 @@ function intent(format: MatchFormat, humanCount: number, fighterId = 'mighty_man
   } as MatchIntent;
 }
 
-function harness(codes: string[] = ['ABCDE'], queueResult: string | null = 'match_12345678') {
+function harness(
+  codes: string[] = ['ABCDE'],
+  queueResult: string | null = 'match_12345678',
+  normalizeIntent: (value: unknown) => Readonly<MatchIntent> | null = (value) =>
+    value as Readonly<MatchIntent>,
+) {
   let now = 1_000;
+  let monotonicNow = 100;
   const sent: Array<{ playerId: PlayerId; message: ServerMessage }> = [];
   const queued: PartyState[] = [];
   const manager = new PartyManager({
     sendTo: (playerId, message) => sent.push({ playerId, message }),
-    normalizeIntent: (value) => value as Readonly<MatchIntent>,
+    normalizeIntent,
     now: () => now,
+    monotonicNow: () => monotonicNow,
     createPartyId: () => `party_${sent.length}_12345678`,
     createCode: () => codes.shift() ?? 'ZZZZZ',
     queueParty: (state) => {
@@ -41,7 +48,17 @@ function harness(codes: string[] = ['ABCDE'], queueResult: string | null = 'matc
       return queueResult;
     },
   });
-  return { manager, sent, queued, advance: (milliseconds: number) => (now += milliseconds) };
+  return {
+    manager,
+    sent,
+    queued,
+    advance: (milliseconds: number) => {
+      now += milliseconds;
+      monotonicNow += milliseconds;
+    },
+    advanceWall: (milliseconds: number) => (now += milliseconds),
+    advanceMonotonic: (milliseconds: number) => (monotonicNow += milliseconds),
+  };
 }
 
 function latestState(sent: Array<{ message: ServerMessage }>) {
@@ -245,6 +262,13 @@ describe('PartyManager authoritative lifecycle', () => {
     );
     state = manager.getStateForPlayer(player1)!;
     expect(state.lifecycle).toBe('queued');
+    expect(state.botFillOffer).toMatchObject({
+      status: 'waiting',
+      waitStartedAt: 1_000,
+      eligibleAt: 1_000 + PARTY_BOT_FILL_WAIT_MS,
+      serverTime: 1_000,
+      openSlotCount: 3,
+    });
     expect(queued).toHaveLength(0);
     const version = state.version;
     expect(manager.setReady(player1, 'ready_same_111', state.partyId, version, true)).toBe(true);
@@ -252,12 +276,214 @@ describe('PartyManager authoritative lifecycle', () => {
     expect(manager.cancelQueue(player1, 'cancel_open_11', state.partyId, version)).toBe(true);
     state = manager.getStateForPlayer(player1)!;
     expect(state).toMatchObject({ lifecycle: 'assembling', members: [{ ready: false }] });
+    expect(state.botFillOffer).toBeUndefined();
     expect(manager.cancelQueue(player1, 'cancel_again_1', state.partyId, state.version)).toBe(
       false,
     );
     expect(sent.at(-1)?.message).toMatchObject({
       type: 'server:partyError',
       code: 'invalid_request',
+    });
+  });
+
+  it.each([
+    ['duel', 2, 1],
+    ['rumble', 2, 1],
+    ['rumble', 3, 2],
+    ['rumble', 4, 1],
+    ['rumble', 4, 3],
+    ['crew', 2, 1],
+    ['crew', 3, 2],
+    ['crew', 4, 1],
+    ['crew', 4, 3],
+  ] as const)(
+    'offers and confirms bot fill for %s requested=%i connected=%i without automatic replacement',
+    (format, requestedHumans, connectedHumans) => {
+      const { manager, queued, advance } = harness();
+      const players = [player1, player2, player3, player4].slice(0, connectedHumans);
+      const fighters = ['mighty_man', 'bruce', 'frost_wizard', 'bubba'] as const;
+      manager.create(
+        player1,
+        `create_${format}_${requestedHumans}`,
+        'Alpha',
+        format,
+        fighters[0],
+        intent(format, requestedHumans),
+      );
+      players.slice(1).forEach((playerId, index) => {
+        manager.join(
+          playerId,
+          `join_fill_${format}_${index}`,
+          `P${index + 2}`,
+          'ABCDE',
+          fighters[index + 1],
+        );
+      });
+      players.forEach((playerId, index) => {
+        const state = manager.getStateForPlayer(playerId)!;
+        manager.setReady(
+          playerId,
+          `ready_fill_${format}_${index}`,
+          state.partyId,
+          state.version,
+          true,
+        );
+      });
+
+      let state = manager.getStateForPlayer(player1)!;
+      expect(state.botFillOffer?.status).toBe('waiting');
+      advance(14_999);
+      expect(manager.tick()).toBe(0);
+      expect(manager.getStateForPlayer(player1)?.botFillOffer?.status).toBe('waiting');
+      expect(queued).toHaveLength(0);
+      advance(1);
+      expect(manager.tick()).toBe(1);
+      state = manager.getStateForPlayer(player1)!;
+      expect(state.botFillOffer).toMatchObject({
+        status: 'available',
+        openSlotCount: requestedHumans - connectedHumans,
+      });
+      expect(queued).toHaveLength(0);
+      expect(
+        manager.confirmBotFill(
+          player1,
+          `confirm_${format}_${requestedHumans}_${connectedHumans}`,
+          state.partyId,
+          state.version,
+        ),
+      ).toBe(true);
+      expect(queued).toHaveLength(1);
+      expect(queued[0]?.intent.composition).toEqual({
+        humanCount: connectedHumans,
+        botCount: (format === 'duel' ? 2 : 4) - connectedHumans,
+      });
+      expect(manager.getStateForPlayer(player1)).toMatchObject({
+        lifecycle: 'match',
+        capacity: connectedHumans,
+        matchId: 'match_12345678',
+      });
+      expect(manager.getStateForPlayer(player1)?.botFillOffer).toBeUndefined();
+    },
+  );
+
+  it('uses monotonic eligibility while projecting the captured server wall clock', () => {
+    const { manager, advanceWall, advanceMonotonic } = harness();
+    manager.create(player1, 'create_clock_1', 'Alpha', 'duel', 'mighty_man', intent('duel', 2));
+    let state = manager.getStateForPlayer(player1)!;
+    manager.setReady(player1, 'ready_clock_11', state.partyId, state.version, true);
+    state = manager.getStateForPlayer(player1)!;
+    expect(state.botFillOffer).toMatchObject({ waitStartedAt: 1_000, eligibleAt: 16_000 });
+    advanceWall(60_000);
+    advanceMonotonic(14_999);
+    expect(manager.tick()).toBe(0);
+    advanceMonotonic(1);
+    expect(manager.tick()).toBe(1);
+    expect(manager.getStateForPlayer(player1)?.botFillOffer).toMatchObject({
+      status: 'available',
+      waitStartedAt: 1_000,
+      eligibleAt: 16_000,
+      serverTime: 61_000,
+    });
+  });
+
+  it('rejects early, unauthorized, stale, and replayed confirmations', () => {
+    const { manager, advance, sent } = harness();
+    manager.create(player1, 'create_guard_1', 'Alpha', 'rumble', 'mighty_man', intent('rumble', 4));
+    manager.join(player2, 'join_guard_222', 'Bravo', 'ABCDE', 'bruce');
+    for (const [index, playerId] of [player1, player2].entries()) {
+      const state = manager.getStateForPlayer(playerId)!;
+      manager.setReady(playerId, `ready_guard_${index}`, state.partyId, state.version, true);
+    }
+    let state = manager.getStateForPlayer(player1)!;
+    advance(14_999);
+    manager.tick();
+    expect(manager.confirmBotFill(player1, 'confirm_early_1', state.partyId, state.version)).toBe(
+      false,
+    );
+    advance(1);
+    manager.tick();
+    state = manager.getStateForPlayer(player1)!;
+    expect(manager.confirmBotFill(player2, 'confirm_member_1', state.partyId, state.version)).toBe(
+      false,
+    );
+    expect(sent.at(-1)?.message).toMatchObject({ type: 'server:partyError', code: 'not_leader' });
+    expect(manager.confirmBotFill(player1, 'confirm_stale_1', state.partyId, 1)).toBe(false);
+    expect(sent.at(-2)?.message).toMatchObject({ type: 'server:partyError', code: 'stale_party' });
+    expect(manager.confirmBotFill(player1, 'confirm_stale_1', state.partyId, state.version)).toBe(
+      false,
+    );
+    expect(sent.at(-1)?.message).toMatchObject({
+      type: 'server:partyError',
+      code: 'replayed_request',
+    });
+  });
+
+  it('invalidates offers on cancellation, membership, fighter, intent, disconnect, and reconnect edges', () => {
+    const { manager, advance } = harness();
+    manager.create(player1, 'create_reset_1', 'Alpha', 'crew', 'mighty_man', intent('crew', 4));
+    let state = manager.getStateForPlayer(player1)!;
+    manager.setReady(player1, 'ready_reset_11', state.partyId, state.version, true);
+    advance(PARTY_BOT_FILL_WAIT_MS);
+    manager.tick();
+    state = manager.getStateForPlayer(player1)!;
+    expect(state.botFillOffer?.status).toBe('available');
+
+    manager.cancelQueue(player1, 'cancel_reset_1', state.partyId, state.version);
+    state = manager.getStateForPlayer(player1)!;
+    expect(state.botFillOffer).toBeUndefined();
+    manager.updateFighter(player1, 'fighter_reset1', state.partyId, state.version, 'bruce');
+    state = manager.getStateForPlayer(player1)!;
+    expect(state.members[0]?.ready).toBe(false);
+    manager.updateIntent(
+      player1,
+      'intent_reset_11',
+      state.partyId,
+      state.version,
+      intent('crew', 4, 'bruce'),
+    );
+    state = manager.getStateForPlayer(player1)!;
+    manager.setReady(player1, 'ready_reset_22', state.partyId, state.version, true);
+    advance(PARTY_BOT_FILL_WAIT_MS);
+    manager.tick();
+    expect(manager.join(player2, 'join_reset_222', 'Bravo', 'ABCDE', 'mighty_man')).toBe(true);
+    state = manager.getStateForPlayer(player2)!;
+    expect(state).toMatchObject({ lifecycle: 'assembling' });
+    expect(state.botFillOffer).toBeUndefined();
+    expect(state.members.every((member) => !member.ready)).toBe(true);
+    expect(manager.disconnect(player2)).toBe(true);
+    state = manager.getStateForPlayer(player1)!;
+    expect(state.botFillOffer).toBeUndefined();
+    expect(manager.join(player3, 'reconnect_reset', 'Bravo', 'ABCDE', 'mighty_man')).toBe(true);
+    expect(manager.getStateForPlayer(player3)?.botFillOffer).toBeUndefined();
+  });
+
+  it('revalidates schedule and rolls back the requested human intent when confirmation fails', () => {
+    let wallNow = 1_000;
+    const normalize = (value: unknown) =>
+      normalizeMatchIntent(value, {
+        serverTime: wallNow,
+        allowedArenaNames: ['Wasteland Outpost'],
+      });
+    const { manager, advance, sent } = harness([], null, normalize);
+    manager.create(player1, 'create_drift_1', 'Alpha', 'duel', 'mighty_man', intent('duel', 2));
+    let state = manager.getStateForPlayer(player1)!;
+    manager.setReady(player1, 'ready_drift_11', state.partyId, state.version, true);
+    advance(PARTY_BOT_FILL_WAIT_MS);
+    wallNow = 100_000;
+    manager.tick();
+    state = manager.getStateForPlayer(player1)!;
+    expect(manager.confirmBotFill(player1, 'confirm_drift1', state.partyId, state.version)).toBe(
+      false,
+    );
+    expect(sent.at(-2)?.message).toMatchObject({
+      type: 'server:partyError',
+      code: 'invalid_intent',
+    });
+    expect(manager.getStateForPlayer(player1)).toMatchObject({
+      lifecycle: 'assembling',
+      capacity: 2,
+      intent: { composition: { humanCount: 2, botCount: 0 } },
+      members: [{ ready: false }],
     });
   });
 

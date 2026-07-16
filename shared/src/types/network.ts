@@ -48,6 +48,7 @@ export type ClientMessage =
   | ClientUpdatePartyFighterMessage
   | ClientSetPartyReadyMessage
   | ClientCancelPartyQueueMessage
+  | ClientConfirmPartyBotFillMessage
   | ClientStartPracticeMessage
   | ClientCancelMatchmakingMessage
   | ClientRematchRequestMessage
@@ -138,6 +139,14 @@ export interface ClientSetPartyReadyMessage {
 
 export interface ClientCancelPartyQueueMessage {
   type: 'client:cancelPartyQueue';
+  requestId: string;
+  partyId: string;
+  expectedVersion: number;
+}
+
+/** Leader-only confirmation of the currently projected server-owned fill offer. */
+export interface ClientConfirmPartyBotFillMessage {
+  type: 'client:confirmPartyBotFill';
   requestId: string;
   partyId: string;
   expectedVersion: number;

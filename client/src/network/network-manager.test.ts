@@ -766,6 +766,33 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
       type: 'client:cancelPartyQueue',
       expectedVersion: 3,
     });
+    const readyMember = { ...state.members[0], ready: true };
+    deliver({
+      type: 'server:partyState',
+      state: {
+        ...state,
+        version: 4,
+        lifecycle: 'queued',
+        members: [readyMember],
+        slots: [
+          { index: 0, status: 'occupied', member: readyMember },
+          { index: 1, status: 'open' },
+        ],
+        botFillOffer: {
+          status: 'available',
+          waitStartedAt: 1_000,
+          eligibleAt: 16_000,
+          serverTime: 16_000,
+          openSlotCount: 1,
+        },
+      },
+    });
+    manager.confirmPartyBotFill();
+    expect(hoisted.sentMessages.at(-1)).toMatchObject({
+      type: 'client:confirmPartyBotFill',
+      partyId: state.partyId,
+      expectedVersion: 4,
+    });
     deliver({ type: 'server:partyLeft', partyId: state.partyId, reason: 'closed' });
     expect(manager.getPartyState()).toBeNull();
   });

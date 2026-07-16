@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import {
   PARTY_CAPACITY_BY_FORMAT,
+  PARTY_BOT_FILL_WAIT_MS,
   PARTY_CODE_LENGTH,
   PARTY_EMPTY_EXPIRY_MS,
   normalizePartyCode,
@@ -34,6 +35,11 @@ interface MutableParty {
   lifecycle: PartyLifecycle;
   matchId: string | null;
   emptyExpiresAt: number | null;
+  botFillWait: {
+    monotonicStartedAt: number;
+    wallStartedAt: number;
+    available: boolean;
+  } | null;
 }
 
 export interface PartyManagerOptions {
@@ -41,6 +47,7 @@ export interface PartyManagerOptions {
   readonly normalizeIntent: (value: unknown) => Readonly<MatchIntent> | null;
   readonly canEnterParty?: (playerId: PlayerId) => boolean;
   readonly now?: () => number;
+  readonly monotonicNow?: () => number;
   readonly createPartyId?: () => string;
   readonly createCode?: () => string;
   /** Enters the existing generalized match-intent authority once every slot is ready. */
@@ -56,11 +63,13 @@ export class PartyManager {
   private readonly partyIdByPlayer = new Map<PlayerId, string>();
   private readonly seenRequestIds = new Map<PlayerId, Set<string>>();
   private readonly now: () => number;
+  private readonly monotonicNow: () => number;
   private readonly createPartyId: () => string;
   private readonly createCode: () => string;
 
   constructor(private readonly options: PartyManagerOptions) {
     this.now = options.now ?? Date.now;
+    this.monotonicNow = options.monotonicNow ?? this.now;
     this.createPartyId = options.createPartyId ?? (() => crypto.randomUUID());
     this.createCode =
       options.createCode ??
@@ -124,6 +133,7 @@ export class PartyManager {
       lifecycle: 'assembling',
       matchId: null,
       emptyExpiresAt: null,
+      botFillWait: null,
     };
     this.partiesById.set(party.partyId, party);
     this.partyIdByCode.set(code, party.partyId);
@@ -175,7 +185,7 @@ export class PartyManager {
         ready: false,
       }),
     );
-    party.lifecycle = 'assembling';
+    this.resetReadiness(party);
     party.version += 1;
     this.partyIdByPlayer.set(playerId, party.partyId);
     this.broadcastState(party);
@@ -351,6 +361,14 @@ export class PartyManager {
     );
     party.lifecycle = party.members.every((entry) => entry.ready) ? 'queued' : 'assembling';
     party.matchId = null;
+    if (
+      party.lifecycle === 'queued' &&
+      party.members.length < party.intent.composition.humanCount
+    ) {
+      this.startBotFillWait(party);
+    } else {
+      party.botFillWait = null;
+    }
     party.version += 1;
     this.broadcastState(party);
 
@@ -371,6 +389,67 @@ export class PartyManager {
       party.version += 1;
       this.broadcastState(party);
     }
+    return true;
+  }
+
+  confirmBotFill(
+    playerId: PlayerId,
+    requestIdValue: unknown,
+    partyIdValue: unknown,
+    expectedVersionValue: unknown,
+  ): boolean {
+    const mutation = this.authorizeMutation(
+      playerId,
+      requestIdValue,
+      partyIdValue,
+      expectedVersionValue,
+      true,
+    );
+    if (!mutation) return false;
+    const { party, requestId } = mutation;
+    const wait = party.botFillWait;
+    const openSlotCount = party.intent.composition.humanCount - party.members.length;
+    if (
+      party.lifecycle !== 'queued' ||
+      !party.members.every((member) => member.ready) ||
+      openSlotCount < 1 ||
+      wait === null ||
+      !wait.available
+    ) {
+      return this.error(playerId, requestId, 'invalid_request');
+    }
+
+    const originalIntent = party.intent;
+    const confirmedIntent = this.options.normalizeIntent({
+      ...originalIntent,
+      composition: {
+        humanCount: party.members.length,
+        botCount: originalIntent.composition.botCount + openSlotCount,
+      },
+    });
+    if (confirmedIntent === null) {
+      this.resetReadiness(party);
+      party.version += 1;
+      this.error(playerId, requestId, 'invalid_intent');
+      this.broadcastState(party);
+      return false;
+    }
+
+    party.intent = confirmedIntent;
+    party.botFillWait = null;
+    const matchId = this.options.queueParty?.(this.snapshot(party)) ?? null;
+    if (matchId === null) {
+      party.intent = originalIntent;
+      this.resetReadiness(party);
+      party.version += 1;
+      this.error(playerId, requestId, 'invalid_intent');
+      this.broadcastState(party);
+      return false;
+    }
+    party.lifecycle = 'match';
+    party.matchId = matchId;
+    party.version += 1;
+    this.broadcastState(party);
     return true;
   }
 
@@ -437,6 +516,27 @@ export class PartyManager {
     party.version += 1;
     this.broadcastState(party);
     return true;
+  }
+
+  /** Advances only server-owned monotonic offer edges; it never fills automatically. */
+  tick(monotonicNow = this.monotonicNow()): number {
+    let offered = 0;
+    for (const party of this.partiesById.values()) {
+      const wait = party.botFillWait;
+      if (
+        wait === null ||
+        wait.available ||
+        party.lifecycle !== 'queued' ||
+        monotonicNow - wait.monotonicStartedAt < PARTY_BOT_FILL_WAIT_MS
+      ) {
+        continue;
+      }
+      wait.available = true;
+      party.version += 1;
+      this.broadcastState(party);
+      offered += 1;
+    }
+    return offered;
   }
 
   expireEmptyRooms(now = this.now()): number {
@@ -535,6 +635,17 @@ export class PartyManager {
       ...(party.matchId === null ? {} : { matchId: party.matchId }),
       members: Object.freeze(members),
       slots: Object.freeze(slots),
+      ...(party.botFillWait === null
+        ? {}
+        : {
+            botFillOffer: Object.freeze({
+              status: party.botFillWait.available ? ('available' as const) : ('waiting' as const),
+              waitStartedAt: party.botFillWait.wallStartedAt,
+              eligibleAt: party.botFillWait.wallStartedAt + PARTY_BOT_FILL_WAIT_MS,
+              serverTime: this.now(),
+              openSlotCount: party.intent.composition.humanCount - party.members.length,
+            }),
+          }),
       intent: Object.freeze({
         ...party.intent,
         composition: Object.freeze({ ...party.intent.composition }),
@@ -556,6 +667,16 @@ export class PartyManager {
     );
     party.lifecycle = 'assembling';
     party.matchId = null;
+    party.botFillWait = null;
+  }
+
+  private startBotFillWait(party: MutableParty): void {
+    if (party.botFillWait !== null) return;
+    party.botFillWait = {
+      monotonicStartedAt: this.monotonicNow(),
+      wallStartedAt: this.now(),
+      available: false,
+    };
   }
 
   private removeMember(party: MutableParty, playerId: PlayerId): void {

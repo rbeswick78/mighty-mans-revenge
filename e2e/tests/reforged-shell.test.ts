@@ -210,6 +210,7 @@ async function playRosterSnapshot(page: Page): Promise<{
     lifecycle: string;
     members: Array<{ nickname: string; fighterId: string; ready: boolean }>;
     slots: Array<{ status: string }>;
+    botFillOffer?: { status: string; openSlotCount: number };
   } | null;
   partyError: string | null;
 }> {
@@ -231,6 +232,7 @@ async function playRosterSnapshot(page: Page): Promise<{
           lifecycle: string;
           members: Array<{ nickname: string; fighterId: string; ready: boolean }>;
           slots: Array<{ status: string }>;
+          botFillOffer?: { status: string; openSlotCount: number };
         } | null;
         partyError: string | null;
       };
@@ -1043,6 +1045,131 @@ test('Party readiness projects recovery, leadership, and server-owned slots acro
     }
   } finally {
     await memberContext.close();
+  }
+});
+
+test('Party bot fill remains server-offered and requires explicit leader confirmation', async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(60_000);
+  test.skip(
+    !shellAdvertised || !schedulesAdvertised,
+    'Run with both Reforged shell and schedule capabilities for queue fallback.',
+  );
+  const touch = testInfo.project.name === 'mobile-landscape';
+  const liveChromium = testInfo.project.name === 'desktop-chromium';
+  await page.addInitScript(() => {
+    localStorage.setItem('mmr_nickname', 'FillLead');
+    localStorage.setItem('mmr_fighter_selection', 'mighty_man');
+  });
+  await page.goto('/');
+  if (!liveChromium) await stageNonChromiumShell(page, 'staged-fill-leader');
+  await waitForActiveScene(page, 'ReforgedShellScene');
+  await reachDuelPartyReview(page, touch);
+  await clickLogicalPlayOption(page, 1, touch);
+
+  if (liveChromium) {
+    await expect
+      .poll(async () => (await playRosterSnapshot(page)).partyState?.code ?? null)
+      .not.toBeNull();
+    await clickLogicalPlayOption(page, 1, false);
+    await expect
+      .poll(async () => (await playRosterSnapshot(page)).partyState?.botFillOffer?.status ?? null)
+      .toBe('waiting');
+    await expect
+      .poll(async () => (await playRosterSnapshot(page)).partyState?.botFillOffer?.status ?? null, {
+        timeout: 20_000,
+      })
+      .toBe('available');
+    const offered = await playRosterSnapshot(page);
+    expect(offered.optionLabels).toContain('FILL WITH BOTS');
+    expect(offered.partyState?.members).toHaveLength(1);
+    expect(offered.partyState?.slots.map((slot) => slot.status)).toEqual(['occupied', 'open']);
+    await page.screenshot({ path: testInfo.outputPath('party-bot-fill-desktop.png') });
+    await page.setViewportSize({ width: 844, height: 390 });
+    await waitForRenderedFrames(page);
+    await page.screenshot({ path: testInfo.outputPath('party-bot-fill-mobile-chromium.png') });
+    await clickLogicalPlayOption(page, 0, false);
+    await expect
+      .poll(async () => {
+        return page.evaluate(() => {
+          const scenes = (window as unknown as { game?: Phaser.Game }).game?.scene.getScenes(true);
+          return scenes?.some(
+            (scene) =>
+              scene.scene.key === 'CharacterSelectScene' || scene.scene.key === 'GameScene',
+          );
+        });
+      })
+      .toBe(true);
+  } else {
+    const reviewed = (await playRosterSnapshot(page)).serialized;
+    if (!reviewed) throw new Error('missing reviewed roster');
+    await page.evaluate((draft) => {
+      const shell = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+        'ReforgedShellScene',
+      ) as unknown as {
+        gameService: {
+          confirmPartyBotFill(): void;
+          getNetworkManager(): { handleMessage(message: unknown): void };
+        };
+      };
+      const member = {
+        playerId: 'staged-fill-leader',
+        nickname: 'FillLead',
+        fighterId: 'mighty_man',
+        joinedAt: 1,
+        ready: true,
+      };
+      shell.gameService.getNetworkManager().handleMessage({
+        type: 'server:partyState',
+        state: {
+          partyId: 'party_fill_12345678',
+          code: 'ABCDE',
+          joinPath: '/?party=ABCDE',
+          format: 'duel',
+          formatCapacity: 2,
+          capacity: 2,
+          leaderId: 'staged-fill-leader',
+          version: 3,
+          lifecycle: 'queued',
+          members: [member],
+          slots: [
+            { index: 0, status: 'occupied', member },
+            { index: 1, status: 'open' },
+          ],
+          botFillOffer: {
+            status: 'available',
+            waitStartedAt: 1_000,
+            eligibleAt: 16_000,
+            serverTime: 16_000,
+            openSlotCount: 1,
+          },
+          intent: {
+            intentId: 'intent_staged_fill_1',
+            format: 'duel',
+            composition: { humanCount: 2, botCount: 0 },
+            mode: draft.mode,
+            fighterId: 'mighty_man',
+            scheduledArena: {
+              mode: draft.mode,
+              mapName: draft.arenaName,
+              rotationEndsAt: 2_000_000,
+            },
+          },
+        },
+      });
+      shell.gameService.confirmPartyBotFill = () => {
+        (window as unknown as { __botFillConfirmed?: boolean }).__botFillConfirmed = true;
+      };
+    }, reviewed);
+    await waitForRenderedFrames(page);
+    expect((await playRosterSnapshot(page)).optionLabels).toContain('FILL WITH BOTS');
+    await clickLogicalPlayOption(page, 0, touch);
+    expect(
+      await page.evaluate(
+        () => (window as unknown as { __botFillConfirmed?: boolean }).__botFillConfirmed,
+      ),
+    ).toBe(true);
   }
 });
 

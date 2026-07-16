@@ -74,6 +74,7 @@ export class GameManager {
       canEnterParty: (playerId) => !this.matchmaking.isPlayerBusy(playerId),
       queueParty: (state) => this.matchmaking.handleSubmitParty(state),
       now: () => this.now().getTime(),
+      monotonicNow: () => performance.now(),
     });
     this.matchmaking.setPartyLifecycleListener((partyId, lifecycle, matchId) => {
       this.parties.markLifecycle(partyId, lifecycle, matchId);
@@ -249,6 +250,15 @@ export class GameManager {
         );
         break;
 
+      case 'client:confirmPartyBotFill':
+        this.parties.confirmBotFill(
+          playerId,
+          message.requestId,
+          message.partyId,
+          message.expectedVersion,
+        );
+        break;
+
       case 'client:startPractice':
         this.matchmaking.handleStartPractice(
           playerId,
@@ -308,6 +318,7 @@ export class GameManager {
 
   private tick(dt: number, tick: number): void {
     this.matchmaking.tick(dt, tick);
+    this.parties.tick();
     this.parties.expireEmptyRooms();
     this.broadcastArenaScheduleClock();
     if (!this.statsStore || tick % SERVER.TICK_RATE !== 0) return;

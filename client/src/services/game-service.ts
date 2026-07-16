@@ -283,6 +283,10 @@ export class GameService {
     this.networkManager.cancelPartyQueue();
   }
 
+  confirmPartyBotFill(): void {
+    this.networkManager.confirmPartyBotFill();
+  }
+
   getPartyState(): Readonly<PartyState> | null {
     return this.networkManager.getPartyState();
   }

@@ -5,8 +5,8 @@ Read this file and `CLAUDE.md` completely at the start of every batch. The
 completed `docs/REPLAYABILITY_ROADMAP.md` remains the historical record for the
 systems this program preserves and reorganizes.
 
-- **Status:** Batch 13 complete on 2026-07-15.
-- **Next batch:** Batch 14 — Queue fallback.
+- **Status:** Batch 14 complete on 2026-07-15.
+- **Next batch:** Batch 15 — Results and rematches.
 - **Public releases:** Reforged Arena, then Battle Royale.
 - **Working model:** one numbered batch per session, direct commits and pushes
   to `main`, milestone-gated production deployments.
@@ -166,8 +166,8 @@ Production deployment happens only at a gate or for an urgent live fix.
 |  11 | General match intent                   | Navigation    | **DONE — 2026-07-15** |
 |  12 | Party core                             | Navigation    | **DONE — 2026-07-15** |
 |  13 | Party readiness and recovery           | Navigation    | **DONE — 2026-07-15** |
-|  14 | Queue fallback                         | Navigation    | NEXT                  |
-|  15 | Results and rematches                  | Navigation    | Pending               |
+|  14 | Queue fallback                         | Navigation    | **DONE — 2026-07-15** |
+|  15 | Results and rematches                  | Navigation    | NEXT                  |
 |  16 | Legacy flow retirement                 | Navigation    | Pending               |
 |  17 | Journey verification                   | Navigation    | Pending               |
 |  18 | Gameplay viewport cutover              | World/camera  | Pending               |
@@ -549,6 +549,30 @@ Acceptance:
 After 15 seconds waiting on requested humans, show a confirmed bot-fill action.
 Never change the intent automatically; cancellation and connection loss must
 leave no phantom queue or party state.
+
+Acceptance:
+
+- [x] Incomplete ready Duel, Rumble, and Crew parties receive a complete
+      server-authored waiting/available bot-fill offer with a monotonic
+      15-second eligibility edge, captured server-clock timestamps, and exact
+      open-slot count; clients never compute eligibility or infer fill state.
+- [x] No requested human source changes automatically. Only the current leader
+      may confirm the available offer through a fresh request id, exact party
+      id, and current version; early, unauthorized, stale, duplicate, and
+      replayed confirmations fail closed.
+- [x] Confirmation revalidates the normalized intent and current scheduled
+      arena, converts only the still-open human slots to standard Scrapper bots,
+      and enters Batch 11's existing launch path across every legal Duel,
+      Rumble, and Crew human count.
+- [x] Cancellation, membership/readiness/intent/fighter mutation, disconnect,
+      reconnect, schedule drift, launch rejection, and cleanup remove the offer
+      and readiness without a phantom queue, leaked lock, or partial source
+      change.
+- [x] The client atomically renders server offer truth and exposes confirmation
+      only to the projected leader. Batch 5-13 boundaries, legacy and
+      schedules-off fallbacks, Practice, Draft, Character Select, default-false
+      capabilities, Results/rematches, production, world/camera, Battle Royale,
+      and art remain unchanged.
 
 #### Batch 15 — Results and rematches
 
@@ -1545,6 +1569,50 @@ plus mobile-sized Chromium visual evidence remain required. The Batch 2 host
 scheduling drift sample and 15.932 effective Hz observation also remain
 unchanged. None blocks Batch 14.
 
+### Batch 14 — 2026-07-15 — Queue fallback
+
+**Shipped:** Extended the server-owned Duel, Rumble, and Crew party lifecycle
+with a complete waiting/available bot-fill offer after 15 seconds of monotonic
+server time. No requested human source changes automatically. Only the current
+leader can confirm with a fresh request id and exact party/version fence; the
+server then revalidates the intent and scheduled arena, replaces only remaining
+open human slots with established standard Scrapper bots, and enters Batch 11's
+existing launch path. The client atomically renders the authoritative offer and
+never calculates eligibility. Cancellation, membership/readiness/intent/fighter
+mutation, disconnect, reconnect, schedule drift, duplicate, stale, replay, and
+failed-launch paths clear or reject the offer without queue residue.
+
+**Verification:** Selected the shared/server/network cross-package plus
+recovery/timer tier. Focused Vitest passed 92 tests across shared party
+validation, PartyManager, GameManager, and NetworkManager, including exhaustive
+14,999/15,000ms, wall-clock drift, all legal Duel/Rumble/Crew fill products,
+authorization, cancellation, invalidation, schedule revalidation, and recovery.
+The mandatory full `corepack pnpm test` passed 125 files and 1,496 tests.
+`corepack pnpm typecheck`, `corepack pnpm lint`, and full production
+`corepack pnpm build` passed; Vite's established chunk-size advisory remains
+unchanged. With both gated capabilities enabled, the focused bot-fill path and
+the two-client readiness/recovery path each passed desktop Chromium, desktop
+Firefox, and mobile landscape. The schedules-off fixed preview and default-
+false legacy Lobby fallback also passed all three projects. Manual inspection
+found the final 1280×720 and 844×390 Chromium bot-fill captures readable,
+complete, and unclipped. Focused evidence showed no wider journey risk, so the
+unrelated Playwright inventory was not escalated.
+
+**Deployment:** Skipped. Batch 14 remains navigation-milestone code behind
+default-false `newShell` and `schedules` capabilities. No production
+environment or flag changed, and this task did not authorize deployment.
+
+**Deviations:** No product-scope deviation. The first focused Chromium command
+used a Windows quoting form that produced an invalid grep before tests ran; the
+corrected focused command and every final gate passed. RFG-003 still requires
+staged Firefox/WebKit object/input assertions plus mobile-sized Chromium visual
+evidence.
+
+**Known issues:** No new bug ID was required. RFG-001 and RFG-002 remain
+assigned to Batches 20/24 and were untouched. RFG-003 remains unchanged. The
+Batch 2 host scheduling drift sample and 15.932 effective Hz observation also
+remain unchanged. None blocks Batch 15.
+
 ## Next-session prompt
 
 ```text
@@ -1552,58 +1620,63 @@ Continue the Reforged build for Mighty Man's Revenge.
 
 Read docs/REIMAGINING_ROADMAP.md and CLAUDE.md completely first. Read
 docs/REFORGED_BASELINE.md and docs/REFORGED_CAPABILITIES.md before
-implementation. Implement Batch 14 — Queue fallback exactly as specified.
-Preserve unrelated changes and do not begin Batch 15 — Results and rematches.
+implementation. Implement Batch 15 — Results and rematches exactly as
+specified. Preserve unrelated changes and do not begin Batch 16 — Legacy flow
+retirement.
 
-Extend the Batch 13 server-owned Duel, Rumble, and Crew party lifecycle with a
-confirmed bot-fill action after 15 seconds waiting on requested humans. The
-server must own the monotonic wait start, eligibility deadline, offer state,
-confirmation, schedule/intent revalidation, and transition into Batch 11's
-existing launch path. Never change a requested human source automatically:
-only an authorized, version-fenced, replay-protected confirmation may replace
-the remaining open human slots with standard Scrapper bots. Every timer edge,
-offer projection, confirmation, cancellation, membership/readiness mutation,
-disconnect, reconnect, queue transition, and cleanup must be server-normalized,
-idempotent, N-player safe, and leave no phantom queue or party state. A client
-must never compute eligibility or infer fill state.
+Complete the capability-owned standard Play journey through Results and valid
+rematches for retained Duel, Rumble, and Crew parties. Results must render only
+the complete server-owned party, format, participant-source, readiness, match,
+and schedule projections; the client must not infer membership, bots, slots,
+leadership, readiness, rematch eligibility, or arena changes. Retain the
+selected explicit mode. When the prior queue-entry arena slot is still active,
+present that server truth; when it expired, preview the newly active scheduled
+arena and use that current server-owned arena for the rematch. Revalidate the
+party roster, confirmed bot-fill composition, human readiness/consensus,
+format/mode compatibility, fighter locks, schedule, lifecycle, versions, and
+connection state before any rematch enters Batch 11's existing launch path.
+Every result recreation, duplicate request, stale/replayed message, timeout,
+cancel/leave, membership or connection edge, schedule boundary, and cleanup
+must be idempotent, N-player safe, and leave no phantom party, queue, arena
+lock, match, or rematch state.
 
 Preserve the Batch 5 pure Play compatibility/serialization boundary, Batch 6
 persisted Fighters selection and server-authoritative locking, all Batch 7
 Challenges paths, the Batch 8 read-only Records archive, the complete Batch 9
-Settings surfaces, Batch 10 schedule/clock/lock authority and FORCE diagnostics,
-Batch 11 generalized intent normalization/queue ownership, Batch 12 party core,
-Batch 13 readiness/recovery, and the complete legacy Lobby fallback. Do not
-silently or automatically replace a requested human, redesign Reforged Results
-or rematch presentation, add Battle Royale parties/gameplay, retire Draft or
-Character Select, enable a capability by default or in production, change the
-gameplay viewport/camera, alter Practice paths, or begin art work.
+Settings surfaces, Batch 10 schedule/clock/lock authority and FORCE
+diagnostics, Batch 11 generalized intent normalization/queue ownership, Batch
+12 party core, Batch 13 readiness/recovery, Batch 14 confirmed queue fallback,
+and the complete legacy Lobby fallback. Do not retire Draft or Character Select,
+change Practice Results/rematches, silently change participant sources, add
+Battle Royale parties/gameplay, enable a capability by default or in
+production, change the gameplay viewport/camera, or begin art work.
 
-Batch 13 is complete and pushed on main as
-`feat(server): add authoritative party readiness`. Enabled test servers own
-member readiness, deterministic earliest-member leadership transfer, explicit
-occupied/open human slots, cancellation, reconnect/disconnect cleanup, and
-versioned party retention through queue, match, Results, and valid rematches for
-Duel, Rumble, and Crew. Full ready rooms launch only through Batch 11's existing
-schedule-lock and explicit-intent authority; incomplete ready rooms wait with
-their requested open human slots. The client replaces party state atomically
-and never derives membership, leadership, readiness, slots, or recovery. Legacy
-joins remain available, all five capability flags remain default false, and no
-production deployment has run. Batch 14 may extend that waiting lifecycle but
-must not duplicate queue or schedule authority.
+Batch 14 is complete and pushed on main as
+`feat(server): add confirmed party bot fill`. Enabled test servers now project
+a monotonic 15-second waiting/available offer for incomplete ready parties. No
+human source changes automatically; only the current leader's fresh,
+version-fenced, replay-protected confirmation revalidates schedule/intent,
+converts remaining open slots to standard Scrapper bots, and reuses Batch 11's
+launch authority. Cancellation, membership/readiness/intent/fighter mutation,
+disconnect, reconnect, schedule drift, and failed launch clear the offer without
+queue residue. The client renders offer truth atomically and never computes
+eligibility. Legacy joins remain available, all five capability flags remain
+default false, and no production deployment has run.
 
-Choose and document the shared/server/network cross-package plus recovery/timer
-tier from the roadmap's risk-based matrix. Add exhaustive deterministic
-14,999ms/15,000ms eligibility, server-clock, offer, confirmation, cancellation,
-membership/readiness/intent/fighter invalidation, disconnect/reconnect, schedule
-drift, duplicate, stale, replay, and N-player coverage across Duel, Rumble, and
-Crew. Run the full `corepack pnpm test` suite, typecheck, lint, relevant
-production builds, targeted desktop/mobile evidence, legacy plus capability-off
-fallback, and a focused multi-browser multi-client timer/recovery subset;
-escalate if focused evidence shows wider risk. Update roadmap acceptance
-evidence, capability and architecture docs, the bug ledger if needed, and the
-Session Log. Run the end-of-batch ritual, commit and push directly to main, skip
-deployment unless explicitly authorized, and end with the fenced paste-ready
-prompt for Batch 15.
+Choose and document the shared/server/network cross-package plus
+recovery/rematch tier from the roadmap's risk-based matrix. Add exhaustive
+deterministic still-active/expired schedule-boundary, retained-human and
+confirmed-bot composition, readiness/consensus, Results recreation, duplicate,
+stale, replay, cancellation, leave, disconnect/reconnect, schedule drift,
+fighter/format/mode invalidation, cleanup, and N-player coverage across Duel,
+Rumble, and Crew. Run the full `corepack pnpm test` suite, typecheck, lint,
+relevant production builds, targeted desktop/mobile Results evidence, legacy
+plus capability-off fallback, and a focused multi-browser multi-client
+Results/rematch/recovery subset; escalate if focused evidence shows wider risk.
+Update roadmap acceptance evidence, capability and architecture docs, the bug
+ledger if needed, and the Session Log. Run the end-of-batch ritual, commit and
+push directly to main, skip deployment unless explicitly authorized, and end
+with the fenced paste-ready prompt for Batch 16.
 
 Carry-over warnings: RFG-001 CameraKick and RFG-002 ZoomPulse overwrite future
 base camera state and remain assigned to Batches 20/24. RFG-003 means headless
@@ -1615,5 +1688,5 @@ remained far below the 50ms budget. Batch 4 broadened RFG-003 evidence: the
 staged mobile WebKit Reforged-shell PNG is also black, so use mobile-sized
 Chromium for visual evidence while retaining staged WebKit object/input
 assertions. Use Corepack pnpm 10.33.0 if the local pnpm shim selects a mismatched
-version. Batch 15 follows Batch 14.
+version. Batch 16 follows Batch 15.
 ```

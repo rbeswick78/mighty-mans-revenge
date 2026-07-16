@@ -182,6 +182,7 @@ export class ReforgedShellScene extends Phaser.Scene {
       onUpdatePartyIntent: (draft) => this.updatePartyIntent(draft),
       onSetPartyReady: (ready) => this.gameService.setPartyReady(ready),
       onCancelPartyQueue: () => this.gameService.cancelPartyQueue(),
+      onConfirmPartyBotFill: () => this.gameService.confirmPartyBotFill(),
       onCancel: () => this.gameService.cancelMatchmaking(),
     }).setDepth(SHELL_DEPTH.panel);
     this.playRosterPanel.setPartyState(

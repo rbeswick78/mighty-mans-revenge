@@ -449,6 +449,17 @@ export class NetworkManager {
     });
   }
 
+  confirmPartyBotFill(): void {
+    const state = this.partyState;
+    if (!state?.botFillOffer || state.botFillOffer.status !== 'available') return;
+    this.connection.send({
+      type: 'client:confirmPartyBotFill',
+      requestId: crypto.randomUUID(),
+      partyId: state.partyId,
+      expectedVersion: state.version,
+    });
+  }
+
   getPartyState(): Readonly<PartyState> | null {
     return this.partyState;
   }

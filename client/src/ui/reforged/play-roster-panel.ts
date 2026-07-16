@@ -44,6 +44,7 @@ interface PlayRosterPanelOptions {
   readonly onUpdatePartyIntent: (draft: SerializedPlayRosterDraft) => boolean;
   readonly onSetPartyReady: (ready: boolean) => void;
   readonly onCancelPartyQueue: () => void;
+  readonly onConfirmPartyBotFill: () => void;
   readonly onCancel: () => void;
 }
 
@@ -360,6 +361,14 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
               if (draft) this.options.onUpdatePartyIntent(draft);
             },
           });
+          if (this.partyState.botFillOffer?.status === 'available') {
+            const openSlotCount = this.partyState.botFillOffer.openSlotCount;
+            definitions.unshift({
+              label: 'FILL WITH BOTS',
+              detail: `CONFIRM ${openSlotCount} SCRAPPER ${openSlotCount === 1 ? 'BOT' : 'BOTS'}`,
+              onSelect: this.options.onConfirmPartyBotFill,
+            });
+          }
           for (const member of this.partyState.members) {
             if (member.playerId === this.localPlayerId) continue;
             definitions.push({
@@ -519,10 +528,16 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
         .filter((slot) => slot.status === 'open')
         .map((slot) => `OPEN HUMAN SLOT ${slot.index + 1}`)
         .join('\n');
+      const fillState = this.partyState.botFillOffer
+        ? this.partyState.botFillOffer.status === 'available'
+          ? `BOT FILL OFFER READY  /  ${this.partyState.botFillOffer.openSlotCount} OPEN`
+          : 'WAITING FOR HUMANS  /  BOT FILL OFFER PENDING'
+        : '';
       return [
         `PARTY ${this.partyState.code}  /  ${this.partyState.format.toUpperCase()}  /  ${this.partyState.members.length} OF ${this.partyState.capacity} HUMAN SLOTS`,
         members,
         openSlots,
+        fillState,
         `${modeLabel(this.partyState.intent.mode)}  /  ${this.partyState.intent.scheduledArena.mapName.toUpperCase()}`,
         this.partyError
           ? `REQUEST REJECTED  /  ${this.partyError.toUpperCase()}`

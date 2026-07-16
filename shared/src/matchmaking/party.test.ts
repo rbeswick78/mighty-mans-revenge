@@ -113,6 +113,36 @@ describe('party code and link compatibility boundary', () => {
       },
     };
     expect(isPartyState(state)).toBe(true);
+    const waiting = {
+      ...state,
+      version: 2,
+      lifecycle: 'queued',
+      members: [{ ...state.members[0], ready: true }],
+      slots: [
+        { index: 0, status: 'occupied', member: { ...state.members[0], ready: true } },
+        { index: 1, status: 'open' },
+      ],
+      botFillOffer: {
+        status: 'waiting',
+        waitStartedAt: 1_000,
+        eligibleAt: 16_000,
+        serverTime: 1_000,
+        openSlotCount: 1,
+      },
+    };
+    expect(isPartyState(waiting)).toBe(true);
+    expect(
+      isPartyState({
+        ...waiting,
+        botFillOffer: { ...waiting.botFillOffer, openSlotCount: 2 },
+      }),
+    ).toBe(false);
+    expect(
+      isPartyState({
+        ...waiting,
+        botFillOffer: { ...waiting.botFillOffer, eligibleAt: 15_999 },
+      }),
+    ).toBe(false);
     expect(isPartyState({ ...state, joinPath: '/?party=FGHJK' })).toBe(false);
     expect(isPartyState({ ...state, leaderId: 'missing' })).toBe(false);
     expect(

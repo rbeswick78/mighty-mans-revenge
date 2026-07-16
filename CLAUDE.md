@@ -284,6 +284,22 @@ fail closed. Do not infer vacancies or recovery from member counts, do not route
 an incomplete party into generalized matchmaking, and do not add Batch 14's
 timed bot-fill offer automatically.
 
+**Reforged queue fallback (Batch 14):** an incomplete party whose current
+humans are all ready now receives a complete server-owned `botFillOffer` with
+waiting/available state, captured wall-clock timestamps, and explicit open-slot
+count. Eligibility advances from a monotonic server clock at exactly 15
+seconds; clients display only the projected state and never derive a deadline.
+No source changes automatically. Only the current leader may send the additive
+`client:confirmPartyBotFill` mutation with a fresh request id, exact party id,
+and current version. Authority then revalidates the normalized intent and
+scheduled arena, converts only the remaining open human slots to the existing
+standard Scrapper bot source, and enters Batch 11's launch path. Cancellation,
+membership/readiness/intent/fighter changes, disconnect, and reconnect clear
+the offer and readiness. Invalid, early, duplicate, stale, replayed,
+schedule-drifted, or capability-off confirmations fail closed without a
+phantom queue or source change. Batch 15 owns Reforged Results and rematch
+presentation; capability defaults and legacy paths remain unchanged.
+
 ### Why This Matters for Agents
 
 Client prediction and server simulation **must use identical physics code** from `/shared`. If you change movement, collision, or physics logic, you must change it in `/shared` and verify both client and server still agree. A mismatch between client prediction and server authority causes visible rubber-banding.

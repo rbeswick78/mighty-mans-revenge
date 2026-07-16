@@ -10,6 +10,7 @@ import {
 export const PARTY_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 export const PARTY_CODE_LENGTH = 5;
 export const PARTY_EMPTY_EXPIRY_MS = 60_000;
+export const PARTY_BOT_FILL_WAIT_MS = 15_000;
 export const PARTY_CAPACITY_BY_FORMAT: Readonly<Record<MatchFormat, number>> = Object.freeze({
   duel: 2,
   rumble: 4,
@@ -25,6 +26,16 @@ export interface PartyMember {
 }
 
 export type PartyLifecycle = 'assembling' | 'queued' | 'match' | 'results';
+
+export interface PartyBotFillOffer {
+  /** Server-owned state; clients never derive availability from the timestamps. */
+  readonly status: 'waiting' | 'available';
+  readonly waitStartedAt: number;
+  readonly eligibleAt: number;
+  /** Wall-clock sample captured with this authoritative projection. */
+  readonly serverTime: number;
+  readonly openSlotCount: number;
+}
 
 export type PartySlot =
   | {
@@ -54,6 +65,8 @@ export interface PartyState {
   readonly members: readonly PartyMember[];
   /** Complete server-authored slot projection; clients never derive vacancies. */
   readonly slots: readonly PartySlot[];
+  /** Present only while every connected human is ready and human slots remain open. */
+  readonly botFillOffer?: Readonly<PartyBotFillOffer>;
   readonly intent: Readonly<MatchIntent>;
 }
 
@@ -215,6 +228,27 @@ export function isPartyState(value: unknown): value is PartyState {
         return false;
       }
     } else if (slot['status'] !== 'open' || 'member' in slot) {
+      return false;
+    }
+  }
+  const botFillOffer = value['botFillOffer'];
+  if (botFillOffer !== undefined) {
+    const openSlotCount = capacity - members.length;
+    if (
+      !isRecord(botFillOffer) ||
+      value['lifecycle'] !== 'queued' ||
+      openSlotCount < 1 ||
+      !members.every((member) => member.ready) ||
+      (botFillOffer['status'] !== 'waiting' && botFillOffer['status'] !== 'available') ||
+      typeof botFillOffer['waitStartedAt'] !== 'number' ||
+      !Number.isFinite(botFillOffer['waitStartedAt']) ||
+      typeof botFillOffer['eligibleAt'] !== 'number' ||
+      !Number.isFinite(botFillOffer['eligibleAt']) ||
+      botFillOffer['eligibleAt'] - botFillOffer['waitStartedAt'] !== PARTY_BOT_FILL_WAIT_MS ||
+      typeof botFillOffer['serverTime'] !== 'number' ||
+      !Number.isFinite(botFillOffer['serverTime']) ||
+      botFillOffer['openSlotCount'] !== openSlotCount
+    ) {
       return false;
     }
   }
