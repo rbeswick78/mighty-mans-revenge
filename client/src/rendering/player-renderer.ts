@@ -17,6 +17,7 @@ import {
 import { batHeldRotation, batSwingRotations } from './bat-presentation.js';
 import { deathVariantPrefix } from './death-variant.js';
 import { armorPresentation } from '../ui/armor-presentation.js';
+import { declareWorldSpace } from './gameplay-coordinate-space.js';
 
 const SPRITE_SCALE = 3;
 
@@ -366,6 +367,9 @@ export class PlayerRenderer {
       this.teammateMarkerText,
     );
     this.container = scene.add.container(0, 0, children);
+    // The fighter container owns its objective/social markers and particles;
+    // the whole hierarchy is explicitly world-space.
+    declareWorldSpace(this.container);
     // Position the wand for the initial 'down' direction.
     if (this.wandGraphics) this.applyWandTransform('down');
   }
@@ -802,6 +806,7 @@ export class PlayerRenderer {
         frequency: 50,
         follow: this.container,
       });
+      declareWorldSpace(this.sprintParticles);
     } else if (!active && this.sprintParticles) {
       const emitter = this.sprintParticles;
       emitter.stop();

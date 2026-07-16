@@ -3,6 +3,7 @@ import type { PlayerId } from '@shared/types/common.js';
 import type { ScrapstormState } from '@shared/types/game.js';
 import { MUTATORS } from '@shared/config/game.js';
 import { MAP_HEIGHT_PX, MAP_WIDTH_PX } from '../ui/layout.js';
+import { declareScreenSpace, declareWorldSpace } from './gameplay-coordinate-space.js';
 
 const SCRAPSTORM_COLOR = 0xff6b35;
 const SCRAPSTORM_GLOW = 0xffc857;
@@ -36,9 +37,10 @@ export function scrapstormPresentation(
   return {
     visible: true,
     targeted: localPlayerId !== null && state.targetPlayerId === localPlayerId,
-    progress: Math.max(0, Math.min(1,
-      1 - state.secondsUntilImpact / MUTATORS.SCRAPSTORM_WARNING_SECONDS,
-    )),
+    progress: Math.max(
+      0,
+      Math.min(1, 1 - state.secondsUntilImpact / MUTATORS.SCRAPSTORM_WARNING_SECONDS),
+    ),
     fillAlpha: 0.1 + pulse * 0.07,
     ringAlpha: 0.68 + pulse * 0.28,
     countdown: `${Math.max(0, state.secondsUntilImpact).toFixed(1)}S`,
@@ -54,37 +56,36 @@ export class ScrapstormRenderer {
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
-    this.warning = scene.add.graphics().setDepth(1402);
-    this.countdown = scene.add
-      .text(0, 0, '', {
-        fontFamily: 'monospace',
-        fontSize: '15px',
-        color: '#fff0c2',
-        stroke: '#4a1608',
-        strokeThickness: 4,
-      })
-      .setOrigin(0.5)
+    this.warning = declareWorldSpace(scene.add.graphics()).setDepth(1402);
+    this.countdown = declareWorldSpace(
+      scene.add
+        .text(0, 0, '', {
+          fontFamily: 'monospace',
+          fontSize: '15px',
+          color: '#fff0c2',
+          stroke: '#4a1608',
+          strokeThickness: 4,
+        })
+        .setOrigin(0.5),
+    )
       .setDepth(1403)
       .setVisible(false);
-    this.localWarning = scene.add
-      .text(MAP_WIDTH_PX / 2, MAP_HEIGHT_PX - 28, 'SCRAPSTORM - MOVE!', {
-        fontFamily: 'monospace',
-        fontSize: '15px',
-        color: '#fff0c2',
-        stroke: '#4a1608',
-        strokeThickness: 4,
-      })
-      .setOrigin(0.5)
-      .setScrollFactor(0)
+    this.localWarning = declareScreenSpace(
+      scene.add
+        .text(MAP_WIDTH_PX / 2, MAP_HEIGHT_PX - 28, 'SCRAPSTORM - MOVE!', {
+          fontFamily: 'monospace',
+          fontSize: '15px',
+          color: '#fff0c2',
+          stroke: '#4a1608',
+          strokeThickness: 4,
+        })
+        .setOrigin(0.5),
+    )
       .setDepth(1451)
       .setVisible(false);
   }
 
-  update(
-    state: ScrapstormState | null,
-    localPlayerId: PlayerId | null,
-    timeMs: number,
-  ): void {
+  update(state: ScrapstormState | null, localPlayerId: PlayerId | null, timeMs: number): void {
     const view = scrapstormPresentation(state, localPlayerId, timeMs);
     this.warning.clear();
     if (!state?.targetPosition || !view.visible) {
@@ -106,13 +107,7 @@ export class ScrapstormRenderer {
     // requiring the player to parse the numeric countdown.
     this.warning.lineStyle(5, SCRAPSTORM_GLOW, view.ringAlpha);
     this.warning.beginPath();
-    this.warning.arc(
-      x,
-      y,
-      radius + 9,
-      -Math.PI / 2,
-      -Math.PI / 2 + Math.PI * 2 * view.progress,
-    );
+    this.warning.arc(x, y, radius + 9, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * view.progress);
     this.warning.strokePath();
 
     // Four inward ticks keep the exact danger boundary legible over busy maps.

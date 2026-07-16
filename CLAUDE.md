@@ -347,6 +347,21 @@ contract. Current arenas, world coordinates, camera scroll/zoom, fixed
 unchanged until Batches 19-22. Do not center or scroll the world, migrate the
 HUD, or repair transient camera composition inside this boundary.
 
+**Reforged coordinate separation (Batch 19):** `GameplayCoordinateSpace` is
+the single gameplay boundary for branded logical screen points, authoritative/
+rendered world points, screen-to-world conversion through Phaser's live camera
+matrix, and the inverse world-to-screen affine transform. Keyboard pointer aim
+and touch-stick direction both cross that boundary explicitly; fixed-map touch
+admission converts logical screen input to world Y before applying the retained
+960x576 board limit. Cursor/touch controls and warning/full-screen effects use
+the shared screen-space declaration helpers, while fighters and their markers,
+KOTH/Core Run/Kill Confirmed objectives, aim/trail/impact/explosion particles,
+and world warnings declare world space. At the Batch 18 camera origin these
+transforms remain identity on both desktop and mobile. Camera scroll `(0, 0)`,
+zoom `1`, fixed maps/render targets/HUD geometry, physics, simulation, wire
+state, and every capability-off compatibility path remain unchanged. Batch 20
+owns follow, clamping, targets, and repair of transient camera composition.
+
 ### Why This Matters for Agents
 
 Client prediction and server simulation **must use identical physics code** from `/shared`. If you change movement, collision, or physics logic, you must change it in `/shared` and verify both client and server still agree. A mismatch between client prediction and server authority causes visible rubber-banding.

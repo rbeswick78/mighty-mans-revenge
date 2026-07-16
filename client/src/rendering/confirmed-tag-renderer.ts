@@ -4,6 +4,7 @@ import type { PlayerId } from '@shared/types/common.js';
 import { Wasteland, cssHex } from '@shared/config/palette.js';
 import { MENU_FONTS } from '../ui/menu/fonts.js';
 import { confirmedTagPresentation } from '../ui/confirmed-tag.js';
+import { declareWorldSpace, placeInWorld, worldPointFrom } from './gameplay-coordinate-space.js';
 
 interface RenderedTag {
   container: Phaser.GameObjects.Container;
@@ -34,7 +35,7 @@ export class ConfirmedTagRenderer {
         rendered.ownTag = ownTag;
         this.restyle(rendered, ownTag);
       }
-      rendered.container.setPosition(state.position.x, state.position.y);
+      placeInWorld(rendered.container, worldPointFrom(state.position));
     }
 
     for (const [id, rendered] of this.tags) {
@@ -56,9 +57,8 @@ export class ConfirmedTagRenderer {
     });
     label.setOrigin(0.5, 0);
     const visual = this.scene.add.container(0, 0, [diamond, label]);
-    const container = this.scene.add.container(state.position.x, state.position.y, [
-      visual,
-    ]);
+    const container = this.scene.add.container(state.position.x, state.position.y, [visual]);
+    declareWorldSpace(container);
     container.setDepth(20);
     const bobTween = this.scene.tweens.add({
       targets: visual,

@@ -167,6 +167,18 @@ change in this batch. The capability remains strict, server-owned, and default
 false; Batches 19-24 own transforms, camera, dynamic rendering, HUD, minimap,
 and the regression gate before any large arena can be exposed.
 
+Batch 19 centralizes the client-only coordinate-domain boundary behind that
+same default-false capability without changing capability negotiation or
+exposure. Gameplay screen and world points are explicit; pointer aim and touch
+direction use the live camera transform; current fixed-map touch admission
+checks transformed world Y; cursor/touch/full-screen overlays are screen-pinned;
+and objectives, fighter markers, and particles are world-space. At the retained
+camera origin and zoom the transform is identity, so old-server, false/absent/
+malformed capability, reconnect, and disconnect paths keep exact 960x720
+behavior while enabled desktop and mobile keep one 1280x720 logical view.
+Camera follow, clamping, transient composition, scrolling, dynamic rendering,
+HUD migration, and capability exposure remain later-batch work.
+
 ## Server-first rollout and rollback
 
 For each capability, keep this order:

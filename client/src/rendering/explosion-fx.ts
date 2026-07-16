@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { declareWorldSpace, placeInWorld, worldPoint } from './gameplay-coordinate-space.js';
 
 /**
  * Explosion debris particles. A radial burst of pooled `Phaser.GameObjects.Image`
@@ -75,6 +76,7 @@ export class ExplosionFx {
 
     for (let i = 0; i < MAX_DEBRIS; i++) {
       const img = scene.add.image(0, 0, DEBRIS_TEXTURE_KEY);
+      declareWorldSpace(img);
       img.setDepth(EXPLOSION_FX_DEPTH);
       img.setVisible(false);
       img.setActive(false);
@@ -146,7 +148,7 @@ export class ExplosionFx {
     const scale = DEBRIS_SCALE_MIN + Math.random() * (DEBRIS_SCALE_MAX - DEBRIS_SCALE_MIN);
     d.img.setActive(true);
     d.img.setVisible(true);
-    d.img.setPosition(x, y);
+    placeInWorld(d.img, worldPoint(x, y));
     d.img.setRotation(Math.random() * Math.PI * 2);
     d.img.setScale(scale);
     d.img.setAlpha(1);

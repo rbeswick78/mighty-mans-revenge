@@ -1,6 +1,11 @@
 import Phaser from 'phaser';
 import type { Vec2 } from '@shared/types/common.js';
 import type { RawInput } from './types.js';
+import {
+  type GameplayCoordinateSpace,
+  screenPoint,
+  worldPointFrom,
+} from '../rendering/gameplay-coordinate-space.js';
 
 /**
  * Mouse buttons we care about. We listen on the canvas directly because
@@ -37,7 +42,10 @@ export class KeyboardMouseInput {
   private tauntPressedFlag = false;
   private readonly onTauntKeyDown: (event: KeyboardEvent) => void;
 
-  constructor(scene: Phaser.Scene) {
+  constructor(
+    scene: Phaser.Scene,
+    private readonly coordinates: GameplayCoordinateSpace,
+  ) {
     this.scene = scene;
 
     if (!scene.input.keyboard) {
@@ -117,13 +125,9 @@ export class KeyboardMouseInput {
     }
 
     // Aim angle from player → mouse cursor in world space.
-    const worldPoint = this.scene.cameras.main.getWorldPoint(
-      this.pointer.x,
-      this.pointer.y,
-    );
-    const aimAngle = Math.atan2(
-      worldPoint.y - playerWorldPos.y,
-      worldPoint.x - playerWorldPos.x,
+    const aimAngle = this.coordinates.aimAngle(
+      worldPointFrom(playerWorldPos),
+      screenPoint(this.pointer.x, this.pointer.y),
     );
 
     // Drain the edge flags. Reading them once-per-tick guarantees a single

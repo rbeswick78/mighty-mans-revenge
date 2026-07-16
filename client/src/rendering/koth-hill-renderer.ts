@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { KOTH, MAP } from '@shared/config/game.js';
 import type { KothHudState } from '@shared/types/network.js';
 import { Wasteland } from '@shared/config/palette.js';
+import { declareWorldSpace, worldPoint } from './gameplay-coordinate-space.js';
 
 /**
  * Draws the King of the Hill zone on the gameboard: a pulsing filled
@@ -19,6 +20,7 @@ export class KothHillRenderer {
 
   constructor(scene: Phaser.Scene) {
     this.gfx = scene.add.graphics();
+    declareWorldSpace(this.gfx);
   }
 
   update(state: KothHudState | null, localPlayerId: string | null, timeMs: number): void {
@@ -28,17 +30,14 @@ export class KothHillRenderer {
     if (!state?.hill) return;
 
     const size = KOTH.HILL_SIZE_TILES * MAP.TILE_SIZE;
-    const x = state.hill.x * MAP.TILE_SIZE;
-    const y = state.hill.y * MAP.TILE_SIZE;
+    const hill = worldPoint(state.hill.x * MAP.TILE_SIZE, state.hill.y * MAP.TILE_SIZE);
+    const { x, y } = hill;
 
     let color: number = Wasteland.TEXT_PRIMARY;
     if (state.contested) {
       color = Wasteland.TEXT_LOADING;
     } else if (state.occupantId !== null) {
-      color =
-        state.occupantId === localPlayerId
-          ? Wasteland.HEALTH_GOOD
-          : Wasteland.TEXT_DEATH;
+      color = state.occupantId === localPlayerId ? Wasteland.HEALTH_GOOD : Wasteland.TEXT_DEATH;
     }
 
     // Soft pulsing fill + steady border.
@@ -74,8 +73,11 @@ export class KothHillRenderer {
     if (state.nextHill) {
       const blink = Math.floor(timeMs / 250) % 2 === 0;
       if (blink) {
-        const nx = state.nextHill.x * MAP.TILE_SIZE;
-        const ny = state.nextHill.y * MAP.TILE_SIZE;
+        const nextHill = worldPoint(
+          state.nextHill.x * MAP.TILE_SIZE,
+          state.nextHill.y * MAP.TILE_SIZE,
+        );
+        const { x: nx, y: ny } = nextHill;
         this.gfx.lineStyle(2, Wasteland.TEXT_RELOAD_WARNING, 0.9);
         this.gfx.strokeRect(nx + 1, ny + 1, size - 2, size - 2);
       }

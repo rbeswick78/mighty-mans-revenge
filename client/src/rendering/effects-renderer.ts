@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import type { Vec2 } from '@shared/types/common.js';
 import { Wasteland, cssHex } from '@shared/config/palette.js';
 import { bucketAimAngle } from './sprite-direction.js';
+import { declareWorldSpace, worldPoint } from './gameplay-coordinate-space.js';
 
 const AIM_LINE_ALPHA = 0.6;
 const AIM_LINE_THICKNESS = 2;
@@ -77,7 +78,7 @@ export class EffectsRenderer {
 
   private ensureAimGraphic(): Phaser.GameObjects.Graphics {
     if (!this.aimGraphic) {
-      this.aimGraphic = this.scene.add.graphics();
+      this.aimGraphic = declareWorldSpace(this.scene.add.graphics());
       // Render below players (depth 10) so the line doesn't obscure them.
       this.aimGraphic.setDepth(5);
     }
@@ -94,7 +95,9 @@ export class EffectsRenderer {
     const angle = Math.atan2(endY - startY, endX - startX);
 
     // Bullet head — tiny 2×1 sprite, rotated to direction of travel.
-    const bullet = this.scene.add.image(startX, startY, 'bullet');
+    const start = worldPoint(startX, startY);
+    const end = worldPoint(endX, endY);
+    const bullet = declareWorldSpace(this.scene.add.image(start.x, start.y, 'bullet'));
     bullet.setOrigin(0.5, 0.5);
     bullet.setScale(BULLET_SCALE);
     bullet.setRotation(angle);
@@ -114,12 +117,13 @@ export class EffectsRenderer {
         alpha: { start: BULLET_TAIL_ALPHA_START, end: 0 },
         tint: Wasteland.BULLET_TRAIL,
       });
+      declareWorldSpace(tail);
     }
 
     this.scene.tweens.add({
       targets: bullet,
-      x: endX,
-      y: endY,
+      x: end.x,
+      y: end.y,
       duration: BULLET_TRAVEL_MS,
       ease: 'Linear',
       onComplete: () => {
@@ -139,7 +143,8 @@ export class EffectsRenderer {
   showMuzzleFlash(x: number, y: number, angle: number): void {
     const direction = bucketAimAngle(angle);
     const key = `fire_${direction}`;
-    const flash = this.scene.add.sprite(x, y, key, 0);
+    const point = worldPoint(x, y);
+    const flash = declareWorldSpace(this.scene.add.sprite(point.x, point.y, key, 0));
     flash.setOrigin(0.5, 0.5);
     flash.setScale(MUZZLE_FLASH_SCALE);
     flash.play(key);
@@ -150,7 +155,10 @@ export class EffectsRenderer {
 
   showExplosion(x: number, y: number): void {
     // Expanding ring
-    const circle = this.scene.add.circle(x, y, 8, Wasteland.EXPLOSION_RING, 0.8);
+    const point = worldPoint(x, y);
+    const circle = declareWorldSpace(
+      this.scene.add.circle(point.x, point.y, 8, Wasteland.EXPLOSION_RING, 0.8),
+    );
     this.scene.tweens.add({
       targets: circle,
       scaleX: 8,
@@ -164,7 +172,9 @@ export class EffectsRenderer {
     });
 
     // Inner bright flash
-    const flash = this.scene.add.circle(x, y, 4, Wasteland.EXPLOSION_FLASH, 1);
+    const flash = declareWorldSpace(
+      this.scene.add.circle(point.x, point.y, 4, Wasteland.EXPLOSION_FLASH, 1),
+    );
     this.scene.tweens.add({
       targets: flash,
       scaleX: 4,
@@ -185,7 +195,7 @@ export class EffectsRenderer {
 
   /** Fast under-player streak and arrival ring for Rook's predicted dash. */
   showDash(start: Vec2, end: Vec2): void {
-    const streak = this.scene.add.graphics();
+    const streak = declareWorldSpace(this.scene.add.graphics());
     streak.setDepth(9);
     streak.lineStyle(12, DASH_COLOR, 0.14);
     streak.beginPath();
@@ -198,7 +208,7 @@ export class EffectsRenderer {
     streak.lineTo(end.x, end.y);
     streak.strokePath();
 
-    const arrival = this.scene.add.circle(end.x, end.y, 9, DASH_COLOR, 0.18);
+    const arrival = declareWorldSpace(this.scene.add.circle(end.x, end.y, 9, DASH_COLOR, 0.18));
     arrival.setDepth(9);
     arrival.setStrokeStyle(2, DASH_COLOR, 0.8);
 
@@ -225,15 +235,11 @@ export class EffectsRenderer {
    * Play an authoritative fighter-hit splash. `variantSeed` comes from the
    * server timestamp, so every client chooses the same cosmetic variation.
    */
-  showPlayerHit(
-    x: number,
-    y: number,
-    bulletAngle: number,
-    variantSeed: number,
-  ): void {
+  showPlayerHit(x: number, y: number, bulletAngle: number, variantSeed: number): void {
     const index = Math.abs(Math.trunc(variantSeed)) % PLAYER_HIT_SPLASH_KEYS.length;
     const key = PLAYER_HIT_SPLASH_KEYS[index];
-    const splash = this.scene.add.sprite(x, y, key, 0);
+    const point = worldPoint(x, y);
+    const splash = declareWorldSpace(this.scene.add.sprite(point.x, point.y, key, 0));
     splash.setOrigin(0.5, 0.5);
     splash.setScale(PLAYER_HIT_SPLASH_SCALE);
     splash.setRotation(bulletAngle);
@@ -255,6 +261,7 @@ export class EffectsRenderer {
         quantity: 5,
         emitting: false,
       });
+      declareWorldSpace(emitter);
       emitter.setDepth(PLAYER_HIT_SPLASH_DEPTH);
       emitter.explode(5);
       this.scene.time.delayedCall(300, () => {
@@ -264,12 +271,15 @@ export class EffectsRenderer {
   }
 
   showDamageNumber(x: number, y: number, damage: number): void {
-    const text = this.scene.add.text(x, y, `-${damage}`, {
-      fontFamily: 'Courier, monospace',
-      fontSize: '14px',
-      color: cssHex(Wasteland.TEXT_DAMAGE),
-      fontStyle: 'bold',
-    });
+    const point = worldPoint(x, y);
+    const text = declareWorldSpace(
+      this.scene.add.text(point.x, point.y, `-${damage}`, {
+        fontFamily: 'Courier, monospace',
+        fontSize: '14px',
+        color: cssHex(Wasteland.TEXT_DAMAGE),
+        fontStyle: 'bold',
+      }),
+    );
     text.setOrigin(0.5, 0.5);
 
     this.scene.tweens.add({
@@ -285,7 +295,10 @@ export class EffectsRenderer {
   }
 
   showPickupEffect(x: number, y: number): void {
-    const flash = this.scene.add.circle(x, y, 8, Wasteland.PICKUP_FLASH, 0.8);
+    const point = worldPoint(x, y);
+    const flash = declareWorldSpace(
+      this.scene.add.circle(point.x, point.y, 8, Wasteland.PICKUP_FLASH, 0.8),
+    );
     this.scene.tweens.add({
       targets: flash,
       scaleX: 3,
@@ -308,6 +321,7 @@ export class EffectsRenderer {
         quantity: 8,
         emitting: false,
       });
+      declareWorldSpace(emitter);
       emitter.explode(8);
       this.scene.time.delayedCall(500, () => {
         emitter.destroy();

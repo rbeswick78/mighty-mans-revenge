@@ -3,6 +3,7 @@ import type { PlayerId } from '@shared/types/common.js';
 import type { CoreRunState } from '@shared/types/game.js';
 import { Wasteland, cssHex } from '@shared/config/palette.js';
 import { MENU_FONTS } from '../ui/menu/fonts.js';
+import { declareWorldSpace, placeInWorld, worldPoint } from './gameplay-coordinate-space.js';
 
 const LOOSE_COLOR = 0xffc857;
 const LOCAL_COLOR = 0x7dffb2;
@@ -32,6 +33,7 @@ export class CoreRunRenderer {
     this.label.setOrigin(0.5, 0);
     this.visual = scene.add.container(0, 0, [this.glow, this.core, this.label]);
     this.container = scene.add.container(0, 0, [this.visual]);
+    declareWorldSpace(this.container);
     this.container.setDepth(24).setVisible(false);
     this.pulse = scene.tweens.add({
       targets: this.visual,
@@ -45,10 +47,7 @@ export class CoreRunRenderer {
     this.restyle('loose');
   }
 
-  update(
-    state: CoreRunState | null,
-    localPlayerId: PlayerId | null,
-  ): void {
+  update(state: CoreRunState | null, localPlayerId: PlayerId | null): void {
     if (!state) {
       this.container.setVisible(false);
       this.positioned = false;
@@ -56,21 +55,20 @@ export class CoreRunRenderer {
     }
 
     const relation =
-      state.carrierId === null
-        ? 'loose'
-        : state.carrierId === localPlayerId
-          ? 'local'
-          : 'rival';
+      state.carrierId === null ? 'loose' : state.carrierId === localPlayerId ? 'local' : 'rival';
     if (relation !== this.relation) this.restyle(relation);
 
     const targetY = state.position.y + (state.carrierId === null ? 0 : -30);
     if (!this.positioned) {
-      this.container.setPosition(state.position.x, targetY);
+      placeInWorld(this.container, worldPoint(state.position.x, targetY));
       this.positioned = true;
     } else {
-      this.container.setPosition(
-        Phaser.Math.Linear(this.container.x, state.position.x, 0.4),
-        Phaser.Math.Linear(this.container.y, targetY, 0.4),
+      placeInWorld(
+        this.container,
+        worldPoint(
+          Phaser.Math.Linear(this.container.x, state.position.x, 0.4),
+          Phaser.Math.Linear(this.container.y, targetY, 0.4),
+        ),
       );
     }
     this.container.setVisible(true);
@@ -78,11 +76,8 @@ export class CoreRunRenderer {
 
   private restyle(relation: 'loose' | 'local' | 'rival'): void {
     this.relation = relation;
-    const color = relation === 'local'
-      ? LOCAL_COLOR
-      : relation === 'rival'
-        ? RIVAL_COLOR
-        : LOOSE_COLOR;
+    const color =
+      relation === 'local' ? LOCAL_COLOR : relation === 'rival' ? RIVAL_COLOR : LOOSE_COLOR;
     this.glow.setFillStyle(color, 0.22);
     this.core.clear();
     this.core.fillStyle(color, 1);

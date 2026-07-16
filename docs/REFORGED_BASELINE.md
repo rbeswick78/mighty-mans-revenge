@@ -120,6 +120,28 @@ camera ownership, dynamic rendering, and responsive HUD placement. Mobile-
 sized Chromium is the trusted visual source; staged WebKit remains object/input
 evidence under RFG-003.
 
+### Batch 19 coordinate separation evidence
+
+`client/src/rendering/gameplay-coordinate-space.ts` now owns branded logical
+screen and world points, Phaser-camera screen-to-world conversion, the exact
+inverse affine world-to-screen path, transformed screen direction/aim helpers,
+fixed-world bounds checks, and explicit screen/world object declarations.
+Keyboard pointer aim and touch-stick aim use this boundary; touch admission
+converts screen input to world Y before preserving the current 576px board
+limit. The crosshair, touch controls, radiation/scrapstorm/X-ray/full-screen
+warnings, fighters and their markers, KOTH/Core Run/Kill Confirmed objectives,
+and aim/trail/impact/explosion particles now declare their domain.
+
+Deterministic tests cover camera-origin identity, transformed round trips,
+scroll/zoom/rotation/viewport-offset affine matrices, pointer and touch aim,
+desktop/mobile logical equivalence, fixed-map bounds, and screen-pinned versus
+world-space placement. Live Phaser evidence confirms those domains and identity
+conversions on the retained 960x720 fallback and capability-owned 1280x720
+surface. No base camera, transient camera layer, map origin/dimension, render
+target, HUD, physics, simulation, wire, or server behavior changed. Mobile-
+sized Chromium remains the trusted visual source; staged mobile WebKit remains
+black under RFG-003.
+
 ## Adjacent bug reproductions
 
 `client/src/rendering/camera-baseline.test.ts` intentionally asserts current

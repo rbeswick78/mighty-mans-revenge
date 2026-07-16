@@ -71,6 +71,11 @@ import {
   BLOOM_STRENGTH,
 } from '../rendering/post-fx/bloom-config.js';
 import { Crosshair } from '../rendering/crosshair.js';
+import {
+  type GameplayCoordinateSpace,
+  createGameplayCoordinateSpace,
+  declareScreenSpace,
+} from '../rendering/gameplay-coordinate-space.js';
 import { combatCalloutFor, withGauntletStyle } from '../ui/combat-callout.js';
 import { confirmedTagCallout } from '../ui/confirmed-tag.js';
 import { killFeedPresentation } from '../ui/kill-feed-presentation.js';
@@ -190,6 +195,7 @@ export class GameScene extends Phaser.Scene {
   private gameService!: GameService;
   private gameplayViewport: GameplayViewportContract = gameplayViewportForCapabilities(undefined);
   private gameplaySafeArea: GameplayOverlaySafeArea | null = null;
+  private gameplayCoordinates!: GameplayCoordinateSpace;
   private nickname = '';
   private matchData: MatchData | null = null;
   private currentTick = 0;
@@ -307,6 +313,10 @@ export class GameScene extends Phaser.Scene {
       this.scale,
       this.gameService.getServerCapabilities(),
     );
+    this.gameplayCoordinates = createGameplayCoordinateSpace(
+      this.cameras.main,
+      this.gameplayViewport.worldBounds,
+    );
     this.scale.on(Phaser.Scale.Events.RESIZE, this.layoutGameplayViewport, this);
     this.layoutGameplayViewport();
     this.cameras.main.fadeIn(300, 0, 0, 0);
@@ -380,10 +390,11 @@ export class GameScene extends Phaser.Scene {
     // Bullseye replaces the OS cursor on desktop only — touch input
     // doesn't have a hover position to track.
     if (!isTouchDevice()) {
-      this.crosshair = new Crosshair(this);
+      this.crosshair = new Crosshair(this, this.gameplayCoordinates);
     }
     this.inputManager = new InputManager(
       this,
+      this.gameplayCoordinates,
       this.matchData?.gameMode === GameModeType.ONE_IN_THE_CHAMBER,
     );
     this.matchMenuGamepad = new MenuGamepadInput();
@@ -1203,6 +1214,10 @@ export class GameScene extends Phaser.Scene {
     return Object.freeze({ viewport: this.gameplayViewport, safeArea: this.gameplaySafeArea });
   }
 
+  getGameplayCoordinateSpace(): GameplayCoordinateSpace {
+    return this.gameplayCoordinates;
+  }
+
   private layoutGameplayViewport(): void {
     this.gameplaySafeArea =
       this.gameplayViewport.mode === 'large-world'
@@ -1319,16 +1334,21 @@ export class GameScene extends Phaser.Scene {
       if (this.leavingMatch) return;
       this.matchMenu?.setAvailable(false);
       // Show disconnect message
-      const msg = this.add
-        .text(this.cameras.main.width / 2, this.cameras.main.height / 2, 'OPPONENT DISCONNECTED', {
-          fontFamily: '"Courier New", Courier, monospace',
-          fontSize: '24px',
-          color: cssHex(Wasteland.TEXT_DISCONNECT),
-          stroke: '#000000',
-          strokeThickness: 4,
-        })
+      const msg = declareScreenSpace(
+        this.add.text(
+          this.cameras.main.width / 2,
+          this.cameras.main.height / 2,
+          'OPPONENT DISCONNECTED',
+          {
+            fontFamily: '"Courier New", Courier, monospace',
+            fontSize: '24px',
+            color: cssHex(Wasteland.TEXT_DISCONNECT),
+            stroke: '#000000',
+            strokeThickness: 4,
+          },
+        ),
+      )
         .setOrigin(0.5)
-        .setScrollFactor(0)
         .setDepth(2000);
 
       this.time.delayedCall(3000, () => {
@@ -1919,23 +1939,32 @@ export class GameScene extends Phaser.Scene {
     this.connectionLostTransitionStarted = true;
     const centerX = this.scale.width / 2;
     const centerY = this.scale.height / 2;
-    this.add
-      .rectangle(centerX, centerY, this.scale.width, this.scale.height, Wasteland.CANVAS_BG, 0.82)
-      .setDepth(20_000);
-    this.add
-      .text(centerX, centerY - 20, 'SIGNAL LOST', {
+    declareScreenSpace(
+      this.add.rectangle(
+        centerX,
+        centerY,
+        this.scale.width,
+        this.scale.height,
+        Wasteland.CANVAS_BG,
+        0.82,
+      ),
+    ).setDepth(20_000);
+    declareScreenSpace(
+      this.add.text(centerX, centerY - 20, 'SIGNAL LOST', {
         fontFamily: MENU_FONTS.HEADER,
         fontSize: '24px',
         color: cssHex(Wasteland.HIT_FLASH),
-      })
+      }),
+    )
       .setOrigin(0.5)
       .setDepth(20_001);
-    this.add
-      .text(centerX, centerY + 22, 'RETURNING TO THE OUTPOST...', {
+    declareScreenSpace(
+      this.add.text(centerX, centerY + 22, 'RETURNING TO THE OUTPOST...', {
         fontFamily: MENU_FONTS.BODY,
         fontSize: '18px',
         color: cssHex(Wasteland.COVER_FILL),
-      })
+      }),
+    )
       .setOrigin(0.5)
       .setDepth(20_001);
     AudioManager.getInstance()?.stopMusic();

@@ -8,6 +8,7 @@ import type { RawInput } from './types.js';
 import { withoutSecondaryActions } from './combat-input.js';
 import { GamepadInput } from './gamepad-input.js';
 import type { TouchAbilityState } from './touch-action-presentation.js';
+import type { GameplayCoordinateSpace } from '../rendering/gameplay-coordinate-space.js';
 
 export type InputMode = 'keyboard' | 'touch' | 'gamepad';
 
@@ -28,9 +29,13 @@ export class InputManager {
   /** Out-of-band edge; never enters authoritative movement prediction. */
   private tauntPressed = false;
 
-  constructor(scene: Phaser.Scene, secondaryActionsDisabled = false) {
-    this.keyboardMouseInput = new KeyboardMouseInput(scene);
-    this.touchInput = new TouchInput(scene, !secondaryActionsDisabled);
+  constructor(
+    scene: Phaser.Scene,
+    coordinates: GameplayCoordinateSpace,
+    secondaryActionsDisabled = false,
+  ) {
+    this.keyboardMouseInput = new KeyboardMouseInput(scene, coordinates);
+    this.touchInput = new TouchInput(scene, coordinates, !secondaryActionsDisabled);
     this.gamepadInput = new GamepadInput();
     this.canvas = scene.game.canvas;
 
@@ -158,9 +163,7 @@ export class InputManager {
 
   acknowledgeInput(sequenceNumber: number): void {
     this.lastAcknowledged = sequenceNumber;
-    const idx = this.inputBuffer.findIndex(
-      (input) => input.sequenceNumber > sequenceNumber,
-    );
+    const idx = this.inputBuffer.findIndex((input) => input.sequenceNumber > sequenceNumber);
     if (idx > 0) {
       this.inputBuffer.splice(0, idx);
     } else if (idx === -1 && this.inputBuffer.length > 0) {

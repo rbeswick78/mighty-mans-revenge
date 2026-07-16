@@ -2,7 +2,12 @@ import Phaser from 'phaser';
 import type { RawInput } from './types.js';
 import { isTouchDevice } from './is-touch-device.js';
 import { Wasteland, cssHex } from '@shared/config/palette.js';
-import { MAP_HEIGHT_PX, TOUCH_ACTION_TOP_PX } from '../ui/layout.js';
+import { TOUCH_ACTION_TOP_PX } from '../ui/layout.js';
+import {
+  type GameplayCoordinateSpace,
+  placeOnScreen,
+  screenPoint,
+} from '../rendering/gameplay-coordinate-space.js';
 import {
   TAUNT_BUTTON_LABEL,
   abilityButtonLabel,
@@ -91,7 +96,11 @@ export class TouchInput {
   private sprintActive = false;
   private readonly isTouch: boolean;
 
-  constructor(scene: Phaser.Scene, secondaryActionsEnabled = true) {
+  constructor(
+    scene: Phaser.Scene,
+    private readonly coordinates: GameplayCoordinateSpace,
+    secondaryActionsEnabled = true,
+  ) {
     this.scene = scene;
     this.isTouch = isTouchDevice();
     this.secondaryActionsEnabled = secondaryActionsEnabled;
@@ -105,8 +114,14 @@ export class TouchInput {
     const btnX = width - GRENADE_BUTTON_MARGIN - GRENADE_BUTTON_SIZE;
     const btnY = TOUCH_ACTION_TOP_PX + GRENADE_BUTTON_SIZE;
 
-    this.grenadeButton = scene.add.circle(btnX, btnY, GRENADE_BUTTON_SIZE, GRENADE_AIM_COLOR, GRENADE_AIM_ALPHA);
-    this.grenadeButton.setScrollFactor(0);
+    this.grenadeButton = scene.add.circle(
+      btnX,
+      btnY,
+      GRENADE_BUTTON_SIZE,
+      GRENADE_AIM_COLOR,
+      GRENADE_AIM_ALPHA,
+    );
+    placeOnScreen(this.grenadeButton, screenPoint(btnX, btnY));
     this.grenadeButton.setDepth(3000);
     this.grenadeButton.setVisible(false);
 
@@ -117,7 +132,7 @@ export class TouchInput {
       ACTION_BUTTON_TEXT_STYLE,
     );
     this.grenadeButtonText.setOrigin(0.5, 0.5);
-    this.grenadeButtonText.setScrollFactor(0);
+    placeOnScreen(this.grenadeButtonText, screenPoint(btnX, btnY));
     this.grenadeButtonText.setDepth(3001);
     this.grenadeButtonText.setVisible(false);
 
@@ -143,8 +158,14 @@ export class TouchInput {
     const abilityX = btnX;
     const abilityY = btnY + GRENADE_BUTTON_SIZE + ABILITY_BUTTON_GAP + ABILITY_BUTTON_SIZE;
 
-    this.abilityButton = scene.add.circle(abilityX, abilityY, ABILITY_BUTTON_SIZE, ABILITY_READY_COLOR, ABILITY_BUTTON_ALPHA);
-    this.abilityButton.setScrollFactor(0);
+    this.abilityButton = scene.add.circle(
+      abilityX,
+      abilityY,
+      ABILITY_BUTTON_SIZE,
+      ABILITY_READY_COLOR,
+      ABILITY_BUTTON_ALPHA,
+    );
+    placeOnScreen(this.abilityButton, screenPoint(abilityX, abilityY));
     this.abilityButton.setDepth(3000);
     this.abilityButton.setVisible(false);
 
@@ -155,7 +176,7 @@ export class TouchInput {
       ACTION_BUTTON_TEXT_STYLE,
     );
     this.abilityButtonText.setOrigin(0.5, 0.5);
-    this.abilityButtonText.setScrollFactor(0);
+    placeOnScreen(this.abilityButtonText, screenPoint(abilityX, abilityY));
     this.abilityButtonText.setDepth(3001);
     this.abilityButtonText.setVisible(false);
 
@@ -175,7 +196,8 @@ export class TouchInput {
       Wasteland.TEXT_LOADING,
       0.65,
     );
-    this.tauntButton.setScrollFactor(0).setDepth(3000).setVisible(false);
+    placeOnScreen(this.tauntButton, screenPoint(tauntX, tauntY));
+    this.tauntButton.setDepth(3000).setVisible(false);
 
     this.tauntButtonText = scene.add.text(
       tauntX,
@@ -183,7 +205,8 @@ export class TouchInput {
       TAUNT_BUTTON_LABEL,
       ACTION_BUTTON_TEXT_STYLE,
     );
-    this.tauntButtonText.setOrigin(0.5).setScrollFactor(0).setDepth(3001).setVisible(false);
+    this.tauntButtonText.setOrigin(0.5).setDepth(3001).setVisible(false);
+    placeOnScreen(this.tauntButtonText, screenPoint(tauntX, tauntY));
     this.tauntButton.on('pointerdown', () => {
       if (!this.gameplayEnabled) return;
       this.tauntButtonPressedFlag = true;
@@ -251,12 +274,12 @@ export class TouchInput {
 
   private createJoystick(): VirtualJoystick {
     const base = this.scene.add.circle(0, 0, BASE_RADIUS, Wasteland.JOYSTICK, BASE_ALPHA);
-    base.setScrollFactor(0);
+    placeOnScreen(base, screenPoint(0, 0));
     base.setDepth(3000);
     base.setVisible(false);
 
     const thumb = this.scene.add.circle(0, 0, THUMB_RADIUS, Wasteland.JOYSTICK, THUMB_ALPHA);
-    thumb.setScrollFactor(0);
+    placeOnScreen(thumb, screenPoint(0, 0));
     thumb.setDepth(3001);
     thumb.setVisible(false);
 
@@ -277,7 +300,7 @@ export class TouchInput {
   private onPointerDown(pointer: Phaser.Input.Pointer): void {
     if (!this.isTouch) return;
     if (!this.gameplayEnabled) return;
-    if (pointer.y >= MAP_HEIGHT_PX) return;
+    if (!this.coordinates.containsWorldYAtScreenPoint(screenPoint(pointer.x, pointer.y))) return;
 
     this.showTouchUI();
 
@@ -310,10 +333,7 @@ export class TouchInput {
     this.updateJoystickIfMatches(this.rightJoystick, pointer);
   }
 
-  private updateJoystickIfMatches(
-    joystick: VirtualJoystick,
-    pointer: Phaser.Input.Pointer,
-  ): void {
+  private updateJoystickIfMatches(joystick: VirtualJoystick, pointer: Phaser.Input.Pointer): void {
     if (!joystick.active || joystick.pointerId !== pointer.id) return;
 
     const dx = pointer.x - joystick.originX;
@@ -399,7 +419,9 @@ export class TouchInput {
     // angle (so the burst fires in that direction on release).
     const rightOutOfDeadZone = aimVec.x !== 0 || aimVec.y !== 0;
     if (rightOutOfDeadZone) {
-      this.rightJoystick.lastAimAngle = Math.atan2(aimVec.y, aimVec.x);
+      this.rightJoystick.lastAimAngle = this.coordinates.screenDirectionAngle(
+        screenPoint(aimVec.x, aimVec.y),
+      );
       this.rightJoystick.wasOutOfDeadZone = true;
     } else if (this.rightJoystick.wasOutOfDeadZone && this.rightJoystick.active) {
       // The thumb returned inside the dead zone without lifting — treat that

@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { type GameplayCoordinateSpace, screenPoint } from './gameplay-coordinate-space.js';
 
 /**
  * Depth above HUD (which is around 1000) so the crosshair is never
@@ -21,11 +22,14 @@ export class Crosshair {
   private canvasLeaveHandler: () => void;
   private pointerInside = false;
 
-  constructor(scene: Phaser.Scene) {
+  constructor(
+    scene: Phaser.Scene,
+    private readonly coordinates: GameplayCoordinateSpace,
+  ) {
     this.scene = scene;
 
     this.sprite = scene.add.image(0, 0, 'crosshair');
-    this.sprite.setScrollFactor(0);
+    this.coordinates.placeOnScreen(this.sprite, screenPoint(0, 0));
     this.sprite.setDepth(CROSSHAIR_DEPTH);
     this.sprite.setAlpha(CROSSHAIR_ALPHA);
     this.sprite.setVisible(false);
@@ -54,7 +58,7 @@ export class Crosshair {
     // will fire, so seed visibility from the current hover state.
     if (canvas.matches(':hover')) {
       const pointer = scene.input.activePointer;
-      this.sprite.setPosition(pointer.x, pointer.y);
+      this.coordinates.placeOnScreen(this.sprite, screenPoint(pointer.x, pointer.y));
       this.pointerInside = true;
       this.sprite.setVisible(true);
     }
@@ -62,7 +66,7 @@ export class Crosshair {
 
   update(enabled: boolean = true): void {
     const pointer = this.scene.input.activePointer;
-    this.sprite.setPosition(pointer.x, pointer.y);
+    this.coordinates.placeOnScreen(this.sprite, screenPoint(pointer.x, pointer.y));
     this.sprite.setVisible(enabled && this.pointerInside);
   }
 

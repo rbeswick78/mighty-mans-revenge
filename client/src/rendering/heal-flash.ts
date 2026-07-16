@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { Wasteland } from '@shared/config/palette.js';
+import { declareScreenSpace } from './gameplay-coordinate-space.js';
 
 const FLASH_ALPHA = 0.4;
 const FLASH_DURATION_MS = 1000;
@@ -28,7 +29,7 @@ export class HealFlash {
       FLASH_ALPHA,
     );
     flash.setOrigin(0, 0);
-    flash.setScrollFactor(0);
+    declareScreenSpace(flash);
     flash.setDepth(HEAL_FLASH_DEPTH);
     this.scene.tweens.add({
       targets: flash,

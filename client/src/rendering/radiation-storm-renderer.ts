@@ -3,6 +3,7 @@ import type { Vec2 } from '@shared/types/common.js';
 import type { RadiationStormState } from '@shared/types/game.js';
 import { isOutsideRadiationStorm } from '@shared/utils/radiation-storm.js';
 import { MAP_HEIGHT_PX, MAP_WIDTH_PX } from '../ui/layout.js';
+import { declareScreenSpace, declareWorldSpace } from './gameplay-coordinate-space.js';
 
 const RADIATION_COLOR = 0x8cff2f;
 
@@ -39,23 +40,23 @@ export class RadiationStormRenderer {
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
-    this.boundary = scene.add.graphics().setDepth(1400);
-    this.wash = scene.add
-      .rectangle(0, 0, MAP_WIDTH_PX, MAP_HEIGHT_PX, RADIATION_COLOR, 0)
-      .setOrigin(0, 0)
-      .setScrollFactor(0)
+    this.boundary = declareWorldSpace(scene.add.graphics()).setDepth(1400);
+    this.wash = declareScreenSpace(
+      scene.add.rectangle(0, 0, MAP_WIDTH_PX, MAP_HEIGHT_PX, RADIATION_COLOR, 0).setOrigin(0, 0),
+    )
       .setDepth(1450)
       .setVisible(false);
-    this.warning = scene.add
-      .text(MAP_WIDTH_PX / 2, MAP_HEIGHT_PX - 28, 'RADIATION - MOVE INSIDE', {
-        fontFamily: 'monospace',
-        fontSize: '15px',
-        color: '#d8ff9b',
-        stroke: '#18330d',
-        strokeThickness: 4,
-      })
-      .setOrigin(0.5)
-      .setScrollFactor(0)
+    this.warning = declareScreenSpace(
+      scene.add
+        .text(MAP_WIDTH_PX / 2, MAP_HEIGHT_PX - 28, 'RADIATION - MOVE INSIDE', {
+          fontFamily: 'monospace',
+          fontSize: '15px',
+          color: '#d8ff9b',
+          stroke: '#18330d',
+          strokeThickness: 4,
+        })
+        .setOrigin(0.5),
+    )
       .setDepth(1451)
       .setVisible(false);
   }

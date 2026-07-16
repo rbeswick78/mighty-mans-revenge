@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 
 import type { CollisionGrid } from '@shared/types/map.js';
 import { sampleIsWall } from './wall-sample.js';
+import { declareWorldSpace, placeInWorld, worldPoint } from './gameplay-coordinate-space.js';
 
 /**
  * Bullet-impact sparks + dust puffs. Pooled — every transient particle is a
@@ -100,15 +101,11 @@ export class ImpactFx {
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
     bakeSparkTexture(scene, SPARK_TEXTURE_KEY, SPARK_TEXTURE_SIZE_PX);
-    bakeDustTexture(
-      scene,
-      DUST_TEXTURE_KEY,
-      DUST_TEXTURE_RADIUS_PX,
-      DUST_TEXTURE_GRADIENT_STEPS,
-    );
+    bakeDustTexture(scene, DUST_TEXTURE_KEY, DUST_TEXTURE_RADIUS_PX, DUST_TEXTURE_GRADIENT_STEPS);
 
     for (let i = 0; i < MAX_SPARKS; i++) {
       const img = scene.add.image(0, 0, SPARK_TEXTURE_KEY);
+      declareWorldSpace(img);
       img.setDepth(IMPACT_FX_DEPTH);
       img.setVisible(false);
       img.setActive(false);
@@ -116,6 +113,7 @@ export class ImpactFx {
     }
     for (let i = 0; i < MAX_DUST; i++) {
       const img = scene.add.image(0, 0, DUST_TEXTURE_KEY);
+      declareWorldSpace(img);
       img.setDepth(IMPACT_FX_DEPTH);
       img.setVisible(false);
       img.setActive(false);
@@ -127,12 +125,7 @@ export class ImpactFx {
    * Emit sparks (and dust if the bullet hit a wall) at an impact point.
    * `bulletAngle` is the bullet's travel direction in radians.
    */
-  spawnBulletImpact(
-    x: number,
-    y: number,
-    bulletAngle: number,
-    grid: CollisionGrid | null,
-  ): void {
+  spawnBulletImpact(x: number, y: number, bulletAngle: number, grid: CollisionGrid | null): void {
     const isWall = sampleIsWall(grid, x, y, bulletAngle);
     const sparkCount = isWall ? SPARK_COUNT_WALL : SPARK_COUNT_AIR;
     const dustCount = isWall ? DUST_COUNT_WALL : DUST_COUNT_AIR;
@@ -185,8 +178,7 @@ export class ImpactFx {
       d.img.setPosition(x, y);
 
       const r =
-        DUST_INITIAL_RADIUS_PX +
-        (DUST_MAX_RADIUS_PX - DUST_INITIAL_RADIUS_PX) * easeOutCubic(t);
+        DUST_INITIAL_RADIUS_PX + (DUST_MAX_RADIUS_PX - DUST_INITIAL_RADIUS_PX) * easeOutCubic(t);
       d.img.setScale(r / DUST_TEXTURE_RADIUS_PX);
       d.img.setAlpha(DUST_INITIAL_ALPHA * (1 - t));
     }
@@ -221,7 +213,7 @@ export class ImpactFx {
 
     s.img.setActive(true);
     s.img.setVisible(true);
-    s.img.setPosition(x, y);
+    placeInWorld(s.img, worldPoint(x, y));
     s.img.setRotation(angle);
     s.img.setScale(
       SPARK_LENGTH_PX / SPARK_TEXTURE_SIZE_PX,
@@ -249,7 +241,7 @@ export class ImpactFx {
 
     d.img.setActive(true);
     d.img.setVisible(true);
-    d.img.setPosition(x, y);
+    placeInWorld(d.img, worldPoint(x, y));
     d.img.setRotation(0);
     d.img.setScale(DUST_INITIAL_RADIUS_PX / DUST_TEXTURE_RADIUS_PX);
     d.img.setAlpha(DUST_INITIAL_ALPHA);
@@ -293,12 +285,7 @@ function bakeSparkTexture(scene: Phaser.Scene, key: string, size: number): void 
   g.destroy();
 }
 
-function bakeDustTexture(
-  scene: Phaser.Scene,
-  key: string,
-  radius: number,
-  steps: number,
-): void {
+function bakeDustTexture(scene: Phaser.Scene, key: string, radius: number, steps: number): void {
   if (scene.textures.exists(key)) return;
   const g = scene.make.graphics({ x: 0, y: 0 }, false);
   for (let i = steps; i >= 1; i--) {

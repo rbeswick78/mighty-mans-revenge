@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { declareScreenSpace } from './gameplay-coordinate-space.js';
 
 const FLASH_COLOR = 0xffffff;
 const FLASH_ALPHA = 0.55;
@@ -33,16 +34,9 @@ export class KillJuice {
 
   private flash(): void {
     const cam = this.scene.cameras.main;
-    const flash = this.scene.add.rectangle(
-      0,
-      0,
-      cam.width,
-      cam.height,
-      FLASH_COLOR,
-      FLASH_ALPHA,
-    );
+    const flash = this.scene.add.rectangle(0, 0, cam.width, cam.height, FLASH_COLOR, FLASH_ALPHA);
     flash.setOrigin(0, 0);
-    flash.setScrollFactor(0);
+    declareScreenSpace(flash);
     flash.setDepth(KILL_JUICE_DEPTH);
     // Tweens run on the scene's tweens manager — when freeze() sets its
     // timeScale to 0, the alpha hold-then-fade lines up automatically with

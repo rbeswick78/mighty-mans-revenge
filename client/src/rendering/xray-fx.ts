@@ -4,6 +4,12 @@ import type { CollisionGrid } from '@shared/types/map.js';
 import { PLAYER } from '@shared/config/game.js';
 import { raycastAgainstGrid } from '@shared/utils/collision.js';
 import { MAP_HEIGHT_PX, MAP_WIDTH_PX } from '../ui/layout.js';
+import {
+  declareScreenSpace,
+  declareWorldSpace,
+  placeInWorld,
+  worldPointFrom,
+} from './gameplay-coordinate-space.js';
 
 const TINT_DEPTH = 1500;
 const BORDER_DEPTH = 1600;
@@ -54,7 +60,7 @@ export class XrayFx {
       XRAY_TINT_ALPHA,
     );
     this.tintRect.setOrigin(0, 0);
-    this.tintRect.setScrollFactor(0);
+    declareScreenSpace(this.tintRect);
     this.tintRect.setDepth(TINT_DEPTH);
     this.tintRect.setVisible(false);
 
@@ -81,7 +87,7 @@ export class XrayFx {
     this.borderRects = [this.borderTop, this.borderBottom, this.borderLeft, this.borderRight];
     for (const rect of this.borderRects) {
       rect.setOrigin(0, 0);
-      rect.setScrollFactor(0);
+      declareScreenSpace(rect);
       rect.setDepth(BORDER_DEPTH);
       rect.setVisible(false);
     }
@@ -94,8 +100,7 @@ export class XrayFx {
     deltaMs: number,
   ): void {
     const active = localState !== null && localState.abilityActiveSeconds > 0;
-    const isMightyMan =
-      active && localState !== null && localState.characterId === 'mighty_man';
+    const isMightyMan = active && localState !== null && localState.characterId === 'mighty_man';
     const isBruce = active && localState !== null && localState.characterId === 'bruce';
 
     if (active) {
@@ -156,9 +161,10 @@ export class XrayFx {
           SILHOUETTE_ALPHA,
         );
         rect.setDepth(SILHOUETTE_DEPTH);
+        declareWorldSpace(rect);
         this.silhouettes.set(other.id, rect);
       }
-      rect.setPosition(other.position.x, other.position.y);
+      placeInWorld(rect, worldPointFrom(other.position));
       rect.setVisible(true);
     }
 
