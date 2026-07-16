@@ -6,12 +6,14 @@ import type {
   LeaderboardEntry,
   ServerCapabilities,
   ServerDailyGauntletLeaderboardMessage,
+  ServerMatchmakingStatusMessage,
 } from '@shared/types/network.js';
+import type { MatchIntent } from '@shared/matchmaking/match-intent.js';
 import { MenuGamepadInput } from '../input/menu-gamepad.js';
 import type { NormalizedArenaSchedule } from '../network/arena-schedule.js';
 import type { ConnectionState } from '../network/types.js';
 import { GameService, type MatchData } from '../services/game-service.js';
-import { readCallsign } from '../ui/callsign.js';
+import { isCallsignReady, readCallsign } from '../ui/callsign.js';
 import { MENU_FONTS } from '../ui/menu/fonts.js';
 import type { ReforgedChallengeStartRequest } from '../ui/reforged/challenge-menu.js';
 import { ChallengesPanel, type ChallengesPanelSnapshot } from '../ui/reforged/challenges-panel.js';
@@ -21,6 +23,7 @@ import { FightersPanel, type FightersPanelSnapshot } from '../ui/reforged/fighte
 import { MenuFocusNavigator } from '../ui/reforged/focus-navigation.js';
 import { menuSceneForCapabilities } from '../ui/reforged/menu-route.js';
 import { PlayRosterPanel, type PlayRosterPanelSnapshot } from '../ui/reforged/play-roster-panel.js';
+import type { SerializedPlayRosterDraft } from '../ui/reforged/play-roster-builder.js';
 import { playSchedulePresentation } from '../ui/reforged/arena-schedule-presentation.js';
 import { RecordsPanel, type RecordsPanelSnapshot } from '../ui/reforged/records-panel.js';
 import type { ReforgedRecordsServerSnapshots } from '../ui/reforged/records-model.js';
@@ -82,6 +85,7 @@ export class ReforgedShellScene extends Phaser.Scene {
   private onCapabilitiesChanged: ((capabilities: Readonly<ServerCapabilities>) => void) | null =
     null;
   private onLobbyConfig: ((schedule: NormalizedArenaSchedule | null) => void) | null = null;
+  private onMatchmakingStatus: ((status: ServerMatchmakingStatusMessage) => void) | null = null;
   private onReconnecting: (() => void) | null = null;
   private onDisconnected: (() => void) | null = null;
   private onFullscreenChange: (() => void) | null = null;
@@ -161,7 +165,10 @@ export class ReforgedShellScene extends Phaser.Scene {
       availability: playSchedule.availability,
       arenaStatusByMode: playSchedule.arenaStatusByMode,
       fighterId: this.selectedFighterId,
+      entryEnabled: this.canSubmitMatchIntent(),
       onPointerIntent: () => this.enterPlayInput(false),
+      onSubmit: (draft) => this.submitPlayIntent(draft),
+      onCancel: () => this.gameService.cancelMatchmaking(),
     }).setDepth(SHELL_DEPTH.panel);
     this.fightersPanel = new FightersPanel(this, {
       initialFighterId: this.selectedFighterId,
@@ -408,6 +415,11 @@ export class ReforgedShellScene extends Phaser.Scene {
         presentation.availability,
         presentation.arenaStatusByMode,
       );
+      this.playRosterPanel?.setEntryEnabled(this.canSubmitMatchIntent(schedule));
+    };
+    this.onMatchmakingStatus = (status) => {
+      if (status.status === 'queued') this.playRosterPanel?.setQueued(true);
+      if (status.status === 'cancelled') this.playRosterPanel?.setQueued(false);
     };
     this.onReconnecting = () => this.handleShellConnectionLoss('reconnecting');
     this.onDisconnected = () => this.handleShellConnectionLoss('disconnected');
@@ -418,6 +430,7 @@ export class ReforgedShellScene extends Phaser.Scene {
     this.gameService.on('dailyGauntletLeaderboard', this.onDailyLeaderboard);
     this.gameService.on('capabilitiesChanged', this.onCapabilitiesChanged);
     this.gameService.on('lobbyConfig', this.onLobbyConfig);
+    this.gameService.on('matchmakingStatus', this.onMatchmakingStatus);
     this.gameService.on('reconnecting', this.onReconnecting);
     this.gameService.on('disconnected', this.onDisconnected);
     document.addEventListener('fullscreenchange', this.onFullscreenChange);
@@ -663,11 +676,51 @@ export class ReforgedShellScene extends Phaser.Scene {
     this.nickname = callsign;
     this.challengesPanel?.setNickname(callsign);
     this.refreshRecordsSnapshots();
+    this.playRosterPanel?.setEntryEnabled(this.canSubmitMatchIntent());
   }
 
   private selectFighter(fighterId: CharacterId): void {
     this.selectedFighterId = persistFighterSelection(localStorage, fighterId);
     this.playRosterPanel?.setPersistedFighterSelection(this.selectedFighterId);
+  }
+
+  private canSubmitMatchIntent(
+    schedule: NormalizedArenaSchedule | null = this.gameService.getArenaSchedule(),
+  ): boolean {
+    const capabilities = this.gameService.getServerCapabilities();
+    return (
+      capabilities.newShell &&
+      capabilities.schedules &&
+      schedule !== null &&
+      schedule.lockedArena === null &&
+      isCallsignReady(this.nickname) &&
+      this.gameService.getNetworkManager().getConnectionState() === 'connected'
+    );
+  }
+
+  private submitPlayIntent(draft: SerializedPlayRosterDraft): boolean {
+    if (this.leaving || !this.canSubmitMatchIntent()) return false;
+    const schedule = this.gameService.getArenaSchedule();
+    const scheduledArena = schedule?.schedules.find((entry) => entry.mode === draft.mode);
+    if (
+      !schedule ||
+      !scheduledArena ||
+      scheduledArena.mapName !== draft.arenaName ||
+      scheduledArena.rotationEndsAt <= schedule.serverTime
+    ) {
+      return false;
+    }
+    const intent: MatchIntent = Object.freeze({
+      intentId: crypto.randomUUID(),
+      format: draft.format,
+      composition: Object.freeze({ ...draft.composition }),
+      mode: draft.mode,
+      fighterId: draft.fighterId,
+      scheduledArena: Object.freeze({ ...scheduledArena }),
+    });
+    this.tryStartFullscreen();
+    this.gameService.submitMatchIntent(this.nickname, intent);
+    return true;
   }
 
   private startChallenge(request: ReforgedChallengeStartRequest): void {
@@ -738,6 +791,10 @@ export class ReforgedShellScene extends Phaser.Scene {
     if (this.onLobbyConfig) {
       this.gameService.off('lobbyConfig', this.onLobbyConfig);
       this.onLobbyConfig = null;
+    }
+    if (this.onMatchmakingStatus) {
+      this.gameService.off('matchmakingStatus', this.onMatchmakingStatus);
+      this.onMatchmakingStatus = null;
     }
     if (this.onReconnecting) {
       this.gameService.off('reconnecting', this.onReconnecting);

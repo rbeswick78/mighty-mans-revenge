@@ -1,14 +1,13 @@
+import { CHARACTERS, CHARACTER_IDS, GAME_MODES, type CharacterId } from '@shared/config/game.js';
 import {
-  CHARACTERS,
-  CHARACTER_IDS,
-  CREW_BATTLE_MODES,
-  GAME_MODES,
-  GAME_MODE_ROTATION,
-  type CharacterId,
-} from '@shared/config/game.js';
+  MATCH_COMPOSITIONS_BY_FORMAT,
+  MATCH_MODES_BY_FORMAT,
+  type MatchComposition,
+  type MatchFormat,
+} from '@shared/matchmaking/match-intent.js';
 import type { GameModeType } from '@shared/types/game.js';
 
-export type PlayFormatId = 'duel' | 'rumble' | 'crew';
+export type PlayFormatId = MatchFormat;
 
 export interface PlayFormatDefinition {
   readonly id: PlayFormatId;
@@ -16,10 +15,7 @@ export interface PlayFormatDefinition {
   readonly detail: string;
 }
 
-export interface PlayRosterComposition {
-  readonly humanCount: number;
-  readonly botCount: number;
-}
+export type PlayRosterComposition = MatchComposition;
 
 export interface PlayScheduledArena {
   readonly mode: GameModeType;
@@ -55,7 +51,8 @@ export type PlayRosterChoice =
 
 /**
  * Batch 5 stops at a reviewed, presentation-only draft. This deliberately is
- * not a network MatchIntent; Batch 11 owns that authoritative contract.
+ * not a network MatchIntent. Batch 11 projects a successfully reviewed value
+ * into its separate authoritative wire contract without weakening this seam.
  */
 export interface SerializedPlayRosterDraft {
   readonly format: PlayFormatId;
@@ -70,43 +67,6 @@ export const PLAY_FORMATS: readonly PlayFormatDefinition[] = Object.freeze([
   Object.freeze({ id: 'rumble', label: 'WASTELAND RUMBLE', detail: '2-4 FIGHTERS' }),
   Object.freeze({ id: 'crew', label: 'CREW BATTLE', detail: 'FIXED 2V2' }),
 ]);
-
-const freezeComposition = (humanCount: number, botCount: number): PlayRosterComposition =>
-  Object.freeze({ humanCount, botCount });
-
-const DUEL_COMPOSITIONS = Object.freeze([freezeComposition(1, 1), freezeComposition(2, 0)]);
-
-const RUMBLE_COMPOSITIONS = Object.freeze([
-  freezeComposition(1, 1),
-  freezeComposition(1, 2),
-  freezeComposition(1, 3),
-  freezeComposition(2, 0),
-  freezeComposition(2, 1),
-  freezeComposition(2, 2),
-  freezeComposition(3, 0),
-  freezeComposition(3, 1),
-  freezeComposition(4, 0),
-]);
-
-const CREW_COMPOSITIONS = Object.freeze([
-  freezeComposition(1, 3),
-  freezeComposition(2, 2),
-  freezeComposition(3, 1),
-  freezeComposition(4, 0),
-]);
-
-const COMPOSITIONS_BY_FORMAT: Readonly<Record<PlayFormatId, readonly PlayRosterComposition[]>> =
-  Object.freeze({
-    duel: DUEL_COMPOSITIONS,
-    rumble: RUMBLE_COMPOSITIONS,
-    crew: CREW_COMPOSITIONS,
-  });
-
-const MODES_BY_FORMAT: Readonly<Record<PlayFormatId, readonly GameModeType[]>> = Object.freeze({
-  duel: GAME_MODE_ROTATION,
-  rumble: GAME_MODE_ROTATION,
-  crew: CREW_BATTLE_MODES,
-});
 
 export const EMPTY_PLAY_ROSTER_STATE: PlayRosterBuilderState = Object.freeze({
   format: null,
@@ -125,7 +85,10 @@ function isPlayFormat(value: unknown): value is PlayFormatId {
 }
 
 function isGameMode(value: unknown): value is GameModeType {
-  return typeof value === 'string' && GAME_MODE_ROTATION.includes(value as GameModeType);
+  return (
+    typeof value === 'string' &&
+    Object.values(MATCH_MODES_BY_FORMAT).some((modes) => modes.includes(value as GameModeType))
+  );
 }
 
 function isCharacter(value: unknown): value is CharacterId {
@@ -149,7 +112,7 @@ function validComposition(value: unknown, format: PlayFormatId): PlayRosterCompo
     return null;
   }
   return (
-    COMPOSITIONS_BY_FORMAT[format].find((composition) =>
+    MATCH_COMPOSITIONS_BY_FORMAT[format].find((composition) =>
       sameComposition(composition, { humanCount, botCount } as PlayRosterComposition),
     ) ?? null
   );
@@ -176,14 +139,14 @@ export function normalizePlayRosterAvailability(
 }
 
 export function playRosterCompositions(format: PlayFormatId): readonly PlayRosterComposition[] {
-  return COMPOSITIONS_BY_FORMAT[format];
+  return MATCH_COMPOSITIONS_BY_FORMAT[format];
 }
 
 export function playRosterModes(
   format: PlayFormatId,
   availability: PlayRosterAvailability,
 ): readonly GameModeType[] {
-  return MODES_BY_FORMAT[format].filter(
+  return MATCH_MODES_BY_FORMAT[format].filter(
     (mode) => availability.currentArenaByMode[mode] !== undefined,
   );
 }
@@ -312,7 +275,7 @@ export function serializePlayRosterDraft(
   if (!isPlayFormat(format) || !isGameMode(mode) || !isCharacter(fighterId)) return null;
 
   const composition = validComposition(value['composition'], format);
-  if (composition === null || !MODES_BY_FORMAT[format].includes(mode)) return null;
+  if (composition === null || !MATCH_MODES_BY_FORMAT[format].includes(mode)) return null;
   const currentArena = currentPlayRosterArena(mode, availability);
   if (currentArena === null || arenaName !== currentArena) return null;
 

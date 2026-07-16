@@ -5,8 +5,8 @@ Read this file and `CLAUDE.md` completely at the start of every batch. The
 completed `docs/REPLAYABILITY_ROADMAP.md` remains the historical record for the
 systems this program preserves and reorganizes.
 
-- **Status:** Batch 10 complete on 2026-07-15.
-- **Next batch:** Batch 11 — General match intent.
+- **Status:** Batch 11 complete on 2026-07-15.
+- **Next batch:** Batch 12 — Party core.
 - **Public releases:** Reforged Arena, then Battle Royale.
 - **Working model:** one numbered batch per session, direct commits and pushes
   to `main`, milestone-gated production deployments.
@@ -163,8 +163,8 @@ Production deployment happens only at a gate or for an urgent live fix.
 |   8 | Records tab                            | Navigation    | **DONE — 2026-07-15** |
 |   9 | Settings tab                           | Navigation    | **DONE — 2026-07-15** |
 |  10 | Scheduled arenas                       | Navigation    | **DONE — 2026-07-15** |
-|  11 | General match intent                   | Navigation    | NEXT                  |
-|  12 | Party core                             | Navigation    | Pending               |
+|  11 | General match intent                   | Navigation    | **DONE — 2026-07-15** |
+|  12 | Party core                             | Navigation    | NEXT                  |
 |  13 | Party readiness and recovery           | Navigation    | Pending               |
 |  14 | Queue fallback                         | Navigation    | Pending               |
 |  15 | Results and rematches                  | Navigation    | Pending               |
@@ -465,6 +465,30 @@ Acceptance:
 Introduce validated match intents for Duel, Rumble, and Crew, retain each
 format's compatible modes, and remove random standard mode/map selection while
 the legacy join messages remain temporarily compatible.
+
+Acceptance:
+
+- [x] Shared frozen contracts enumerate Duel, Rumble, and Crew, every exact
+      Batch 5 human/bot composition, and every format-compatible standard mode.
+      The normalizer rejects malformed, stale, unknown, or incompatible fields.
+- [x] The gated Play review submits the persisted fighter, explicit mode and
+      composition, and displayed Batch 10 arena through the additive
+      `client:submitMatchIntent` message only with a live complete authoritative
+      schedule. Capability-off, old-server, reconnect, and disconnect paths
+      retain established behavior.
+- [x] The server creates and consumes its own queue-entry arena lock, compares
+      it exactly with the normalized echo, groups only identical compatible
+      intent keys, and launches Duel, Rumble, or Crew with explicit mode, map,
+      server-owned teams, standard bots, and fighter locks. No standard random
+      map/mode selection or client-authored fallback was added.
+- [x] Duplicate, stale, replayed, incompatible, fighter-collision, cancel, and
+      disconnect paths fail closed without a phantom queue or leaked arena
+      lock. Reconnect starts from the established recovery state.
+- [x] Legacy join messages, Lobby, Draft, Character Select, Practice,
+      Challenges, Records, Settings, schedule/FORCE authority, and all
+      default-false capability behavior remain intact. No party, readiness,
+      queue fallback, Reforged Results/rematch, Battle Royale, viewport/camera,
+      or art work began.
 
 #### Batch 12 — Party core
 
@@ -1323,6 +1347,59 @@ staged gameplay/Reforged-shell WebKit PNGs are black, so staged object/input
 assertions plus mobile-sized Chromium visual evidence remain required. None
 blocks Batch 11.
 
+### Batch 11 — 2026-07-15 — General match intent
+
+**Shipped:** Added frozen shared `MatchIntent` format, participant-source,
+composition, mode, fighter, and scheduled-arena contracts with an exhaustive
+normalizer over every legal Duel, Rumble, and Crew product. The gated Play
+review now submits the additive `client:submitMatchIntent` message only with a
+live callsign and complete authoritative schedule; it enters queued
+presentation only after server acknowledgement and clears through cancel or
+connection recovery. `GameManager` normalizes untrusted wire values and the
+matchmaking manager creates its own schedule lock, compares the complete echo,
+groups exact compatible intent keys, rejects fighter collisions and replayed
+ids, and launches explicit maps/modes with server-owned fighter locks, Crew
+teams, and established Scrapper bots. The Batch 5 serializer stays pure, the
+client never derives or randomly replaces intent, and all legacy join paths
+remain available.
+
+**Verification:** Selected the roadmap's shared/server/network cross-package
+tier because Batch 11 changes wire authority and queue ownership, then included
+the required focused multi-browser entry/recovery subset. Focused Vitest passed
+150 intent normalization, Play serialization, NetworkManager, GameManager, and
+matchmaking integration tests across five files. The mandatory `corepack pnpm
+test` passed 123 files and 1,437 tests; `corepack pnpm typecheck`, `corepack pnpm
+lint`, and the full `corepack pnpm build` passed, with Vite's established
+chunk-size advisory unchanged. With both gated capabilities enabled, the full
+affected Reforged-shell file completed 21 cases in desktop Chromium, desktop
+Firefox, and mobile landscape with three expected inverse-gate skips; the live
+Chromium path submitted the generalized intent and reached Character Select or
+Game, while staged Firefox/mobile proved queued recovery and legacy gameplay
+size restoration. New-shell/schedules-off fixed-preview coverage passed all
+three projects, and default-false legacy Lobby coverage passed all three.
+Desktop plus 844×390 mobile Play-entry layout assertions and capture calls
+completed without wider-risk evidence, so the unrelated Playwright inventory
+was not escalated.
+
+**Deployment:** Skipped. Batch 11 remains navigation-milestone code behind the
+default-false `newShell` and `schedules` capabilities. No production environment
+or capability flag changed, and this task did not authorize deployment.
+
+**Deviations:** No product-scope deviation. The first enabled Playwright command
+included an extra argument separator and therefore expanded from the requested
+grep to the complete affected Reforged-shell file; that stronger run passed.
+The pre-full-suite diff review removed an unnecessary generalized team-stats
+extension so legacy Practice and Records persistence stayed unchanged. These
+were local verification and scope-tightening corrections, not runtime defects.
+
+**Known issues:** No new bug ID was required. RFG-001 and RFG-002 remain
+assigned to Batches 20/24 and were untouched. RFG-003 remains unchanged:
+headless Firefox/WebKit cannot use the live local WebRTC practice path and
+staged gameplay/Reforged-shell WebKit PNGs are black, so staged object/input
+assertions plus mobile-sized Chromium visual evidence remain required. The
+Batch 2 host scheduling sample and its 15.932 effective Hz observation also
+remain unchanged. None blocks Batch 12.
+
 ## Next-session prompt
 
 ```text
@@ -1330,51 +1407,54 @@ Continue the Reforged build for Mighty Man's Revenge.
 
 Read docs/REIMAGINING_ROADMAP.md and CLAUDE.md completely first. Read
 docs/REFORGED_BASELINE.md and docs/REFORGED_CAPABILITIES.md before
-implementation. Implement Batch 11 — General match intent exactly as specified.
-Preserve unrelated changes and do not begin Batch 12 — Party core.
+implementation. Implement Batch 12 — Party core exactly as specified. Preserve
+unrelated changes and do not begin Batch 13 — Party readiness and recovery.
 
-Introduce a validated, server-owned general match intent for Duel, Rumble, and
-Crew. Carry explicit format, compatible human/bot composition, standard mode,
-persisted fighter selection, and the Batch 10 scheduled-arena lock through an
-additive compatibility boundary. The server must normalize and authorize every
-field, consume its own queue-entry arena lock, and reject stale, malformed, or
-incompatible intent without client-authored random selection. Retain the
-legacy join messages temporarily for old clients and old servers, and make
-old/new, capability-off, reconnect, disconnect, duplicate, stale, and replayed
-paths fail closed to established behavior.
+Introduce server-owned ephemeral parties for Duel, Rumble, and Crew only. Add
+collision-safe short room codes and shareable join links, format capacity,
+joining, leader-owned generalized match intent, visible member fighter
+selection, leader kick, member leave, and empty-room expiry through additive
+discriminated compatibility messages. The server must normalize and authorize
+every code, link, membership mutation, capacity, leader action, fighter, and
+intent field. Leadership stays with the creator in this batch; fail closed on
+unknown, full, malformed, duplicate, stale, replayed, or unauthorized requests
+without client-authored party state.
 
-Preserve the Batch 5 pure Play roster compatibility/serialization boundary,
-Batch 6 persisted Fighters selection and server-authoritative locking, all
-Batch 7 Challenges paths, the Batch 8 read-only Records archive, the complete
-Batch 9 Settings surfaces, Batch 10 schedule/clock/lock authority and FORCE
-diagnostics, and the complete legacy Lobby fallback. Do not add parties,
-readiness, party codes or links, queue fallback, Reforged Results, rematches,
-or Battle Royale intent/gameplay. Do not retire Draft or Character Select,
-enable a capability by default or in production, change gameplay
-viewport/camera, alter Practice paths, or begin art work.
+Preserve the Batch 5 pure Play compatibility/serialization boundary, Batch 6
+persisted Fighters selection and server-authoritative locking, all Batch 7
+Challenges paths, the Batch 8 read-only Records archive, the complete Batch 9
+Settings surfaces, Batch 10 schedule/clock/lock authority and FORCE diagnostics,
+Batch 11 generalized intent normalization/queue ownership, and the complete
+legacy Lobby fallback. Do not add readiness, leader transfer, reconnect party
+recovery, open-slot recovery, queue fallback, Reforged Results, rematches, or
+Battle Royale parties/gameplay. Do not retire Draft or Character Select, enable
+a capability by default or in production, change gameplay viewport/camera,
+alter Practice paths, or begin art work.
 
-Batch 10 is complete and pushed on main as `feat(server): add Reforged arena
-schedules`. Enabled servers now advertise complete five-minute per-mode
-schedules from authoritative time, deterministic offsets, registered maps, and
-valid FORCE diagnostics. Play accepts only complete server snapshots, retains
-the Batch 5 fixed preview on every compatibility failure, and shows immutable
-server-owned queue locks. Batch 11 may consume the narrow lock/release seam but
-must not move schedule derivation to the client. All five server capability
-flags remain default false, and no production deployment has run.
+Batch 11 is complete and pushed on main as `feat(server): add generalized match
+intent`. Enabled test servers accept exact Duel, Rumble, and Crew intents only
+after server normalization and comparison with their own scheduled-arena lock;
+explicit modes, compositions, maps, fighters, teams, and standard bots launch
+without random standard selection. Legacy join messages remain available, the
+Batch 5 serializer stays pure, all five capability flags remain default false,
+and no production deployment has run. Batch 12 may compose party ownership
+around this narrow intent boundary but must not weaken or duplicate its server
+authority.
 
 Choose and document the shared/server/network cross-package verification tier
-from the roadmap's risk-based matrix. Add exhaustive intent normalization and
-compatibility coverage, focused matchmaking/server integration for all three
-formats and their compatible compositions/modes, scheduled-lock consumption,
-duplicate/stale/replay/reconnect handling, and legacy join preservation. Run
-the full `corepack pnpm test` suite, typecheck, lint, relevant production
-builds, targeted desktop/mobile Play-entry evidence, and legacy plus old/new
-fallback coverage. Because matchmaking wire authority changes, include the
-focused multi-browser entry/recovery subset and escalate further if focused
-evidence shows wider risk. Update roadmap acceptance evidence, capability and
-architecture docs, the bug ledger if needed, and the Session Log. Run the
-end-of-batch ritual, commit and push directly to main, skip deployment unless
-explicitly authorized, and end with the fenced paste-ready prompt for Batch 12.
+from the roadmap's risk-based matrix. Add exhaustive room-code/link parsing,
+collision/capacity/authorization/expiry coverage, focused server integration for
+create/join/leave/kick and leader-owned intent/member-fighter projection across
+all three formats, old/new compatibility, and duplicate/stale/replay handling.
+Run the full `corepack pnpm test` suite, typecheck, lint, relevant production
+builds, targeted desktop/mobile party-entry evidence, and legacy plus
+capability-off fallback coverage. Because party membership adds multi-client
+wire state, include the focused multi-browser multi-client subset and escalate
+further if focused evidence shows wider risk. Update roadmap acceptance
+evidence, capability and architecture docs, the bug ledger if needed, and the
+Session Log. Run the end-of-batch ritual, commit and push directly to main, skip
+deployment unless explicitly authorized, and end with the fenced paste-ready
+prompt for Batch 13.
 
 Carry-over warnings: RFG-001 CameraKick and RFG-002 ZoomPulse overwrite future
 base camera state and remain assigned to Batches 20/24. RFG-003 means headless
@@ -1386,5 +1466,5 @@ remained far below the 50ms budget. Batch 4 broadened RFG-003 evidence: the
 staged mobile WebKit Reforged-shell PNG is also black, so use mobile-sized
 Chromium for visual evidence while retaining staged WebKit object/input
 assertions. Use Corepack pnpm 10.33.0 if the local pnpm shim selects a mismatched
-version. Batch 12 follows Batch 11.
+version. Batch 13 follows Batch 12.
 ```

@@ -30,6 +30,7 @@ import type {
   MutatorId,
   TauntId,
 } from '../config/game.js';
+import type { MatchIntent } from '../matchmaking/match-intent.js';
 
 // === Client -> Server Messages ===
 
@@ -37,6 +38,7 @@ export type ClientMessage =
   | ClientInputMessage
   | ClientJoinMatchmakingMessage
   | ClientJoinRumbleMessage
+  | ClientSubmitMatchIntentMessage
   | ClientStartPracticeMessage
   | ClientCancelMatchmakingMessage
   | ClientRematchRequestMessage
@@ -60,6 +62,13 @@ export interface ClientJoinMatchmakingMessage {
 export interface ClientJoinRumbleMessage {
   type: 'client:joinRumble';
   nickname: string;
+}
+
+/** Additive generalized standard-match entry; legacy joins remain accepted. */
+export interface ClientSubmitMatchIntentMessage {
+  type: 'client:submitMatchIntent';
+  nickname: string;
+  intent: MatchIntent;
 }
 
 export interface ClientStartPracticeMessage {

@@ -191,6 +191,8 @@ async function playRosterSnapshot(page: Page): Promise<{
   serialized: Record<string, unknown> | null;
   optionLabels: string[];
   arenaStatus: string | null;
+  entryEnabled: boolean;
+  queued: boolean;
 }> {
   return page.evaluate(() => {
     const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
@@ -202,6 +204,8 @@ async function playRosterSnapshot(page: Page): Promise<{
         serialized: Record<string, unknown> | null;
         optionLabels: string[];
         arenaStatus: string | null;
+        entryEnabled: boolean;
+        queued: boolean;
       };
     };
     return scene.getPlayRosterSnapshot();
@@ -534,7 +538,10 @@ test('Play roster builder reaches only a valid review across pointer, keyboard, 
   page,
 }, testInfo) => {
   test.skip(!shellAdvertised, 'Run with CAPABILITY_NEW_SHELL=true for the gated shell path.');
-  await page.addInitScript(() => localStorage.setItem('mmr_fighter_selection', 'frost_wizard'));
+  await page.addInitScript(() => {
+    localStorage.setItem('mmr_fighter_selection', 'frost_wizard');
+    localStorage.setItem('mmr_nickname', 'Batch11');
+  });
   await page.goto('/');
   const touch = testInfo.project.name === 'mobile-landscape';
   if (testInfo.project.name !== 'desktop-chromium') await stageNonChromiumShell(page);
@@ -593,7 +600,9 @@ test('Play roster builder reaches only a valid review across pointer, keyboard, 
     expect(review.serialized?.arenaName).toBe('Overgrown Suburb');
     expect(review.arenaStatus).toBeNull();
   }
-  expect(review.optionLabels).toEqual([]);
+  expect(review.optionLabels).toEqual(['ENTER MATCH']);
+  expect(review.entryEnabled).toBe(schedulesAdvertised);
+  expect(review.queued).toBe(false);
 
   // Standard gamepad B skips the Fighters-owned dependency and edits arena.
   await queueMenuGamepadActions(page, [{ back: true }]);
@@ -656,6 +665,136 @@ test('Play roster builder reaches only a valid review across pointer, keyboard, 
       path: testInfo.outputPath('play-roster-options-mobile-chromium.png'),
     });
   }
+});
+
+test('Play submits one server-scheduled general intent and recovery clears queued entry', async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    !shellAdvertised || !schedulesAdvertised,
+    'Run with both Reforged shell and schedule capabilities for generalized entry.',
+  );
+  await page.addInitScript(() => {
+    localStorage.setItem('mmr_nickname', 'Intent11');
+    localStorage.setItem('mmr_fighter_selection', 'rook');
+  });
+  await page.goto('/');
+  const touch = testInfo.project.name === 'mobile-landscape';
+  const liveChromium = testInfo.project.name === 'desktop-chromium';
+  if (!liveChromium) await stageNonChromiumShell(page);
+  await waitForActiveScene(page, 'ReforgedShellScene');
+
+  await page.evaluate((forwardToServer) => {
+    const shell = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'ReforgedShellScene',
+    ) as unknown as {
+      gameService: {
+        getNetworkManager(): { connection: { send(message: unknown): void } };
+      };
+    };
+    const connection = shell.gameService.getNetworkManager().connection;
+    const send = connection.send.bind(connection);
+    connection.send = (message: unknown): void => {
+      (window as unknown as { batch11Intent?: unknown }).batch11Intent = message;
+      if (forwardToServer) send(message);
+    };
+  }, liveChromium);
+
+  await clickLogicalPlayOption(page, 0, touch);
+  await clickLogicalPlayOption(page, 0, touch);
+  await clickLogicalPlayOption(page, 1, touch);
+  await clickLogicalPlayOption(page, 0, touch);
+  await expect.poll(async () => (await playRosterSnapshot(page)).step).toBe('review');
+  expect((await playRosterSnapshot(page)).optionLabels).toEqual(['ENTER MATCH']);
+  await clickLogicalPlayOption(page, 0, touch);
+
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as unknown as { batch11Intent?: { type?: string } }).batch11Intent?.type ?? null,
+      ),
+    )
+    .toBe('client:submitMatchIntent');
+  const submitted = await page.evaluate(
+    () => (window as unknown as { batch11Intent?: Record<string, unknown> }).batch11Intent,
+  );
+  expect(submitted).toMatchObject({
+    type: 'client:submitMatchIntent',
+    nickname: 'Intent11',
+    intent: {
+      format: 'duel',
+      composition: { humanCount: 1, botCount: 1 },
+      mode: 'koth',
+      fighterId: 'rook',
+      scheduledArena: { mode: 'koth' },
+    },
+  });
+
+  if (liveChromium) {
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() => {
+            const game = (window as unknown as { game?: Phaser.Game }).game;
+            const scenes = game?.scene.getScenes(true).map((scene) => scene.scene.key) ?? [];
+            return scenes.includes('CharacterSelectScene') || scenes.includes('GameScene');
+          }),
+        { timeout: 30_000 },
+      )
+      .toBe(true);
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const game = (window as unknown as { game?: Phaser.Game }).game;
+          return [game?.scale.width, game?.scale.height];
+        }),
+      )
+      .toEqual([960, 720]);
+    return;
+  }
+
+  await page.evaluate(() => {
+    const shell = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'ReforgedShellScene',
+    ) as unknown as {
+      gameService: {
+        getNetworkManager(): {
+          connection: { setState(state: string): void };
+          handleMessage(message: unknown): void;
+        };
+      };
+    };
+    const manager = shell.gameService.getNetworkManager();
+    manager.handleMessage({
+      type: 'server:matchmakingStatus',
+      status: 'queued',
+      matchKind: 'duel',
+      groupSize: 1,
+      maxGroupSize: 1,
+      playersOnline: 1,
+    });
+  });
+  await expect.poll(async () => (await playRosterSnapshot(page)).queued).toBe(true);
+  await page.evaluate(() => {
+    const shell = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'ReforgedShellScene',
+    ) as unknown as {
+      gameService: {
+        getNetworkManager(): { connection: { setState(state: string): void } };
+      };
+    };
+    shell.gameService.getNetworkManager().connection.setState('reconnecting');
+  });
+  await waitForActiveScene(page, 'LobbyScene');
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const game = (window as unknown as { game?: Phaser.Game }).game;
+        return [game?.scale.width, game?.scale.height];
+      }),
+    )
+    .toEqual([960, 720]);
 });
 
 test('Fighters owns roster detail, mastery, persistent selection, and Play handoff', async ({

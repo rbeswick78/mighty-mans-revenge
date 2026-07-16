@@ -31,13 +31,16 @@ interface PlayRosterPanelOptions {
   readonly availability: PlayRosterAvailability;
   readonly arenaStatusByMode?: Readonly<Partial<Record<GameModeType, string>>>;
   readonly fighterId: CharacterId;
+  readonly entryEnabled: boolean;
   readonly onPointerIntent: () => void;
+  readonly onSubmit: (draft: SerializedPlayRosterDraft) => boolean;
+  readonly onCancel: () => void;
 }
 
 interface ChoiceDefinition {
   readonly label: string;
   readonly detail: string;
-  readonly choice: PlayRosterChoice;
+  readonly onSelect: () => void;
 }
 
 export interface PlayRosterPanelSnapshot {
@@ -46,6 +49,8 @@ export interface PlayRosterPanelSnapshot {
   readonly serialized: SerializedPlayRosterDraft | null;
   readonly optionLabels: readonly string[];
   readonly arenaStatus: string | null;
+  readonly entryEnabled: boolean;
+  readonly queued: boolean;
 }
 
 const STEP_NUMBER: Readonly<Record<PlayRosterBuilderStep, number>> = Object.freeze({
@@ -69,6 +74,8 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
   private persistedFighterId: CharacterId;
   private availability: PlayRosterAvailability;
   private arenaStatusByMode: Readonly<Partial<Record<GameModeType, string>>>;
+  private entryEnabled: boolean;
+  private queued = false;
   private panelWidth = 1;
   private panelHeight = 1;
 
@@ -80,6 +87,7 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
     this.persistedFighterId = options.fighterId;
     this.availability = options.availability;
     this.arenaStatusByMode = options.arenaStatusByMode ?? Object.freeze({});
+    this.entryEnabled = options.entryEnabled;
     const tokens = ReforgedMenuTokens;
     this.stageLabel = scene.add.text(0, 0, '', {
       fontFamily: MENU_FONTS.HEADER,
@@ -145,6 +153,7 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
   }
 
   back(): boolean {
+    if (this.queued) return false;
     let next = backPlayRosterBuilder(this.builderState);
     // Fighter choice now belongs to Fighters. Editing a reviewed Play draft
     // skips that internal pure-reducer dependency and returns to arena.
@@ -168,7 +177,21 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
         this.builderState.mode === null
           ? null
           : (this.arenaStatusByMode[this.builderState.mode] ?? null),
+      entryEnabled: this.entryEnabled,
+      queued: this.queued,
     };
+  }
+
+  setEntryEnabled(enabled: boolean): void {
+    if (this.entryEnabled === enabled) return;
+    this.entryEnabled = enabled;
+    this.rebuild();
+  }
+
+  setQueued(queued: boolean): void {
+    if (this.queued === queued) return;
+    this.queued = queued;
+    this.rebuild();
   }
 
   setArenaSchedule(
@@ -238,21 +261,21 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
       return PLAY_FORMATS.map((format) => ({
         label: format.label,
         detail: format.detail,
-        choice: { kind: 'format', format: format.id },
+        onSelect: () => this.choose({ kind: 'format', format: format.id }),
       }));
     }
     if (step === 'composition' && this.builderState.format !== null) {
       return playRosterCompositions(this.builderState.format).map((composition) => ({
         label: compositionLabel(composition),
         detail: 'EXACT REQUEST',
-        choice: { kind: 'composition', composition },
+        onSelect: () => this.choose({ kind: 'composition', composition }),
       }));
     }
     if (step === 'mode' && this.builderState.format !== null) {
       return playRosterModes(this.builderState.format, this.availability).map((mode) => ({
         label: modeLabel(mode),
         detail: 'EXPLICIT MODE',
-        choice: { kind: 'mode', mode },
+        onSelect: () => this.choose({ kind: 'mode', mode }),
       }));
     }
     if (step === 'arena' && this.builderState.mode !== null) {
@@ -263,9 +286,29 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
             {
               label: arenaName.toUpperCase(),
               detail: this.arenaStatusByMode[this.builderState.mode] ?? 'CONFIRM CURRENT ARENA',
-              choice: { kind: 'arena' },
+              onSelect: () => this.choose({ kind: 'arena' }),
             },
           ];
+    }
+    if (step === 'review') {
+      return [
+        {
+          label: this.queued ? 'CANCEL QUEUE' : 'ENTER MATCH',
+          detail: this.queued
+            ? 'RELEASE SERVER ARENA LOCK'
+            : this.entryEnabled
+              ? 'SERVER-VALIDATED INTENT'
+              : 'REQUIRES LIVE SERVER SCHEDULE',
+          onSelect: () => {
+            if (this.queued) {
+              this.options.onCancel();
+              return;
+            }
+            const draft = serializePlayRosterDraft(this.builderState, this.availability);
+            if (this.entryEnabled && draft) this.options.onSubmit(draft);
+          },
+        },
+      ];
     }
     return [];
   }
@@ -291,8 +334,9 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
     this.optionButtons = choices.map((definition) => {
       const button = new ReforgedChoiceButton(this.scene, definition.label, definition.detail, {
         onPointerIntent: this.options.onPointerIntent,
-        onSelect: () => this.choose(definition.choice),
+        onSelect: definition.onSelect,
       });
+      if (step === 'review' && !this.queued) button.setDisabled(!this.entryEnabled);
       this.add(button);
       return button;
     });
@@ -366,7 +410,11 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
       this.arenaStatusByMode[draft.mode] ?? 'READ-ONLY ARENA PREVIEW',
       `FIGHTER  /  ${fighterLabel(draft.fighterId)}`,
       '',
-      'ROSTER DRAFT VALID  -  MATCH ENTRY REMAINS DISABLED',
+      this.queued
+        ? 'QUEUED  -  SERVER ARENA LOCK HELD'
+        : this.entryEnabled
+          ? 'ROSTER INTENT READY  -  SERVER VALIDATES EVERY FIELD'
+          : 'ROSTER DRAFT VALID  -  MATCH ENTRY REMAINS DISABLED',
       'ESC / BACKSPACE / GAMEPAD B TO EDIT',
     ].join('\n');
   }

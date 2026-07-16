@@ -1,4 +1,11 @@
-import { DAILY_GAUNTLET_LEADERBOARD, LEADERBOARD, SERVER, dailyChallengeKey } from '@shared/game';
+import {
+  DAILY_GAUNTLET_LEADERBOARD,
+  LEADERBOARD,
+  SERVER,
+  dailyChallengeKey,
+  listMapNames,
+  normalizeMatchIntent,
+} from '@shared/game';
 import type { PlayerId, ClientMessage, GameModeType, ScheduledArenaLock } from '@shared/game';
 import { GameLoop } from './game-loop.js';
 import { GameServer } from '../network/server.js';
@@ -48,6 +55,10 @@ export class GameManager {
       statsStore,
       Math.random,
       now,
+      {
+        lock: (playerId, mode) => this.lockArenaForQueue(playerId, mode),
+        release: (playerId) => this.releaseArenaScheduleLock(playerId),
+      },
     );
 
     this.gameLoop = new GameLoop((dt, tick) => {
@@ -133,6 +144,18 @@ export class GameManager {
         this.matchmaking.handleJoinRumble(playerId, message.nickname);
         break;
 
+      case 'client:submitMatchIntent': {
+        const nickname = message.nickname;
+        const intent = normalizeMatchIntent(message.intent, {
+          serverTime: this.now().getTime(),
+          allowedArenaNames: listMapNames(),
+        });
+        if (/^[A-Za-z0-9_.-]{2,16}$/.test(nickname) && intent !== null) {
+          this.matchmaking.handleSubmitMatchIntent(playerId, nickname, intent);
+        }
+        break;
+      }
+
       case 'client:startPractice':
         this.matchmaking.handleStartPractice(
           playerId,
@@ -214,8 +237,8 @@ export class GameManager {
   }
 
   /**
-   * Server-authoritative queue-entry lock for Batch 11's intent path. Batch 10
-   * exposes the lock lifecycle without adding or routing generalized intents.
+   * Server-authoritative queue-entry lock consumed by the generalized intent
+   * path. Schedule derivation and lock ownership stay inside GameManager.
    */
   lockArenaForQueue(playerId: PlayerId, mode: GameModeType): ScheduledArenaLock | null {
     if (!this.server.getCapabilities().schedules) return null;

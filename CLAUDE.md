@@ -232,9 +232,24 @@ server-supplied map, clock delta, forced mode, and optional immutable
 queue-entry lock; it never derives schedule outcomes or advances a clock
 locally. Missing, partial, malformed, stale, disconnected, or capability-off
 state returns Play to the Batch 5 fixed preview. The server exposes the narrow
-lock/release boundary for Batch 11 without adding match intent, and leaves the
-legacy join messages plus existing map/mode rotation untouched. All capability
-defaults remain false.
+lock/release boundary consumed by Batch 11, and leaves the legacy join messages
+plus existing map/mode rotation untouched. All capability defaults remain
+false.
+
+**Reforged general match intent (Batch 11):** `MatchIntent` and its frozen
+format/composition/mode compatibility tables live in shared matchmaking code.
+The gated Play review projects the still-pure Batch 5 serialized draft into the
+additive `client:submitMatchIntent` message only when both capabilities, a
+current complete schedule, a callsign, and a live connection are present. The
+server normalizes every untrusted field, creates and compares its own
+queue-entry arena lock, groups only exact compatible requests, locks all human
+and standard-bot fighters, and launches the explicit map/mode without Draft or
+random standard selection. Duplicate, replayed, stale, incompatible,
+capability-off, cancelled, and disconnected paths never create a phantom queue;
+reconnect begins from established Lobby recovery. Keep the legacy join
+messages, Draft, Character Select, Practice, Results, and legacy Lobby intact
+until their owning batches. Parties, readiness, bot fallback offers, and
+Reforged rematches do not belong in this boundary.
 
 ### Why This Matters for Agents
 

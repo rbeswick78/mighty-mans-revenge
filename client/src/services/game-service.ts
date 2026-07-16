@@ -29,6 +29,7 @@ import type { BotDifficulty, PracticeKind } from '@shared/config/game.js';
 import type { CharacterId, WeaponId, MutatorId, TauntId } from '@shared/config/game.js';
 import { NetworkManager, type LocalCorrection } from '../network/network-manager.js';
 import type { NormalizedArenaSchedule } from '../network/arena-schedule.js';
+import type { MatchIntent } from '@shared/matchmaking/match-intent.js';
 import { localArenaWinsFromDraft, mergeArenaWinsFromResult } from './record-snapshots.js';
 
 export interface EventWarningPayload {
@@ -237,6 +238,11 @@ export class GameService {
   joinRumble(nickname: string): void {
     this.localNickname = nickname;
     this.networkManager.joinRumble(nickname);
+  }
+
+  submitMatchIntent(nickname: string, intent: Readonly<MatchIntent>): void {
+    this.localNickname = nickname;
+    this.networkManager.submitMatchIntent(nickname, intent);
   }
 
   startPractice(

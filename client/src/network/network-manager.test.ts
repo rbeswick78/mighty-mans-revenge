@@ -656,4 +656,35 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
     deliver({ type: 'server:playerLeft', playerId: REMOTE_ID, nickname: 'Bravo' });
     expect(seen).toEqual([{ playerId: REMOTE_ID, nickname: 'Bravo' }]);
   });
+
+  it('sends the additive generalized match intent without changing legacy joins', () => {
+    manager.submitMatchIntent('Alpha', {
+      intentId: 'intent_client_0001',
+      format: 'crew',
+      composition: { humanCount: 2, botCount: 2 },
+      mode: GameModeType.CORE_RUN,
+      fighterId: 'rook',
+      scheduledArena: {
+        mode: GameModeType.CORE_RUN,
+        mapName: 'Wasteland Outpost',
+        rotationEndsAt: 2_000,
+      },
+    });
+    expect(hoisted.sentMessages).toContainEqual({
+      type: 'client:submitMatchIntent',
+      nickname: 'Alpha',
+      intent: {
+        intentId: 'intent_client_0001',
+        format: 'crew',
+        composition: { humanCount: 2, botCount: 2 },
+        mode: 'core_run',
+        fighterId: 'rook',
+        scheduledArena: {
+          mode: 'core_run',
+          mapName: 'Wasteland Outpost',
+          rotationEndsAt: 2_000,
+        },
+      },
+    });
+  });
 });

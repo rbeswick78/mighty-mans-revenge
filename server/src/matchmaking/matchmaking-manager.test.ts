@@ -20,6 +20,8 @@ import {
   createEmptyArenaWins,
   practiceGauntletChaosBounty,
   dailyChallengeKey,
+  type MatchIntent,
+  type ScheduledArenaLock,
 } from '@shared/game';
 import type {
   CharacterId,
@@ -100,6 +102,188 @@ function walkDraft(
   mgr.handleDraftPick(first, 'map', picks.map ?? snap.mapOptions[0]);
   mgr.handleDraftPick(second, 'mode', picks.mode ?? snap.modeOptions[0]);
 }
+
+function generalIntent(
+  overrides: Partial<MatchIntent> & Pick<MatchIntent, 'intentId'>,
+): Readonly<MatchIntent> {
+  return Object.freeze({
+    format: 'duel',
+    composition: Object.freeze({ humanCount: 1, botCount: 1 }),
+    mode: GameModeType.DEATHMATCH,
+    fighterId: 'mighty_man',
+    scheduledArena: Object.freeze({
+      mode: GameModeType.DEATHMATCH,
+      mapName: listMapNames()[0],
+      rotationEndsAt: 2_000,
+    }),
+    ...overrides,
+  });
+}
+
+describe('MatchmakingManager generalized match intent', () => {
+  function setup(lockOverride: Partial<ScheduledArenaLock> = {}) {
+    const made = makeFakeServer();
+    const locks = new Map<PlayerId, ScheduledArenaLock>();
+    const release = vi.fn((playerId: PlayerId) => locks.delete(playerId));
+    const manager = new MatchmakingManager(
+      made.fake,
+      () => 0,
+      undefined,
+      () => 0,
+      () => new Date(1_000),
+      {
+        lock: (playerId, mode) => {
+          const lock = {
+            mode,
+            mapName: listMapNames()[0],
+            rotationEndsAt: 2_000,
+            lockedAt: 1_000,
+            ...lockOverride,
+          } as ScheduledArenaLock;
+          locks.set(playerId, lock);
+          return lock;
+        },
+        release,
+      },
+    );
+    return { ...made, manager, locks, release };
+  }
+
+  it('launches an explicit Duel with one compatible standard bot and persisted fighter', () => {
+    const { manager, sent, release } = setup();
+    expect(
+      manager.handleSubmitMatchIntent('p1', 'Alpha', generalIntent({ intentId: 'intent_0001' })),
+    ).toBe(true);
+
+    const [match] = manager.getActiveMatches();
+    expect(match.getMapData().name).toBe(listMapNames()[0]);
+    expect(match.gameModeType).toBe(GameModeType.DEATHMATCH);
+    expect(match.players.size).toBe(2);
+    expect(match.selectionState.get('p1')?.locked).toBe('mighty_man');
+    expect([...match.selectionState.values()].every(({ locked }) => locked !== null)).toBe(true);
+    expect(sent.some(({ message }) => message.type === 'server:draftState')).toBe(false);
+    expect(
+      sent.find(
+        ({ playerId, message }) => playerId === 'p1' && message.type === 'server:matchFound',
+      )?.message,
+    ).toMatchObject({
+      type: 'server:matchFound',
+      mapName: listMapNames()[0],
+      gameMode: GameModeType.DEATHMATCH,
+      matchKind: 'duel',
+    });
+    expect(release).toHaveBeenCalledWith('p1');
+  });
+
+  it('groups exact Rumble humans, fills requested bots, and rejects fighter collisions', () => {
+    const { manager, sent } = setup();
+    const base = {
+      format: 'rumble' as const,
+      composition: { humanCount: 2, botCount: 1 },
+      mode: GameModeType.KOTH,
+      scheduledArena: {
+        mode: GameModeType.KOTH,
+        mapName: listMapNames()[0],
+        rotationEndsAt: 2_000,
+      },
+    };
+    manager.handleSubmitMatchIntent(
+      'p1',
+      'Alpha',
+      generalIntent({ ...base, intentId: 'intent_1001', fighterId: 'mighty_man' }),
+    );
+    manager.handleSubmitMatchIntent(
+      'p2',
+      'Bravo',
+      generalIntent({ ...base, intentId: 'intent_1002', fighterId: 'mighty_man' }),
+    );
+    expect(manager.getActiveMatches()).toHaveLength(0);
+    expect(sent.at(-1)?.message).toMatchObject({
+      type: 'server:matchmakingStatus',
+      groupSize: 1,
+      maxGroupSize: 2,
+    });
+    manager.handleSubmitMatchIntent(
+      'p3',
+      'Cora',
+      generalIntent({ ...base, intentId: 'intent_1003', fighterId: 'bruce' }),
+    );
+    const [match] = manager.getActiveMatches();
+    expect(match.players.size).toBe(3);
+    expect(match.gameModeType).toBe(GameModeType.KOTH);
+    expect(match.selectionState.get('p1')?.locked).toBe('mighty_man');
+    expect(match.selectionState.get('p3')?.locked).toBe('bruce');
+    expect(match.selectionState.has('p2')).toBe(false);
+  });
+
+  it('builds authoritative two-versus-two Crew sides for three humans and one bot', () => {
+    const { manager } = setup();
+    for (const [index, fighterId] of CHARACTER_IDS.slice(0, 3).entries()) {
+      manager.handleSubmitMatchIntent(
+        `p${index + 1}`,
+        `Human${index + 1}`,
+        generalIntent({
+          intentId: `crew_000${index + 1}`,
+          format: 'crew',
+          composition: { humanCount: 3, botCount: 1 },
+          mode: GameModeType.CORE_RUN,
+          fighterId,
+          scheduledArena: {
+            mode: GameModeType.CORE_RUN,
+            mapName: listMapNames()[0],
+            rotationEndsAt: 2_000,
+          },
+        }),
+      );
+    }
+    const [match] = manager.getActiveMatches();
+    expect(match.players.size).toBe(4);
+    expect(match.getTeamIds().sort()).toEqual(['blue', 'red']);
+    expect([...match.getTeamAssignments().values()].filter((team) => team === 'blue')).toHaveLength(
+      2,
+    );
+    expect([...match.getTeamAssignments().values()].filter((team) => team === 'red')).toHaveLength(
+      2,
+    );
+  });
+
+  it('fails closed for lock mismatch, duplicate, replay, cancel, and disconnect paths', () => {
+    const mismatch = setup({ mapName: listMapNames()[1] });
+    expect(
+      mismatch.manager.handleSubmitMatchIntent(
+        'p1',
+        'Alpha',
+        generalIntent({ intentId: 'intent_2001' }),
+      ),
+    ).toBe(false);
+    expect(mismatch.manager.getQueueLength()).toBe(0);
+    expect(mismatch.release).toHaveBeenCalledWith('p1');
+
+    const accepted = setup();
+    const first = generalIntent({
+      intentId: 'intent_2002',
+      composition: { humanCount: 2, botCount: 0 },
+    });
+    expect(accepted.manager.handleSubmitMatchIntent('p1', 'Alpha', first)).toBe(true);
+    expect(accepted.manager.handleSubmitMatchIntent('p1', 'Alpha', first)).toBe(false);
+    expect(
+      accepted.manager.handleSubmitMatchIntent(
+        'p1',
+        'Alpha',
+        generalIntent({
+          intentId: 'intent_2003',
+          composition: { humanCount: 2, botCount: 0 },
+        }),
+      ),
+    ).toBe(false);
+    accepted.manager.handleCancelMatchmaking('p1');
+    expect(accepted.manager.getQueueLength()).toBe(0);
+    expect(accepted.locks.has('p1')).toBe(false);
+    expect(accepted.manager.handleSubmitMatchIntent('p1', 'Alpha', first)).toBe(false);
+    accepted.manager.handlePlayerDisconnect('p1');
+    expect(accepted.manager.handleSubmitMatchIntent('p1', 'Alpha', first)).toBe(true);
+  });
+});
 
 describe('MatchmakingManager rematch flow', () => {
   let mgr: MatchmakingManager;
@@ -1554,9 +1738,7 @@ describe('MatchmakingManager pre-match draft', () => {
     const endings = sent.filter((entry) => entry.message.type === 'server:matchEnd');
     expect(endings.map((entry) => entry.playerId)).toEqual(['B']);
     expect(
-      endings[0]?.message.type === 'server:matchEnd'
-        ? endings[0].message.result.winnerId
-        : null,
+      endings[0]?.message.type === 'server:matchEnd' ? endings[0].message.result.winnerId : null,
     ).toBe('B');
 
     sent.length = 0;
@@ -1810,9 +1992,7 @@ describe('MatchmakingManager solo practice flow', () => {
     mgr.handleStartPractice('A', 'Alpha');
     expect(mgr.getActiveMatches()).toHaveLength(1);
     expect(
-      sent.some(
-        (entry) => entry.playerId === 'A' && entry.message.type === 'server:matchFound',
-      ),
+      sent.some((entry) => entry.playerId === 'A' && entry.message.type === 'server:matchFound'),
     ).toBe(true);
   });
 
@@ -2133,13 +2313,7 @@ describe('MatchmakingManager solo practice flow', () => {
       'blackout',
     );
     mgr.tick(2, 0);
-    mgr.handleStartPractice(
-      'B',
-      'Bravo',
-      'rookie',
-      'crew_battle',
-      GameModeType.DEATHMATCH,
-    );
+    mgr.handleStartPractice('B', 'Bravo', 'rookie', 'crew_battle', GameModeType.DEATHMATCH);
     mgr.tick(0, 1);
 
     const match = mgr.getActiveMatches()[0];

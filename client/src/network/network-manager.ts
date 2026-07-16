@@ -37,6 +37,7 @@ import {
 } from '@shared/config/game.js';
 import { playerMovementModifiers } from '@shared/utils/event-modifiers.js';
 import { listMapNames } from '@shared/maps/registry.js';
+import type { MatchIntent } from '@shared/matchmaking/match-intent.js';
 import { NetworkConnection } from './connection.js';
 import { normalizeArenaSchedule, type NormalizedArenaSchedule } from './arena-schedule.js';
 import { ClientPrediction } from './prediction.js';
@@ -341,6 +342,11 @@ export class NetworkManager {
   /** Join the separate 2-4 player Wasteland Rumble queue. */
   joinRumble(nickname: string): void {
     this.connection.send({ type: 'client:joinRumble', nickname });
+  }
+
+  /** Submit the additive server-validated standard-match contract. */
+  submitMatchIntent(nickname: string, intent: Readonly<MatchIntent>): void {
+    this.connection.send({ type: 'client:submitMatchIntent', nickname, intent });
   }
 
   getContractState(): MatchContractHudState | null {

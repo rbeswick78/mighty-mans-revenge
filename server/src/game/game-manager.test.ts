@@ -8,7 +8,7 @@ import {
   DISABLED_SERVER_CAPABILITIES,
   GameModeType,
 } from '@shared/game';
-import type { PlayerId, ServerMessage } from '@shared/game';
+import type { ClientMessage, PlayerId, ServerMessage } from '@shared/game';
 import { GameManager } from './game-manager.js';
 import { PersistentStatsStore } from '../persistence/persistent-stats-store.js';
 import type { GameServer } from '../network/server.js';
@@ -27,6 +27,8 @@ function makeFakeServer(schedules = false) {
   const sent: SentMessage[] = [];
   const connected: PlayerId[] = [];
   let connectHandler: ((playerId: PlayerId) => void) | null = null;
+  let disconnectHandler: ((playerId: PlayerId) => void) | null = null;
+  let messageHandler: ((playerId: PlayerId, message: ClientMessage) => void) | null = null;
   const fake = {
     sendTo: vi.fn((playerId: PlayerId, message: ServerMessage, opts?: { reliable?: boolean }) => {
       sent.push({ playerId, message, reliable: !!opts?.reliable });
@@ -41,15 +43,29 @@ function makeFakeServer(schedules = false) {
     onConnect: vi.fn((handler: (playerId: PlayerId) => void) => {
       connectHandler = handler;
     }),
-    onDisconnect: vi.fn(),
-    onMessage: vi.fn(),
+    onDisconnect: vi.fn((handler: (playerId: PlayerId) => void) => {
+      disconnectHandler = handler;
+    }),
+    onMessage: vi.fn((handler: (playerId: PlayerId, message: ClientMessage) => void) => {
+      messageHandler = handler;
+    }),
   } as unknown as GameServer;
   const connect = (playerId: PlayerId): void => {
     if (!connectHandler) throw new Error('GameManager never registered onConnect');
     if (!connected.includes(playerId)) connected.push(playerId);
     connectHandler(playerId);
   };
-  return { fake, sent, connect, connected };
+  const disconnect = (playerId: PlayerId): void => {
+    if (!disconnectHandler) throw new Error('GameManager never registered onDisconnect');
+    const index = connected.indexOf(playerId);
+    if (index >= 0) connected.splice(index, 1);
+    disconnectHandler(playerId);
+  };
+  const message = (playerId: PlayerId, value: ClientMessage): void => {
+    if (!messageHandler) throw new Error('GameManager never registered onMessage');
+    messageHandler(playerId, value);
+  };
+  return { fake, sent, connect, disconnect, message, connected };
 }
 
 describe('GameManager connection leaderboard', () => {
@@ -232,5 +248,96 @@ describe('GameManager connection leaderboard', () => {
     connect('p1');
     (manager as unknown as { tick: (dt: number, tick: number) => void }).tick(0.05, 1);
     expect(sent.some((entry) => entry.message.type === 'server:lobbyConfig')).toBe(false);
+  });
+
+  it('normalizes and routes a live generalized intent through its own schedule lock', () => {
+    const { fake, sent, connect, message } = makeFakeServer(true);
+    const now = new Date('2026-07-15T12:00:00Z');
+    const manager = new GameManager(fake, undefined, () => now);
+    connect('p1');
+    const config = sent.find(({ message }) => message.type === 'server:lobbyConfig')?.message;
+    if (!config || config.type !== 'server:lobbyConfig') throw new Error('missing schedule');
+    const scheduledArena = config.schedules.find(({ mode }) => mode === GameModeType.KOTH)!;
+
+    message('p1', {
+      type: 'client:submitMatchIntent',
+      nickname: 'Alpha',
+      intent: {
+        intentId: 'intent_live_0001',
+        format: 'duel',
+        composition: { humanCount: 1, botCount: 1 },
+        mode: GameModeType.KOTH,
+        fighterId: 'bruce',
+        scheduledArena,
+      },
+    });
+
+    const found = sent.find(
+      ({ playerId, message }) => playerId === 'p1' && message.type === 'server:matchFound',
+    )?.message;
+    expect(found).toMatchObject({
+      type: 'server:matchFound',
+      mapName: scheduledArena.mapName,
+      gameMode: GameModeType.KOTH,
+      matchKind: 'duel',
+    });
+    expect(manager.matchmakingManager.getActiveMatches()).toHaveLength(1);
+    const lockSnapshots = sent.filter(
+      ({ playerId, message }) =>
+        playerId === 'p1' &&
+        message.type === 'server:lobbyConfig' &&
+        message.lockedArena !== undefined,
+    );
+    expect(lockSnapshots).toHaveLength(1);
+    expect(sent.at(-1)?.message).toMatchObject({ type: 'server:lobbyConfig' });
+  });
+
+  it('rejects malformed, stale, incompatible, capability-off, and replayed intents', () => {
+    const now = new Date('2026-07-15T12:00:00Z');
+    const enabled = makeFakeServer(true);
+    const manager = new GameManager(enabled.fake, undefined, () => now);
+    enabled.connect('p1');
+    const config = enabled.sent.find(
+      ({ message }) => message.type === 'server:lobbyConfig',
+    )?.message;
+    if (!config || config.type !== 'server:lobbyConfig') throw new Error('missing schedule');
+    const scheduledArena = config.schedules[0]!;
+    const valid: ClientMessage = {
+      type: 'client:submitMatchIntent',
+      nickname: 'Alpha',
+      intent: {
+        intentId: 'intent_wait_0001',
+        format: 'duel',
+        composition: { humanCount: 2, botCount: 0 },
+        mode: scheduledArena.mode,
+        fighterId: 'mighty_man',
+        scheduledArena,
+      },
+    };
+    enabled.message('p1', valid);
+    enabled.message('p1', valid);
+    enabled.message('p1', {
+      ...valid,
+      intent: { ...valid.intent, intentId: 'intent_wait_0002', fighterId: 'not_real' as never },
+    });
+    enabled.message('p1', {
+      ...valid,
+      intent: {
+        ...valid.intent,
+        intentId: 'intent_wait_0003',
+        scheduledArena: { ...scheduledArena, rotationEndsAt: now.getTime() },
+      },
+    });
+    expect(manager.matchmakingManager.getQueueLength()).toBe(1);
+    expect(manager.matchmakingManager.getActiveMatches()).toHaveLength(0);
+
+    const disabled = makeFakeServer(false);
+    const disabledManager = new GameManager(disabled.fake, undefined, () => now);
+    disabled.connect('p2');
+    disabled.message('p2', {
+      ...valid,
+      intent: { ...valid.intent, intentId: 'intent_wait_0004' },
+    });
+    expect(disabledManager.matchmakingManager.getQueueLength()).toBe(0);
   });
 });

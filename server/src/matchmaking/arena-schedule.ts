@@ -55,8 +55,8 @@ export function createArenaScheduleMessage(
 
 /**
  * Capture one immutable server-authored outcome at queue entry. The lock is
- * intentionally independent of later schedule snapshots and is ready for the
- * generalized intent queue in Batch 11 without adding that queue early.
+ * intentionally independent of later schedule snapshots. The generalized
+ * intent queue consumes this boundary without deriving schedules itself.
  */
 export function lockScheduledArena(
   snapshot: Pick<ServerLobbyConfigMessage, 'schedules'>,

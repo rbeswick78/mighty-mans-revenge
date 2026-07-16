@@ -58,9 +58,22 @@ server-supplied outcome and clock delta. A missing, partial, malformed, stale,
 or disconnected snapshot, or a non-literal/disabled `schedules` capability,
 fails closed to the fixed Batch 5 Play preview. Older clients ignore the
 additive message; newer clients retain that preview against old servers. The
-server lock/release boundary is present for the next batch, but no generalized
-match intent, legacy rotation change, or production capability enablement is
-part of Batch 10.
+server lock/release boundary is consumed by Batch 11's generalized match
+intent, while schedule derivation remains entirely server-owned.
+
+Batch 11 adds the additive `client:submitMatchIntent` compatibility message for
+servers that advertise both `newShell` and `schedules`. The payload carries one
+explicit Duel, Rumble, or Crew format, an exact compatible human/bot
+composition, a format-valid standard mode, the persisted fighter choice, and
+an echo of the displayed scheduled arena. The server normalizes every field,
+creates its own queue-entry lock, and queues only when that authoritative lock
+exactly matches the echo. Exact compatible groups launch with the requested
+mode/map and server-owned fighter locks; standard bot slots use the established
+Scrapper baseline. Malformed, stale, incompatible, duplicate, replayed,
+disconnected, or capability-off requests do not enter a queue or choose random
+client-authored replacements. The legacy Duel/Rumble/Crew join messages remain
+available for compatibility, and all production capability defaults remain
+false.
 
 ## Server-first rollout and rollback
 

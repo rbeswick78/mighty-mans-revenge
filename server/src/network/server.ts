@@ -18,6 +18,7 @@ const CLIENT_MESSAGE_TYPE_FLAGS: Record<ClientMessage['type'], true> = {
   'client:input': true,
   'client:joinMatchmaking': true,
   'client:joinRumble': true,
+  'client:submitMatchIntent': true,
   'client:startPractice': true,
   'client:cancelMatchmaking': true,
   'client:rematchRequest': true,
