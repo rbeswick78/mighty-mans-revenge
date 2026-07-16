@@ -1,0 +1,56 @@
+{
+  "assets": [
+    {
+      "id": "fighter.bruce.core",
+      "provenance": {
+        "attribution": "OpenAI-assisted production reference; deterministic project geometry",
+        "creator": "Mighty Man's Revenge Reforged fighter geometry",
+        "generation": {
+          "id": "exec-53f6d276-c30d-4878-807f-f48904b0d35e",
+          "promptDocument": "art/reforged/references/fighter-art-i/PROMPTS.md",
+          "provider": "OpenAI built-in image generation"
+        },
+        "license": "LicenseRef-MMR-Project-Owned",
+        "origin": "ai-assisted",
+        "sourceReference": "tools/reforged-assets/create-fighter-art-i-sources.mjs"
+      },
+      "sourceSha256": "6ef25960b6d73ed8cddc9b775c5be6355bee999bdb81261efb3c3aca045575f1"
+    },
+    {
+      "id": "fighter.frost-wizard.core",
+      "provenance": {
+        "attribution": "OpenAI-assisted production reference; deterministic project geometry",
+        "creator": "Mighty Man's Revenge Reforged fighter geometry",
+        "generation": {
+          "id": "exec-4006255a-e203-4da2-8600-20e36a9982c0",
+          "promptDocument": "art/reforged/references/fighter-art-i/PROMPTS.md",
+          "provider": "OpenAI built-in image generation"
+        },
+        "license": "LicenseRef-MMR-Project-Owned",
+        "origin": "ai-assisted",
+        "sourceReference": "tools/reforged-assets/create-fighter-art-i-sources.mjs"
+      },
+      "sourceSha256": "4a768cc7918fc7da033bacd6bb33d568540b35005298c0fff691a291f7d3b181"
+    },
+    {
+      "id": "fighter.mighty-man.core",
+      "provenance": {
+        "attribution": "OpenAI-assisted production reference; deterministic project geometry",
+        "creator": "Mighty Man's Revenge Reforged fighter geometry",
+        "generation": {
+          "id": "exec-ad46aa00-d221-4206-aaff-7110510fe9ef",
+          "promptDocument": "art/reforged/references/fighter-art-i/PROMPTS.md",
+          "provider": "OpenAI built-in image generation"
+        },
+        "license": "LicenseRef-MMR-Project-Owned",
+        "origin": "ai-assisted",
+        "sourceReference": "tools/reforged-assets/create-fighter-art-i-sources.mjs"
+      },
+      "sourceSha256": "b695889b74d5d8b7387cb32128cdd36fbd48cd8987984122c3ca9c1997b58a13"
+    }
+  ],
+  "atlasId": "fighter-art-i.core",
+  "manifestSha256": "237e7592ec561131f0143653bc00261dd244884d9ae61ea3be32d67d587db648",
+  "schemaVersion": 1,
+  "textureSha256": "6e3e171596a730cf0b586cafdd3a563aea0c16e34c11f44b5145ae2b1502c42a"
+}

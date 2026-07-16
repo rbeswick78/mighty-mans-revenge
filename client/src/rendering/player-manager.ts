@@ -4,12 +4,22 @@ import { PlayerRenderer } from './player-renderer.js';
 
 export class ClientPlayerManager {
   private scene: Phaser.Scene;
+  private readonly modernArtEnabled: boolean;
   private renderers: Map<string, PlayerRenderer> = new Map();
+  private previousPresentation = new Map<
+    string,
+    {
+      readonly health: number;
+      readonly abilityActive: boolean;
+      readonly abilityCoolingDown: boolean;
+    }
+  >();
   /** big_heads mutator flag — applied to every renderer each update. */
   private bigHeadsActive = false;
 
-  constructor(scene: Phaser.Scene) {
+  constructor(scene: Phaser.Scene, modernArtEnabled = false) {
     this.scene = scene;
+    this.modernArtEnabled = modernArtEnabled;
   }
 
   /** Toggle the big_heads render scale for all players (current and future). */
@@ -39,15 +49,38 @@ export class ClientPlayerManager {
       if (renderer && renderer.getCharacterId() !== playerState.characterId) {
         renderer.destroy();
         this.renderers.delete(playerState.id);
+        this.previousPresentation.delete(playerState.id);
         renderer = undefined;
       }
       if (!renderer) {
         // SerializedPlayerState.characterId is non-null inside an active
         // match (server only ships gameState messages from COUNTDOWN
         // onward, by which point both players are locked).
-        renderer = new PlayerRenderer(this.scene, playerState.characterId);
+        renderer = new PlayerRenderer(this.scene, playerState.characterId, this.modernArtEnabled);
         this.renderers.set(playerState.id, renderer);
       }
+
+      const previous = this.previousPresentation.get(playerState.id);
+      const abilityActive = playerState.abilityActiveSeconds > 0;
+      const abilityCoolingDown = playerState.abilityCooldownSeconds > 0;
+      if (
+        previous &&
+        !playerState.isDead &&
+        ((abilityActive && !previous.abilityActive) ||
+          (playerState.characterId === 'frost_wizard' &&
+            abilityCoolingDown &&
+            !previous.abilityCoolingDown))
+      ) {
+        renderer.playAbilityAnimation();
+      }
+      if (previous && !playerState.isDead && playerState.health < previous.health) {
+        renderer.playDamageAnimation();
+      }
+      this.previousPresentation.set(playerState.id, {
+        health: playerState.health,
+        abilityActive,
+        abilityCoolingDown,
+      });
 
       // Convert SerializedPlayerState to a shape update expects
       renderer.setBigHeads(this.bigHeadsActive);
@@ -94,6 +127,7 @@ export class ClientPlayerManager {
       if (!currentIds.has(id)) {
         renderer.destroy();
         this.renderers.delete(id);
+        this.previousPresentation.delete(id);
       }
     }
 
@@ -104,10 +138,22 @@ export class ClientPlayerManager {
     return this.renderers.get(playerId);
   }
 
+  getReforgedArtStates(): readonly Readonly<{
+    playerId: string;
+    art: ReturnType<PlayerRenderer['getReforgedArtState']>;
+  }>[] {
+    return [...this.renderers.entries()]
+      .sort(([leftId], [rightId]) => leftId.localeCompare(rightId))
+      .map(([playerId, renderer]) =>
+        Object.freeze({ playerId, art: renderer.getReforgedArtState() }),
+      );
+  }
+
   destroy(): void {
     for (const renderer of this.renderers.values()) {
       renderer.destroy();
     }
     this.renderers.clear();
+    this.previousPresentation.clear();
   }
 }

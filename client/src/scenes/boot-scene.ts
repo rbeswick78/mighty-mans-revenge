@@ -14,6 +14,11 @@ import { generateMenuTextures } from '../ui/menu/wasteland-street.js';
 import { MENU_FONT_CHECK_LIST } from '../ui/menu/fonts.js';
 import { preloadModernUiAtlas, registerModernUiAtlas } from '../ui/modern-ui-runtime.js';
 import {
+  createReforgedFighterAnimations,
+  preloadReforgedFighterAtlas,
+  registerReforgedFighterAtlas,
+} from '../rendering/reforged-fighter-runtime.js';
+import {
   WIRE_GATE_FRAME_HEIGHT,
   WIRE_GATE_FRAME_WIDTH,
   WIRE_GATE_OPEN_ANIMATION_KEY,
@@ -163,6 +168,7 @@ export class BootScene extends Phaser.Scene {
   preload(): void {
     this.setupLoadingBar();
     preloadModernUiAtlas(this);
+    preloadReforgedFighterAtlas(this);
     this.loadRealAssets();
     this.generateProceduralAssets();
     // Menu-scene procedural textures (sky gradient, city silhouette, brick
@@ -173,7 +179,9 @@ export class BootScene extends Phaser.Scene {
 
   create(): void {
     registerModernUiAtlas(this);
+    registerReforgedFighterAtlas(this);
     this.createCharacterAnimations();
+    createReforgedFighterAnimations(this);
     // Singleton bound to Phaser.Game (process lifetime). Scenes don't
     // retarget it — sounds and fades live above the scene graph.
     if (!AudioManager.getInstance()) {

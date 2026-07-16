@@ -487,6 +487,22 @@ and exact established behavior. The UI atlas contains no fighter, weapon,
 pickup, biome, combat-effect, or map art; Batch 28 owns fighter art I and Batch
 33 still owns the coherent full-journey visual cutover.
 
+**Reforged fighter art I (Batch 28):** one AI-assisted, project-cleaned
+`fighter-art-i.core` manifest packs complete 64px directional idle, move,
+attack, ability, damage, and live death-variant sets for Mighty Man (100
+frames), Bruce (88), and Frost Wizard (100) into a deterministic 288-frame
+2048x1024 RGBA8888 atlas. Boot validates/registers runtime-safe named frames;
+complete prompts, generation IDs, source hashes, license, and attribution stay
+outside runtime. Literal server-owned `modernArt: true` selects the new bodies
+inside capability-owned gameplay while preserving authoritative aim, movement,
+weapon, ability, hit, death, and respawn lifecycles. Mighty Man's non-rifle and
+Frost Wizard's bat states deliberately fall back to their complete legacy body/
+overlay paths so carried-object truth is never hidden; Bruce remains gunless.
+False/absent/old-server, missing-atlas, other-roster, and incompatible-weapon
+paths stay legacy. Full and reduced tiers keep authored body/ability cues.
+Batch 29 owns Bubba, Jack, and Rook; Batch 33 still owns coherent Boot-through-
+Results cutover and any verified legacy retirement.
+
 ### Why This Matters for Agents
 
 Client prediction and server simulation **must use identical physics code** from `/shared`. If you change movement, collision, or physics logic, you must change it in `/shared` and verify both client and server still agree. A mismatch between client prediction and server authority causes visible rubber-banding.

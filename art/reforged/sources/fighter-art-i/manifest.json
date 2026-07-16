@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "atlas": {
+    "id": "fighter-art-i.core",
+    "maxWidth": 2048,
+    "maxHeight": 2048,
+    "padding": 3,
+    "extrude": 2,
+    "limits": {
+      "maxSourceBytes": 1048576,
+      "maxDecodedBytes": 6291456,
+      "maxAtlasBytes": 2097152
+    }
+  },
+  "assets": [
+    {
+      "id": "fighter.bruce.core",
+      "source": "bruce-states.png",
+      "width": 256,
+      "height": 1408,
+      "frames": { "width": 64, "height": 64, "count": 88, "columns": 4 },
+      "provenance": {
+        "origin": "ai-assisted",
+        "creator": "Mighty Man's Revenge Reforged fighter geometry",
+        "license": "LicenseRef-MMR-Project-Owned",
+        "attribution": "OpenAI-assisted production reference; deterministic project geometry",
+        "sourceReference": "tools/reforged-assets/create-fighter-art-i-sources.mjs",
+        "generation": {
+          "provider": "OpenAI built-in image generation",
+          "id": "exec-53f6d276-c30d-4878-807f-f48904b0d35e",
+          "promptDocument": "art/reforged/references/fighter-art-i/PROMPTS.md"
+        }
+      }
+    },
+    {
+      "id": "fighter.frost-wizard.core",
+      "source": "frost-wizard-states.png",
+      "width": 256,
+      "height": 1600,
+      "frames": { "width": 64, "height": 64, "count": 100, "columns": 4 },
+      "provenance": {
+        "origin": "ai-assisted",
+        "creator": "Mighty Man's Revenge Reforged fighter geometry",
+        "license": "LicenseRef-MMR-Project-Owned",
+        "attribution": "OpenAI-assisted production reference; deterministic project geometry",
+        "sourceReference": "tools/reforged-assets/create-fighter-art-i-sources.mjs",
+        "generation": {
+          "provider": "OpenAI built-in image generation",
+          "id": "exec-4006255a-e203-4da2-8600-20e36a9982c0",
+          "promptDocument": "art/reforged/references/fighter-art-i/PROMPTS.md"
+        }
+      }
+    },
+    {
+      "id": "fighter.mighty-man.core",
+      "source": "mighty-man-states.png",
+      "width": 256,
+      "height": 1600,
+      "frames": { "width": 64, "height": 64, "count": 100, "columns": 4 },
+      "provenance": {
+        "origin": "ai-assisted",
+        "creator": "Mighty Man's Revenge Reforged fighter geometry",
+        "license": "LicenseRef-MMR-Project-Owned",
+        "attribution": "OpenAI-assisted production reference; deterministic project geometry",
+        "sourceReference": "tools/reforged-assets/create-fighter-art-i-sources.mjs",
+        "generation": {
+          "provider": "OpenAI built-in image generation",
+          "id": "exec-ad46aa00-d221-4206-aaff-7110510fe9ef",
+          "promptDocument": "art/reforged/references/fighter-art-i/PROMPTS.md"
+        }
+      }
+    }
+  ]
+}

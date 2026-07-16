@@ -18,8 +18,19 @@ import { batHeldRotation, batSwingRotations } from './bat-presentation.js';
 import { deathVariantPrefix } from './death-variant.js';
 import { armorPresentation } from '../ui/armor-presentation.js';
 import { declareWorldSpace } from './gameplay-coordinate-space.js';
+import {
+  REFORGED_FIGHTER_TEXTURE_KEY,
+  isReforgedFighterId,
+  reforgedFighterAnimationKey,
+  reforgedFighterFrameName,
+  shouldUseReforgedFighterBody,
+  type ReforgedFighterId,
+  type ReforgedFighterLivingState,
+} from './reforged-fighter-contract.js';
+import { reforgedFighterAtlasAvailable } from './reforged-fighter-runtime.js';
 
 const SPRITE_SCALE = 3;
+const REFORGED_SPRITE_SCALE = 1;
 
 const HEALTH_BAR_WIDTH = 36;
 const HEALTH_BAR_HEIGHT = 4;
@@ -104,6 +115,14 @@ export class PlayerRenderer {
   /** Optional animated cosmetic synchronized to the body (Rook's helmet). */
   private bodyOverlaySprite: Phaser.GameObjects.Sprite | null;
   private readonly characterDef: CharacterDef;
+  private readonly modernFighterId: ReforgedFighterId | null;
+  private readonly modernArtAvailable: boolean;
+  private useModernBody: boolean;
+  private modernTransientState: Extract<
+    ReforgedFighterLivingState,
+    'attack' | 'ability' | 'damage'
+  > | null = null;
+  private modernTransientTimer: Phaser.Time.TimerEvent | null = null;
   /**
    * Held weapon overlay. Null for characters whose CharacterDef.hasGun is
    * false (e.g. Bruce, whose zombie sprite already shows his hands and
@@ -151,6 +170,7 @@ export class PlayerRenderer {
   private isAxeless = false;
   private currentDirection: Direction4 = 'down';
   private deathDirection: DeathDirection = 'side';
+  private currentDeathCount = 1;
   /** Body prefix selected for the current authoritative death edge. */
   private currentDeathPrefix: string;
   private isDead = false;
@@ -182,22 +202,37 @@ export class PlayerRenderer {
   /** Extra sprite scale while the big_heads mutator is active (1 otherwise). */
   private renderScaleMultiplier = 1;
 
-  constructor(scene: Phaser.Scene, characterId: CharacterId) {
+  constructor(scene: Phaser.Scene, characterId: CharacterId, modernArtEnabled = false) {
     this.scene = scene;
     // Annotated as CharacterDef so optional fields (altBody) are visible —
     // the frozen registry literal narrows each entry to its own shape.
     const def: CharacterDef = CHARACTERS[characterId];
     this.characterDef = def;
     this.characterId = characterId;
+    this.modernFighterId = isReforgedFighterId(characterId) ? characterId : null;
+    this.modernArtAvailable =
+      modernArtEnabled && this.modernFighterId !== null && reforgedFighterAtlasAvailable(scene);
+    this.useModernBody = this.modernArtAvailable;
     this.texturePrefix = def.spritePrefix;
     this.altBodyPrefix = def.altBody?.spritePrefix ?? null;
     this.currentDeathPrefix = def.spritePrefix;
     this.hasGun = def.hasGun;
 
-    this.sprite = scene.add.sprite(0, 0, this.animKey('down', 'idle'), 0);
+    this.sprite = this.useModernBody
+      ? scene.add.sprite(
+          0,
+          0,
+          REFORGED_FIGHTER_TEXTURE_KEY,
+          reforgedFighterFrameName(this.modernFighterId!, 0),
+        )
+      : scene.add.sprite(0, 0, this.animKey('down', 'idle'), 0);
     this.sprite.setOrigin(0.5, 0.5);
-    this.sprite.setScale(SPRITE_SCALE);
-    this.sprite.play(this.animKey('down', 'idle'));
+    this.sprite.setScale(this.bodySpriteScale());
+    this.sprite.play(
+      this.useModernBody
+        ? reforgedFighterAnimationKey(this.modernFighterId!, 'idle', 'down')
+        : this.animKey('down', 'idle'),
+    );
 
     if (def.bodyOverlay) {
       const overlayKey = `${def.bodyOverlay.spritePrefix}_down_idle`;
@@ -214,7 +249,7 @@ export class PlayerRenderer {
     // differentiator (flat tint barely shifts the palette). A frozen
     // player overrides this with FROZEN_TARGET_TINT while their freeze
     // is active (handled in update()).
-    if (this.characterId === 'frost_wizard') {
+    if (this.characterId === 'frost_wizard' && !this.useModernBody) {
       this.applyFrostWizardTint();
     }
 
@@ -227,6 +262,7 @@ export class PlayerRenderer {
       gun.setOrigin(0.5, 0.5);
       gun.setScale(SPRITE_SCALE);
       gun.play(this.gunKey('down', 'hold'));
+      gun.setVisible(!this.useModernBody);
       this.gunSprite = gun;
     } else {
       this.gunSprite = null;
@@ -262,6 +298,7 @@ export class PlayerRenderer {
       wand.fillStyle(WAND_TIP_COLOR, 1);
       wand.fillRect(4, -1, 2, 2);
       wand.setScale(SPRITE_SCALE);
+      wand.setVisible(!this.useModernBody);
       this.wandGraphics = wand;
     }
 
@@ -403,7 +440,7 @@ export class PlayerRenderer {
       if (isFrozen) {
         this.sprite.setTint(FROZEN_TARGET_TINT);
         this.bodyOverlaySprite?.setTint(FROZEN_TARGET_TINT);
-      } else if (this.characterId === 'frost_wizard') {
+      } else if (this.characterId === 'frost_wizard' && !this.useModernBody) {
         this.applyFrostWizardTint();
       } else {
         this.sprite.clearTint();
@@ -510,11 +547,12 @@ export class PlayerRenderer {
   setWeapon(weaponId: WeaponId): void {
     if (weaponId === this.currentWeaponId) return;
     this.currentWeaponId = weaponId;
+    this.updateModernBodySelection();
     this.batSwingTween?.stop();
     this.batSwingTween = null;
     this.batSprite.setRotation(batHeldRotation(this.lastAimAngle));
     this.batSprite.setVisible(!this.isDead && weaponId === 'bat');
-    this.wandGraphics?.setVisible(!this.isDead && weaponId !== 'bat');
+    this.wandGraphics?.setVisible(!this.isDead && weaponId !== 'bat' && !this.useModernBody);
     this.gunShootTimer?.remove(false);
     this.gunShootTimer = null;
     this.currentGunState = 'hold';
@@ -523,7 +561,7 @@ export class PlayerRenderer {
       this.gunSprite.setVisible(false);
       return;
     }
-    const rendersOverlay = weaponRendersOverlay(weaponId);
+    const rendersOverlay = weaponRendersOverlay(weaponId) && !this.useModernBody;
     this.gunSprite.setVisible(rendersOverlay);
     if (rendersOverlay) {
       this.playCurrentGunAnim();
@@ -540,6 +578,7 @@ export class PlayerRenderer {
    * bullet trails, but guard anyway).
    */
   playShootAnimation(): void {
+    if (this.useModernBody && !this.isDead) this.playModernTransient('attack', 160);
     if (this.isDead || !this.gunSprite || !weaponRendersOverlay(this.currentWeaponId)) return;
     this.currentGunState = 'shoot';
     this.playCurrentGunAnim();
@@ -584,6 +623,31 @@ export class PlayerRenderer {
     this.attackTimer = this.scene.time.delayedCall(ATTACK_SWING_DURATION_MS, () => {
       this.attackTimer = null;
       this.isAttacking = false;
+      this.playCurrentAnim();
+    });
+  }
+
+  /** Play the authored ability pose from a snapshot-derived activation edge. */
+  playAbilityAnimation(): void {
+    this.playModernTransient('ability', 460);
+  }
+
+  /** Play the compact authored hit reaction without changing authoritative movement. */
+  playDamageAnimation(): void {
+    this.playModernTransient('damage', 165);
+  }
+
+  private playModernTransient(
+    state: Extract<ReforgedFighterLivingState, 'attack' | 'ability' | 'damage'>,
+    durationMs: number,
+  ): void {
+    if (!this.useModernBody || this.isDead) return;
+    this.modernTransientTimer?.remove(false);
+    this.modernTransientState = state;
+    this.playCurrentAnim();
+    this.modernTransientTimer = this.scene.time.delayedCall(durationMs, () => {
+      this.modernTransientTimer = null;
+      this.modernTransientState = null;
       this.playCurrentAnim();
     });
   }
@@ -648,6 +712,28 @@ export class PlayerRenderer {
     return this.characterId;
   }
 
+  getReforgedArtState(): Readonly<{
+    characterId: CharacterId;
+    available: boolean;
+    usingModernBody: boolean;
+    direction: Direction4;
+    animationKey: string | null;
+    frameName: string | number;
+    weaponId: WeaponId;
+    dead: boolean;
+  }> {
+    return Object.freeze({
+      characterId: this.characterId,
+      available: this.modernArtAvailable,
+      usingModernBody: this.useModernBody,
+      direction: this.currentDirection,
+      animationKey: this.sprite.anims.currentAnim?.key ?? null,
+      frameName: this.sprite.frame.name,
+      weaponId: this.currentWeaponId,
+      dead: this.isDead,
+    });
+  }
+
   /**
    * Toggle the big_heads render scale. Scales only the body/weapon art —
    * the health bar and nickname stay put, and the matching hitbox scale
@@ -657,12 +743,11 @@ export class PlayerRenderer {
     const multiplier = active ? MUTATORS.BIG_HEADS_RENDER_SCALE : 1;
     if (multiplier === this.renderScaleMultiplier) return;
     this.renderScaleMultiplier = multiplier;
-    const scale = SPRITE_SCALE * multiplier;
-    this.sprite.setScale(scale);
-    this.gunSprite?.setScale(scale);
-    this.batSprite.setScale(scale);
-    this.bodyOverlaySprite?.setScale(scale);
-    this.wandGraphics?.setScale(scale);
+    this.sprite.setScale(this.bodySpriteScale());
+    this.gunSprite?.setScale(SPRITE_SCALE * multiplier);
+    this.batSprite.setScale(SPRITE_SCALE * multiplier);
+    this.bodyOverlaySprite?.setScale(SPRITE_SCALE * multiplier);
+    this.wandGraphics?.setScale(SPRITE_SCALE * multiplier);
     this.applyCurrentBodyOverlayTransform();
   }
 
@@ -691,6 +776,7 @@ export class PlayerRenderer {
     if (dead === this.isDead) return;
     this.isDead = dead;
     if (dead) {
+      this.currentDeathCount = Math.max(1, Math.floor(deathCount));
       this.currentDeathPrefix = deathVariantPrefix(this.characterDef, this.isAxeless, deathCount);
       this.playDeathAnimation();
     } else {
@@ -703,6 +789,9 @@ export class PlayerRenderer {
     this.gunShootTimer?.remove(false);
     this.gunShootTimer = null;
     this.currentGunState = 'hold';
+    this.modernTransientTimer?.remove(false);
+    this.modernTransientTimer = null;
+    this.modernTransientState = null;
     this.setInvulnerable(false);
     this.setSprintEffect(false);
     this.container.setVisible(true);
@@ -721,7 +810,7 @@ export class PlayerRenderer {
     this.container.setVisible(true);
     this.container.setAlpha(1);
     this.setAliveVisualsVisible(true);
-    if (this.characterId === 'frost_wizard') {
+    if (this.characterId === 'frost_wizard' && !this.useModernBody) {
       this.applyFrostWizardTint();
     } else {
       this.sprite.clearTint();
@@ -733,9 +822,11 @@ export class PlayerRenderer {
   }
 
   private setAliveVisualsVisible(alive: boolean): void {
-    this.gunSprite?.setVisible(alive && weaponRendersOverlay(this.currentWeaponId));
+    this.gunSprite?.setVisible(
+      alive && weaponRendersOverlay(this.currentWeaponId) && !this.useModernBody,
+    );
     this.batSprite.setVisible(alive && this.currentWeaponId === 'bat');
-    this.wandGraphics?.setVisible(alive && this.currentWeaponId !== 'bat');
+    this.wandGraphics?.setVisible(alive && this.currentWeaponId !== 'bat' && !this.useModernBody);
     this.frostMistGraphics?.setVisible(alive);
     if (!alive) this.frozenCrystalGraphics?.setVisible(false);
     this.healthBarBg.setVisible(alive);
@@ -834,6 +925,8 @@ export class PlayerRenderer {
     this.gunShootTimer = null;
     this.attackTimer?.remove(false);
     this.attackTimer = null;
+    this.modernTransientTimer?.remove(false);
+    this.modernTransientTimer = null;
     this.batSwingTween?.stop();
     this.batSwingTween = null;
     // Container.destroy disposes children, so wand/mist/crystal graphics
@@ -847,9 +940,16 @@ export class PlayerRenderer {
     // idle↔run flips resolve to the same attack key (ignored below), and a
     // direction change resolves to a different attack key so the swing
     // re-plays in the new facing instead of snapping back to idle.
-    const key = this.isAttacking
-      ? this.attackKey(this.currentDirection)
-      : this.animKey(this.currentDirection, this.currentAnimState);
+    const key = this.useModernBody
+      ? reforgedFighterAnimationKey(
+          this.modernFighterId!,
+          this.modernTransientState ??
+            (this.isAttacking ? 'attack' : this.currentAnimState === 'run' ? 'move' : 'idle'),
+          this.currentDirection,
+        )
+      : this.isAttacking
+        ? this.attackKey(this.currentDirection)
+        : this.animKey(this.currentDirection, this.currentAnimState);
     // ignoreIfPlaying = true means re-calling with the same key is a no-op.
     this.sprite.play(key, true);
     if (this.bodyOverlaySprite) {
@@ -885,7 +985,39 @@ export class PlayerRenderer {
   }
 
   private deathKey(): string {
+    if (this.useModernBody) {
+      return reforgedFighterAnimationKey(
+        this.modernFighterId!,
+        'death',
+        this.deathDirection,
+        this.currentDeathCount,
+      );
+    }
     return `${this.currentDeathPrefix}_${this.deathDirection}_death`;
+  }
+
+  private bodySpriteScale(): number {
+    return (this.useModernBody ? REFORGED_SPRITE_SCALE : SPRITE_SCALE) * this.renderScaleMultiplier;
+  }
+
+  private updateModernBodySelection(): void {
+    const next = shouldUseReforgedFighterBody(
+      this.characterId,
+      this.currentWeaponId,
+      this.modernArtAvailable,
+      true,
+    );
+    if (next === this.useModernBody) return;
+    this.useModernBody = next;
+    this.modernTransientTimer?.remove(false);
+    this.modernTransientTimer = null;
+    this.modernTransientState = null;
+    this.sprite.setScale(this.bodySpriteScale());
+    if (this.characterId === 'frost_wizard' && !this.useModernBody) this.applyFrostWizardTint();
+    else this.sprite.clearTint();
+    this.setAliveVisualsVisible(!this.isDead);
+    if (this.isDead) this.sprite.play(this.deathKey(), true);
+    else this.playCurrentAnim();
   }
 
   private bodyOverlayAnimKey(direction: Direction4, state: AnimState): string {

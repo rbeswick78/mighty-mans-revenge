@@ -296,3 +296,22 @@ metadata, compression, live UI replacement, fighter animation sheets, weapon or
 pickup production art, biome tiles, combat-effect cutover, map authoring,
 balance changes, capability exposure, or deployment. Those remain owned by
 Batches 26-39 in roadmap order.
+
+## Batch 28 production mapping
+
+The first fighter production atlas applies this bible to Mighty Man, Bruce, and
+Frost Wizard only. All use registered 64x64 cells, one dominant body mass,
+transparent negative space, heavy outer contours, at most three body-value
+bands, and short authored action accents. Mighty Man retains the balanced human
+rifleman mass with bone face guard, amber scarf, steel rifle, and cyan x-ray
+release; Bruce remains compact, stocky, undead, and gunless with ember breath;
+Frost Wizard remains a slim human hood/wrap/wand silhouette with cyan/indigo
+frost. Horizontal aim is carried in the art rather than sprite rotation.
+
+The complete directional idle, move, attack, ability, damage, and live death-
+variant sets are presentation-only. They do not move hitboxes, change attack or
+ability timing, infer server state, or alter death/respawn authority. Authored
+body recognition and ability cues remain in full and reduced tiers; only
+existing secondary particles may reduce. Incompatible held-object states and
+all non-Batch-28 fighters stay on registered legacy fallbacks until their owning
+batches and the Batch 33 coherent cutover are verified.

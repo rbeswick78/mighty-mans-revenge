@@ -180,3 +180,22 @@ outputs live in the separate Batch 26 boundaries under
 `tools/reforged-assets/`, `art/reforged/`, and
 `client/public/assets/reforged/modern-ui/`. No external image, font file,
 third-party archive, or generated-image cache is a Batch 27 production input.
+
+## Batch 28 production disposition
+
+Batch 28 leaves every Batch 25 artifact and recorded hash unchanged. Three new
+original image-generation runs supplied production references for Mighty Man,
+Bruce, and Frost Wizard; their exact prompts, provider, generation IDs, and
+unaltered reference PNGs live under
+`art/reforged/references/fighter-art-i/`. The references were used only as
+visual-development inputs. Deterministic project geometry performs the human
+consistency cleanup and is the sole source of canonical production pixels.
+
+The separate `fighter-art-i` manifest records each asset as AI-assisted with a
+project-owned license, prompt document, generation ID, and durable source
+reference. The generated non-runtime provenance report records all three
+source hashes plus the manifest and atlas hashes. Runtime import JSON contains
+only frame/dimension/integrity data. No third-party reference, source archive,
+font, logo, trademark, Batch 25 pixel, or image-generation cache enters runtime
+redistribution. Bubba, Jack, Rook, weapons, pickups, biomes, combat effects,
+maps, and UI-atlas content remain outside this production set.

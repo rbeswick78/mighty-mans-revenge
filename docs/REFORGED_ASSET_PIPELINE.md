@@ -143,9 +143,39 @@ same essential frame/icon/focus treatment. The set contains no raster text,
 source archive, license detail, golden pixel, fighter, weapon, pickup, biome,
 combat effect, or map art.
 
+## Batch 28 fighter art I disposition
+
+`art/reforged/sources/fighter-art-i/manifest.json` packs the first fighter
+production set. Its durable geometry source is
+`tools/reforged-assets/create-fighter-art-i-sources.mjs`; the source was cleaned
+against three original AI-assisted production references whose complete prompts
+and generation IDs remain under `art/reforged/references/fighter-art-i/`.
+Neither the references nor any Batch 25 golden enter the build.
+
+The three canonical 64px-frame sheets contain complete directional idle,
+movement, attack, ability, and damage grids plus the live death-variant cycles:
+100 frames for Mighty Man, 88 for Bruce, and 100 for Frost Wizard. The unchanged
+Batch 26 tool sorts those assets and all 288 frames deterministically into one
+2048x1024 `fighter-art-i.core` RGBA8888 atlas with 3px padding and 2px
+extrusion. Runtime output stays under
+`client/public/assets/reforged/fighter-art-i/`; source hashes, license,
+attribution, and generation lineage stay under
+`art/reforged/provenance/fighter-art-i/`.
+
+Boot validates and registers the runtime-safe frame grid. Literal server-owned
+`modernArt` selects authored bodies only for Mighty Man's rifle identity,
+Bruce's no-gun identity, and Frost Wizard's wand identity. Incompatible held
+states retain the complete legacy body/overlay path, as do false, absent,
+old-server, missing-atlas, and non-Batch-28 roster paths. Authored body states
+and ability cues are essential in both quality tiers; reduced quality may drop
+only secondary particles. Batch 28 does not place fighter pixels in the modern
+UI atlas and does not authorize legacy removal or the Boot-through-Results
+cutover owned by Batch 33.
+
 ## Scope boundary
 
 Batch 26 owns this contract and tooling; Batch 27 owns the completed modern UI
-production set. Batches 28-32 own fighter, weapon/pickup, biome, and combat-feedback
-production sets. Batch 33 owns coherent live cutover. No pipeline output can
-enable `modernArt`, change fallback behavior, or authorize deployment.
+production set; Batch 28 owns the completed Mighty Man, Bruce, and Frost Wizard
+set. Batches 29-32 own the remaining fighter, weapon/pickup, biome, and combat-
+feedback production sets. Batch 33 owns coherent live cutover. No pipeline
+output can enable `modernArt`, retire a fallback, or authorize deployment.

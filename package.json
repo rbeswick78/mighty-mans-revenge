@@ -14,6 +14,7 @@
     "assets:validate": "node tools/reforged-assets/asset-pipeline.mjs validate",
     "assets:build": "node tools/reforged-assets/asset-pipeline.mjs build",
     "assets:generate:modern-ui": "node tools/reforged-assets/create-modern-ui-sources.mjs",
+    "assets:generate:fighter-art-i": "node tools/reforged-assets/create-fighter-art-i-sources.mjs",
     "test:assets": "node --test tools/reforged-assets/*.test.mjs",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint . --ext .ts,.tsx",

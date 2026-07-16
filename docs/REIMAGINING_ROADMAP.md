@@ -5,9 +5,9 @@ Read this file and `CLAUDE.md` completely at the start of every batch. The
 completed `docs/REPLAYABILITY_ROADMAP.md` remains the historical record for the
 systems this program preserves and reorganizes.
 
-- **Status:** Batch 27 complete on 2026-07-16; the deterministic modern UI atlas
-  and capability-owned client chrome are in-repo.
-- **Next batch:** Batch 28 — Fighter art I.
+- **Status:** Batch 28 complete on 2026-07-16; the deterministic Fighter Art I
+  atlas and capability-owned gameplay presentation are in-repo.
+- **Next batch:** Batch 29 — Fighter art II.
 - **Public releases:** Reforged Arena, then Battle Royale.
 - **Working model:** one numbered batch per session, direct commits and pushes
   to `main`, milestone-gated production deployments.
@@ -181,7 +181,7 @@ Production deployment happens only at a gate or for an urgent live fix.
 |  25 | Style bible                            | Visual system | **DONE — 2026-07-16** |
 |  26 | Asset pipeline                         | Visual system | **DONE — 2026-07-16** |
 |  27 | Modern UI assets                       | Visual system | **DONE — 2026-07-16** |
-|  28 | Fighter art I                          | Visual system | Pending               |
+|  28 | Fighter art I                          | Visual system | **DONE — 2026-07-16** |
 |  29 | Fighter art II                         | Visual system | Pending               |
 |  30 | Weapons and pickups                    | Visual system | Pending               |
 |  31 | Biome environment kit                  | Visual system | Pending               |
@@ -993,6 +993,38 @@ Acceptance:
 
 Modernize Mighty Man, Bruce, and Frost Wizard across directional idle,
 movement, attack, ability, damage, and death states without changing mechanics.
+
+Acceptance:
+
+- [x] Three original AI-assisted production references and one deterministic
+      project geometry source produce canonical 64px sheets for Mighty Man,
+      Bruce, and Frost Wizard without copying, cropping, or reinterpreting a
+      Batch 25 golden.
+- [x] All three fighters provide registered four-direction idle, movement,
+      attack, ability, and damage states plus exact existing horizontal death-
+      variant cycles: 100 Mighty Man, 88 Bruce, and 100 Frost Wizard frames.
+- [x] Silhouette, facing, negative space, and identity locks preserve Mighty
+      Man's bone/amber rifleman and cyan x-ray cue, Bruce's stocky undead no-gun
+      mass and ember breath, and Frost Wizard's slim hood/wrap/wand and cyan/
+      indigo frost at full, mobile-width, and gameplay scale.
+- [x] The Batch 26 packer emits one deterministic 288-frame 2048x1024 RGBA8888
+      atlas with exact declared grids, stable sorting, no trim/rotation, 3px
+      padding, 2px extrusion, byte ceilings, runtime-safe metadata, and separate
+      complete source/generation provenance.
+- [x] Literal server-owned `modernArt` gates live gameplay bodies. False,
+      absent, old-server, missing-atlas, non-Batch-28 roster, Mighty Man non-
+      rifle, and Frost Wizard bat paths retain complete legacy fallbacks; Bruce
+      remains gunless and no capability/default/mechanic contract changes.
+- [x] Snapshot-derived attack, ability, damage, death, and respawn presentation
+      consumes existing authority without changing animation lifecycle, aim,
+      collision, movement, weapon, combat, ability, wire, or server behavior.
+      Authored recognition and ability cues remain essential in full/reduced.
+- [x] Focused generation/asset/import/grid/registration/layer/state/direction/
+      fallback/full-reduced tests, typecheck, lint, affected/full builds,
+      formatting, diff/provenance review, targeted Chromium/mobile-landscape,
+      small-world, HUD/minimap, Results/rematch, recovery, and inspected visual
+      evidence pass. No Batch 29 content, legacy removal, capability exposure,
+      production configuration, or deployment occurs.
 
 #### Batch 29 — Fighter art II
 
@@ -2651,6 +2683,63 @@ evidence model, while Chromium is the live/compositor and mobile-sized visual
 reference. Batch 28 owns Mighty Man, Bruce, and Frost Wizard production art;
 the modern UI atlas does not authorize Batch 29 or later work.
 
+### Batch 28 — 2026-07-16 — Fighter art I
+
+**Shipped:** Added three original AI-assisted production references plus one
+deterministic project cleanup source for Mighty Man, Bruce, and Frost Wizard.
+The source emits complete registered 64px directional idle, move, attack,
+ability, and damage grids plus the fighters' exact live death-variant cycles.
+The unchanged Batch 26 tool packs 288 frames into one deterministic 2048x1024
+RGBA8888 `fighter-art-i.core` atlas with runtime-safe import JSON and separate
+complete provenance. Boot validates/registers the named frames. Literal server-
+owned `modernArt` selects the bodies in gameplay, while snapshot edges select
+authored ability, damage, death, and respawn presentation without changing
+authority. Mighty Man keeps his rifle/bone/amber/cyan identity, Bruce stays a
+stocky ember-accented gunless undead, and Frost Wizard keeps the slim hood/wrap/
+wand cyan/indigo identity. Incompatible carried-object states and every false,
+absent, old-server, missing-atlas, or other-roster path stay on complete legacy
+fallbacks.
+
+**Verification:** Selected the visual plus isolated client-rendering tier
+because executable changes are confined to deterministic art tooling, Boot
+loading, and capability-owned player presentation; no shared/server/wire/
+persistence, input, recovery authority, capability default, production, or
+mechanics boundary changed. The focused asset suite passed all existing
+validators plus byte-identical source/runtime/provenance rebuild, exact 288-
+frame metadata, grid, registration, dominant-mass, negative-space, palette,
+layer, and identity checks. Focused Vitest passed six import, frame-range,
+death-cycle, direction, held-object fallback, and full/reduced tests.
+`corepack pnpm typecheck`, `corepack pnpm lint`, affected client build, full
+production build, repository formatting, and `git diff --check` passed; Vite's
+established chunk advisory remains. Targeted desktop Chromium and mobile-
+landscape evidence passed capability-on directional/state, ability, damage,
+death/respawn, fallback/restoration, current 960x576 world, HUD/minimap,
+Results/rematch, and recovery checks plus capability-off/old-server fallback.
+The source sheets, packed atlas, 1280x720 direct-renderer frame, 844x390
+Chromium frame, and gameplay-scale silhouettes were inspected. Full unit and
+three-project browser inventories were omitted because the isolated evidence
+showed no broader coupling; Batch 33 and Batch 39 retain their full-journey and
+release-gate matrices.
+
+**Deployment:** Skipped. Batch 28 is incomplete visual-system milestone work
+behind a default-false server capability. No production environment, flag,
+server/client deployment, capability exposure, or legacy asset changed.
+
+**Deviations:** No product-scope deviation. The first pnpm test invocation used
+an invalid focused forwarding form and was rerun with the repository Vitest
+binary. The first Playwright invocation forwarded a literal separator and found
+no tests; the corrected command passed. Managed sandbox node-module reads
+required approved repository-local execution. Mobile-landscape compositor PNGs
+retain RFG-003's black-frame limitation, so passing object/state assertions and
+non-black direct-renderer pixels remain the trustworthy evidence; desktop
+Chromium supplied the live and mobile-sized compositor references.
+
+**Known issues:** No new bug-ledger entry was required. RFG-001 and RFG-002
+remain closed historical proofs. RFG-003 remains gate-dispositioned and did not
+change. Batch 29 owns Bubba, Jack, and Rook, including Jack axe/no-axe and Rook
+synchronized layers. Batch 33 owns coherent Boot-through-Results cutover and
+verified legacy retirement.
+
 ## Batch 22 input prompt (historical)
 
 ```text
@@ -3002,7 +3091,7 @@ applicable, with Chromium as the live/compositor and mobile-sized visual
 reference. Batch 27 owns modern UI assets; Batch 28 owns fighter art I.
 ```
 
-## Next-session prompt
+## Batch 28 input prompt (historical)
 
 ```text
 Continue the Reforged build for Mighty Man's Revenge.
@@ -3092,4 +3181,106 @@ remain closed historical proofs. RFG-003 still requires staged Firefox/WebKit
 object/input evidence and direct renderer pixels where applicable, with Chromium
 as the live/compositor and mobile-sized visual reference. Batch 28 owns Mighty
 Man, Bruce, and Frost Wizard production art; Batch 29 owns Bubba, Jack, and Rook.
+```
+
+## Next-session prompt
+
+```text
+Continue the Reforged build for Mighty Man's Revenge.
+
+Read docs/REIMAGINING_ROADMAP.md and CLAUDE.md completely first. Read
+docs/REFORGED_BASELINE.md, docs/REFORGED_CAPABILITIES.md,
+docs/REFORGED_STYLE_BIBLE.md, docs/REFORGED_ASSET_PIPELINE.md, and
+docs/reforged/style-bible/PROVENANCE.md before implementation. Batch 28 —
+Fighter art I is complete. Implement Batch 29 — Fighter art II exactly as
+specified and do not begin Batch 30 — Weapons and pickups.
+
+Produce coherent production art for Bubba, Jack, and Rook across the complete
+directional idle, movement, attack, ability, damage, and death state sets
+required by their existing live identities. Preserve Bubba's tallest/widest
+undead tank silhouette, planted feet, patched industrial overalls/scrap plating,
+no-gun truth, and steel-blue Iron Hide cue; Jack's wiry asymmetric undead
+silhouette, rust-red work coat, long-handled axe, distinct complete axe-present
+and axe-absent bodies, and rust-red thrown-axe cue; and Rook's compact forward-
+leaning human rifleman silhouette, green full scavenger helmet/round lenses/
+short ridge, close-carried rifle, oxidized-teal paired chevrons, and low dash
+streak. Rook's body and helmet layers must keep identical registration and
+synchronized state grids. Every state must preserve aim/facing, carried-object
+or no-gun truth, readable negative space, one dominant body mass, and gameplay-
+scale recognition at 48–72 CSS pixels. Do not alter mechanics to fit animation.
+
+Use the Batch 26 source/manifest/provenance contract and the smallest production
+source/atlas sets that preserve exact frame grids and loading lifecycle. Keep
+canonical PNG, lower-kebab names, exact declared dimensions/counts/columns,
+deterministic sorting, no trim/rotation, mip-safe extrusion/padding, byte limits,
+runtime-safe metadata, and complete non-runtime lineage. Batch 25 goldens remain
+documentation references and may not be copied into runtime output. Record all
+original/AI-assisted production lineage and inspect source plus packed output at
+full, mobile-width, and gameplay scale before acceptance.
+
+Preserve Batch 28's complete `fighter-art-i.core` contract: 288 registered
+frames in one deterministic 2048x1024 atlas; Mighty Man/Bruce/Frost Wizard
+directional idle/move/attack/ability/damage/death states; exact live death
+variant cycles; bone/amber/cyan, stocky no-gun/ember, and slim wand/cyan-indigo
+identity cues; snapshot-owned animation selection; full/reduced essential body
+and ability treatment; held-object fallback; and literal server-owned
+`modernArt` gating. Do not rewrite, merge, or place new fighter pixels in that
+atlas merely to accommodate Batch 29.
+
+Preserve Batch 27's complete modern UI contract and the complete Batch 18–24
+viewport, coordinate, camera, dynamic rendering, quality, responsive HUD,
+minimap, fallback, and regression-gate contracts. Current maps remain 960x576
+at `(0, 0)` with unchanged collision, shared/server physics, authoritative 20Hz
+simulation, gameplay rules, wire contracts, menus, Results/rematches, and
+production configuration. Capability-off, old-server, and old-client paths
+retain the exact established 960x720 gameplay/Lobby behavior through Batch 54.
+All capabilities remain strict server-owned opt-ins and default false.
+
+Do not begin Batch 30 or later work: no six-gun or pickup production set, rarity
+auras, biome kit, combat-feedback cutover, full-journey visual cutover, larger
+arena, tactical-map gameplay/input, movement or balance tuning, Battle Royale,
+capability exposure, or deployment. Retain every legacy fighter asset/fallback
+until a verified gated replacement owns each live use; Batch 33 still owns the
+coherent Boot-through-Results cutover. Never enable a capability by default or
+deploy without explicit authorization.
+
+Batch 28 is complete and pushed on main as `feat(art): add Reforged fighter art
+I`. Three original AI-assisted references plus deterministic project cleanup
+emit 100 Mighty Man, 88 Bruce, and 100 Frost Wizard canonical frames. The Batch
+26 tool packs a 288-frame 2048x1024 RGBA8888 atlas plus runtime-safe import JSON
+and separate complete provenance. Focused generation/asset/import/grid/
+registration/layer/state/direction/fallback/full-reduced tests, typecheck, lint,
+affected/full builds, formatting, diff/provenance review, targeted desktop
+Chromium/mobile-landscape state and visual evidence, capability-off fallback,
+death/respawn/restoration, current small-world HUD/minimap, Results/rematch, and
+recovery checks are green. No shared/server/wire/mechanics/capability-default/
+production/deployment behavior changed.
+
+Choose and document the Batch 29 visual/client-rendering verification tier. Run
+focused asset validators for every new manifest/output; add deterministic import,
+frame-grid, registration/layer synchronization, state-selection, direction,
+Jack axe/no-axe, Rook body/helmet, fallback, and full/reduced tests. Verify all
+required Bubba/Jack/Rook states at full, mobile, and gameplay scale, capability-
+on rendering, capability-off/old-server fallback, current small-world behavior,
+HUD/minimap readability, Results/rematch, death/respawn, and recovery
+restoration. Run repository formatting, `git diff --check`, intended-diff/
+provenance review, `corepack pnpm typecheck`, `corepack pnpm lint`, affected and
+full production builds, and targeted desktop Chromium/mobile-landscape
+interaction and visual evidence. Escalate to full unit or three-project browser
+suites if shared/server/wire, animation lifecycle, recovery, capability
+foundations, or broader scene behavior changes. Update roadmap acceptance/
+status, architecture/pipeline/provenance docs, bug ledger only with proven
+evidence, and Session Log. Run the complete end-of-batch ritual, commit and push
+directly to main, verify a clean worktree with HEAD exactly matching origin/main,
+and skip deployment.
+
+Carry-over warnings: use Corepack pnpm 10.33.0 if the local shim mismatches. Do
+not overwrite, reinterpret, or atlas the Batch 25 goldens. Keep source archives
+and full license/generation lineage out of runtime redistribution. Preserve
+Jack's complete axe-present/axe-absent body truth and Rook's synchronized body/
+helmet layers across every state and death facing. RFG-001/RFG-002 remain closed
+historical proofs. RFG-003 still requires staged Firefox/WebKit object/input
+evidence and direct renderer pixels where applicable, with Chromium as the
+live/compositor and mobile-sized visual reference. Batch 29 owns Bubba, Jack,
+and Rook; Batch 30 owns weapons and pickups.
 ```

@@ -390,7 +390,7 @@ export class GameScene extends Phaser.Scene {
     // the hard-swap look turns out wrong.
 
     // Create subsystems
-    this.playerManager = new ClientPlayerManager(this);
+    this.playerManager = new ClientPlayerManager(this, capabilities.modernArt);
     this.tauntRenderer = new TauntRenderer(this);
     this.effectsRenderer = new EffectsRenderer(this, this.cameraController);
     this.pickupRenderer = new PickupRenderer(this);
@@ -1167,6 +1167,10 @@ export class GameScene extends Phaser.Scene {
           })
         : null,
     });
+  }
+
+  getReforgedFighterRenderState(): ReturnType<ClientPlayerManager['getReforgedArtStates']> {
+    return this.playerManager?.getReforgedArtStates() ?? [];
   }
 
   private updateAimLine(localState: ReturnType<NetworkManager['getLocalPlayerState']>): void {
