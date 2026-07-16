@@ -5,10 +5,9 @@ Read this file and `CLAUDE.md` completely at the start of every batch. The
 completed `docs/REPLAYABILITY_ROADMAP.md` remains the historical record for the
 systems this program preserves and reorganizes.
 
-- **Status:** Batch 24 complete on 2026-07-16; the cumulative scrolling-world
-  and camera foundation is verified behind default-false capabilities.
-- **Next batch:** Batch 25 — Style bible, pending explicit user review and a
-  new authorization chain.
+- **Status:** Batch 25 complete on 2026-07-16; the original Reforged visual
+  system and four golden reference sheets are approved in-repo.
+- **Next batch:** Batch 26 — Asset pipeline.
 - **Public releases:** Reforged Arena, then Battle Royale.
 - **Working model:** one numbered batch per session, direct commits and pushes
   to `main`, milestone-gated production deployments.
@@ -179,7 +178,7 @@ Production deployment happens only at a gate or for an urgent live fix.
 |  22 | Responsive combat HUD                  | World/camera  | **DONE — 2026-07-16** |
 |  23 | Minimap foundation                     | World/camera  | **DONE — 2026-07-16** |
 |  24 | Camera regression gate                 | World/camera  | **DONE — 2026-07-16** |
-|  25 | Style bible                            | Visual system | Pending               |
+|  25 | Style bible                            | Visual system | **DONE — 2026-07-16** |
 |  26 | Asset pipeline                         | Visual system | Pending               |
 |  27 | Modern UI assets                       | Visual system | Pending               |
 |  28 | Fighter art I                          | Visual system | Pending               |
@@ -898,6 +897,32 @@ Acceptance:
 Generate and approve original reference sheets for fighters, environments,
 UI, guns, rarity effects, lighting, line weight, color hierarchy, and motion.
 Do not bulk-generate production assets before the golden references pass.
+
+Acceptance:
+
+- [x] Four original golden reference sheets define all six established fighter
+      identities/silhouettes, four biome families, modern UI and six-gun
+      language, all six rarity colors/shapes, lighting, line weight, color
+      hierarchy, motion, and full/reduced cosmetic principles.
+- [x] Mighty Man, Bruce, Frost Wizard, Bubba, Jack, and Rook retain their
+      established mass, posture, carried-object, human/undead, state/layer, and
+      ability-accent identities at full and gameplay scale.
+- [x] Explicit written criteria cover gameplay-scale readability, collision/
+      cover/objective separation, palette and line hierarchy, biome
+      differentiation, UI/rarity contrast, lighting, motion, originality,
+      provenance, and browser/mobile feasibility.
+- [x] Every approved 1536x1024 reference was inspected at full size plus
+      temporary 768x512 mobile-width and 384x256 gameplay-detail scales. The
+      one generic UI candidate that introduced prohibited `SHOP`/economy copy
+      was rejected and narrowly corrected; no other direction required a
+      revision.
+- [x] `docs/REFORGED_STYLE_BIBLE.md` and the in-repo provenance manifest record
+      the approved set, generation lineage, prompt specifications, dimensions, hashes,
+      inspection evidence, rejected/deferred directions, and later-batch scope.
+- [x] Only documentation/reference artifacts changed. No Batch 26 pipeline,
+      production atlas/asset, live UI/fighter/weapon/environment replacement,
+      runtime camera/rendering/HUD/minimap behavior, map, gameplay, wire,
+      capability default, production configuration, or deployment changed.
 
 #### Batch 26 — Asset pipeline
 
@@ -2424,6 +2449,53 @@ specific visual evidence. Live and mobile-sized Chromium remain the compositor/
 hardware visual source; real-device/live-channel coverage should be revisited
 at the Reforged Arena release gate. No new bug ID was required.
 
+### Batch 25 — 2026-07-16 — Style bible
+
+**Shipped:** Established the original Reforged stylized-comic 2D visual system
+and four approved 1536x1024 golden reference sheets: all six fighter identities
+and silhouettes; wasteland, overgrown, industrial, and irradiated biome
+families; modern five-tab UI, six-gun, pickup, and rarity language; and the
+complete line-weight, value, lighting, motion, and full/reduced-effect grammar.
+`docs/REFORGED_STYLE_BIBLE.md` freezes the written implementation rules and
+acceptance criteria. The provenance manifest records every prompt, output id,
+dimension, SHA-256, inspection result, and disposition. Five total candidates
+were generated: four goldens plus one retained rejected UI predecessor. No
+production sprites, atlases, import metadata, live replacement, or runtime
+behavior was added.
+
+**Verification:** Selected the camera/world/visual documentation-and-reference
+tier. Every golden PNG was inspected at original 1536x1024 resolution and in
+temporary local 768x512 mobile-width plus 384x256 gameplay-detail previews.
+Fighter identity, gameplay silhouette, collision/objective hierarchy, all four
+biomes, UI states, six gun shapes, six value/shape-coded rarities, five lighting
+conditions, motion strips, and full/reduced effect pairs remained readable. The
+initial UI sheet's generic `SHOP`, upgrade, and dismantle copy violated the
+locked no-economy scope; a single text-only image edit preserved its approved
+visual structure while restoring Play/Fighters/Challenges/Records/Settings and
+neutral game actions. Repository Prettier, `git diff --check`, in-repo image
+dimension/hash validation, provenance/intended-diff review, and link/path review
+passed. Runtime typecheck, lint, unit, build, recorder, and browser suites were
+deliberately omitted because no executable source, configuration, generated
+runtime content, dependency, capability, or production path changed.
+
+**Deployment:** Skipped. Batch 25 is visual reference documentation inside the
+unfinished visual-system milestone. All five capabilities and production
+configuration remain default false and unchanged; no server or client was
+deployed.
+
+**Deviations:** No product-scope deviation. Direct `file://` inspection in the
+in-app browser was blocked by browser URL policy, so reduced-scale evidence used
+local temporary PNG previews and the image viewer without modifying the golden
+sources. The initial UI candidate's prohibited generic economy labels were a
+tightly coupled reference defect and were corrected before approval. No bulk
+candidate or production-asset generation occurred.
+
+**Known issues:** No new bug-ledger entry was required. RFG-001 and RFG-002
+remain closed historical camera proofs. RFG-003 remains gate-dispositioned and
+unchanged because Batch 25 introduced no runtime/browser path. The style bible
+does not authorize pipeline implementation, visual cutover, larger maps,
+capability exposure, or deployment; Batch 26 owns the source/atlas pipeline.
+
 ## Batch 22 input prompt (historical)
 
 ```text
@@ -2690,33 +2762,72 @@ review; do not create Batch 25.
 ## Next-session prompt
 
 ```text
-Review the completed Batch 24 camera regression gate for Mighty Man's Revenge.
+Continue the Reforged build for Mighty Man's Revenge.
 
-Read docs/REIMAGINING_ROADMAP.md, CLAUDE.md, docs/REFORGED_BASELINE.md, and
-docs/REFORGED_CAPABILITIES.md completely first. Batch 24 — Camera regression
-gate is complete and pushed on main. Do not begin Batch 25 — Style bible or any
-later implementation without a new explicit user authorization chain.
+Read docs/REIMAGINING_ROADMAP.md and CLAUDE.md completely first. Read
+docs/REFORGED_BASELINE.md, docs/REFORGED_CAPABILITIES.md,
+docs/REFORGED_STYLE_BIBLE.md, and
+docs/reforged/style-bible/PROVENANCE.md before implementation. Batch 25 — Style
+bible is complete. Implement Batch 26 — Asset pipeline exactly as specified and
+do not begin Batch 27 — Modern UI assets.
 
-Inspect the Batch 24 acceptance evidence, verification tier, Session Log,
-RFG-001/RFG-002 historical proofs, and RFG-003 gate disposition. Confirm that
-the cumulative Batch 18–23 viewport, coordinate, camera, dynamic rendering,
-responsive HUD, and minimap contracts are adequately verified while all five
-capabilities remain strict server-owned opt-ins and default false. Preserve the
-exact capability-off/old-server/old-client 960x720 fallback through Batch 54.
+Establish the production source/reference folder contract, cleanup and
+consistency rules, deterministic atlas generation, import metadata, naming,
+provenance/attribution, compression, and automated dimension/frame validation
+needed by the later visual batches. The Batch 25 golden references are the
+approved visual authority, but remain documentation artifacts rather than
+runtime assets. Build the smallest pipeline and fixtures that prove the rules;
+do not bulk-generate or replace production art.
 
-Final recorded gates: 133 unit/integration files and 1,563 tests passed;
-typecheck, lint, affected/full builds passed; the complete default-false
-three-project Playwright inventory passed 139 cases with 68 documented skips;
-the enabled three-project camera/world/HUD/minimap matrix passed 17 cases with
-four expected skips; server/client recorders and inspected 1280x720, 844x390,
-Firefox-renderer, and WebKit-renderer evidence passed. RFG-001 retains exact
-`(320, 144)` scroll proof, RFG-002 retains exact `0.9` zoom proof, and RFG-003
-is gate-dispositioned through staged object/input assertions plus direct
-non-black Phaser renderer snapshots while Chromium remains the live/compositor
-reference. Production was not deployed.
+Preserve the complete Batch 25 style contract: all six established fighter
+identities and silhouettes, four biome families, five-tab/no-economy UI
+language, six-gun and six-rarity shape/color hierarchy, collision/objective
+readability, lighting, line-weight, motion, and full/reduced cosmetic guidance.
+Preserve the completed Batch 18–24 viewport, coordinate, camera, dynamic
+rendering, quality, responsive HUD, minimap, fallback, and regression-gate
+contracts. Current maps remain 960x576 at `(0, 0)` with unchanged collision,
+shared/server physics, authoritative 20Hz simulation, gameplay rules, wire
+contracts, menus, Results/rematches, and production configuration. Capability-
+off, old-server, and old-client paths retain the exact established 960x720
+gameplay/Lobby behavior through Batch 54. All capabilities remain strict
+server-owned opt-ins and default false.
 
-If review accepts the milestone, ask the user for a fresh explicit Batch 25
-authorization. Do not generate style references, modern art, assets, larger
-arenas, tactical maps, Battle Royale work, capability exposure, or deployment
-inside this review task.
+Do not begin Batch 27 or later work: no modern UI production assets, live UI or
+fighter/weapon/environment replacement, fighter animation production, six-gun
+production set, biome kit, combat-feedback cutover, larger arena authoring,
+tactical map, movement or balance tuning, Battle Royale gameplay, capability
+exposure, or deployment. Do not change runtime gameplay/camera/minimap/
+rendering/HUD behavior to accommodate the pipeline. Never enable a capability
+by default or deploy without explicit authorization.
+
+Batch 25 is complete and pushed on main as the Style Bible batch. Four approved
+1536x1024 golden sheets and one retained rejected UI predecessor are in
+`docs/reforged/style-bible/`; prompt specifications, generation lineage, hashes,
+inspection evidence, and dispositions are in the provenance manifest. Every
+golden passed full-size, 768x512 mobile-width, and 384x256 gameplay-detail
+inspection. The initial generic UI candidate was rejected for prohibited
+`SHOP`/economy language and narrowly corrected. No runtime source,
+configuration, dependency, production asset, capability default, or deployment
+changed. RFG-001/RFG-002 remain closed historical proofs; RFG-003 remains
+gate-dispositioned and unchanged.
+
+Choose and document the Batch 26 verification tier. Add focused deterministic
+validators for naming, dimensions, frame counts, metadata, atlas determinism,
+compression boundaries, provenance completeness, and failure reporting. Run
+the focused validators, repository formatting, `git diff --check`, intended-
+diff/provenance review, `corepack pnpm typecheck`, `corepack pnpm lint`, and the
+affected/full production builds if executable tooling or package configuration
+changes. Escalate to runtime unit/browser suites only if runtime code,
+generated runtime content, shared/server/wire behavior, or a broader boundary
+changes. Update roadmap acceptance/status, architecture/pipeline/provenance
+documentation, bug ledger only with proven evidence, and Session Log. Run the
+complete end-of-batch ritual, commit and push directly to main, verify a clean
+worktree with HEAD exactly matching origin/main, and skip deployment.
+
+Carry-over warnings: use Corepack pnpm 10.33.0 if the local shim mismatches.
+Do not overwrite or reinterpret Batch 25 goldens; if a pipeline rule exposes a
+true reference defect, record it without generating replacement production
+art. Keep source archives and third-party licensing constraints out of runtime
+redistribution. Batch 26 owns tooling and contracts only; Batch 27 owns modern
+UI assets.
 ```

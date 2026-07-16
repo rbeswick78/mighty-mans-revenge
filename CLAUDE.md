@@ -447,6 +447,18 @@ prevent unrelated listeners from being mistaken for the repository server.
 No camera, rendering, HUD, minimap, gameplay, wire, capability-default,
 production, art, arena, or Battle Royale behavior changed in this gate.
 
+**Reforged style bible (Batch 25):** `docs/REFORGED_STYLE_BIBLE.md` is the
+written visual authority for the browser-efficient stylized-comic 2D direction.
+Four approved in-repo golden sheets lock all six fighter identities and
+silhouettes, four biome families, five-tab/no-economy UI, six-gun and six-rarity
+language, collision/objective readability, lighting, line hierarchy, motion,
+and full/reduced effect behavior. The adjacent provenance manifest records the
+five-candidate generation lineage, prompt specifications, dimensions, hashes, reduced-
+scale inspection, one rejected generic-economy UI predecessor, and deferred
+production scope. These are documentation references only: they are not runtime
+assets and do not authorize Batch 26 atlas tooling, Batch 27+ production art,
+visual cutover, capability exposure, or deployment.
+
 ### Why This Matters for Agents
 
 Client prediction and server simulation **must use identical physics code** from `/shared`. If you change movement, collision, or physics logic, you must change it in `/shared` and verify both client and server still agree. A mismatch between client prediction and server authority causes visible rubber-banding.
@@ -752,4 +764,5 @@ every suite by default. The detailed matrix and release-gate triggers live in
 - [Phaser 3 docs](https://photonstorm.github.io/phaser3-docs/) — game engine
 - User stories and full spec: `USER_STORIES.md` in repo root
 - Active Reforged build plan (multi-session): `docs/REIMAGINING_ROADMAP.md` — read it before every Reforged batch and implement only the active batch
+- Approved Reforged visual direction: `docs/REFORGED_STYLE_BIBLE.md` — golden references, identity locks, readability rules, and later-asset constraints
 - Completed replayability build history: `docs/REPLAYABILITY_ROADMAP.md` — read it when changing established weapons, modes, maps, mutators, characters, stats, awards, or challenge behavior

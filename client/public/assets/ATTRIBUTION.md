@@ -89,5 +89,16 @@ original works, procedurally synthesized by `client/scripts/gen-sfx.mjs`
 (deterministic — rerunning the script reproduces the files byte-for-byte). No
 third-party license applies.
 
+## Reforged visual-development references
+
+The Batch 25 golden reference sheets under `docs/reforged/style-bible/` are
+original AI-assisted visual-development artifacts created with OpenAI's
+built-in image-generation path. They are documentation references only and are
+not loaded or redistributed as runtime assets. No third-party image input was
+used for the approved text-to-image sheets; the sole image-edit input was the
+project's own initial Batch 25 UI candidate. Prompt specifications, generation lineage,
+dimensions, hashes, dispositions, and inspection evidence live in
+`docs/reforged/style-bible/PROVENANCE.md`.
+
 If we ever ship this commercially (charge money, run ads, promote a paid
 product) we owe the author at least $2 — pay before release.

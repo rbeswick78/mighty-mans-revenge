@@ -231,6 +231,7 @@ them.
 | Why each big decision was made              | [`docs/adr/`](./docs/adr/)                                         |
 | Full feature spec / user stories            | [`USER_STORIES.md`](./USER_STORIES.md)                             |
 | Active Reforged multi-session roadmap       | [`docs/REIMAGINING_ROADMAP.md`](./docs/REIMAGINING_ROADMAP.md)     |
+| Approved Reforged visual style and goldens  | [`docs/REFORGED_STYLE_BIBLE.md`](./docs/REFORGED_STYLE_BIBLE.md)   |
 | Completed replayability build history       | [`docs/REPLAYABILITY_ROADMAP.md`](./docs/REPLAYABILITY_ROADMAP.md) |
 | Visual / graphics roadmap                   | [`GRAPHICS_PLAN.md`](./GRAPHICS_PLAN.md)                           |
 | Idea backlog                                | [`IDEAS.md`](./IDEAS.md)                                           |
