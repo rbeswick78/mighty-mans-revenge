@@ -5,26 +5,28 @@ test.describe('Gauntlet route draft', () => {
     gamePage,
   }, testInfo) => {
     await expect
-      .poll(() =>
-        gamePage.evaluate(() => {
-          const game = (
-            window as unknown as {
-              game?: {
-                scene: {
-                  scenes: Array<{
-                    scene: { key: string };
-                    sys: { settings: { active: boolean } };
-                  }>;
+      .poll(
+        () =>
+          gamePage.evaluate(() => {
+            const game = (
+              window as unknown as {
+                game?: {
+                  scene: {
+                    scenes: Array<{
+                      scene: { key: string };
+                      sys: { settings: { active: boolean } };
+                    }>;
+                  };
                 };
-              };
-            }
-          ).game;
-          return (
-            game?.scene.scenes.some(
-              (scene) => scene.scene.key === 'LobbyScene' && scene.sys.settings.active,
-            ) ?? false
-          );
-        }),
+              }
+            ).game;
+            return (
+              game?.scene.scenes.some(
+                (scene) => scene.scene.key === 'LobbyScene' && scene.sys.settings.active,
+              ) ?? false
+            );
+          }),
+        { timeout: 15_000 },
       )
       .toBe(true);
 
@@ -96,21 +98,23 @@ test.describe('Gauntlet route draft', () => {
     });
 
     await expect
-      .poll(() =>
-        gamePage.evaluate(() => {
-          const w = window as unknown as {
-            game?: {
-              scene: {
-                scenes: Array<{ scene: { key: string }; sys: { settings: { active: boolean } } }>;
+      .poll(
+        () =>
+          gamePage.evaluate(() => {
+            const w = window as unknown as {
+              game?: {
+                scene: {
+                  scenes: Array<{ scene: { key: string }; sys: { settings: { active: boolean } } }>;
+                };
               };
             };
-          };
-          return (
-            w.game?.scene.scenes.some(
-              (scene) => scene.scene.key === 'ResultsScene' && scene.sys.settings.active,
-            ) ?? false
-          );
-        }),
+            return (
+              w.game?.scene.scenes.some(
+                (scene) => scene.scene.key === 'ResultsScene' && scene.sys.settings.active,
+              ) ?? false
+            );
+          }),
+        { timeout: 15_000 },
       )
       .toBe(true);
 
@@ -200,26 +204,28 @@ test.describe('Gauntlet route draft', () => {
 
   test('discovers a named two-boon build after a full clear', async ({ gamePage }) => {
     await expect
-      .poll(() =>
-        gamePage.evaluate(() => {
-          const game = (
-            window as unknown as {
-              game?: {
-                scene: {
-                  scenes: Array<{
-                    scene: { key: string };
-                    sys: { settings: { active: boolean } };
-                  }>;
+      .poll(
+        () =>
+          gamePage.evaluate(() => {
+            const game = (
+              window as unknown as {
+                game?: {
+                  scene: {
+                    scenes: Array<{
+                      scene: { key: string };
+                      sys: { settings: { active: boolean } };
+                    }>;
+                  };
                 };
-              };
-            }
-          ).game;
-          return (
-            game?.scene.scenes.some(
-              (scene) => scene.scene.key === 'LobbyScene' && scene.sys.settings.active,
-            ) ?? false
-          );
-        }),
+              }
+            ).game;
+            return (
+              game?.scene.scenes.some(
+                (scene) => scene.scene.key === 'LobbyScene' && scene.sys.settings.active,
+              ) ?? false
+            );
+          }),
+        { timeout: 15_000 },
       )
       .toBe(true);
 

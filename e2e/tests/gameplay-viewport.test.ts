@@ -1,8 +1,19 @@
-import type { Page } from '@playwright/test';
+import { Buffer } from 'node:buffer';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
+
+import type { Page, TestInfo } from '@playwright/test';
 
 import { expect, test } from '../fixtures';
 
 const largeWorldsAdvertised = process.env.CAPABILITY_LARGE_WORLDS === 'true';
+
+function batch24ArtifactPath(testInfo: TestInfo, name: string): string | null {
+  const artifactDir = process.env.BATCH24_ARTIFACT_DIR;
+  if (!artifactDir) return null;
+  mkdirSync(artifactDir, { recursive: true });
+  return path.join(artifactDir, `${testInfo.project.name}-${name}.png`);
+}
 
 async function waitForScene(page: Page, key: string): Promise<void> {
   await expect
@@ -17,6 +28,54 @@ async function waitForScene(page: Page, key: string): Promise<void> {
       { timeout: 15_000 },
     )
     .toBe(true);
+}
+
+async function rendererSnapshot(page: Page): Promise<{
+  dataUrl: string;
+  sampledColors: number;
+  nonBlackSamples: number;
+}> {
+  return page.evaluate(
+    () =>
+      new Promise<{
+        dataUrl: string;
+        sampledColors: number;
+        nonBlackSamples: number;
+      }>((resolve, reject) => {
+        const game = (window as unknown as { game?: Phaser.Game }).game;
+        if (!game) {
+          reject(new Error('game is missing before renderer snapshot'));
+          return;
+        }
+        game.renderer.snapshot((image) => {
+          const sample = document.createElement('canvas');
+          sample.width = 160;
+          sample.height = 90;
+          const context = sample.getContext('2d', { willReadFrequently: true });
+          if (!context) {
+            reject(new Error('renderer snapshot sample context is unavailable'));
+            return;
+          }
+          context.drawImage(image, 0, 0, sample.width, sample.height);
+          const pixels = context.getImageData(0, 0, sample.width, sample.height).data;
+          const colors = new Set<string>();
+          let nonBlackSamples = 0;
+          for (let index = 0; index < pixels.length; index += 16) {
+            const red = pixels[index] ?? 0;
+            const green = pixels[index + 1] ?? 0;
+            const blue = pixels[index + 2] ?? 0;
+            const alpha = pixels[index + 3] ?? 0;
+            colors.add(`${red},${green},${blue},${alpha}`);
+            if (alpha > 0 && red + green + blue > 12) nonBlackSamples += 1;
+          }
+          resolve({
+            dataUrl: image.src,
+            sampledColors: colors.size,
+            nonBlackSamples,
+          });
+        });
+      }),
+  );
 }
 
 async function stageGameplay(page: Page, largeWorlds: boolean): Promise<void> {
@@ -1441,8 +1500,11 @@ test('minimap projects map truth, objectives, local and Crew allies without came
   ]);
   expect(snapshot.crewKoth.players.some(({ playerId }) => playerId === 'rival')).toBe(false);
 
+  const desktopScreenshot = await page.screenshot();
+  const desktopArtifact = batch24ArtifactPath(testInfo, 'camera-world-hud-minimap');
+  if (desktopArtifact) writeFileSync(desktopArtifact, desktopScreenshot);
   await testInfo.attach('minimap-foundation', {
-    body: await page.screenshot(),
+    body: desktopScreenshot,
     contentType: 'image/png',
   });
   if (testInfo.project.name === 'desktop-chromium') {
@@ -1453,11 +1515,43 @@ test('minimap projects map truth, objectives, local and Crew allies without came
         return state?.layout.panel ?? null;
       })
       .toEqual(snapshot.crewKoth.layout.panel);
+    const mobileScreenshot = await page.screenshot();
+    const mobileArtifact = batch24ArtifactPath(testInfo, 'camera-world-hud-minimap-mobile-size');
+    if (mobileArtifact) writeFileSync(mobileArtifact, mobileScreenshot);
     await testInfo.attach('minimap-foundation-mobile-chromium', {
-      body: await page.screenshot(),
+      body: mobileScreenshot,
       contentType: 'image/png',
     });
   }
+});
+
+test('renderer snapshots provide trustworthy staged non-Chromium visual evidence', async ({
+  page,
+}, testInfo) => {
+  test.skip(!largeWorldsAdvertised, 'Run with CAPABILITY_LARGE_WORLDS=true.');
+  test.skip(
+    testInfo.project.name === 'desktop-chromium',
+    'Chromium already supplies live and mobile-sized compositor screenshots.',
+  );
+  await stageGameplay(page, true);
+  await minimapScenarioSnapshot(page);
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      ),
+  );
+
+  const snapshot = await rendererSnapshot(page);
+  expect(snapshot.sampledColors).toBeGreaterThan(8);
+  expect(snapshot.nonBlackSamples).toBeGreaterThan(100);
+  const image = Buffer.from(snapshot.dataUrl.split(',')[1] ?? '', 'base64');
+  const artifact = batch24ArtifactPath(testInfo, 'renderer-visual');
+  if (artifact) writeFileSync(artifact, image);
+  await testInfo.attach('renderer-visual', {
+    body: image,
+    contentType: 'image/png',
+  });
 });
 
 test('dynamic chunks, destruction resources, lighting, and quality stay aligned', async ({

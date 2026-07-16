@@ -5,9 +5,10 @@ Read this file and `CLAUDE.md` completely at the start of every batch. The
 completed `docs/REPLAYABILITY_ROADMAP.md` remains the historical record for the
 systems this program preserves and reorganizes.
 
-- **Status:** Batch 23 complete on 2026-07-16; minimap foundation active
-  behind default-false capabilities.
-- **Next batch:** Batch 24 — Camera regression gate.
+- **Status:** Batch 24 complete on 2026-07-16; the cumulative scrolling-world
+  and camera foundation is verified behind default-false capabilities.
+- **Next batch:** Batch 25 — Style bible, pending explicit user review and a
+  new authorization chain.
 - **Public releases:** Reforged Arena, then Battle Royale.
 - **Working model:** one numbered batch per session, direct commits and pushes
   to `main`, milestone-gated production deployments.
@@ -177,7 +178,7 @@ Production deployment happens only at a gate or for an urgent live fix.
 |  21 | Dynamic world rendering                | World/camera  | **DONE — 2026-07-16** |
 |  22 | Responsive combat HUD                  | World/camera  | **DONE — 2026-07-16** |
 |  23 | Minimap foundation                     | World/camera  | **DONE — 2026-07-16** |
-|  24 | Camera regression gate                 | World/camera  | Pending               |
+|  24 | Camera regression gate                 | World/camera  | **DONE — 2026-07-16** |
 |  25 | Style bible                            | Visual system | Pending               |
 |  26 | Asset pipeline                         | Visual system | Pending               |
 |  27 | Modern UI assets                       | Visual system | Pending               |
@@ -862,6 +863,34 @@ Acceptance:
 Verify center follow, every edge/corner, aiming while scrolling, touch,
 screen-space effects, minimap accuracy, quality fallback, and frame pacing.
 
+Acceptance:
+
+- [x] Deterministic and live Phaser evidence verifies exact local, respawn,
+      and spectator follow; every edge/corner clamp; current small-world origin
+      anchoring; and composed recoil, shake, zoom, and roll without a second
+      camera owner.
+- [x] Pointer aim, touch aim/admission, world markers/effects, screen-pinned
+      HUD/effects, equal desktop/mobile logical visibility, and the repaired
+      RFG-001 `(320, 144)` scroll plus RFG-002 `0.9` zoom proofs pass while the
+      synthetic gate is scrolled, zoomed, and rolled.
+- [x] Dynamic chunks, decals, lighting, storms/X-ray resources, destruction,
+      full/reduced quality budgets, and the complete map/objective/local/Crew
+      minimap remain accurate independently of camera culling and transients.
+- [x] Responsive HUD resources, all eight mode projections, kill feed,
+      contracts, simultaneous callouts, touch actions, live-match menu,
+      Results/rematch, recovery, exact 960x720 fallback, and every preserved
+      standard/challenge journey pass the complete verification inventory.
+- [x] RFG-003 has an explicit gate disposition: non-Chromium live local WebRTC
+      remains unavailable in this headless host, while staged object/input
+      assertions plus direct non-black Phaser renderer snapshots provide
+      trusted Firefox/WebKit visual evidence; live and mobile-sized Chromium
+      remain the compositor/hardware reference.
+- [x] Full unit/integration, typecheck, lint, affected/full builds, complete
+      default-false three-project Playwright, enabled three-project camera/
+      world/HUD/minimap, server/client recorder, performance, and inspected
+      visual gates pass. All capabilities remain default false and production
+      was not deployed.
+
 ### Milestone 3 — Modern visual system
 
 #### Batch 25 — Style bible
@@ -1088,11 +1117,11 @@ test frequency, not acceptance coverage or release quality gates.
    deliberately. It does not silently expand the active batch.
 4. Existing user changes are never discarded or staged accidentally.
 
-| ID      | Discovered | Reproduction/evidence                                                                                              | Relationship  | Disposition                                                                                                 | Status   |
-| ------- | ---------- | ------------------------------------------------------------------------------------------------------------------ | ------------- | ----------------------------------------------------------------------------------------------------------- | -------- |
-| RFG-001 | 2026-07-15 | Idle recoil used to clear sustained `(320, 144)` base scroll to `(0, 0)`.                                          | Batches 20/24 | Resolved by composed kick offsets in Batch 20; retain the proof in the Batch 24 gate.                       | Resolved |
-| RFG-002 | 2026-07-15 | Idle zoom pulse used to clear sustained base zoom `0.9` back to `1`.                                               | Batches 20/24 | Resolved by the composed zoom multiplier in Batch 20; retain the proof in the Batch 24 gate.                | Resolved |
-| RFG-003 | 2026-07-15 | Headless Firefox/WebKit live practice gets no player ID; staged gameplay and Reforged-shell WebKit PNGs are black. | Batches 17/24 | Keep staged assertions plus Chromium visual evidence; restore trustworthy non-Chromium visual path by gate. | Open     |
+| ID      | Discovered | Reproduction/evidence                                                                                                     | Relationship  | Disposition                                                                                                                                                                                                                                                   | Status             |
+| ------- | ---------- | ------------------------------------------------------------------------------------------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| RFG-001 | 2026-07-15 | Idle recoil used to clear sustained `(320, 144)` base scroll to `(0, 0)`.                                                 | Batches 20/24 | Resolved by composed kick offsets in Batch 20; retain the proof in the Batch 24 gate.                                                                                                                                                                         | Resolved           |
+| RFG-002 | 2026-07-15 | Idle zoom pulse used to clear sustained base zoom `0.9` back to `1`.                                                      | Batches 20/24 | Resolved by the composed zoom multiplier in Batch 20; retain the proof in the Batch 24 gate.                                                                                                                                                                  | Resolved           |
+| RFG-003 | 2026-07-15 | Headless Firefox/WebKit live practice gets no player ID; compositor screenshots from staged WebKit gameplay remain black. | Batches 17/24 | Batch 24 accepts staged object/input assertions plus direct non-black Phaser renderer snapshots as trustworthy Firefox/WebKit visual evidence; Chromium remains the live/compositor reference. Revisit real-device/live-channel coverage at the release gate. | Gate-dispositioned |
 
 ## End-of-batch ritual
 
@@ -2330,6 +2359,71 @@ remains open for headless Firefox/WebKit live WebRTC and black staged canvas
 captures. The Batch 21 host-limited frame observations and Batch 2 scheduling-
 drift sample remain non-hardware evidence; no simulation or server code changed.
 
+### Batch 24 — 2026-07-16 — Camera regression gate
+
+**Shipped:** Completed the cumulative Batch 18–23 scrolling-world/camera
+verification gate without changing gameplay presentation or authority. The
+existing deterministic and live Phaser matrix verifies exact local, respawn,
+and spectator follow, every edge/corner clamp, RFG-001 sustained scroll
+`(320, 144)`, RFG-002 sustained zoom `0.9`, transformed pointer/touch aim,
+screen-pinned HUD/effects, map-derived chunks/resources, destruction, quality
+fallback, responsive HUD, complete minimap truth, Results/rematch, recovery,
+and exact capability-off fallback. Added only verification infrastructure:
+isolated configurable E2E ports, direct Phaser renderer snapshots for staged
+non-Chromium pixels, retained gate artifacts, and host-tolerant 15-second
+Gauntlet scene-readiness waits.
+
+**Verification:** Selected the complete camera/world/performance verification-
+gate tier required by Batch 24. The final `corepack pnpm test` inventory passed
+133 files and 1,563 tests. `corepack pnpm typecheck`, `corepack pnpm lint`, the
+affected client build, and the full production build passed with the established
+Vite chunk advisory. The complete default-false three-project Playwright
+inventory passed 139 cases with 68 documented capability/project skips and no
+failures in 23.8 minutes. With only `largeWorlds` enabled, the complete camera/
+world/HUD/minimap file passed 17 cases with four expected inverse/project skips
+in 3.3 minutes across desktop Chromium, desktop Firefox, and mobile landscape.
+The final three-project client recorder passed, as did the server simulation,
+snapshot, and live-loop recorder. Direct inspection of retained 1280x720 and
+844x390 Chromium compositor frames plus Firefox and WebKit renderer-extracted
+frames found the current arena, HUD, minimap, objective/Crew markers, callout,
+and touch controls readable and unclipped.
+
+**Performance/network:** The server recorder observed 0.027ms mean, 0.051ms
+p95, 0.223ms p99, and 4.009ms max across 2,000 warmed four-player ticks; active
+two/four-player snapshots remained 2,481/3,762 bytes. Its live window recorded
+15.981 effective Hz, a 0.104ms processing mean, and one 253.572ms host scheduling
+drift reset while the rolling counter remained 20Hz. The enabled client recorder
+observed live Chromium at 3.227 FPS / 309.930ms mean, staged Firefox at 109.392
+FPS / 9.141ms mean, and staged mobile WebKit at 21.046 FPS / 47.516ms mean.
+These remain local headless/software-renderer observations, not hardware pass
+thresholds; gameplay authority and simulation stayed within their existing
+budgets.
+
+**Deployment:** Skipped. Batch 24 is a verification gate inside the unfinished
+world/camera milestone, not a production release gate. All five capabilities
+and production configuration remain unchanged and default false. User review
+is required before Batch 25 or any deployment.
+
+**Deviations:** No product-scope deviation. The first live Chromium recorder
+attempt reused an unrelated access-protected listener on port 3000 and timed
+out without a welcome. Configurable isolated E2E ports forced fresh repository
+services and the focused plus complete recorder reruns passed. The first full
+default-false matrix then found only three Firefox Gauntlet boot waits exceeding
+their implicit five-second polling default under host contention; all three
+passed narrowly, their readiness waits were aligned to the existing 15-second
+cross-browser boundary, and the complete 23.8-minute gate rerun passed. No
+runtime camera, minimap, rendering, HUD, input, gameplay, server, or wire change
+was made to satisfy the gate.
+
+**Known issues:** RFG-001 and RFG-002 are closed and retained as mandatory
+historical proofs. RFG-003 is gate-dispositioned rather than fully resolved:
+headless Firefox/WebKit still cannot use the live local WebRTC practice path and
+WebKit compositor screenshots may remain black, but staged object/input checks
+and direct non-black Phaser renderer snapshots now provide trustworthy engine-
+specific visual evidence. Live and mobile-sized Chromium remain the compositor/
+hardware visual source; real-device/live-channel coverage should be revisited
+at the Reforged Arena release gate. No new bug ID was required.
+
 ## Batch 22 input prompt (historical)
 
 ```text
@@ -2506,7 +2600,7 @@ combat-overlay boundaries. Batch 23 owns the minimap; Batch 24 owns the camera
 regression gate.
 ```
 
-## Next-session prompt
+## Batch 24 input prompt (historical)
 
 ```text
 Continue the Reforged build for Mighty Man's Revenge.
@@ -2591,4 +2685,38 @@ Current maps remain smaller than the logical viewport and anchor at origin.
 Batch 24 is a verification gate, not authorization for larger maps or visual
 cutover. When Batch 24 completes, stop the user-authorized chain and request
 review; do not create Batch 25.
+```
+
+## Next-session prompt
+
+```text
+Review the completed Batch 24 camera regression gate for Mighty Man's Revenge.
+
+Read docs/REIMAGINING_ROADMAP.md, CLAUDE.md, docs/REFORGED_BASELINE.md, and
+docs/REFORGED_CAPABILITIES.md completely first. Batch 24 — Camera regression
+gate is complete and pushed on main. Do not begin Batch 25 — Style bible or any
+later implementation without a new explicit user authorization chain.
+
+Inspect the Batch 24 acceptance evidence, verification tier, Session Log,
+RFG-001/RFG-002 historical proofs, and RFG-003 gate disposition. Confirm that
+the cumulative Batch 18–23 viewport, coordinate, camera, dynamic rendering,
+responsive HUD, and minimap contracts are adequately verified while all five
+capabilities remain strict server-owned opt-ins and default false. Preserve the
+exact capability-off/old-server/old-client 960x720 fallback through Batch 54.
+
+Final recorded gates: 133 unit/integration files and 1,563 tests passed;
+typecheck, lint, affected/full builds passed; the complete default-false
+three-project Playwright inventory passed 139 cases with 68 documented skips;
+the enabled three-project camera/world/HUD/minimap matrix passed 17 cases with
+four expected skips; server/client recorders and inspected 1280x720, 844x390,
+Firefox-renderer, and WebKit-renderer evidence passed. RFG-001 retains exact
+`(320, 144)` scroll proof, RFG-002 retains exact `0.9` zoom proof, and RFG-003
+is gate-dispositioned through staged object/input assertions plus direct
+non-black Phaser renderer snapshots while Chromium remains the live/compositor
+reference. Production was not deployed.
+
+If review accepts the milestone, ask the user for a fresh explicit Batch 25
+authorization. Do not generate style references, modern art, assets, larger
+arenas, tactical maps, Battle Royale work, capability exposure, or deployment
+inside this review task.
 ```

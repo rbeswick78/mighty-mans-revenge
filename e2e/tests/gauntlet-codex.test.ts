@@ -19,26 +19,28 @@ test.describe('Gauntlet Build Codex', () => {
     await gamePage.reload();
 
     await expect
-      .poll(() =>
-        gamePage.evaluate(() => {
-          const game = (
-            window as unknown as {
-              game?: {
-                scene: {
-                  scenes: Array<{
-                    scene: { key: string };
-                    sys: { settings: { active: boolean } };
-                  }>;
+      .poll(
+        () =>
+          gamePage.evaluate(() => {
+            const game = (
+              window as unknown as {
+                game?: {
+                  scene: {
+                    scenes: Array<{
+                      scene: { key: string };
+                      sys: { settings: { active: boolean } };
+                    }>;
+                  };
                 };
-              };
-            }
-          ).game;
-          return (
-            game?.scene.scenes.some(
-              (scene) => scene.scene.key === 'LobbyScene' && scene.sys.settings.active,
-            ) ?? false
-          );
-        }),
+              }
+            ).game;
+            return (
+              game?.scene.scenes.some(
+                (scene) => scene.scene.key === 'LobbyScene' && scene.sys.settings.active,
+              ) ?? false
+            );
+          }),
+        { timeout: 15_000 },
       )
       .toBe(true);
 

@@ -234,6 +234,20 @@ malformed, reconnecting, disconnected, and old-server paths retain exact
 strict, server-owned, and default false; Batch 24 owns the cumulative camera
 regression gate.
 
+Batch 24 completes that cumulative verification gate without changing the
+`largeWorlds` handshake, fallback, or exposure state. Full deterministic,
+three-project browser, recorder, and visual evidence covers the 1280x720
+capability-owned viewport, safe area, sole coordinate transform, sole camera
+controller, dynamic resources/quality tiers, responsive HUD, minimap,
+Results/rematch/recovery, and the exact 960x720 capability-off/old-server path.
+RFG-001 and RFG-002 retain their exact historical regression values. RFG-003
+is gate-dispositioned with staged Firefox/WebKit object/input assertions plus
+direct non-black Phaser renderer snapshots; Chromium remains the live and
+compositor visual reference. All capabilities still require literal server-
+owned `true`, default false, and remain unadvertised in production. Batch 24
+does not authorize Batch 25 visual work, larger arenas, capability exposure,
+or deployment.
+
 ## Server-first rollout and rollback
 
 For each capability, keep this order:

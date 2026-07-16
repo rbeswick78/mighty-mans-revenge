@@ -246,6 +246,42 @@ legacy no-minimap fallback, Results/rematch, and recovery. Inspected attached
 1280x720 and resized 844x390 Chromium frames are readable and unclipped. Staged
 mobile WebKit remains object evidence rather than trusted pixels under RFG-003.
 
+### Batch 24 camera regression gate evidence
+
+Batch 24 selected the complete camera/world/performance verification-gate tier.
+The final deterministic inventory passed 133 files and 1,563 tests, including
+exact local/respawn/spectator follow, all edge/corner clamps, transformed aim
+and touch, current small-world origin anchoring, dynamic chunks/resources,
+destruction, full/reduced quality, responsive HUD priorities, minimap truth,
+Results/rematch/recovery, and the repaired RFG-001 `(320, 144)` scroll plus
+RFG-002 `0.9` zoom values. Typecheck, lint, affected/full production builds,
+the complete default-false three-project browser inventory, and the complete
+enabled camera/world/HUD/minimap matrix passed.
+
+The final default-false Playwright inventory passed 139 cases with 68 documented
+capability/project skips in 23.8 minutes. With `largeWorlds` enabled, the
+three-project gameplay-viewport matrix passed 17 cases with four expected
+inverse/project skips in 3.3 minutes. Retained 1280x720 and resized 844x390
+Chromium frames show the complete current arena, HUD, minimap, objective/Crew
+markers, and callout layers without clipping. Direct Phaser renderer snapshots
+from desktop Firefox and mobile WebKit are non-black, visually complete, and
+pair with their staged object/input assertions. This gate-dispositions RFG-003
+for the milestone: live local WebRTC remains unavailable in those headless
+engines and WebKit compositor screenshots may remain black, but renderer-
+extracted engine pixels are trusted; Chromium remains the live/compositor and
+mobile-sized visual reference.
+
+The server recorder measured 0.027ms mean, 0.051ms p95, 0.223ms p99, and
+4.009ms max across 2,000 warmed four-player simulation ticks. Active two/four-
+player snapshots remained 2,481/3,762 bytes. The live loop recorded 15.981
+effective Hz, 0.104ms mean processing, and one 253.572ms host scheduling drift
+reset while its rolling counter remained 20Hz. The enabled client recorder
+observed live Chromium at 3.227 FPS / 309.930ms mean, staged Firefox at 109.392
+FPS / 9.141ms mean, and staged mobile WebKit at 21.046 FPS / 47.516ms mean.
+These remain host/software-renderer observations rather than hardware pass
+thresholds. All capabilities remain default false and production was not
+deployed.
+
 ## Adjacent bug reproductions
 
 `client/src/rendering/camera-baseline.test.ts` now asserts the repaired
@@ -258,9 +294,12 @@ Run `corepack pnpm exec vitest run client/src/rendering/camera-baseline.test.ts`
 both repair assertions pass. The roadmap retains RFG-001 and RFG-002 as
 resolved historical evidence for the Batch 24 regression gate.
 
-The baseline E2E helper also reproduced the existing non-Chromium headless
-network limitation: Firefox and mobile WebKit did not obtain a local player ID
-within 15 seconds on the live practice path. Their baseline path therefore
-uses the same staged-scene strategy as existing composition tests. The black
-non-Chromium staged screenshots remain unresolved and are not evidence that a
-real Firefox or Safari user sees a black game.
+The baseline E2E helper still reproduces the non-Chromium headless network
+limitation: Firefox and mobile WebKit do not obtain a local player ID within 15
+seconds on the live practice path. Their recorder path therefore uses the same
+staged real scene as the composition tests. Batch 24 now extracts pixels
+directly from Phaser's renderer and proves varied, non-black Firefox/WebKit
+frames, so black WebKit compositor screenshots are classified as a headless
+compositor limitation rather than game pixels. Pair those renderer frames with
+staged object/input assertions and keep Chromium as the live/compositor visual
+reference until real-device coverage at the release gate.

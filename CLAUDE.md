@@ -429,6 +429,24 @@ Capability-off, old-server, reconnecting, and disconnected paths retain exact
 tactical map, wire, simulation, capability default, or production behavior
 changed.
 
+**Reforged camera regression gate (Batch 24):** the cumulative Batch 18–23
+client foundation now has one complete verification gate over the fixed
+1280×720 gameplay/safe-area contract, sole screen/world transform, sole
+composed camera controller, map-derived chunks/resources and quality budgets,
+responsive combat HUD, and authority-independent minimap. Deterministic and
+three-engine evidence retains exact local/respawn/spectator follow, every
+edge/corner clamp, transformed pointer/touch aim, screen-pinned overlays,
+destruction, full/reduced quality, all supported minimap projections,
+Results/rematch/recovery, and exact 960×720 fallback. RFG-001's sustained
+`(320, 144)` scroll and RFG-002's sustained `0.9` zoom remain mandatory proofs.
+For RFG-003, staged Firefox/WebKit object/input assertions plus direct Phaser
+renderer snapshots are trusted visual evidence even though their live local
+WebRTC path remains unavailable and WebKit compositor PNGs may be black;
+Chromium remains the live/compositor reference. Isolated configurable E2E ports
+prevent unrelated listeners from being mistaken for the repository server.
+No camera, rendering, HUD, minimap, gameplay, wire, capability-default,
+production, art, arena, or Battle Royale behavior changed in this gate.
+
 ### Why This Matters for Agents
 
 Client prediction and server simulation **must use identical physics code** from `/shared`. If you change movement, collision, or physics logic, you must change it in `/shared` and verify both client and server still agree. A mismatch between client prediction and server authority causes visible rubber-banding.
