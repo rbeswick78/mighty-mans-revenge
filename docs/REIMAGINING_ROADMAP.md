@@ -5,9 +5,9 @@ Read this file and `CLAUDE.md` completely at the start of every batch. The
 completed `docs/REPLAYABILITY_ROADMAP.md` remains the historical record for the
 systems this program preserves and reorganizes.
 
-- **Status:** Batch 25 complete on 2026-07-16; the original Reforged visual
-  system and four golden reference sheets are approved in-repo.
-- **Next batch:** Batch 26 — Asset pipeline.
+- **Status:** Batch 26 complete on 2026-07-16; the deterministic Reforged asset
+  pipeline, source/reference contract, and provenance validators are in-repo.
+- **Next batch:** Batch 27 — Modern UI assets.
 - **Public releases:** Reforged Arena, then Battle Royale.
 - **Working model:** one numbered batch per session, direct commits and pushes
   to `main`, milestone-gated production deployments.
@@ -179,7 +179,7 @@ Production deployment happens only at a gate or for an urgent live fix.
 |  23 | Minimap foundation                     | World/camera  | **DONE — 2026-07-16** |
 |  24 | Camera regression gate                 | World/camera  | **DONE — 2026-07-16** |
 |  25 | Style bible                            | Visual system | **DONE — 2026-07-16** |
-|  26 | Asset pipeline                         | Visual system | Pending               |
+|  26 | Asset pipeline                         | Visual system | **DONE — 2026-07-16** |
 |  27 | Modern UI assets                       | Visual system | Pending               |
 |  28 | Fighter art I                          | Visual system | Pending               |
 |  29 | Fighter art II                         | Visual system | Pending               |
@@ -929,6 +929,34 @@ Acceptance:
 Establish source/reference folders, cleanup and consistency rules, atlas
 generation, import metadata, naming, provenance/attribution, compression, and
 automated dimension/frame validation.
+
+Acceptance:
+
+- [x] Non-runtime source, production-reference, provenance, local-archive, and
+      generated-runtime destinations are explicit; Batch 25 goldens remain
+      immutable documentation references and no production art is added.
+- [x] Canonical PNG cleanup, lower-kebab naming, exact sheet/frame grids,
+      registration/layer consistency, mip-safe padding/extrusion, and visual
+      review responsibilities are documented for later visual batches.
+- [x] A dependency-free deterministic packer validates PNG checksums/formats,
+      declared dimensions/frame counts, source/decoded/atlas byte ceilings,
+      stable sort/packing, no trim/rotation, RGBA8888 output, and repeatable
+      hashes.
+- [x] Runtime import metadata contains only atlas/frame/dimension/integrity
+      data, while complete origin, creator, license, attribution, source
+      references, generation lineage, and hashes remain in non-runtime
+      provenance reports.
+- [x] Third-party source archives and licensing detail cannot enter runtime
+      redistribution; archive paths are rejected, local archives are ignored,
+      and provenance output under `client/public` fails closed.
+- [x] The smallest synthetic fixture proves naming, source confinement,
+      dimensions, frame counts, metadata separation, atlas determinism,
+      compression boundaries, provenance completeness, and stable multi-error
+      reporting without committing generated runtime content.
+- [x] Focused validators, repository formatting, `git diff --check`, intended-
+      diff/provenance review, typecheck, lint, affected client build, and full
+      production build pass. No runtime unit/browser escalation, capability
+      exposure, production asset, gameplay behavior, or deployment occurs.
 
 #### Batch 27 — Modern UI assets
 
@@ -2496,6 +2524,54 @@ unchanged because Batch 25 introduced no runtime/browser path. The style bible
 does not authorize pipeline implementation, visual cutover, larger maps,
 capability exposure, or deployment; Batch 26 owns the source/atlas pipeline.
 
+### Batch 26 — 2026-07-16 — Asset pipeline
+
+**Shipped:** Established `art/reforged/sources`, `references`, and `provenance`
+as non-runtime production-art boundaries, with local source archives and atlas
+scratch output ignored. Added `docs/REFORGED_ASSET_PIPELINE.md` as the cleanup,
+naming, exact sheet/frame-grid, registration, compression, attribution, and
+later-batch acceptance contract. Added a dependency-free Node PNG/atlas tool
+that verifies checksums and canonical 8-bit RGB/RGBA input, confines source
+paths, sorts asset/frame identities, packs deterministic power-of-two shelves
+without trim or rotation, extrudes mip-safe edges, emits RGBA8888 plus stable
+runtime import JSON, enforces source/decoded/atlas byte ceilings, and writes
+complete hashes/license/lineage only to a separate non-runtime provenance
+report. The synthetic fixture creates two tiny PNGs only in the system temp
+directory and commits no generated runtime content or production art.
+
+**Verification:** Selected the visual/tooling tier with executable-tooling
+escalation because Batch 26 changes a root package script and adds a standalone
+build tool, but changes no runtime source, generated runtime content, shared,
+server, wire, persistence, scene, capability, or production boundary.
+`corepack pnpm test:assets` passed 8 focused deterministic validators for
+naming/path confinement, dimensions, frame counts, metadata separation,
+byte-identical atlas/import/provenance output, compression boundaries,
+provenance completeness, and stable failure reporting. Repository Prettier,
+`git diff --check`, intended-diff/provenance review, `corepack pnpm typecheck`,
+`corepack pnpm lint`, `corepack pnpm --filter @game/client build`, and the full
+`corepack pnpm build` passed. Vite's established chunk-size advisory remains.
+Runtime unit and browser suites were deliberately omitted because the tool and
+fixtures never enter application execution or runtime asset output, and focused
+evidence showed no broader coupling.
+
+**Deployment:** Skipped. Batch 26 is tooling and contract work inside the
+unfinished visual-system milestone. All five capabilities and production
+configuration remain default false and unchanged; no server or client was
+deployed.
+
+**Deviations:** No product-scope deviation. Repository-local Prettier,
+TypeScript, and ESLint binaries initially hit the managed sandbox's node-module
+read restriction; the identical commands passed with approved repository-local
+execution. The first documented pnpm forwarding form was exercised, corrected,
+and made separator-tolerant before final verification. No production art was
+generated and no Batch 25 golden was modified.
+
+**Known issues:** No new bug-ledger entry was required. RFG-001 and RFG-002
+remain closed historical camera proofs. RFG-003 remains gate-dispositioned and
+unchanged because Batch 26 adds no runtime/browser path. Batch 27 owns modern UI
+production assets; the pipeline does not authorize fighter, weapon, biome,
+combat-feedback, map, Battle Royale, capability-exposure, or deployment work.
+
 ## Batch 22 input prompt (historical)
 
 ```text
@@ -2766,23 +2842,29 @@ Continue the Reforged build for Mighty Man's Revenge.
 
 Read docs/REIMAGINING_ROADMAP.md and CLAUDE.md completely first. Read
 docs/REFORGED_BASELINE.md, docs/REFORGED_CAPABILITIES.md,
-docs/REFORGED_STYLE_BIBLE.md, and
-docs/reforged/style-bible/PROVENANCE.md before implementation. Batch 25 — Style
-bible is complete. Implement Batch 26 — Asset pipeline exactly as specified and
-do not begin Batch 27 — Modern UI assets.
+docs/REFORGED_STYLE_BIBLE.md, docs/REFORGED_ASSET_PIPELINE.md, and
+docs/reforged/style-bible/PROVENANCE.md before implementation. Batch 26 — Asset
+pipeline is complete. Implement Batch 27 — Modern UI assets exactly as
+specified and do not begin Batch 28 — Fighter art I.
 
-Establish the production source/reference folder contract, cleanup and
-consistency rules, deterministic atlas generation, import metadata, naming,
-provenance/attribution, compression, and automated dimension/frame validation
-needed by the later visual batches. The Batch 25 golden references are the
-approved visual authority, but remain documentation artifacts rather than
-runtime assets. Build the smallest pipeline and fixtures that prove the rules;
-do not bulk-generate or replace production art.
+Produce the coherent modern tab, card, button, icon, typography, party, queue,
+tactical-map-language, HUD-frame, and Results chrome owned by Batch 27 using
+the approved UI/rarity golden and the Batch 26 source/manifest/provenance
+contract. Keep Play/Fighters/Challenges/Records/Settings and the locked
+no-economy language exact. Preserve strong teal focus, amber pressed/primary
+actions, visible disabled states, red-only danger/leave emphasis, mobile-safe
+touch targets, readable contrast, and pointer/keyboard/gamepad/touch parity.
+Use the smallest production UI source/atlas set needed to complete this batch;
+do not generate fighter, weapon, pickup, biome, or combat-effect art.
 
 Preserve the complete Batch 25 style contract: all six established fighter
 identities and silhouettes, four biome families, five-tab/no-economy UI
 language, six-gun and six-rarity shape/color hierarchy, collision/objective
 readability, lighting, line-weight, motion, and full/reduced cosmetic guidance.
+Preserve Batch 26's canonical PNG, naming, exact frame-grid, deterministic
+packing, mip-safe extrusion, byte-limit, runtime-metadata, provenance, and
+third-party redistribution rules. Batch 25 goldens remain documentation
+references and may not be copied into runtime output.
 Preserve the completed Batch 18–24 viewport, coordinate, camera, dynamic
 rendering, quality, responsive HUD, minimap, fallback, and regression-gate
 contracts. Current maps remain 960x576 at `(0, 0)` with unchanged collision,
@@ -2792,42 +2874,51 @@ off, old-server, and old-client paths retain the exact established 960x720
 gameplay/Lobby behavior through Batch 54. All capabilities remain strict
 server-owned opt-ins and default false.
 
-Do not begin Batch 27 or later work: no modern UI production assets, live UI or
-fighter/weapon/environment replacement, fighter animation production, six-gun
-production set, biome kit, combat-feedback cutover, larger arena authoring,
-tactical map, movement or balance tuning, Battle Royale gameplay, capability
-exposure, or deployment. Do not change runtime gameplay/camera/minimap/
-rendering/HUD behavior to accommodate the pipeline. Never enable a capability
-by default or deploy without explicit authorization.
+Do not begin Batch 28 or later work: no Mighty Man/Bruce/Frost Wizard or other
+fighter production art, fighter animation set, live fighter/weapon/environment
+replacement, six-gun production set, biome kit, combat-feedback cutover,
+larger arena authoring, tactical-map gameplay/input, movement or balance
+tuning, Battle Royale gameplay, capability exposure, or deployment. Do not
+change gameplay/camera/minimap/rendering authority or HUD values/visibility to
+accommodate art. Never enable a capability by default or deploy without
+explicit authorization.
 
-Batch 25 is complete and pushed on main as the Style Bible batch. Four approved
-1536x1024 golden sheets and one retained rejected UI predecessor are in
-`docs/reforged/style-bible/`; prompt specifications, generation lineage, hashes,
-inspection evidence, and dispositions are in the provenance manifest. Every
-golden passed full-size, 768x512 mobile-width, and 384x256 gameplay-detail
-inspection. The initial generic UI candidate was rejected for prohibited
-`SHOP`/economy language and narrowly corrected. No runtime source,
-configuration, dependency, production asset, capability default, or deployment
-changed. RFG-001/RFG-002 remain closed historical proofs; RFG-003 remains
-gate-dispositioned and unchanged.
+Batch 26 is complete and pushed on main as `chore(assets): establish Reforged
+asset pipeline`. `docs/REFORGED_ASSET_PIPELINE.md` and
+`art/reforged/{sources,references,provenance}` now own production cleanup,
+naming, source/reference separation, exact dimensions/frame grids, mip-safe
+packing, deterministic RGBA8888 output, runtime-safe metadata, compression
+ceilings, and complete non-runtime provenance. The dependency-free Node tool
+and synthetic temp-only fixture passed 8 focused validators; typecheck, lint,
+affected client build, full production build, formatting, diff, and provenance
+review are green. No production art, generated runtime atlas, loader/runtime
+source, capability default, production configuration, or deployment changed.
+RFG-001/RFG-002 remain closed historical proofs; RFG-003 remains gate-
+dispositioned and unchanged.
 
-Choose and document the Batch 26 verification tier. Add focused deterministic
-validators for naming, dimensions, frame counts, metadata, atlas determinism,
-compression boundaries, provenance completeness, and failure reporting. Run
-the focused validators, repository formatting, `git diff --check`, intended-
-diff/provenance review, `corepack pnpm typecheck`, `corepack pnpm lint`, and the
-affected/full production builds if executable tooling or package configuration
-changes. Escalate to runtime unit/browser suites only if runtime code,
-generated runtime content, shared/server/wire behavior, or a broader boundary
-changes. Update roadmap acceptance/status, architecture/pipeline/provenance
-documentation, bug ledger only with proven evidence, and Session Log. Run the
-complete end-of-batch ritual, commit and push directly to main, verify a clean
-worktree with HEAD exactly matching origin/main, and skip deployment.
+Choose and document the Batch 27 visual/client-UI verification tier. Run the
+focused asset validators for every manifest and generated output, add focused
+deterministic/import tests for atlas metadata and UI-state mapping, and verify
+focus, contrast, touch targets, safe-area containment, full/reduced treatment,
+current small-world behavior, capability-off/old-server fallback,
+Results/rematch, and recovery restoration. Run repository formatting,
+`git diff --check`, intended-diff/provenance review, `corepack pnpm typecheck`,
+`corepack pnpm lint`, affected and full production builds, and targeted desktop
+Chromium/mobile-landscape interaction and visual evidence. Escalate to full
+unit or three-project browser suites if shared/server/wire, input/focus,
+recovery, capability foundations, or broader scene behavior changes. Update
+roadmap acceptance/status, architecture/pipeline/provenance documentation, bug
+ledger only with proven evidence, and Session Log. Run the complete end-of-
+batch ritual, commit and push directly to main, verify a clean worktree with
+HEAD exactly matching origin/main, and skip deployment.
 
 Carry-over warnings: use Corepack pnpm 10.33.0 if the local shim mismatches.
-Do not overwrite or reinterpret Batch 25 goldens; if a pipeline rule exposes a
-true reference defect, record it without generating replacement production
-art. Keep source archives and third-party licensing constraints out of runtime
-redistribution. Batch 26 owns tooling and contracts only; Batch 27 owns modern
-UI assets.
+Do not overwrite, reinterpret, or atlas the Batch 25 goldens. Keep source
+archives and full licensing/generation lineage out of runtime redistribution;
+runtime output receives only generated atlas PNG and import metadata. Preserve
+the retained legacy art/fallback until a verified gated replacement owns every
+live use; Batch 33 owns the full-journey visual cutover. RFG-003 still requires
+staged Firefox/WebKit object/input evidence and direct renderer pixels where
+applicable, with Chromium as the live/compositor and mobile-sized visual
+reference. Batch 27 owns modern UI assets; Batch 28 owns fighter art I.
 ```

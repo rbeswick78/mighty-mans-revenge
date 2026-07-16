@@ -100,5 +100,15 @@ project's own initial Batch 25 UI candidate. Prompt specifications, generation l
 dimensions, hashes, dispositions, and inspection evidence live in
 `docs/reforged/style-bible/PROVENANCE.md`.
 
+## Reforged production pipeline
+
+Batch 26 adds no production asset and changes none of the files attributed
+above. It establishes the source/reference/provenance and deterministic atlas
+contract in `docs/REFORGED_ASSET_PIPELINE.md`. Future Reforged atlas manifests
+must carry per-asset origin, creator, license, attribution, source reference,
+and source hash evidence. Complete lineage remains outside `client/public`;
+runtime import metadata contains no source archive, source URL, generation
+lineage, or license text. Third-party archives are never redistributed.
+
 If we ever ship this commercially (charge money, run ads, promote a paid
 product) we owe the author at least $2 — pay before release.

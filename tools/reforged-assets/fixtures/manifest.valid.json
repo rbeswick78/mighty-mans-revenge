@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "atlas": {
+    "id": "fixture.core",
+    "maxWidth": 64,
+    "maxHeight": 64,
+    "padding": 2,
+    "extrude": 1,
+    "limits": {
+      "maxSourceBytes": 4096,
+      "maxDecodedBytes": 65536,
+      "maxAtlasBytes": 4096
+    }
+  },
+  "assets": [
+    {
+      "id": "fixture.icon.marker",
+      "source": "sources/icon-marker.png",
+      "width": 2,
+      "height": 2,
+      "frames": {
+        "width": 2,
+        "height": 2,
+        "count": 1,
+        "columns": 1
+      },
+      "provenance": {
+        "origin": "original",
+        "creator": "Mighty Man's Revenge",
+        "license": "LicenseRef-MMR-Project-Owned",
+        "attribution": "none-required",
+        "sourceReference": "Batch 26 deterministic fixture"
+      }
+    },
+    {
+      "id": "fixture.panel.state",
+      "source": "sources/panel-state.png",
+      "width": 4,
+      "height": 2,
+      "frames": {
+        "width": 2,
+        "height": 2,
+        "count": 2,
+        "columns": 2
+      },
+      "provenance": {
+        "origin": "original",
+        "creator": "Mighty Man's Revenge",
+        "license": "LicenseRef-MMR-Project-Owned",
+        "attribution": "none-required",
+        "sourceReference": "Batch 26 deterministic fixture"
+      }
+    }
+  ]
+}

@@ -157,3 +157,15 @@ were not committed.
 The five total generated candidates are the minimum set used to establish four
 approved goldens and correct one proven contract violation. No bulk production
 asset generation occurred.
+
+## Batch 26 pipeline disposition
+
+The approved and rejected Batch 25 sheets remain documentation artifacts in
+this manifest. Batch 26 does not move, rewrite, recompress, crop, hash-change,
+or feed any of them into an atlas. Later production manifests must reference
+their own canonical sources under `art/reforged/sources/` and record complete
+per-asset provenance under the contract in
+`docs/REFORGED_ASSET_PIPELINE.md`. Generated runtime import metadata excludes
+license/source/generation detail; deterministic provenance reports stay under
+`art/reforged/provenance/` and third-party source archives stay outside runtime
+redistribution.

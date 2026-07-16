@@ -51,3 +51,8 @@ firebase-debug.log
 # client/public/assets/.
 /*.zip
 /.asset-inspect/
+
+# Reforged working archives and local atlas scratch output are never runtime
+# redistribution inputs. Curated canonical PNGs/manifests remain tracked.
+/art/reforged/source-archives/
+/art/reforged/.build/

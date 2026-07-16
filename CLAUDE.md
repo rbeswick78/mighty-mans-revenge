@@ -459,6 +459,20 @@ production scope. These are documentation references only: they are not runtime
 assets and do not authorize Batch 26 atlas tooling, Batch 27+ production art,
 visual cutover, capability exposure, or deployment.
 
+**Reforged asset pipeline (Batch 26):**
+`docs/REFORGED_ASSET_PIPELINE.md` owns the non-runtime production-art folder,
+naming, cleanup, manifest, provenance, compression, atlas, and validation
+contract. Canonical sources and per-asset references live under
+`art/reforged/`; later-batch generated runtime atlases/import JSON alone may
+enter `client/public/assets/reforged/`. The dependency-free Node packer sorts
+asset IDs and frames, validates exact PNG dimensions/grids and byte ceilings,
+packs without trim/rotation, extrudes mip-safe edges, emits deterministic
+RGBA8888 PNG plus runtime-safe metadata, and writes full source hashes/license/
+lineage only to the non-runtime provenance tree. Third-party source archives
+remain ignored and may never enter runtime redistribution. The Batch 25 golden
+sheets stay documentation references and are never atlas inputs. Batch 26 adds
+no production art or loader behavior; Batch 27 owns modern UI assets.
+
 ### Why This Matters for Agents
 
 Client prediction and server simulation **must use identical physics code** from `/shared`. If you change movement, collision, or physics logic, you must change it in `/shared` and verify both client and server still agree. A mismatch between client prediction and server authority causes visible rubber-banding.

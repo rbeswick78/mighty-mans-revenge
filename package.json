@@ -11,9 +11,12 @@
     "test:e2e": "playwright test --config e2e/playwright.config.ts",
     "baseline:server": "pnpm --filter @game/server baseline:evidence",
     "baseline:client": "playwright test --config e2e/playwright.config.ts e2e/tests/baseline-evidence.test.ts",
+    "assets:validate": "node tools/reforged-assets/asset-pipeline.mjs validate",
+    "assets:build": "node tools/reforged-assets/asset-pipeline.mjs build",
+    "test:assets": "node --test tools/reforged-assets/asset-pipeline.test.mjs",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint . --ext .ts,.tsx",
-    "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",
+    "format": "prettier --write \"**/*.{ts,tsx,mjs,json,md}\"",
     "typecheck": "tsc -b"
   },
   "devDependencies": {
