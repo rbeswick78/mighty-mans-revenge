@@ -11,6 +11,7 @@ export const PARTY_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 export const PARTY_CODE_LENGTH = 5;
 export const PARTY_EMPTY_EXPIRY_MS = 60_000;
 export const PARTY_BOT_FILL_WAIT_MS = 15_000;
+export const PARTY_REMATCH_TIMEOUT_MS = 60_000;
 export const PARTY_CAPACITY_BY_FORMAT: Readonly<Record<MatchFormat, number>> = Object.freeze({
   duel: 2,
   rumble: 4,
@@ -25,6 +26,18 @@ export interface PartyMember {
   readonly ready: boolean;
 }
 
+export type PartyParticipantSource = 'human' | 'standard_bot';
+
+/** One exact server-owned entrant retained through match and Results. */
+export interface PartyParticipant {
+  readonly playerId: PlayerId;
+  readonly nickname: string;
+  readonly fighterId: CharacterId;
+  readonly source: PartyParticipantSource;
+  /** Server-owned readiness/consensus projection; standard bots are always ready. */
+  readonly ready: boolean;
+}
+
 export type PartyLifecycle = 'assembling' | 'queued' | 'match' | 'results';
 
 export interface PartyBotFillOffer {
@@ -35,6 +48,24 @@ export interface PartyBotFillOffer {
   /** Wall-clock sample captured with this authoritative projection. */
   readonly serverTime: number;
   readonly openSlotCount: number;
+}
+
+export type PartyRematchUnavailableReason =
+  | 'match_unavailable'
+  | 'schedule_unavailable'
+  | 'party_changed';
+
+/** Complete Results/rematch truth. Clients never derive eligibility or arena changes. */
+export interface PartyRematchState {
+  readonly status: 'waiting' | 'ready' | 'unavailable';
+  readonly previousArena: Readonly<MatchIntent['scheduledArena']>;
+  readonly currentArena: Readonly<MatchIntent['scheduledArena']>;
+  readonly arenaChanged: boolean;
+  readonly eligiblePlayerIds: readonly PlayerId[];
+  readonly requestedPlayerIds: readonly PlayerId[];
+  readonly serverTime: number;
+  readonly expiresAt: number;
+  readonly unavailableReason?: PartyRematchUnavailableReason;
 }
 
 export type PartySlot =
@@ -67,6 +98,10 @@ export interface PartyState {
   readonly slots: readonly PartySlot[];
   /** Present only while every connected human is ready and human slots remain open. */
   readonly botFillOffer?: Readonly<PartyBotFillOffer>;
+  /** Complete entrants, including confirmed standard bots, while attached to a match. */
+  readonly participants?: readonly PartyParticipant[];
+  /** Present only for the capability-owned standard-party Results lifecycle. */
+  readonly rematch?: Readonly<PartyRematchState>;
   readonly intent: Readonly<MatchIntent>;
 }
 
@@ -255,10 +290,11 @@ export function isPartyState(value: unknown): value is PartyState {
   if (value['lifecycle'] === 'queued' && !members.every((member) => member.ready)) return false;
   if (
     (value['lifecycle'] === 'match' || value['lifecycle'] === 'results') &&
-    (members.length !== capacity || !members.every((member) => member.ready))
+    members.length !== capacity
   ) {
     return false;
   }
+  if (value['lifecycle'] === 'match' && !members.every((member) => member.ready)) return false;
   if (!playerIds.has(value['leaderId'])) return false;
   const intent = value['intent'];
   if (!isRecord(intent) || intent['format'] !== format) return false;
@@ -291,6 +327,106 @@ export function isPartyState(value: unknown): value is PartyState {
     !Number.isFinite(scheduledArena['rotationEndsAt'])
   ) {
     return false;
+  }
+  const participants = value['participants'];
+  const requiresParticipants = value['lifecycle'] === 'match' || value['lifecycle'] === 'results';
+  if (requiresParticipants !== Array.isArray(participants)) return false;
+  if (Array.isArray(participants)) {
+    const expectedCount = capacity + (composition['botCount'] as number);
+    if (participants.length !== expectedCount) return false;
+    const participantIds = new Set<string>();
+    const participantFighters = new Set<CharacterId>();
+    let humanCount = 0;
+    let botCount = 0;
+    for (const participant of participants) {
+      if (!isRecord(participant)) return false;
+      const participantId = participant['playerId'];
+      const fighterId = normalizePartyFighter(participant['fighterId']);
+      const source = participant['source'];
+      if (
+        typeof participantId !== 'string' ||
+        participantId.length === 0 ||
+        typeof participant['nickname'] !== 'string' ||
+        participant['nickname'].length === 0 ||
+        fighterId === null ||
+        (source !== 'human' && source !== 'standard_bot') ||
+        typeof participant['ready'] !== 'boolean' ||
+        participantIds.has(participantId) ||
+        participantFighters.has(fighterId)
+      ) {
+        return false;
+      }
+      participantIds.add(participantId);
+      participantFighters.add(fighterId);
+      if (source === 'human') {
+        const member = members.find(
+          (entry) => isRecord(entry) && entry['playerId'] === participantId,
+        );
+        if (!member || participant['ready'] !== member['ready']) return false;
+        humanCount += 1;
+      } else {
+        if (participant['ready'] !== true || playerIds.has(participantId)) return false;
+        botCount += 1;
+      }
+    }
+    if (humanCount !== capacity || botCount !== composition['botCount']) return false;
+  }
+  const rematch = value['rematch'];
+  if ((value['lifecycle'] === 'results') !== (rematch !== undefined)) return false;
+  if (rematch !== undefined) {
+    if (!isRecord(rematch) || !Array.isArray(participants)) return false;
+    const previousArena = rematch['previousArena'];
+    const currentArena = rematch['currentArena'];
+    const eligible = rematch['eligiblePlayerIds'];
+    const requested = rematch['requestedPlayerIds'];
+    const status = rematch['status'];
+    const unavailableReason = rematch['unavailableReason'];
+    const validArena = (arena: unknown): arena is Record<string, unknown> =>
+      isRecord(arena) &&
+      arena['mode'] === mode &&
+      typeof arena['mapName'] === 'string' &&
+      arena['mapName'].length > 0 &&
+      typeof arena['rotationEndsAt'] === 'number' &&
+      Number.isFinite(arena['rotationEndsAt']);
+    if (
+      (status !== 'waiting' && status !== 'ready' && status !== 'unavailable') ||
+      !validArena(previousArena) ||
+      !validArena(currentArena) ||
+      rematch['arenaChanged'] !==
+        (previousArena['mapName'] !== currentArena['mapName'] ||
+          previousArena['rotationEndsAt'] !== currentArena['rotationEndsAt']) ||
+      !Array.isArray(eligible) ||
+      !Array.isArray(requested) ||
+      typeof rematch['serverTime'] !== 'number' ||
+      !Number.isFinite(rematch['serverTime']) ||
+      typeof rematch['expiresAt'] !== 'number' ||
+      !Number.isFinite(rematch['expiresAt']) ||
+      rematch['expiresAt'] < rematch['serverTime'] ||
+      (status === 'unavailable') !==
+        (unavailableReason === 'match_unavailable' ||
+          unavailableReason === 'schedule_unavailable' ||
+          unavailableReason === 'party_changed')
+    ) {
+      return false;
+    }
+    const eligibleIds = new Set(eligible);
+    const requestedIds = new Set(requested);
+    if (eligibleIds.size !== eligible.length || requestedIds.size !== requested.length)
+      return false;
+    for (const member of members) {
+      if (member.ready !== requestedIds.has(member.playerId)) return false;
+      if (status !== 'unavailable' && eligibleIds.has(member.playerId) === member.ready) {
+        return false;
+      }
+    }
+    if (
+      [...eligibleIds, ...requestedIds].some((id) => !playerIds.has(id)) ||
+      (status === 'ready' && eligible.length !== 0) ||
+      (status === 'waiting' && eligible.length === 0) ||
+      (status === 'unavailable' && (eligible.length !== 0 || requested.length !== 0))
+    ) {
+      return false;
+    }
   }
   return true;
 }

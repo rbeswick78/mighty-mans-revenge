@@ -300,6 +300,25 @@ schedule-drifted, or capability-off confirmations fail closed without a
 phantom queue or source change. Batch 15 owns Reforged Results and rematch
 presentation; capability defaults and legacy paths remain unchanged.
 
+**Reforged Results and rematches (Batch 15):** retained capability-owned Duel,
+Rumble, and Crew parties now carry a complete server-authored participant
+projection through match and Results, including exact human/standard-bot
+source, nickname, locked fighter, and readiness. Results renders only that
+projection plus the retained format, explicit mode, prior queue-entry arena,
+current scheduled arena, arena-change decision, and versioned human consensus.
+The additive `client:requestPartyRematch` mutation is accepted only from a
+currently eligible human with a fresh request id, exact party id, and version.
+Before launch, the server revalidates the retained post-match roster and
+confirmed bot composition, format/mode, fighter locks, schedule locks,
+lifecycle, match identity, and connection mappings, then creates the new match
+through Batch 11's explicit intent authority. Schedule-boundary changes clear
+old consensus and use the newly active arena without changing the selected
+mode. Duplicate, stale, replayed, disconnected, invalidated, timed-out, or
+failed-launch paths fail closed and clean up party/rematch/lock state. Generic
+legacy rematch messages cannot bypass a retained party. Practice and
+capability-off Results remain on their established paths; Batch 16 owns
+standard Draft and Character Select retirement.
+
 ### Why This Matters for Agents
 
 Client prediction and server simulation **must use identical physics code** from `/shared`. If you change movement, collision, or physics logic, you must change it in `/shared` and verify both client and server still agree. A mismatch between client prediction and server authority causes visible rubber-banding.

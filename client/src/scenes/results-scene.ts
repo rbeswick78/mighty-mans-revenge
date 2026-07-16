@@ -3,6 +3,7 @@ import type { PlayerId } from '@shared/types/common.js';
 import type { PlayerStats } from '@shared/types/player.js';
 import type { MatchResult, PracticeGauntletRouteId, TeamId } from '@shared/types/game.js';
 import type { ServerMatchmakingStatusMessage } from '@shared/types/network.js';
+import type { PartyState } from '@shared/matchmaking/party.js';
 import {
   AWARD_DEFS,
   CHARACTERS,
@@ -71,6 +72,10 @@ import {
   normalizeCrewTourRecord,
   type CrewTourUpdate,
 } from '../ui/crew-tour.js';
+import {
+  partyResultsPresentation,
+  type PartyResultsPresentation,
+} from '../ui/reforged/party-results.js';
 
 interface ResultsSceneData {
   result?: MatchResult;
@@ -146,6 +151,9 @@ export class ResultsScene extends Phaser.Scene {
   private isNewGauntletBuildBest = false;
   private scrapPitRecordUpdate: ScrapPitRecordUpdate | null = null;
   private crewTourUpdate: CrewTourUpdate | null = null;
+  private partyState: Readonly<PartyState> | null = null;
+  private partyProjectionText: Phaser.GameObjects.Text | null = null;
+  private partyScheduleText: Phaser.GameObjects.Text | null = null;
 
   // Event handler references for cleanup
   private onRematchStatus: ((opponentWantsRematch: boolean) => void) | null = null;
@@ -154,6 +162,7 @@ export class ResultsScene extends Phaser.Scene {
   private onOpponentDisconnected: ((playerId: PlayerId) => void) | null = null;
   private onMatchmakingStatus: ((msg: ServerMatchmakingStatusMessage) => void) | null = null;
   private onConnectionLost: (() => void) | null = null;
+  private onPartyState: ((state: Readonly<PartyState> | null) => void) | null = null;
 
   constructor() {
     super({ key: 'ResultsScene' });
@@ -185,6 +194,9 @@ export class ResultsScene extends Phaser.Scene {
     this.isNewGauntletBuildBest = false;
     this.scrapPitRecordUpdate = null;
     this.crewTourUpdate = null;
+    this.partyState = null;
+    this.partyProjectionText = null;
+    this.partyScheduleText = null;
   }
 
   create(): void {
@@ -257,6 +269,16 @@ export class ResultsScene extends Phaser.Scene {
     const centerX = this.cameras.main.width / 2;
     const camHeight = this.cameras.main.height;
     const localPlayerId = this.gameService.getPlayerId();
+    const capabilities = this.gameService.getServerCapabilities();
+    this.partyState =
+      capabilities.newShell && capabilities.schedules && !this.result?.isPractice
+        ? this.gameService.getPartyState()
+        : null;
+    const partyResults = partyResultsPresentation(
+      this.partyState,
+      this.result?.matchId,
+      localPlayerId,
+    );
 
     const localTeam = localPlayerId ? this.result?.playerTeams?.[localPlayerId] : undefined;
     const isTeamMatch = this.result?.matchKind === 'duos';
@@ -367,7 +389,11 @@ export class ResultsScene extends Phaser.Scene {
     // New results use the authoritative locked roster; old payloads retain
     // the original Mighty Man/Bruce fallback pair.
     // ────────────────────────────────────────────────────────────────────
-    if (this.result?.matchKind !== 'rumble' && this.result?.matchKind !== 'duos') {
+    if (
+      partyResults === null &&
+      this.result?.matchKind !== 'rumble' &&
+      this.result?.matchKind !== 'duos'
+    ) {
       this.renderTableau(isWinner, isDraw, camHeight, localPlayerId);
     }
 
@@ -403,6 +429,7 @@ export class ResultsScene extends Phaser.Scene {
         .setOrigin(0.5);
       panel.add(noData);
     }
+    if (partyResults) this.renderPartyResultsPanels(partyResults, camHeight);
 
     // ────────────────────────────────────────────────────────────────────
     // Rematch status text + action buttons
@@ -437,15 +464,18 @@ export class ResultsScene extends Phaser.Scene {
         this.showRematchUnavailable();
         return;
       }
-      this.gameService.requestRematch(gauntletRouteId);
+      if (partyResults) this.gameService.requestPartyRematch();
+      else this.gameService.requestRematch(gauntletRouteId);
       if (hasRouteDraft) this.setRematchButtonsDisabled(true);
       this.rematchStatusText
         ?.setText(
-          hasRouteDraft
-            ? 'Route locked. Preparing next fight...'
-            : this.result?.gauntlet
-              ? 'Preparing next fight...'
-              : 'Waiting for opponent...',
+          partyResults
+            ? 'Readiness sent. Waiting for party...'
+            : hasRouteDraft
+              ? 'Route locked. Preparing next fight...'
+              : this.result?.gauntlet
+                ? 'Preparing next fight...'
+                : 'Waiting for opponent...',
         )
         .setVisible(true);
     };
@@ -458,7 +488,9 @@ export class ResultsScene extends Phaser.Scene {
       btnH,
       hasRouteDraft
         ? gauntletRouteButtonLabel(routeChoices[0])
-        : (gauntletActionLabel(this.result) ?? rematchButtonLabel(this.result)),
+        : partyResults
+          ? 'READY FOR REMATCH'
+          : (gauntletActionLabel(this.result) ?? rematchButtonLabel(this.result)),
       {
         variant: 'primary',
         fontSize: hasBoonDraft
@@ -474,6 +506,10 @@ export class ResultsScene extends Phaser.Scene {
       },
     );
     this.rematchButton.setDepth(WastelandStreet.DEPTH.UI);
+    if (partyResults) {
+      this.rematchButton.setDisabled(!partyResults.canRequestRematch);
+      this.rematchStatusText.setText(partyResults.statusText).setVisible(true);
+    }
 
     if (hasRouteDraft) {
       this.alternateRouteButton = new PixelButton(
@@ -1427,6 +1463,64 @@ export class ResultsScene extends Phaser.Scene {
     };
   }
 
+  private renderPartyResultsPanels(
+    presentation: Readonly<PartyResultsPresentation>,
+    camHeight: number,
+  ): void {
+    const panelY = 150;
+    const panelH = Math.min(250, camHeight - 360);
+    const partyPanel = new MenuPanel(this, 16, panelY, 250, panelH, { fillAlpha: 0.92 });
+    partyPanel.setName('party-results-roster-panel');
+    partyPanel.setDepth(WastelandStreet.DEPTH.UI);
+    this.partyProjectionText = this.add
+      .text(14, 14, presentation.partyLines.join('\n\n'), {
+        fontFamily: MENU_FONTS.HEADER,
+        fontSize: '7px',
+        color: cssHex(VALUE_COLOR),
+        wordWrap: { width: 222 },
+        lineSpacing: 2,
+      })
+      .setDepth(WastelandStreet.DEPTH.UI);
+    partyPanel.add(this.partyProjectionText);
+
+    const schedulePanel = new MenuPanel(this, 694, panelY, 250, panelH, { fillAlpha: 0.92 });
+    schedulePanel.setName('party-results-schedule-panel');
+    schedulePanel.setDepth(WastelandStreet.DEPTH.UI);
+    this.partyScheduleText = this.add
+      .text(14, 14, [...presentation.scheduleLines, '', presentation.statusText].join('\n\n'), {
+        fontFamily: MENU_FONTS.HEADER,
+        fontSize: '8px',
+        color: cssHex(NEXT_DRAFT_COLOR),
+        wordWrap: { width: 222 },
+        lineSpacing: 2,
+      })
+      .setDepth(WastelandStreet.DEPTH.UI);
+    schedulePanel.add(this.partyScheduleText);
+  }
+
+  private updatePartyResults(state: Readonly<PartyState> | null): void {
+    this.partyState = state;
+    const presentation = partyResultsPresentation(
+      state,
+      this.result?.matchId,
+      this.gameService.getPlayerId(),
+    );
+    if (!presentation) {
+      this.showRematchUnavailable();
+      return;
+    }
+    this.partyProjectionText?.setText(presentation.partyLines.join('\n\n'));
+    this.partyScheduleText?.setText(
+      [...presentation.scheduleLines, '', presentation.statusText].join('\n\n'),
+    );
+    this.rematchButton?.setDisabled(!presentation.canRequestRematch);
+    this.rematchStatusText?.setText(presentation.statusText).setVisible(true);
+    if (presentation.canRequestRematch) {
+      this.rematchUnavailable = false;
+      this.rematchStatusText?.setColor(cssHex(REMATCH_STATUS_COLOR));
+    }
+  }
+
   private wireGameServiceEvents(): void {
     this.onRematchStatus = (opponentWantsRematch: boolean) => {
       if (opponentWantsRematch && this.rematchStatusText) {
@@ -1499,6 +1593,10 @@ export class ResultsScene extends Phaser.Scene {
       this.showRematchUnavailable();
     };
 
+    this.onPartyState = (state: Readonly<PartyState> | null) => {
+      if (this.partyState !== null) this.updatePartyResults(state);
+    };
+
     this.gameService.on('rematchStatus', this.onRematchStatus);
     this.gameService.on('matchFound', this.onMatchFound);
     this.gameService.on('draftState', this.onDraftState);
@@ -1506,6 +1604,7 @@ export class ResultsScene extends Phaser.Scene {
     this.gameService.on('matchmakingStatus', this.onMatchmakingStatus);
     this.gameService.on('reconnecting', this.onConnectionLost);
     this.gameService.on('disconnected', this.onConnectionLost);
+    this.gameService.on('partyState', this.onPartyState);
   }
 
   private cleanupEvents(): void {
@@ -1533,6 +1632,10 @@ export class ResultsScene extends Phaser.Scene {
       this.gameService.off('reconnecting', this.onConnectionLost);
       this.gameService.off('disconnected', this.onConnectionLost);
       this.onConnectionLost = null;
+    }
+    if (this.onPartyState) {
+      this.gameService.off('partyState', this.onPartyState);
+      this.onPartyState = null;
     }
   }
 

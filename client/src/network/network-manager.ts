@@ -460,6 +460,25 @@ export class NetworkManager {
     });
   }
 
+  requestPartyRematch(): void {
+    const state = this.partyState;
+    const playerId = this.localPlayerId;
+    if (
+      !state?.rematch ||
+      state.lifecycle !== 'results' ||
+      playerId === null ||
+      !state.rematch.eligiblePlayerIds.includes(playerId)
+    ) {
+      return;
+    }
+    this.connection.send({
+      type: 'client:requestPartyRematch',
+      requestId: crypto.randomUUID(),
+      partyId: state.partyId,
+      expectedVersion: state.version,
+    });
+  }
+
   getPartyState(): Readonly<PartyState> | null {
     return this.partyState;
   }

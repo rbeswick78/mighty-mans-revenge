@@ -73,6 +73,8 @@ export class GameManager {
       normalizeIntent: (value) => this.normalizePartyIntent(value),
       canEnterParty: (playerId) => !this.matchmaking.isPlayerBusy(playerId),
       queueParty: (state) => this.matchmaking.handleSubmitParty(state),
+      rematchParty: (state) => this.matchmaking.handleSubmitPartyRematch(state),
+      refreshRematchIntent: (intent) => this.refreshPartyRematchIntent(intent),
       now: () => this.now().getTime(),
       monotonicNow: () => performance.now(),
     });
@@ -259,6 +261,15 @@ export class GameManager {
         );
         break;
 
+      case 'client:requestPartyRematch':
+        this.parties.requestRematch(
+          playerId,
+          message.requestId,
+          message.partyId,
+          message.expectedVersion,
+        );
+        break;
+
       case 'client:startPractice':
         this.matchmaking.handleStartPractice(
           playerId,
@@ -357,6 +368,21 @@ export class GameManager {
       ...intent,
       composition: Object.freeze({ ...intent.composition }),
       scheduledArena: Object.freeze({ ...authoritativeArena }),
+    });
+  }
+
+  private refreshPartyRematchIntent(intent: Readonly<MatchIntent>): Readonly<MatchIntent> | null {
+    if (!this.server.getCapabilities().newShell || !this.server.getCapabilities().schedules) {
+      return null;
+    }
+    const serverTime = this.now().getTime();
+    const schedule = createArenaScheduleMessage(serverTime);
+    if (schedule.forcedMode !== undefined && schedule.forcedMode !== intent.mode) return null;
+    const currentArena = schedule.schedules.find((entry) => entry.mode === intent.mode);
+    if (!currentArena) return null;
+    return Object.freeze({
+      ...intent,
+      scheduledArena: Object.freeze({ ...currentArena }),
     });
   }
 

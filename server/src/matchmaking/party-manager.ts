@@ -4,6 +4,7 @@ import {
   PARTY_BOT_FILL_WAIT_MS,
   PARTY_CODE_LENGTH,
   PARTY_EMPTY_EXPIRY_MS,
+  PARTY_REMATCH_TIMEOUT_MS,
   normalizePartyCode,
   normalizePartyFighter,
   normalizePartyId,
@@ -19,6 +20,8 @@ import type {
   PartyErrorCode,
   PartyLifecycle,
   PartyMember,
+  PartyParticipant,
+  PartyRematchState,
   PartyState,
   PlayerId,
   ServerMessage,
@@ -40,6 +43,13 @@ interface MutableParty {
     wallStartedAt: number;
     available: boolean;
   } | null;
+  participants: readonly PartyParticipant[] | null;
+  rematch: Readonly<PartyRematchState> | null;
+}
+
+export interface PartyLaunchResult {
+  readonly matchId: string;
+  readonly participants: readonly PartyParticipant[];
 }
 
 export interface PartyManagerOptions {
@@ -51,7 +61,11 @@ export interface PartyManagerOptions {
   readonly createPartyId?: () => string;
   readonly createCode?: () => string;
   /** Enters the existing generalized match-intent authority once every slot is ready. */
-  readonly queueParty?: (state: Readonly<PartyState>) => string | null;
+  readonly queueParty?: (state: Readonly<PartyState>) => Readonly<PartyLaunchResult> | null;
+  /** Revalidates and launches a Results consensus through generalized intent authority. */
+  readonly rematchParty?: (state: Readonly<PartyState>) => Readonly<PartyLaunchResult> | null;
+  /** Refreshes the selected mode onto the current server-owned arena schedule. */
+  readonly refreshRematchIntent?: (intent: Readonly<MatchIntent>) => Readonly<MatchIntent> | null;
 }
 
 const validNickname = (value: unknown): value is string =>
@@ -134,6 +148,8 @@ export class PartyManager {
       matchId: null,
       emptyExpiresAt: null,
       botFillWait: null,
+      participants: null,
+      rematch: null,
     };
     this.partiesById.set(party.partyId, party);
     this.partyIdByCode.set(code, party.partyId);
@@ -376,8 +392,8 @@ export class PartyManager {
       party.lifecycle === 'queued' &&
       party.members.length === party.intent.composition.humanCount
     ) {
-      const matchId = this.options.queueParty?.(this.snapshot(party)) ?? null;
-      if (matchId === null) {
+      const launch = this.options.queueParty?.(this.snapshot(party)) ?? null;
+      if (launch === null) {
         this.resetReadiness(party);
         party.version += 1;
         this.error(playerId, requestId, 'invalid_intent');
@@ -385,7 +401,9 @@ export class PartyManager {
         return false;
       }
       party.lifecycle = 'match';
-      party.matchId = matchId;
+      party.matchId = launch.matchId;
+      party.participants = launch.participants;
+      party.rematch = null;
       party.version += 1;
       this.broadcastState(party);
     }
@@ -437,8 +455,8 @@ export class PartyManager {
 
     party.intent = confirmedIntent;
     party.botFillWait = null;
-    const matchId = this.options.queueParty?.(this.snapshot(party)) ?? null;
-    if (matchId === null) {
+    const launch = this.options.queueParty?.(this.snapshot(party)) ?? null;
+    if (launch === null) {
       party.intent = originalIntent;
       this.resetReadiness(party);
       party.version += 1;
@@ -447,7 +465,9 @@ export class PartyManager {
       return false;
     }
     party.lifecycle = 'match';
-    party.matchId = matchId;
+    party.matchId = launch.matchId;
+    party.participants = launch.participants;
+    party.rematch = null;
     party.version += 1;
     this.broadcastState(party);
     return true;
@@ -471,6 +491,77 @@ export class PartyManager {
       return this.error(playerId, requestId, 'invalid_request');
     }
     this.resetReadiness(party);
+    party.version += 1;
+    this.broadcastState(party);
+    return true;
+  }
+
+  requestRematch(
+    playerId: PlayerId,
+    requestIdValue: unknown,
+    partyIdValue: unknown,
+    expectedVersionValue: unknown,
+  ): boolean {
+    const mutation = this.authorizeMutation(
+      playerId,
+      requestIdValue,
+      partyIdValue,
+      expectedVersionValue,
+    );
+    if (!mutation) return false;
+    const { party, requestId } = mutation;
+    if (party.lifecycle !== 'results' || party.rematch === null || party.matchId === null) {
+      return this.error(playerId, requestId, 'invalid_request');
+    }
+    if (this.refreshResultsSchedule(party)) {
+      party.version += 1;
+      this.error(playerId, requestId, 'stale_party');
+      this.broadcastState(party);
+      return false;
+    }
+    if (
+      party.rematch.status === 'unavailable' ||
+      !party.rematch.eligiblePlayerIds.includes(playerId)
+    ) {
+      this.send(playerId, { type: 'server:partyState', state: this.snapshot(party) });
+      return party.rematch.requestedPlayerIds.includes(playerId);
+    }
+
+    party.members = party.members.map((member) =>
+      member.playerId === playerId ? Object.freeze({ ...member, ready: true }) : member,
+    );
+    this.rebuildRematchProjection(party);
+    party.version += 1;
+    this.broadcastState(party);
+    if (!party.members.every((member) => member.ready)) return true;
+
+    const launch = this.options.rematchParty?.(this.snapshot(party)) ?? null;
+    if (launch === null) {
+      party.members = party.members.map((member) =>
+        member.ready ? Object.freeze({ ...member, ready: false }) : member,
+      );
+      party.rematch = Object.freeze({
+        ...party.rematch,
+        status: 'unavailable',
+        eligiblePlayerIds: Object.freeze([]),
+        requestedPlayerIds: Object.freeze([]),
+        unavailableReason: 'match_unavailable',
+      });
+      party.participants = this.projectParticipantReadiness(party);
+      party.version += 1;
+      this.error(playerId, requestId, 'invalid_intent');
+      this.broadcastState(party);
+      return false;
+    }
+    party.intent = Object.freeze({
+      ...party.intent,
+      intentId: crypto.randomUUID(),
+      scheduledArena: Object.freeze({ ...party.rematch.currentArena }),
+    });
+    party.lifecycle = 'match';
+    party.matchId = launch.matchId;
+    party.participants = launch.participants;
+    party.rematch = null;
     party.version += 1;
     this.broadcastState(party);
     return true;
@@ -500,6 +591,9 @@ export class PartyManager {
     const partyId = normalizePartyId(partyIdValue);
     const party = partyId ? this.partiesById.get(partyId) : undefined;
     if (!party) return false;
+    const normalizedMatchId = lifecycle === 'assembling' ? null : normalizePartyId(matchId);
+    if (lifecycle !== 'assembling' && normalizedMatchId === null) return false;
+    if (party.lifecycle === lifecycle && party.matchId === normalizedMatchId) return true;
     if (
       lifecycle !== 'assembling' &&
       (party.members.length !== party.intent.composition.humanCount ||
@@ -507,12 +601,37 @@ export class PartyManager {
     ) {
       return false;
     }
-    const normalizedMatchId = lifecycle === 'assembling' ? null : normalizePartyId(matchId);
-    if (lifecycle !== 'assembling' && normalizedMatchId === null) return false;
-    if (party.lifecycle === lifecycle && party.matchId === normalizedMatchId) return true;
     party.lifecycle = lifecycle;
     party.matchId = normalizedMatchId;
-    if (lifecycle === 'assembling') this.resetReadiness(party);
+    if (lifecycle === 'assembling') {
+      this.resetReadiness(party);
+    } else if (lifecycle === 'results') {
+      party.members = party.members.map((member) =>
+        member.ready ? Object.freeze({ ...member, ready: false }) : member,
+      );
+      const currentIntent = this.options.refreshRematchIntent?.(party.intent) ?? null;
+      const serverTime = this.now();
+      party.rematch = Object.freeze({
+        status: currentIntent === null ? ('unavailable' as const) : ('waiting' as const),
+        previousArena: Object.freeze({ ...party.intent.scheduledArena }),
+        currentArena: Object.freeze({
+          ...(currentIntent?.scheduledArena ?? party.intent.scheduledArena),
+        }),
+        arenaChanged:
+          currentIntent !== null &&
+          (currentIntent.scheduledArena.mapName !== party.intent.scheduledArena.mapName ||
+            currentIntent.scheduledArena.rotationEndsAt !==
+              party.intent.scheduledArena.rotationEndsAt),
+        eligiblePlayerIds: Object.freeze(
+          currentIntent === null ? [] : party.members.map((member) => member.playerId),
+        ),
+        requestedPlayerIds: Object.freeze([]),
+        serverTime,
+        expiresAt: serverTime + PARTY_REMATCH_TIMEOUT_MS,
+        ...(currentIntent === null ? { unavailableReason: 'schedule_unavailable' as const } : {}),
+      });
+      party.participants = this.projectParticipantReadiness(party);
+    }
     party.version += 1;
     this.broadcastState(party);
     return true;
@@ -522,6 +641,10 @@ export class PartyManager {
   tick(monotonicNow = this.monotonicNow()): number {
     let offered = 0;
     for (const party of this.partiesById.values()) {
+      if (party.lifecycle === 'results' && this.refreshResultsSchedule(party)) {
+        party.version += 1;
+        this.broadcastState(party);
+      }
       const wait = party.botFillWait;
       if (
         wait === null ||
@@ -646,6 +769,24 @@ export class PartyManager {
               openSlotCount: party.intent.composition.humanCount - party.members.length,
             }),
           }),
+      ...(party.participants === null
+        ? {}
+        : {
+            participants: Object.freeze(
+              party.participants.map((participant) => Object.freeze({ ...participant })),
+            ),
+          }),
+      ...(party.rematch === null
+        ? {}
+        : {
+            rematch: Object.freeze({
+              ...party.rematch,
+              previousArena: Object.freeze({ ...party.rematch.previousArena }),
+              currentArena: Object.freeze({ ...party.rematch.currentArena }),
+              eligiblePlayerIds: Object.freeze([...party.rematch.eligiblePlayerIds]),
+              requestedPlayerIds: Object.freeze([...party.rematch.requestedPlayerIds]),
+            }),
+          }),
       intent: Object.freeze({
         ...party.intent,
         composition: Object.freeze({ ...party.intent.composition }),
@@ -668,6 +809,8 @@ export class PartyManager {
     party.lifecycle = 'assembling';
     party.matchId = null;
     party.botFillWait = null;
+    party.participants = null;
+    party.rematch = null;
   }
 
   private startBotFillWait(party: MutableParty): void {
@@ -677,6 +820,85 @@ export class PartyManager {
       wallStartedAt: this.now(),
       available: false,
     };
+  }
+
+  private refreshResultsSchedule(party: MutableParty): boolean {
+    if (party.lifecycle !== 'results' || party.rematch === null) return false;
+    const currentIntent = this.options.refreshRematchIntent?.(party.intent) ?? null;
+    const prior = party.rematch;
+    if (currentIntent === null) {
+      if (prior.status === 'unavailable' && prior.unavailableReason === 'schedule_unavailable') {
+        return false;
+      }
+      party.members = party.members.map((member) =>
+        member.ready ? Object.freeze({ ...member, ready: false }) : member,
+      );
+      party.rematch = Object.freeze({
+        ...prior,
+        status: 'unavailable',
+        eligiblePlayerIds: Object.freeze([]),
+        requestedPlayerIds: Object.freeze([]),
+        serverTime: this.now(),
+        unavailableReason: 'schedule_unavailable',
+      });
+      party.participants = this.projectParticipantReadiness(party);
+      return true;
+    }
+    const arena = currentIntent.scheduledArena;
+    if (
+      prior.currentArena.mapName === arena.mapName &&
+      prior.currentArena.rotationEndsAt === arena.rotationEndsAt &&
+      prior.status !== 'unavailable'
+    ) {
+      return false;
+    }
+    party.members = party.members.map((member) =>
+      member.ready ? Object.freeze({ ...member, ready: false }) : member,
+    );
+    party.rematch = Object.freeze({
+      ...prior,
+      status: 'waiting',
+      currentArena: Object.freeze({ ...arena }),
+      arenaChanged:
+        prior.previousArena.mapName !== arena.mapName ||
+        prior.previousArena.rotationEndsAt !== arena.rotationEndsAt,
+      eligiblePlayerIds: Object.freeze(party.members.map((member) => member.playerId)),
+      requestedPlayerIds: Object.freeze([]),
+      serverTime: this.now(),
+      unavailableReason: undefined,
+    });
+    party.participants = this.projectParticipantReadiness(party);
+    return true;
+  }
+
+  private rebuildRematchProjection(party: MutableParty): void {
+    if (party.rematch === null) return;
+    const requestedPlayerIds = party.members
+      .filter((member) => member.ready)
+      .map((member) => member.playerId);
+    const eligiblePlayerIds = party.members
+      .filter((member) => !member.ready)
+      .map((member) => member.playerId);
+    party.rematch = Object.freeze({
+      ...party.rematch,
+      status: eligiblePlayerIds.length === 0 ? 'ready' : 'waiting',
+      eligiblePlayerIds: Object.freeze(eligiblePlayerIds),
+      requestedPlayerIds: Object.freeze(requestedPlayerIds),
+      serverTime: this.now(),
+      unavailableReason: undefined,
+    });
+    party.participants = this.projectParticipantReadiness(party);
+  }
+
+  private projectParticipantReadiness(party: MutableParty): readonly PartyParticipant[] | null {
+    if (party.participants === null) return null;
+    return Object.freeze(
+      party.participants.map((participant) => {
+        if (participant.source === 'standard_bot') return participant;
+        const member = party.members.find((entry) => entry.playerId === participant.playerId);
+        return Object.freeze({ ...participant, ready: member?.ready ?? false });
+      }),
+    );
   }
 
   private removeMember(party: MutableParty, playerId: PlayerId): void {

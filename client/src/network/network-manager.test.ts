@@ -850,4 +850,106 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
     hoisted.stateCb?.('reconnecting');
     expect(manager.getPartyState()).toBeNull();
   });
+
+  it('sends party rematch readiness only from the server-projected eligible version', () => {
+    deliver({ type: 'server:welcome', playerId: LOCAL_ID });
+    const member = {
+      playerId: LOCAL_ID,
+      nickname: 'Alpha',
+      fighterId: 'mighty_man' as const,
+      joinedAt: 1,
+      ready: false,
+    };
+    deliver({
+      type: 'server:partyState',
+      state: {
+        partyId: 'party_results_123',
+        code: 'ABCDE',
+        joinPath: '/?party=ABCDE',
+        format: 'duel',
+        formatCapacity: 2,
+        capacity: 1,
+        leaderId: LOCAL_ID,
+        version: 12,
+        lifecycle: 'results',
+        matchId: 'match_results_123',
+        members: [member],
+        slots: [{ index: 0, status: 'occupied', member }],
+        participants: [
+          { ...member, source: 'human' },
+          {
+            playerId: 'bot:results',
+            nickname: 'Rusty',
+            fighterId: 'bruce',
+            source: 'standard_bot',
+            ready: true,
+          },
+        ],
+        rematch: {
+          status: 'waiting',
+          previousArena: {
+            mode: GameModeType.DEATHMATCH,
+            mapName: 'Wasteland Outpost',
+            rotationEndsAt: 2_000,
+          },
+          currentArena: {
+            mode: GameModeType.DEATHMATCH,
+            mapName: 'Scrapyard',
+            rotationEndsAt: 302_000,
+          },
+          arenaChanged: true,
+          eligiblePlayerIds: [LOCAL_ID],
+          requestedPlayerIds: [],
+          serverTime: 2_001,
+          expiresAt: 62_001,
+        },
+        intent: {
+          intentId: 'party_results_intent',
+          format: 'duel',
+          composition: { humanCount: 1, botCount: 1 },
+          mode: GameModeType.DEATHMATCH,
+          fighterId: 'mighty_man',
+          scheduledArena: {
+            mode: GameModeType.DEATHMATCH,
+            mapName: 'Wasteland Outpost',
+            rotationEndsAt: 2_000,
+          },
+        },
+      },
+    });
+    manager.requestPartyRematch();
+    expect(hoisted.sentMessages.at(-1)).toMatchObject({
+      type: 'client:requestPartyRematch',
+      partyId: 'party_results_123',
+      expectedVersion: 12,
+    });
+    const sentCount = hoisted.sentMessages.length;
+    deliver({
+      type: 'server:partyState',
+      state: {
+        ...manager.getPartyState()!,
+        version: 13,
+        members: [{ ...member, ready: true }],
+        slots: [{ index: 0, status: 'occupied', member: { ...member, ready: true } }],
+        participants: [
+          { ...member, source: 'human', ready: true },
+          {
+            playerId: 'bot:results',
+            nickname: 'Rusty',
+            fighterId: 'bruce',
+            source: 'standard_bot',
+            ready: true,
+          },
+        ],
+        rematch: {
+          ...manager.getPartyState()!.rematch!,
+          status: 'ready',
+          eligiblePlayerIds: [],
+          requestedPlayerIds: [LOCAL_ID],
+        },
+      },
+    });
+    manager.requestPartyRematch();
+    expect(hoisted.sentMessages).toHaveLength(sentCount);
+  });
 });

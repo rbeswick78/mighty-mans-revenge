@@ -338,6 +338,10 @@ export class GameService {
     this.networkManager.requestRematch(gauntletRouteId);
   }
 
+  requestPartyRematch(): void {
+    this.networkManager.requestPartyRematch();
+  }
+
   returnToLobby(): void {
     this.networkManager.returnToLobby();
     this.currentMatch = null;

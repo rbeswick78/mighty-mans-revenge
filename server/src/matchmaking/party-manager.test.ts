@@ -31,11 +31,41 @@ function harness(
   queueResult: string | null = 'match_12345678',
   normalizeIntent: (value: unknown) => Readonly<MatchIntent> | null = (value) =>
     value as Readonly<MatchIntent>,
+  refreshRematchIntent: (value: Readonly<MatchIntent>) => Readonly<MatchIntent> | null = (
+    value,
+  ) => ({ ...value, scheduledArena: { ...value.scheduledArena } }),
+  rematchResult: string | null = 'rematch_12345678',
 ) {
   let now = 1_000;
   let monotonicNow = 100;
   const sent: Array<{ playerId: PlayerId; message: ServerMessage }> = [];
   const queued: PartyState[] = [];
+  const rematched: PartyState[] = [];
+  const launchResult = (state: Readonly<PartyState>, matchId: string) => {
+    const used = new Set(state.members.map((member) => member.fighterId));
+    const available = ['mighty_man', 'bruce', 'frost_wizard', 'bubba', 'jack', 'rook'].filter(
+      (fighterId) => !used.has(fighterId as never),
+    );
+    return {
+      matchId,
+      participants: [
+        ...state.members.map((member) => ({
+          playerId: member.playerId,
+          nickname: member.nickname,
+          fighterId: member.fighterId,
+          source: 'human' as const,
+          ready: true,
+        })),
+        ...Array.from({ length: state.intent.composition.botCount }, (_, index) => ({
+          playerId: `bot:test-${index}` as PlayerId,
+          nickname: `Bot${index + 1}`,
+          fighterId: available[index] as PartyState['members'][number]['fighterId'],
+          source: 'standard_bot' as const,
+          ready: true,
+        })),
+      ],
+    };
+  };
   const manager = new PartyManager({
     sendTo: (playerId, message) => sent.push({ playerId, message }),
     normalizeIntent,
@@ -45,13 +75,19 @@ function harness(
     createCode: () => codes.shift() ?? 'ZZZZZ',
     queueParty: (state) => {
       queued.push(state as PartyState);
-      return queueResult;
+      return queueResult === null ? null : launchResult(state, queueResult);
     },
+    rematchParty: (state) => {
+      rematched.push(state as PartyState);
+      return rematchResult === null ? null : launchResult(state, rematchResult);
+    },
+    refreshRematchIntent,
   });
   return {
     manager,
     sent,
     queued,
+    rematched,
     advance: (milliseconds: number) => {
       now += milliseconds;
       monotonicNow += milliseconds;
@@ -565,10 +601,28 @@ describe('PartyManager authoritative lifecycle', () => {
       expect(manager.markLifecycle(state.partyId, 'results', state.matchId)).toBe(true);
       state = manager.getStateForPlayer(player1)!;
       expect(state.lifecycle).toBe('results');
+      expect(state.participants).toHaveLength(capacity);
+      expect(state.members.every((member) => !member.ready)).toBe(true);
+      expect(state.rematch).toMatchObject({
+        status: 'waiting',
+        arenaChanged: false,
+        eligiblePlayerIds: players,
+        requestedPlayerIds: [],
+      });
       const resultsVersion = state.version;
       expect(manager.markLifecycle(state.partyId, 'results', state.matchId)).toBe(true);
       expect(manager.getStateForPlayer(player1)?.version).toBe(resultsVersion);
-      expect(manager.markLifecycle(state.partyId, 'match', 'rematch_12345678')).toBe(true);
+      for (const [index, playerId] of players.entries()) {
+        state = manager.getStateForPlayer(playerId)!;
+        expect(
+          manager.requestRematch(
+            playerId,
+            `rematch_life_${format}_${index}`,
+            state.partyId,
+            state.version,
+          ),
+        ).toBe(true);
+      }
       for (const playerId of players) {
         expect(manager.getStateForPlayer(playerId)).toMatchObject({
           format,
@@ -579,4 +633,111 @@ describe('PartyManager authoritative lifecycle', () => {
       }
     },
   );
+
+  it('refreshes an expired Results arena atomically and clears prior consensus', () => {
+    let currentMap = 'Wasteland Outpost';
+    let rotationEndsAt = 99_999;
+    const { manager } = harness(
+      ['ABCDE'],
+      'match_12345678',
+      (value) => value as Readonly<MatchIntent>,
+      (value) => ({
+        ...value,
+        scheduledArena: { ...value.scheduledArena, mapName: currentMap, rotationEndsAt },
+      }),
+    );
+    manager.create(player1, 'create_boundary_1', 'Alpha', 'duel', 'mighty_man', intent('duel', 2));
+    manager.join(player2, 'join_boundary_12', 'Bravo', 'ABCDE', 'bruce');
+    for (const [index, playerId] of [player1, player2].entries()) {
+      const state = manager.getStateForPlayer(playerId)!;
+      manager.setReady(playerId, `ready_boundary_${index}`, state.partyId, state.version, true);
+    }
+    let state = manager.getStateForPlayer(player1)!;
+    manager.markLifecycle(state.partyId, 'results', state.matchId);
+    state = manager.getStateForPlayer(player1)!;
+    const stillActiveVersion = state.version;
+    expect(manager.tick()).toBe(0);
+    expect(manager.getStateForPlayer(player1)?.version).toBe(stillActiveVersion);
+    manager.requestRematch(player1, 'rematch_boundary_1', state.partyId, state.version);
+    expect(manager.getStateForPlayer(player1)?.rematch?.requestedPlayerIds).toEqual([player1]);
+
+    currentMap = 'Scrapyard';
+    rotationEndsAt = 399_999;
+    manager.tick();
+    state = manager.getStateForPlayer(player1)!;
+    expect(state.rematch).toMatchObject({
+      status: 'waiting',
+      arenaChanged: true,
+      currentArena: { mapName: 'Scrapyard', rotationEndsAt: 399_999 },
+      eligiblePlayerIds: [player1, player2],
+      requestedPlayerIds: [],
+    });
+    expect(state.members.every((member) => !member.ready)).toBe(true);
+  });
+
+  it('rejects stale and replayed Results votes while fresh duplicate intent is idempotent', () => {
+    const { manager, sent } = harness();
+    manager.create(player1, 'create_results_1', 'Alpha', 'duel', 'mighty_man', intent('duel', 2));
+    manager.join(player2, 'join_results_222', 'Bravo', 'ABCDE', 'bruce');
+    for (const [index, playerId] of [player1, player2].entries()) {
+      const state = manager.getStateForPlayer(playerId)!;
+      manager.setReady(playerId, `ready_results_${index}`, state.partyId, state.version, true);
+    }
+    let state = manager.getStateForPlayer(player1)!;
+    manager.markLifecycle(state.partyId, 'results', state.matchId);
+    state = manager.getStateForPlayer(player1)!;
+    expect(
+      manager.requestRematch(player1, 'rematch_stale_1', state.partyId, state.version - 1),
+    ).toBe(false);
+    expect(sent.at(-2)?.message).toMatchObject({ type: 'server:partyError', code: 'stale_party' });
+    expect(manager.requestRematch(player1, 'rematch_valid_1', state.partyId, state.version)).toBe(
+      true,
+    );
+    state = manager.getStateForPlayer(player1)!;
+    const votedVersion = state.version;
+    expect(manager.requestRematch(player1, 'rematch_valid_1', state.partyId, state.version)).toBe(
+      false,
+    );
+    expect(sent.at(-1)?.message).toMatchObject({
+      type: 'server:partyError',
+      code: 'replayed_request',
+    });
+    expect(
+      manager.requestRematch(player1, 'rematch_duplicate_2', state.partyId, state.version),
+    ).toBe(true);
+    expect(manager.getStateForPlayer(player1)?.version).toBe(votedVersion);
+  });
+
+  it('fails a rejected rematch closed without a phantom match or retained readiness', () => {
+    const { manager, rematched, sent } = harness(
+      ['ABCDE'],
+      'match_12345678',
+      (value) => value as Readonly<MatchIntent>,
+      (value) => ({ ...value, scheduledArena: { ...value.scheduledArena } }),
+      null,
+    );
+    manager.create(player1, 'create_reject_1', 'Alpha', 'duel', 'mighty_man', intent('duel', 2));
+    manager.join(player2, 'join_reject_222', 'Bravo', 'ABCDE', 'bruce');
+    let state = manager.getStateForPlayer(player1)!;
+    manager.setReady(player1, 'ready_reject_12', state.partyId, state.version, true);
+    state = manager.getStateForPlayer(player2)!;
+    manager.setReady(player2, 'ready_reject_22', state.partyId, state.version, true);
+    state = manager.getStateForPlayer(player1)!;
+    manager.markLifecycle(state.partyId, 'results', state.matchId);
+    state = manager.getStateForPlayer(player1)!;
+    manager.requestRematch(player1, 'rematch_reject_1', state.partyId, state.version);
+    state = manager.getStateForPlayer(player2)!;
+    expect(manager.requestRematch(player2, 'rematch_reject_2', state.partyId, state.version)).toBe(
+      false,
+    );
+    expect(rematched).toHaveLength(1);
+    expect(manager.getStateForPlayer(player1)).toMatchObject({
+      lifecycle: 'results',
+      members: [{ ready: false }, { ready: false }],
+      rematch: { status: 'unavailable', unavailableReason: 'match_unavailable' },
+    });
+    expect(
+      [...sent].reverse().find(({ message }) => message.type === 'server:partyError')?.message,
+    ).toMatchObject({ type: 'server:partyError', code: 'invalid_intent' });
+  });
 });

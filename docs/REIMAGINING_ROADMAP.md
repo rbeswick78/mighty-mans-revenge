@@ -5,8 +5,8 @@ Read this file and `CLAUDE.md` completely at the start of every batch. The
 completed `docs/REPLAYABILITY_ROADMAP.md` remains the historical record for the
 systems this program preserves and reorganizes.
 
-- **Status:** Batch 14 complete on 2026-07-15.
-- **Next batch:** Batch 15 — Results and rematches.
+- **Status:** Batch 15 complete on 2026-07-15.
+- **Next batch:** Batch 16 — Legacy flow retirement.
 - **Public releases:** Reforged Arena, then Battle Royale.
 - **Working model:** one numbered batch per session, direct commits and pushes
   to `main`, milestone-gated production deployments.
@@ -167,8 +167,8 @@ Production deployment happens only at a gate or for an urgent live fix.
 |  12 | Party core                             | Navigation    | **DONE — 2026-07-15** |
 |  13 | Party readiness and recovery           | Navigation    | **DONE — 2026-07-15** |
 |  14 | Queue fallback                         | Navigation    | **DONE — 2026-07-15** |
-|  15 | Results and rematches                  | Navigation    | NEXT                  |
-|  16 | Legacy flow retirement                 | Navigation    | Pending               |
+|  15 | Results and rematches                  | Navigation    | **DONE — 2026-07-15** |
+|  16 | Legacy flow retirement                 | Navigation    | NEXT                  |
 |  17 | Journey verification                   | Navigation    | Pending               |
 |  18 | Gameplay viewport cutover              | World/camera  | Pending               |
 |  19 | Coordinate separation                  | World/camera  | Pending               |
@@ -578,6 +578,30 @@ Acceptance:
 
 Render the retained party, revalidate readiness/format, preview schedule
 changes, and use the current active arena for a rematch when a slot expired.
+
+Acceptance:
+
+- [x] Capability-owned Results render the complete server-authored party,
+      format, participant source, locked fighter, readiness/consensus, match,
+      retained explicit mode, prior arena, current arena, and arena-change
+      projection without deriving membership, bots, eligibility, or schedule
+      outcomes on the client.
+- [x] A still-active queue-entry slot remains the rematch arena; an expired
+      slot clears prior consensus, projects the newly active server schedule,
+      and uses that exact current arena while preserving the explicit mode.
+- [x] Fresh version-fenced, replay-protected human consensus revalidates the
+      retained roster, confirmed Scrapper composition, format/mode, fighter
+      locks, schedule, lifecycle, post-match identity, and connection mappings
+      before entering Batch 11's existing explicit launch authority.
+- [x] Result recreation, duplicate/stale/replayed requests, timeout,
+      cancel/leave, disconnect/reconnect, schedule drift, invalid fighter/
+      format/mode state, rejected launch, and cleanup are idempotent,
+      N-player-safe across Duel, Rumble, and Crew, and leave no phantom party,
+      queue, arena lock, match, or rematch projection.
+- [x] Practice Results/rematches, Draft, Character Select, legacy Lobby and
+      capability-off paths, all prior Reforged boundaries, default-false
+      capabilities, production, world/camera, Battle Royale, and art remain
+      unchanged; Batch 16 legacy retirement did not begin.
 
 #### Batch 16 — Legacy flow retirement
 
@@ -1613,6 +1637,61 @@ assigned to Batches 20/24 and were untouched. RFG-003 remains unchanged. The
 Batch 2 host scheduling drift sample and 15.932 effective Hz observation also
 remain unchanged. None blocks Batch 15.
 
+### Batch 15 — 2026-07-15 — Results and rematches
+
+**Shipped:** Extended retained capability-owned Duel, Rumble, and Crew parties
+with complete human/confirmed-Scrapper participant projections and a
+server-owned Results/rematch state. Results now shows the exact format, source,
+locked fighter, readiness, explicit mode, prior queue-entry arena, current
+scheduled arena, arena-change decision, and human consensus without client
+inference. Fresh version-fenced rematch requests clear on schedule boundaries
+and require unanimous live humans. Before launching, Matchmaking revalidates
+the original post-match roster and confirmed bot composition, format/mode,
+fighter locks, current per-player arena locks, lifecycle, party/match identity,
+and connection mappings, then atomically creates the new participants through
+Batch 11's explicit launch path. Generic rematch messages cannot bypass the
+retained party. Invalidations, disconnects, timeouts, rejected launches, and
+cleanup fail closed without phantom party, queue, lock, match, or rematch state.
+
+**Verification:** Selected the shared/server/network cross-package plus
+recovery/rematch tier because Batch 15 changes additive wire state, post-match
+ownership, schedule boundaries, and multi-client recovery. The six directly
+affected Vitest files contributed 187 passing shared party, PartyManager,
+MatchmakingManager, GameManager, NetworkManager, and pure Results-presentation
+tests. The mandatory final `corepack pnpm test` passed 126 files and 1,506 tests;
+`corepack pnpm typecheck`, `corepack pnpm lint`, and full production
+`corepack pnpm build` passed, with Vite's established chunk-size advisory
+unchanged. Focused two-client Results/rematch/recovery evidence passed desktop
+Chromium, desktop Firefox, and mobile landscape; the desktop Chromium
+capability-off legacy Results fallback also passed, with two inverse-project
+duplicates intentionally skipped (four passed, two skipped). Manual inspection
+of final 1280×720 and 844×390 Chromium captures found the complete party/source,
+mode, prior/current arena, and consensus projections readable and contained.
+Focused evidence showed no wider journey risk, so the unrelated full Playwright
+inventory remained reserved for Batch 17's verification gate.
+
+**Deployment:** Skipped. Batch 15 remains navigation-milestone code behind
+default-false `newShell` and `schedules` capabilities. No production
+environment or capability flag changed, and this task did not authorize
+deployment.
+
+**Deviations:** No product-scope deviation. Early focused Playwright recovery
+assertions were coupled to the live local WebRTC channel and therefore raced
+engine-specific connection transitions. The final staged clients explicitly
+closed that channel and exercised the same Results recovery callbacks and
+authoritative party-state replacement deterministically across all projects.
+This was a test-harness correction, not a runtime defect. The full unrelated
+browser inventory was not escalated because the final focused matrix, legacy
+fallback, unit suite, static gates, and inspected visuals showed no wider risk.
+
+**Known issues:** No new bug ID was required. RFG-001 and RFG-002 remain
+assigned to Batches 20/24 and were untouched. RFG-003 remains unchanged:
+headless Firefox/WebKit cannot use the live local WebRTC practice path and
+staged gameplay/Reforged-shell WebKit PNGs are black, so staged object/input
+assertions plus mobile-sized Chromium visual evidence remain required. The
+Batch 2 scheduling-drift sample and 15.932 effective Hz observation also remain
+unchanged. None blocks Batch 16.
+
 ## Next-session prompt
 
 ```text
@@ -1620,25 +1699,30 @@ Continue the Reforged build for Mighty Man's Revenge.
 
 Read docs/REIMAGINING_ROADMAP.md and CLAUDE.md completely first. Read
 docs/REFORGED_BASELINE.md and docs/REFORGED_CAPABILITIES.md before
-implementation. Implement Batch 15 — Results and rematches exactly as
-specified. Preserve unrelated changes and do not begin Batch 16 — Legacy flow
-retirement.
+implementation. Implement Batch 16 — Legacy flow retirement exactly as
+specified. Preserve unrelated changes and do not begin Batch 17 — Journey
+verification.
 
-Complete the capability-owned standard Play journey through Results and valid
-rematches for retained Duel, Rumble, and Crew parties. Results must render only
-the complete server-owned party, format, participant-source, readiness, match,
-and schedule projections; the client must not infer membership, bots, slots,
-leadership, readiness, rematch eligibility, or arena changes. Retain the
-selected explicit mode. When the prior queue-entry arena slot is still active,
-present that server truth; when it expired, preview the newly active scheduled
-arena and use that current server-owned arena for the rematch. Revalidate the
-party roster, confirmed bot-fill composition, human readiness/consensus,
-format/mode compatibility, fighter locks, schedule, lifecycle, versions, and
-connection state before any rematch enters Batch 11's existing launch path.
-Every result recreation, duplicate request, stale/replayed message, timeout,
-cancel/leave, membership or connection edge, schedule boundary, and cleanup
-must be idempotent, N-player safe, and leave no phantom party, queue, arena
-lock, match, or rematch state.
+Retire standard Draft and post-matchmaking Character Select routing only for
+the capability-owned Duel, Rumble, and Crew Play journey. A valid generalized
+intent, complete party launch, confirmed bot-fill launch, or retained-party
+rematch must proceed from server-authoritative queue/party validation and
+locked fighters directly into the existing match countdown/gameplay path. The
+client must render and route only the server-owned match contract; it must not
+invent a fighter, map, mode, team, source, readiness, or bypass. Keep the
+selected explicit mode, current locked scheduled arena, exact human/standard-
+bot composition, fighter locks, Crew teams, Rumble state, contracts/mutators,
+and Batch 15 retained-party rematch ownership intact across the cutover.
+
+Retain challenge-specific and Practice setup, including every Gauntlet, Daily,
+Spar, Scrap Pit, and Crew Battle Character Select/route surface. Retain the
+complete capability-off and old-server Lobby, legacy join messages, Draft,
+Character Select, Results, rematch, FORCE diagnostics, and wire compatibility;
+transitional messages remain until Batch 54. Malformed, partial, stale,
+duplicate, replayed, incompatible, cancelled, disconnected, old-client, and
+capability-drift paths must fail closed without phantom draft, character-select,
+party, queue, arena lock, match, or rematch state. Do not delete legacy scene
+code or shared messages that fallbacks still consume.
 
 Preserve the Batch 5 pure Play compatibility/serialization boundary, Batch 6
 persisted Fighters selection and server-authoritative locking, all Batch 7
@@ -1646,37 +1730,39 @@ Challenges paths, the Batch 8 read-only Records archive, the complete Batch 9
 Settings surfaces, Batch 10 schedule/clock/lock authority and FORCE
 diagnostics, Batch 11 generalized intent normalization/queue ownership, Batch
 12 party core, Batch 13 readiness/recovery, Batch 14 confirmed queue fallback,
-and the complete legacy Lobby fallback. Do not retire Draft or Character Select,
-change Practice Results/rematches, silently change participant sources, add
-Battle Royale parties/gameplay, enable a capability by default or in
-production, change the gameplay viewport/camera, or begin art work.
+Batch 15 authoritative Results/rematches, and the complete legacy Lobby
+fallback. Do not retire challenge/Practice setup or capability-off Draft/
+Character Select, change Practice Results/rematches, silently change
+participant sources, add Battle Royale parties/gameplay, enable a capability by
+default or in production, change the gameplay viewport/camera, or begin art
+work.
 
-Batch 14 is complete and pushed on main as
-`feat(server): add confirmed party bot fill`. Enabled test servers now project
-a monotonic 15-second waiting/available offer for incomplete ready parties. No
-human source changes automatically; only the current leader's fresh,
-version-fenced, replay-protected confirmation revalidates schedule/intent,
-converts remaining open slots to standard Scrapper bots, and reuses Batch 11's
-launch authority. Cancellation, membership/readiness/intent/fighter mutation,
-disconnect, reconnect, schedule drift, and failed launch clear the offer without
-queue residue. The client renders offer truth atomically and never computes
-eligibility. Legacy joins remain available, all five capability flags remain
-default false, and no production deployment has run.
+Batch 15 is complete and pushed on main as
+`feat(play): add authoritative party rematches`. Enabled test servers now
+retain complete server-owned human/confirmed-bot participants through Results,
+project the prior and current scheduled arena while preserving the explicit
+mode, collect version-fenced human consensus, and revalidate roster,
+composition, fighters, schedule locks, lifecycle, match identity, and
+connections before the existing explicit launch path. Generic rematch requests
+cannot bypass retained-party authority. Practice and capability-off Results
+remain unchanged, all five capability flags remain default false, and no
+production deployment has run.
 
-Choose and document the shared/server/network cross-package plus
-recovery/rematch tier from the roadmap's risk-based matrix. Add exhaustive
-deterministic still-active/expired schedule-boundary, retained-human and
-confirmed-bot composition, readiness/consensus, Results recreation, duplicate,
-stale, replay, cancellation, leave, disconnect/reconnect, schedule drift,
-fighter/format/mode invalidation, cleanup, and N-player coverage across Duel,
-Rumble, and Crew. Run the full `corepack pnpm test` suite, typecheck, lint,
-relevant production builds, targeted desktop/mobile Results evidence, legacy
-plus capability-off fallback, and a focused multi-browser multi-client
-Results/rematch/recovery subset; escalate if focused evidence shows wider risk.
-Update roadmap acceptance evidence, capability and architecture docs, the bug
-ledger if needed, and the Session Log. Run the end-of-batch ritual, commit and
-push directly to main, skip deployment unless explicitly authorized, and end
-with the fenced paste-ready prompt for Batch 16.
+Choose and document the cross-cutting navigation/input/recovery/capability tier
+from the roadmap's risk-based matrix. Add exhaustive deterministic direct-
+launch, fighter-lock, explicit mode/arena, human/bot source, Crew team, Rumble,
+party/rematch, duplicate, stale, replay, cancellation, leave, disconnect/
+reconnect, capability drift, cleanup, and N-player coverage across Duel,
+Rumble, and Crew. Prove challenge/Practice setup and complete capability-off/
+old-client legacy Draft and Character Select fallbacks remain intact. Run the
+full `corepack pnpm test` suite, typecheck, lint, full production build, and the
+complete three-project Playwright matrix required for legacy retirement,
+including pointer, keyboard, gamepad, touch, targeted desktop/mobile direct-
+launch evidence, legacy fallback, and focused multi-client recovery. Update
+roadmap acceptance evidence, capability and architecture docs, the bug ledger
+if needed, and the Session Log. Run the end-of-batch ritual, commit and push
+directly to main, skip deployment unless explicitly authorized, and end with
+the fenced paste-ready prompt for Batch 17.
 
 Carry-over warnings: RFG-001 CameraKick and RFG-002 ZoomPulse overwrite future
 base camera state and remain assigned to Batches 20/24. RFG-003 means headless
@@ -1688,5 +1774,5 @@ remained far below the 50ms budget. Batch 4 broadened RFG-003 evidence: the
 staged mobile WebKit Reforged-shell PNG is also black, so use mobile-sized
 Chromium for visual evidence while retaining staged WebKit object/input
 assertions. Use Corepack pnpm 10.33.0 if the local pnpm shim selects a mismatched
-version. Batch 16 follows Batch 15.
+version. Batch 17 follows Batch 16.
 ```

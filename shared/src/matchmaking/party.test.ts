@@ -166,5 +166,84 @@ describe('party code and link compatibility boundary', () => {
         intent: { ...state.intent, composition: { humanCount: 1, botCount: 1 } },
       }),
     ).toBe(false);
+
+    const results = {
+      ...state,
+      capacity: 1,
+      lifecycle: 'results',
+      matchId: 'match_12345678',
+      members: [state.members[0]],
+      slots: [state.slots[0]],
+      participants: [
+        {
+          playerId: 'leader',
+          nickname: 'Alpha',
+          fighterId: 'mighty_man',
+          source: 'human',
+          ready: false,
+        },
+        {
+          playerId: 'bot:standard',
+          nickname: 'Rusty',
+          fighterId: 'bruce',
+          source: 'standard_bot',
+          ready: true,
+        },
+      ],
+      rematch: {
+        status: 'waiting',
+        previousArena: state.intent.scheduledArena,
+        currentArena: {
+          ...state.intent.scheduledArena,
+          mapName: 'Scrapyard',
+          rotationEndsAt: 300_000,
+        },
+        arenaChanged: true,
+        eligiblePlayerIds: ['leader'],
+        requestedPlayerIds: [],
+        serverTime: 2,
+        expiresAt: 60_002,
+      },
+      intent: { ...state.intent, composition: { humanCount: 1, botCount: 1 } },
+    };
+    expect(isPartyState(results)).toBe(true);
+    expect(
+      isPartyState({
+        ...results,
+        participants: results.participants.map((participant) => ({
+          ...participant,
+          source: 'human',
+        })),
+      }),
+    ).toBe(false);
+    expect(isPartyState({ ...results, rematch: { ...results.rematch, arenaChanged: false } })).toBe(
+      false,
+    );
+    expect(
+      isPartyState({
+        ...results,
+        rematch: { ...results.rematch, eligiblePlayerIds: [], requestedPlayerIds: [] },
+      }),
+    ).toBe(false);
+    expect(
+      isPartyState({
+        ...results,
+        lifecycle: 'match',
+        rematch: undefined,
+        members: [{ ...results.members[0], ready: true }],
+        slots: [
+          {
+            index: 0,
+            status: 'occupied',
+            member: { ...results.members[0], ready: true },
+          },
+        ],
+        participants: results.participants.map((participant) => ({
+          ...participant,
+          ready: true,
+        })),
+      }),
+    ).toBe(true);
+    expect(isPartyState({ ...state, rematch: results.rematch })).toBe(false);
   });
 });

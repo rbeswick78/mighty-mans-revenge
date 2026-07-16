@@ -492,6 +492,34 @@ describe('GameManager party wire integration', () => {
     });
   });
 
+  it('routes the additive version-fenced party rematch mutation', () => {
+    const { fake, connect, message } = makeFakeServer(true, true);
+    const manager = new GameManager(fake, undefined, () => new Date('2026-07-15T18:00:00Z'));
+    const parties = (
+      manager as unknown as {
+        parties: {
+          requestRematch(
+            playerId: PlayerId,
+            requestId: unknown,
+            partyId: unknown,
+            expectedVersion: unknown,
+          ): boolean;
+        };
+      }
+    ).parties;
+    const requestRematch = vi.spyOn(parties, 'requestRematch').mockReturnValue(true);
+    connect('leader');
+
+    message('leader', {
+      type: 'client:requestPartyRematch',
+      requestId: 'rematch_wire_15',
+      partyId: 'party_wire_15',
+      expectedVersion: 15,
+    });
+
+    expect(requestRematch).toHaveBeenCalledWith('leader', 'rematch_wire_15', 'party_wire_15', 15);
+  });
+
   it('keeps old/capability-off servers fail-closed and ignores malformed schedule echoes', () => {
     const now = new Date('2026-07-15T18:00:00Z');
     const disabled = makeFakeServer(true, false);

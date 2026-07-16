@@ -28,6 +28,7 @@ const CLIENT_MESSAGE_TYPE_FLAGS: Record<ClientMessage['type'], true> = {
   'client:setPartyReady': true,
   'client:cancelPartyQueue': true,
   'client:confirmPartyBotFill': true,
+  'client:requestPartyRematch': true,
   'client:startPractice': true,
   'client:cancelMatchmaking': true,
   'client:rematchRequest': true,

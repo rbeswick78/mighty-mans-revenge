@@ -321,8 +321,9 @@ describe('MatchmakingManager generalized match intent', () => {
         slots: members.map((member, index) => ({ index, status: 'occupied', member })),
         intent: baseIntent,
       };
-      const matchId = manager.handleSubmitParty(state);
-      expect(matchId).toEqual(expect.any(String));
+      const launch = manager.handleSubmitParty(state);
+      expect(launch?.matchId).toEqual(expect.any(String));
+      expect(launch?.participants).toHaveLength(format === 'duel' ? 2 : 4);
       expect(manager.getActiveMatches()).toHaveLength(1);
       const [match] = manager.getActiveMatches();
       expect(match.players.size).toBe(format === 'duel' ? 2 : 4);
@@ -364,16 +365,139 @@ describe('MatchmakingManager generalized match intent', () => {
         composition: { humanCount: 2, botCount: 0 },
       }),
     };
-    const firstMatchId = manager.handleSubmitParty(state)!;
+    const firstLaunch = manager.handleSubmitParty(state)!;
+    const firstMatchId = firstLaunch.matchId;
     const [match] = manager.getActiveMatches();
     match.phase = MatchPhase.ENDED;
     manager.tick(0.05, 1);
     expect(transitions.at(-1)).toEqual([state.partyId, 'results', firstMatchId]);
     manager.handleRematchRequest('p1');
     manager.handleRematchRequest('p2');
-    expect(transitions.at(-1)?.slice(0, 2)).toEqual([state.partyId, 'match']);
-    expect(transitions.at(-1)?.[2]).not.toBe(firstMatchId);
+    expect(manager.getActiveMatches()).toHaveLength(0);
   });
+
+  it.each([
+    ['duel', 1, 1, GameModeType.DEATHMATCH],
+    ['rumble', 2, 2, GameModeType.KOTH],
+    ['crew', 3, 1, GameModeType.CORE_RUN],
+  ] as const)(
+    'revalidates retained %s humans/bots and launches the current scheduled arena',
+    (format, humanCount, botCount, mode) => {
+      const lockOverride: Partial<ScheduledArenaLock> = {};
+      const { manager } = setup(lockOverride);
+      const members = Array.from({ length: humanCount }, (_, index) => ({
+        playerId: `rematch-player-${index + 1}` as PlayerId,
+        nickname: `Human${index + 1}`,
+        fighterId: CHARACTER_IDS[index]!,
+        joinedAt: index + 1,
+        ready: true,
+      }));
+      const originalArena = {
+        mode,
+        mapName: listMapNames()[0],
+        rotationEndsAt: 2_000,
+      };
+      const state: PartyState = {
+        partyId: `party_rematch_${format}`,
+        code: 'ABCDE',
+        joinPath: '/?party=ABCDE',
+        format,
+        formatCapacity: format === 'duel' ? 2 : 4,
+        capacity: humanCount,
+        leaderId: members[0]!.playerId,
+        version: 7,
+        lifecycle: 'queued',
+        members,
+        slots: members.map((member, index) => ({ index, status: 'occupied', member })),
+        intent: generalIntent({
+          intentId: `party_rematch_${format}_intent`,
+          format,
+          composition: { humanCount, botCount },
+          mode,
+          scheduledArena: originalArena,
+        }),
+      };
+      const firstLaunch = manager.handleSubmitParty(state)!;
+      const [completed] = manager.getActiveMatches();
+      completed.phase = MatchPhase.ENDED;
+      manager.tick(0.05, 1);
+
+      lockOverride.mapName = listMapNames()[1];
+      lockOverride.rotationEndsAt = 302_000;
+      const resultsState: PartyState = {
+        ...state,
+        version: 9,
+        lifecycle: 'results',
+        matchId: firstLaunch.matchId,
+        participants: firstLaunch.participants.map((participant) => ({
+          ...participant,
+          ready: true,
+        })),
+        members: members.map((member) => ({ ...member, ready: true })),
+        slots: members.map((member, index) => ({
+          index,
+          status: 'occupied',
+          member: { ...member, ready: true },
+        })),
+        rematch: {
+          status: 'ready',
+          previousArena: originalArena,
+          currentArena: {
+            mode,
+            mapName: listMapNames()[1],
+            rotationEndsAt: 302_000,
+          },
+          arenaChanged: true,
+          eligiblePlayerIds: [],
+          requestedPlayerIds: members.map((member) => member.playerId),
+          serverTime: 2_001,
+          expiresAt: 62_001,
+        },
+      };
+
+      expect(
+        manager.handleSubmitPartyRematch({
+          ...resultsState,
+          format: format === 'duel' ? 'rumble' : 'duel',
+        }),
+      ).toBeNull();
+      expect(
+        manager.handleSubmitPartyRematch({
+          ...resultsState,
+          intent: { ...resultsState.intent, mode: GameModeType.BOUNTY_HUNT },
+        }),
+      ).toBeNull();
+      expect(
+        manager.handleSubmitPartyRematch({
+          ...resultsState,
+          members: resultsState.members.map((member, index) =>
+            index === 0 ? { ...member, fighterId: 'rook' } : member,
+          ),
+        }),
+      ).toBeNull();
+      expect(
+        manager.handleSubmitPartyRematch({
+          ...resultsState,
+          rematch: {
+            ...resultsState.rematch!,
+            currentArena: { ...resultsState.rematch!.currentArena, mapName: listMapNames()[2] },
+          },
+        }),
+      ).toBeNull();
+
+      const rematchLaunch = manager.handleSubmitPartyRematch(resultsState)!;
+      const [rematch] = manager.getActiveMatches();
+      expect(rematch.getMapData().name).toBe(listMapNames()[1]);
+      expect(rematch.gameModeType).toBe(mode);
+      expect(rematchLaunch.participants.filter((entry) => entry.source === 'human')).toHaveLength(
+        humanCount,
+      );
+      expect(
+        rematchLaunch.participants.filter((entry) => entry.source === 'standard_bot'),
+      ).toHaveLength(botCount);
+      expect(manager.getActiveMatches()).toHaveLength(1);
+    },
+  );
 });
 
 describe('MatchmakingManager rematch flow', () => {

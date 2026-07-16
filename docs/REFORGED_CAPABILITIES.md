@@ -118,6 +118,25 @@ stale, duplicate, replayed, expired-schedule, old-server, and capability-off
 paths fail closed without queue residue. Results/rematch presentation remains
 Batch 15 scope, and all production defaults remain false.
 
+Batch 15 adds complete participant and rematch projections to the existing
+`server:partyState` contract plus the additive, versioned
+`client:requestPartyRematch` mutation behind enabled `newShell` and `schedules`.
+During Results, the server publishes the retained party format, human and
+confirmed standard-bot entrants, locked fighters, human consensus, prior
+queue-entry arena, current scheduled arena, explicit mode, arena-change
+decision, eligibility, expiry, and lifecycle/match identity. Clients replace
+that projection atomically and never calculate membership, source, readiness,
+eligibility, or schedule outcomes. A valid rematch requires fresh unanimous
+human requests and revalidation of roster, bot composition, format/mode,
+fighter locks, current schedule locks, lifecycle, versions, post-match state,
+and live connection mappings before Batch 11's explicit launch path runs.
+Schedule drift clears old votes and uses the newly active arena while retaining
+the selected mode. Stale, duplicate, replayed, disconnected, invalidated,
+timed-out, failed-launch, old-server, and capability-off paths fail closed;
+generic rematch messages cannot bypass retained party authority. Practice and
+legacy Results remain unchanged, all capability defaults remain false, and
+Batch 16 owns standard Draft/Character Select routing retirement.
+
 ## Server-first rollout and rollback
 
 For each capability, keep this order:

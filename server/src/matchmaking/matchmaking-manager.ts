@@ -66,6 +66,7 @@ import type {
   TeamId,
   MatchIntent,
   PartyState,
+  PartyParticipant,
   ScheduledArenaLock,
 } from '@shared/game';
 import { Match } from '../game/match.js';
@@ -79,6 +80,7 @@ import { MatchIntentQueue, type MatchIntentQueueEntry } from './match-intent-que
 import { resolveRumbleCrown } from './rumble-crown.js';
 import { resolveRumbleGrudges } from './rumble-grudges.js';
 import { logger } from '../utils/logger.js';
+import type { PartyLaunchResult } from './party-manager.js';
 import type {
   PersistentStatsStore,
   MatchStatsEntry,
@@ -152,6 +154,25 @@ type MatchKind = 'duel' | 'rumble' | 'duos' | 'practice';
 interface MatchIntentArenaAuthority {
   lock(playerId: PlayerId, mode: GameModeType): Readonly<ScheduledArenaLock> | null;
   release(playerId: PlayerId): void;
+}
+
+interface PartyMatchContext {
+  readonly partyId: string;
+  readonly format: MatchIntent['format'];
+  readonly mode: GameModeType;
+  readonly participants: readonly PartyParticipant[];
+}
+
+interface IntentRematchContext {
+  readonly previousMutators: readonly MutatorId[];
+  readonly previousContractId: MatchContractId;
+  readonly rumbleCrown: RumbleCrownState | null;
+  readonly rumbleGrudges: RumbleGrudges;
+}
+
+interface IntentGroupLaunchResult {
+  readonly matchId: string;
+  readonly participants: readonly PartyParticipant[];
 }
 
 /**
@@ -271,6 +292,7 @@ export class MatchmakingManager {
   private readonly seenMatchIntentIds = new Map<PlayerId, Set<string>>();
   /** Party identity follows its authoritative match through Results/rematches. */
   private readonly partyIdByMatchId = new Map<string, string>();
+  private readonly partyMatchContexts = new Map<string, Readonly<PartyMatchContext>>();
   private partyLifecycleListener:
     | ((partyId: string, lifecycle: 'match' | 'results' | 'assembling', matchId?: string) => void)
     | null = null;
@@ -330,7 +352,7 @@ export class MatchmakingManager {
   }
 
   /** Queue a complete ready room through the same locks and launch path as Batch 11. */
-  handleSubmitParty(state: Readonly<PartyState>): string | null {
+  handleSubmitParty(state: Readonly<PartyState>): Readonly<PartyLaunchResult> | null {
     if (
       state.lifecycle !== 'queued' ||
       state.members.length !== state.capacity ||
@@ -388,10 +410,131 @@ export class MatchmakingManager {
         { reliable: true },
       );
     }
-    const matchId = this.launchIntentGroup(entries);
+    const launch = this.launchIntentGroup(entries);
     for (const playerId of lockedPlayers) this.matchIntentArenaAuthority.release(playerId);
-    this.partyIdByMatchId.set(matchId, state.partyId);
-    return matchId;
+    this.partyIdByMatchId.set(launch.matchId, state.partyId);
+    this.partyMatchContexts.set(
+      launch.matchId,
+      Object.freeze({
+        partyId: state.partyId,
+        format: state.format,
+        mode: state.intent.mode,
+        participants: launch.participants,
+      }),
+    );
+    return Object.freeze({ matchId: launch.matchId, participants: launch.participants });
+  }
+
+  /** Results consensus keeps explicit mode/composition but re-locks the current arena. */
+  handleSubmitPartyRematch(state: Readonly<PartyState>): Readonly<PartyLaunchResult> | null {
+    if (
+      state.lifecycle !== 'results' ||
+      state.matchId === undefined ||
+      state.rematch?.status !== 'ready' ||
+      state.rematch.eligiblePlayerIds.length !== 0 ||
+      !state.members.every((member) => member.ready) ||
+      !this.matchIntentArenaAuthority
+    ) {
+      return null;
+    }
+    const previousMatchId = state.matchId;
+    const postMatch = this.postMatchStates.get(previousMatchId);
+    const context = this.partyMatchContexts.get(previousMatchId);
+    if (
+      !postMatch ||
+      !context ||
+      context.partyId !== state.partyId ||
+      context.format !== state.format ||
+      context.mode !== state.intent.mode ||
+      this.partyIdByMatchId.get(previousMatchId) !== state.partyId
+    ) {
+      return null;
+    }
+    const expectedHumans = context.participants
+      .filter((participant) => participant.source === 'human')
+      .map((participant) => participant.playerId)
+      .sort();
+    const requestedHumans = state.members.map((member) => member.playerId).sort();
+    const expectedBots = context.participants.filter(
+      (participant) => participant.source === 'standard_bot',
+    );
+    if (
+      expectedHumans.length !== requestedHumans.length ||
+      expectedHumans.some((playerId, index) => playerId !== requestedHumans[index]) ||
+      expectedBots.length !== state.intent.composition.botCount ||
+      context.participants.length !== postMatch.playerIds.length ||
+      context.participants.some(
+        (participant) => !postMatch.playerIds.includes(participant.playerId),
+      ) ||
+      state.members.some(
+        (member) =>
+          context.participants.find((participant) => participant.playerId === member.playerId)
+            ?.fighterId !== member.fighterId,
+      )
+    ) {
+      return null;
+    }
+
+    const lockedPlayers: PlayerId[] = [];
+    for (const member of state.members) {
+      if (this.playerMatchMap.get(member.playerId) !== previousMatchId) {
+        for (const playerId of lockedPlayers) this.matchIntentArenaAuthority.release(playerId);
+        return null;
+      }
+      const lock = this.matchIntentArenaAuthority.lock(member.playerId, state.intent.mode);
+      if (
+        lock === null ||
+        lock.mode !== state.rematch.currentArena.mode ||
+        lock.mapName !== state.rematch.currentArena.mapName ||
+        lock.rotationEndsAt !== state.rematch.currentArena.rotationEndsAt
+      ) {
+        if (lock !== null) this.matchIntentArenaAuthority.release(member.playerId);
+        for (const playerId of lockedPlayers) this.matchIntentArenaAuthority.release(playerId);
+        return null;
+      }
+      lockedPlayers.push(member.playerId);
+    }
+
+    const rematchIntent: Readonly<MatchIntent> = Object.freeze({
+      ...state.intent,
+      intentId: crypto.randomUUID(),
+      scheduledArena: Object.freeze({ ...state.rematch.currentArena }),
+    });
+    const entries: MatchIntentQueueEntry[] = state.members.map((member) => ({
+      playerId: member.playerId,
+      nickname: member.nickname,
+      joinedAt: member.joinedAt,
+      intent: Object.freeze({ ...rematchIntent, fighterId: member.fighterId }),
+    }));
+
+    clearTimeout(postMatch.timeoutHandle);
+    this.postMatchStates.delete(previousMatchId);
+    this.matchKinds.delete(previousMatchId);
+    this.rumbleCrowns.delete(previousMatchId);
+    this.partyIdByMatchId.delete(previousMatchId);
+    this.partyMatchContexts.delete(previousMatchId);
+    for (const playerId of postMatch.playerIds) this.playerMatchMap.delete(playerId);
+    this.releasePracticePlayers(postMatch.playerIds);
+    if (postMatch.setComplete) this.releaseRivalrySet(postMatch.playerIds);
+
+    const launch = this.launchIntentGroup(entries, {
+      previousMutators: postMatch.previousMutators,
+      previousContractId: postMatch.previousContractId,
+      rumbleCrown: postMatch.rumbleCrown,
+      rumbleGrudges: postMatch.rumbleGrudges,
+    });
+    for (const playerId of lockedPlayers) this.matchIntentArenaAuthority.release(playerId);
+    this.partyIdByMatchId.set(launch.matchId, state.partyId);
+    this.partyMatchContexts.set(
+      launch.matchId,
+      Object.freeze({
+        partyId: state.partyId,
+        format: state.format,
+        mode: state.intent.mode,
+        participants: launch.participants,
+      }),
+    );
+    return Object.freeze({ matchId: launch.matchId, participants: launch.participants });
   }
 
   handleJoinMatchmaking(playerId: PlayerId, nickname: string): void {
@@ -745,6 +888,14 @@ export class MatchmakingManager {
     const postMatch = this.postMatchStates.get(matchId);
     if (!postMatch) {
       logger.warn({ playerId, matchId }, 'Ignoring rematch request outside post-match state');
+      this.sendRematchUnavailable(playerId);
+      return;
+    }
+    // Capability-owned parties use the version-fenced consensus message so
+    // bots, roster, explicit mode, and the current scheduled arena are all
+    // revalidated. Never let an old/stale generic request bypass that path.
+    if (this.partyIdByMatchId.has(matchId)) {
+      logger.warn({ playerId, matchId }, 'Ignoring generic rematch request for retained party');
       this.sendRematchUnavailable(playerId);
       return;
     }
@@ -1106,7 +1257,7 @@ export class MatchmakingManager {
   private tryCreateIntentMatches(): void {
     let group = this.matchIntentQueue.takeReadyGroup();
     while (group !== null) {
-      const matchId = this.launchIntentGroup(group);
+      const matchId = this.launchIntentGroup(group).matchId;
       for (const entry of group) this.matchIntentArenaAuthority?.release(entry.playerId);
       const intent = group[0]!.intent;
       logger.info(
@@ -1124,7 +1275,10 @@ export class MatchmakingManager {
     }
   }
 
-  private launchIntentGroup(group: readonly MatchIntentQueueEntry[]): string {
+  private launchIntentGroup(
+    group: readonly MatchIntentQueueEntry[],
+    rematch?: Readonly<IntentRematchContext>,
+  ): Readonly<IntentGroupLaunchResult> {
     const intent = group[0]!.intent;
     const humanEntries = group.map((entry) => ({ id: entry.playerId, nickname: entry.nickname }));
     const selectedFighters = new Map<PlayerId, CharacterId>(
@@ -1146,6 +1300,9 @@ export class MatchmakingManager {
     const matchId = crypto.randomUUID();
     const matchKind = this.matchKindForFormat(intent.format);
     this.matchKinds.set(matchId, matchKind);
+    if (matchKind === 'rumble' && rematch?.rumbleCrown) {
+      this.rumbleCrowns.set(matchId, rematch.rumbleCrown);
+    }
     let playerTeams: ReadonlyMap<PlayerId, TeamId> = new Map();
     if (intent.format === 'crew') {
       playerTeams = new Map<PlayerId, TeamId>([
@@ -1158,10 +1315,10 @@ export class MatchmakingManager {
       getMap(intent.scheduledArena.mapName),
       intent.mode,
       playerEntries,
-      {},
+      matchKind === 'rumble' ? (rematch?.rumbleGrudges ?? {}) : {},
       null,
-      [],
-      undefined,
+      rematch?.previousMutators ?? [],
+      rematch?.previousContractId,
       null,
       undefined,
       null,
@@ -1170,7 +1327,19 @@ export class MatchmakingManager {
       playerTeams,
       selectedFighters,
     );
-    return matchId;
+    const humanIds = new Set(group.map((entry) => entry.playerId));
+    const participants = Object.freeze(
+      playerEntries.map((entry) =>
+        Object.freeze({
+          playerId: entry.id,
+          nickname: entry.nickname,
+          fighterId: selectedFighters.get(entry.id)!,
+          source: humanIds.has(entry.id) ? ('human' as const) : ('standard_bot' as const),
+          ready: true,
+        }),
+      ),
+    );
+    return Object.freeze({ matchId, participants });
   }
 
   /**
@@ -2833,7 +3002,10 @@ export class MatchmakingManager {
 
   private transferPartyMatch(previousMatchId: string, nextMatchId: string, partyId: string): void {
     this.partyIdByMatchId.delete(previousMatchId);
+    const context = this.partyMatchContexts.get(previousMatchId);
+    this.partyMatchContexts.delete(previousMatchId);
     this.partyIdByMatchId.set(nextMatchId, partyId);
+    if (context) this.partyMatchContexts.set(nextMatchId, context);
     this.partyLifecycleListener?.(partyId, 'match', nextMatchId);
   }
 
@@ -2841,6 +3013,7 @@ export class MatchmakingManager {
     const partyId = this.partyIdByMatchId.get(matchId);
     if (!partyId) return;
     this.partyIdByMatchId.delete(matchId);
+    this.partyMatchContexts.delete(matchId);
     this.partyLifecycleListener?.(partyId, 'assembling');
   }
 
