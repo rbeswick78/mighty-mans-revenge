@@ -535,6 +535,23 @@ physics, wire state, capability default, production behavior, or deployment.
 Literal server-owned `modernArt` permits only the verified dormant preview;
 Batch 32 owns combat feedback and Batch 33 owns coherent live map cutover.
 
+**Reforged combat feedback (Batch 32):** one separate deterministic 96-frame
+1024x512 `combat-feedback-art.core` atlas owns four-direction muzzle flashes,
+distinct scenery and confirmed-player impacts, an exact-radius explosion cue,
+healing, armor, all six fighter release identities, six rarity shapes, zone
+boundary/warning, and four-direction elimination cues. Boot validates and
+registers the exact runtime-safe grid. A 32-slot preallocated renderer reuses
+the same pool for every family and limits reduced quality to 16 active slots;
+both tiers retain the decisive hit point, direction, radius/boundary, identity,
+timing, and silhouette without bloom. Literal server-owned `modernArt` plus
+atlas availability permits additive live presentation only from existing
+bullet, confirmed-hit, grenade, pickup, kill, death-edge, and ability snapshot
+truth. Rarity and zone art remain verification-preview-only. Every legacy
+effect and procedural fallback remains registered and active until Batch 33
+owns the coherent Boot-through-Results cutover. No damage, healing, armor,
+ability, rarity, zone, projectile, collision, camera, physics, input, wire,
+capability-default, production, or deployment behavior changed.
+
 ### Why This Matters for Agents
 
 Client prediction and server simulation **must use identical physics code** from `/shared`. If you change movement, collision, or physics logic, you must change it in `/shared` and verify both client and server still agree. A mismatch between client prediction and server authority causes visible rubber-banding.

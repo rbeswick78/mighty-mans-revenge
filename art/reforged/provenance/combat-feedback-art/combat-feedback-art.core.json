@@ -1,0 +1,24 @@
+{
+  "assets": [
+    {
+      "id": "feedback.presentation.core",
+      "provenance": {
+        "attribution": "OpenAI-assisted production reference; deterministic project geometry",
+        "creator": "Mighty Man's Revenge Reforged combat-feedback geometry",
+        "generation": {
+          "id": "exec-acedef78-2adb-45cf-9953-e6a9a1d2051b",
+          "promptDocument": "art/reforged/references/combat-feedback-art/PROMPTS.md",
+          "provider": "OpenAI built-in image generation"
+        },
+        "license": "LicenseRef-MMR-Project-Owned",
+        "origin": "ai-assisted",
+        "sourceReference": "tools/reforged-assets/create-combat-feedback-art-sources.mjs"
+      },
+      "sourceSha256": "7c07461dea14fa6d55d220d4d222c4fb8ac5e7f6fa0fb49ceab16403d6506919"
+    }
+  ],
+  "atlasId": "combat-feedback-art.core",
+  "manifestSha256": "8300fa6b50f3ed0307b7c52c876b147bcc91da6bc83a9fa525016d76d8c25971",
+  "schemaVersion": 1,
+  "textureSha256": "1f259cd74299f77b3092697175d5722fdcb981f8c56e59b1173484b23c3dfa6d"
+}

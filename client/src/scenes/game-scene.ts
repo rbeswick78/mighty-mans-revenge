@@ -11,7 +11,7 @@ import type {
 import { GameModeType, MatchPhase } from '@shared/types/game.js';
 import type { BulletTrail, PunchEvent } from '@shared/types/projectile.js';
 import { PickupType } from '@shared/types/pickup.js';
-import { PLAYER, SERVER, WEAPONS } from '@shared/config/game.js';
+import { GRENADE, PLAYER, SERVER, WEAPONS } from '@shared/config/game.js';
 import { TAUNT, TAUNT_IDS, type TauntId } from '@shared/config/game.js';
 import { Wasteland, cssHex } from '@shared/config/palette.js';
 import { predictBulletRay, predictGrenadePath } from '@shared/utils/trajectory-prediction.js';
@@ -48,6 +48,7 @@ import { SmokeFx } from '../rendering/smoke-fx.js';
 import { FireBreathFx } from '../rendering/fire-breath-fx.js';
 import { XrayFx } from '../rendering/xray-fx.js';
 import { AbilityAura } from '../rendering/ability-aura.js';
+import { ReforgedCombatFeedbackRenderer } from '../rendering/reforged-combat-feedback-renderer.js';
 import { touchAbilityState } from '../input/touch-action-presentation.js';
 import { DecalRenderer } from '../rendering/decal-renderer.js';
 import { KothHillRenderer } from '../rendering/koth-hill-renderer.js';
@@ -173,6 +174,7 @@ export class GameScene extends Phaser.Scene {
   private fireBreathFx: FireBreathFx | null = null;
   private xrayFx: XrayFx | null = null;
   private abilityAura: AbilityAura | null = null;
+  private reforgedCombatFeedback: ReforgedCombatFeedbackRenderer | null = null;
   /**
    * Last-seen `abilityActiveSeconds > 0` for the local player. Used to
    * detect the false→true edge so the activation banner fires exactly
@@ -393,6 +395,11 @@ export class GameScene extends Phaser.Scene {
     this.playerManager = new ClientPlayerManager(this, capabilities.modernArt);
     this.tauntRenderer = new TauntRenderer(this);
     this.effectsRenderer = new EffectsRenderer(this, this.cameraController);
+    this.reforgedCombatFeedback = ReforgedCombatFeedbackRenderer.create(
+      this,
+      capabilities.modernArt,
+      () => this.worldRenderQuality.getBudget(),
+    );
     this.pickupRenderer = new PickupRenderer(this, capabilities.modernArt);
     this.confirmedTagRenderer = new ConfirmedTagRenderer(this);
     this.coreRunRenderer = new CoreRunRenderer(this);
@@ -734,6 +741,7 @@ export class GameScene extends Phaser.Scene {
           const prev = this.prevDeadStates.get(p.id);
           if (prev === false && p.isDead) {
             this.killJuice?.trigger();
+            this.reforgedCombatFeedback?.showElimination(p.position.x, p.position.y, p.aimAngle);
           }
           this.prevDeadStates.set(p.id, p.isDead);
         }
@@ -773,6 +781,7 @@ export class GameScene extends Phaser.Scene {
         const localSerialized = allPlayers.find((p) => p.id === playerId) ?? null;
         const collisionGrid = this.mapRenderer?.getCollisionGrid() ?? null;
         this.abilityAura?.update(allPlayers, delta);
+        this.reforgedCombatFeedback?.update(allPlayers, delta);
         this.fireBreathFx?.update(allPlayers, delta);
         this.xrayFx?.update(localSerialized, allPlayers, collisionGrid, delta);
 
@@ -1603,6 +1612,7 @@ export class GameScene extends Phaser.Scene {
       const shooter = this.playerManager?.getRenderer(trail.shooterId);
       if (primaryOfBlast && (shooter?.rendersGun() ?? true)) {
         this.effectsRenderer?.showMuzzleFlash(trail.startPos.x, trail.startPos.y, bulletAngle);
+        this.reforgedCombatFeedback?.showMuzzle(trail.startPos.x, trail.startPos.y, bulletAngle);
         this.lightingRenderer?.addMuzzleFlash(trail.startPos.x, trail.startPos.y);
       }
 
@@ -1655,6 +1665,12 @@ export class GameScene extends Phaser.Scene {
               bulletAngle,
               trail.timestamp,
             );
+            this.reforgedCombatFeedback?.showImpact(
+              'player',
+              trail.endPos.x,
+              trail.endPos.y,
+              bulletAngle,
+            );
 
             // This dry UI tick is private shooter feedback. Shotgun pellets
             // share one blast, so only its first confirmed pellet owns it.
@@ -1672,6 +1688,12 @@ export class GameScene extends Phaser.Scene {
             }
           } else {
             this.impactFx?.spawnBulletImpact(trail.endPos.x, trail.endPos.y, bulletAngle, grid);
+            this.reforgedCombatFeedback?.showImpact(
+              'scenery',
+              trail.endPos.x,
+              trail.endPos.y,
+              bulletAngle,
+            );
             this.decalRenderer?.addBulletHoleIfWall(
               trail.endPos.x,
               trail.endPos.y,
@@ -1727,6 +1749,10 @@ export class GameScene extends Phaser.Scene {
       if (entry.killerId === localId && entry.killerId !== entry.victimId) {
         audio.play('kill', callout?.killSfx);
         this.healFlash?.trigger();
+        const localState = networkManager.getLocalPlayerState();
+        if (localState) {
+          this.reforgedCombatFeedback?.showHealing(localState.position.x, localState.position.y);
+        }
       }
       if (entry.assistId === localId && entry.killerId !== localId && entry.victimId !== localId) {
         audio.play('menuSelect', { rate: 1.2, detune: 200 });
@@ -1757,6 +1783,11 @@ export class GameScene extends Phaser.Scene {
       // shotgun lands as a heavier clunk, the pistol as a lighter clack,
       // the bandage as a lighter snip.
       const pickupType = networkManager.getPickups().find((p) => p.id === pickupId)?.type;
+      if (collectorPos && pickupType === PickupType.BANDAGE) {
+        this.reforgedCombatFeedback?.showHealing(collectorPos.x, collectorPos.y);
+      } else if (collectorPos && pickupType === PickupType.ARMOR) {
+        this.reforgedCombatFeedback?.showArmor(collectorPos.x, collectorPos.y);
+      }
       let sfxOptions: { rate: number } | undefined;
       if (pickupType === PickupType.WEAPON_SHOTGUN) {
         sfxOptions = { rate: 0.6 };
@@ -1923,6 +1954,7 @@ export class GameScene extends Phaser.Scene {
 
     this.onGrenadeExploded = (pos: Vec2) => {
       this.effectsRenderer?.showExplosion(pos.x, pos.y);
+      this.reforgedCombatFeedback?.showExplosion(pos.x, pos.y, GRENADE.BLAST_RADIUS);
       this.lightingRenderer?.addExplosionFlash(pos.x, pos.y);
       this.explosionFx?.spawnExplosion(pos.x, pos.y);
       this.smokeFx?.spawnExplosionSmoke(pos.x, pos.y);
@@ -2343,6 +2375,10 @@ export class GameScene extends Phaser.Scene {
     if (this.effectsRenderer) {
       this.effectsRenderer.destroy();
       this.effectsRenderer = null;
+    }
+    if (this.reforgedCombatFeedback) {
+      this.reforgedCombatFeedback.destroy();
+      this.reforgedCombatFeedback = null;
     }
     if (this.pickupRenderer) {
       this.pickupRenderer.destroy();

@@ -5,9 +5,9 @@ Read this file and `CLAUDE.md` completely at the start of every batch. The
 completed `docs/REPLAYABILITY_ROADMAP.md` remains the historical record for the
 systems this program preserves and reorganizes.
 
-- **Status:** Batch 31 complete on 2026-07-16; the deterministic four-family
-  biome environment kit is in-repo and mechanically dormant.
-- **Next batch:** Batch 32 — Modern combat feedback.
+- **Status:** Batch 32 complete on 2026-07-16; the deterministic pooled combat-
+  feedback set is in-repo behind default-false `modernArt` presentation.
+- **Next batch:** Batch 33 — Full-journey visual cutover.
 - **Public releases:** Reforged Arena, then Battle Royale.
 - **Working model:** one numbered batch per session, direct commits and pushes
   to `main`, milestone-gated production deployments.
@@ -183,9 +183,9 @@ Production deployment happens only at a gate or for an urgent live fix.
 |  27 | Modern UI assets                       | Visual system | **DONE — 2026-07-16** |
 |  28 | Fighter art I                          | Visual system | **DONE — 2026-07-16** |
 |  29 | Fighter art II                         | Visual system | **DONE — 2026-07-16** |
-|  30 | Weapons and pickups                    | Visual system | Pending               |
-|  31 | Biome environment kit                  | Visual system | Pending               |
-|  32 | Modern combat feedback                 | Visual system | Pending               |
+|  30 | Weapons and pickups                    | Visual system | **DONE — 2026-07-16** |
+|  31 | Biome environment kit                  | Visual system | **DONE — 2026-07-16** |
+|  32 | Modern combat feedback                 | Visual system | **DONE — 2026-07-16** |
 |  33 | Full-journey visual cutover            | Visual system | Pending               |
 |  34 | Map authoring contract                 | Large arenas  | Pending               |
 |  35 | Wasteland Outpost and Overgrown Suburb | Large arenas  | Pending               |
@@ -1128,6 +1128,32 @@ families with explicit collision readability.
 
 Replace muzzle, impact, explosion, healing, armor, ability, rarity, zone, and
 elimination effects with pooled, quality-tiered equivalents.
+
+- [x] One original AI-assisted reference plus deterministic project geometry
+      emits one exact 96-frame 64px source sheet covering directional muzzle,
+      distinct scenery/confirmed-player impact, explosion, healing, armor, all
+      six fighter releases, six rarity shapes, zone, and elimination.
+- [x] The unchanged Batch 26 packer emits one separate deterministic 1024x512
+      RGBA8888 `combat-feedback-art.core` atlas with stable sorting, no trim or
+      rotation, 3px padding, 2px extrusion, byte ceilings, runtime-safe import
+      metadata, and complete non-runtime lineage. The five completed atlases
+      and Batch 25 goldens remain unchanged.
+- [x] Boot validates/registers all 96 frames. One preallocated 32-slot renderer
+      reuses a deterministic FIFO pool; reduced quality caps active feedback at
+      16 while retaining event, confirmed point, direction, radius/boundary,
+      identity, timing, and silhouette without bloom.
+- [x] Literal server-owned `modernArt` plus atlas availability gates additive
+      presentation from existing bullet/confirmed-hit, grenade, pickup, kill,
+      death-edge, and ability snapshot/event truth. Player hits are never
+      inferred from endpoints, explosion uses the unchanged shared radius, and
+      rarity/zone remain verification-preview-only. Every legacy fallback stays
+      active for Batch 33.
+- [x] Thirty deterministic asset checks, seven client contract tests, the full
+      unit matrix, typecheck, lint, affected/full builds, formatting, diff/
+      provenance review, and eight targeted desktop Chromium/mobile-landscape
+      direct-renderer, fallback, small-world HUD/minimap, Results, rematch, and
+      recovery cases pass. No shared/server/wire/mechanics/capability-default/
+      production/deployment behavior changes and no Batch 33 work occurs.
 
 #### Batch 33 — Full-journey visual cutover
 
@@ -2990,6 +3016,59 @@ remain closed historical proofs. RFG-003 remains gate-dispositioned and
 unchanged. Batch 32 owns modern combat feedback; Batch 33 owns coherent
 Boot-through-Results visual cutover and verified legacy retirement.
 
+### Batch 32 — 2026-07-16 — Modern combat feedback
+
+**Shipped:** Added one original AI-assisted combat-feedback reference plus
+deterministic project geometry for one canonical 96-frame 64px sheet. The
+unchanged Batch 26 packer emits a separate deterministic 1024x512 RGBA8888
+`combat-feedback-art.core` atlas, runtime-safe import JSON, and complete non-
+runtime provenance. Its exact grids cover four-direction muzzle, distinct
+scenery and authoritative confirmed-player impact, fixed-radius explosion,
+healing, armor, six fighter ability releases, six rarity shapes, zone boundary/
+warning, and four-direction elimination. Boot validates/registers the atlas.
+A capability-owned renderer preallocates 32 FIFO-reused slots, caps reduced
+quality at 16, and consumes only existing snapshot/event truth. Live rarity and
+zone callers do not exist. Every legacy effect remains active for Batch 33.
+
+**Verification:** Selected the visual/client-rendering tier and escalated to the
+full unit matrix because one new renderer participates in the established
+effect lifecycle. All 30 asset tests passed byte-identical source/runtime/
+provenance rebuild, exact 96-frame metadata, grid, origin, direction, timing,
+event-family separation, radius/boundary, identity, palette, grayscale,
+bounded-overdraw, runtime-safety, and lineage checks. Seven focused Vitest
+contract tests and the full configured unit matrix passed exact import,
+coverage, fighter release edges, confirmed-hit/scenery separation, unchanged
+grenade radius, future-art dormancy, capability/missing-atlas fallback, FIFO
+pooling, timing, and full/reduced rules. Typecheck, lint, affected client build,
+full production build, repository formatting, `git diff --check`, completed-
+atlas isolation, intended-diff, and provenance review passed. Eight targeted
+browser cases passed: full/reduced direct renderer in desktop Chromium and
+mobile landscape, capability-off/old-server legacy surface, current small-
+world HUD/minimap and Results in desktop/mobile, and desktop Results/rematch/
+recovery restoration. Full 1024x512 and 844x390 atlas views plus grayscale and
+gameplay-scale source checks remained readable. A full three-project browser
+matrix was not required because no shared/server/wire, recovery, capability
+foundation, camera, or broader scene contract changed.
+
+**Deployment:** Skipped. Batch 32 is incomplete visual-system milestone work
+behind a default-false capability. No production environment, server/client
+deployment, capability exposure, or legacy asset changed.
+
+**Deviations:** No product-scope deviation. The first grayscale threshold
+identified two light-only fighter-release groups; adding their required ink
+underlay improved the source rather than weakening acceptance. Formatting the
+manifest changed its provenance hash, so the identical atlas was rebuilt once
+before the byte-identity gate. The pnpm Playwright wrapper forwarded a literal
+separator and one test path was relative to the config instead of its test
+directory; corrected repository-local commands passed on fresh isolated ports.
+The ad hoc in-app client probe lacked a compatible signaling route, while the
+isolated automated browser servers and direct atlas inspection were green.
+
+**Known issues:** No new bug-ledger entry was required. RFG-001 and RFG-002
+remain closed historical proofs. RFG-003 remains gate-dispositioned and
+unchanged. Batch 33 owns the coherent Boot-through-Results visual cutover and
+verified legacy retirement; Batch 34 owns larger-map authoring contracts.
+
 ## Batch 22 input prompt (historical)
 
 ```text
@@ -3548,7 +3627,7 @@ where applicable, with Chromium as the live/compositor and mobile-sized visual
 reference. Batch 30 owns weapons and pickups; Batch 31 owns the biome kit.
 ```
 
-## Next-session prompt
+## Batch 32 input prompt (historical)
 
 ```text
 Continue the Reforged build for Mighty Man's Revenge.
@@ -3659,4 +3738,125 @@ closed historical proofs. RFG-003 still requires staged Firefox/WebKit object/
 input evidence and direct renderer pixels where applicable, with Chromium as
 the live/compositor and mobile-sized visual reference. Batch 32 owns modern
 combat feedback; Batch 33 owns coherent visual cutover.
+```
+
+## Next-session prompt
+
+```text
+Continue the Reforged build for Mighty Man's Revenge.
+
+Read docs/REIMAGINING_ROADMAP.md and CLAUDE.md completely first. Read
+docs/REFORGED_BASELINE.md, docs/REFORGED_CAPABILITIES.md,
+docs/REFORGED_STYLE_BIBLE.md, docs/REFORGED_ASSET_PIPELINE.md, and
+docs/reforged/style-bible/PROVENANCE.md before implementation. Batch 32 — Modern
+combat feedback is complete. Implement Batch 33 — Full-journey visual cutover
+exactly as specified and do not begin Batch 34 — Map authoring contract.
+
+Cut the literal server-owned `modernArt` journey coherently from Boot through
+Lobby/Reforged shell, matchmaking/party and fighter selection, current
+small-world gameplay, live-match menu/HUD/minimap, death/respawn, and Results/
+rematch/recovery. Use the six completed production atlases as one approved
+system: 48-frame modern UI, 288-frame fighter I, 404-frame fighter II,
+158-frame weapon/pickup, 80-frame biome environment, and 96-frame combat
+feedback. Preserve the style-bible reading order, roster and carried-object
+truth, collision-class silhouette, quiet-ground hierarchy, direction/origin,
+hit-confirmation separation, explosion radius, ability identity, HUD priority,
+focus/pressed/disabled/danger states, full/reduced essentials, and responsive
+safe-area behavior at desktop and mobile landscape sizes.
+
+Modern presentation must consume existing server-owned capability,
+snapshot/event, map, collision, destruction, pickup, weapon, ability, death,
+and Results truth only. Do not add or change gameplay, damage, healing, armor,
+rarity, zone, projectile, hazard, collision, physics, camera, input, map, wire,
+matchmaking, party, Results, persistence, or authority rules. Do not infer
+confirmed hits from ray endpoints, alter grenade/hazard radii, invent missing
+fighter/weapon states, expose dormant SMG/sniper/launcher/container/rarity/zone
+mechanics, or let cosmetic quality affect gameplay. Current maps remain
+960x576 at `(0, 0)` with the unchanged authoritative 20Hz simulation.
+
+Replace additive double-presentation inside the complete verified `modernArt`
+path so each live event has one coherent modern owner. Retain the complete
+legacy/procedural capability-off, absent/malformed-capability, old-server,
+old-client, missing/incompatible-atlas, and recovery fallbacks through Batch
+54. Remove or stop loading a legacy asset only when every live use, compatible
+state, fallback requirement, and recovery path has an explicitly verified
+replacement; otherwise leave it registered. Preserve bat/punch and every
+incompatible carried-object fallback until their modern coverage is complete.
+The cutover may not create a mixed journey or make the default-false capability
+necessary for established gameplay.
+
+Activate Batch 31 biome art for current maps only as a presentation projection
+of existing map JSON and server/shared collision/destruction truth. Do not
+change tile dimensions, collision cells, destructible classes, navigation,
+spawns, objectives, pickups, landmarks, world bounds, chunk visibility,
+minimap projection, or map names. Current small-world and capability-off paths
+must remain exact. Preserve the complete Batch 18–24 viewport, coordinate,
+camera, dynamic rendering, responsive HUD, minimap, fallback, and cumulative
+regression-gate contracts.
+
+Activate Batch 32 feedback as the sole modern presentation beside retained
+fallback ownership: muzzle, scenery impact, confirmed-player impact,
+explosion, healing, armor, each fighter release, and elimination must remain
+pooled, bounded, deterministic, event-owned, and quality-tiered. Rarity and
+zone art remain mechanically dormant because their authoritative owning
+systems do not exist in the current journey. Preserve exact impact point,
+direction, explosion radius, warning/timing, 32/16 pool budgets, and no-bloom
+reduced readability. Do not add a live caller merely to show dormant art.
+
+Preserve the Batch 26 source/manifest/provenance contract and every completed
+atlas byte-for-byte unless a proven import-only correction is required for the
+cutover. Keep canonical PNG, exact grids, deterministic sorting, no trim/
+rotation, mip-safe extrusion/padding, byte limits, runtime-safe metadata, and
+complete non-runtime lineage. Batch 25 goldens remain documentation references
+and may not enter runtime output. No new art generation is expected unless a
+specific verified gap proves one completed set cannot cover an established live
+state; document and scope any such gap before producing pixels.
+
+Do not begin Batch 34 or later work: no 40x24 map schema/tooling, larger arena,
+new map layout, tactical-map gameplay/input, movement or balance tuning,
+Battle Royale mechanics, rarity mechanics, loot/containers, hazards,
+spectating, capability exposure, production rollout, or deployment. Batch 34
+owns larger-map authoring contracts and Batch 39 owns the Reforged Arena
+release gate. All capabilities remain strict server-owned opt-ins and default
+false.
+
+Batch 32 is complete and pushed on main as `feat(art): add Reforged combat
+feedback`. One original AI-assisted reference plus deterministic project
+geometry emits one exact 96-frame 512x768 source sheet. The Batch 26 tool packs
+one separate 1024x512 RGBA8888 atlas plus runtime-safe import JSON and complete
+non-runtime provenance. Thirty asset tests, seven focused client contract
+tests, the full unit matrix, typecheck, lint, affected/full builds, formatting,
+diff/provenance review, and eight targeted desktop Chromium/mobile-landscape
+direct-renderer, fallback, small-world HUD/minimap, Results, rematch, and
+recovery cases are green. The preallocated renderer uses 32 full/16 reduced
+slots and existing authoritative events only. Rarity/zone stay preview-only;
+legacy effects remain active. No shared/server/wire/map/mechanics/capability-
+default/production/deployment behavior changed.
+
+Choose and document the Batch 33 cross-cutting interaction/visual verification
+tier. Add deterministic cutover-selection, atlas-availability, legacy-fallback,
+scene-lifecycle, map-projection, event-ownership, full/reduced, and recovery
+tests. Verify one coherent literal-`modernArt` Boot-through-Results journey;
+every live fighter, weapon/pickup, biome, feedback, UI, focus/input, HUD/minimap,
+death/respawn, Results/rematch, and reconnect state; no double effects; dormant
+future art; missing/incompatible-atlas fallbacks; capability-off and old-server
+exact 960x720 behavior; current 960x576 small-world collision/destruction;
+and restoration after recovery. Run all asset validators, the full unit matrix,
+typecheck, lint, affected and full production builds, repository formatting,
+`git diff --check`, intended-diff/provenance review, and the complete three-
+project browser matrix. Pair staged Firefox/mobile object/input assertions and
+direct renderer pixels with live desktop Chromium visual evidence under
+RFG-003. Update roadmap acceptance/status, architecture/capability/style/
+pipeline/provenance docs, bug ledger only with proven evidence, and Session Log.
+Run the complete end-of-batch ritual, commit and push directly to main, verify a
+clean worktree with HEAD exactly matching origin/main, and skip deployment.
+
+Carry-over warnings: use Corepack pnpm 10.33.0 if the local shim mismatches. Do
+not overwrite, reinterpret, or atlas the Batch 25 goldens. Keep source archives
+and complete license/generation lineage out of runtime redistribution. Preserve
+all six completed atlas grids and every capability-off/old-server fallback.
+RFG-001/RFG-002 remain closed historical proofs. RFG-003 still requires staged
+Firefox/WebKit object/input evidence and direct renderer pixels, with Chromium
+as the live/compositor and mobile-sized visual reference. Batch 33 owns coherent
+visual cutover; Batch 34 owns larger-map authoring contracts.
 ```

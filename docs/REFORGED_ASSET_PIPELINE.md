@@ -256,12 +256,41 @@ maps; only the literal `modernArt` verification preview may instantiate it.
 Current map JSON, legacy tiles/decorations, collision/destruction authority,
 and all completed atlases remain unchanged until Batch 33 owns coherent cutover.
 
+## Batch 32 combat-feedback disposition
+
+`art/reforged/sources/combat-feedback-art/manifest.json` is the separate loading
+and lineage boundary for the complete feedback family. One original
+AI-assisted visual-development reference is retained with its complete prompt,
+generation ID, dimensions, hash, and full/mobile/grayscale/gameplay inspection
+record under `art/reforged/references/combat-feedback-art/`; deterministic
+project geometry in
+`tools/reforged-assets/create-combat-feedback-art-sources.mjs` is the sole
+source of canonical production pixels. Neither the reference nor a Batch 25
+golden enters runtime output.
+
+One canonical eight-column 512x768 sheet contains 96 exact 64px frames: 16
+directional muzzle frames, 12 scenery impacts, 12 confirmed-player impacts,
+eight explosions, four healing, four armor, 18 fighter-release, six rarity,
+eight zone, and eight elimination frames. The unchanged Batch 26 packer emits
+one 1024x512 `combat-feedback-art.core` RGBA8888 atlas with 3px padding, 2px
+extrusion, no trim or rotation, and the established byte limits. Runtime
+PNG/import JSON stays under
+`client/public/assets/reforged/combat-feedback-art/`; complete license, prompt,
+generation, source, and hash lineage stays under
+`art/reforged/provenance/combat-feedback-art/`.
+
+Boot validates/registers the exact schema. Literal server-owned `modernArt`
+plus atlas availability permits the pooled renderer for existing live event
+families, while rarity and zone remain verification-preview-only. False,
+absent, old-server, missing-atlas, and every completed-atlas path stay
+unchanged. Batch 33 owns coherent cutover and any verified fallback retirement.
+
 ## Scope boundary
 
 Batch 26 owns this contract and tooling; Batch 27 owns the completed modern UI
 production set; Batch 28 owns the completed Mighty Man, Bruce, and Frost Wizard
 set; Batch 29 owns the completed Bubba, Jack, and Rook set; Batch 30 owns the
 completed weapon/pickup production set; Batch 31 owns the completed biome
-environment set; Batch 32 owns combat-feedback production. Batch 33 owns
-coherent live cutover. No pipeline output
+environment set; Batch 32 owns the completed combat-feedback production set;
+Batch 33 owns coherent live cutover. No pipeline output
 can enable `modernArt`, retire a fallback, or authorize deployment.

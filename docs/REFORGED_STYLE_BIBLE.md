@@ -389,3 +389,34 @@ All Batch 31 art is presentation-only. Damaged frames mirror existing
 authoritative destruction truth and add no destructible class, health, hazard,
 collision, cover rule, prop behavior, region, spawn, objective, or physics.
 Current maps and their legacy visual fallbacks remain unchanged until Batch 33.
+
+## Batch 32 production mapping
+
+The combat-feedback atlas applies one compact 64px language to every established
+presentation family. Muzzle flashes and scenery/player impacts use four
+directional grids with a shared registered origin; player impacts add the
+bright decisive contact star and remain visually distinct from dust/chip
+scenery impacts. Explosion frames retain a fixed outer ring that scales only
+from the unchanged authoritative grenade radius. Healing uses a mint
+restorative pulse; armor uses a steel-blue shield pulse. Mighty Man, Bruce,
+Frost Wizard, Bubba, Jack, and Rook keep gold heroic, coral fire, cyan frost,
+amber ground-shock, violet axe-arc, and steel-blue defensive/dash releases.
+Rarity keeps six compact shape steps, zone keeps an explicit boundary/warning
+ring, and elimination keeps a directional collapse cue.
+
+Reading order is event first, confirmed point or origin second, direction or
+radius/boundary third, then bounded support detail. Every 120-800ms family is
+short, transparent-edge bounded, and registered without trim or rotation.
+Full quality permits the 32-slot pool and bounded secondary sparks, smoke,
+debris, facets, soft light, and trails. Reduced quality caps presentation at 16
+active slots while retaining the decisive event, confirmed impact point,
+explosion radius, healing/armor identity, fighter release, rarity shape, zone
+boundary, and elimination silhouette. Neither tier requires bloom or changes
+gameplay.
+
+All Batch 32 art is presentation-only. Existing authoritative bullet and
+confirmed-hit events, grenade events, pickup types, kill events, death snapshot
+edges, and ability snapshot edges are the only live inputs. The client does not
+infer a player hit from an endpoint, alter a radius, create rarity or zone
+state, or add a mechanic. Rarity and zone stay verification-preview-only;
+legacy combat effects remain active until Batch 33 owns the coherent cutover.

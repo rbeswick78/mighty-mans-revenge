@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "atlas": {
+    "id": "combat-feedback-art.core",
+    "maxWidth": 1024,
+    "maxHeight": 1024,
+    "padding": 3,
+    "extrude": 2,
+    "limits": {
+      "maxSourceBytes": 1048576,
+      "maxDecodedBytes": 2097152,
+      "maxAtlasBytes": 2097152
+    }
+  },
+  "assets": [
+    {
+      "id": "feedback.presentation.core",
+      "source": "combat-feedback.png",
+      "width": 512,
+      "height": 768,
+      "frames": { "width": 64, "height": 64, "count": 96, "columns": 8 },
+      "provenance": {
+        "origin": "ai-assisted",
+        "creator": "Mighty Man's Revenge Reforged combat-feedback geometry",
+        "license": "LicenseRef-MMR-Project-Owned",
+        "attribution": "OpenAI-assisted production reference; deterministic project geometry",
+        "sourceReference": "tools/reforged-assets/create-combat-feedback-art-sources.mjs",
+        "generation": {
+          "provider": "OpenAI built-in image generation",
+          "id": "exec-acedef78-2adb-45cf-9953-e6a9a1d2051b",
+          "promptDocument": "art/reforged/references/combat-feedback-art/PROMPTS.md"
+        }
+      }
+    }
+  ]
+}

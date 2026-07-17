@@ -257,6 +257,20 @@ instantiate environment-kit presentation. No capability default, map/collision
 authority, destruction lifecycle, physics, wire contract, production exposure,
 or deployment changes. Batch 33 remains the owner of coherent live cutover.
 
+Batch 32 adds a registered combat-feedback atlas and one capability-owned,
+preallocated client renderer without changing the `modernArt` handshake,
+fallback, or exposure state. Literal `modernArt: true` plus a valid atlas may
+add modern cues beside retained legacy presentation for existing muzzle,
+scenery/confirmed-player impact, grenade explosion, healing, armor, fighter
+ability, and elimination events. Confirmed-player feedback still requires the
+existing authoritative hit fields; explosion presentation uses the unchanged
+shared grenade radius. Rarity and zone frames are registered for verification
+preview only and have no live caller. False, absent, malformed, reconnecting,
+disconnected, old-server, and missing-atlas paths never instantiate the new
+renderer. No capability default, event authority, gameplay rule, wire
+contract, production exposure, or deployment changes. Batch 33 still owns one
+coherent live visual cutover and any verified legacy retirement.
+
 ## Server-first rollout and rollback
 
 For each capability, keep this order:

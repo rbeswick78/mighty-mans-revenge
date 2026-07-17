@@ -262,3 +262,27 @@ external font, third-party reference, logo, trademark, Batch 25 pixel,
 generated-image cache, or completed-atlas pixel is redistributed at runtime.
 Combat feedback, map authoring, hazards, collision, and coherent full-journey
 cutover remain outside this set.
+
+## Batch 32 production disposition
+
+Batch 32 leaves every Batch 25 artifact and all five previously completed
+production atlases unchanged. One original image-generation run supplied the
+visual-development reference for the muzzle, scenery/player impact, explosion,
+healing, armor, six fighter-release, rarity, zone, and elimination language.
+Its exact prompt, OpenAI built-in provider, generation ID
+`exec-acedef78-2adb-45cf-9953-e6a9a1d2051b`, unaltered 1536x1024 PNG, SHA-256
+`09ddc3878df4673f46b2bde1072b716491265315ea216dfb6c02ebe81dd2c40b`, and
+inspection disposition live under
+`art/reforged/references/combat-feedback-art/`. It is a visual-development
+input only; deterministic project geometry is the sole source of canonical
+runtime pixels.
+
+The `combat-feedback-art` manifest records one AI-assisted canonical 96-frame
+sheet under the project-owned license. The separate non-runtime report records
+the source hash plus manifest and atlas integrity. Runtime import JSON contains
+only loading-safe asset/frame, dimension, packing, and texture-integrity
+fields. No prompt, generation ID, license detail, source archive, external
+font, third-party reference, logo, trademark, Batch 25 pixel, generated-image
+cache, or completed-atlas pixel is redistributed at runtime. Rarity/zone
+mechanics, map authoring, hazards, coherent full-journey cutover, and fallback
+retirement remain outside this set.
