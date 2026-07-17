@@ -165,6 +165,8 @@ describe('findDemolitionWaveTiles', () => {
       'Overgrown Suburb',
       'Scrapyard',
       'Collapsed Overpass',
+      'Checkpoint Zero',
+      'Rusted Refinery',
     ]) {
       const map = getMap(name, { largeWorlds: true });
       const grid = createCollisionGrid(map);

@@ -316,6 +316,17 @@ the capability is true. No viewport, map-name, local-config, or art inference
 participates, no second client-owned selection surface exists, and the opt-in
 remains default false, unexposed, undeployed, and disabled in production.
 
+Batch 37 completes the private resolver with strict 40x24 variants for
+Checkpoint Zero and Rusted Refinery. The authoritative launch/rematch inputs
+and normalized client handshake remain unchanged: literal `largeWorlds: true`
+selects one of all six authored successors by its unchanged public name, while
+false, absent, malformed, old-server, and reconnect fallback paths retain the
+exact 20x12 legacy objects. No viewport, map-name, local-config, or art
+inference participates, no second client-owned selection surface exists, and
+the opt-in remains default false, unexposed, undeployed, and disabled in
+production. Batch 38 owns cross-arena mode/bot rebalance; Batch 39 owns release
+review and any capability exposure.
+
 ## Server-first rollout and rollback
 
 For each capability, keep this order:

@@ -16,6 +16,8 @@ const AUTHORED_SUCCESSOR_NAMES = [
   'Overgrown Suburb',
   'Scrapyard',
   'Collapsed Overpass',
+  'Checkpoint Zero',
+  'Rusted Refinery',
 ] as const;
 
 describe('MAP_REGISTRY', () => {
@@ -29,7 +31,7 @@ describe('MAP_REGISTRY', () => {
     expect(m.tiles.length).toBe(m.height);
   });
 
-  it('resolves only the four authored successors for a literal large-world selection', () => {
+  it('resolves all six authored successors only for a literal large-world selection', () => {
     for (const name of AUTHORED_SUCCESSOR_NAMES) {
       const legacy = getMap(name);
       const successor = getMap(name, { largeWorlds: true });
@@ -51,7 +53,7 @@ describe('MAP_REGISTRY', () => {
     }
   });
 
-  it('keeps all four authored successors playable through shared runtime systems', () => {
+  it('keeps all six authored successors playable through shared runtime systems', () => {
     for (const name of AUTHORED_SUCCESSOR_NAMES) {
       const map = getMap(name, { largeWorlds: true });
       const authoring = map.authoring!;
@@ -275,6 +277,34 @@ describe('MAP_REGISTRY', () => {
     ).toBe(true);
   });
 
+  it('Checkpoint Zero successor preserves control lanes, inspection gates, and paired props', () => {
+    const checkpoint = getMap('Checkpoint Zero', { largeWorlds: true });
+    const landmarkIds = checkpoint.authoring!.landmarks.map(({ id }) => id);
+    const gateIds = checkpoint.authoring!.gates.map(({ decorationId }) => decorationId);
+
+    expect(checkpoint.theme).toBe('checkpoint');
+    expect(landmarkIds).toEqual(
+      expect.arrayContaining([
+        'west-inspection-chokepoint',
+        'central-paired-gate-control',
+        'east-inspection-chokepoint',
+        'north-horizontal-barricade-route',
+        'south-vertical-barricade-route',
+      ]),
+    );
+    expect(gateIds).toEqual(['gate-west-inspection', 'gate-east-inspection']);
+    expect(checkpoint.tiles.some((row) => row.filter((tile) => tile === 2).length >= 8)).toBe(true);
+    expect(
+      checkpoint.tiles.some((row, y) =>
+        row.some(
+          (tile, x) =>
+            tile === 2 &&
+            (checkpoint.tiles[y - 1]?.[x] === 2 || checkpoint.tiles[y + 1]?.[x] === 2),
+        ),
+      ),
+    ).toBe(true);
+  });
+
   it('Rusted Refinery wraps a rotationally fair power vault in breachable side lanes', () => {
     const refinery = getMap('Rusted Refinery');
     expect(refinery.theme).toBe('refinery');
@@ -297,6 +327,32 @@ describe('MAP_REGISTRY', () => {
     ]);
     for (const y of [2, 3, 8, 9]) {
       expect(refinery.tiles[y].slice(9, 11), `open vault approach on row ${y}`).toEqual([0, 0]);
+    }
+  });
+
+  it('Rusted Refinery successor keeps the red-roof vault and open north/south approaches', () => {
+    const refinery = getMap('Rusted Refinery', { largeWorlds: true });
+    const landmarkIds = refinery.authoring!.landmarks.map(({ id }) => id);
+
+    expect(refinery.theme).toBe('refinery');
+    expect(landmarkIds).toEqual(
+      expect.arrayContaining([
+        'red-roof-central-power-vault',
+        'open-north-vault-approach',
+        'open-south-vault-approach',
+        'west-pipe-and-tank-lanes',
+        'east-tank-and-processing-lanes',
+      ]),
+    );
+    expect(refinery.authoring!.gates.map(({ decorationId }) => decorationId)).toEqual([
+      'gate-west-vault',
+      'gate-east-vault',
+    ]);
+    for (const y of [2, 3, 20, 21]) {
+      expect(
+        refinery.tiles[y].slice(19, 21).every((tile) => [0, 3, 4].includes(tile)),
+        `open vault approach on row ${y}`,
+      ).toBe(true);
     }
   });
 });

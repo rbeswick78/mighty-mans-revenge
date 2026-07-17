@@ -1,0 +1,525 @@
+{
+  "name": "Rusted Refinery",
+  "width": 40,
+  "height": 24,
+  "tileSize": 48,
+  "theme": "refinery",
+  "tiles": [
+    [
+      1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+      1, 1, 1, 1, 1, 1, 1, 1, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 3, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2,
+      2, 2, 2, 2, 2, 2, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 4, 0, 0, 0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0,
+      2, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 2, 2, 2, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 1, 0, 0, 4, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0,
+      2, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 2, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0,
+      2, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      2, 0, 0, 0, 4, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 4, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0,
+      2, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 2, 0,
+      2, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 4, 0, 0, 1, 0, 0, 0, 0, 0, 0, 2,
+      2, 2, 2, 2, 2, 2, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0,
+      2, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0, 0, 0, 4, 0, 0,
+      2, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2,
+      2, 2, 2, 2, 2, 2, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 3, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+      1, 1, 1, 1, 1, 1, 1, 1, 1
+    ]
+  ],
+  "spawnPoints": [
+    {
+      "id": "spawn-north-west",
+      "x": 3,
+      "y": 3
+    },
+    {
+      "id": "spawn-south-east",
+      "x": 36,
+      "y": 20
+    },
+    {
+      "id": "spawn-south-west",
+      "x": 3,
+      "y": 20
+    },
+    {
+      "id": "spawn-north-east",
+      "x": 36,
+      "y": 3
+    }
+  ],
+  "pickupSpawns": [
+    {
+      "id": "shotgun-vault-north",
+      "x": 19,
+      "y": 9,
+      "type": "weapon_shotgun"
+    },
+    {
+      "id": "pistol-vault-south",
+      "x": 20,
+      "y": 14,
+      "type": "weapon_pistol"
+    },
+    {
+      "id": "bat-north-approach",
+      "x": 19,
+      "y": 2,
+      "type": "weapon_bat"
+    },
+    {
+      "id": "ammo-south-approach",
+      "x": 20,
+      "y": 21,
+      "type": "gun_ammo"
+    },
+    {
+      "id": "armor-core-west",
+      "x": 19,
+      "y": 12,
+      "type": "armor"
+    },
+    {
+      "id": "overcharge-core-east",
+      "x": 20,
+      "y": 11,
+      "type": "overcharge"
+    },
+    {
+      "id": "grenade-west-pipe-lane",
+      "x": 11,
+      "y": 7,
+      "type": "grenade"
+    },
+    {
+      "id": "grenade-east-tank-lane",
+      "x": 28,
+      "y": 16,
+      "type": "grenade"
+    },
+    {
+      "id": "bandage-west-processing",
+      "x": 4,
+      "y": 12,
+      "type": "bandage"
+    },
+    {
+      "id": "bandage-east-processing",
+      "x": 35,
+      "y": 11,
+      "type": "bandage"
+    }
+  ],
+  "decorations": [
+    {
+      "id": "red-roof-north-vault",
+      "x": 17,
+      "y": 7,
+      "w": 2,
+      "h": 1,
+      "texture": "deco_container_red"
+    },
+    {
+      "id": "red-roof-south-vault",
+      "x": 21,
+      "y": 16,
+      "w": 2,
+      "h": 1,
+      "texture": "deco_container_red",
+      "flipX": true
+    },
+    {
+      "id": "tanks-west-processing",
+      "x": 5,
+      "y": 5,
+      "w": 2,
+      "h": 1,
+      "texture": "deco_container_gray"
+    },
+    {
+      "id": "tanks-east-processing",
+      "x": 33,
+      "y": 18,
+      "w": 2,
+      "h": 1,
+      "texture": "deco_container_gray",
+      "flipX": true
+    },
+    {
+      "id": "barrel-west-pipe-yard",
+      "x": 10,
+      "y": 10,
+      "w": 1,
+      "h": 1,
+      "texture": "deco_barrel_red",
+      "hazard": "explosive_barrel"
+    },
+    {
+      "id": "barrel-east-tank-yard",
+      "x": 29,
+      "y": 13,
+      "w": 1,
+      "h": 1,
+      "texture": "deco_barrel_red",
+      "hazard": "explosive_barrel"
+    },
+    {
+      "id": "cache-south-west-processing",
+      "x": 6,
+      "y": 18,
+      "w": 1,
+      "h": 1,
+      "texture": "deco_scavenger_cache",
+      "interaction": "scavenger_cache"
+    },
+    {
+      "id": "cache-north-east-processing",
+      "x": 33,
+      "y": 5,
+      "w": 1,
+      "h": 1,
+      "texture": "deco_scavenger_cache",
+      "interaction": "scavenger_cache"
+    },
+    {
+      "id": "gate-west-vault",
+      "x": 13,
+      "y": 11,
+      "w": 1,
+      "h": 1,
+      "texture": "tiles_wire_fence_closing",
+      "interaction": "shootable_gate"
+    },
+    {
+      "id": "gate-east-vault",
+      "x": 26,
+      "y": 12,
+      "w": 1,
+      "h": 1,
+      "texture": "tiles_wire_fence_closing",
+      "interaction": "shootable_gate"
+    }
+  ],
+  "kothHills": [
+    {
+      "x": 5,
+      "y": 11
+    },
+    {
+      "x": 19,
+      "y": 11
+    },
+    {
+      "x": 33,
+      "y": 11
+    }
+  ],
+  "authoring": {
+    "schemaVersion": 1,
+    "profile": "standard-40x24",
+    "regions": [
+      {
+        "id": "west-processing-yard",
+        "areas": [
+          {
+            "x": 0,
+            "y": 0,
+            "w": 14,
+            "h": 24
+          }
+        ]
+      },
+      {
+        "id": "central-power-vault",
+        "areas": [
+          {
+            "x": 14,
+            "y": 0,
+            "w": 12,
+            "h": 24
+          }
+        ]
+      },
+      {
+        "id": "east-processing-yard",
+        "areas": [
+          {
+            "x": 26,
+            "y": 0,
+            "w": 14,
+            "h": 24
+          }
+        ]
+      }
+    ],
+    "landmarks": [
+      {
+        "id": "west-pipe-and-tank-lanes",
+        "regionId": "west-processing-yard",
+        "footprint": {
+          "x": 3,
+          "y": 5,
+          "w": 10,
+          "h": 14
+        },
+        "minimap": "major"
+      },
+      {
+        "id": "red-roof-central-power-vault",
+        "regionId": "central-power-vault",
+        "footprint": {
+          "x": 16,
+          "y": 7,
+          "w": 8,
+          "h": 10
+        },
+        "minimap": "major"
+      },
+      {
+        "id": "east-tank-and-processing-lanes",
+        "regionId": "east-processing-yard",
+        "footprint": {
+          "x": 27,
+          "y": 5,
+          "w": 10,
+          "h": 14
+        },
+        "minimap": "major"
+      },
+      {
+        "id": "open-north-vault-approach",
+        "regionId": "central-power-vault",
+        "footprint": {
+          "x": 14,
+          "y": 1,
+          "w": 12,
+          "h": 6
+        },
+        "minimap": "minor"
+      },
+      {
+        "id": "open-south-vault-approach",
+        "regionId": "central-power-vault",
+        "footprint": {
+          "x": 14,
+          "y": 17,
+          "w": 12,
+          "h": 6
+        },
+        "minimap": "minor"
+      }
+    ],
+    "minimap": {
+      "projection": "orthographic-top-left",
+      "bounds": {
+        "x": 0,
+        "y": 0,
+        "w": 40,
+        "h": 24
+      },
+      "landmarkIds": [
+        "west-pipe-and-tank-lanes",
+        "red-roof-central-power-vault",
+        "east-tank-and-processing-lanes",
+        "open-north-vault-approach",
+        "open-south-vault-approach"
+      ]
+    },
+    "connectivity": {
+      "requireSingleWalkableComponent": true,
+      "links": [
+        {
+          "id": "west-open-processing-lane",
+          "fromRegionId": "west-processing-yard",
+          "toRegionId": "central-power-vault"
+        },
+        {
+          "id": "east-open-processing-lane",
+          "fromRegionId": "central-power-vault",
+          "toRegionId": "east-processing-yard"
+        },
+        {
+          "id": "west-vault-gate-shortcut",
+          "fromRegionId": "west-processing-yard",
+          "toRegionId": "central-power-vault",
+          "gateId": "gate-west-vault"
+        },
+        {
+          "id": "east-vault-gate-shortcut",
+          "fromRegionId": "central-power-vault",
+          "toRegionId": "east-processing-yard",
+          "gateId": "gate-east-vault"
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "koth-west-pipe-yard",
+        "kind": "koth",
+        "regionId": "west-processing-yard",
+        "footprint": {
+          "x": 5,
+          "y": 11,
+          "w": 2,
+          "h": 2
+        }
+      },
+      {
+        "id": "koth-central-power-vault",
+        "kind": "koth",
+        "regionId": "central-power-vault",
+        "footprint": {
+          "x": 19,
+          "y": 11,
+          "w": 2,
+          "h": 2
+        }
+      },
+      {
+        "id": "koth-east-tank-yard",
+        "kind": "koth",
+        "regionId": "east-processing-yard",
+        "footprint": {
+          "x": 33,
+          "y": 11,
+          "w": 2,
+          "h": 2
+        }
+      },
+      {
+        "id": "core-run-center",
+        "kind": "core-run",
+        "regionId": "central-power-vault",
+        "footprint": {
+          "x": 19,
+          "y": 11,
+          "w": 2,
+          "h": 2
+        }
+      }
+    ],
+    "spawnSafety": {
+      "spawnIds": ["spawn-north-west", "spawn-south-east", "spawn-south-west", "spawn-north-east"],
+      "minimumPathDistanceTiles": 17,
+      "minimumEgressDirections": 4
+    },
+    "pickupPlacement": {
+      "pickupIds": [
+        "shotgun-vault-north",
+        "pistol-vault-south",
+        "bat-north-approach",
+        "ammo-south-approach",
+        "armor-core-west",
+        "overcharge-core-east",
+        "grenade-west-pipe-lane",
+        "grenade-east-tank-lane",
+        "bandage-west-processing",
+        "bandage-east-processing"
+      ]
+    },
+    "gates": [
+      {
+        "decorationId": "gate-west-vault",
+        "connectsRegionIds": ["west-processing-yard", "central-power-vault"]
+      },
+      {
+        "decorationId": "gate-east-vault",
+        "connectsRegionIds": ["central-power-vault", "east-processing-yard"]
+      }
+    ],
+    "hazards": [
+      {
+        "decorationId": "barrel-west-pipe-yard",
+        "kind": "explosive_barrel",
+        "regionId": "west-processing-yard"
+      },
+      {
+        "decorationId": "barrel-east-tank-yard",
+        "kind": "explosive_barrel",
+        "regionId": "east-processing-yard"
+      }
+    ],
+    "symmetryReview": {
+      "kind": "asymmetric",
+      "rationale": "The red-roof vault, pipe runs, tank masses, and processing cover are intentionally offset around open north and south approaches; horizontal, vertical, and rotational transforms were reviewed for comparable side-gate access, pickup reach, objective pressure, and escape routes.",
+      "exceptions": [],
+      "checkedTransforms": ["horizontal", "vertical", "rotational"]
+    }
+  }
+}

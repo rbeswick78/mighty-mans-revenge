@@ -213,7 +213,9 @@ type AuthoredSuccessorName =
   | 'Wasteland Outpost'
   | 'Overgrown Suburb'
   | 'Scrapyard'
-  | 'Collapsed Overpass';
+  | 'Collapsed Overpass'
+  | 'Checkpoint Zero'
+  | 'Rusted Refinery';
 
 async function authoredSuccessorSnapshot(
   page: Page,
@@ -227,6 +229,8 @@ async function authoredSuccessorSnapshot(
     'Overgrown Suburb': { gate: { col: 13, row: 8 }, barrel: { col: 12, row: 7 } },
     Scrapyard: { gate: { col: 14, row: 6 }, barrel: { col: 12, row: 9 } },
     'Collapsed Overpass': { gate: { col: 14, row: 6 }, barrel: { col: 12, row: 9 } },
+    'Checkpoint Zero': { gate: { col: 14, row: 7 }, barrel: { col: 10, row: 9 } },
+    'Rusted Refinery': { gate: { col: 13, row: 11 }, barrel: { col: 10, row: 10 } },
   };
   return page.evaluate(async ({ gate, barrel }) => {
     const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
@@ -3006,7 +3010,7 @@ test('one missing atlas restores the complete legacy visual owner', async ({ pag
   });
 });
 
-test('Batch 36 successors preserve server-owned selection, arena systems, and legacy restoration', async ({
+test('Batch 37 successors preserve server-owned selection, arena systems, and legacy restoration', async ({
   page,
 }, testInfo) => {
   test.skip(!largeWorldsAdvertised, 'Run with CAPABILITY_LARGE_WORLDS=true.');
@@ -3017,6 +3021,8 @@ test('Batch 36 successors preserve server-owned selection, arena systems, and le
     { name: 'Overgrown Suburb' as const, landmarks: 10, family: 'overgrown' },
     { name: 'Scrapyard' as const, landmarks: 10, family: 'industrial' },
     { name: 'Collapsed Overpass' as const, landmarks: 14, family: 'industrial' },
+    { name: 'Checkpoint Zero' as const, landmarks: 10, family: 'industrial' },
+    { name: 'Rusted Refinery' as const, landmarks: 10, family: 'industrial' },
   ];
   for (const expected of successors) {
     await stageGameplay(page, true, false, expected.name);
@@ -3085,7 +3091,7 @@ test('Batch 36 successors preserve server-owned selection, arena systems, and le
 
     if (testInfo.project.name === 'desktop-chromium') {
       const live = await page.screenshot();
-      await testInfo.attach(`batch-36-${expected.name}-desktop-live`, {
+      await testInfo.attach(`batch-37-${expected.name}-desktop-live`, {
         body: live,
         contentType: 'image/png',
       });
@@ -3093,7 +3099,7 @@ test('Batch 36 successors preserve server-owned selection, arena systems, and le
       const direct = await rendererSnapshot(page);
       expect(direct.sampledColors, expected.name).toBeGreaterThan(8);
       expect(direct.nonBlackSamples, expected.name).toBeGreaterThan(100);
-      await testInfo.attach(`batch-36-${expected.name}-direct-renderer`, {
+      await testInfo.attach(`batch-37-${expected.name}-direct-renderer`, {
         body: Buffer.from(direct.dataUrl.split(',')[1] ?? '', 'base64'),
         contentType: 'image/png',
       });
@@ -3108,7 +3114,7 @@ test('Batch 36 successors preserve server-owned selection, arena systems, and le
       scene: { start(key: string, data: unknown): void };
     };
     scene.shutdown();
-    scene.scene.start('ResultsScene', { nickname: 'BATCH 36' });
+    scene.scene.start('ResultsScene', { nickname: 'BATCH 37' });
   });
   await waitForScene(page, 'ResultsScene');
   await expect
@@ -3121,14 +3127,14 @@ test('Batch 36 successors preserve server-owned selection, arena systems, and le
     .toEqual([960, 720]);
   await page.evaluate(() => {
     const game = (window as unknown as { game?: Phaser.Game }).game;
-    if (!game) throw new Error('game missing before Batch 36 rematch');
+    if (!game) throw new Error('game missing before Batch 37 rematch');
     game.scene.stop('ResultsScene');
     game.scene.start('GameScene', {
-      nickname: 'BATCH 36',
+      nickname: 'BATCH 37',
       matchData: {
-        matchId: 'batch-36-rematch',
+        matchId: 'batch-37-rematch',
         opponents: [{ id: 'viewport-rival', nickname: 'RIVAL' }],
-        mapName: 'Collapsed Overpass',
+        mapName: 'Rusted Refinery',
         gameMode: 'deathmatch',
         matchKind: 'practice',
       },
@@ -3179,7 +3185,7 @@ test('Batch 36 successors preserve server-owned selection, arena systems, and le
       game.scene.getScenes(true)[0]?.scene.start('GameScene', {
         nickname: 'OLD SERVER',
         matchData: {
-          matchId: 'batch-36-old-server',
+          matchId: 'batch-37-old-server',
           opponents: [{ id: 'viewport-rival', nickname: 'RIVAL' }],
           mapName,
           gameMode: 'deathmatch',

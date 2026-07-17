@@ -363,6 +363,37 @@ to require Chromium live/compositor pixels plus staged Firefox/mobile object,
 input, and direct-renderer evidence; simulation remains authoritative at 20Hz
 and production remains unchanged.
 
+### Batch 37 final successor-arena evidence
+
+Checkpoint Zero and Rusted Refinery now each have one deterministic strict
+40x24, 48px-tile successor document. Both retain the exact public arena name,
+one `(0, 0)`-origin 1920x1152 world, four quadrant spawns, three KOTH anchors,
+the centered Core Run anchor, a reachable ten-pickup economy, one connected
+walkable component, complete minimap metadata, destructible cover, two
+shootable-gate shortcuts, two existing explosive-barrel hazards, and explicit
+asymmetric transform review. Checkpoint Zero preserves dense horizontal and
+vertical barricade control lanes, paired inspection chokepoints, gates, and
+props. Rusted Refinery preserves the red-roof central power vault, open north
+and south approaches, side gates, pipe routes, tanks, and processing lanes.
+
+The public six-map registry, registry order, persistence keys, draft/schedule
+names, and wire payloads remain unchanged. With the literal server capability
+false or absent, all six names return their byte-identical 20x12 legacy
+documents. With `largeWorlds: true`, the server resolves any of the six strict
+successors for every authoritative launch/rematch path and the client consumes
+the same normalized handshake. No viewport, map-name, local-config, or art
+inference participates, and no capability is exposed or enabled by default.
+
+The preserved Batch 18 logical resource envelope remains 960x576 while actual
+successor world truth is 1920x1152 in the dynamic render plan, camera bounds,
+collision grid, and minimap projection. The Batch 37 authored-layout/runtime-
+loading tier covers both final industrial layouts, all camera edges and spawn
+quadrants, objectives, gate destruction and barrel preservation, HUD and
+minimap, Results/rematch, recovery, and legacy restoration. RFG-003 continues
+to require Chromium live/compositor pixels plus staged Firefox/mobile object,
+input, and direct-renderer evidence; simulation remains authoritative at 20Hz
+and production remains unchanged.
+
 ## Adjacent bug reproductions
 
 `client/src/rendering/camera-baseline.test.ts` now asserts the repaired

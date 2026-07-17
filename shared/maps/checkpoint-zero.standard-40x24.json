@@ -1,0 +1,525 @@
+{
+  "name": "Checkpoint Zero",
+  "width": 40,
+  "height": 24,
+  "tileSize": 48,
+  "theme": "checkpoint",
+  "tiles": [
+    [
+      1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+      1, 1, 1, 1, 1, 1, 1, 1, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 3, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 2,
+      2, 2, 2, 2, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2,
+      2, 2, 2, 2, 2, 2, 2, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0,
+      0, 0, 0, 0, 4, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2,
+      2, 2, 2, 2, 2, 2, 2, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0,
+      4, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 1, 0,
+      0, 1, 1, 1, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0,
+      0, 1, 1, 1, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 2,
+      2, 2, 2, 2, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 3, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+      1, 1, 1, 1, 1, 1, 1, 1, 1
+    ]
+  ],
+  "spawnPoints": [
+    {
+      "id": "spawn-north-west",
+      "x": 3,
+      "y": 3
+    },
+    {
+      "id": "spawn-south-east",
+      "x": 36,
+      "y": 20
+    },
+    {
+      "id": "spawn-south-west",
+      "x": 3,
+      "y": 20
+    },
+    {
+      "id": "spawn-north-east",
+      "x": 36,
+      "y": 3
+    }
+  ],
+  "pickupSpawns": [
+    {
+      "id": "shotgun-central-inspection",
+      "x": 19,
+      "y": 10,
+      "type": "weapon_shotgun"
+    },
+    {
+      "id": "pistol-south-control",
+      "x": 20,
+      "y": 13,
+      "type": "weapon_pistol"
+    },
+    {
+      "id": "bat-north-control",
+      "x": 19,
+      "y": 2,
+      "type": "weapon_bat"
+    },
+    {
+      "id": "ammo-south-service",
+      "x": 20,
+      "y": 21,
+      "type": "gun_ammo"
+    },
+    {
+      "id": "armor-core-west",
+      "x": 19,
+      "y": 12,
+      "type": "armor"
+    },
+    {
+      "id": "overcharge-core-east",
+      "x": 20,
+      "y": 11,
+      "type": "overcharge"
+    },
+    {
+      "id": "grenade-west-inspection",
+      "x": 8,
+      "y": 8,
+      "type": "grenade"
+    },
+    {
+      "id": "grenade-east-inspection",
+      "x": 31,
+      "y": 15,
+      "type": "grenade"
+    },
+    {
+      "id": "bandage-west-lane",
+      "x": 4,
+      "y": 11,
+      "type": "bandage"
+    },
+    {
+      "id": "bandage-east-lane",
+      "x": 35,
+      "y": 12,
+      "type": "bandage"
+    }
+  ],
+  "decorations": [
+    {
+      "id": "container-west-inspection",
+      "x": 8,
+      "y": 5,
+      "w": 2,
+      "h": 1,
+      "texture": "deco_container_gray"
+    },
+    {
+      "id": "container-east-inspection",
+      "x": 30,
+      "y": 18,
+      "w": 2,
+      "h": 1,
+      "texture": "deco_container_red",
+      "flipX": true
+    },
+    {
+      "id": "car-south-west-barricade",
+      "x": 11,
+      "y": 18,
+      "w": 2,
+      "h": 1,
+      "texture": "deco_car_scrap_gray",
+      "flipX": true
+    },
+    {
+      "id": "car-north-east-barricade",
+      "x": 27,
+      "y": 5,
+      "w": 2,
+      "h": 1,
+      "texture": "deco_car_scrap_red"
+    },
+    {
+      "id": "barrel-west-control",
+      "x": 10,
+      "y": 9,
+      "w": 1,
+      "h": 1,
+      "texture": "deco_barrel_red",
+      "hazard": "explosive_barrel"
+    },
+    {
+      "id": "barrel-east-control",
+      "x": 29,
+      "y": 14,
+      "w": 1,
+      "h": 1,
+      "texture": "deco_barrel_red",
+      "hazard": "explosive_barrel"
+    },
+    {
+      "id": "cache-south-west-lane",
+      "x": 5,
+      "y": 14,
+      "w": 1,
+      "h": 1,
+      "texture": "deco_scavenger_cache",
+      "interaction": "scavenger_cache"
+    },
+    {
+      "id": "cache-north-east-lane",
+      "x": 34,
+      "y": 9,
+      "w": 1,
+      "h": 1,
+      "texture": "deco_scavenger_cache",
+      "interaction": "scavenger_cache"
+    },
+    {
+      "id": "gate-west-inspection",
+      "x": 14,
+      "y": 7,
+      "w": 1,
+      "h": 1,
+      "texture": "tiles_wire_fence_closing",
+      "interaction": "shootable_gate"
+    },
+    {
+      "id": "gate-east-inspection",
+      "x": 25,
+      "y": 16,
+      "w": 1,
+      "h": 1,
+      "texture": "tiles_wire_fence_closing",
+      "interaction": "shootable_gate"
+    }
+  ],
+  "kothHills": [
+    {
+      "x": 5,
+      "y": 11
+    },
+    {
+      "x": 19,
+      "y": 11
+    },
+    {
+      "x": 33,
+      "y": 11
+    }
+  ],
+  "authoring": {
+    "schemaVersion": 1,
+    "profile": "standard-40x24",
+    "regions": [
+      {
+        "id": "west-control-sector",
+        "areas": [
+          {
+            "x": 0,
+            "y": 0,
+            "w": 15,
+            "h": 24
+          }
+        ]
+      },
+      {
+        "id": "central-inspection-sector",
+        "areas": [
+          {
+            "x": 15,
+            "y": 0,
+            "w": 10,
+            "h": 24
+          }
+        ]
+      },
+      {
+        "id": "east-control-sector",
+        "areas": [
+          {
+            "x": 25,
+            "y": 0,
+            "w": 15,
+            "h": 24
+          }
+        ]
+      }
+    ],
+    "landmarks": [
+      {
+        "id": "west-inspection-chokepoint",
+        "regionId": "west-control-sector",
+        "footprint": {
+          "x": 4,
+          "y": 4,
+          "w": 10,
+          "h": 6
+        },
+        "minimap": "major"
+      },
+      {
+        "id": "central-paired-gate-control",
+        "regionId": "central-inspection-sector",
+        "footprint": {
+          "x": 14,
+          "y": 6,
+          "w": 12,
+          "h": 12
+        },
+        "minimap": "major"
+      },
+      {
+        "id": "east-inspection-chokepoint",
+        "regionId": "east-control-sector",
+        "footprint": {
+          "x": 26,
+          "y": 14,
+          "w": 10,
+          "h": 6
+        },
+        "minimap": "major"
+      },
+      {
+        "id": "north-horizontal-barricade-route",
+        "regionId": "central-inspection-sector",
+        "footprint": {
+          "x": 8,
+          "y": 1,
+          "w": 24,
+          "h": 5
+        },
+        "minimap": "minor"
+      },
+      {
+        "id": "south-vertical-barricade-route",
+        "regionId": "central-inspection-sector",
+        "footprint": {
+          "x": 8,
+          "y": 18,
+          "w": 24,
+          "h": 5
+        },
+        "minimap": "minor"
+      }
+    ],
+    "minimap": {
+      "projection": "orthographic-top-left",
+      "bounds": {
+        "x": 0,
+        "y": 0,
+        "w": 40,
+        "h": 24
+      },
+      "landmarkIds": [
+        "west-inspection-chokepoint",
+        "central-paired-gate-control",
+        "east-inspection-chokepoint",
+        "north-horizontal-barricade-route",
+        "south-vertical-barricade-route"
+      ]
+    },
+    "connectivity": {
+      "requireSingleWalkableComponent": true,
+      "links": [
+        {
+          "id": "west-open-control-lane",
+          "fromRegionId": "west-control-sector",
+          "toRegionId": "central-inspection-sector"
+        },
+        {
+          "id": "east-open-control-lane",
+          "fromRegionId": "central-inspection-sector",
+          "toRegionId": "east-control-sector"
+        },
+        {
+          "id": "west-gate-shortcut",
+          "fromRegionId": "west-control-sector",
+          "toRegionId": "central-inspection-sector",
+          "gateId": "gate-west-inspection"
+        },
+        {
+          "id": "east-gate-shortcut",
+          "fromRegionId": "central-inspection-sector",
+          "toRegionId": "east-control-sector",
+          "gateId": "gate-east-inspection"
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "koth-west-control",
+        "kind": "koth",
+        "regionId": "west-control-sector",
+        "footprint": {
+          "x": 5,
+          "y": 11,
+          "w": 2,
+          "h": 2
+        }
+      },
+      {
+        "id": "koth-central-inspection",
+        "kind": "koth",
+        "regionId": "central-inspection-sector",
+        "footprint": {
+          "x": 19,
+          "y": 11,
+          "w": 2,
+          "h": 2
+        }
+      },
+      {
+        "id": "koth-east-control",
+        "kind": "koth",
+        "regionId": "east-control-sector",
+        "footprint": {
+          "x": 33,
+          "y": 11,
+          "w": 2,
+          "h": 2
+        }
+      },
+      {
+        "id": "core-run-center",
+        "kind": "core-run",
+        "regionId": "central-inspection-sector",
+        "footprint": {
+          "x": 19,
+          "y": 11,
+          "w": 2,
+          "h": 2
+        }
+      }
+    ],
+    "spawnSafety": {
+      "spawnIds": ["spawn-north-west", "spawn-south-east", "spawn-south-west", "spawn-north-east"],
+      "minimumPathDistanceTiles": 17,
+      "minimumEgressDirections": 4
+    },
+    "pickupPlacement": {
+      "pickupIds": [
+        "shotgun-central-inspection",
+        "pistol-south-control",
+        "bat-north-control",
+        "ammo-south-service",
+        "armor-core-west",
+        "overcharge-core-east",
+        "grenade-west-inspection",
+        "grenade-east-inspection",
+        "bandage-west-lane",
+        "bandage-east-lane"
+      ]
+    },
+    "gates": [
+      {
+        "decorationId": "gate-west-inspection",
+        "connectsRegionIds": ["west-control-sector", "central-inspection-sector"]
+      },
+      {
+        "decorationId": "gate-east-inspection",
+        "connectsRegionIds": ["central-inspection-sector", "east-control-sector"]
+      }
+    ],
+    "hazards": [
+      {
+        "decorationId": "barrel-west-control",
+        "kind": "explosive_barrel",
+        "regionId": "west-control-sector"
+      },
+      {
+        "decorationId": "barrel-east-control",
+        "kind": "explosive_barrel",
+        "regionId": "east-control-sector"
+      }
+    ],
+    "symmetryReview": {
+      "kind": "asymmetric",
+      "rationale": "Barricade rows, inspection booths, paired props, and vertical control posts are deliberately offset; horizontal, vertical, and rotational transforms were reviewed for comparable lane access, gate flanks, pickup reach, and escapable control positions.",
+      "exceptions": [],
+      "checkedTransforms": ["horizontal", "vertical", "rotational"]
+    }
+  }
+}

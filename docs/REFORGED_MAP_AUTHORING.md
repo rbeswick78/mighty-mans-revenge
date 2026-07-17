@@ -1,12 +1,12 @@
 # Reforged Standard-Arena Authoring Contract
 
 Batch 34 defines the shared, deterministic contract for 40x24 standard arenas.
-Batches 35-36 apply it to Wasteland Outpost, Overgrown Suburb, Scrapyard, and
-Collapsed Overpass behind the existing literal server-owned `largeWorlds`
-opt-in. The six current 20x12 maps remain the registry/default/fallback
-documents; runtime simulation, collision, destruction, navigation, camera, HUD,
-matchmaking, mode, and bot behavior still consume the established shared
-contracts.
+Batches 35-37 apply it to Wasteland Outpost, Overgrown Suburb, Scrapyard,
+Collapsed Overpass, Checkpoint Zero, and Rusted Refinery behind the existing
+literal server-owned `largeWorlds` opt-in. The six current 20x12 maps remain the
+registry/default/fallback documents; runtime simulation, collision, destruction,
+navigation, camera, HUD, matchmaking, mode, and bot behavior still consume the
+established shared contracts.
 
 ## Compatibility profiles
 
@@ -143,15 +143,14 @@ failure behavior.
 - The client dynamic renderer, camera, HUD, and current minimap continue to use
   actual map dimensions, collision, decorations, and snapshots. They do not
   infer regions, objectives, teams, or visibility from authoring metadata.
-- Wasteland Outpost, Overgrown Suburb, Scrapyard, and Collapsed Overpass have
-  separately named source files but retain their exact public names. The
+- All six arenas have separately named successor source files but retain their
+  exact public names. The
   authoritative server resolves their 40x24 variants only from its advertised
   `largeWorlds` capability; the client consumes that same normalized handshake
   choice with no viewport, name, local-config, or art inference and no second
   wire/map-selection surface.
 - The six legacy documents remain 20x12 at tile size 48, world size 960x576,
-  origin `(0, 0)`, and the same registry order/names. Checkpoint Zero and Rusted
-  Refinery have no successor variant yet.
+  origin `(0, 0)`, and the same registry order/names.
 - All capabilities remain strict server-owned opt-ins and default false. This
   resolver cannot schedule, expose, default-match, or deploy an arena.
 
@@ -195,12 +194,32 @@ and an explicit asymmetric review of horizontal, vertical, and rotational
 transforms. Their tiles and established runtime arrays are the only gameplay
 truth; region/landmark/review metadata remains declarative.
 
+## Batch 37 authored successors
+
+`checkpoint-zero.standard-40x24.json` preserves the reinforced-checkpoint
+identity through dense horizontal and vertical barricade routes, paired
+inspection chokepoints, offset control posts, mirrored prop pressure, and two
+shootable gate shortcuts into the central control sector.
+
+`rusted-refinery.standard-40x24.json` preserves the red-roof central power
+vault, open north and south approaches, west pipe/tank processing lanes, east
+tank/processing lanes, and two shootable side gates into the vault. Its vault
+remains defensible but escapable through four open approach/side routes.
+
+Both documents declare four quadrant spawns, ten reachable pickups, three
+legal KOTH anchors, the geometric-center Core Run anchor, complete minimap
+metadata, one connected walkable component, two existing explosive-barrel
+hazards, two shootable gates, meaningful destructible cover, and an explicit
+asymmetric review of horizontal, vertical, and rotational transforms. Their
+tiles and established runtime arrays are the only gameplay truth; region,
+landmark, route, and review metadata remains declarative.
+
 ## Scope boundary
 
 Batch 34 owns the schema, validator, fixtures, and CLI. Batch 35 owns the first
 two successor layouts and minimal resolver; Batch 36 owns only Scrapyard and
 Collapsed Overpass in that resolver; Batch 37 owns Checkpoint Zero and Rusted
 Refinery. Batch 38 owns mode/bot rebalance; Batch 39 owns the Reforged Arena
-release gate and any production exposure. Tactical-map gameplay,
-Battle Royale regions, containers, loot, rarity, safe zones, spectating, new
-hazards, and production deployment remain outside this contract.
+release gate and any production exposure. Tactical-map gameplay, Battle Royale
+regions, containers, loot, rarity, safe zones, spectating, new hazards, and
+production deployment remain outside this contract.

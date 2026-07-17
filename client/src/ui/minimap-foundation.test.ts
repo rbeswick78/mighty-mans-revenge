@@ -85,12 +85,14 @@ describe('minimap foundation', () => {
     expect(projection.landmarks).toHaveLength(map.decorations?.length ?? 0);
   });
 
-  it('projects all four 40x24 successor documents from their authored world bounds', () => {
+  it('projects all six 40x24 successor documents from their authored world bounds', () => {
     for (const name of [
       'Wasteland Outpost',
       'Overgrown Suburb',
       'Scrapyard',
       'Collapsed Overpass',
+      'Checkpoint Zero',
+      'Rusted Refinery',
     ]) {
       const successor = getMap(name, { largeWorlds: true });
       const successorBounds = worldBoundsForMap(successor);

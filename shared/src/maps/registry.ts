@@ -10,7 +10,9 @@ import scrapyardStandard from '../../maps/scrapyard.standard-40x24.json' with { 
 import collapsedOverpass from '../../maps/collapsed-overpass.json' with { type: 'json' };
 import collapsedOverpassStandard from '../../maps/collapsed-overpass.standard-40x24.json' with { type: 'json' };
 import checkpointZero from '../../maps/checkpoint-zero.json' with { type: 'json' };
+import checkpointZeroStandard from '../../maps/checkpoint-zero.standard-40x24.json' with { type: 'json' };
 import rustedRefinery from '../../maps/rusted-refinery.json' with { type: 'json' };
+import rustedRefineryStandard from '../../maps/rusted-refinery.standard-40x24.json' with { type: 'json' };
 
 /** Registry order doubles as the rotation order (see getNextMapName). */
 const ALL: readonly MapData[] = [
@@ -28,6 +30,8 @@ const LARGE_WORLD_VARIANTS: ReadonlyMap<string, MapData> = new Map(
     overgrownSuburbStandard,
     scrapyardStandard,
     collapsedOverpassStandard,
+    checkpointZeroStandard,
+    rustedRefineryStandard,
   ].map((document) => {
     const validation = validateMapDocument(document, 'standard-40x24');
     if (!validation.valid || !validation.mapData) {
