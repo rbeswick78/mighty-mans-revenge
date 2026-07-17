@@ -16,6 +16,13 @@ function batch24ArtifactPath(testInfo: TestInfo, name: string): string | null {
   return path.join(artifactDir, `${testInfo.project.name}-${name}.png`);
 }
 
+function batch30ArtifactPath(testInfo: TestInfo, name: string): string | null {
+  const artifactDir = process.env.BATCH30_ARTIFACT_DIR;
+  if (!artifactDir) return null;
+  mkdirSync(artifactDir, { recursive: true });
+  return path.join(artifactDir, `${testInfo.project.name}-${name}.png`);
+}
+
 async function waitForScene(page: Page, key: string): Promise<void> {
   await expect
     .poll(
@@ -2129,6 +2136,219 @@ test('fighter art II remains legacy when modernArt proof is absent', async ({ pa
   });
   expect(fallback.every((art) => !art.available && !art.usingModernBody)).toBe(true);
   expect(fallback.every((art) => !String(art.animationKey).startsWith('reforged-ii-'))).toBe(true);
+});
+
+test('weapon and pickup art preserves live identities, fallbacks, and future-art dormancy', async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    !largeWorldsAdvertised ||
+      !modernArtAdvertised ||
+      !['desktop-chromium', 'mobile-landscape'].includes(testInfo.project.name),
+    'Run the Batch 30 visual tier in desktop Chromium and mobile landscape.',
+  );
+  await stageGameplay(page, true, true);
+  const evidence = await page.evaluate(() => {
+    const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'GameScene',
+    ) as unknown as {
+      scene: { pause(): void };
+      textures: Phaser.Textures.TextureManager;
+      anims: Phaser.Animations.AnimationManager;
+      playerManager: { updatePlayers(players: unknown[], localPlayerId: string): unknown };
+      pickupRenderer: { updatePickups(pickups: unknown[]): void };
+      getReforgedFighterRenderState(): Array<{
+        playerId: string;
+        art: {
+          weaponArtAvailable: boolean;
+          usingModernWeaponArt: boolean;
+          weaponAnimationKey: string | null;
+          weaponFrameName: string | number | null;
+          weaponId: string;
+        };
+      }>;
+      getReforgedPickupRenderState(): Array<{
+        id: string;
+        textureKey: string;
+        frameName: string | number;
+      }>;
+    };
+    scene.scene.pause();
+    const base = {
+      velocity: { x: 0, y: 0 },
+      health: 100,
+      maxHealth: 100,
+      armor: 0,
+      ammo: 30,
+      specialAmmo: 6,
+      specialReserve: 12,
+      grenades: 2,
+      isReloading: false,
+      isSprinting: false,
+      stamina: 100,
+      isDead: false,
+      respawnTimer: 0,
+      invulnerableTimer: 0,
+      lastProcessedInput: 0,
+      score: 0,
+      deaths: 0,
+      abilityActiveSeconds: 0,
+      abilityCooldownSeconds: 0,
+      frozenTimer: 0,
+      secondWindTimer: 0,
+    };
+    const players = [
+      {
+        ...base,
+        id: 'pistol',
+        nickname: 'PISTOL',
+        characterId: 'mighty_man',
+        position: { x: 390, y: 300 },
+        aimAngle: 0,
+        weaponId: 'pistol',
+      },
+      {
+        ...base,
+        id: 'shotgun',
+        nickname: 'SHOTGUN',
+        characterId: 'rook',
+        position: { x: 570, y: 300 },
+        aimAngle: Math.PI,
+        weaponId: 'shotgun',
+      },
+      {
+        ...base,
+        id: 'bat',
+        nickname: 'BAT',
+        characterId: 'bubba',
+        position: { x: 750, y: 300 },
+        aimAngle: Math.PI / 2,
+        weaponId: 'bat',
+      },
+    ];
+    scene.playerManager.updatePlayers(players, 'pistol');
+    scene.playerManager.updatePlayers(players, 'pistol');
+    scene.pickupRenderer.updatePickups(
+      [
+        'gun_ammo',
+        'grenade',
+        'bandage',
+        'armor',
+        'overcharge',
+        'weapon_pistol',
+        'weapon_shotgun',
+        'weapon_bat',
+      ].map((type, index) => ({
+        id: type,
+        type,
+        position: { x: 230 + index * 75, y: 430 },
+        isActive: true,
+        respawnTimer: 0,
+      })),
+    );
+    const texture = scene.textures.get('reforged-weapon-pickup-art');
+    return {
+      players: scene.getReforgedFighterRenderState(),
+      pickups: scene.getReforgedPickupRenderState(),
+      futureFrames: ['smg', 'sniper-rifle', 'launcher'].map((id) =>
+        texture.has(`weapon.${id}.core/023`),
+      ),
+      futureAnimations: ['smg', 'sniper-rifle', 'launcher'].map((id) =>
+        scene.anims.exists(`reforged-weapon-${id}-side-hold`),
+      ),
+    };
+  });
+  expect(evidence.players.find(({ playerId }) => playerId === 'pistol')?.art).toMatchObject({
+    weaponArtAvailable: true,
+    usingModernWeaponArt: true,
+    weaponId: 'pistol',
+    weaponAnimationKey: 'reforged-weapon-pistol-side-hold',
+  });
+  expect(evidence.players.find(({ playerId }) => playerId === 'shotgun')?.art).toMatchObject({
+    weaponArtAvailable: true,
+    usingModernWeaponArt: true,
+    weaponId: 'shotgun',
+    weaponAnimationKey: 'reforged-weapon-shotgun-side-left-hold',
+  });
+  expect(evidence.players.find(({ playerId }) => playerId === 'bat')?.art).toMatchObject({
+    weaponArtAvailable: true,
+    usingModernWeaponArt: false,
+    weaponId: 'bat',
+  });
+  const modernPickupIds = new Set(
+    evidence.pickups
+      .filter(({ textureKey }) => textureKey === 'reforged-weapon-pickup-art')
+      .map(({ id }) => id),
+  );
+  expect(modernPickupIds).toEqual(
+    new Set([
+      'gun_ammo',
+      'grenade',
+      'bandage',
+      'armor',
+      'overcharge',
+      'weapon_pistol',
+      'weapon_shotgun',
+    ]),
+  );
+  expect(evidence.pickups.find(({ id }) => id === 'weapon_bat')?.textureKey).toBe('pickup_bat');
+  expect(evidence.futureFrames).toEqual([true, true, true]);
+  expect(evidence.futureAnimations).toEqual([true, true, true]);
+  expect(evidence.players.some(({ art }) => /smg|sniper|launcher/.test(art.weaponId))).toBe(false);
+  const gameplayPath =
+    batch30ArtifactPath(testInfo, 'weapons-pickups-gameplay') ??
+    testInfo.outputPath('batch-30-weapons-pickups-gameplay.png');
+  await page.screenshot({ path: gameplayPath });
+  if (testInfo.project.name === 'desktop-chromium') {
+    await page.setViewportSize({ width: 844, height: 390 });
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        ),
+    );
+    const mobileWidthPath = batch30ArtifactPath(testInfo, 'weapons-pickups-mobile-width');
+    if (mobileWidthPath) await page.screenshot({ path: mobileWidthPath });
+  }
+  const direct = await rendererSnapshot(page);
+  expect(direct.sampledColors).toBeGreaterThan(8);
+  expect(direct.nonBlackSamples).toBeGreaterThan(100);
+  const directImage = Buffer.from(direct.dataUrl.split(',')[1] ?? '', 'base64');
+  const directPath = batch30ArtifactPath(testInfo, 'weapons-pickups-direct-renderer');
+  if (directPath) writeFileSync(directPath, directImage);
+  await testInfo.attach('batch-30-weapons-pickups-direct-renderer', {
+    body: directImage,
+    contentType: 'image/png',
+  });
+});
+
+test('weapon and pickup art remains legacy without modernArt proof', async ({ page }, testInfo) => {
+  test.skip(
+    !largeWorldsAdvertised || testInfo.project.name !== 'desktop-chromium',
+    'Run the Batch 30 capability fallback proof in desktop Chromium.',
+  );
+  await stageGameplay(page, true, false);
+  const fallback = await page.evaluate(() => {
+    const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'GameScene',
+    ) as unknown as {
+      scene: { pause(): void };
+      pickupRenderer: { updatePickups(pickups: unknown[]): void };
+      getReforgedPickupRenderState(): Array<{ textureKey: string }>;
+    };
+    scene.scene.pause();
+    scene.pickupRenderer.updatePickups([
+      {
+        id: 'ammo',
+        type: 'gun_ammo',
+        position: { x: 400, y: 300 },
+        isActive: true,
+        respawnTimer: 0,
+      },
+    ]);
+    return scene.getReforgedPickupRenderState();
+  });
+  expect(fallback).toEqual([{ id: 'ammo', textureKey: 'pickup_ammo', frameName: '__BASE' }]);
 });
 
 test('Results and connection recovery restore legacy scene sizing', async ({ page }) => {

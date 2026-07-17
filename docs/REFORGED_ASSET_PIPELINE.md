@@ -200,10 +200,40 @@ capability-off, old-server, other-roster, and Rook non-rifle paths retain legacy
 assets. Full and reduced quality keep authored bodies, ability cues, and Rook's
 synchronized layer; only secondary particles may reduce.
 
+## Batch 30 weapon and pickup disposition
+
+`art/reforged/sources/weapon-pickup-art/manifest.json` is the isolated loading
+and lineage boundary for production weapons, sustain pickups, containers, and
+rarity presentation. One original AI-assisted reference is retained with its
+complete prompt, generation ID, dimensions, and hash under
+`art/reforged/references/weapon-pickup-art/`; deterministic project geometry in
+`tools/reforged-assets/create-weapon-pickup-art-sources.mjs` is the sole source
+of canonical production pixels. Neither the reference nor a Batch 25 golden is
+packed into runtime output.
+
+Six canonical four-column 64px gun sheets each contain 24 frames: directional
+held and firing pairs, four dry facings, and ground, HUD, ammo, and container
+presentation. Separate sustain and rarity sheets contain eight and six frames.
+The unchanged Batch 26 packer sorts all eight assets and 158 frames into one
+1024x1024 `weapon-pickup-art.core` RGBA8888 atlas with 3px padding, 2px
+extrusion, exact grids, no trim or rotation, and the established byte limits.
+Runtime PNG/import JSON stays under
+`client/public/assets/reforged/weapon-pickup-art/`; license, prompt, generation,
+source, and hash lineage stays under
+`art/reforged/provenance/weapon-pickup-art/`.
+
+Boot validates the exact schema before registering named Phaser frames. Literal
+server-owned `modernArt` selects only current live rifle/pistol/shotgun, sustain
+pickup, and HUD/ammo presentation. Bat/punch and every false, absent,
+old-server, missing-atlas path stay legacy. SMG, sniper, launcher, rarity, and
+container frames are registered production inputs but remain mechanically
+dormant until their owning later batches.
+
 ## Scope boundary
 
 Batch 26 owns this contract and tooling; Batch 27 owns the completed modern UI
 production set; Batch 28 owns the completed Mighty Man, Bruce, and Frost Wizard
-set; Batch 29 owns the completed Bubba, Jack, and Rook set. Batches 30-32 own
-the weapon/pickup, biome, and combat-feedback production sets. Batch 33 owns coherent live cutover. No pipeline
-output can enable `modernArt`, retire a fallback, or authorize deployment.
+set; Batch 29 owns the completed Bubba, Jack, and Rook set; Batch 30 owns the
+completed weapon/pickup production set. Batches 31-32 own biome and combat-
+feedback production. Batch 33 owns coherent live cutover. No pipeline output
+can enable `modernArt`, retire a fallback, or authorize deployment.

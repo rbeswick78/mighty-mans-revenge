@@ -42,6 +42,12 @@ import {
   menuHeaderFont,
   modernUiEnabledForScene,
 } from './modern-ui-runtime.js';
+import {
+  REFORGED_WEAPON_PICKUP_TEXTURE_KEY,
+  liveReforgedGunArtId,
+  reforgedGunPresentationFrame,
+} from '../rendering/reforged-weapon-pickup-contract.js';
+import { reforgedWeaponPickupAtlasAvailable } from '../rendering/reforged-weapon-pickup-runtime.js';
 
 // Press Start 2P is much wider per glyph than Courier, so the final-minute
 // banner size drops to compensate (Courier 40px ≈ PS2P 22-24px in width).
@@ -102,6 +108,7 @@ export class HUD {
   private staminaBarFg: Phaser.GameObjects.Rectangle;
   private staminaText: Phaser.GameObjects.Text;
   private ammoText: Phaser.GameObjects.Text;
+  private readonly weaponAmmoIcon: Phaser.GameObjects.Image | null;
   private grenadeText: Phaser.GameObjects.Text;
 
   // Special-weapon row: label + indicator icons + count text. Hidden while
@@ -188,7 +195,7 @@ export class HUD {
   private abilityCenterY: number = 0;
   private abilityRadius: number = 0;
 
-  constructor(scene: Phaser.Scene, layout?: ResponsiveCombatHudLayout) {
+  constructor(scene: Phaser.Scene, layout?: ResponsiveCombatHudLayout, modernArtEnabled = false) {
     this.scene = scene;
 
     // Strip occupies the bottom band of the canvas. The gameboard owns
@@ -307,6 +314,21 @@ export class HUD {
     });
     this.ammoText.setScrollFactor(0);
     this.ammoText.setDepth(1000);
+    this.weaponAmmoIcon =
+      modernArtEnabled && reforgedWeaponPickupAtlasAvailable(scene)
+        ? scene.add
+            .image(
+              hbX - 24,
+              ammoY + 9,
+              REFORGED_WEAPON_PICKUP_TEXTURE_KEY,
+              reforgedGunPresentationFrame('rifle', 'ammo'),
+            )
+            .setOrigin(0.5)
+            .setScale(0.36)
+            .setScrollFactor(0)
+            .setDepth(1000)
+        : null;
+    if (this.weaponAmmoIcon) this.ammoText.setX(hbX + 28);
 
     const grenadeY = ammoY + 24;
     const startingGrenades = grenadePresentation(false, GRENADE.STARTING_COUNT, false);
@@ -747,7 +769,8 @@ export class HUD {
     this.staminaBarBg.setPosition(stamina.x, stamina.y).setSize(stamina.width, stamina.height);
     this.staminaBarFg.setPosition(stamina.x, stamina.y);
     this.staminaText.setPosition(stamina.x + stamina.width / 2, stamina.y + stamina.height / 2);
-    this.ammoText.setPosition(layout.ammo.x, layout.ammo.y);
+    this.ammoText.setPosition(layout.ammo.x + (this.weaponAmmoIcon ? 28 : 0), layout.ammo.y);
+    this.weaponAmmoIcon?.setPosition(layout.ammo.x, layout.ammo.y + 9);
     this.grenadeText.setPosition(layout.grenades.x, layout.grenades.y);
 
     this.specialWeaponLabel.setPosition(layout.specialWeapon.x, layout.specialWeapon.y + 4);
@@ -893,6 +916,11 @@ export class HUD {
    */
   updateSpecialWeapon(weaponId: WeaponId, magAmmo: number, reserve: number): void {
     this.currentWeaponId = weaponId;
+    const modernGun = liveReforgedGunArtId(weaponId);
+    this.weaponAmmoIcon?.setVisible(modernGun !== null);
+    if (modernGun) {
+      this.weaponAmmoIcon?.setFrame(reforgedGunPresentationFrame(modernGun, 'ammo'));
+    }
 
     const showLabel = weaponId !== 'rifle';
     this.specialWeaponLabel.setVisible(showLabel);
@@ -1703,6 +1731,7 @@ export class HUD {
     this.staminaBarFg.destroy();
     this.staminaText.destroy();
     this.ammoText.destroy();
+    this.weaponAmmoIcon?.destroy();
     this.grenadeText.destroy();
     this.specialWeaponLabel.destroy();
     for (const icon of this.specialShellIcons) {

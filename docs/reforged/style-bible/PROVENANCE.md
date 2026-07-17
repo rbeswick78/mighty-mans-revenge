@@ -219,3 +219,25 @@ license detail, source archive, external font, third-party reference, logo,
 trademark, Batch 25 pixel, image-generation cache, or Batch 28 fighter pixel is
 redistributed at runtime. Weapons, pickups, rarity auras, biomes, combat
 effects, maps, and coherent full-journey cutover remain outside this set.
+
+## Batch 30 production disposition
+
+Batch 30 leaves every Batch 25 artifact and both completed fighter atlases
+unchanged. One original text-only image-generation run supplied the production
+reference for the six-gun, sustain-pickup, container, ammo, and rarity language.
+Its exact prompt, provider, generation ID, unaltered 1536x1024 PNG, dimensions,
+SHA-256, and inspection disposition live under
+`art/reforged/references/weapon-pickup-art/`. It is a visual-development input
+only; deterministic project geometry is the sole source of canonical runtime
+pixels.
+
+The `weapon-pickup-art` manifest records eight AI-assisted canonical sheets
+under the project-owned license: six 24-frame gun sheets, one eight-frame
+sustain/container sheet, and one six-frame rarity sheet. The separate non-
+runtime report records every source hash plus manifest and atlas integrity.
+Runtime import JSON contains only loading-safe asset/frame, dimension, packing,
+and texture-integrity fields. No prompt, generation ID, license detail, source
+archive, external font, third-party reference, logo, trademark, Batch 25 pixel,
+image-generation cache, or fighter-atlas pixel is redistributed at runtime.
+Biome, combat-feedback, map, inventory, loot, rarity-mechanics, and coherent
+full-journey cutover work remain outside this set.

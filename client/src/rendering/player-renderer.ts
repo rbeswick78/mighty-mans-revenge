@@ -40,9 +40,19 @@ import {
   type ReforgedFighterArtIIState,
 } from './reforged-fighter-art-ii-contract.js';
 import { reforgedFighterArtIIAtlasAvailable } from './reforged-fighter-art-ii-runtime.js';
+import {
+  REFORGED_WEAPON_PICKUP_TEXTURE_KEY,
+  liveReforgedGunArtId,
+  reforgedGunAnimationKey,
+  reforgedGunAssetId,
+  reforgedWeaponPickupFrameName,
+  shouldUseReforgedGunArt,
+} from './reforged-weapon-pickup-contract.js';
+import { reforgedWeaponPickupAtlasAvailable } from './reforged-weapon-pickup-runtime.js';
 
 const SPRITE_SCALE = 3;
 const REFORGED_SPRITE_SCALE = 1;
+const REFORGED_WEAPON_SCALE = 1;
 
 const HEALTH_BAR_WIDTH = 36;
 const HEALTH_BAR_HEIGHT = 4;
@@ -132,6 +142,7 @@ export class PlayerRenderer {
   private readonly characterDef: CharacterDef;
   private readonly modernFighterId: ModernFighterId | null;
   private readonly modernArtAvailable: boolean;
+  private readonly modernWeaponArtAvailable: boolean;
   private useModernBody: boolean;
   private modernTransientState: Extract<
     ModernFighterLivingState,
@@ -234,6 +245,7 @@ export class PlayerRenderer {
       (isReforgedFighterId(this.modernFighterId)
         ? reforgedFighterAtlasAvailable(scene)
         : reforgedFighterArtIIAtlasAvailable(scene));
+    this.modernWeaponArtAvailable = modernArtEnabled && reforgedWeaponPickupAtlasAvailable(scene);
     this.useModernBody = this.modernArtAvailable;
     this.texturePrefix = def.spritePrefix;
     this.altBodyPrefix = def.altBody?.spritePrefix ?? null;
@@ -282,9 +294,16 @@ export class PlayerRenderer {
     // centered weapon falls into the held-hand position. Skipped entirely
     // for hands-on-sprite characters like Bruce.
     if (this.hasGun) {
-      const gun = scene.add.sprite(0, 0, this.gunKey('down', 'hold'), 0);
+      const gun = this.usesModernWeaponArt()
+        ? scene.add.sprite(
+            0,
+            0,
+            REFORGED_WEAPON_PICKUP_TEXTURE_KEY,
+            reforgedWeaponPickupFrameName(reforgedGunAssetId('rifle'), 0),
+          )
+        : scene.add.sprite(0, 0, this.gunKey('down', 'hold'), 0);
       gun.setOrigin(0.5, 0.5);
-      gun.setScale(SPRITE_SCALE);
+      gun.setScale(this.usesModernWeaponArt() ? REFORGED_WEAPON_SCALE : SPRITE_SCALE);
       gun.play(this.gunKey('down', 'hold'));
       gun.setVisible(!this.useModernBody);
       this.gunSprite = gun;
@@ -755,6 +774,10 @@ export class PlayerRenderer {
     frameName: string | number;
     overlayAnimationKey: string | null;
     overlayFrameName: string | number | null;
+    weaponArtAvailable: boolean;
+    usingModernWeaponArt: boolean;
+    weaponAnimationKey: string | null;
+    weaponFrameName: string | number | null;
     weaponId: WeaponId;
     dead: boolean;
   }> {
@@ -767,6 +790,10 @@ export class PlayerRenderer {
       frameName: this.sprite.frame.name,
       overlayAnimationKey: this.bodyOverlaySprite?.anims.currentAnim?.key ?? null,
       overlayFrameName: this.bodyOverlaySprite?.frame.name ?? null,
+      weaponArtAvailable: this.modernWeaponArtAvailable,
+      usingModernWeaponArt: this.usesModernWeaponArt() && !this.useModernBody,
+      weaponAnimationKey: this.gunSprite?.anims.currentAnim?.key ?? null,
+      weaponFrameName: this.gunSprite?.frame.name ?? null,
       weaponId: this.currentWeaponId,
       dead: this.isDead,
     });
@@ -782,7 +809,9 @@ export class PlayerRenderer {
     if (multiplier === this.renderScaleMultiplier) return;
     this.renderScaleMultiplier = multiplier;
     this.sprite.setScale(this.bodySpriteScale());
-    this.gunSprite?.setScale(SPRITE_SCALE * multiplier);
+    this.gunSprite?.setScale(
+      (this.usesModernWeaponArt() ? REFORGED_WEAPON_SCALE : SPRITE_SCALE) * multiplier,
+    );
     this.batSprite.setScale(SPRITE_SCALE * multiplier);
     this.bodyOverlaySprite?.setScale(this.bodyOverlaySpriteScale());
     this.wandGraphics?.setScale(SPRITE_SCALE * multiplier);
@@ -1010,6 +1039,10 @@ export class PlayerRenderer {
   private playCurrentGunAnim(): void {
     if (this.isDead || !this.gunSprite || !weaponRendersOverlay(this.currentWeaponId)) return;
     const key = this.gunKey(this.currentDirection, this.currentGunState);
+    this.gunSprite.setScale(
+      (this.usesModernWeaponArt() ? REFORGED_WEAPON_SCALE : SPRITE_SCALE) *
+        this.renderScaleMultiplier,
+    );
     // ignoreIfPlaying = false: shooting again restarts the shoot anim.
     this.gunSprite.play(key, this.currentGunState === 'hold');
   }
@@ -1183,6 +1216,18 @@ export class PlayerRenderer {
   }
 
   private gunKey(direction: Direction4, state: GunOverlayState): string {
+    const modernId = liveReforgedGunArtId(this.currentWeaponId);
+    if (modernId && this.usesModernWeaponArt()) {
+      return reforgedGunAnimationKey(modernId, state, direction);
+    }
     return weaponOverlayKey(this.currentWeaponId, direction, state);
+  }
+
+  private usesModernWeaponArt(): boolean {
+    return shouldUseReforgedGunArt(
+      this.currentWeaponId,
+      this.modernWeaponArtAvailable,
+      this.modernWeaponArtAvailable,
+    );
   }
 }

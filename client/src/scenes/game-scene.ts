@@ -393,7 +393,7 @@ export class GameScene extends Phaser.Scene {
     this.playerManager = new ClientPlayerManager(this, capabilities.modernArt);
     this.tauntRenderer = new TauntRenderer(this);
     this.effectsRenderer = new EffectsRenderer(this, this.cameraController);
-    this.pickupRenderer = new PickupRenderer(this);
+    this.pickupRenderer = new PickupRenderer(this, capabilities.modernArt);
     this.confirmedTagRenderer = new ConfirmedTagRenderer(this);
     this.coreRunRenderer = new CoreRunRenderer(this);
     this.radiationStormRenderer = new RadiationStormRenderer(
@@ -442,7 +442,7 @@ export class GameScene extends Phaser.Scene {
     if (grid && minimapLayout) {
       this.minimapRenderer = new MinimapRenderer(this, mapData, grid, minimapLayout);
     }
-    this.hud = new HUD(this, this.combatHudLayout);
+    this.hud = new HUD(this, this.combatHudLayout, capabilities.modernArt);
     // Bullseye replaces the OS cursor on desktop only — touch input
     // doesn't have a hover position to track.
     if (!isTouchDevice()) {
@@ -1171,6 +1171,10 @@ export class GameScene extends Phaser.Scene {
 
   getReforgedFighterRenderState(): ReturnType<ClientPlayerManager['getReforgedArtStates']> {
     return this.playerManager?.getReforgedArtStates() ?? [];
+  }
+
+  getReforgedPickupRenderState(): ReturnType<PickupRenderer['getReforgedPresentationStates']> {
+    return this.pickupRenderer?.getReforgedPresentationStates() ?? [];
   }
 
   private updateAimLine(localState: ReturnType<NetworkManager['getLocalPlayerState']>): void {

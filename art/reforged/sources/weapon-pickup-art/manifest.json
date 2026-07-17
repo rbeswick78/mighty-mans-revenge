@@ -1,0 +1,169 @@
+{
+  "schemaVersion": 1,
+  "atlas": {
+    "id": "weapon-pickup-art.core",
+    "maxWidth": 1024,
+    "maxHeight": 1024,
+    "padding": 3,
+    "extrude": 2,
+    "limits": {
+      "maxSourceBytes": 1048576,
+      "maxDecodedBytes": 5242880,
+      "maxAtlasBytes": 2097152
+    }
+  },
+  "assets": [
+    {
+      "id": "pickup.sustain.core",
+      "source": "sustain-pickups.png",
+      "width": 256,
+      "height": 128,
+      "frames": { "width": 64, "height": 64, "count": 8, "columns": 4 },
+      "provenance": {
+        "origin": "ai-assisted",
+        "creator": "Mighty Man's Revenge Reforged weapon and pickup geometry",
+        "license": "LicenseRef-MMR-Project-Owned",
+        "attribution": "OpenAI-assisted production reference; deterministic project geometry",
+        "sourceReference": "tools/reforged-assets/create-weapon-pickup-art-sources.mjs",
+        "generation": {
+          "provider": "OpenAI built-in image generation",
+          "id": "exec-085576a8-9aa1-42f6-aee4-762942019573",
+          "promptDocument": "art/reforged/references/weapon-pickup-art/PROMPTS.md"
+        }
+      }
+    },
+    {
+      "id": "rarity.presentation.core",
+      "source": "rarity-language.png",
+      "width": 192,
+      "height": 128,
+      "frames": { "width": 64, "height": 64, "count": 6, "columns": 3 },
+      "provenance": {
+        "origin": "ai-assisted",
+        "creator": "Mighty Man's Revenge Reforged weapon and pickup geometry",
+        "license": "LicenseRef-MMR-Project-Owned",
+        "attribution": "OpenAI-assisted production reference; deterministic project geometry",
+        "sourceReference": "tools/reforged-assets/create-weapon-pickup-art-sources.mjs",
+        "generation": {
+          "provider": "OpenAI built-in image generation",
+          "id": "exec-085576a8-9aa1-42f6-aee4-762942019573",
+          "promptDocument": "art/reforged/references/weapon-pickup-art/PROMPTS.md"
+        }
+      }
+    },
+    {
+      "id": "weapon.launcher.core",
+      "source": "launcher-states.png",
+      "width": 256,
+      "height": 384,
+      "frames": { "width": 64, "height": 64, "count": 24, "columns": 4 },
+      "provenance": {
+        "origin": "ai-assisted",
+        "creator": "Mighty Man's Revenge Reforged weapon and pickup geometry",
+        "license": "LicenseRef-MMR-Project-Owned",
+        "attribution": "OpenAI-assisted production reference; deterministic project geometry",
+        "sourceReference": "tools/reforged-assets/create-weapon-pickup-art-sources.mjs",
+        "generation": {
+          "provider": "OpenAI built-in image generation",
+          "id": "exec-085576a8-9aa1-42f6-aee4-762942019573",
+          "promptDocument": "art/reforged/references/weapon-pickup-art/PROMPTS.md"
+        }
+      }
+    },
+    {
+      "id": "weapon.pistol.core",
+      "source": "pistol-states.png",
+      "width": 256,
+      "height": 384,
+      "frames": { "width": 64, "height": 64, "count": 24, "columns": 4 },
+      "provenance": {
+        "origin": "ai-assisted",
+        "creator": "Mighty Man's Revenge Reforged weapon and pickup geometry",
+        "license": "LicenseRef-MMR-Project-Owned",
+        "attribution": "OpenAI-assisted production reference; deterministic project geometry",
+        "sourceReference": "tools/reforged-assets/create-weapon-pickup-art-sources.mjs",
+        "generation": {
+          "provider": "OpenAI built-in image generation",
+          "id": "exec-085576a8-9aa1-42f6-aee4-762942019573",
+          "promptDocument": "art/reforged/references/weapon-pickup-art/PROMPTS.md"
+        }
+      }
+    },
+    {
+      "id": "weapon.rifle.core",
+      "source": "rifle-states.png",
+      "width": 256,
+      "height": 384,
+      "frames": { "width": 64, "height": 64, "count": 24, "columns": 4 },
+      "provenance": {
+        "origin": "ai-assisted",
+        "creator": "Mighty Man's Revenge Reforged weapon and pickup geometry",
+        "license": "LicenseRef-MMR-Project-Owned",
+        "attribution": "OpenAI-assisted production reference; deterministic project geometry",
+        "sourceReference": "tools/reforged-assets/create-weapon-pickup-art-sources.mjs",
+        "generation": {
+          "provider": "OpenAI built-in image generation",
+          "id": "exec-085576a8-9aa1-42f6-aee4-762942019573",
+          "promptDocument": "art/reforged/references/weapon-pickup-art/PROMPTS.md"
+        }
+      }
+    },
+    {
+      "id": "weapon.shotgun.core",
+      "source": "shotgun-states.png",
+      "width": 256,
+      "height": 384,
+      "frames": { "width": 64, "height": 64, "count": 24, "columns": 4 },
+      "provenance": {
+        "origin": "ai-assisted",
+        "creator": "Mighty Man's Revenge Reforged weapon and pickup geometry",
+        "license": "LicenseRef-MMR-Project-Owned",
+        "attribution": "OpenAI-assisted production reference; deterministic project geometry",
+        "sourceReference": "tools/reforged-assets/create-weapon-pickup-art-sources.mjs",
+        "generation": {
+          "provider": "OpenAI built-in image generation",
+          "id": "exec-085576a8-9aa1-42f6-aee4-762942019573",
+          "promptDocument": "art/reforged/references/weapon-pickup-art/PROMPTS.md"
+        }
+      }
+    },
+    {
+      "id": "weapon.smg.core",
+      "source": "smg-states.png",
+      "width": 256,
+      "height": 384,
+      "frames": { "width": 64, "height": 64, "count": 24, "columns": 4 },
+      "provenance": {
+        "origin": "ai-assisted",
+        "creator": "Mighty Man's Revenge Reforged weapon and pickup geometry",
+        "license": "LicenseRef-MMR-Project-Owned",
+        "attribution": "OpenAI-assisted production reference; deterministic project geometry",
+        "sourceReference": "tools/reforged-assets/create-weapon-pickup-art-sources.mjs",
+        "generation": {
+          "provider": "OpenAI built-in image generation",
+          "id": "exec-085576a8-9aa1-42f6-aee4-762942019573",
+          "promptDocument": "art/reforged/references/weapon-pickup-art/PROMPTS.md"
+        }
+      }
+    },
+    {
+      "id": "weapon.sniper-rifle.core",
+      "source": "sniper-rifle-states.png",
+      "width": 256,
+      "height": 384,
+      "frames": { "width": 64, "height": 64, "count": 24, "columns": 4 },
+      "provenance": {
+        "origin": "ai-assisted",
+        "creator": "Mighty Man's Revenge Reforged weapon and pickup geometry",
+        "license": "LicenseRef-MMR-Project-Owned",
+        "attribution": "OpenAI-assisted production reference; deterministic project geometry",
+        "sourceReference": "tools/reforged-assets/create-weapon-pickup-art-sources.mjs",
+        "generation": {
+          "provider": "OpenAI built-in image generation",
+          "id": "exec-085576a8-9aa1-42f6-aee4-762942019573",
+          "promptDocument": "art/reforged/references/weapon-pickup-art/PROMPTS.md"
+        }
+      }
+    }
+  ]
+}

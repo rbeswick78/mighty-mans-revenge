@@ -337,3 +337,29 @@ hitboxes or altering combat, ability, death, or respawn timing. Authored bodies,
 ability cues, and Rook's body/helmet synchronization remain essential in full
 and reduced quality. All incompatible states retain registered legacy
 fallbacks until Batch 33 owns a coherent verified cutover.
+
+## Batch 30 production mapping
+
+The weapon/pickup atlas applies the same compact 64x64-cell grammar to six gun
+identities and current sustain pickups. Rifle is the balanced middle-length
+baseline; pistol is the smallest one-handed block; shotgun concentrates mass in
+its thick pump and front; SMG stays short with a deep magazine; sniper is the
+longest narrow scoped shape; launcher is the broadest tube with the heaviest
+rear. Directional held, firing, dry, ground, HUD, ammo, and container frames
+reuse those base masses instead of inventing presentation-specific weapons.
+
+Gun ammo, grenade, bandage, armor, and overcharge retain distinct value and
+shape identities at gameplay and mobile scale. Common uses only the compact
+neutral badge/rim; Uncommon adds one underline; Rare uses two orbit ticks; Epic
+uses four facets; Legendary uses three crown rays; Mythical uses a narrow
+double-chevron halo. Those overlays remain readable in grayscale and never
+repaint the whole gun. Full quality may retain bounded facets, soft light, and
+secondary motion; reduced quality retains badge, rim, silhouette, timing, and
+pickup identity without bloom or extra particles.
+
+All Batch 30 art is presentation-only. It does not add gun/pickup types,
+weapon instances, inventory, containers, loot, rarity damage, ammo behavior,
+spawn timing, melee mechanics, or authority. Live use is limited to existing
+rifle/pistol/shotgun and sustain-pickup paths behind literal server-owned
+`modernArt`; bat/punch and fallback behavior stay complete. SMG, sniper,
+launcher, rarity, and container art remains dormant until later owning batches.

@@ -2,8 +2,14 @@ import Phaser from 'phaser';
 import type { PickupState } from '@shared/types/pickup.js';
 import { PickupType } from '@shared/types/pickup.js';
 import { pickupPresentation } from './pickup-presentation.js';
+import {
+  REFORGED_WEAPON_PICKUP_TEXTURE_KEY,
+  reforgedPickupFrame,
+} from './reforged-weapon-pickup-contract.js';
+import { reforgedWeaponPickupAtlasAvailable } from './reforged-weapon-pickup-runtime.js';
 
 const PICKUP_SCALE = 3;
+const REFORGED_PICKUP_SCALE = 0.75;
 
 const PICKUP_TEXTURES: Record<PickupType, string> = {
   [PickupType.GUN_AMMO]: 'pickup_ammo',
@@ -28,9 +34,11 @@ interface PickupSprite {
 export class PickupRenderer {
   private scene: Phaser.Scene;
   private pickups: Map<string, PickupSprite> = new Map();
+  private readonly modernArtAvailable: boolean;
 
-  constructor(scene: Phaser.Scene) {
+  constructor(scene: Phaser.Scene, modernArtEnabled = false) {
     this.scene = scene;
+    this.modernArtAvailable = modernArtEnabled && reforgedWeaponPickupAtlasAvailable(scene);
   }
 
   updatePickups(pickups: PickupState[]): void {
@@ -94,11 +102,14 @@ export class PickupRenderer {
   }
 
   private createPickup(state: PickupState): PickupSprite {
-    const textureKey = PICKUP_TEXTURES[state.type] ?? 'pickup_ammo';
+    const modernFrame = this.modernArtAvailable ? reforgedPickupFrame(state.type) : null;
+    const textureKey = modernFrame
+      ? REFORGED_WEAPON_PICKUP_TEXTURE_KEY
+      : (PICKUP_TEXTURES[state.type] ?? 'pickup_ammo');
 
-    const sprite = this.scene.add.sprite(0, 0, textureKey);
+    const sprite = this.scene.add.sprite(0, 0, textureKey, modernFrame ?? undefined);
     sprite.setOrigin(0.5, 0.5);
-    sprite.setScale(PICKUP_SCALE);
+    sprite.setScale(modernFrame ? REFORGED_PICKUP_SCALE : PICKUP_SCALE);
 
     let auraHalo: Phaser.GameObjects.Arc | null = null;
     let auraLabel: Phaser.GameObjects.Text | null = null;
@@ -124,11 +135,7 @@ export class PickupRenderer {
       children.push(auraLabel);
     }
 
-    const container = this.scene.add.container(
-      state.position.x,
-      state.position.y,
-      children,
-    );
+    const container = this.scene.add.container(state.position.x, state.position.y, children);
 
     container.setVisible(state.isActive);
 
@@ -142,6 +149,22 @@ export class PickupRenderer {
       auraHalo,
       auraLabel,
     };
+  }
+
+  getReforgedPresentationStates(): readonly Readonly<{
+    id: string;
+    textureKey: string;
+    frameName: string | number;
+  }>[] {
+    return Object.freeze(
+      [...this.pickups.entries()].map(([id, pickup]) =>
+        Object.freeze({
+          id,
+          textureKey: pickup.sprite.texture.key,
+          frameName: pickup.sprite.frame.name,
+        }),
+      ),
+    );
   }
 
   private createBobTween(sprite: Phaser.GameObjects.Sprite): Phaser.Tweens.Tween {

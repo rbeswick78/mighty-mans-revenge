@@ -503,6 +503,25 @@ paths stay legacy. Full and reduced tiers keep authored body/ability cues.
 Batch 29 owns Bubba, Jack, and Rook; Batch 33 still owns coherent Boot-through-
 Results cutover and any verified legacy retirement.
 
+**Reforged fighter art II (Batch 29):** a separate 404-frame 2048x2048
+`fighter-art-ii.core` atlas registers complete Bubba, Jack axe-present/absent,
+and synchronized Rook body/helmet directional states and exact live death
+cycles. Literal server-owned `modernArt` plus snapshot-owned character, axe,
+weapon, ability, hit, death, and respawn truth selects presentation without
+changing mechanics. Missing/incompatible paths stay legacy; the Batch 28 atlas
+is unchanged.
+
+**Reforged weapons and pickups (Batch 30):** one deterministic 158-frame
+1024x1024 `weapon-pickup-art.core` atlas owns six 24-frame gun presentation
+sets, the five current sustain pickups plus supply/container language, and six
+shape-coded rarity overlays. Boot validates and registers exact named frames.
+Literal server-owned `modernArt` selects existing live rifle/pistol/shotgun,
+sustain-pickup, and HUD/ammo art only; bat/punch, false/absent/old-server, and
+missing-atlas paths remain legacy. SMG, sniper, launcher, rarity, and container
+art is mechanically dormant. No shared/server/wire, damage, ammo, spawn,
+inventory, loot, capability-default, production, or deployment behavior is
+changed; Batch 31 owns biomes and Batch 33 owns coherent cutover.
+
 ### Why This Matters for Agents
 
 Client prediction and server simulation **must use identical physics code** from `/shared`. If you change movement, collision, or physics logic, you must change it in `/shared` and verify both client and server still agree. A mismatch between client prediction and server authority causes visible rubber-banding.
