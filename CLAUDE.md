@@ -741,6 +741,21 @@ Maps are visually themed: map JSON carries an optional `theme` id resolved clien
 
 Map JSON also carries `kothHills` — top-left tiles of the 2×2 King of the Hill zones, in relocation order. The validator checks bounds/walkability (≥3 entries when present); the registry requires every shipped map to declare them, because mode rotation can put KOTH on any map.
 
+**Reforged map authoring contract (Batch 34):** successor standard arenas use
+the shared `standard-40x24` document profile: exactly 40x24 48px tiles plus a
+versioned declarative `authoring` block for complete non-overlapping regions,
+identified landmarks and minimap projection, connected walkable routes,
+existing KOTH/Core Run objective anchors, identified N-player spawns and
+pickups, shootable gates, existing explosive-barrel hazards, and explicit
+symmetry/asymmetry review. `validateMapDocument()` returns stable coded paths;
+`tools/reforged-maps/map-authoring.mjs` validates files/directories in stable
+order. The `compatible` profile accepts the unchanged six legacy maps with no
+authoring block. Runtime simulation still consumes the established `MapData`
+fields only: authoring IDs/review data do not register a map, alter collision,
+destruction, selection, balance, rendering, minimap visibility, matchmaking,
+or capability exposure. See `docs/REFORGED_MAP_AUTHORING.md`. Batches 35-37 own
+successor layouts, Batch 38 owns mode/bot rebalance, and Batch 39 owns release.
+
 Six arenas ship in registry order: Wasteland Outpost, Overgrown Suburb, Scrapyard, Collapsed Overpass, Checkpoint Zero, and Rusted Refinery. Collapsed Overpass uses the `overpass` theme, six hill locations, heavy central supports, and open outer loops. Checkpoint Zero uses the `checkpoint` theme, rotationally paired gates/props, and dense horizontal plus vertical low-cover lanes. Rusted Refinery uses the `refinery` theme, a red-roofed central power vault with open north/south approaches, and two diagonal shootable side gates. All three create destructible route choices without introducing map-only collision rules.
 
 **Rusted Refinery (Session 73):** the 20×12 arena is exactly rotationally symmetric at the tile layer, with four paired spawns, five legal KOTH sites, the standard pickup economy, and rotational pairs of barrels, caches, and gates. Its open north/south vault approaches provide stable primary routes while the shootable diagonal gates create optional east/west shortcuts. The `refinery` theme is presentation-only and reuses the reinforced barricade treatment; collision, destruction, spawn validation, bot navigation, and mode behavior stay on the shared map contracts.

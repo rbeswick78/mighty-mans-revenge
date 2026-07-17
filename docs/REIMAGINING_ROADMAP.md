@@ -5,9 +5,9 @@ Read this file and `CLAUDE.md` completely at the start of every batch. The
 completed `docs/REPLAYABILITY_ROADMAP.md` remains the historical record for the
 systems this program preserves and reorganizes.
 
-- **Status:** Batch 33 complete on 2026-07-17; the six approved production
-  atlases now cut over atomically behind default-false `modernArt`.
-- **Next batch:** Batch 34 — Map authoring contract.
+- **Status:** Batch 34 complete on 2026-07-17; future 40x24 standard arenas now
+  have a versioned shared authoring contract and deterministic validation tools.
+- **Next batch:** Batch 35 — Wasteland Outpost and Overgrown Suburb.
 - **Public releases:** Reforged Arena, then Battle Royale.
 - **Working model:** one numbered batch per session, direct commits and pushes
   to `main`, milestone-gated production deployments.
@@ -187,7 +187,7 @@ Production deployment happens only at a gate or for an urgent live fix.
 |  31 | Biome environment kit                  | Visual system | **DONE — 2026-07-16** |
 |  32 | Modern combat feedback                 | Visual system | **DONE — 2026-07-16** |
 |  33 | Full-journey visual cutover            | Visual system | **DONE — 2026-07-17** |
-|  34 | Map authoring contract                 | Large arenas  | Pending               |
+|  34 | Map authoring contract                 | Large arenas  | **DONE — 2026-07-17** |
 |  35 | Wasteland Outpost and Overgrown Suburb | Large arenas  | Pending               |
 |  36 | Scrapyard and Collapsed Overpass       | Large arenas  | Pending               |
 |  37 | Checkpoint Zero and Rusted Refinery    | Large arenas  | Pending               |
@@ -1193,6 +1193,32 @@ updated.
 
 Extend validation/tooling for 40×24 maps, regions, landmarks, minimaps,
 connectivity, objectives, spawns, pickups, gates, hazards, and symmetry.
+
+Acceptance:
+
+- [x] Shared additive types define one versioned `standard-40x24` authoring
+      profile for complete non-overlapping regions, identified landmarks,
+      full-grid minimap projection, region connectivity, existing objectives,
+      identified spawns/pickups, shootable gates, existing explosive-barrel
+      hazards, and explicit symmetry/asymmetry review.
+- [x] Stable coded validation covers document/dimension/row/tile shape, bounds,
+      region coverage/overlap, landmark identity/footprint, objective and pickup
+      reachability, four-player spawn separation/egress, gate/hazard metadata,
+      minimap inventory, a single walkable component, region links, and
+      symmetry review without encoding art policy, runtime balance, or client state.
+- [x] The shared loading boundary supports a strict future-map profile and an
+      old-schema-compatible profile. All six current maps retain exact names,
+      JSON bytes, registry order, 20x12/48px dimensions, 960x576 `(0, 0)`
+      behavior, collision/destruction, current rendering/minimap, and gameplay.
+- [x] Deterministic positive and negative fixtures plus a stable-order CLI
+      prove the complete contract, current-map compatibility, parse failures,
+      and actionable multi-error output for future authoring sessions.
+- [x] Focused map schema/tool tests, full unit matrix, typecheck, lint,
+      affected/full production builds, repository formatting, diff checks, and
+      risk-based current-map/collision/destruction/viewport/camera/HUD/minimap/
+      fallback/Results/rematch/recovery browser evidence pass. No runtime
+      loading consumer changes, capability exposure, production deployment, or
+      Batch 35 layout work occurs.
 
 #### Batch 35 — Wasteland Outpost and Overgrown Suburb
 
@@ -3135,9 +3161,11 @@ confirmed one coherent six-atlas reading order, quiet ground, collision-class
 silhouettes, roster and carried-object truth, HUD priority, distinct feedback,
 safe areas, and recovery restoration.
 
-**Deployment:** Skipped. Batch 33 remains behind a default-false server-owned
-capability. No production environment, server/client deployment, capability
-exposure, or authoritative gameplay behavior changed.
+**Deployment:** The Batch 33 implementation session skipped deployment. In a
+separate post-prompt operation, the user explicitly approved production
+deployment of commit `f39eb34131f8827f85432aafcc6d6c18a2d0ac51` to Firebase
+Hosting and the GCE server. Health remained green at the unchanged 20Hz;
+`modernArt` and every other capability remained server-owned and default false.
 
 **Deviations:** No product-scope deviation. The first atomic availability probe
 used a nonexistent semantic-icon terminal frame and was corrected to the
@@ -3154,6 +3182,66 @@ correction was needed.
 **Known issues:** No bug-ledger entry was added. RFG-001 and RFG-002 remain
 closed historical proofs. RFG-003 remains gate-dispositioned and unchanged.
 Batch 34 owns the 40x24 map authoring contract; Batch 39 owns the release gate.
+
+### Batch 34 — 2026-07-17 — Map authoring contract
+
+**Shipped:** Added one additive, versioned `standard-40x24` authoring profile to
+shared `MapData`, plus `validateMapDocument()` as the fail-closed shared loading
+boundary for future arena documents. The contract covers exact dimensions and
+row shape, complete non-overlapping regions, identified landmark footprints,
+full-grid minimap projection metadata, one connected walkable component and
+declared region links, existing KOTH/Core Run objectives, four-player spawn
+separation and safe egress, identified reachable pickups, shootable-gate and
+existing explosive-barrel metadata, and explicit symmetry/asymmetry review.
+Validation produces stable coded paths and returns consumable map data only on
+success. Deterministic positive/negative fixtures and the stable-order
+`tools/reforged-maps/map-authoring.mjs` CLI cover both strict future-map and
+old-schema-compatible profiles. `docs/REFORGED_MAP_AUTHORING.md` is the complete
+authoring/tool reference.
+
+The six registered maps, names, JSON bytes, registry order, 20x12/48px shape,
+960x576 `(0, 0)` behavior, collision/destruction truth, runtime loader,
+matchmaking, camera, HUD, minimap, biome projection, and recovery paths remain
+unchanged. The authoring block is declarative review metadata: it adds no art
+policy, client-only state, balance constants, capability, or runtime authority.
+
+**Verification:** Selected the shared-contract/tooling tier and retained the
+risk-based browser tier because no runtime loader or cross-cutting consumer
+changed. The focused shared validator/current-registry/server-destruction/client-
+minimap matrix passed 6 files and 74 tests; the authored CLI suite passed 3; all
+six current maps passed compatible validation in stable file order; and the
+full Vitest matrix passed 142 files and 1,618 tests. Typecheck, lint, the affected
+shared/server/client production builds, and the full production build passed;
+Vite's established chunk advisory remains. The enabled desktop Chromium/mobile-
+landscape gameplay selection passed 14 cases with 2 intentional capability-off
+skips, the separate default-false/old-server selection passed 2, and focused
+Results/rematch/recovery coverage passed 4. These cases cover current small
+worlds, collision/destruction resources, viewport/camera, responsive HUD,
+minimap, biome projection, legacy fallback, rematch, and reconnect restoration.
+The complete three-project browser matrix was not required because runtime map
+loading and every consumer remained byte-for-byte untouched.
+
+Repository-wide Prettier was executed and reported 100 pre-existing unrelated
+files; none belongs to the Batch 34 allowlist. The explicit allowlist formatting
+check and `git diff --check` passed, and intended-diff review confirmed no map
+JSON, registry, runtime consumer, art/atlas, capability, production, or Batch 35
+layout change.
+
+**Deployment:** Skipped exactly as required for Batch 34. Production remains on
+the separately approved Batch 33 commit above; all capabilities remain strict
+server-owned opt-ins and default false, and authoritative simulation remains
+20Hz.
+
+**Deviations:** No product-scope deviation. Managed Windows node-module access
+required approved repository-local execution. Repository-wide formatting debt
+was preserved rather than broadening the allowlist. The risk-based browser tier
+was sufficient because the new loading boundary is exported for later authoring
+tools but is not wired into the current registry or runtime consumers.
+
+**Known issues:** No bug-ledger entry was added. RFG-001 and RFG-002 remain
+closed historical proofs. RFG-003 remains gate-dispositioned and unchanged.
+Batch 35 owns the first two successor layouts; Batch 38 owns mode/bot rebalance;
+Batch 39 owns release review and any capability exposure.
 
 ## Batch 22 input prompt (historical)
 
@@ -3947,7 +4035,7 @@ as the live/compositor and mobile-sized visual reference. Batch 33 owns coherent
 visual cutover; Batch 34 owns larger-map authoring contracts.
 ```
 
-## Next-session prompt
+## Batch 34 input prompt (historical)
 
 ```text
 Continue the Reforged build for Mighty Man's Revenge.
@@ -4025,4 +4113,99 @@ atlas grids and complete non-runtime lineage. RFG-001/RFG-002 remain closed
 historical proofs. RFG-003 still pairs staged Firefox/mobile object/input and
 direct-renderer evidence with Chromium live/compositor pixels. Batch 34 owns
 only the map authoring contract; Batch 35 owns actual successor maps.
+```
+
+## Next-session prompt
+
+```text
+Continue the Reforged build for Mighty Man's Revenge.
+
+Read docs/REIMAGINING_ROADMAP.md and CLAUDE.md completely first. Read
+docs/REFORGED_BASELINE.md, docs/REFORGED_CAPABILITIES.md,
+docs/REFORGED_MAP_AUTHORING.md, docs/REFORGED_STYLE_BIBLE.md,
+docs/REFORGED_ASSET_PIPELINE.md, and
+docs/reforged/style-bible/PROVENANCE.md before implementation. Batch 34 — Map
+authoring contract is complete. Implement Batch 35 — Wasteland Outpost and
+Overgrown Suburb exactly as specified and do not begin Batch 36 — Scrapyard and
+Collapsed Overpass.
+
+Hand-author deterministic 40x24, 48px-tile successor documents for Wasteland
+Outpost and Overgrown Suburb against the complete version-1
+`standard-40x24` contract. Preserve their exact public names and recognizable
+biome identities while giving each readable primary routes, flanks, defensible
+but escapable landmarks, three legal KOTH anchors, the Core Run center anchor,
+four N-player-safe spawns, reachable pickup economy, meaningful destructible
+cover, existing explosive-barrel hazards, shootable-gate shortcuts where
+appropriate, complete minimap metadata, one connected walkable component, and
+an honest symmetry/asymmetry review. Keep all authored truth declarative and
+deterministic; use shared tiles, collision, destruction, objectives, pickups,
+and validation rather than map-specific gameplay code or client inference.
+
+Batch 35 owns only these first two successor layouts and the minimal additive
+variant resolver required to exercise them behind the existing literal server-
+owned `largeWorlds` opt-in. Capability-off and old-server paths
+must keep the byte-identical 20x12 legacy Wasteland Outpost and Overgrown
+Suburb, all four other current arenas remain byte-for-byte unchanged, and no
+40x24 arena may enter default matchmaking or production. The authoritative
+server and capability handshake must choose the map variant; the client may
+consume that server-owned choice but must not infer it from viewport size,
+map name, local configuration, or art availability. Keep public map names and
+wire payloads compatible; do not create a second client-owned map-selection
+surface.
+
+Do not tune world/camera/input/physics/combat/navigation/bot/mode balance,
+author the Batch 36-37 arenas, or begin Batch 38 rebalance. Do not add tactical-
+map gameplay, Battle Royale systems, rarity/loot/containers, new hazard types,
+spectating, capability exposure, production rollout, or deployment. Batch 38
+owns cross-arena mode/bot rebalance; Batch 39 owns the Reforged Arena release
+gate, production review, and any capability exposure.
+
+Preserve the complete Batch 18-24 viewport, coordinate, camera, dynamic-
+rendering, responsive HUD, minimap, fallback, and cumulative regression-gate
+contracts. Preserve Batch 25-33 art, asset, provenance, atomic six-atlas
+`modernArt` cutover, event ownership, current-map biome projection, fallback,
+and recovery behavior byte-for-byte. Preserve Batch 34 stable validation codes,
+strict/compatible loading profiles, fail-closed result, stable-order tooling,
+and all old-schema fixtures. All capabilities remain strict server-owned
+opt-ins and default false. Current authoritative simulation remains 20Hz.
+
+Batch 34 is complete and pushed on main as `feat(maps): establish Reforged
+authoring contract`. The shared contract validates dimensions/rows/tiles,
+regions, landmarks, minimap projection, connectivity, objectives, spawn safety,
+pickup placement, shootable gates, existing explosive barrels, and symmetry
+review. All six legacy maps pass compatibility validation without changing
+their JSON or runtime registry. Focused tests, the 142-file/1,618-test full unit
+matrix, static checks, affected/full builds, and risk-based browser regression
+passed. Repository-wide Prettier still reports 100 unrelated historical files;
+the Batch 34 allowlist is formatted. Batch 34 skipped deployment; production
+remains on the separately user-approved Batch 33 commit
+`f39eb34131f8827f85432aafcc6d6c18a2d0ac51`, healthy at 20Hz with every
+capability default false.
+
+Choose and document the Batch 35 authored-layout/runtime-loading verification
+tier. Run the strict validator and stable-order CLI on both successors; focused
+positive/negative authoring, registry/selection, connectivity, objective,
+spawn/pickup, collision/destruction, gate/hazard, minimap, and old-schema tests;
+the full unit matrix because these documents cross client/server authority;
+typecheck; lint; affected and full production builds; repository formatting;
+`git diff --check`; intended-diff and legacy-byte review. Because the successor
+documents become runtime-loadable behind `largeWorlds`, run the complete three-
+project browser matrix plus targeted desktop Chromium and mobile-landscape
+visual evidence for both 40x24 arenas,
+camera edges, spawn quadrants, routes/landmarks, destruction/gates/hazards,
+objectives, HUD/minimap, capability-off/old-server legacy restoration, Results/
+rematch, and recovery. Under RFG-003, use Chromium for live/compositor pixels
+and staged Firefox/mobile object/input plus direct-renderer evidence.
+
+Update roadmap acceptance/status, architecture/baseline/capability and map-
+authoring docs, bug ledger only with proven evidence, and Session Log. Run the
+complete end-of-batch ritual, commit and push directly to main, verify a clean
+worktree with HEAD exactly matching origin/main, and skip deployment.
+
+Carry-over warnings: use Corepack pnpm 10.33.0 if the local shim mismatches.
+Keep the Batch 25 goldens documentation-only and preserve all six production
+atlas grids and complete non-runtime lineage. RFG-001/RFG-002 remain closed
+historical proofs. RFG-003 remains the paired staged/live visual-evidence rule.
+Batch 35 owns only Wasteland Outpost and Overgrown Suburb; Batch 36 owns
+Scrapyard and Collapsed Overpass.
 ```

@@ -22,6 +22,27 @@ export interface MapTile {
   pickupType?: PickupSpawnType;
 }
 
+export interface MapTilePoint {
+  x: number;
+  y: number;
+}
+
+export interface MapTileRect extends MapTilePoint {
+  w: number;
+  h: number;
+}
+
+export interface MapSpawnPoint extends MapTilePoint {
+  /** Required by the 40x24 authoring profile; optional for legacy maps. */
+  id?: string;
+}
+
+export interface MapPickupSpawn extends MapTilePoint {
+  type: PickupSpawnType;
+  /** Required by the 40x24 authoring profile; optional for legacy maps. */
+  id?: string;
+}
+
 /**
  * A client sprite drawn centered on a tile rect (e.g. a wrecked car spanning
  * 1×2 solid tiles). Collision comes
@@ -30,6 +51,8 @@ export interface MapTile {
  * texture and flip remain client-only presentation.
  */
 export interface MapDecoration {
+  /** Required for authored landmarks, gates, and hazards; optional for legacy maps. */
+  id?: string;
   /** Tile rect the sprite is centered on (tile coords, w/h in tiles). */
   x: number;
   y: number;
@@ -45,14 +68,96 @@ export interface MapDecoration {
   interaction?: 'shootable_gate' | 'scavenger_cache';
 }
 
+export type StandardArenaSymmetryKind = 'rotational' | 'horizontal' | 'vertical' | 'asymmetric';
+
+export interface StandardArenaRegion {
+  /** Stable lower-kebab identity used by authoring metadata only. */
+  id: string;
+  /** Rectangles form a complete, non-overlapping partition of the tile grid. */
+  areas: MapTileRect[];
+}
+
+export interface StandardArenaLandmark {
+  id: string;
+  regionId: string;
+  footprint: MapTileRect;
+  minimap: 'major' | 'minor' | 'hidden';
+}
+
+export interface StandardArenaConnectivityLink {
+  id: string;
+  fromRegionId: string;
+  toRegionId: string;
+  /** Optional shootable-gate decoration whose opposite sides join the regions. */
+  gateId?: string;
+}
+
+export interface StandardArenaObjectiveAnchor {
+  id: string;
+  kind: 'koth' | 'core-run';
+  regionId: string;
+  footprint: MapTileRect;
+}
+
+export interface StandardArenaGateMetadata {
+  decorationId: string;
+  connectsRegionIds: readonly [string, string];
+}
+
+export interface StandardArenaHazardMetadata {
+  decorationId: string;
+  kind: 'explosive_barrel';
+  regionId: string;
+}
+
+/**
+ * Declarative review and loading contract for successor standard arenas.
+ * Runtime simulation continues to consume the established MapData fields;
+ * this block supplies deterministic authoring proof without client inference.
+ */
+export interface StandardArenaAuthoring {
+  schemaVersion: 1;
+  profile: 'standard-40x24';
+  regions: StandardArenaRegion[];
+  landmarks: StandardArenaLandmark[];
+  minimap: {
+    projection: 'orthographic-top-left';
+    bounds: MapTileRect;
+    landmarkIds: string[];
+  };
+  connectivity: {
+    requireSingleWalkableComponent: true;
+    links: StandardArenaConnectivityLink[];
+  };
+  objectives: StandardArenaObjectiveAnchor[];
+  spawnSafety: {
+    spawnIds: string[];
+    minimumPathDistanceTiles: number;
+    minimumEgressDirections: number;
+  };
+  pickupPlacement: {
+    pickupIds: string[];
+  };
+  gates: StandardArenaGateMetadata[];
+  hazards: StandardArenaHazardMetadata[];
+  symmetryReview: {
+    kind: StandardArenaSymmetryKind;
+    rationale: string;
+    /** Tile rectangles allowed to differ for a declared symmetric review. */
+    exceptions: MapTileRect[];
+    /** Asymmetric reviews must explicitly inspect all three available transforms. */
+    checkedTransforms: Exclude<StandardArenaSymmetryKind, 'asymmetric'>[];
+  };
+}
+
 export interface MapData {
   name: string;
   width: number;
   height: number;
   tileSize: number;
   tiles: TileType[][];
-  spawnPoints: { x: number; y: number }[];
-  pickupSpawns: { x: number; y: number; type: PickupSpawnType }[];
+  spawnPoints: MapSpawnPoint[];
+  pickupSpawns: MapPickupSpawn[];
   /**
    * Visual theme id resolved by the client tile renderer (see
    * client/src/rendering/map-themes.ts). Absent/unknown ids fall back to
@@ -69,6 +174,8 @@ export interface MapData {
    * enforces presence so mode rotation can put KOTH on any map).
    */
   kothHills?: { x: number; y: number }[];
+  /** Versioned authoring proof. Absent on the six legacy 20x12 maps. */
+  authoring?: StandardArenaAuthoring;
 }
 
 /** Persisted real-match wins keyed by canonical arena name. */

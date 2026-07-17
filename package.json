@@ -20,6 +20,8 @@
     "assets:generate:biome-environment-art": "node tools/reforged-assets/create-biome-environment-art-sources.mjs",
     "assets:generate:combat-feedback-art": "node tools/reforged-assets/create-combat-feedback-art-sources.mjs",
     "test:assets": "node --test tools/reforged-assets/*.test.mjs",
+    "maps:validate": "pnpm --filter @shared/game build && node tools/reforged-maps/map-authoring.mjs validate --profile compatible shared/maps",
+    "test:maps": "pnpm --filter @shared/game build && node --test tools/reforged-maps/*.test.mjs",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write \"**/*.{ts,tsx,mjs,json,md}\"",

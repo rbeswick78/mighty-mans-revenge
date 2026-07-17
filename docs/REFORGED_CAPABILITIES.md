@@ -284,6 +284,16 @@ Results/rematch, persistence, and the 20Hz server remain authoritative and
 unchanged. Production still advertises no Reforged capability; Batch 33 does
 not authorize exposure or deployment.
 
+Batch 34 adds the shared `standard-40x24` authoring profile without changing
+any capability handshake, normalization, default, or rollout step. The six
+registered maps remain old-schema-compatible 20x12 arenas and continue to load
+through their established runtime path. A future 40x24 document must pass the
+versioned regions/landmarks/minimap/connectivity/objective/spawn/pickup/gate/
+hazard/symmetry contract before a later batch may register it, but validation
+alone cannot advertise `largeWorlds`, add it to schedules or matchmaking, or
+change client/server authority. All five capabilities remain literal server-
+owned opt-ins and default false; Batch 39 still owns Reforged Arena exposure.
+
 ## Server-first rollout and rollback
 
 For each capability, keep this order:

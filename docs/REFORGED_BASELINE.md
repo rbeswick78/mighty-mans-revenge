@@ -282,6 +282,26 @@ These remain host/software-renderer observations rather than hardware pass
 thresholds. All capabilities remain default false and production was not
 deployed.
 
+### Batch 34 map authoring contract evidence
+
+Batch 34 adds a shared document-loading and authoring-validation boundary but
+does not change the current registry or any runtime map consumer. The
+`compatible` profile accepts all six unchanged 20x12 JSON maps without an
+`authoring` block; their names, 48px tiles, 960x576 bounds, `(0, 0)` origin,
+collision/destruction grids, spawns, pickups, KOTH anchors, decoration
+semantics, dynamic chunks, camera clamps, HUD, minimap projection, modern biome
+projection, and fallback paths remain the Batch 24/33 baseline.
+
+The separate `standard-40x24` profile validates future map documents before
+registration. Its deterministic positive fixture proves 40x24 dimensions,
+complete regions, landmark/minimap identity, walkable connectivity, KOTH/Core
+Run anchors, four identified spawns, reachable identified pickups, existing
+shootable gates and explosive barrels, and rotational review. Negative fixtures
+prove stable coded failures for every owned authoring surface. The CLI validates
+file and directory inputs in stable order. No recorder threshold, browser
+layout, capability default, authoritative 20Hz behavior, snapshot shape, or
+production state changes in this batch.
+
 ## Adjacent bug reproductions
 
 `client/src/rendering/camera-baseline.test.ts` now asserts the repaired
