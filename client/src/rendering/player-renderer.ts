@@ -28,6 +28,18 @@ import {
   type ReforgedFighterLivingState,
 } from './reforged-fighter-contract.js';
 import { reforgedFighterAtlasAvailable } from './reforged-fighter-runtime.js';
+import {
+  REFORGED_FIGHTER_ART_II_TEXTURE_KEY,
+  isReforgedFighterArtIIId,
+  reforgedFighterArtIIAnimationKey,
+  reforgedFighterArtIIAssetForCharacter,
+  reforgedFighterArtIIFrameName,
+  shouldUseReforgedFighterArtIIBody,
+  type ReforgedFighterArtIIId,
+  type ReforgedFighterArtIILivingState,
+  type ReforgedFighterArtIIState,
+} from './reforged-fighter-art-ii-contract.js';
+import { reforgedFighterArtIIAtlasAvailable } from './reforged-fighter-art-ii-runtime.js';
 
 const SPRITE_SCALE = 3;
 const REFORGED_SPRITE_SCALE = 1;
@@ -108,6 +120,9 @@ const ATTACK_SWING_DURATION_MS = 350;
 const BAT_SWING_DURATION_MS = 310;
 
 type AnimState = 'idle' | 'run';
+type ModernFighterId = ReforgedFighterId | ReforgedFighterArtIIId;
+type ModernFighterLivingState = ReforgedFighterLivingState | ReforgedFighterArtIILivingState;
+type ModernFighterState = ModernFighterLivingState | ReforgedFighterArtIIState;
 
 export class PlayerRenderer {
   private container: Phaser.GameObjects.Container;
@@ -115,11 +130,11 @@ export class PlayerRenderer {
   /** Optional animated cosmetic synchronized to the body (Rook's helmet). */
   private bodyOverlaySprite: Phaser.GameObjects.Sprite | null;
   private readonly characterDef: CharacterDef;
-  private readonly modernFighterId: ReforgedFighterId | null;
+  private readonly modernFighterId: ModernFighterId | null;
   private readonly modernArtAvailable: boolean;
   private useModernBody: boolean;
   private modernTransientState: Extract<
-    ReforgedFighterLivingState,
+    ModernFighterLivingState,
     'attack' | 'ability' | 'damage'
   > | null = null;
   private modernTransientTimer: Phaser.Time.TimerEvent | null = null;
@@ -209,9 +224,16 @@ export class PlayerRenderer {
     const def: CharacterDef = CHARACTERS[characterId];
     this.characterDef = def;
     this.characterId = characterId;
-    this.modernFighterId = isReforgedFighterId(characterId) ? characterId : null;
+    this.modernFighterId =
+      isReforgedFighterId(characterId) || isReforgedFighterArtIIId(characterId)
+        ? characterId
+        : null;
     this.modernArtAvailable =
-      modernArtEnabled && this.modernFighterId !== null && reforgedFighterAtlasAvailable(scene);
+      modernArtEnabled &&
+      this.modernFighterId !== null &&
+      (isReforgedFighterId(this.modernFighterId)
+        ? reforgedFighterAtlasAvailable(scene)
+        : reforgedFighterArtIIAtlasAvailable(scene));
     this.useModernBody = this.modernArtAvailable;
     this.texturePrefix = def.spritePrefix;
     this.altBodyPrefix = def.altBody?.spritePrefix ?? null;
@@ -219,26 +241,28 @@ export class PlayerRenderer {
     this.hasGun = def.hasGun;
 
     this.sprite = this.useModernBody
-      ? scene.add.sprite(
-          0,
-          0,
-          REFORGED_FIGHTER_TEXTURE_KEY,
-          reforgedFighterFrameName(this.modernFighterId!, 0),
-        )
+      ? scene.add.sprite(0, 0, this.modernTextureKey(), this.modernFrameName(0))
       : scene.add.sprite(0, 0, this.animKey('down', 'idle'), 0);
     this.sprite.setOrigin(0.5, 0.5);
     this.sprite.setScale(this.bodySpriteScale());
     this.sprite.play(
-      this.useModernBody
-        ? reforgedFighterAnimationKey(this.modernFighterId!, 'idle', 'down')
-        : this.animKey('down', 'idle'),
+      this.useModernBody ? this.modernAnimationKey('idle', 'down') : this.animKey('down', 'idle'),
     );
 
     if (def.bodyOverlay) {
-      const overlayKey = `${def.bodyOverlay.spritePrefix}_down_idle`;
-      this.bodyOverlaySprite = scene.add.sprite(0, 0, overlayKey, 0);
+      const overlayKey = this.useModernRookOverlay()
+        ? this.modernOverlayAnimationKey('idle', 'down')
+        : `${def.bodyOverlay.spritePrefix}_down_idle`;
+      this.bodyOverlaySprite = this.useModernRookOverlay()
+        ? scene.add.sprite(
+            0,
+            0,
+            REFORGED_FIGHTER_ART_II_TEXTURE_KEY,
+            reforgedFighterArtIIFrameName('rook-helmet', 0),
+          )
+        : scene.add.sprite(0, 0, overlayKey, 0);
       this.bodyOverlaySprite.setOrigin(0.5, 0.5);
-      this.bodyOverlaySprite.setScale(SPRITE_SCALE);
+      this.bodyOverlaySprite.setScale(this.bodyOverlaySpriteScale());
       this.bodyOverlaySprite.play(overlayKey);
       this.applyBodyOverlayTransform('down', 'idle');
     } else {
@@ -615,9 +639,19 @@ export class PlayerRenderer {
     this.attackTimer?.remove(false);
     this.isAttacking = true;
     // ignoreIfPlaying = false: a rapid re-swing restarts the animation.
-    this.sprite.play(this.attackKey(this.currentDirection), false);
+    this.sprite.play(
+      this.useModernBody
+        ? this.modernAnimationKey('attack', this.currentDirection)
+        : this.attackKey(this.currentDirection),
+      false,
+    );
     if (this.bodyOverlaySprite) {
-      this.bodyOverlaySprite.play(this.bodyOverlayAttackKey(this.currentDirection), false);
+      this.bodyOverlaySprite.play(
+        this.useModernRookOverlay()
+          ? this.modernOverlayAnimationKey('attack', this.currentDirection)
+          : this.bodyOverlayAttackKey(this.currentDirection),
+        false,
+      );
       this.applyBodyOverlayTransform(this.currentDirection, 'attack');
     }
     this.attackTimer = this.scene.time.delayedCall(ATTACK_SWING_DURATION_MS, () => {
@@ -638,7 +672,7 @@ export class PlayerRenderer {
   }
 
   private playModernTransient(
-    state: Extract<ReforgedFighterLivingState, 'attack' | 'ability' | 'damage'>,
+    state: Extract<ModernFighterLivingState, 'attack' | 'ability' | 'damage'>,
     durationMs: number,
   ): void {
     if (!this.useModernBody || this.isDead) return;
@@ -719,6 +753,8 @@ export class PlayerRenderer {
     direction: Direction4;
     animationKey: string | null;
     frameName: string | number;
+    overlayAnimationKey: string | null;
+    overlayFrameName: string | number | null;
     weaponId: WeaponId;
     dead: boolean;
   }> {
@@ -729,6 +765,8 @@ export class PlayerRenderer {
       direction: this.currentDirection,
       animationKey: this.sprite.anims.currentAnim?.key ?? null,
       frameName: this.sprite.frame.name,
+      overlayAnimationKey: this.bodyOverlaySprite?.anims.currentAnim?.key ?? null,
+      overlayFrameName: this.bodyOverlaySprite?.frame.name ?? null,
       weaponId: this.currentWeaponId,
       dead: this.isDead,
     });
@@ -746,7 +784,7 @@ export class PlayerRenderer {
     this.sprite.setScale(this.bodySpriteScale());
     this.gunSprite?.setScale(SPRITE_SCALE * multiplier);
     this.batSprite.setScale(SPRITE_SCALE * multiplier);
-    this.bodyOverlaySprite?.setScale(SPRITE_SCALE * multiplier);
+    this.bodyOverlaySprite?.setScale(this.bodyOverlaySpriteScale());
     this.wandGraphics?.setScale(SPRITE_SCALE * multiplier);
     this.applyCurrentBodyOverlayTransform();
   }
@@ -941,8 +979,7 @@ export class PlayerRenderer {
     // direction change resolves to a different attack key so the swing
     // re-plays in the new facing instead of snapping back to idle.
     const key = this.useModernBody
-      ? reforgedFighterAnimationKey(
-          this.modernFighterId!,
+      ? this.modernAnimationKey(
           this.modernTransientState ??
             (this.isAttacking ? 'attack' : this.currentAnimState === 'run' ? 'move' : 'idle'),
           this.currentDirection,
@@ -953,9 +990,15 @@ export class PlayerRenderer {
     // ignoreIfPlaying = true means re-calling with the same key is a no-op.
     this.sprite.play(key, true);
     if (this.bodyOverlaySprite) {
-      const overlayKey = this.isAttacking
-        ? this.bodyOverlayAttackKey(this.currentDirection)
-        : this.bodyOverlayAnimKey(this.currentDirection, this.currentAnimState);
+      const overlayKey = this.useModernRookOverlay()
+        ? this.modernOverlayAnimationKey(
+            this.modernTransientState ??
+              (this.isAttacking ? 'attack' : this.currentAnimState === 'run' ? 'move' : 'idle'),
+            this.currentDirection,
+          )
+        : this.isAttacking
+          ? this.bodyOverlayAttackKey(this.currentDirection)
+          : this.bodyOverlayAnimKey(this.currentDirection, this.currentAnimState);
       this.bodyOverlaySprite.play(overlayKey, true);
       this.applyBodyOverlayTransform(
         this.currentDirection,
@@ -986,36 +1029,97 @@ export class PlayerRenderer {
 
   private deathKey(): string {
     if (this.useModernBody) {
-      return reforgedFighterAnimationKey(
-        this.modernFighterId!,
-        'death',
-        this.deathDirection,
-        this.currentDeathCount,
-      );
+      return this.modernAnimationKey('death', this.deathDirection, this.currentDeathCount);
     }
     return `${this.currentDeathPrefix}_${this.deathDirection}_death`;
+  }
+
+  private modernTextureKey(): string {
+    return isReforgedFighterId(this.modernFighterId!)
+      ? REFORGED_FIGHTER_TEXTURE_KEY
+      : REFORGED_FIGHTER_ART_II_TEXTURE_KEY;
+  }
+
+  private modernFrameName(frameIndex: number): string {
+    if (isReforgedFighterId(this.modernFighterId!)) {
+      return reforgedFighterFrameName(this.modernFighterId, frameIndex);
+    }
+    return reforgedFighterArtIIFrameName(
+      reforgedFighterArtIIAssetForCharacter(
+        this.modernFighterId as ReforgedFighterArtIIId,
+        this.isAxeless,
+      ),
+      frameIndex,
+    );
+  }
+
+  private modernAnimationKey(
+    state: ModernFighterState,
+    direction: Direction4 | DeathDirection,
+    deathCount = 1,
+  ): string {
+    if (isReforgedFighterId(this.modernFighterId!)) {
+      return reforgedFighterAnimationKey(this.modernFighterId, state, direction, deathCount);
+    }
+    return reforgedFighterArtIIAnimationKey(
+      reforgedFighterArtIIAssetForCharacter(
+        this.modernFighterId as ReforgedFighterArtIIId,
+        this.isAxeless,
+      ),
+      state,
+      direction,
+      deathCount,
+    );
+  }
+
+  private useModernRookOverlay(): boolean {
+    return this.useModernBody && this.modernFighterId === 'rook';
+  }
+
+  private modernOverlayAnimationKey(
+    state: ReforgedFighterArtIIState,
+    direction: Direction4 | DeathDirection,
+    deathCount = 1,
+  ): string {
+    return reforgedFighterArtIIAnimationKey('rook-helmet', state, direction, deathCount);
   }
 
   private bodySpriteScale(): number {
     return (this.useModernBody ? REFORGED_SPRITE_SCALE : SPRITE_SCALE) * this.renderScaleMultiplier;
   }
 
-  private updateModernBodySelection(): void {
-    const next = shouldUseReforgedFighterBody(
-      this.characterId,
-      this.currentWeaponId,
-      this.modernArtAvailable,
-      true,
+  private bodyOverlaySpriteScale(): number {
+    return (
+      (this.useModernRookOverlay() ? REFORGED_SPRITE_SCALE : SPRITE_SCALE) *
+      this.renderScaleMultiplier
     );
+  }
+
+  private updateModernBodySelection(): void {
+    const next = isReforgedFighterId(this.characterId)
+      ? shouldUseReforgedFighterBody(
+          this.characterId,
+          this.currentWeaponId,
+          this.modernArtAvailable,
+          true,
+        )
+      : shouldUseReforgedFighterArtIIBody(
+          this.characterId,
+          this.currentWeaponId,
+          this.modernArtAvailable,
+          true,
+        );
     if (next === this.useModernBody) return;
     this.useModernBody = next;
     this.modernTransientTimer?.remove(false);
     this.modernTransientTimer = null;
     this.modernTransientState = null;
     this.sprite.setScale(this.bodySpriteScale());
+    this.bodyOverlaySprite?.setScale(this.bodyOverlaySpriteScale());
     if (this.characterId === 'frost_wizard' && !this.useModernBody) this.applyFrostWizardTint();
     else this.sprite.clearTint();
     this.setAliveVisualsVisible(!this.isDead);
+    this.applyCurrentBodyOverlayTransform();
     if (this.isDead) this.sprite.play(this.deathKey(), true);
     else this.playCurrentAnim();
   }
@@ -1029,6 +1133,9 @@ export class PlayerRenderer {
   }
 
   private bodyOverlayDeathKey(): string {
+    if (this.useModernRookOverlay()) {
+      return this.modernOverlayAnimationKey('death', this.deathDirection, this.currentDeathCount);
+    }
     return `${this.characterDef.bodyOverlay!.spritePrefix}_${this.deathDirection}_death`;
   }
 
@@ -1039,6 +1146,10 @@ export class PlayerRenderer {
   ): void {
     const overlay = this.characterDef.bodyOverlay;
     if (!overlay || !this.bodyOverlaySprite) return;
+    if (this.useModernRookOverlay()) {
+      this.bodyOverlaySprite.setPosition(0, 0);
+      return;
+    }
 
     const bodyHeight =
       state === 'death'

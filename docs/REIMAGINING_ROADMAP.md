@@ -5,9 +5,9 @@ Read this file and `CLAUDE.md` completely at the start of every batch. The
 completed `docs/REPLAYABILITY_ROADMAP.md` remains the historical record for the
 systems this program preserves and reorganizes.
 
-- **Status:** Batch 28 complete on 2026-07-16; the deterministic Fighter Art I
-  atlas and capability-owned gameplay presentation are in-repo.
-- **Next batch:** Batch 29 — Fighter art II.
+- **Status:** Batch 29 complete on 2026-07-16; both deterministic fighter-art
+  atlases and capability-owned gameplay presentation are in-repo.
+- **Next batch:** Batch 30 — Weapons and pickups.
 - **Public releases:** Reforged Arena, then Battle Royale.
 - **Working model:** one numbered batch per session, direct commits and pushes
   to `main`, milestone-gated production deployments.
@@ -182,7 +182,7 @@ Production deployment happens only at a gate or for an urgent live fix.
 |  26 | Asset pipeline                         | Visual system | **DONE — 2026-07-16** |
 |  27 | Modern UI assets                       | Visual system | **DONE — 2026-07-16** |
 |  28 | Fighter art I                          | Visual system | **DONE — 2026-07-16** |
-|  29 | Fighter art II                         | Visual system | Pending               |
+|  29 | Fighter art II                         | Visual system | **DONE — 2026-07-16** |
 |  30 | Weapons and pickups                    | Visual system | Pending               |
 |  31 | Biome environment kit                  | Visual system | Pending               |
 |  32 | Modern combat feedback                 | Visual system | Pending               |
@@ -1030,6 +1030,34 @@ Acceptance:
 
 Modernize Bubba, Jack, and Rook with equivalent coverage, including Jack's
 weapon state and Rook's synchronized visual layers.
+
+- [x] Three original AI-assisted references plus deterministic project cleanup
+      produce Bubba, Jack, and Rook without copying, cropping, or reinterpreting
+      a Batch 25 golden or changing the completed Fighter Art I atlas.
+- [x] Five registered canonical sheets provide 404 exact frames: 88 Bubba, 88
+      Jack axe-absent, 76 Jack axe-present, 76 Rook body, and 76 Rook helmet.
+      All include four-direction idle/move/attack/ability/damage and exact live
+      death cycles; Jack's two complete bodies and Rook's synchronized layers
+      preserve their grids and registration through every facing and death.
+- [x] Bubba retains the tallest/widest planted no-gun undead tank, patched
+      overalls/scrap mass, and steel-blue Iron Hide cue; Jack retains a wiry
+      rust-red undead shape, long-handled axe truth, and thrown-axe cue; Rook
+      retains a compact forward rifleman, close rifle, full green lens helmet,
+      paired teal chevrons, and low dash streak at full/mobile/gameplay scale.
+- [x] The Batch 26 packer emits one deterministic 404-frame 2048x2048 RGBA8888
+      `fighter-art-ii.core` atlas with exact grids, stable sorting, no trim or
+      rotation, 3px padding, 2px extrusion, byte ceilings, runtime-safe import
+      metadata, and separate complete production lineage.
+- [x] Literal server-owned `modernArt` gates live bodies. False, absent,
+      old-server, missing-atlas, non-Batch-29, and incompatible Rook non-rifle
+      paths preserve legacy fallbacks; Bubba remains no-gun and Jack follows
+      the existing snapshot-owned axe cooldown without mechanics changes.
+- [x] Focused deterministic asset/import/grid/registration/layer/state/
+      direction/fallback/full-reduced tests, typecheck, lint, affected/full
+      builds, formatting, diff/provenance review, targeted desktop Chromium and
+      mobile-landscape interaction/visual evidence, small-world HUD/minimap,
+      Results/rematch, death/respawn, and recovery checks pass. No Batch 30
+      content, capability exposure, legacy retirement, or deployment occurs.
 
 #### Batch 30 — Weapons and pickups
 
@@ -2740,6 +2768,67 @@ change. Batch 29 owns Bubba, Jack, and Rook, including Jack axe/no-axe and Rook
 synchronized layers. Batch 33 owns coherent Boot-through-Results cutover and
 verified legacy retirement.
 
+### Batch 29 — 2026-07-16 — Fighter art II
+
+**Shipped:** Added three original AI-assisted production references plus one
+deterministic project cleanup source for Bubba, Jack, and Rook. Five canonical
+64px sheets provide complete registered four-direction idle, move, attack,
+ability, and damage states plus exact live death cycles: 88 Bubba, 88 Jack
+axe-absent, 76 Jack axe-present, 76 Rook body, and 76 Rook helmet frames. The
+unchanged Batch 26 packer emits a deterministic 404-frame 2048x2048 RGBA8888
+`fighter-art-ii.core` atlas, runtime-safe import JSON, and separate complete
+provenance. Boot validates and registers it independently from Fighter Art I.
+Literal server-owned `modernArt` selects the bodies from existing snapshots;
+Jack's cooldown selects a complete axe body and Rook's helmet animates in
+lockstep with his rifle body. Bubba stays the planted steel-blue no-gun tank,
+Jack stays the wiry rust-red axe undead, and Rook stays the compact green-helmet
+rifleman with paired teal dash chevrons. All incompatible, absent, false,
+old-server, missing-atlas, or other-roster paths retain complete legacy art.
+
+**Verification:** Selected the visual plus isolated client-rendering tier
+because executable changes are confined to deterministic production art, Boot
+loading, snapshot-owned presentation selection, and focused browser
+instrumentation. No shared/server/wire/persistence, gameplay, collision, input,
+camera, recovery authority, capability default, production, or deployment
+boundary changed. The focused asset suite passed deterministic source/runtime/
+provenance rebuild, exact 404-frame metadata, grid, registration, dominant-mass,
+negative-space, identity-palette, Jack axe truth, and Rook layer synchronization
+checks. Focused Vitest passed seven import, frame/death range, state/direction,
+held-object fallback, and full/reduced tests. Typecheck, lint, affected client
+build, full production build, repository formatting, and `git diff --check`
+passed; Vite's established chunk advisory remains. Targeted desktop Chromium
+and mobile-landscape evidence passed capability-on state/direction, ability,
+damage, death/respawn, Jack axe swap, Rook layer lockstep, Rook held-object
+fallback/restoration, and capability-off/old-server fallback plus retained
+small-world, HUD/minimap, Results/rematch, and recovery cases. The five source
+sheets, packed atlas, 1280x720 desktop renderer, 844x390 Chromium frame, and
+gameplay-scale silhouettes were inspected. Full unit and three-project browser
+inventories were omitted because focused evidence showed no broader coupling;
+Batch 33 and Batch 39 retain the full-journey and release-gate matrices.
+
+**Deployment:** Skipped. Batch 29 is incomplete visual-system milestone work
+behind a default-false server capability. No production environment, server or
+client deployment, capability exposure, or legacy asset changed.
+
+**Deviations:** No product-scope deviation. Initial focused validators correctly
+found a clipped Bubba attack margin and then exposed over-specified Jack/Rook
+test geometry; the source pose was tightened and the checks were rewritten to
+assert direct per-frame axe presence/absence and authored helmet registration.
+The corrected suite passed. The Batch 26 atlas height was raised from the
+initial 1024 estimate to 2048 because the exact 404-frame grid cannot fit the
+smaller declared shelf; byte ceilings and loading lifecycle stayed unchanged.
+Managed sandbox node-module reads required approved repository-local execution.
+The pnpm Playwright wrapper forwarded a literal separator, so final targeted
+evidence used the installed Playwright shim. Mobile staged object/input and
+direct-renderer evidence retains RFG-003's role; desktop Chromium supplied the
+live/compositor and resized mobile-width visual reference.
+
+**Known issues:** No new bug-ledger entry was required. RFG-001 and RFG-002
+remain closed historical proofs. RFG-003 remains gate-dispositioned and
+unchanged. Batch 30 owns weapons, pickups, ammo/container art, and rarity auras;
+Batch 33 owns coherent Boot-through-Results cutover and verified legacy
+retirement.
+
 ## Batch 22 input prompt (historical)
 
 ```text
@@ -3191,23 +3280,33 @@ Continue the Reforged build for Mighty Man's Revenge.
 Read docs/REIMAGINING_ROADMAP.md and CLAUDE.md completely first. Read
 docs/REFORGED_BASELINE.md, docs/REFORGED_CAPABILITIES.md,
 docs/REFORGED_STYLE_BIBLE.md, docs/REFORGED_ASSET_PIPELINE.md, and
-docs/reforged/style-bible/PROVENANCE.md before implementation. Batch 28 —
-Fighter art I is complete. Implement Batch 29 — Fighter art II exactly as
-specified and do not begin Batch 30 — Weapons and pickups.
+docs/reforged/style-bible/PROVENANCE.md before implementation. Batch 29 —
+Fighter art II is complete. Implement Batch 30 — Weapons and pickups exactly as
+specified and do not begin Batch 31 — Biome environment kit.
 
-Produce coherent production art for Bubba, Jack, and Rook across the complete
-directional idle, movement, attack, ability, damage, and death state sets
-required by their existing live identities. Preserve Bubba's tallest/widest
-undead tank silhouette, planted feet, patched industrial overalls/scrap plating,
-no-gun truth, and steel-blue Iron Hide cue; Jack's wiry asymmetric undead
-silhouette, rust-red work coat, long-handled axe, distinct complete axe-present
-and axe-absent bodies, and rust-red thrown-axe cue; and Rook's compact forward-
-leaning human rifleman silhouette, green full scavenger helmet/round lenses/
-short ridge, close-carried rifle, oxidized-teal paired chevrons, and low dash
-streak. Rook's body and helmet layers must keep identical registration and
-synchronized state grids. Every state must preserve aim/facing, carried-object
-or no-gun truth, readable negative space, one dominant body mass, and gameplay-
-scale recognition at 48–72 CSS pixels. Do not alter mechanics to fit animation.
+Produce coherent production art for the six-gun visual language: rifle, pistol,
+shotgun, SMG, sniper rifle, and launcher. Preserve the locked silhouettes in
+held/top-down, firing, ground-pickup, HUD/ammo, and container presentation:
+rifle as the balanced middle-length baseline; pistol as the smallest compact
+one-handed block; shotgun with a thick pump/front mass; SMG as a short box with
+deep magazine; sniper as the longest narrow scoped shape; and launcher as the
+broadest tube with the heaviest rear mass. The same base silhouette must remain
+recognizable when dry, dropped, held, firing, or rarity-treated. Produce the
+existing sustain pickup family—gun ammo, grenade, bandage, armor, and
+overcharge—plus container/supply language without changing authoritative pickup
+types, behavior, spawn timing, ammo, rarity, or inventory mechanics. Preserve
+the existing bat/punch presentation and fallbacks; do not invent new melee
+mechanics or silently treat them as members of the six-gun roster.
+
+Implement the locked rarity language as production presentation only: Common
+neutral/no aura, Uncommon one underline, Rare two orbit ticks, Epic four
+faceted marks, Legendary three crown rays, and Mythical a narrow double-
+chevron halo. Keep the compact badge/rim and shape code readable in grayscale;
+never repaint the whole gun. Full quality may keep bounded facets, soft light,
+and secondary motion, while reduced quality must retain the badge, rim, main
+silhouette, timing, and pickup identity without bloom or extra particles. Do
+not add rarity damage, weapon instances, Battle Royale inventory, containers,
+or loot behavior; their later batches own mechanics and authority.
 
 Use the Batch 26 source/manifest/provenance contract and the smallest production
 source/atlas sets that preserve exact frame grids and loading lifecycle. Keep
@@ -3218,14 +3317,15 @@ documentation references and may not be copied into runtime output. Record all
 original/AI-assisted production lineage and inspect source plus packed output at
 full, mobile-width, and gameplay scale before acceptance.
 
-Preserve Batch 28's complete `fighter-art-i.core` contract: 288 registered
-frames in one deterministic 2048x1024 atlas; Mighty Man/Bruce/Frost Wizard
-directional idle/move/attack/ability/damage/death states; exact live death
-variant cycles; bone/amber/cyan, stocky no-gun/ember, and slim wand/cyan-indigo
-identity cues; snapshot-owned animation selection; full/reduced essential body
-and ability treatment; held-object fallback; and literal server-owned
-`modernArt` gating. Do not rewrite, merge, or place new fighter pixels in that
-atlas merely to accommodate Batch 29.
+Preserve Batch 29's complete `fighter-art-ii.core` contract: five canonical
+sheets and 404 registered frames in one deterministic 2048x2048 atlas; Bubba,
+Jack axe-present/axe-absent, and synchronized Rook body/helmet directional
+idle/move/attack/ability/damage/death states; exact live death cycles; steel-
+blue tank, rust-red axe, and green-helmet/teal-chevron identity cues; snapshot-
+owned selection; full/reduced essential body/layer treatment; held-object
+fallback; and literal server-owned `modernArt` gating. Preserve Batch 28's
+separate 288-frame `fighter-art-i.core` contract unchanged. Do not rewrite,
+merge, or place weapon/pickup pixels in either fighter atlas.
 
 Preserve Batch 27's complete modern UI contract and the complete Batch 18–24
 viewport, coordinate, camera, dynamic rendering, quality, responsive HUD,
@@ -3236,38 +3336,40 @@ production configuration. Capability-off, old-server, and old-client paths
 retain the exact established 960x720 gameplay/Lobby behavior through Batch 54.
 All capabilities remain strict server-owned opt-ins and default false.
 
-Do not begin Batch 30 or later work: no six-gun or pickup production set, rarity
-auras, biome kit, combat-feedback cutover, full-journey visual cutover, larger
-arena, tactical-map gameplay/input, movement or balance tuning, Battle Royale,
-capability exposure, or deployment. Retain every legacy fighter asset/fallback
-until a verified gated replacement owns each live use; Batch 33 still owns the
-coherent Boot-through-Results cutover. Never enable a capability by default or
-deploy without explicit authorization.
+Do not begin Batch 31 or later work: no biome terrain/cover/prop production set,
+combat-feedback cutover, full-journey visual cutover, larger arena, tactical-map
+gameplay/input, movement or balance tuning, Battle Royale mechanics, capability
+exposure, or deployment. Do not add SMG/sniper/launcher mechanics merely because
+their art exists. Retain every legacy weapon, pickup, fighter, and procedural
+fallback until a verified gated replacement owns each live use; Batch 33 still
+owns the coherent Boot-through-Results cutover. Never enable a capability by
+default or deploy without explicit authorization.
 
-Batch 28 is complete and pushed on main as `feat(art): add Reforged fighter art
-I`. Three original AI-assisted references plus deterministic project cleanup
-emit 100 Mighty Man, 88 Bruce, and 100 Frost Wizard canonical frames. The Batch
-26 tool packs a 288-frame 2048x1024 RGBA8888 atlas plus runtime-safe import JSON
-and separate complete provenance. Focused generation/asset/import/grid/
-registration/layer/state/direction/fallback/full-reduced tests, typecheck, lint,
-affected/full builds, formatting, diff/provenance review, targeted desktop
-Chromium/mobile-landscape state and visual evidence, capability-off fallback,
-death/respawn/restoration, current small-world HUD/minimap, Results/rematch, and
-recovery checks are green. No shared/server/wire/mechanics/capability-default/
-production/deployment behavior changed.
+Batch 29 is complete and pushed on main as `feat(art): add Reforged fighter art
+II`. Three original AI-assisted references plus deterministic project cleanup
+emit 88 Bubba, 88 Jack axe-absent, 76 Jack axe-present, 76 Rook body, and 76
+Rook helmet frames. The Batch 26 tool packs a 404-frame 2048x2048 RGBA8888 atlas
+plus runtime-safe import JSON and separate complete provenance. Focused
+generation/asset/import/grid/registration/layer/state/direction/fallback/full-
+reduced tests, typecheck, lint, affected/full builds, formatting, diff/
+provenance review, targeted desktop Chromium/mobile-landscape state and visual
+evidence, capability-off fallback, death/respawn/restoration, current small-
+world HUD/minimap, Results/rematch, and recovery checks are green. No shared/
+server/wire/mechanics/capability-default/production/deployment behavior changed.
 
-Choose and document the Batch 29 visual/client-rendering verification tier. Run
-focused asset validators for every new manifest/output; add deterministic import,
-frame-grid, registration/layer synchronization, state-selection, direction,
-Jack axe/no-axe, Rook body/helmet, fallback, and full/reduced tests. Verify all
-required Bubba/Jack/Rook states at full, mobile, and gameplay scale, capability-
-on rendering, capability-off/old-server fallback, current small-world behavior,
-HUD/minimap readability, Results/rematch, death/respawn, and recovery
-restoration. Run repository formatting, `git diff --check`, intended-diff/
-provenance review, `corepack pnpm typecheck`, `corepack pnpm lint`, affected and
-full production builds, and targeted desktop Chromium/mobile-landscape
+Choose and document the Batch 30 visual/client-rendering verification tier. Run
+focused asset validators for every new manifest/output; add deterministic
+import, exact grid, registration, silhouette, held/firing/ground/HUD/ammo/
+container, rarity-shape/grayscale, pickup identity, fallback, and full/reduced
+tests. Verify all six gun identities, current live rifle/pistol/shotgun and
+sustain-pickup presentation, future-art dormancy, capability-on rendering,
+capability-off/old-server fallback, current small-world behavior, HUD/minimap
+readability, Results/rematch, and recovery restoration at full, mobile-width,
+and gameplay scale. Run repository formatting, `git diff --check`, intended-
+diff/provenance review, `corepack pnpm typecheck`, `corepack pnpm lint`, affected
+and full production builds, and targeted desktop Chromium/mobile-landscape
 interaction and visual evidence. Escalate to full unit or three-project browser
-suites if shared/server/wire, animation lifecycle, recovery, capability
+suites if shared/server/wire, pickup/weapon lifecycle, recovery, capability
 foundations, or broader scene behavior changes. Update roadmap acceptance/
 status, architecture/pipeline/provenance docs, bug ledger only with proven
 evidence, and Session Log. Run the complete end-of-batch ritual, commit and push
@@ -3276,11 +3378,11 @@ and skip deployment.
 
 Carry-over warnings: use Corepack pnpm 10.33.0 if the local shim mismatches. Do
 not overwrite, reinterpret, or atlas the Batch 25 goldens. Keep source archives
-and full license/generation lineage out of runtime redistribution. Preserve
-Jack's complete axe-present/axe-absent body truth and Rook's synchronized body/
-helmet layers across every state and death facing. RFG-001/RFG-002 remain closed
-historical proofs. RFG-003 still requires staged Firefox/WebKit object/input
-evidence and direct renderer pixels where applicable, with Chromium as the
-live/compositor and mobile-sized visual reference. Batch 29 owns Bubba, Jack,
-and Rook; Batch 30 owns weapons and pickups.
+and full license/generation lineage out of runtime redistribution. Preserve both
+completed fighter atlases, Jack's complete axe bodies, and Rook's synchronized
+layers. Keep future SMG/sniper/launcher and rarity presentation mechanically
+dormant. RFG-001/RFG-002 remain closed historical proofs. RFG-003 still
+requires staged Firefox/WebKit object/input evidence and direct renderer pixels
+where applicable, with Chromium as the live/compositor and mobile-sized visual
+reference. Batch 30 owns weapons and pickups; Batch 31 owns the biome kit.
 ```

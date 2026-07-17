@@ -1,0 +1,88 @@
+{
+  "assets": [
+    {
+      "id": "fighter.bubba.core",
+      "provenance": {
+        "attribution": "OpenAI-assisted production reference; deterministic project geometry",
+        "creator": "Mighty Man's Revenge Reforged fighter geometry",
+        "generation": {
+          "id": "exec-a28b48f0-271a-4d9b-adb5-b1e6643adb23",
+          "promptDocument": "art/reforged/references/fighter-art-ii/PROMPTS.md",
+          "provider": "OpenAI built-in image generation"
+        },
+        "license": "LicenseRef-MMR-Project-Owned",
+        "origin": "ai-assisted",
+        "sourceReference": "tools/reforged-assets/create-fighter-art-ii-sources.mjs"
+      },
+      "sourceSha256": "c1713fbc486cb22d48fb489debabf110e364c72579176ecb699ce65727d10eec"
+    },
+    {
+      "id": "fighter.jack.axe-absent",
+      "provenance": {
+        "attribution": "OpenAI-assisted production reference; deterministic project geometry",
+        "creator": "Mighty Man's Revenge Reforged fighter geometry",
+        "generation": {
+          "id": "exec-f3fbee85-985c-4ce3-8e35-018f1ea86717",
+          "promptDocument": "art/reforged/references/fighter-art-ii/PROMPTS.md",
+          "provider": "OpenAI built-in image generation"
+        },
+        "license": "LicenseRef-MMR-Project-Owned",
+        "origin": "ai-assisted",
+        "sourceReference": "tools/reforged-assets/create-fighter-art-ii-sources.mjs"
+      },
+      "sourceSha256": "1e32b679c67daa01d7343af1c31335d6fe173368b853a35ed0a6d98fa99af38e"
+    },
+    {
+      "id": "fighter.jack.axe-present",
+      "provenance": {
+        "attribution": "OpenAI-assisted production reference; deterministic project geometry",
+        "creator": "Mighty Man's Revenge Reforged fighter geometry",
+        "generation": {
+          "id": "exec-f3fbee85-985c-4ce3-8e35-018f1ea86717",
+          "promptDocument": "art/reforged/references/fighter-art-ii/PROMPTS.md",
+          "provider": "OpenAI built-in image generation"
+        },
+        "license": "LicenseRef-MMR-Project-Owned",
+        "origin": "ai-assisted",
+        "sourceReference": "tools/reforged-assets/create-fighter-art-ii-sources.mjs"
+      },
+      "sourceSha256": "f9cef18f89e3128366fef0f583b39692c64f894a1e283cea6189df44e74a63a9"
+    },
+    {
+      "id": "fighter.rook.body",
+      "provenance": {
+        "attribution": "OpenAI-assisted production reference; deterministic project geometry",
+        "creator": "Mighty Man's Revenge Reforged fighter geometry",
+        "generation": {
+          "id": "exec-abc93106-cd1b-4730-8ee4-75a2d6ab4657",
+          "promptDocument": "art/reforged/references/fighter-art-ii/PROMPTS.md",
+          "provider": "OpenAI built-in image generation"
+        },
+        "license": "LicenseRef-MMR-Project-Owned",
+        "origin": "ai-assisted",
+        "sourceReference": "tools/reforged-assets/create-fighter-art-ii-sources.mjs"
+      },
+      "sourceSha256": "a1434aa1dddc9e220b5a956d2f0a352df95582c00fd94696af95f94eeb406029"
+    },
+    {
+      "id": "fighter.rook.helmet",
+      "provenance": {
+        "attribution": "OpenAI-assisted production reference; deterministic project geometry",
+        "creator": "Mighty Man's Revenge Reforged fighter geometry",
+        "generation": {
+          "id": "exec-abc93106-cd1b-4730-8ee4-75a2d6ab4657",
+          "promptDocument": "art/reforged/references/fighter-art-ii/PROMPTS.md",
+          "provider": "OpenAI built-in image generation"
+        },
+        "license": "LicenseRef-MMR-Project-Owned",
+        "origin": "ai-assisted",
+        "sourceReference": "tools/reforged-assets/create-fighter-art-ii-sources.mjs"
+      },
+      "sourceSha256": "dca0f3144b1d147fc776af8976e8af5f09155249b2d0236a7a75c6ab2945858c"
+    }
+  ],
+  "atlasId": "fighter-art-ii.core",
+  "manifestSha256": "ed97d387056f1c78ed10aff307f90187d10ede0ad04459fc3e86d65063767b91",
+  "schemaVersion": 1,
+  "textureSha256": "241364812c55f1a4dc39d0e49f4052d4cb0505df2ef92611b9a1a2b94425871d"
+}

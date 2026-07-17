@@ -315,3 +315,25 @@ body recognition and ability cues remain in full and reduced tiers; only
 existing secondary particles may reduce. Incompatible held-object states and
 all non-Batch-28 fighters stay on registered legacy fallbacks until their owning
 batches and the Batch 33 coherent cutover are verified.
+
+## Batch 29 production mapping
+
+The second fighter atlas applies the same registered 64x64-cell grammar to
+Bubba, Jack, and Rook. Bubba is the roster's tallest and widest undead tank:
+planted feet, patched industrial overalls, scrap-plated shoulders, empty hands,
+and a restrained steel-blue Iron Hide plane. Jack remains a wiry asymmetric
+undead worker in a rust-red coat; his long-handled axe creates deliberate
+negative space, and his separately complete axe-absent body uses rust-red
+throw/return marks without leaking a partial carried weapon. Rook remains a
+compact, forward-leaning human rifleman with a close-carried rifle. His separate
+green full helmet, round lenses, and short ridge are registered to the same
+state grid as his body; paired oxidized-teal chevrons and a low streak carry the
+dash cue.
+
+Four-direction idle, move, attack, ability, damage, and exact live death cycles
+remain presentation-only. They preserve one dominant body mass, aim/facing,
+carried-object or no-gun truth, and 48–72 CSS-pixel recognition without moving
+hitboxes or altering combat, ability, death, or respawn timing. Authored bodies,
+ability cues, and Rook's body/helmet synchronization remain essential in full
+and reduced quality. All incompatible states retain registered legacy
+fallbacks until Batch 33 owns a coherent verified cutover.

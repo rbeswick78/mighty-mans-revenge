@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 1,
+  "atlas": {
+    "id": "fighter-art-ii.core",
+    "maxWidth": 2048,
+    "maxHeight": 2048,
+    "padding": 3,
+    "extrude": 2,
+    "limits": {
+      "maxSourceBytes": 1572864,
+      "maxDecodedBytes": 9437184,
+      "maxAtlasBytes": 3145728
+    }
+  },
+  "assets": [
+    {
+      "id": "fighter.bubba.core",
+      "source": "bubba-states.png",
+      "width": 256,
+      "height": 1408,
+      "frames": { "width": 64, "height": 64, "count": 88, "columns": 4 },
+      "provenance": {
+        "origin": "ai-assisted",
+        "creator": "Mighty Man's Revenge Reforged fighter geometry",
+        "license": "LicenseRef-MMR-Project-Owned",
+        "attribution": "OpenAI-assisted production reference; deterministic project geometry",
+        "sourceReference": "tools/reforged-assets/create-fighter-art-ii-sources.mjs",
+        "generation": {
+          "provider": "OpenAI built-in image generation",
+          "id": "exec-a28b48f0-271a-4d9b-adb5-b1e6643adb23",
+          "promptDocument": "art/reforged/references/fighter-art-ii/PROMPTS.md"
+        }
+      }
+    },
+    {
+      "id": "fighter.jack.axe-absent",
+      "source": "jack-axe-absent-states.png",
+      "width": 256,
+      "height": 1408,
+      "frames": { "width": 64, "height": 64, "count": 88, "columns": 4 },
+      "provenance": {
+        "origin": "ai-assisted",
+        "creator": "Mighty Man's Revenge Reforged fighter geometry",
+        "license": "LicenseRef-MMR-Project-Owned",
+        "attribution": "OpenAI-assisted production reference; deterministic project geometry",
+        "sourceReference": "tools/reforged-assets/create-fighter-art-ii-sources.mjs",
+        "generation": {
+          "provider": "OpenAI built-in image generation",
+          "id": "exec-f3fbee85-985c-4ce3-8e35-018f1ea86717",
+          "promptDocument": "art/reforged/references/fighter-art-ii/PROMPTS.md"
+        }
+      }
+    },
+    {
+      "id": "fighter.jack.axe-present",
+      "source": "jack-axe-present-states.png",
+      "width": 256,
+      "height": 1216,
+      "frames": { "width": 64, "height": 64, "count": 76, "columns": 4 },
+      "provenance": {
+        "origin": "ai-assisted",
+        "creator": "Mighty Man's Revenge Reforged fighter geometry",
+        "license": "LicenseRef-MMR-Project-Owned",
+        "attribution": "OpenAI-assisted production reference; deterministic project geometry",
+        "sourceReference": "tools/reforged-assets/create-fighter-art-ii-sources.mjs",
+        "generation": {
+          "provider": "OpenAI built-in image generation",
+          "id": "exec-f3fbee85-985c-4ce3-8e35-018f1ea86717",
+          "promptDocument": "art/reforged/references/fighter-art-ii/PROMPTS.md"
+        }
+      }
+    },
+    {
+      "id": "fighter.rook.body",
+      "source": "rook-body-states.png",
+      "width": 256,
+      "height": 1216,
+      "frames": { "width": 64, "height": 64, "count": 76, "columns": 4 },
+      "provenance": {
+        "origin": "ai-assisted",
+        "creator": "Mighty Man's Revenge Reforged fighter geometry",
+        "license": "LicenseRef-MMR-Project-Owned",
+        "attribution": "OpenAI-assisted production reference; deterministic project geometry",
+        "sourceReference": "tools/reforged-assets/create-fighter-art-ii-sources.mjs",
+        "generation": {
+          "provider": "OpenAI built-in image generation",
+          "id": "exec-abc93106-cd1b-4730-8ee4-75a2d6ab4657",
+          "promptDocument": "art/reforged/references/fighter-art-ii/PROMPTS.md"
+        }
+      }
+    },
+    {
+      "id": "fighter.rook.helmet",
+      "source": "rook-helmet-states.png",
+      "width": 256,
+      "height": 1216,
+      "frames": { "width": 64, "height": 64, "count": 76, "columns": 4 },
+      "provenance": {
+        "origin": "ai-assisted",
+        "creator": "Mighty Man's Revenge Reforged fighter geometry",
+        "license": "LicenseRef-MMR-Project-Owned",
+        "attribution": "OpenAI-assisted production reference; deterministic project geometry",
+        "sourceReference": "tools/reforged-assets/create-fighter-art-ii-sources.mjs",
+        "generation": {
+          "provider": "OpenAI built-in image generation",
+          "id": "exec-abc93106-cd1b-4730-8ee4-75a2d6ab4657",
+          "promptDocument": "art/reforged/references/fighter-art-ii/PROMPTS.md"
+        }
+      }
+    }
+  ]
+}

@@ -199,3 +199,23 @@ only frame/dimension/integrity data. No third-party reference, source archive,
 font, logo, trademark, Batch 25 pixel, or image-generation cache enters runtime
 redistribution. Bubba, Jack, Rook, weapons, pickups, biomes, combat effects,
 maps, and UI-atlas content remain outside this production set.
+
+## Batch 29 production disposition
+
+Batch 29 leaves every Batch 25 artifact, the modern UI atlas, and
+`fighter-art-i.core` unchanged. Three original image-generation runs supplied
+production references for Bubba, Jack, and Rook. Their exact prompts, provider,
+generation IDs, unaltered 1536x1024 PNGs, dimensions, SHA-256 hashes, and
+inspection disposition live under `art/reforged/references/fighter-art-ii/`.
+They are visual-development inputs only; deterministic project geometry is the
+sole source of canonical runtime pixels.
+
+The `fighter-art-ii` manifest records five AI-assisted canonical sheets under a
+project-owned license: Bubba; Jack axe-present and axe-absent; and Rook body and
+helmet. The separate non-runtime report records every source hash plus manifest
+and atlas integrity. Runtime import JSON contains only loading-safe asset/frame,
+dimension, packing, and texture-integrity fields. No prompt, generation ID,
+license detail, source archive, external font, third-party reference, logo,
+trademark, Batch 25 pixel, image-generation cache, or Batch 28 fighter pixel is
+redistributed at runtime. Weapons, pickups, rarity auras, biomes, combat
+effects, maps, and coherent full-journey cutover remain outside this set.

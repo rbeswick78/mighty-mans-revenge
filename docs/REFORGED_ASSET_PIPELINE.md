@@ -172,10 +172,38 @@ only secondary particles. Batch 28 does not place fighter pixels in the modern
 UI atlas and does not authorize legacy removal or the Boot-through-Results
 cutover owned by Batch 33.
 
+## Batch 29 fighter art II disposition
+
+`art/reforged/sources/fighter-art-ii/manifest.json` is a separate loading and
+lineage boundary for Bubba, Jack, and Rook. Its durable deterministic cleanup
+source is `tools/reforged-assets/create-fighter-art-ii-sources.mjs`, informed by
+three original AI-assisted production references and complete prompt/generation
+records under `art/reforged/references/fighter-art-ii/`. Neither those references
+nor any Batch 25 golden enters a runtime build.
+
+Five canonical four-column 64px sheets contain 404 frames: 88 Bubba, 88 Jack
+axe-absent, 76 Jack axe-present, 76 Rook body, and 76 Rook helmet. The living
+grids share exact directional idle, movement, attack, ability, and damage index
+ranges. Death ranges retain each live variant cycle. Jack's two complete bodies
+never synthesize a partial weapon layer, and Rook's body and helmet use identical
+frame registration and synchronized animation keys.
+
+The unchanged Batch 26 packer sorts the five assets and all frames into one
+2048x2048 `fighter-art-ii.core` RGBA8888 atlas with 3px padding and 2px
+extrusion. Runtime PNG/import JSON stays under
+`client/public/assets/reforged/fighter-art-ii/`; hashes, license, attribution,
+prompts, and generation lineage stay in
+`art/reforged/provenance/fighter-art-ii/`. Boot validates the exact 404-frame
+schema before registration. Literal server-owned `modernArt` selects these
+bodies only where carried-object truth is complete; the missing-atlas,
+capability-off, old-server, other-roster, and Rook non-rifle paths retain legacy
+assets. Full and reduced quality keep authored bodies, ability cues, and Rook's
+synchronized layer; only secondary particles may reduce.
+
 ## Scope boundary
 
 Batch 26 owns this contract and tooling; Batch 27 owns the completed modern UI
 production set; Batch 28 owns the completed Mighty Man, Bruce, and Frost Wizard
-set. Batches 29-32 own the remaining fighter, weapon/pickup, biome, and combat-
-feedback production sets. Batch 33 owns coherent live cutover. No pipeline
+set; Batch 29 owns the completed Bubba, Jack, and Rook set. Batches 30-32 own
+the weapon/pickup, biome, and combat-feedback production sets. Batch 33 owns coherent live cutover. No pipeline
 output can enable `modernArt`, retire a fallback, or authorize deployment.

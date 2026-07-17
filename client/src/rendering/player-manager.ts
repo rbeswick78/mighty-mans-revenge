@@ -67,7 +67,7 @@ export class ClientPlayerManager {
         previous &&
         !playerState.isDead &&
         ((abilityActive && !previous.abilityActive) ||
-          (playerState.characterId === 'frost_wizard' &&
+          (['frost_wizard', 'jack', 'rook'].includes(playerState.characterId) &&
             abilityCoolingDown &&
             !previous.abilityCoolingDown))
       ) {

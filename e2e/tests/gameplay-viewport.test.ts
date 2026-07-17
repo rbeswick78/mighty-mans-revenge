@@ -1889,6 +1889,248 @@ test('fighter art I remains legacy when modernArt proof is absent', async ({ pag
     .toMatchObject({ available: false, usingModernBody: false });
 });
 
+test('fighter art II preserves identity layers, carried-object truth, death, and recovery', async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    !largeWorldsAdvertised ||
+      !modernArtAdvertised ||
+      !['desktop-chromium', 'mobile-landscape'].includes(testInfo.project.name),
+    'Run the Batch 29 visual tier in desktop Chromium and mobile landscape.',
+  );
+  await stageGameplay(page, true, true);
+
+  const evidence = await page.evaluate(() => {
+    const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'GameScene',
+    ) as unknown as {
+      scene: { pause(): void };
+      playerManager: { updatePlayers(players: unknown[], localPlayerId: string): unknown };
+      getReforgedFighterRenderState(): Array<{
+        playerId: string;
+        art: {
+          characterId: string;
+          available: boolean;
+          usingModernBody: boolean;
+          direction: string;
+          animationKey: string | null;
+          frameName: string | number;
+          overlayAnimationKey: string | null;
+          overlayFrameName: string | number | null;
+          weaponId: string;
+          dead: boolean;
+        };
+      }>;
+    };
+    scene.scene.pause();
+
+    const fighter = (
+      id: string,
+      characterId: string,
+      x: number,
+      aimAngle: number,
+      health: number,
+    ) => ({
+      id,
+      nickname: id.toUpperCase(),
+      characterId,
+      position: { x, y: 300 },
+      velocity: { x: 0, y: 0 },
+      aimAngle,
+      health,
+      maxHealth: health,
+      armor: 0,
+      ammo: 30,
+      weaponId: 'rifle',
+      specialAmmo: 0,
+      specialReserve: 0,
+      grenades: 2,
+      isReloading: false,
+      isSprinting: false,
+      stamina: 100,
+      isDead: false,
+      respawnTimer: 0,
+      invulnerableTimer: 0,
+      lastProcessedInput: 0,
+      score: 0,
+      deaths: 0,
+      abilityActiveSeconds: 0,
+      abilityCooldownSeconds: 0,
+      frozenTimer: 0,
+      secondWindTimer: 0,
+    });
+    const roster = [
+      fighter('bubba', 'bubba', 350, Math.PI / 2, 150),
+      fighter('jack', 'jack', 480, -Math.PI / 2, 100),
+      fighter('rook', 'rook', 610, 0, 100),
+    ];
+    scene.playerManager.updatePlayers(roster, 'bubba');
+    scene.playerManager.updatePlayers(roster, 'bubba');
+    const initial = scene.getReforgedFighterRenderState();
+
+    const ability = roster.map((state) => ({
+      ...state,
+      abilityActiveSeconds: state.characterId === 'bubba' ? 1 : 0,
+      abilityCooldownSeconds: state.characterId === 'bubba' ? 0 : 4,
+    }));
+    scene.playerManager.updatePlayers(ability, 'bubba');
+    const abilityState = scene.getReforgedFighterRenderState();
+
+    const damaged = ability.map((state) => ({ ...state, health: state.health - 10 }));
+    scene.playerManager.updatePlayers(damaged, 'bubba');
+    const damageState = scene.getReforgedFighterRenderState();
+
+    const dead = damaged.map((state) => ({ ...state, isDead: true, deaths: 2 }));
+    scene.playerManager.updatePlayers(dead, 'bubba');
+    const deathState = scene.getReforgedFighterRenderState();
+
+    const respawned = roster.map((state) => ({ ...state, deaths: 2, invulnerableTimer: 1 }));
+    scene.playerManager.updatePlayers(respawned, 'bubba');
+    scene.playerManager.updatePlayers(respawned, 'bubba');
+    const respawnState = scene.getReforgedFighterRenderState();
+
+    const incompatible = respawned.map((state) => ({
+      ...state,
+      weaponId: state.characterId === 'rook' ? 'pistol' : state.weaponId,
+    }));
+    scene.playerManager.updatePlayers(incompatible, 'bubba');
+    const fallbackState = scene.getReforgedFighterRenderState();
+
+    scene.playerManager.updatePlayers(respawned, 'bubba');
+    scene.playerManager.updatePlayers(respawned, 'bubba');
+    const restoredState = scene.getReforgedFighterRenderState();
+    return {
+      initial,
+      abilityState,
+      damageState,
+      deathState,
+      respawnState,
+      fallbackState,
+      restoredState,
+    };
+  });
+
+  expect(evidence.initial.map(({ art }) => [art.characterId, art.direction])).toEqual([
+    ['bubba', 'down'],
+    ['jack', 'up'],
+    ['rook', 'side'],
+  ]);
+  expect(evidence.initial.every(({ art }) => art.available && art.usingModernBody)).toBe(true);
+  expect(evidence.initial.map(({ art }) => art.animationKey)).toEqual([
+    'reforged-ii-bubba-down-idle',
+    'reforged-ii-jack-axe-present-up-idle',
+    'reforged-ii-rook-body-side-idle',
+  ]);
+  expect(evidence.initial[2]?.art.overlayAnimationKey).toBe('reforged-ii-rook-helmet-side-idle');
+  expect(String(evidence.initial[2]?.art.frameName).split('/').at(-1)).toBe(
+    String(evidence.initial[2]?.art.overlayFrameName).split('/').at(-1),
+  );
+  expect(evidence.abilityState.map(({ art }) => art.animationKey)).toEqual([
+    'reforged-ii-bubba-down-ability',
+    'reforged-ii-jack-axe-absent-up-ability',
+    'reforged-ii-rook-body-side-ability',
+  ]);
+  expect(evidence.abilityState[2]?.art.overlayAnimationKey).toBe(
+    'reforged-ii-rook-helmet-side-ability',
+  );
+  expect(evidence.damageState.every(({ art }) => art.animationKey?.includes('-damage'))).toBe(true);
+  expect(evidence.deathState.map(({ art }) => art.animationKey)).toEqual([
+    'reforged-ii-bubba-side-death-v2',
+    'reforged-ii-jack-axe-absent-side-death-v2',
+    'reforged-ii-rook-body-side-death-v1',
+  ]);
+  expect(evidence.deathState[2]?.art.overlayAnimationKey).toBe(
+    'reforged-ii-rook-helmet-side-death-v1',
+  );
+  expect(evidence.respawnState.map(({ art }) => art.animationKey)).toEqual([
+    'reforged-ii-bubba-down-idle',
+    'reforged-ii-jack-axe-present-up-idle',
+    'reforged-ii-rook-body-side-idle',
+  ]);
+  expect(evidence.fallbackState.map(({ art }) => art.usingModernBody)).toEqual([true, true, false]);
+  expect(evidence.restoredState.every(({ art }) => art.usingModernBody)).toBe(true);
+
+  await page.screenshot({ path: testInfo.outputPath('batch-29-fighter-art-ii-gameplay.png') });
+  if (testInfo.project.name === 'desktop-chromium') {
+    await page.setViewportSize({ width: 844, height: 390 });
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        ),
+    );
+    await page.screenshot({
+      path: testInfo.outputPath('batch-29-fighter-art-ii-mobile-size.png'),
+    });
+  }
+  const direct = await rendererSnapshot(page);
+  expect(direct.sampledColors).toBeGreaterThan(8);
+  expect(direct.nonBlackSamples).toBeGreaterThan(100);
+  const directImage = Buffer.from(direct.dataUrl.split(',')[1] ?? '', 'base64');
+  writeFileSync(testInfo.outputPath('batch-29-fighter-art-ii-direct-renderer.png'), directImage);
+  await testInfo.attach('batch-29-fighter-art-ii-direct-renderer', {
+    body: directImage,
+    contentType: 'image/png',
+  });
+});
+
+test('fighter art II remains legacy when modernArt proof is absent', async ({ page }, testInfo) => {
+  test.skip(
+    !largeWorldsAdvertised || testInfo.project.name !== 'desktop-chromium',
+    'Run the Batch 29 capability fallback proof in desktop Chromium.',
+  );
+  await stageGameplay(page, true, false);
+  const fallback = await page.evaluate(() => {
+    const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'GameScene',
+    ) as unknown as {
+      scene: { pause(): void };
+      playerManager: { updatePlayers(players: unknown[], localPlayerId: string): unknown };
+      getReforgedFighterRenderState(): Array<{
+        art: { available: boolean; usingModernBody: boolean; animationKey: string | null };
+      }>;
+    };
+    scene.scene.pause();
+    const base = {
+      position: { x: 400, y: 300 },
+      velocity: { x: 0, y: 0 },
+      aimAngle: 0,
+      health: 100,
+      maxHealth: 100,
+      armor: 0,
+      ammo: 30,
+      weaponId: 'rifle',
+      specialAmmo: 0,
+      specialReserve: 0,
+      grenades: 2,
+      isReloading: false,
+      isSprinting: false,
+      stamina: 100,
+      isDead: false,
+      respawnTimer: 0,
+      invulnerableTimer: 0,
+      lastProcessedInput: 0,
+      score: 0,
+      deaths: 0,
+      abilityActiveSeconds: 0,
+      abilityCooldownSeconds: 0,
+      frozenTimer: 0,
+      secondWindTimer: 0,
+    };
+    const roster = ['bubba', 'jack', 'rook'].map((characterId, index) => ({
+      ...base,
+      id: characterId,
+      nickname: characterId.toUpperCase(),
+      characterId,
+      position: { x: 350 + index * 130, y: 300 },
+    }));
+    scene.playerManager.updatePlayers(roster, 'bubba');
+    return scene.getReforgedFighterRenderState().map(({ art }) => art);
+  });
+  expect(fallback.every((art) => !art.available && !art.usingModernBody)).toBe(true);
+  expect(fallback.every((art) => !String(art.animationKey).startsWith('reforged-ii-'))).toBe(true);
+});
+
 test('Results and connection recovery restore legacy scene sizing', async ({ page }) => {
   test.skip(!largeWorldsAdvertised, 'Run with CAPABILITY_LARGE_WORLDS=true.');
   await stageGameplay(page, true);

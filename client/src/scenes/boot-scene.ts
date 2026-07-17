@@ -19,6 +19,11 @@ import {
   registerReforgedFighterAtlas,
 } from '../rendering/reforged-fighter-runtime.js';
 import {
+  createReforgedFighterArtIIAnimations,
+  preloadReforgedFighterArtIIAtlas,
+  registerReforgedFighterArtIIAtlas,
+} from '../rendering/reforged-fighter-art-ii-runtime.js';
+import {
   WIRE_GATE_FRAME_HEIGHT,
   WIRE_GATE_FRAME_WIDTH,
   WIRE_GATE_OPEN_ANIMATION_KEY,
@@ -169,6 +174,7 @@ export class BootScene extends Phaser.Scene {
     this.setupLoadingBar();
     preloadModernUiAtlas(this);
     preloadReforgedFighterAtlas(this);
+    preloadReforgedFighterArtIIAtlas(this);
     this.loadRealAssets();
     this.generateProceduralAssets();
     // Menu-scene procedural textures (sky gradient, city silhouette, brick
@@ -180,8 +186,10 @@ export class BootScene extends Phaser.Scene {
   create(): void {
     registerModernUiAtlas(this);
     registerReforgedFighterAtlas(this);
+    registerReforgedFighterArtIIAtlas(this);
     this.createCharacterAnimations();
     createReforgedFighterAnimations(this);
+    createReforgedFighterArtIIAnimations(this);
     // Singleton bound to Phaser.Game (process lifetime). Scenes don't
     // retarget it — sounds and fades live above the scene graph.
     if (!AudioManager.getInstance()) {
