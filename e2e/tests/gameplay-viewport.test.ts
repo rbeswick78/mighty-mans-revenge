@@ -1702,6 +1702,179 @@ test('modern UI frames preserve the current small world, HUD/minimap priorities,
   await page.screenshot({ path: testInfo.outputPath('batch-27-modern-results.png') });
 });
 
+test('atomic cutover owns fighter selection across desktop and mobile landscape', async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    !largeWorldsAdvertised ||
+      !modernArtAdvertised ||
+      !['desktop-chromium', 'mobile-landscape'].includes(testInfo.project.name),
+    'Run the Batch 33 fighter-selection proof in Chromium and mobile landscape.',
+  );
+  const pageErrors: string[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  await stageGameplay(page, true, true);
+  await page.evaluate(() => {
+    const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'GameScene',
+    ) as unknown as {
+      shutdown(): void;
+      scene: { start(key: string, data: unknown): void };
+    };
+    scene.shutdown();
+    scene.scene.start('CharacterSelectScene', {
+      nickname: 'CUTOVER',
+      matchData: {
+        matchId: 'batch-33-selection',
+        opponents: [{ id: 'cutover-rival', nickname: 'RIVAL' }],
+        mapName: 'Scrapyard',
+        gameMode: 'deathmatch',
+        matchKind: 'practice',
+        characterWins: {},
+      },
+    });
+  });
+  await waitForScene(page, 'CharacterSelectScene');
+  const state = await page.evaluate(() => {
+    const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'CharacterSelectScene',
+    ) as Phaser.Scene;
+    const textureKeys = new Set<string>();
+    const collect = (entries: readonly Phaser.GameObjects.GameObject[]): void => {
+      for (const entry of entries) {
+        if ('texture' in entry) {
+          const key = (entry as Phaser.GameObjects.Image).texture?.key;
+          if (key) textureKeys.add(key);
+        }
+        if ('list' in entry && Array.isArray((entry as Phaser.GameObjects.Container).list)) {
+          collect((entry as Phaser.GameObjects.Container).list);
+        }
+      }
+    };
+    collect(scene.children.list);
+    return Array.from(textureKeys).sort();
+  });
+  expect(pageErrors).toEqual([]);
+  expect(state).toEqual(
+    expect.arrayContaining([
+      'reforged-biome-environment-art',
+      'reforged-fighter-art-i',
+      'reforged-fighter-art-ii',
+      'reforged-modern-ui',
+    ]),
+  );
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('Enter');
+  await page.screenshot({ path: testInfo.outputPath('batch-33-modern-fighter-selection.png') });
+  const direct = await rendererSnapshot(page);
+  expect(direct.sampledColors).toBeGreaterThan(12);
+  expect(direct.nonBlackSamples).toBeGreaterThan(120);
+});
+
+test('modern gameplay events have one feedback owner without legacy doubles', async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    !largeWorldsAdvertised || !modernArtAdvertised || testInfo.project.name !== 'desktop-chromium',
+    'Run the Batch 33 live event-ownership proof in desktop Chromium.',
+  );
+  await stageGameplay(page, true, true);
+  const evidence = await page.evaluate(() => {
+    let legacyMuzzle = 0;
+    let legacyPlayerImpact = 0;
+    let legacySceneryImpact = 0;
+    let legacyExplosion = 0;
+    const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'GameScene',
+    ) as unknown as {
+      effectsRenderer: {
+        showMuzzleFlash: () => void;
+        showPlayerHit: () => void;
+        showExplosion: () => void;
+        showBulletTrail: (
+          x1: number,
+          y1: number,
+          x2: number,
+          y2: number,
+          complete: () => void,
+        ) => void;
+      };
+      impactFx: { spawnBulletImpact: () => void };
+      explosionFx: { spawnExplosion: () => void };
+      smokeFx: { spawnExplosionSmoke: () => void };
+      onBulletTrail: (trail: {
+        startPos: { x: number; y: number };
+        endPos: { x: number; y: number };
+        shooterId: string;
+        timestamp: number;
+        weaponId: 'pistol';
+        hitPlayerId: string | null;
+        damageApplied: number;
+      }) => void;
+      onGrenadeExploded: (position: { x: number; y: number }) => void;
+      getReforgedCombatFeedbackState(): {
+        activeFamilies: string[];
+        sequence: number;
+      } | null;
+    };
+    scene.effectsRenderer.showMuzzleFlash = () => {
+      legacyMuzzle += 1;
+    };
+    scene.effectsRenderer.showPlayerHit = () => {
+      legacyPlayerImpact += 1;
+    };
+    scene.effectsRenderer.showExplosion = () => {
+      legacyExplosion += 1;
+    };
+    scene.effectsRenderer.showBulletTrail = (_x1, _y1, _x2, _y2, complete) => complete();
+    scene.impactFx.spawnBulletImpact = () => {
+      legacySceneryImpact += 1;
+    };
+    scene.explosionFx.spawnExplosion = () => {
+      legacyExplosion += 1;
+    };
+    scene.smokeFx.spawnExplosionSmoke = () => {
+      legacyExplosion += 1;
+    };
+    scene.onBulletTrail({
+      startPos: { x: 300, y: 240 },
+      endPos: { x: 430, y: 240 },
+      shooterId: 'cutover-shooter',
+      timestamp: 33001,
+      weaponId: 'pistol',
+      hitPlayerId: null,
+      damageApplied: 0,
+    });
+    scene.onBulletTrail({
+      startPos: { x: 300, y: 280 },
+      endPos: { x: 430, y: 280 },
+      shooterId: 'cutover-shooter',
+      timestamp: 33002,
+      weaponId: 'pistol',
+      hitPlayerId: 'confirmed-target',
+      damageApplied: 12,
+    });
+    scene.onGrenadeExploded({ x: 520, y: 310 });
+    return {
+      modern: scene.getReforgedCombatFeedbackState(),
+      legacyMuzzle,
+      legacyPlayerImpact,
+      legacySceneryImpact,
+      legacyExplosion,
+    };
+  });
+  expect(evidence).toMatchObject({
+    modern: {
+      sequence: 5,
+      activeFamilies: ['muzzle', 'scenery-impact', 'muzzle', 'player-impact', 'explosion'],
+    },
+    legacyMuzzle: 0,
+    legacyPlayerImpact: 0,
+    legacySceneryImpact: 0,
+    legacyExplosion: 0,
+  });
+});
+
 test('fighter art I preserves directional states, identity fallbacks, death, and respawn', async ({
   page,
 }, testInfo) => {
@@ -2358,7 +2531,7 @@ test('weapon and pickup art remains legacy without modernArt proof', async ({ pa
   expect(fallback).toEqual([{ id: 'ammo', textureKey: 'pickup_ammo', frameName: '__BASE' }]);
 });
 
-test('biome kit preview preserves four families, collision hierarchy, damage pairs, and live-map dormancy', async ({
+test('biome kit live projection preserves four families, collision hierarchy, and damage pairs', async ({
   page,
 }, testInfo) => {
   test.skip(
@@ -2378,15 +2551,28 @@ test('biome kit preview preserves four families, collision hierarchy, damage pai
       children: Phaser.GameObjects.DisplayList;
       textures: Phaser.Textures.TextureManager;
       mapRenderer: { getCollisionGrid(): number[][] };
+      getReforgedEnvironmentState(): {
+        active: boolean;
+        modernUseCount: number;
+      };
     };
     scene.scene.pause();
     scene.cameras.main.resetFX();
     const textureKey = 'reforged-biome-environment-art';
     const texture = scene.textures.get(textureKey);
-    const before = scene.children.list.filter(
-      (entry) =>
-        'texture' in entry && (entry as Phaser.GameObjects.Image).texture?.key === textureKey,
-    ).length;
+    const countTexture = (entries: readonly Phaser.GameObjects.GameObject[]): number =>
+      entries.reduce((count, entry) => {
+        const own =
+          'texture' in entry && (entry as Phaser.GameObjects.Image).texture?.key === textureKey
+            ? 1
+            : 0;
+        const nested =
+          'list' in entry && Array.isArray((entry as Phaser.GameObjects.Container).list)
+            ? countTexture((entry as Phaser.GameObjects.Container).list)
+            : 0;
+        return count + own + nested;
+      }, 0);
+    const before = countTexture(scene.children.list);
     const collisionBefore = JSON.stringify(scene.mapRenderer.getCollisionGrid());
     const families = ['wasteland', 'overgrown', 'industrial', 'irradiated'];
     const panel = scene.add.rectangle(480, 270, 920, 500, 0x090d14, 0.94).setDepth(2000);
@@ -2485,16 +2671,18 @@ test('biome kit preview preserves four families, collision hierarchy, damage pai
       previewImages,
       collisionUnchanged: collisionBefore === collisionAfter,
       currentMapTextureKeys: Array.from(currentMapTextureKeys),
+      mapState: scene.getReforgedEnvironmentState(),
     };
   });
   expect(evidence).toMatchObject({
     atlasAvailable: true,
     terminalFrames: [true, true, true, true],
-    before: 0,
     previewImages: 72,
     collisionUnchanged: true,
+    mapState: { active: true },
   });
-  expect(evidence.currentMapTextureKeys.some((key) => key.startsWith('tiles_'))).toBe(true);
+  expect(evidence.before).toBeGreaterThan(0);
+  expect(evidence.mapState.modernUseCount).toBeGreaterThan(0);
   const gameplayPath =
     batch31ArtifactPath(testInfo, 'biome-kit-gameplay') ??
     testInfo.outputPath('batch-31-biome-kit-gameplay.png');
@@ -2543,20 +2731,85 @@ test('biome kit remains dormant without modernArt proof', async ({ page }, testI
       'GameScene',
     ) as Phaser.Scene;
     const textureKey = 'reforged-biome-environment-art';
+    const countTexture = (entries: readonly Phaser.GameObjects.GameObject[]): number =>
+      entries.reduce((count, entry) => {
+        const own =
+          'texture' in entry && (entry as Phaser.GameObjects.Image).texture?.key === textureKey
+            ? 1
+            : 0;
+        const nested =
+          'list' in entry && Array.isArray((entry as Phaser.GameObjects.Container).list)
+            ? countTexture((entry as Phaser.GameObjects.Container).list)
+            : 0;
+        return count + own + nested;
+      }, 0);
     return {
       atlasRegistered: scene.textures.exists(textureKey),
-      liveUses: scene.children.list.filter(
-        (entry) =>
-          'texture' in entry && (entry as Phaser.GameObjects.Image).texture?.key === textureKey,
-      ).length,
+      liveUses: countTexture(scene.children.list),
     };
   });
   expect(state).toEqual({ atlasRegistered: true, liveUses: 0 });
 });
 
+test('one missing atlas restores the complete legacy visual owner', async ({ page }, testInfo) => {
+  test.skip(
+    !largeWorldsAdvertised || !modernArtAdvertised || testInfo.project.name !== 'desktop-chromium',
+    'Run the Batch 33 atomic fallback proof in desktop Chromium.',
+  );
+  await stageGameplay(page, true, true);
+  await page.evaluate(() => {
+    const game = (window as unknown as { game?: Phaser.Game }).game;
+    if (!game) throw new Error('game missing');
+    const scene = game.scene.getScene('GameScene') as unknown as {
+      shutdown(): void;
+      scene: { start(key: string, data: unknown): void };
+    };
+    scene.shutdown();
+    game.textures.remove('reforged-combat-feedback-art');
+    scene.scene.start('GameScene', {
+      nickname: 'ATOMIC FALLBACK',
+      matchData: {
+        matchId: 'batch-33-missing-atlas',
+        opponents: [{ id: 'fallback-rival', nickname: 'RIVAL' }],
+        mapName: 'Scrapyard',
+        gameMode: 'deathmatch',
+        matchKind: 'practice',
+      },
+    });
+  });
+  await waitForScene(page, 'GameScene');
+  const state = await page.evaluate(() => {
+    const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'GameScene',
+    ) as unknown as {
+      getReforgedVisualCutoverState(): {
+        active: boolean;
+        owner: string;
+        missingAtlases: string[];
+      };
+      getReforgedEnvironmentState(): { active: boolean } | null;
+      getReforgedCombatFeedbackState(): unknown;
+    };
+    return {
+      cutover: scene.getReforgedVisualCutoverState(),
+      modernEnvironment: scene.getReforgedEnvironmentState()?.active,
+      feedback: scene.getReforgedCombatFeedbackState(),
+    };
+  });
+  expect(state).toMatchObject({
+    cutover: {
+      active: false,
+      owner: 'legacy-fallback',
+      missingAtlases: ['combatFeedback'],
+    },
+    modernEnvironment: false,
+    feedback: null,
+  });
+});
+
 test('Results and connection recovery restore legacy scene sizing', async ({ page }) => {
   test.skip(!largeWorldsAdvertised, 'Run with CAPABILITY_LARGE_WORLDS=true.');
-  await stageGameplay(page, true);
+  await stageGameplay(page, true, modernArtAdvertised);
 
   await page.evaluate(() => {
     const game = (window as unknown as { game?: Phaser.Game }).game;
@@ -2600,15 +2853,22 @@ test('Results and connection recovery restore legacy scene sizing', async ({ pag
         const scene = game?.scene.getScene('GameScene') as unknown as {
           getResponsiveHudLayout(): { mode: string } | null;
           getMinimapRenderState(): unknown;
+          getReforgedVisualCutoverState(): { active: boolean } | null;
         };
         return {
           size: [game?.scale.width, game?.scale.height],
           hudMode: scene.getResponsiveHudLayout()?.mode ?? null,
           minimap: scene.getMinimapRenderState() !== null,
+          modernCutover: scene.getReforgedVisualCutoverState()?.active ?? false,
         };
       }),
     )
-    .toEqual({ size: [1280, 720], hudMode: 'large-world', minimap: true });
+    .toEqual({
+      size: [1280, 720],
+      hudMode: 'large-world',
+      minimap: true,
+      modernCutover: modernArtAdvertised,
+    });
   await page.evaluate(() => {
     const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
       'GameScene',

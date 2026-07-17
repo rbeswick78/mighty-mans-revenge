@@ -286,3 +286,18 @@ font, third-party reference, logo, trademark, Batch 25 pixel, generated-image
 cache, or completed-atlas pixel is redistributed at runtime. Rarity/zone
 mechanics, map authoring, hazards, coherent full-journey cutover, and fallback
 retirement remain outside this set.
+
+## Batch 33 production disposition
+
+Batch 33 adds no generated or hand-authored production art. Every Batch 25
+golden, six canonical source grids, six packed atlases, runtime import files,
+reference image, and non-runtime provenance report remains byte-for-byte
+unchanged. The cutover consumes only the existing runtime-safe named frames and
+records no new provider, generation ID, license, attribution, or source archive.
+All prompts, source hashes, inspection records, and complete lineage remain
+outside runtime redistribution. No legacy asset is removed: animated gates,
+scavenger caches, bat/punch, incompatible carried-object states, capability-
+off/old-server paths, and recovery still require their registered fallbacks.
+Map authoring, larger arenas, future weapon/container/rarity/zone mechanics,
+capability exposure, production rollout, and deployment remain outside this
+disposition.

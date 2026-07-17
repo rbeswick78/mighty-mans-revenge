@@ -285,6 +285,20 @@ families, while rarity and zone remain verification-preview-only. False,
 absent, old-server, missing-atlas, and every completed-atlas path stay
 unchanged. Batch 33 owns coherent cutover and any verified fallback retirement.
 
+## Batch 33 cutover disposition
+
+Batch 33 produces no pixels and changes no manifest, canonical sheet, packed
+PNG, runtime import JSON, or provenance report. Runtime selection treats the
+existing 48-, 288-, 404-, 158-, 80-, and 96-frame atlases as one atomic system:
+literal server-owned `modernArt` plus compatible registration of all six is
+required before any modern scene owner activates. One missing or incompatible
+atlas leaves every scene on its registered legacy/procedural path. The current-
+map environment projection and pooled event feedback consume only named frames
+already emitted by the Batch 26 pipeline. Animated gates/caches and all other
+incompatible states retain their existing assets; no legacy file is removed or
+stops loading. Batch 25 goldens and complete source/license/generation lineage
+remain non-runtime references.
+
 ## Scope boundary
 
 Batch 26 owns this contract and tooling; Batch 27 owns the completed modern UI
@@ -292,5 +306,5 @@ production set; Batch 28 owns the completed Mighty Man, Bruce, and Frost Wizard
 set; Batch 29 owns the completed Bubba, Jack, and Rook set; Batch 30 owns the
 completed weapon/pickup production set; Batch 31 owns the completed biome
 environment set; Batch 32 owns the completed combat-feedback production set;
-Batch 33 owns coherent live cutover. No pipeline output
+Batch 33 owns the completed coherent live cutover. No pipeline output
 can enable `modernArt`, retire a fallback, or authorize deployment.

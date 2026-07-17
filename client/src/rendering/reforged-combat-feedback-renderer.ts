@@ -203,6 +203,25 @@ export class ReforgedCombatFeedbackRenderer {
     }
   }
 
+  getRenderState(): Readonly<{
+    capacity: number;
+    poolLimit: number;
+    activeFamilies: readonly ReforgedCombatFeedbackFamily[];
+    sequence: number;
+  }> {
+    return Object.freeze({
+      capacity: this.slots.length,
+      poolLimit: reforgedCombatFeedbackQualityTreatment(this.getBudget().tier).poolLimit,
+      activeFamilies: Object.freeze(
+        this.slots
+          .filter((slot) => slot.active)
+          .sort((a, b) => a.sequence - b.sequence)
+          .map((slot) => slot.family),
+      ),
+      sequence: this.sequence,
+    });
+  }
+
   destroy(): void {
     for (const slot of this.slots) slot.sprite.destroy();
     this.slots.length = 0;

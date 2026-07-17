@@ -24,6 +24,20 @@ import {
   type WorldRenderPlan,
   type WorldViewRect,
 } from './dynamic-world-rendering.js';
+import {
+  REFORGED_ENVIRONMENT_FRAME_SIZE,
+  REFORGED_ENVIRONMENT_TEXTURE_KEY,
+  reforgedBiomeFamilyForTheme,
+  reforgedEnvironmentDamagedRole,
+  reforgedEnvironmentDecorationRole,
+  reforgedEnvironmentFrame,
+  reforgedEnvironmentGroundRole,
+  reforgedEnvironmentTileRole,
+  shouldPresentReforgedEnvironmentKit,
+  type ReforgedBiomeFamily,
+  type ReforgedEnvironmentFrameRole,
+} from './reforged-environment-contract.js';
+import { reforgedEnvironmentAtlasAvailable } from './reforged-environment-runtime.js';
 
 /**
  * Renders a MapData grid using the map's visual theme (map-themes.ts):
@@ -71,9 +85,17 @@ export class MapRenderer {
   private gateSpritesByCell = new Map<number, Phaser.GameObjects.Sprite>();
   /** Scavenger cache cells keep their sprite for the loot-burst animation. */
   private cacheSpritesByCell = new Map<number, Phaser.GameObjects.Sprite>();
+  private readonly modernArtEnabled: boolean;
+  private modernEnvironment = false;
+  private modernEnvironmentFamily: ReforgedBiomeFamily = 'wasteland';
+  private modernEnvironmentUseCount = 0;
+  private legacyEnvironmentFallbackUseCount = 0;
+  private modernDamagedFrames = new Map<Phaser.GameObjects.Sprite, string>();
+  private modernShadowsByCell = new Map<number, Phaser.GameObjects.Sprite>();
 
-  constructor(scene: Phaser.Scene) {
+  constructor(scene: Phaser.Scene, modernArtEnabled = false) {
     this.scene = scene;
+    this.modernArtEnabled = modernArtEnabled;
   }
 
   renderMap(mapData: MapData): Phaser.GameObjects.Container {
@@ -81,9 +103,15 @@ export class MapRenderer {
     this.destroy();
 
     const tileSize = mapData.tileSize;
-    const scale = tileSize / SOURCE_TILE_SIZE;
+    const legacyScale = tileSize / SOURCE_TILE_SIZE;
     const theme = getTheme(mapData.theme);
     this.theme = theme;
+    this.modernEnvironmentFamily = reforgedBiomeFamilyForTheme(mapData.theme);
+    this.modernEnvironment = shouldPresentReforgedEnvironmentKit(
+      'live-map',
+      this.modernArtEnabled,
+      reforgedEnvironmentAtlasAvailable(this.scene),
+    );
     this.container = this.scene.add.container(0, 0);
     this.renderPlan = createWorldRenderPlan(mapData, {
       width: this.scene.cameras.main.width,
@@ -131,14 +159,48 @@ export class MapRenderer {
         const isCover = tileType === TileType.COVER_LOW;
 
         if (isInnerWall || isCover) {
-          const floorSprite = this.scene.add.sprite(
-            x,
-            y,
-            theme.floorTexture,
-            pickVariant(theme.floorVariants, row, col),
+          const floorSprite = this.modernEnvironment
+            ? this.scene.add.sprite(
+                x,
+                y,
+                REFORGED_ENVIRONMENT_TEXTURE_KEY,
+                reforgedEnvironmentFrame(
+                  this.modernEnvironmentFamily,
+                  reforgedEnvironmentGroundRole(row, col),
+                ),
+              )
+            : this.scene.add.sprite(
+                x,
+                y,
+                theme.floorTexture,
+                pickVariant(theme.floorVariants, row, col),
+              );
+          floorSprite.setScale(
+            this.modernEnvironment ? tileSize / REFORGED_ENVIRONMENT_FRAME_SIZE : legacyScale,
           );
-          floorSprite.setScale(scale);
+          if (this.modernEnvironment) this.modernEnvironmentUseCount += 1;
           this.addToChunkAtCell(floorSprite, col, row);
+        }
+
+        if (
+          this.modernEnvironment &&
+          (tileType === TileType.WALL || isCover) &&
+          !decoCovered.has(row * mapData.width + col)
+        ) {
+          const shadowRole: ReforgedEnvironmentFrameRole =
+            tileType === TileType.WALL ? 'shadow-wall' : 'shadow-low-cover';
+          const shadow = this.scene.add
+            .sprite(
+              x + tileSize * 0.08,
+              y + tileSize * 0.08,
+              REFORGED_ENVIRONMENT_TEXTURE_KEY,
+              reforgedEnvironmentFrame(this.modernEnvironmentFamily, shadowRole),
+            )
+            .setScale(tileSize / REFORGED_ENVIRONMENT_FRAME_SIZE)
+            .setAlpha(0.72);
+          this.modernEnvironmentUseCount += 1;
+          this.addToChunkAtCell(shadow, col, row);
+          this.modernShadowsByCell.set(row * mapData.width + col, shadow);
         }
 
         const { texture, frame } = this.pickTile(
@@ -151,7 +213,20 @@ export class MapRenderer {
           decoCovered,
         );
         const sprite = this.scene.add.sprite(x, y, texture, frame);
-        sprite.setScale(scale);
+        sprite.setScale(
+          this.modernEnvironment ? tileSize / REFORGED_ENVIRONMENT_FRAME_SIZE : legacyScale,
+        );
+        if (this.modernEnvironment) {
+          this.modernEnvironmentUseCount += 1;
+          const role = this.modernTileRole(tileType, row, col, decoCovered);
+          const damaged = reforgedEnvironmentDamagedRole(role);
+          if (damaged) {
+            this.modernDamagedFrames.set(
+              sprite,
+              reforgedEnvironmentFrame(this.modernEnvironmentFamily, damaged),
+            );
+          }
+        }
         if (
           isCover &&
           !decoCovered.has(row * mapData.width + col) &&
@@ -171,7 +246,8 @@ export class MapRenderer {
     // the rect exactly, so a slight overflow past the collision box is
     // expected and reads as organic clutter.
     for (const deco of mapData.decorations ?? []) {
-      if (!this.scene.textures.exists(deco.texture)) {
+      const modernRole = this.modernEnvironment ? reforgedEnvironmentDecorationRole(deco) : null;
+      if (modernRole === null && !this.scene.textures.exists(deco.texture)) {
         // Unknown key (e.g. newer map JSON than client) — skip quietly
         // rather than render Phaser's missing-texture placeholder.
         continue;
@@ -180,13 +256,50 @@ export class MapRenderer {
       const cy = (deco.y + deco.h / 2) * tileSize;
       const isGate = deco.interaction === 'shootable_gate';
       const isCache = deco.interaction === 'scavenger_cache';
-      const sprite = this.scene.add.sprite(
-        cx,
-        cy,
-        deco.texture,
-        isGate ? WIRE_GATE_CLOSED_FRAME : undefined,
-      );
-      sprite.setScale(isGate ? wireGateScale(tileSize) : scale);
+      if (modernRole) {
+        const shadow = this.scene.add
+          .sprite(
+            cx + tileSize * 0.08,
+            cy + tileSize * 0.08,
+            REFORGED_ENVIRONMENT_TEXTURE_KEY,
+            reforgedEnvironmentFrame(this.modernEnvironmentFamily, 'shadow-prop'),
+          )
+          .setDisplaySize(deco.w * tileSize, deco.h * tileSize)
+          .setAlpha(0.72);
+        this.modernEnvironmentUseCount += 1;
+        this.addToChunkAtCell(
+          shadow,
+          Math.min(mapData.width - 1, Math.floor(deco.x + deco.w / 2)),
+          Math.min(mapData.height - 1, Math.floor(deco.y + deco.h / 2)),
+        );
+        for (let row = deco.y; row < deco.y + deco.h; row += 1) {
+          for (let col = deco.x; col < deco.x + deco.w; col += 1) {
+            this.modernShadowsByCell.set(row * mapData.width + col, shadow);
+          }
+        }
+      }
+      const sprite = modernRole
+        ? this.scene.add.sprite(
+            cx,
+            cy,
+            REFORGED_ENVIRONMENT_TEXTURE_KEY,
+            reforgedEnvironmentFrame(this.modernEnvironmentFamily, modernRole),
+          )
+        : this.scene.add.sprite(cx, cy, deco.texture, isGate ? WIRE_GATE_CLOSED_FRAME : undefined);
+      if (modernRole) {
+        sprite.setDisplaySize(deco.w * tileSize, deco.h * tileSize);
+        this.modernEnvironmentUseCount += 1;
+        const damaged = reforgedEnvironmentDamagedRole(modernRole);
+        if (damaged) {
+          this.modernDamagedFrames.set(
+            sprite,
+            reforgedEnvironmentFrame(this.modernEnvironmentFamily, damaged),
+          );
+        }
+      } else {
+        sprite.setScale(isGate ? wireGateScale(tileSize) : legacyScale);
+        if (this.modernEnvironment) this.legacyEnvironmentFallbackUseCount += 1;
+      }
       sprite.setFlipX(deco.flipX ?? false);
       this.addToChunkAtCell(
         sprite,
@@ -208,12 +321,26 @@ export class MapRenderer {
       const x = spawn.x * tileSize + tileSize / 2;
       const y = spawn.y * tileSize + tileSize / 2;
 
-      const marker = this.scene.add.graphics();
-      marker.lineStyle(1, Wasteland.SPAWN_MARKER, 0.4);
-      marker.strokeCircle(x, y, 8);
-      marker.lineStyle(1, Wasteland.SPAWN_MARKER, 0.3);
-      marker.lineBetween(x - 4, y, x + 4, y);
-      marker.lineBetween(x, y - 4, x, y + 4);
+      const marker = this.modernEnvironment
+        ? this.scene.add
+            .image(
+              x,
+              y,
+              REFORGED_ENVIRONMENT_TEXTURE_KEY,
+              reforgedEnvironmentFrame(this.modernEnvironmentFamily, 'navigation-anchor'),
+            )
+            .setDisplaySize(24, 24)
+            .setAlpha(0.55)
+        : this.scene.add.graphics();
+      if (marker instanceof Phaser.GameObjects.Graphics) {
+        marker.lineStyle(1, Wasteland.SPAWN_MARKER, 0.4);
+        marker.strokeCircle(x, y, 8);
+        marker.lineStyle(1, Wasteland.SPAWN_MARKER, 0.3);
+        marker.lineBetween(x - 4, y, x + 4, y);
+        marker.lineBetween(x, y - 4, x, y + 4);
+      } else {
+        this.modernEnvironmentUseCount += 1;
+      }
       this.addToChunkAtCell(marker, spawn.x, spawn.y);
     }
 
@@ -253,6 +380,20 @@ export class MapRenderer {
     });
   }
 
+  getReforgedEnvironmentState(): Readonly<{
+    active: boolean;
+    family: ReforgedBiomeFamily;
+    modernUseCount: number;
+    legacyFallbackUseCount: number;
+  }> {
+    return Object.freeze({
+      active: this.modernEnvironment,
+      family: this.modernEnvironmentFamily,
+      modernUseCount: this.modernEnvironmentUseCount,
+      legacyFallbackUseCount: this.legacyEnvironmentFallbackUseCount,
+    });
+  }
+
   private addToChunkAtCell(object: Phaser.GameObjects.GameObject, col: number, row: number): void {
     if (!this.renderPlan) {
       this.container?.add(object);
@@ -271,8 +412,16 @@ export class MapRenderer {
     row: number,
     col: number,
     decoCovered: ReadonlySet<number>,
-  ): { texture: string; frame: number } {
+  ): { texture: string; frame: number | string } {
     const tileType = tiles[row][col];
+
+    if (this.modernEnvironment) {
+      const role = this.modernTileRole(tileType, row, col, decoCovered);
+      return {
+        texture: REFORGED_ENVIRONMENT_TEXTURE_KEY,
+        frame: reforgedEnvironmentFrame(this.modernEnvironmentFamily, role),
+      };
+    }
 
     if (tileType === TileType.WALL) {
       const style = WALL_STYLES[isOuterWall(row, col, h, w) ? theme.outerWall : theme.innerWall];
@@ -292,6 +441,18 @@ export class MapRenderer {
       texture: theme.floorTexture,
       frame: pickVariant(theme.floorVariants, row, col),
     };
+  }
+
+  private modernTileRole(
+    tileType: TileType,
+    row: number,
+    col: number,
+    decoCovered: ReadonlySet<number>,
+  ): ReforgedEnvironmentFrameRole {
+    if (decoCovered.has(row * this.mapWidth + col)) {
+      return reforgedEnvironmentGroundRole(row, col);
+    }
+    return reforgedEnvironmentTileRole(tileType, row, col);
   }
 
   /**
@@ -321,7 +482,14 @@ export class MapRenderer {
       // setTexture handles the case where the cell was rendered from a
       // different sheet (floor and scorch share the theme's floor sheet
       // today, but the call keeps scorch decoupled from floor texture).
-      sprite.setTexture(this.theme.floorTexture, this.theme.scorchFrame);
+      if (this.modernEnvironment) {
+        sprite.setTexture(
+          REFORGED_ENVIRONMENT_TEXTURE_KEY,
+          reforgedEnvironmentFrame(this.modernEnvironmentFamily, 'ground-c'),
+        );
+      } else {
+        sprite.setTexture(this.theme.floorTexture, this.theme.scorchFrame);
+      }
       this.scorchedCells.add(key);
     }
   }
@@ -345,6 +513,13 @@ export class MapRenderer {
     if (tileType !== TileType.WALL && tileType !== TileType.COVER_LOW) return;
 
     const key = row * this.mapWidth + col;
+    const shadow = this.modernShadowsByCell.get(key);
+    if (shadow) {
+      shadow.destroy();
+      for (const [cell, candidate] of this.modernShadowsByCell) {
+        if (candidate === shadow) this.modernShadowsByCell.delete(cell);
+      }
+    }
     if (this.decoratedCells.has(key)) {
       const prop = this.decorationSpritesByCell.get(key);
       const gate = this.gateSpritesByCell.get(key);
@@ -358,7 +533,7 @@ export class MapRenderer {
         this.cacheSpritesByCell.delete(key);
         this.animateScavengerCacheOpen(prop);
       } else if (prop) {
-        prop.destroy();
+        this.retireDestroyedSprite(prop);
         for (const [cell, sprite] of this.decorationSpritesByCell) {
           if (sprite === prop) this.decorationSpritesByCell.delete(cell);
         }
@@ -368,7 +543,7 @@ export class MapRenderer {
         // the prop; remove that layer to reveal the inner-wall floor underlay.
         const wall = this.tileSprites[row][col];
         if (wall) {
-          wall.destroy();
+          this.retireDestroyedSprite(wall);
           this.tileSprites[row][col] = null;
         }
       }
@@ -377,7 +552,7 @@ export class MapRenderer {
     } else {
       const sprite = this.tileSprites[row][col];
       if (sprite) {
-        sprite.destroy();
+        this.retireDestroyedSprite(sprite);
         this.tileSprites[row][col] = null;
       }
     }
@@ -385,6 +560,23 @@ export class MapRenderer {
     if (this.collisionGrid) {
       this.collisionGrid.solid[row][col] = false;
     }
+  }
+
+  private retireDestroyedSprite(sprite: Phaser.GameObjects.Sprite): void {
+    const damagedFrame = this.modernDamagedFrames.get(sprite);
+    this.modernDamagedFrames.delete(sprite);
+    if (!damagedFrame) {
+      sprite.destroy();
+      return;
+    }
+    sprite.setFrame(damagedFrame);
+    this.scene.tweens.add({
+      targets: sprite,
+      alpha: 0,
+      duration: 160,
+      ease: 'Quad.easeOut',
+      onComplete: () => sprite.destroy(),
+    });
   }
 
   /** Gold pop + crushed-crate flicker driven by authoritative destruction. */
@@ -435,6 +627,12 @@ export class MapRenderer {
     this.decorationSpritesByCell.clear();
     this.gateSpritesByCell.clear();
     this.cacheSpritesByCell.clear();
+    this.modernDamagedFrames.clear();
+    this.modernShadowsByCell.clear();
+    this.modernEnvironment = false;
+    this.modernEnvironmentFamily = 'wasteland';
+    this.modernEnvironmentUseCount = 0;
+    this.legacyEnvironmentFallbackUseCount = 0;
     this.mapWidth = 0;
     this.mapHeight = 0;
     this.mapTileSize = 0;

@@ -16,6 +16,7 @@ import { MenuGamepadInput } from '../input/menu-gamepad.js';
 import type { NormalizedArenaSchedule } from '../network/arena-schedule.js';
 import type { ConnectionState } from '../network/types.js';
 import { GameService, type MatchData } from '../services/game-service.js';
+import { reforgedVisualCutoverForScene } from '../rendering/reforged-visual-cutover.js';
 import { isCallsignReady, readCallsign } from '../ui/callsign.js';
 import { MENU_FONTS } from '../ui/menu/fonts.js';
 import {
@@ -118,7 +119,10 @@ export class ReforgedShellScene extends Phaser.Scene {
       this.scene.start('LobbyScene');
       return;
     }
-    configureModernUiScene(this, capabilities.modernArt);
+    configureModernUiScene(
+      this,
+      reforgedVisualCutoverForScene(this, capabilities.modernArt).active,
+    );
 
     useReforgedMenuLogicalSize(this.scale);
     this.cameras.main.setViewport(0, 0, MENU_LOGICAL_WIDTH, MENU_LOGICAL_HEIGHT);

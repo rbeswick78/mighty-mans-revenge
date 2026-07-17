@@ -19,6 +19,11 @@ import { AudioManager } from '../audio/audio-manager.js';
 import { isTouchDevice } from '../input/is-touch-device.js';
 import { MenuGamepadInput } from '../input/menu-gamepad.js';
 import { GameService, type MatchData } from '../services/game-service.js';
+import { reforgedVisualCutoverForScene } from '../rendering/reforged-visual-cutover.js';
+import { reforgedFighterPreview } from '../rendering/reforged-fighter-preview.js';
+import { reforgedBiomeFamilyForTheme } from '../rendering/reforged-environment-contract.js';
+import { ReforgedVisualBackdrop } from '../ui/reforged-visual-backdrop.js';
+import { getMap } from '@shared/maps/registry.js';
 import { matchFoundDestination } from '../ui/reforged/standard-match-route.js';
 import { WastelandStreet, type Outcome } from '../ui/menu/wasteland-street.js';
 import { MenuPanel } from '../ui/menu/menu-panel.js';
@@ -277,7 +282,8 @@ export class ResultsScene extends Phaser.Scene {
     const camHeight = this.cameras.main.height;
     const localPlayerId = this.gameService.getPlayerId();
     const capabilities = this.gameService.getServerCapabilities();
-    configureModernUiScene(this, capabilities.modernArt);
+    const visualCutover = reforgedVisualCutoverForScene(this, capabilities.modernArt);
+    configureModernUiScene(this, visualCutover.active);
     this.partyState =
       capabilities.newShell && capabilities.schedules && !this.result?.isPractice
         ? this.gameService.getPartyState()
@@ -303,7 +309,10 @@ export class ResultsScene extends Phaser.Scene {
     // Embers retune to the outcome mood (orange for victory, slow ash for
     // defeat, dust for draw).
     // ────────────────────────────────────────────────────────────────────
-    const street = new WastelandStreet(this, { lowDetail: this.isLikelyMobile() });
+    const mapTheme = this.matchData?.mapName ? getMap(this.matchData.mapName).theme : undefined;
+    const street = visualCutover.active
+      ? new ReforgedVisualBackdrop(this, reforgedBiomeFamilyForTheme(mapTheme))
+      : new WastelandStreet(this, { lowDetail: this.isLikelyMobile() });
     street.setOutcomeWash(outcome);
 
     // Win/lose music keyed off result. Draws fall through to the lose
@@ -750,19 +759,31 @@ export class ResultsScene extends Phaser.Scene {
     name?: string,
   ): Phaser.GameObjects.Sprite {
     const character: CharacterDef = CHARACTERS[characterId];
+    const modernPreview = reforgedFighterPreview(
+      characterId,
+      'side',
+      modernUiEnabledForScene(this),
+    );
     const animKey = `${character.spritePrefix}_side_idle`;
-    const scale = slumped ? standingScale * (5 / 6) : standingScale;
+    const scale = modernPreview
+      ? slumped
+        ? 1.45
+        : 1.75
+      : slumped
+        ? standingScale * (5 / 6)
+        : standingScale;
     const slumpRotation = slumped ? (flipX ? -0.35 : 0.35) : 0;
     const bodyY = slumped ? y + 14 : y;
     const sprite = this.add
-      .sprite(x, bodyY, animKey)
+      .sprite(x, bodyY, modernPreview?.body.texture ?? animKey, modernPreview?.body.frame)
       .setOrigin(0.5, 1)
       .setScale(scale)
       .setDepth(WastelandStreet.DEPTH.CHARACTERS)
       .setFlipX(flipX)
       .setData('resultCharacterId', characterId);
     if (name) sprite.setName(name);
-    sprite.play(animKey);
+    if (modernPreview) sprite.play(modernPreview.body.animation);
+    else sprite.play(animKey);
     if (characterId === 'frost_wizard') {
       sprite.setTint(
         FROST_WIZARD_TINT_TOP,
@@ -778,7 +799,20 @@ export class ResultsScene extends Phaser.Scene {
     if (parent) parent.add(sprite);
 
     const overlay = character.bodyOverlay;
-    if (overlay) {
+    if (modernPreview?.overlay) {
+      const overlaySprite = this.add
+        .sprite(x, bodyY, modernPreview.overlay.texture, modernPreview.overlay.frame)
+        .setOrigin(0.5, 1)
+        .setScale(scale)
+        .setDepth(WastelandStreet.DEPTH.CHARACTERS + 1)
+        .setFlipX(flipX)
+        .setData('resultCharacterId', characterId);
+      if (slumped) {
+        overlaySprite.setTint(LOSER_TINT);
+        overlaySprite.setRotation(slumpRotation);
+      }
+      if (parent) parent.add(overlaySprite);
+    } else if (overlay) {
       const overlayKey = `${overlay.spritePrefix}_side_idle`;
       const overlayOffset = (character.idleFrames.side.h - overlay.idleFrames.side.h) * scale;
       const overlayX = slumped ? x + overlayOffset * Math.sin(slumpRotation) : x;

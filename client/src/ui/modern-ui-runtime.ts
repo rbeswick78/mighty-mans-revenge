@@ -48,6 +48,12 @@ export function modernUiEnabledForScene(scene: Phaser.Scene): boolean {
   return MODERN_UI_SCENES.get(scene) ?? false;
 }
 
+export function modernUiAtlasAvailable(scene: Phaser.Scene): boolean {
+  if (!scene.textures.exists(MODERN_UI_TEXTURE_KEY)) return false;
+  const texture = scene.textures.get(MODERN_UI_TEXTURE_KEY);
+  return texture.has('ui.chrome.states/000') && texture.has('ui.icon.language/015');
+}
+
 export function menuHeaderFont(scene: Phaser.Scene): string {
   return modernUiEnabledForScene(scene) ? MODERN_UI_FONTS.HEADER : MENU_FONTS.HEADER;
 }

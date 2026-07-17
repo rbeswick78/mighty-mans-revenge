@@ -6,6 +6,10 @@ import {
   REFORGED_ENVIRONMENT_FRAME_ROLES,
   normalizeReforgedEnvironmentImportMetadata,
   reforgedEnvironmentFrame,
+  reforgedBiomeFamilyForTheme,
+  reforgedEnvironmentDecorationRole,
+  reforgedEnvironmentDamagedRole,
+  reforgedEnvironmentTileRole,
   reforgedEnvironmentQualityTreatment,
   shouldPresentReforgedEnvironmentKit,
 } from './reforged-environment-contract.js';
@@ -67,7 +71,37 @@ describe('Reforged biome environment contract', () => {
     expect(shouldPresentReforgedEnvironmentKit('verification-preview', true, true)).toBe(true);
     expect(shouldPresentReforgedEnvironmentKit('verification-preview', false, true)).toBe(false);
     expect(shouldPresentReforgedEnvironmentKit('verification-preview', true, false)).toBe(false);
-    expect(shouldPresentReforgedEnvironmentKit('live-map', true, true)).toBe(false);
+    expect(shouldPresentReforgedEnvironmentKit('live-map', true, true)).toBe(true);
+  });
+
+  it('projects current map themes, collision classes, and compatible decorations only', () => {
+    expect(reforgedBiomeFamilyForTheme(undefined)).toBe('wasteland');
+    expect(reforgedBiomeFamilyForTheme('suburb')).toBe('overgrown');
+    expect(reforgedBiomeFamilyForTheme('refinery')).toBe('industrial');
+    expect(reforgedBiomeFamilyForTheme('future-theme')).toBe('wasteland');
+    expect(reforgedEnvironmentTileRole(1, 1, 1)).toBe('wall-intact');
+    expect(reforgedEnvironmentTileRole(2, 1, 1)).toBe('low-cover-intact');
+    expect(
+      reforgedEnvironmentDecorationRole({
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        texture: 'deco_barrel_red',
+        hazard: 'explosive_barrel',
+      }),
+    ).toBe('prop-b-intact');
+    expect(
+      reforgedEnvironmentDecorationRole({
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        texture: 'tiles_wire_fence_closing',
+        interaction: 'shootable_gate',
+      }),
+    ).toBeNull();
+    expect(reforgedEnvironmentDamagedRole('landmark-intact')).toBe('landmark-damaged');
   });
 
   it('retains gameplay-readable essentials in full and reduced quality', () => {

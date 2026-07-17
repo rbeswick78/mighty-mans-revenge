@@ -420,3 +420,27 @@ edges, and ability snapshot edges are the only live inputs. The client does not
 infer a player hit from an endpoint, alter a radius, create rarity or zone
 state, or add a mechanic. Rarity and zone stay verification-preview-only;
 legacy combat effects remain active until Batch 33 owns the coherent cutover.
+
+## Batch 33 production mapping
+
+The six approved atlases now read as one literal-`modernArt` system from shell
+through Results. UI chrome establishes focus/action hierarchy; fighter body and
+carried-object silhouettes remain primary; weapon/pickup identity and the quiet
+ground/collision hierarchy sit below them; confirmed event feedback is brief
+and decisive above play. Fighter selection and Results reuse the same atlas
+identities as gameplay, including Jack's axe-present preview and Rook's aligned
+body/helmet layers. Current map themes project deterministically to wasteland,
+overgrown, or industrial families; unknown/absent themes retain the wasteland
+default. Full collision, low cover, quiet ground, southeast shadows, damaged
+pairs, and navigation anchors keep their established reading order.
+
+Every established modern feedback event has one graphical owner. Muzzle,
+scenery impact, authoritative confirmed-player impact, exact-radius explosion,
+healing, armor, fighter release, and elimination use the pooled atlas path;
+legacy graphical doubles are suppressed only there. Audio, lighting, camera,
+decals, scorch, hit confirmation, and gameplay state remain separate owners.
+Reduced quality keeps the same essentials within 16 slots; full keeps 32.
+Animated gates, scavenger caches, bat/punch, and incompatible carried-object
+states retain explicit legacy presentation. Rarity/zone and future weapon/
+container art remain dormant. If any completed atlas is unavailable, the whole
+journey returns to legacy/procedural presentation rather than mixing styles.

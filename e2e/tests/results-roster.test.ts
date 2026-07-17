@@ -1,5 +1,7 @@
 import { test, expect } from '../fixtures';
 
+const modernArtAdvertised = process.env.CAPABILITY_MODERN_ART === 'true';
+
 async function waitForLobby(gamePage: import('@playwright/test').Page): Promise<void> {
   await expect
     .poll(
@@ -23,7 +25,7 @@ test.describe('Result fighter roster', () => {
     gamePage,
   }) => {
     await waitForLobby(gamePage);
-    await gamePage.evaluate(() => {
+    await gamePage.evaluate((advertiseModernArt) => {
       const w = window as unknown as {
         game?: {
           scene: {
@@ -37,10 +39,18 @@ test.describe('Result fighter roster', () => {
       };
       const active = w.game?.scene.scenes.find((scene) => scene.sys.settings.active);
       const lobby = w.game?.scene.getScene('LobbyScene') as {
-        gameService?: { getPlayerId: () => string | null };
+        gameService?: {
+          getPlayerId: () => string | null;
+          getServerCapabilities: () => Record<string, boolean>;
+        };
       };
       if (!active || !lobby.gameService) throw new Error('lobby is not ready');
       lobby.gameService.getPlayerId = () => 'local';
+      const currentCapabilities = lobby.gameService.getServerCapabilities();
+      lobby.gameService.getServerCapabilities = () => ({
+        ...currentCapabilities,
+        modernArt: advertiseModernArt,
+      });
       const stats = {
         kills: 4,
         assists: 2,
@@ -102,7 +112,7 @@ test.describe('Result fighter roster', () => {
           wentToOvertime: false,
         },
       });
-    });
+    }, modernArtAdvertised);
 
     await expect
       .poll(() =>
@@ -152,6 +162,26 @@ test.describe('Result fighter roster', () => {
         rookLayers: 2,
         labels: ['ROOK', 'BUBBA', 'FROST WIZARD', 'JACK'],
       });
+
+    const modernTextures = await gamePage.evaluate(() => {
+      const scene = (
+        window as unknown as { game?: { scene: { getScene: (key: string) => unknown } } }
+      ).game?.scene.getScene('ResultsScene') as {
+        children?: {
+          list: Array<{
+            texture?: { key?: string };
+            list?: Array<{ texture?: { key?: string } }>;
+          }>;
+        };
+      };
+      return (scene?.children?.list ?? [])
+        .flatMap((child) => [child, ...(child.list ?? [])])
+        .map((child) => child.texture?.key)
+        .filter((key): key is string => Boolean(key));
+    });
+    expect(modernTextures.includes('reforged-biome-environment-art')).toBe(modernArtAdvertised);
+    expect(modernTextures.includes('reforged-fighter-art-i')).toBe(modernArtAdvertised);
+    expect(modernTextures.includes('reforged-fighter-art-ii')).toBe(modernArtAdvertised);
 
     await gamePage.evaluate(() => {
       const scene = (
@@ -229,12 +259,12 @@ test.describe('Result fighter roster', () => {
           const rookLayers = children.filter(
             (child) => child.getData?.('resultCharacterId') === 'rook',
           );
-          const rookBody = rookLayers.find(
-            (child) => child.texture?.key === 'mighty_man_side_idle',
-          );
-          const rookHelmet = rookLayers.find(
-            (child) => child.texture?.key === 'rook-helmet_side_idle',
-          );
+          const rookBody =
+            rookLayers.find((child) => child.texture?.key === 'mighty_man_side_idle') ??
+            rookLayers[0];
+          const rookHelmet =
+            rookLayers.find((child) => child.texture?.key === 'rook-helmet_side_idle') ??
+            rookLayers[1];
           const aligned =
             rookBody?.x !== undefined &&
             rookBody.y !== undefined &&
@@ -260,7 +290,7 @@ test.describe('Result fighter roster', () => {
       )
       .toEqual({
         characters: ['bubba', 'rook', 'rook'],
-        aligned: { sameRotation: true, layerOffset: 40 },
+        aligned: { sameRotation: true, layerOffset: modernArtAdvertised ? 0 : 40 },
       });
   });
 });

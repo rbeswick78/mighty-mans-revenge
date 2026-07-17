@@ -271,6 +271,19 @@ renderer. No capability default, event authority, gameplay rule, wire
 contract, production exposure, or deployment changes. Batch 33 still owns one
 coherent live visual cutover and any verified legacy retirement.
 
+Batch 33 makes `modernArt` an atomic six-atlas presentation selection without
+changing the handshake, normalization, default, or rollout order. Literal
+server-owned `modernArt: true` selects modern UI, both fighter sets, current
+weapon/pickup presentation, current-map biome projection, and combat feedback
+only when every completed atlas is registered and compatible. A false, absent,
+malformed, reconnecting, disconnected, old-server, or single missing-atlas
+case selects the complete registered legacy/procedural owner instead of a mixed
+journey. Recovery and scene recreation reevaluate the same selector. Current
+960x576 maps, collision/destruction, matchmaking/party, snapshots/events,
+Results/rematch, persistence, and the 20Hz server remain authoritative and
+unchanged. Production still advertises no Reforged capability; Batch 33 does
+not authorize exposure or deployment.
+
 ## Server-first rollout and rollback
 
 For each capability, keep this order:

@@ -1,4 +1,6 @@
 export const REFORGED_ENVIRONMENT_ATLAS_ID = 'biome-environment-art.core';
+import { TileType, type MapDecoration } from '@shared/types/map.js';
+
 export const REFORGED_ENVIRONMENT_TEXTURE_KEY = 'reforged-biome-environment-art';
 export const REFORGED_ENVIRONMENT_IMPORT_CACHE_KEY = 'reforged-biome-environment-art-import';
 export const REFORGED_ENVIRONMENT_ATLAS_IMAGE =
@@ -100,7 +102,72 @@ export function shouldPresentReforgedEnvironmentKit(
   modernArtEnabled: boolean,
   atlasAvailable: boolean,
 ): boolean {
-  return owner === 'verification-preview' && modernArtEnabled && atlasAvailable;
+  return (
+    (owner === 'verification-preview' || owner === 'live-map') && modernArtEnabled && atlasAvailable
+  );
+}
+
+const THEME_FAMILIES: Readonly<Record<string, ReforgedBiomeFamily>> = Object.freeze({
+  wasteland: 'wasteland',
+  suburb: 'overgrown',
+  scrapyard: 'industrial',
+  overpass: 'industrial',
+  checkpoint: 'industrial',
+  refinery: 'industrial',
+});
+
+/** Presentation-only projection; unknown/absent current themes remain wasteland. */
+export function reforgedBiomeFamilyForTheme(themeId: string | undefined): ReforgedBiomeFamily {
+  return THEME_FAMILIES[themeId ?? 'wasteland'] ?? 'wasteland';
+}
+
+export function reforgedEnvironmentGroundRole(
+  row: number,
+  col: number,
+): ReforgedEnvironmentFrameRole {
+  const index = (((row * 19349663) ^ (col * 73856093)) >>> 0) % 3;
+  return (['ground-a', 'ground-b', 'ground-c'] as const)[index];
+}
+
+export function reforgedEnvironmentTileRole(
+  tileType: TileType,
+  row: number,
+  col: number,
+): ReforgedEnvironmentFrameRole {
+  if (tileType === TileType.WALL) return 'wall-intact';
+  if (tileType === TileType.COVER_LOW) return 'low-cover-intact';
+  return reforgedEnvironmentGroundRole(row, col);
+}
+
+/**
+ * Existing animated gates and caches have no compatible Batch 31 state grid,
+ * so they explicitly retain their registered legacy presentation. Other
+ * decoration roles project from authored map metadata without changing it.
+ */
+export function reforgedEnvironmentDecorationRole(
+  decoration: MapDecoration,
+): ReforgedEnvironmentFrameRole | null {
+  if (decoration.interaction === 'shootable_gate' || decoration.interaction === 'scavenger_cache') {
+    return null;
+  }
+  if (decoration.hazard === 'explosive_barrel') return 'prop-b-intact';
+  if (decoration.texture.includes('car') || decoration.texture.includes('container')) {
+    return 'landmark-intact';
+  }
+  return 'prop-a-intact';
+}
+
+export function reforgedEnvironmentDamagedRole(
+  role: ReforgedEnvironmentFrameRole,
+): ReforgedEnvironmentFrameRole | null {
+  const pairs: Partial<Record<ReforgedEnvironmentFrameRole, ReforgedEnvironmentFrameRole>> = {
+    'wall-intact': 'wall-damaged',
+    'low-cover-intact': 'low-cover-damaged',
+    'prop-a-intact': 'prop-a-damaged',
+    'prop-b-intact': 'prop-b-damaged',
+    'landmark-intact': 'landmark-damaged',
+  };
+  return pairs[role] ?? null;
 }
 
 export function reforgedEnvironmentQualityTreatment(quality: ReforgedEnvironmentQuality) {

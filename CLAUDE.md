@@ -552,6 +552,24 @@ owns the coherent Boot-through-Results cutover. No damage, healing, armor,
 ability, rarity, zone, projectile, collision, camera, physics, input, wire,
 capability-default, production, or deployment behavior changed.
 
+**Full-journey visual cutover (Batch 33):** literal server-owned `modernArt`
+selects one atomic client presentation owner only when all six completed
+atlases are registered and compatible. The selector is shared by the Reforged
+shell, fighter selection, current-map gameplay, HUD/minimap/match menu, and
+Results; one missing atlas returns the whole journey to registered legacy/
+procedural presentation. Current map JSON projects deterministically to the
+Batch 31 wasteland/overgrown/industrial grammar while retaining authoritative
+960x576 bounds, collision, destruction, chunks, spawns, objectives, pickups,
+and minimap truth. Existing animated gates and scavenger caches remain explicit
+legacy presentation fallbacks because the environment atlas has no compatible
+state grid. Modern muzzle, scenery impact, confirmed-player impact, explosion,
+healing, armor, fighter release, and elimination cues are the sole graphical
+owners on the modern path; audio, lighting, camera, decals, and authoritative
+state remain unchanged. Bat/punch and incompatible carried-object paths stay
+legacy, while SMG/sniper/launcher/container/rarity/zone mechanics remain
+dormant. No atlas bytes, shared/server/wire/map/mechanics, capability defaults,
+production exposure, or deployment changed.
+
 ### Why This Matters for Agents
 
 Client prediction and server simulation **must use identical physics code** from `/shared`. If you change movement, collision, or physics logic, you must change it in `/shared` and verify both client and server still agree. A mismatch between client prediction and server authority causes visible rubber-banding.

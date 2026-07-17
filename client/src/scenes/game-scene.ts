@@ -97,6 +97,10 @@ import { MENU_FONTS } from '../ui/menu/fonts.js';
 import { MatchMenu } from '../ui/match-menu.js';
 import { configureModernUiScene, modernUiEnabledForScene } from '../ui/modern-ui-runtime.js';
 import {
+  reforgedVisualCutoverForScene,
+  type ReforgedVisualCutoverSelection,
+} from '../rendering/reforged-visual-cutover.js';
+import {
   currentGameplayOverlaySafeArea,
   gameplayViewportForCapabilities,
   type GameplayOverlaySafeArea,
@@ -175,6 +179,7 @@ export class GameScene extends Phaser.Scene {
   private xrayFx: XrayFx | null = null;
   private abilityAura: AbilityAura | null = null;
   private reforgedCombatFeedback: ReforgedCombatFeedbackRenderer | null = null;
+  private reforgedVisualCutover: ReforgedVisualCutoverSelection | null = null;
   /**
    * Last-seen `abilityActiveSeconds > 0` for the local player. Used to
    * detect the false→true edge so the activation banner fires exactly
@@ -327,13 +332,15 @@ export class GameScene extends Phaser.Scene {
     this.gameplaySafeArea = null;
     this.combatHudLayout = null;
     this.worldRenderPlan = null;
+    this.reforgedVisualCutover = null;
     this.worldRenderQuality.reset();
   }
 
   create(): void {
     this.gameService = GameService.getInstance();
     const capabilities = this.gameService.getServerCapabilities();
-    configureModernUiScene(this, capabilities.modernArt && capabilities.largeWorlds);
+    this.reforgedVisualCutover = reforgedVisualCutoverForScene(this, capabilities.modernArt);
+    configureModernUiScene(this, this.reforgedVisualCutover.active);
     this.gameplayViewport = useGameplayLogicalSize(this.scale, capabilities);
     const mapData: MapData = getMap(this.matchData?.mapName ?? DEFAULT_MAP_NAME);
     this.worldRenderPlan = createWorldRenderPlan(mapData, {
@@ -362,7 +369,7 @@ export class GameScene extends Phaser.Scene {
     // client via matchFound.mapName; we look it up in the shared registry.
     // Falls back to the default map if matchData is missing (e.g., reloaded
     // mid-match before the matchFound event re-fires).
-    this.mapRenderer = new MapRenderer(this);
+    this.mapRenderer = new MapRenderer(this, this.reforgedVisualCutover.active);
     this.mapRenderer.renderMap(mapData);
 
     // Wire the collision grid into the network manager so client-side
@@ -392,15 +399,15 @@ export class GameScene extends Phaser.Scene {
     // the hard-swap look turns out wrong.
 
     // Create subsystems
-    this.playerManager = new ClientPlayerManager(this, capabilities.modernArt);
+    this.playerManager = new ClientPlayerManager(this, this.reforgedVisualCutover.active);
     this.tauntRenderer = new TauntRenderer(this);
     this.effectsRenderer = new EffectsRenderer(this, this.cameraController);
     this.reforgedCombatFeedback = ReforgedCombatFeedbackRenderer.create(
       this,
-      capabilities.modernArt,
+      this.reforgedVisualCutover.active,
       () => this.worldRenderQuality.getBudget(),
     );
-    this.pickupRenderer = new PickupRenderer(this, capabilities.modernArt);
+    this.pickupRenderer = new PickupRenderer(this, this.reforgedVisualCutover.active);
     this.confirmedTagRenderer = new ConfirmedTagRenderer(this);
     this.coreRunRenderer = new CoreRunRenderer(this);
     this.radiationStormRenderer = new RadiationStormRenderer(
@@ -449,7 +456,7 @@ export class GameScene extends Phaser.Scene {
     if (grid && minimapLayout) {
       this.minimapRenderer = new MinimapRenderer(this, mapData, grid, minimapLayout);
     }
-    this.hud = new HUD(this, this.combatHudLayout, capabilities.modernArt);
+    this.hud = new HUD(this, this.combatHudLayout, this.reforgedVisualCutover.active);
     // Bullseye replaces the OS cursor on desktop only — touch input
     // doesn't have a hover position to track.
     if (!isTouchDevice()) {
@@ -740,8 +747,11 @@ export class GameScene extends Phaser.Scene {
           seenIds.add(p.id);
           const prev = this.prevDeadStates.get(p.id);
           if (prev === false && p.isDead) {
-            this.killJuice?.trigger();
-            this.reforgedCombatFeedback?.showElimination(p.position.x, p.position.y, p.aimAngle);
+            if (this.reforgedCombatFeedback) {
+              this.reforgedCombatFeedback.showElimination(p.position.x, p.position.y, p.aimAngle);
+            } else {
+              this.killJuice?.trigger();
+            }
           }
           this.prevDeadStates.set(p.id, p.isDead);
         }
@@ -1368,6 +1378,20 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  getReforgedVisualCutoverState(): ReforgedVisualCutoverSelection | null {
+    return this.reforgedVisualCutover;
+  }
+
+  getReforgedCombatFeedbackState(): ReturnType<
+    ReforgedCombatFeedbackRenderer['getRenderState']
+  > | null {
+    return this.reforgedCombatFeedback?.getRenderState() ?? null;
+  }
+
+  getReforgedEnvironmentState(): ReturnType<MapRenderer['getReforgedEnvironmentState']> | null {
+    return this.mapRenderer?.getReforgedEnvironmentState() ?? null;
+  }
+
   private updateCameraTarget(
     localState: ReturnType<NetworkManager['getLocalPlayerState']>,
     networkManager: NetworkManager,
@@ -1611,8 +1635,11 @@ export class GameScene extends Phaser.Scene {
       // still plays so the shot is legible.
       const shooter = this.playerManager?.getRenderer(trail.shooterId);
       if (primaryOfBlast && (shooter?.rendersGun() ?? true)) {
-        this.effectsRenderer?.showMuzzleFlash(trail.startPos.x, trail.startPos.y, bulletAngle);
-        this.reforgedCombatFeedback?.showMuzzle(trail.startPos.x, trail.startPos.y, bulletAngle);
+        if (this.reforgedCombatFeedback) {
+          this.reforgedCombatFeedback.showMuzzle(trail.startPos.x, trail.startPos.y, bulletAngle);
+        } else {
+          this.effectsRenderer?.showMuzzleFlash(trail.startPos.x, trail.startPos.y, bulletAngle);
+        }
         this.lightingRenderer?.addMuzzleFlash(trail.startPos.x, trail.startPos.y);
       }
 
@@ -1659,18 +1686,21 @@ export class GameScene extends Phaser.Scene {
         trail.endPos.y,
         () => {
           if (confirmedPlayerHit) {
-            this.effectsRenderer?.showPlayerHit(
-              trail.endPos.x,
-              trail.endPos.y,
-              bulletAngle,
-              trail.timestamp,
-            );
-            this.reforgedCombatFeedback?.showImpact(
-              'player',
-              trail.endPos.x,
-              trail.endPos.y,
-              bulletAngle,
-            );
+            if (this.reforgedCombatFeedback) {
+              this.reforgedCombatFeedback.showImpact(
+                'player',
+                trail.endPos.x,
+                trail.endPos.y,
+                bulletAngle,
+              );
+            } else {
+              this.effectsRenderer?.showPlayerHit(
+                trail.endPos.x,
+                trail.endPos.y,
+                bulletAngle,
+                trail.timestamp,
+              );
+            }
 
             // This dry UI tick is private shooter feedback. Shotgun pellets
             // share one blast, so only its first confirmed pellet owns it.
@@ -1687,13 +1717,16 @@ export class GameScene extends Phaser.Scene {
               if (playHitConfirm) audio.play('hitConfirm');
             }
           } else {
-            this.impactFx?.spawnBulletImpact(trail.endPos.x, trail.endPos.y, bulletAngle, grid);
-            this.reforgedCombatFeedback?.showImpact(
-              'scenery',
-              trail.endPos.x,
-              trail.endPos.y,
-              bulletAngle,
-            );
+            if (this.reforgedCombatFeedback) {
+              this.reforgedCombatFeedback.showImpact(
+                'scenery',
+                trail.endPos.x,
+                trail.endPos.y,
+                bulletAngle,
+              );
+            } else {
+              this.impactFx?.spawnBulletImpact(trail.endPos.x, trail.endPos.y, bulletAngle, grid);
+            }
             this.decalRenderer?.addBulletHoleIfWall(
               trail.endPos.x,
               trail.endPos.y,
@@ -1748,10 +1781,11 @@ export class GameScene extends Phaser.Scene {
       if (!audio) return;
       if (entry.killerId === localId && entry.killerId !== entry.victimId) {
         audio.play('kill', callout?.killSfx);
-        this.healFlash?.trigger();
         const localState = networkManager.getLocalPlayerState();
-        if (localState) {
-          this.reforgedCombatFeedback?.showHealing(localState.position.x, localState.position.y);
+        if (this.reforgedCombatFeedback && localState) {
+          this.reforgedCombatFeedback.showHealing(localState.position.x, localState.position.y);
+        } else {
+          this.healFlash?.trigger();
         }
       }
       if (entry.assistId === localId && entry.killerId !== localId && entry.victimId !== localId) {
@@ -1953,11 +1987,15 @@ export class GameScene extends Phaser.Scene {
     };
 
     this.onGrenadeExploded = (pos: Vec2) => {
-      this.effectsRenderer?.showExplosion(pos.x, pos.y);
-      this.reforgedCombatFeedback?.showExplosion(pos.x, pos.y, GRENADE.BLAST_RADIUS);
+      if (this.reforgedCombatFeedback) {
+        this.reforgedCombatFeedback.showExplosion(pos.x, pos.y, GRENADE.BLAST_RADIUS);
+      } else {
+        this.effectsRenderer?.showExplosion(pos.x, pos.y);
+        this.explosionFx?.spawnExplosion(pos.x, pos.y);
+        this.smokeFx?.spawnExplosionSmoke(pos.x, pos.y);
+        this.shockwaveController?.trigger(pos.x, pos.y);
+      }
       this.lightingRenderer?.addExplosionFlash(pos.x, pos.y);
-      this.explosionFx?.spawnExplosion(pos.x, pos.y);
-      this.smokeFx?.spawnExplosionSmoke(pos.x, pos.y);
 
       const audio = AudioManager.getInstance();
       if (audio) {
@@ -1978,7 +2016,6 @@ export class GameScene extends Phaser.Scene {
       // midpoint to the lighter-spot frame. Pixel-art coherent, snaps
       // to the grid.
       this.mapRenderer?.scorchTileAt(pos.x, pos.y);
-      this.shockwaveController?.trigger(pos.x, pos.y);
       this.cameraController?.triggerZoomPulse();
     };
 
@@ -2461,6 +2498,7 @@ export class GameScene extends Phaser.Scene {
       this.decalRenderer = null;
     }
     this.worldRenderPlan = null;
+    this.reforgedVisualCutover = null;
     this.combatHudLayout = null;
     this.worldRenderQuality.reset();
     this.prevDeadStates.clear();

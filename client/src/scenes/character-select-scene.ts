@@ -31,6 +31,12 @@ import {
   normalizeCrewTourRecord,
 } from '../ui/crew-tour.js';
 import { fighterBriefing } from '../ui/fighter-briefing.js';
+import { getMap } from '@shared/maps/registry.js';
+import { reforgedVisualCutoverForScene } from '../rendering/reforged-visual-cutover.js';
+import { reforgedFighterPreview } from '../rendering/reforged-fighter-preview.js';
+import { reforgedBiomeFamilyForTheme } from '../rendering/reforged-environment-contract.js';
+import { ReforgedVisualBackdrop } from '../ui/reforged-visual-backdrop.js';
+import { configureModernUiScene, createModernUiNineSlice } from '../ui/modern-ui-runtime.js';
 
 // Scene-local color decisions. HEALTH_GOOD (mint) doubles as the "you"
 // highlight — same color the HUD uses for the local player's health bar,
@@ -92,7 +98,7 @@ interface CharacterSelectSceneData {
 interface CardWidgets {
   characterId: CharacterId;
   container: Phaser.GameObjects.Container;
-  bg: Phaser.GameObjects.Graphics;
+  bg: Phaser.GameObjects.Graphics | Phaser.GameObjects.NineSlice;
   border: Phaser.GameObjects.Graphics;
   sprite: Phaser.GameObjects.Sprite;
   nameText: Phaser.GameObjects.Text;
@@ -110,7 +116,7 @@ export class CharacterSelectScene extends Phaser.Scene {
   private menuGamepad: MenuGamepadInput | null = null;
   private statusText!: Phaser.GameObjects.Text;
   private timerText!: Phaser.GameObjects.Text;
-  private fighterDetailPanel!: Phaser.GameObjects.Graphics;
+  private fighterDetailPanel!: Phaser.GameObjects.Graphics | Phaser.GameObjects.NineSlice;
   private fighterDetailTitle!: Phaser.GameObjects.Text;
   private fighterDetailText!: Phaser.GameObjects.Text;
   private lockButton!: PixelButton;
@@ -121,6 +127,7 @@ export class CharacterSelectScene extends Phaser.Scene {
   private lastTapId: CharacterId | null = null;
   private lastTapMs = 0;
   private transitioned = false;
+  private modernCutover = false;
 
   private onCharacterSelectState: ((msg: ServerCharacterSelectStateMessage) => void) | null = null;
   private onMatchCountdown: ((countdown: number) => void) | null = null;
@@ -140,12 +147,18 @@ export class CharacterSelectScene extends Phaser.Scene {
     this.lastTapId = null;
     this.lastTapMs = 0;
     this.transitioned = false;
+    this.modernCutover = false;
     this.cards = new Map();
   }
 
   create(): void {
     this.cameras.main.fadeIn(300, 0, 0, 0);
     this.gameService = GameService.getInstance();
+    this.modernCutover = reforgedVisualCutoverForScene(
+      this,
+      this.gameService.getServerCapabilities().modernArt,
+    ).active;
+    configureModernUiScene(this, this.modernCutover);
     this.menuGamepad = new MenuGamepadInput();
 
     const centerX = this.cameras.main.width / 2;
@@ -155,7 +168,12 @@ export class CharacterSelectScene extends Phaser.Scene {
     // Backdrop: same wasteland street as the lobby + results so the
     // menu trio reads as one continuous place.
     // ────────────────────────────────────────────────────────────────────
-    new WastelandStreet(this, { lowDetail: this.isLikelyMobile() });
+    if (this.modernCutover) {
+      const theme = this.matchData?.mapName ? getMap(this.matchData.mapName).theme : undefined;
+      new ReforgedVisualBackdrop(this, reforgedBiomeFamilyForTheme(theme));
+    } else {
+      new WastelandStreet(this, { lowDetail: this.isLikelyMobile() });
+    }
 
     this.backButton = new PixelButton(this, 24, 24, 150, 30, 'BACK TO LOBBY', {
       variant: 'secondary',
@@ -249,21 +267,32 @@ export class CharacterSelectScene extends Phaser.Scene {
     });
 
     const detailTop = cardY + CARD_HEIGHT / 2 + 10;
-    this.fighterDetailPanel = this.add.graphics();
-    drawBeveledChrome(
-      this.fighterDetailPanel,
-      centerX - DETAIL_PANEL_WIDTH / 2,
-      detailTop,
-      DETAIL_PANEL_WIDTH,
-      DETAIL_PANEL_HEIGHT,
-      {
-        fillColor: Wasteland.HUD_STRIP_BG,
-        fillAlpha: 0.96,
-        strokeColor: Wasteland.CANVAS_BG,
-        highlightColor: Wasteland.COVER_FILL,
-        shadowColor: Wasteland.WALL_LINE,
-      },
-    );
+    this.fighterDetailPanel = this.modernCutover
+      ? createModernUiNineSlice(
+          this,
+          'panel',
+          centerX - DETAIL_PANEL_WIDTH / 2,
+          detailTop,
+          DETAIL_PANEL_WIDTH,
+          DETAIL_PANEL_HEIGHT,
+        ).setOrigin(0)
+      : this.add.graphics();
+    if (this.fighterDetailPanel instanceof Phaser.GameObjects.Graphics) {
+      drawBeveledChrome(
+        this.fighterDetailPanel,
+        centerX - DETAIL_PANEL_WIDTH / 2,
+        detailTop,
+        DETAIL_PANEL_WIDTH,
+        DETAIL_PANEL_HEIGHT,
+        {
+          fillColor: Wasteland.HUD_STRIP_BG,
+          fillAlpha: 0.96,
+          strokeColor: Wasteland.CANVAS_BG,
+          highlightColor: Wasteland.COVER_FILL,
+          shadowColor: Wasteland.WALL_LINE,
+        },
+      );
+    }
     this.fighterDetailPanel.setDepth(WastelandStreet.DEPTH.UI);
     this.fighterDetailTitle = this.add
       .text(centerX, detailTop + 17, '', {
@@ -403,25 +432,51 @@ export class CharacterSelectScene extends Phaser.Scene {
 
     // Beveled pixel-art card chrome (square corners), matching the menu
     // panels on the lobby + results screens.
-    const bg = this.add.graphics();
-    drawBeveledChrome(bg, -CARD_WIDTH / 2, -CARD_HEIGHT / 2, CARD_WIDTH, CARD_HEIGHT, {
-      fillColor: Wasteland.HUD_STRIP_BG,
-      fillAlpha: 0.92,
-      strokeColor: Wasteland.CANVAS_BG,
-      highlightColor: Wasteland.TEXT_PRIMARY,
-      shadowColor: Wasteland.WALL_LINE,
-    });
+    const bg = this.modernCutover
+      ? createModernUiNineSlice(
+          this,
+          'panel',
+          -CARD_WIDTH / 2,
+          -CARD_HEIGHT / 2,
+          CARD_WIDTH,
+          CARD_HEIGHT,
+        ).setOrigin(0)
+      : this.add.graphics();
+    if (bg instanceof Phaser.GameObjects.Graphics) {
+      drawBeveledChrome(bg, -CARD_WIDTH / 2, -CARD_HEIGHT / 2, CARD_WIDTH, CARD_HEIGHT, {
+        fillColor: Wasteland.HUD_STRIP_BG,
+        fillAlpha: 0.92,
+        strokeColor: Wasteland.CANVAS_BG,
+        highlightColor: Wasteland.TEXT_PRIMARY,
+        shadowColor: Wasteland.WALL_LINE,
+      });
+    }
 
     // Border highlight (drawn on top of bg, toggled in drawCardBorder).
     const border = this.add.graphics();
 
     // Character preview sprite — same animation key style as elsewhere.
-    const sprite = this.add.sprite(0, -44, `${def.spritePrefix}_down_idle`);
-    sprite.setScale(SPRITE_SCALE);
-    sprite.play(`${def.spritePrefix}_down_idle`);
+    const modernPreview = reforgedFighterPreview(id, 'down', this.modernCutover);
+    const sprite = this.add.sprite(
+      0,
+      -44,
+      modernPreview?.body.texture ?? `${def.spritePrefix}_down_idle`,
+      modernPreview?.body.frame,
+    );
+    sprite.setScale(modernPreview ? 1.65 : SPRITE_SCALE);
+    sprite.play(modernPreview?.body.animation ?? `${def.spritePrefix}_down_idle`);
 
     let bodyOverlay: Phaser.GameObjects.Sprite | null = null;
-    if (def.bodyOverlay) {
+    if (modernPreview?.overlay) {
+      bodyOverlay = this.add.sprite(
+        0,
+        -44,
+        modernPreview.overlay.texture,
+        modernPreview.overlay.frame,
+      );
+      bodyOverlay.setScale(1.65);
+      bodyOverlay.play(modernPreview.overlay.animation);
+    } else if (def.bodyOverlay) {
       const key = `${def.bodyOverlay.spritePrefix}_down_idle`;
       const offsetY =
         ((def.bodyOverlay.idleFrames.down.h - def.idleFrames.down.h) / 2) * SPRITE_SCALE;
