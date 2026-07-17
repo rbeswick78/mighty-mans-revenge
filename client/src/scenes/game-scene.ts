@@ -342,7 +342,9 @@ export class GameScene extends Phaser.Scene {
     this.reforgedVisualCutover = reforgedVisualCutoverForScene(this, capabilities.modernArt);
     configureModernUiScene(this, this.reforgedVisualCutover.active);
     this.gameplayViewport = useGameplayLogicalSize(this.scale, capabilities);
-    const mapData: MapData = getMap(this.matchData?.mapName ?? DEFAULT_MAP_NAME);
+    const mapData: MapData = getMap(this.matchData?.mapName ?? DEFAULT_MAP_NAME, {
+      largeWorlds: capabilities.largeWorlds,
+    });
     this.worldRenderPlan = createWorldRenderPlan(mapData, {
       width: this.gameplayViewport.logicalWidth,
       height: this.gameplayViewport.logicalHeight,

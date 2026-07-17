@@ -1,0 +1,490 @@
+{
+  "name": "Wasteland Outpost",
+  "width": 40,
+  "height": 24,
+  "tileSize": 48,
+  "tiles": [
+    [
+      1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+      1, 1, 1, 1, 1, 1, 1, 1, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 3, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 0, 2, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 2, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 4, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0,
+      2, 0, 0, 0, 4, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 4, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 4, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0,
+      2, 2, 2, 2, 2, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1,
+      1, 0, 1, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1,
+      1, 1, 1, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 1,
+      1, 1, 1, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 1,
+      1, 1, 1, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 3, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+      1, 1, 1, 1, 1, 1, 1, 1, 1
+    ]
+  ],
+  "spawnPoints": [
+    {
+      "id": "spawn-north-west",
+      "x": 3,
+      "y": 3
+    },
+    {
+      "id": "spawn-south-east",
+      "x": 36,
+      "y": 20
+    },
+    {
+      "id": "spawn-south-west",
+      "x": 3,
+      "y": 20
+    },
+    {
+      "id": "spawn-north-east",
+      "x": 36,
+      "y": 3
+    }
+  ],
+  "pickupSpawns": [
+    {
+      "id": "shotgun-outpost",
+      "x": 19,
+      "y": 9,
+      "type": "weapon_shotgun"
+    },
+    {
+      "id": "pistol-south-door",
+      "x": 20,
+      "y": 14,
+      "type": "weapon_pistol"
+    },
+    {
+      "id": "bat-north-route",
+      "x": 20,
+      "y": 2,
+      "type": "weapon_bat"
+    },
+    {
+      "id": "ammo-south-door",
+      "x": 19,
+      "y": 14,
+      "type": "gun_ammo"
+    },
+    {
+      "id": "armor-core-west",
+      "x": 19,
+      "y": 12,
+      "type": "armor"
+    },
+    {
+      "id": "overcharge-core-east",
+      "x": 20,
+      "y": 11,
+      "type": "overcharge"
+    },
+    {
+      "id": "grenade-west-flank",
+      "x": 10,
+      "y": 5,
+      "type": "grenade"
+    },
+    {
+      "id": "grenade-east-flank",
+      "x": 29,
+      "y": 18,
+      "type": "grenade"
+    },
+    {
+      "id": "bandage-west-route",
+      "x": 4,
+      "y": 12,
+      "type": "bandage"
+    },
+    {
+      "id": "bandage-east-route",
+      "x": 35,
+      "y": 11,
+      "type": "bandage"
+    }
+  ],
+  "decorations": [
+    {
+      "id": "barrel-west-watch",
+      "x": 12,
+      "y": 6,
+      "w": 1,
+      "h": 1,
+      "texture": "deco_barrel_red",
+      "hazard": "explosive_barrel"
+    },
+    {
+      "id": "barrel-east-watch",
+      "x": 27,
+      "y": 17,
+      "w": 1,
+      "h": 1,
+      "texture": "deco_barrel_red",
+      "hazard": "explosive_barrel"
+    },
+    {
+      "id": "cache-south-west",
+      "x": 10,
+      "y": 17,
+      "w": 1,
+      "h": 1,
+      "texture": "deco_scavenger_cache",
+      "interaction": "scavenger_cache"
+    },
+    {
+      "id": "cache-north-east",
+      "x": 29,
+      "y": 6,
+      "w": 1,
+      "h": 1,
+      "texture": "deco_scavenger_cache",
+      "interaction": "scavenger_cache"
+    },
+    {
+      "id": "gate-west-outpost",
+      "x": 15,
+      "y": 11,
+      "w": 1,
+      "h": 1,
+      "texture": "tiles_wire_fence_closing",
+      "interaction": "shootable_gate"
+    },
+    {
+      "id": "gate-east-outpost",
+      "x": 24,
+      "y": 12,
+      "w": 1,
+      "h": 1,
+      "texture": "tiles_wire_fence_closing",
+      "interaction": "shootable_gate"
+    }
+  ],
+  "kothHills": [
+    {
+      "x": 6,
+      "y": 11
+    },
+    {
+      "x": 19,
+      "y": 11
+    },
+    {
+      "x": 32,
+      "y": 11
+    }
+  ],
+  "authoring": {
+    "schemaVersion": 1,
+    "profile": "standard-40x24",
+    "regions": [
+      {
+        "id": "west-badlands",
+        "areas": [
+          {
+            "x": 0,
+            "y": 0,
+            "w": 15,
+            "h": 24
+          }
+        ]
+      },
+      {
+        "id": "central-outpost",
+        "areas": [
+          {
+            "x": 15,
+            "y": 0,
+            "w": 10,
+            "h": 24
+          }
+        ]
+      },
+      {
+        "id": "east-badlands",
+        "areas": [
+          {
+            "x": 25,
+            "y": 0,
+            "w": 15,
+            "h": 24
+          }
+        ]
+      }
+    ],
+    "landmarks": [
+      {
+        "id": "west-watchtower",
+        "regionId": "west-badlands",
+        "footprint": {
+          "x": 6,
+          "y": 5,
+          "w": 4,
+          "h": 4
+        },
+        "minimap": "major"
+      },
+      {
+        "id": "central-command-post",
+        "regionId": "central-outpost",
+        "footprint": {
+          "x": 15,
+          "y": 7,
+          "w": 10,
+          "h": 10
+        },
+        "minimap": "major"
+      },
+      {
+        "id": "east-watchtower",
+        "regionId": "east-badlands",
+        "footprint": {
+          "x": 30,
+          "y": 15,
+          "w": 4,
+          "h": 4
+        },
+        "minimap": "major"
+      },
+      {
+        "id": "north-supply-road",
+        "regionId": "central-outpost",
+        "footprint": {
+          "x": 17,
+          "y": 1,
+          "w": 6,
+          "h": 5
+        },
+        "minimap": "minor"
+      },
+      {
+        "id": "south-supply-road",
+        "regionId": "central-outpost",
+        "footprint": {
+          "x": 17,
+          "y": 18,
+          "w": 6,
+          "h": 5
+        },
+        "minimap": "minor"
+      }
+    ],
+    "minimap": {
+      "projection": "orthographic-top-left",
+      "bounds": {
+        "x": 0,
+        "y": 0,
+        "w": 40,
+        "h": 24
+      },
+      "landmarkIds": [
+        "west-watchtower",
+        "central-command-post",
+        "east-watchtower",
+        "north-supply-road",
+        "south-supply-road"
+      ]
+    },
+    "connectivity": {
+      "requireSingleWalkableComponent": true,
+      "links": [
+        {
+          "id": "west-open-road",
+          "fromRegionId": "west-badlands",
+          "toRegionId": "central-outpost"
+        },
+        {
+          "id": "east-open-road",
+          "fromRegionId": "central-outpost",
+          "toRegionId": "east-badlands"
+        },
+        {
+          "id": "west-gate-shortcut",
+          "fromRegionId": "west-badlands",
+          "toRegionId": "central-outpost",
+          "gateId": "gate-west-outpost"
+        },
+        {
+          "id": "east-gate-shortcut",
+          "fromRegionId": "central-outpost",
+          "toRegionId": "east-badlands",
+          "gateId": "gate-east-outpost"
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "koth-west-watch",
+        "kind": "koth",
+        "regionId": "west-badlands",
+        "footprint": {
+          "x": 6,
+          "y": 11,
+          "w": 2,
+          "h": 2
+        }
+      },
+      {
+        "id": "koth-command-post",
+        "kind": "koth",
+        "regionId": "central-outpost",
+        "footprint": {
+          "x": 19,
+          "y": 11,
+          "w": 2,
+          "h": 2
+        }
+      },
+      {
+        "id": "koth-east-watch",
+        "kind": "koth",
+        "regionId": "east-badlands",
+        "footprint": {
+          "x": 32,
+          "y": 11,
+          "w": 2,
+          "h": 2
+        }
+      },
+      {
+        "id": "core-run-center",
+        "kind": "core-run",
+        "regionId": "central-outpost",
+        "footprint": {
+          "x": 19,
+          "y": 11,
+          "w": 2,
+          "h": 2
+        }
+      }
+    ],
+    "spawnSafety": {
+      "spawnIds": ["spawn-north-west", "spawn-south-east", "spawn-south-west", "spawn-north-east"],
+      "minimumPathDistanceTiles": 17,
+      "minimumEgressDirections": 4
+    },
+    "pickupPlacement": {
+      "pickupIds": [
+        "shotgun-outpost",
+        "pistol-south-door",
+        "bat-north-route",
+        "ammo-south-door",
+        "armor-core-west",
+        "overcharge-core-east",
+        "grenade-west-flank",
+        "grenade-east-flank",
+        "bandage-west-route",
+        "bandage-east-route"
+      ]
+    },
+    "gates": [
+      {
+        "decorationId": "gate-west-outpost",
+        "connectsRegionIds": ["west-badlands", "central-outpost"]
+      },
+      {
+        "decorationId": "gate-east-outpost",
+        "connectsRegionIds": ["central-outpost", "east-badlands"]
+      }
+    ],
+    "hazards": [
+      {
+        "decorationId": "barrel-west-watch",
+        "kind": "explosive_barrel",
+        "regionId": "west-badlands"
+      },
+      {
+        "decorationId": "barrel-east-watch",
+        "kind": "explosive_barrel",
+        "regionId": "east-badlands"
+      }
+    ],
+    "symmetryReview": {
+      "kind": "asymmetric",
+      "rationale": "Routes and structural masses are rotationally paired, while the unique standard pickup economy deliberately breaks exact point symmetry; horizontal, vertical, and rotational transforms were reviewed for comparable travel and escape options.",
+      "exceptions": [],
+      "checkedTransforms": ["horizontal", "vertical", "rotational"]
+    }
+  }
+}

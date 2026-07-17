@@ -1,10 +1,11 @@
 # Reforged Standard-Arena Authoring Contract
 
-Batch 34 defines the shared, deterministic contract for future 40x24 standard
-arenas. It does not replace or edit the six current 20x12 maps, register a new
-map, enable `largeWorlds`, or change runtime simulation, collision,
-destruction, navigation, camera, HUD, minimap, matchmaking, mode, or bot
-behavior.
+Batch 34 defines the shared, deterministic contract for 40x24 standard arenas.
+Batch 35 applies it to Wasteland Outpost and Overgrown Suburb behind the
+existing literal server-owned `largeWorlds` opt-in. The six current 20x12 maps
+remain the registry/default/fallback documents; runtime simulation, collision,
+destruction, navigation, camera, HUD, matchmaking, mode, and bot behavior still
+consume the established shared contracts.
 
 ## Compatibility profiles
 
@@ -17,10 +18,10 @@ and available to both client and server packages.
 | `standard-40x24` | Requires exactly 40x24 tiles at 48px and the complete version-1 `authoring` block below.                     |
 
 If an authoring block is present under either profile, it is validated fully.
-The runtime registry remains on its established typed imports in Batch 34, so
-current loading and `(0, 0)` behavior do not change. Batch 35+ map files can be
-validated with the strict profile before a later batch deliberately registers
-them.
+The public runtime registry remains the six established typed legacy imports.
+An additive variant resolver can return a strict successor only when its caller
+passes the literal server-owned `largeWorlds: true` selection; absent/false and
+unowned names return the existing registry object.
 
 Validation returns ordered issues with a stable code, JSON-style path, and
 actionable message. Human-readable errors use this exact shape:
@@ -109,7 +110,7 @@ Build shared and validate all current maps through the compatible profile:
 corepack pnpm maps:validate
 ```
 
-Validate one successor arena before registration:
+Validate one successor arena before runtime selection:
 
 ```powershell
 corepack pnpm --filter @shared/game build
@@ -141,15 +142,42 @@ failure behavior.
 - The client dynamic renderer, camera, HUD, and current minimap continue to use
   actual map dimensions, collision, decorations, and snapshots. They do not
   infer regions, objectives, teams, or visibility from authoring metadata.
-- The six current maps remain 20x12 at tile size 48, world size 960x576, origin
-  `(0, 0)`, and the same registry order and names.
+- Wasteland Outpost and Overgrown Suburb have separately named source files but
+  retain their exact public names. The authoritative server resolves their
+  40x24 variants only from its advertised `largeWorlds` capability; the client
+  consumes that same normalized handshake choice with no viewport, name,
+  local-config, or art inference and no second wire/map-selection surface.
+- The six legacy documents remain 20x12 at tile size 48, world size 960x576,
+  origin `(0, 0)`, and the same registry order/names. Scrapyard, Collapsed
+  Overpass, Checkpoint Zero, and Rusted Refinery have no successor variant yet.
 - All capabilities remain strict server-owned opt-ins and default false. This
-  contract cannot register, schedule, expose, or deploy an arena.
+  resolver cannot schedule, expose, default-match, or deploy an arena.
+
+## Batch 35 authored successors
+
+`wasteland-outpost.standard-40x24.json` preserves the badlands/command-post
+identity with west/east watchtowers, open supply roads, two gate shortcuts,
+paired barrel/cache pressure, three KOTH sites, and the center Core Run anchor.
+Its rotationally paired structure deliberately keeps an asymmetric pickup
+economy, recorded honestly in the transform review.
+
+`overgrown-suburb.standard-40x24.json` preserves ruined rowhomes, cul-de-sacs,
+park/greenway lanes, parked-car cover, two gate shortcuts, and paired
+barrel/cache pressure. Unequal home footprints preserve the organic suburb
+identity while the explicit horizontal/vertical/rotational review documents
+comparable routes, flanks, pickup access, and escape options.
+
+Both documents declare four quadrant spawns, ten reachable pickups, three
+legal KOTH anchors, the geometric-center Core Run anchor, complete minimap
+metadata, one connected walkable component, two shootable gates, and two
+existing explosive barrels. Their tiles and established runtime arrays are the
+only gameplay truth; region/landmark/review metadata remains declarative.
 
 ## Scope boundary
 
-Batch 34 owns only this schema, validator, fixtures, and CLI. Batches 35-37 own
-the six successor layouts; Batch 38 owns mode/bot rebalance; Batch 39 owns the
+Batch 34 owns the schema, validator, fixtures, and CLI. Batch 35 owns only the
+first two successor layouts and minimal resolver; Batches 36-37 own the other
+four layouts. Batch 38 owns mode/bot rebalance; Batch 39 owns the
 Reforged Arena release gate and any production exposure. Tactical-map gameplay,
 Battle Royale regions, containers, loot, rarity, safe zones, spectating, new
 hazards, and production deployment remain outside this contract.

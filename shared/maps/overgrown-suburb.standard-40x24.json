@@ -1,0 +1,525 @@
+{
+  "name": "Overgrown Suburb",
+  "width": 40,
+  "height": 24,
+  "tileSize": 48,
+  "theme": "suburb",
+  "tiles": [
+    [
+      1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+      1, 1, 1, 1, 1, 1, 1, 1, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1,
+      1, 1, 1, 1, 0, 3, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1,
+      1, 1, 1, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 2, 2, 2, 2, 2, 2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 1, 1,
+      1, 1, 1, 1, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 1, 1,
+      0, 1, 1, 1, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 4, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 1, 4, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 2, 0, 0, 0, 0, 0, 2, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 4, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 2, 2, 2, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      2, 0, 0, 0, 4, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      2, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 2, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1,
+      0, 0, 1, 1, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1,
+      1, 1, 1, 1, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 1, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 1, 1, 1,
+      1, 1, 1, 1, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 1, 1, 1,
+      1, 1, 1, 1, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 0, 1, 1, 0,
+      0, 1, 1, 1, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 1, 1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 3, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+      1, 1, 1, 1, 1, 1, 1, 1, 1
+    ]
+  ],
+  "spawnPoints": [
+    {
+      "id": "spawn-north-west",
+      "x": 3,
+      "y": 3
+    },
+    {
+      "id": "spawn-south-east",
+      "x": 36,
+      "y": 20
+    },
+    {
+      "id": "spawn-south-west",
+      "x": 3,
+      "y": 20
+    },
+    {
+      "id": "spawn-north-east",
+      "x": 36,
+      "y": 3
+    }
+  ],
+  "pickupSpawns": [
+    {
+      "id": "shotgun-greenway",
+      "x": 19,
+      "y": 9,
+      "type": "weapon_shotgun"
+    },
+    {
+      "id": "pistol-north-park",
+      "x": 19,
+      "y": 2,
+      "type": "weapon_pistol"
+    },
+    {
+      "id": "bat-south-park",
+      "x": 20,
+      "y": 21,
+      "type": "weapon_bat"
+    },
+    {
+      "id": "ammo-south-greenway",
+      "x": 20,
+      "y": 14,
+      "type": "gun_ammo"
+    },
+    {
+      "id": "armor-core-west",
+      "x": 19,
+      "y": 12,
+      "type": "armor"
+    },
+    {
+      "id": "overcharge-core-east",
+      "x": 20,
+      "y": 11,
+      "type": "overcharge"
+    },
+    {
+      "id": "grenade-west-drive",
+      "x": 11,
+      "y": 7,
+      "type": "grenade"
+    },
+    {
+      "id": "grenade-east-drive",
+      "x": 27,
+      "y": 15,
+      "type": "grenade"
+    },
+    {
+      "id": "bandage-west-loop",
+      "x": 4,
+      "y": 11,
+      "type": "bandage"
+    },
+    {
+      "id": "bandage-east-loop",
+      "x": 35,
+      "y": 12,
+      "type": "bandage"
+    }
+  ],
+  "decorations": [
+    {
+      "id": "car-west-blue",
+      "x": 8,
+      "y": 10,
+      "w": 1,
+      "h": 2,
+      "texture": "deco_car_overgrown_blue",
+      "flipX": true
+    },
+    {
+      "id": "car-east-red",
+      "x": 31,
+      "y": 12,
+      "w": 1,
+      "h": 2,
+      "texture": "deco_car_overgrown_red"
+    },
+    {
+      "id": "car-north-red",
+      "x": 18,
+      "y": 5,
+      "w": 1,
+      "h": 2,
+      "texture": "deco_car_overgrown_red"
+    },
+    {
+      "id": "car-south-blue",
+      "x": 21,
+      "y": 17,
+      "w": 1,
+      "h": 2,
+      "texture": "deco_car_overgrown_blue",
+      "flipX": true
+    },
+    {
+      "id": "barrel-west-drive",
+      "x": 12,
+      "y": 7,
+      "w": 1,
+      "h": 1,
+      "texture": "deco_barrel_red",
+      "hazard": "explosive_barrel"
+    },
+    {
+      "id": "barrel-east-drive",
+      "x": 27,
+      "y": 16,
+      "w": 1,
+      "h": 1,
+      "texture": "deco_barrel_red",
+      "hazard": "explosive_barrel"
+    },
+    {
+      "id": "cache-west-yard",
+      "x": 10,
+      "y": 14,
+      "w": 1,
+      "h": 1,
+      "texture": "deco_scavenger_cache",
+      "interaction": "scavenger_cache"
+    },
+    {
+      "id": "cache-east-yard",
+      "x": 29,
+      "y": 9,
+      "w": 1,
+      "h": 1,
+      "texture": "deco_scavenger_cache",
+      "interaction": "scavenger_cache"
+    },
+    {
+      "id": "gate-west-greenway",
+      "x": 13,
+      "y": 8,
+      "w": 1,
+      "h": 1,
+      "texture": "tiles_wire_fence_closing",
+      "interaction": "shootable_gate"
+    },
+    {
+      "id": "gate-east-greenway",
+      "x": 26,
+      "y": 15,
+      "w": 1,
+      "h": 1,
+      "texture": "tiles_wire_fence_closing",
+      "interaction": "shootable_gate"
+    }
+  ],
+  "kothHills": [
+    {
+      "x": 6,
+      "y": 11
+    },
+    {
+      "x": 19,
+      "y": 11
+    },
+    {
+      "x": 32,
+      "y": 11
+    }
+  ],
+  "authoring": {
+    "schemaVersion": 1,
+    "profile": "standard-40x24",
+    "regions": [
+      {
+        "id": "west-homes",
+        "areas": [
+          {
+            "x": 0,
+            "y": 0,
+            "w": 13,
+            "h": 24
+          }
+        ]
+      },
+      {
+        "id": "central-greenway",
+        "areas": [
+          {
+            "x": 13,
+            "y": 0,
+            "w": 14,
+            "h": 24
+          }
+        ]
+      },
+      {
+        "id": "east-homes",
+        "areas": [
+          {
+            "x": 27,
+            "y": 0,
+            "w": 13,
+            "h": 24
+          }
+        ]
+      }
+    ],
+    "landmarks": [
+      {
+        "id": "west-rowhomes",
+        "regionId": "west-homes",
+        "footprint": {
+          "x": 4,
+          "y": 4,
+          "w": 8,
+          "h": 6
+        },
+        "minimap": "major"
+      },
+      {
+        "id": "north-cul-de-sac",
+        "regionId": "east-homes",
+        "footprint": {
+          "x": 29,
+          "y": 3,
+          "w": 6,
+          "h": 4
+        },
+        "minimap": "minor"
+      },
+      {
+        "id": "central-park",
+        "regionId": "central-greenway",
+        "footprint": {
+          "x": 16,
+          "y": 8,
+          "w": 8,
+          "h": 8
+        },
+        "minimap": "major"
+      },
+      {
+        "id": "south-cul-de-sac",
+        "regionId": "west-homes",
+        "footprint": {
+          "x": 4,
+          "y": 16,
+          "w": 6,
+          "h": 4
+        },
+        "minimap": "minor"
+      },
+      {
+        "id": "east-rowhomes",
+        "regionId": "east-homes",
+        "footprint": {
+          "x": 28,
+          "y": 14,
+          "w": 7,
+          "h": 5
+        },
+        "minimap": "major"
+      }
+    ],
+    "minimap": {
+      "projection": "orthographic-top-left",
+      "bounds": {
+        "x": 0,
+        "y": 0,
+        "w": 40,
+        "h": 24
+      },
+      "landmarkIds": [
+        "west-rowhomes",
+        "north-cul-de-sac",
+        "central-park",
+        "south-cul-de-sac",
+        "east-rowhomes"
+      ]
+    },
+    "connectivity": {
+      "requireSingleWalkableComponent": true,
+      "links": [
+        {
+          "id": "west-open-greenway",
+          "fromRegionId": "west-homes",
+          "toRegionId": "central-greenway"
+        },
+        {
+          "id": "east-open-greenway",
+          "fromRegionId": "central-greenway",
+          "toRegionId": "east-homes"
+        },
+        {
+          "id": "west-gate-shortcut",
+          "fromRegionId": "west-homes",
+          "toRegionId": "central-greenway",
+          "gateId": "gate-west-greenway"
+        },
+        {
+          "id": "east-gate-shortcut",
+          "fromRegionId": "central-greenway",
+          "toRegionId": "east-homes",
+          "gateId": "gate-east-greenway"
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "koth-west-playground",
+        "kind": "koth",
+        "regionId": "west-homes",
+        "footprint": {
+          "x": 6,
+          "y": 11,
+          "w": 2,
+          "h": 2
+        }
+      },
+      {
+        "id": "koth-central-park",
+        "kind": "koth",
+        "regionId": "central-greenway",
+        "footprint": {
+          "x": 19,
+          "y": 11,
+          "w": 2,
+          "h": 2
+        }
+      },
+      {
+        "id": "koth-east-playground",
+        "kind": "koth",
+        "regionId": "east-homes",
+        "footprint": {
+          "x": 32,
+          "y": 11,
+          "w": 2,
+          "h": 2
+        }
+      },
+      {
+        "id": "core-run-center",
+        "kind": "core-run",
+        "regionId": "central-greenway",
+        "footprint": {
+          "x": 19,
+          "y": 11,
+          "w": 2,
+          "h": 2
+        }
+      }
+    ],
+    "spawnSafety": {
+      "spawnIds": ["spawn-north-west", "spawn-south-east", "spawn-south-west", "spawn-north-east"],
+      "minimumPathDistanceTiles": 17,
+      "minimumEgressDirections": 4
+    },
+    "pickupPlacement": {
+      "pickupIds": [
+        "shotgun-greenway",
+        "pistol-north-park",
+        "bat-south-park",
+        "ammo-south-greenway",
+        "armor-core-west",
+        "overcharge-core-east",
+        "grenade-west-drive",
+        "grenade-east-drive",
+        "bandage-west-loop",
+        "bandage-east-loop"
+      ]
+    },
+    "gates": [
+      {
+        "decorationId": "gate-west-greenway",
+        "connectsRegionIds": ["west-homes", "central-greenway"]
+      },
+      {
+        "decorationId": "gate-east-greenway",
+        "connectsRegionIds": ["central-greenway", "east-homes"]
+      }
+    ],
+    "hazards": [
+      {
+        "decorationId": "barrel-west-drive",
+        "kind": "explosive_barrel",
+        "regionId": "west-homes"
+      },
+      {
+        "decorationId": "barrel-east-drive",
+        "kind": "explosive_barrel",
+        "regionId": "east-homes"
+      }
+    ],
+    "symmetryReview": {
+      "kind": "asymmetric",
+      "rationale": "Unequal ruined-home footprints and parked-car lanes preserve the suburb's organic identity; horizontal, vertical, and rotational transforms were checked for comparable primary routes, flanks, pickup access, and escape opportunities.",
+      "exceptions": [],
+      "checkedTransforms": ["horizontal", "vertical", "rotational"]
+    }
+  }
+}

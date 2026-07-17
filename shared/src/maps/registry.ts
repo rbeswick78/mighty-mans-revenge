@@ -1,7 +1,10 @@
 import type { ArenaWins, MapData } from '../types/map.js';
+import { validateMapDocument } from '../utils/map-authoring-validator.js';
 import { validateMap } from '../utils/map-validator.js';
 import wastelandOutpost from '../../maps/wasteland-outpost.json' with { type: 'json' };
+import wastelandOutpostStandard from '../../maps/wasteland-outpost.standard-40x24.json' with { type: 'json' };
 import overgrownSuburb from '../../maps/overgrown-suburb.json' with { type: 'json' };
+import overgrownSuburbStandard from '../../maps/overgrown-suburb.standard-40x24.json' with { type: 'json' };
 import scrapyard from '../../maps/scrapyard.json' with { type: 'json' };
 import collapsedOverpass from '../../maps/collapsed-overpass.json' with { type: 'json' };
 import checkpointZero from '../../maps/checkpoint-zero.json' with { type: 'json' };
@@ -16,6 +19,16 @@ const ALL: readonly MapData[] = [
   checkpointZero as MapData,
   rustedRefinery as MapData,
 ];
+
+const LARGE_WORLD_VARIANTS: ReadonlyMap<string, MapData> = new Map(
+  [wastelandOutpostStandard, overgrownSuburbStandard].map((document) => {
+    const validation = validateMapDocument(document, 'standard-40x24');
+    if (!validation.valid || !validation.mapData) {
+      throw new Error(`Invalid large-world map: ${validation.errors.join('; ')}`);
+    }
+    return [validation.mapData.name, validation.mapData] as const;
+  }),
+);
 
 for (const m of ALL) {
   const r = validateMap(m);
@@ -34,12 +47,12 @@ export const MAP_REGISTRY: ReadonlyMap<string, MapData> = new Map(
   ALL.map((m) => [m.name, m] as const),
 );
 
-export function getMap(name: string): MapData {
+export function getMap(name: string, selection: Readonly<{ largeWorlds?: boolean }> = {}): MapData {
   const m = MAP_REGISTRY.get(name);
   if (!m) {
     throw new Error(`Unknown map: ${name}`);
   }
-  return m;
+  return selection.largeWorlds === true ? (LARGE_WORLD_VARIANTS.get(name) ?? m) : m;
 }
 
 export function listMapNames(): readonly string[] {

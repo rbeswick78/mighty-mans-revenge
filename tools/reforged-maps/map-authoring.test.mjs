@@ -16,16 +16,23 @@ function run(...args) {
   });
 }
 
-test('compatible profile validates all six current maps in stable path order', () => {
+test('compatible profile validates six legacy maps and two successors in stable path order', () => {
   const execution = run('validate', '--profile', 'compatible', CURRENT_MAPS);
   assert.equal(execution.status, 0, execution.stderr);
   const lines = execution.stdout.trim().split(/\r?\n/);
-  assert.equal(lines.length, 6);
+  assert.equal(lines.length, 8);
   assert.deepEqual(
     lines,
     [...lines].sort((left, right) => left.localeCompare(right)),
   );
   assert.ok(lines.every((line) => line.endsWith('OK (compatible)')));
+  assert.deepEqual(
+    lines.filter((line) => line.includes('.standard-40x24.json:')),
+    [
+      `${resolve(CURRENT_MAPS, 'overgrown-suburb.standard-40x24.json')}: OK (compatible)`,
+      `${resolve(CURRENT_MAPS, 'wasteland-outpost.standard-40x24.json')}: OK (compatible)`,
+    ],
+  );
 });
 
 test('standard profile rejects a legacy map with stable actionable codes', () => {

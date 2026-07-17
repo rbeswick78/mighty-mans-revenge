@@ -772,7 +772,7 @@ export class MatchmakingManager {
     if (safeKind === 'rusty_rumble') this.matchKinds.set(matchId, 'rumble');
     this.launchMatch(
       matchId,
-      this.forcedMap() ?? getMap(mapName),
+      this.forcedMap() ?? this.resolveMap(mapName),
       selectedMode,
       [{ id: playerId, nickname }, ...botEntries],
       {},
@@ -1130,7 +1130,12 @@ export class MatchmakingManager {
       logger.warn({ forced, known: listMapNames() }, 'Ignoring unknown FORCE_MAP');
       return null;
     }
-    return getMap(forced);
+    return this.resolveMap(forced);
+  }
+
+  /** Resolve the server-owned arena document from the advertised capability. */
+  private resolveMap(name: string): MapData {
+    return getMap(name, { largeWorlds: this.server.getCapabilities().largeWorlds });
   }
 
   /**
@@ -1143,7 +1148,7 @@ export class MatchmakingManager {
     const names = listMapNames();
     const name = names[this.mapRotationIndex % names.length];
     this.mapRotationIndex++;
-    return getMap(name);
+    return this.resolveMap(name);
   }
 
   /**
@@ -1340,7 +1345,7 @@ export class MatchmakingManager {
     });
     this.launchMatch(
       matchId,
-      getMap(intent.scheduledArena.mapName),
+      this.resolveMap(intent.scheduledArena.mapName),
       intent.mode,
       playerEntries,
       matchKind === 'rumble' ? (rematch?.rumbleGrudges ?? {}) : {},
@@ -1564,7 +1569,7 @@ export class MatchmakingManager {
     );
     this.launchMatch(
       matchId,
-      this.forcedMap() ?? getMap(mapName),
+      this.forcedMap() ?? this.resolveMap(mapName),
       selectedMode,
       allEntries,
       {},
@@ -2189,7 +2194,7 @@ export class MatchmakingManager {
     // so these lookups can't miss.
     this.launchMatch(
       draft.matchId,
-      getMap(draft.mapPick!),
+      this.resolveMap(draft.mapPick!),
       draft.modePick!,
       draft.playerEntries,
       draft.rumbleGrudges,
@@ -2966,7 +2971,7 @@ export class MatchmakingManager {
       }
       this.launchMatch(
         nextMatchId,
-        getMap(postMatch.nextMapName),
+        this.resolveMap(postMatch.nextMapName),
         postMatch.nextGameMode,
         playerEntries,
         rematchKind === 'rumble' ? postMatch.rumbleGrudges : {},
@@ -2995,7 +3000,7 @@ export class MatchmakingManager {
       if (postMatch.rumbleCrown) this.rumbleCrowns.set(nextMatchId, postMatch.rumbleCrown);
       this.launchMatch(
         nextMatchId,
-        getMap(postMatch.nextMapName),
+        this.resolveMap(postMatch.nextMapName),
         postMatch.nextGameMode,
         playerEntries,
         postMatch.rumbleGrudges,

@@ -5,9 +5,9 @@ Read this file and `CLAUDE.md` completely at the start of every batch. The
 completed `docs/REPLAYABILITY_ROADMAP.md` remains the historical record for the
 systems this program preserves and reorganizes.
 
-- **Status:** Batch 34 complete on 2026-07-17; future 40x24 standard arenas now
-  have a versioned shared authoring contract and deterministic validation tools.
-- **Next batch:** Batch 35 — Wasteland Outpost and Overgrown Suburb.
+- **Status:** Batch 35 complete on 2026-07-17; Wasteland Outpost and Overgrown
+  Suburb now have strict 40x24 successors behind the server-owned opt-in.
+- **Next batch:** Batch 36 — Scrapyard and Collapsed Overpass.
 - **Public releases:** Reforged Arena, then Battle Royale.
 - **Working model:** one numbered batch per session, direct commits and pushes
   to `main`, milestone-gated production deployments.
@@ -188,7 +188,7 @@ Production deployment happens only at a gate or for an urgent live fix.
 |  32 | Modern combat feedback                 | Visual system | **DONE — 2026-07-16** |
 |  33 | Full-journey visual cutover            | Visual system | **DONE — 2026-07-17** |
 |  34 | Map authoring contract                 | Large arenas  | **DONE — 2026-07-17** |
-|  35 | Wasteland Outpost and Overgrown Suburb | Large arenas  | Pending               |
+|  35 | Wasteland Outpost and Overgrown Suburb | Large arenas  | **DONE — 2026-07-17** |
 |  36 | Scrapyard and Collapsed Overpass       | Large arenas  | Pending               |
 |  37 | Checkpoint Zero and Rusted Refinery    | Large arenas  | Pending               |
 |  38 | Mode and bot rebalance                 | Large arenas  | Pending               |
@@ -1224,6 +1224,27 @@ Acceptance:
 
 Hand-author recognizable 40×24 successors with balanced routes, objectives,
 spawns, pickup economy, destruction, landmarks, and minimaps.
+
+Acceptance:
+
+- [x] Deterministic strict `standard-40x24` documents preserve both public
+      names and biome identities while supplying readable primary/flank routes,
+      defensible escapable landmarks, four quadrant spawns, three legal KOTH
+      anchors, the Core Run center, reachable pickup economy, one walkable
+      component, destructible cover, gates/barrels, complete minimap metadata,
+      and honest asymmetric reviews.
+- [x] The additive shared resolver returns either successor only for literal
+      `largeWorlds: true`; absent/false paths return the exact legacy objects
+      and the other four arenas remain unchanged. Registry order, public/wire
+      names, persistence keys, and default matchmaking remain compatible.
+- [x] Every authoritative server launch/rematch path resolves from the server
+      capability. The client consumes the normalized handshake choice without
+      viewport/name/config/art inference or a second selection surface.
+- [x] Strict/stable validation, focused positive/negative and cross-package
+      tests, full unit/static/build/format/diff/legacy-byte gates, the complete
+      default-false and enabled three-project browser matrices, and targeted
+      Chromium/Firefox/mobile arena evidence pass under RFG-003. Production,
+      capability exposure, 20Hz simulation, and Batch 36+ work remain unchanged.
 
 #### Batch 36 — Scrapyard and Collapsed Overpass
 
@@ -3243,6 +3264,71 @@ closed historical proofs. RFG-003 remains gate-dispositioned and unchanged.
 Batch 35 owns the first two successor layouts; Batch 38 owns mode/bot rebalance;
 Batch 39 owns release review and any capability exposure.
 
+### Batch 35 - 2026-07-17 - Wasteland Outpost and Overgrown Suburb
+
+**Shipped:** Hand-authored deterministic version-1 `standard-40x24`, 40x24,
+48px-tile successors for Wasteland Outpost and Overgrown Suburb. Both preserve
+their public names and biome identities while declaring primary routes,
+flanks, defensible but escapable landmarks, three legal KOTH anchors, the
+centered Core Run anchor, four quadrant spawns, reachable pickup economies,
+destructible cover, shootable-gate shortcuts, existing explosive-barrel
+hazards, complete minimap projection metadata, one connected walkable
+component, and explicit asymmetry reviews.
+
+The shared registry now has one private strict-validated successor table and a
+literal `{ largeWorlds: true }` variant resolver. Every authoritative server
+launch path resolves through the server capability snapshot, and `GameScene`
+consumes the normalized handshake choice. Capability-off, absent/malformed
+old-server, and recovery paths retain the legacy documents; the public
+`MAP_REGISTRY`, public map names, wire payloads, all six legacy JSON bytes, and
+the other four current arenas are unchanged. No successor enters default
+matchmaking or production, and no map-specific gameplay or client-owned
+selection surface was added.
+
+**Verification:** Selected the authored-layout/runtime-loading cross-authority
+tier. Both successors passed strict validation and stable-order CLI output;
+the map CLI suite passed 3 tests. Focused positive/negative authoring,
+registry/selection, connectivity, objectives, spawn/pickup, collision/
+destruction, gate/hazard, minimap, dynamic-world, and old-schema coverage
+passed 7 files and 166 tests. The full Vitest matrix passed 142 files and
+1,623 tests. Typecheck, lint, affected shared/server/client builds, and the
+full production build passed; Vite's established chunk advisory remains.
+
+The complete default-false three-project browser matrix passed 145 cases with
+110 expected skips. The final literal-`largeWorlds` three-project matrix passed
+166 cases with 89 expected skips in 29.9 minutes. Targeted Chromium,
+Firefox, and mobile-landscape arena evidence covered both successors, all
+camera edges and spawn quadrants, routes/landmarks, destruction, gates,
+barrels, KOTH/Core Run anchors, HUD/minimap, server-owned choice,
+capability-off/old-server legacy restoration, Results/rematch, and recovery.
+Chromium supplied live/compositor pixels; Firefox/mobile supplied staged
+object/input and direct-renderer evidence under RFG-003.
+
+Repository-wide Prettier still reports the established 100 unrelated
+historical files; the Batch 35 allowlist is formatted. `git diff --check`,
+intended-diff review, stable-order review, and legacy-byte review passed.
+
+**Deployment:** Skipped exactly as required. Production remains on separately
+approved Batch 33 commit `f39eb34131f8827f85432aafcc6d6c18a2d0ac51`, all
+capabilities remain strict server-owned opt-ins and default false, and the
+authoritative simulation remains 20Hz.
+
+**Deviations:** No product-scope deviation. The complete enabled browser matrix
+exposed two validation-harness assumptions: the rumble-lead bound check assumed
+a camera at legacy-world origin, and one three-client rally test had only a
+60-second budget despite taking 43.7 seconds in isolation. The assertions now
+use the active camera world view, and the orchestration-only rally budget is 90
+seconds with a 20-second phase poll. The unchanged rally journey then passed in
+37.3 seconds inside the final full matrix. Managed Windows node-module access
+required approved repository-local execution. The Codex patch wrapper later
+hit a Windows path/access fault, so its narrow mechanical fallback used Git's
+patch applicator with exact diff review.
+
+**Known issues:** No bug-ledger entry was added. RFG-001 and RFG-002 remain
+closed historical proofs. RFG-003 remains gate-dispositioned and unchanged.
+Batch 36 owns only Scrapyard and Collapsed Overpass; Batch 38 owns cross-arena
+mode/bot rebalance; Batch 39 owns release review and capability exposure.
+
 ## Batch 22 input prompt (historical)
 
 ```text
@@ -4115,7 +4201,7 @@ direct-renderer evidence with Chromium live/compositor pixels. Batch 34 owns
 only the map authoring contract; Batch 35 owns actual successor maps.
 ```
 
-## Next-session prompt
+## Batch 35 input prompt (historical)
 
 ```text
 Continue the Reforged build for Mighty Man's Revenge.
@@ -4208,4 +4294,109 @@ atlas grids and complete non-runtime lineage. RFG-001/RFG-002 remain closed
 historical proofs. RFG-003 remains the paired staged/live visual-evidence rule.
 Batch 35 owns only Wasteland Outpost and Overgrown Suburb; Batch 36 owns
 Scrapyard and Collapsed Overpass.
+```
+
+## Next-session prompt
+
+```text
+Continue the Reforged build for Mighty Man's Revenge.
+
+Read docs/REIMAGINING_ROADMAP.md and CLAUDE.md completely first. Read
+docs/REFORGED_BASELINE.md, docs/REFORGED_CAPABILITIES.md,
+docs/REFORGED_MAP_AUTHORING.md, docs/REFORGED_STYLE_BIBLE.md,
+docs/REFORGED_ASSET_PIPELINE.md, and
+docs/reforged/style-bible/PROVENANCE.md before implementation. Batch 35 -
+Wasteland Outpost and Overgrown Suburb is complete. Implement Batch 36 -
+Scrapyard and Collapsed Overpass exactly as specified and do not begin Batch
+37 - Checkpoint and Rusted Warehouse.
+
+Hand-author deterministic 40x24, 48px-tile successor documents for Scrapyard
+and Collapsed Overpass against the complete version-1 `standard-40x24`
+contract. Preserve their exact public names and recognizable biome identities:
+Scrapyard must read as lanes through compressed cars, containers, salvage
+stacks, and fenced processing yards; Collapsed Overpass must read as broken
+road decks, underpass channels, stranded vehicles, and divided concrete
+approaches. Give each readable primary routes, flanks, defensible but escapable
+landmarks, three legal KOTH anchors, the Core Run center anchor, four
+N-player-safe spawns, reachable pickup economy, meaningful destructible cover,
+existing explosive-barrel hazards, shootable-gate shortcuts where appropriate,
+complete minimap metadata, one connected walkable component, and an honest
+symmetry/asymmetry review. Keep all authored truth declarative and
+deterministic; use shared tiles, collision, destruction, objectives, pickups,
+and validation rather than map-specific gameplay code or client inference.
+
+Batch 36 owns only these two successor layouts and the minimal additive entries
+in the existing Batch 35 variant resolver. Preserve the completed 40x24
+Wasteland Outpost and Overgrown Suburb successors byte-for-byte unless a proven
+shared-contract correction is required. Capability-off and old-server paths
+must keep the byte-identical 20x12 legacy Scrapyard and Collapsed Overpass, all
+six legacy JSON files remain unchanged, Checkpoint and Rusted Warehouse remain
+legacy-only, and no 40x24 arena may enter default matchmaking or production.
+The authoritative server and capability handshake must continue choosing the
+map variant; the client may consume that server-owned choice but must not infer
+it from viewport size, map name, local configuration, or art availability.
+Keep public map names and wire payloads compatible; do not create a second
+client-owned map-selection surface.
+
+Do not tune world/camera/input/physics/combat/navigation/bot/mode balance,
+author the Batch 37 arenas, or begin Batch 38 rebalance. Do not add tactical-
+map gameplay, Battle Royale systems, rarity/loot/containers, new hazard types,
+spectating, capability exposure, production rollout, or deployment. Batch 38
+owns cross-arena mode/bot rebalance; Batch 39 owns the Reforged Arena release
+gate, production review, and any capability exposure.
+
+Preserve the complete Batch 18-24 viewport, coordinate, camera, dynamic-
+rendering, responsive HUD, minimap, fallback, and cumulative regression-gate
+contracts. Preserve Batch 25-33 art, asset, provenance, atomic six-atlas
+`modernArt` cutover, event ownership, current-map biome projection, fallback,
+and recovery behavior byte-for-byte. Preserve Batch 34 stable validation codes,
+strict/compatible loading profiles, fail-closed result, stable-order tooling,
+and all old-schema fixtures. Preserve Batch 35's literal server-owned variant
+selection, legacy restoration, public registry compatibility, runtime loading,
+and authored Wasteland/Overgrown truth. All capabilities remain strict server-
+owned opt-ins and default false. Current authoritative simulation remains 20Hz.
+
+Batch 35 is complete and pushed on main as `feat(maps): author first Reforged
+arenas`. Wasteland Outpost and Overgrown Suburb now have strict-validated 40x24
+successors behind literal server-owned `largeWorlds`; all authoritative launch
+paths resolve the variant, while the client consumes only the normalized
+handshake choice. Both layouts cover routes/flanks, landmarks, three KOTH
+anchors, centered Core Run, four quadrant spawns, pickup economy, destructible
+cover, shootable gates, explosive barrels, minimap metadata, connectivity, and
+asymmetry review. All six legacy JSON bytes and the public registry remain
+unchanged. Strict/stable-order tooling, 7 focused files/166 tests, the
+142-file/1,623-test full unit matrix, static checks, affected/full builds, the
+145-pass default-false browser matrix, and the final 166-pass enabled three-
+project matrix passed. Repository-wide Prettier still reports 100 unrelated
+historical files; the Batch 35 allowlist is formatted. Batch 35 skipped
+deployment; production remains on the separately user-approved Batch 33 commit
+`f39eb34131f8827f85432aafcc6d6c18a2d0ac51`, healthy at 20Hz with every
+capability default false.
+
+Choose and document the Batch 36 authored-layout/runtime-loading verification
+tier. Run the strict validator and stable-order CLI on all four successors;
+focused positive/negative authoring, registry/selection, connectivity,
+objective, spawn/pickup, collision/destruction, gate/hazard, minimap, and old-
+schema tests; the full unit matrix because these documents cross client/server
+authority; typecheck; lint; affected and full production builds; repository
+formatting; `git diff --check`; intended-diff and legacy-byte review. Because
+the successor documents become runtime-loadable behind `largeWorlds`, run the
+complete three-project browser matrix plus targeted desktop Chromium and
+mobile-landscape visual evidence for both new 40x24 arenas, camera edges, spawn
+quadrants, routes/landmarks, destruction/gates/hazards, objectives, HUD/minimap,
+capability-off/old-server legacy restoration, Results/rematch, and recovery.
+Under RFG-003, use Chromium for live/compositor pixels and staged Firefox/mobile
+object/input plus direct-renderer evidence.
+
+Update roadmap acceptance/status, architecture/baseline/capability and map-
+authoring docs, bug ledger only with proven evidence, and Session Log. Run the
+complete end-of-batch ritual, commit and push directly to main, verify a clean
+worktree with HEAD exactly matching origin/main, and skip deployment.
+
+Carry-over warnings: use Corepack pnpm 10.33.0 if the local shim mismatches.
+Keep the Batch 25 goldens documentation-only and preserve all six production
+atlas grids and complete non-runtime lineage. RFG-001/RFG-002 remain closed
+historical proofs. RFG-003 remains the paired staged/live visual-evidence rule.
+Batch 36 owns only Scrapyard and Collapsed Overpass; Batch 37 owns only
+Checkpoint and Rusted Warehouse.
 ```

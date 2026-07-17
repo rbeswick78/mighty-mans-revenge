@@ -93,9 +93,14 @@ async function rendererSnapshot(page: Page): Promise<{
   );
 }
 
-async function stageGameplay(page: Page, largeWorlds: boolean, modernArt = false): Promise<void> {
+async function stageGameplay(
+  page: Page,
+  largeWorlds: boolean,
+  modernArt = false,
+  mapName = 'Scrapyard',
+): Promise<void> {
   await page.evaluate(
-    ({ advertiseLargeWorlds, advertiseModernArt }) => {
+    ({ advertiseLargeWorlds, advertiseModernArt, selectedMapName }) => {
       const game = (window as unknown as { game?: Phaser.Game }).game;
       const lobby = game?.scene.getScene('LobbyScene') as unknown as {
         gameService: {
@@ -161,20 +166,199 @@ async function stageGameplay(page: Page, largeWorlds: boolean, modernArt = false
         spawnRushTimer: 0,
       });
 
-      game.scene.getScenes(true)[0]?.scene.start('GameScene', {
+      const nextGameData = {
         nickname: 'VIEWPORT',
         matchData: {
           matchId: 'batch-18-viewport',
           opponents: [{ id: 'viewport-rival', nickname: 'RIVAL' }],
-          mapName: 'Scrapyard',
+          mapName: selectedMapName,
           gameMode: 'deathmatch',
           matchKind: 'practice',
         },
-      });
+      };
+      if (active.sys.settings.key === 'GameScene') {
+        (active as unknown as { shutdown(): void }).shutdown();
+        game.scene.stop('GameScene');
+        game.scene.start('GameScene', nextGameData);
+      } else {
+        active.scene.start('GameScene', nextGameData);
+      }
     },
-    { advertiseLargeWorlds: largeWorlds, advertiseModernArt: modernArt },
+    {
+      advertiseLargeWorlds: largeWorlds,
+      advertiseModernArt: modernArt,
+      selectedMapName: mapName,
+    },
   );
   await waitForScene(page, 'GameScene');
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+          'GameScene',
+        ) as unknown as { matchData?: { mapName?: string } };
+        return scene.matchData?.mapName ?? null;
+      }),
+    )
+    .toBe(mapName);
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      ),
+  );
+}
+
+async function batch35SuccessorSnapshot(
+  page: Page,
+  mapName: 'Wasteland Outpost' | 'Overgrown Suburb',
+): Promise<Record<string, unknown>> {
+  const interaction =
+    mapName === 'Wasteland Outpost'
+      ? { gate: { col: 15, row: 11 }, barrel: { col: 12, row: 6 } }
+      : { gate: { col: 13, row: 8 }, barrel: { col: 12, row: 7 } };
+  return page.evaluate(async ({ gate, barrel }) => {
+    const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'GameScene',
+    ) as unknown as {
+      cameras: { main: { preRender(): void } };
+      mapRenderer: {
+        getCollisionGrid(): { solid: boolean[][] } | null;
+      };
+      minimapRenderer: {
+        mapData: {
+          name: string;
+          decorations?: Array<{ id?: string; x: number; y: number; w: number; h: number }>;
+        };
+      };
+      onTilesDestroyed: ((tiles: Array<{ col: number; row: number }>) => void) | null;
+      getCameraController(): {
+        setTarget(target: {
+          kind: 'local-player';
+          position: { space: 'world'; x: number; y: number };
+        }): void;
+        update(deltaMs: number): void;
+        getState(): {
+          base: { scrollX: number; scrollY: number; zoom: number };
+        };
+      } | null;
+      getMinimapRenderState(): {
+        solidCount: number;
+        landmarkCount: number;
+        objectives: Array<{ kind: string }>;
+      } | null;
+      getReforgedEnvironmentState(): { family: string } | null;
+    };
+    const controller = scene.getCameraController();
+    const grid = scene.mapRenderer.getCollisionGrid();
+    if (!controller || !grid) throw new Error('Batch 35 scene systems are not ready');
+    const edgeTargets = [
+      { label: 'north-west', x: 168, y: 168 },
+      { label: 'north-east', x: 1752, y: 168 },
+      { label: 'south-west', x: 168, y: 984 },
+      { label: 'south-east', x: 1752, y: 984 },
+    ];
+    const cameraEdges = edgeTargets.map(({ label, x, y }) => {
+      controller.setTarget({ kind: 'local-player', position: { space: 'world', x, y } });
+      controller.update(0);
+      scene.cameras.main.preRender();
+      return { label, ...controller.getState().base };
+    });
+
+    const settle = () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      );
+    const before = scene.getMinimapRenderState();
+    const minimapSource = {
+      name: scene.minimapRenderer.mapData.name,
+      decorations: (scene.minimapRenderer.mapData.decorations ?? []).map((decoration) => ({
+        id: decoration.id,
+        hasSolid: Array.from({ length: decoration.h }, (_, rowOffset) =>
+          Array.from(
+            { length: decoration.w },
+            (_, colOffset) =>
+              grid.solid[decoration.y + rowOffset]?.[decoration.x + colOffset] ?? false,
+          ),
+        )
+          .flat()
+          .some(Boolean),
+      })),
+    };
+    const gateWasSolid = grid.solid[gate.row]?.[gate.col] ?? false;
+    const barrelWasSolid = grid.solid[barrel.row]?.[barrel.col] ?? false;
+    scene.onTilesDestroyed?.([gate]);
+    await settle();
+    const after = scene.getMinimapRenderState();
+
+    controller.setTarget({
+      kind: 'local-player',
+      position: { space: 'world', x: 960, y: 576 },
+    });
+    controller.update(0);
+    return {
+      cameraEdges,
+      gateWasSolid,
+      gateIsSolid: grid.solid[gate.row]?.[gate.col] ?? false,
+      barrelWasSolid,
+      barrelIsSolid: grid.solid[barrel.row]?.[barrel.col] ?? false,
+      minimapBefore: before,
+      minimapAfter: after,
+      environment: scene.getReforgedEnvironmentState(),
+      minimapSource,
+    };
+  }, interaction);
+}
+
+async function batch35ObjectiveKinds(page: Page, mode: 'koth' | 'core_run'): Promise<string[]> {
+  await page.evaluate((selectedMode) => {
+    const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'GameScene',
+    ) as unknown as {
+      matchData: { gameMode: string };
+      gameService: {
+        getNetworkManager(): {
+          getKothState(): unknown;
+          getCoreRunState(): unknown;
+        };
+      };
+    };
+    const manager = scene.gameService.getNetworkManager();
+    scene.matchData.gameMode = selectedMode;
+    manager.getKothState = () =>
+      selectedMode === 'koth'
+        ? {
+            hill: { x: 19, y: 11 },
+            nextHill: { x: 32, y: 11 },
+            occupantId: 'viewport-local',
+            contested: false,
+            captureFraction: 0.5,
+          }
+        : null;
+    manager.getCoreRunState = () =>
+      selectedMode === 'core_run'
+        ? {
+            position: { x: 960, y: 576 },
+            carrierId: null,
+            returnInSeconds: null,
+            carryFraction: 0,
+          }
+        : null;
+  }, mode);
+  const expected = mode === 'koth' ? ['koth', 'next-koth'] : ['core'];
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+          'GameScene',
+        ) as unknown as {
+          getMinimapRenderState(): { objectives: Array<{ kind: string }> } | null;
+        };
+        return (scene.getMinimapRenderState()?.objectives ?? []).map(({ kind }) => kind);
+      }),
+    )
+    .toEqual(expected);
+  return expected;
 }
 
 async function viewportSnapshot(page: Page): Promise<Record<string, unknown>> {
@@ -2805,6 +2989,194 @@ test('one missing atlas restores the complete legacy visual owner', async ({ pag
     modernEnvironment: false,
     feedback: null,
   });
+});
+
+test('Batch 35 successors preserve server-owned selection, arena systems, and legacy restoration', async ({
+  page,
+}, testInfo) => {
+  test.skip(!largeWorldsAdvertised, 'Run with CAPABILITY_LARGE_WORLDS=true.');
+  test.setTimeout(90_000);
+
+  const successors = [
+    { name: 'Wasteland Outpost' as const, landmarks: 6, family: 'wasteland' },
+    { name: 'Overgrown Suburb' as const, landmarks: 10, family: 'overgrown' },
+  ];
+  for (const expected of successors) {
+    await stageGameplay(page, true, false, expected.name);
+    const viewport = await viewportSnapshot(page);
+    expect(viewport, expected.name).toMatchObject({
+      mode: 'large-world',
+      // Batch 18's fixed viewport resource envelope remains 960x576;
+      // actual authored world truth lives in the dynamic plan and minimap.
+      worldBounds: { left: 0, top: 0, width: 960, height: 576 },
+      dynamic: {
+        worldBounds: { left: 0, top: 0, width: 1920, height: 1152 },
+        chunks: 15,
+      },
+      minimap: {
+        worldBounds: { left: 0, top: 0, width: 1920, height: 1152 },
+        interactive: false,
+      },
+    });
+
+    expect(await batch35ObjectiveKinds(page, 'koth')).toEqual(['koth', 'next-koth']);
+    expect(await batch35ObjectiveKinds(page, 'core_run')).toEqual(['core']);
+    const scenario = (await batch35SuccessorSnapshot(page, expected.name)) as {
+      cameraEdges: Array<{ label: string; scrollX: number; scrollY: number; zoom: number }>;
+      gateWasSolid: boolean;
+      gateIsSolid: boolean;
+      barrelWasSolid: boolean;
+      barrelIsSolid: boolean;
+      minimapBefore: { solidCount: number; landmarkCount: number };
+      minimapAfter: { solidCount: number; landmarkCount: number };
+      environment: { family: string };
+      minimapSource: {
+        name: string;
+        decorations: Array<{ id?: string; hasSolid: boolean }>;
+      };
+    };
+    expect(scenario.cameraEdges).toEqual([
+      { label: 'north-west', scrollX: 0, scrollY: 0, zoom: 1 },
+      { label: 'north-east', scrollX: 640, scrollY: 0, zoom: 1 },
+      { label: 'south-west', scrollX: 0, scrollY: 432, zoom: 1 },
+      { label: 'south-east', scrollX: 640, scrollY: 432, zoom: 1 },
+    ]);
+    expect(scenario).toMatchObject({
+      gateWasSolid: true,
+      gateIsSolid: false,
+      barrelWasSolid: true,
+      barrelIsSolid: true,
+      environment: { family: expected.family },
+      minimapSource: { name: expected.name },
+    });
+    expect(scenario.minimapSource.decorations).toHaveLength(expected.landmarks);
+    expect(scenario.minimapSource.decorations.every(({ hasSolid }) => hasSolid)).toBe(true);
+    expect(scenario.minimapBefore.landmarkCount).toBe(expected.landmarks);
+    expect(scenario.minimapAfter.solidCount).toBe(scenario.minimapBefore.solidCount - 1);
+    expect(scenario.minimapAfter.landmarkCount).toBe(scenario.minimapBefore.landmarkCount - 1);
+
+    if (testInfo.project.name === 'mobile-landscape') {
+      await page.locator('canvas').tap({ position: { x: 24, y: 24 } });
+    }
+    const input = await coordinateInputSnapshot(page, testInfo.project.name === 'mobile-landscape');
+    expect(input.rawAim).toBeCloseTo(input.expectedAim as number, 6);
+    if (testInfo.project.name === 'mobile-landscape') {
+      // The same logical y=600 probe is outside a 576px legacy map but
+      // legitimately inside these authored 1152px-tall successor worlds.
+      expect(input.fixedMapRejectsOutsideWorldY).toBe(false);
+    }
+
+    if (testInfo.project.name === 'desktop-chromium') {
+      const live = await page.screenshot();
+      await testInfo.attach(`batch-35-${expected.name}-desktop-live`, {
+        body: live,
+        contentType: 'image/png',
+      });
+    } else {
+      const direct = await rendererSnapshot(page);
+      expect(direct.sampledColors, expected.name).toBeGreaterThan(8);
+      expect(direct.nonBlackSamples, expected.name).toBeGreaterThan(100);
+      await testInfo.attach(`batch-35-${expected.name}-direct-renderer`, {
+        body: Buffer.from(direct.dataUrl.split(',')[1] ?? '', 'base64'),
+        contentType: 'image/png',
+      });
+    }
+  }
+
+  await page.evaluate(() => {
+    const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'GameScene',
+    ) as unknown as {
+      shutdown(): void;
+      scene: { start(key: string, data: unknown): void };
+    };
+    scene.shutdown();
+    scene.scene.start('ResultsScene', { nickname: 'BATCH 35' });
+  });
+  await waitForScene(page, 'ResultsScene');
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const game = (window as unknown as { game?: Phaser.Game }).game;
+        return [game?.scale.width, game?.scale.height];
+      }),
+    )
+    .toEqual([960, 720]);
+  await page.evaluate(() => {
+    const game = (window as unknown as { game?: Phaser.Game }).game;
+    if (!game) throw new Error('game missing before Batch 35 rematch');
+    game.scene.stop('ResultsScene');
+    game.scene.start('GameScene', {
+      nickname: 'BATCH 35',
+      matchData: {
+        matchId: 'batch-35-rematch',
+        opponents: [{ id: 'viewport-rival', nickname: 'RIVAL' }],
+        mapName: 'Overgrown Suburb',
+        gameMode: 'deathmatch',
+        matchKind: 'practice',
+      },
+    });
+  });
+  await waitForScene(page, 'GameScene');
+  expect(await viewportSnapshot(page)).toMatchObject({
+    mode: 'large-world',
+    dynamic: { worldBounds: { width: 1920, height: 1152 } },
+    minimap: { worldBounds: { width: 1920, height: 1152 } },
+  });
+  await page.evaluate(() => {
+    const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'GameScene',
+    ) as unknown as {
+      gameService: { getNetworkManager(): { connection: { setState(state: string): void } } };
+    };
+    scene.gameService.getNetworkManager().connection.setState('reconnecting');
+  });
+  await waitForScene(page, 'LobbyScene');
+
+  for (const expected of successors) {
+    await stageGameplay(page, false, false, expected.name);
+    expect(await viewportSnapshot(page), `${expected.name} capability-off`).toMatchObject({
+      mode: 'legacy',
+      worldBounds: { left: 0, top: 0, width: 960, height: 576 },
+      minimap: null,
+    });
+  }
+
+  for (const expected of successors) {
+    await page.evaluate((mapName) => {
+      const game = (window as unknown as { game?: Phaser.Game }).game;
+      const lobby = game?.scene.getScene('LobbyScene') as unknown as {
+        gameService: {
+          getNetworkManager(): {
+            handleMessage(message: unknown): void;
+            getPlayerId(): string;
+            getLocalPlayerState(): unknown;
+          };
+        };
+      };
+      if (!game || !lobby.gameService) throw new Error('old-server staging is not ready');
+      const manager = lobby.gameService.getNetworkManager();
+      manager.handleMessage({ type: 'server:welcome', playerId: 'old-server-local' });
+      manager.getPlayerId = () => 'old-server-local';
+      manager.getLocalPlayerState = () => null;
+      game.scene.getScenes(true)[0]?.scene.start('GameScene', {
+        nickname: 'OLD SERVER',
+        matchData: {
+          matchId: 'batch-35-old-server',
+          opponents: [{ id: 'viewport-rival', nickname: 'RIVAL' }],
+          mapName,
+          gameMode: 'deathmatch',
+          matchKind: 'practice',
+        },
+      });
+    }, expected.name);
+    await waitForScene(page, 'GameScene');
+    expect(await viewportSnapshot(page), `${expected.name} old-server`).toMatchObject({
+      mode: 'legacy',
+      worldBounds: { left: 0, top: 0, width: 960, height: 576 },
+      minimap: null,
+    });
+  }
 });
 
 test('Results and connection recovery restore legacy scene sizing', async ({ page }) => {

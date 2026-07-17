@@ -144,6 +144,11 @@ test('composes Rumble lead drama in the live HUD', async ({ gamePage }, testInfo
           getBounds: () => { x: number; y: number; width: number; height: number };
         };
       };
+      cameras: {
+        main: {
+          worldView: { x: number; y: number; width: number; height: number };
+        };
+      };
     };
     const localId = scene.gameService.getPlayerId();
     if (!localId) throw new Error('local fighter missing');
@@ -154,6 +159,7 @@ test('composes Rumble lead drama in the live HUD', async ({ gamePage }, testInfo
     ]);
     const callout = scene.hud.combatCalloutText;
     const bounds = callout.getBounds();
+    const worldView = scene.cameras.main.worldView;
     return {
       text: callout.text,
       visible: callout.visible,
@@ -164,6 +170,12 @@ test('composes Rumble lead drama in the live HUD', async ({ gamePage }, testInfo
         right: bounds.x + bounds.width,
         bottom: bounds.y + bounds.height,
       },
+      visibleBounds: {
+        x: worldView.x,
+        y: worldView.y,
+        right: worldView.x + worldView.width,
+        bottom: worldView.y + worldView.height,
+      },
     };
   });
 
@@ -172,10 +184,10 @@ test('composes Rumble lead drama in the live HUD', async ({ gamePage }, testInfo
     visible: true,
   });
   expect(presentation.alpha).toBeGreaterThan(0.9);
-  expect(presentation.bounds.x).toBeGreaterThanOrEqual(0);
-  expect(presentation.bounds.right).toBeLessThanOrEqual(960);
-  expect(presentation.bounds.y).toBeGreaterThanOrEqual(0);
-  expect(presentation.bounds.bottom).toBeLessThanOrEqual(576);
+  expect(presentation.bounds.x).toBeGreaterThanOrEqual(presentation.visibleBounds.x);
+  expect(presentation.bounds.right).toBeLessThanOrEqual(presentation.visibleBounds.right);
+  expect(presentation.bounds.y).toBeGreaterThanOrEqual(presentation.visibleBounds.y);
+  expect(presentation.bounds.bottom).toBeLessThanOrEqual(presentation.visibleBounds.bottom);
 
   if (process.env.VERIFY_RUMBLE_LEAD_SCREENSHOT === '1') {
     // Freeze the short 1.4s callout tween so slow mobile screenshot capture

@@ -294,6 +294,18 @@ alone cannot advertise `largeWorlds`, add it to schedules or matchmaking, or
 change client/server authority. All five capabilities remain literal server-
 owned opt-ins and default false; Batch 39 still owns Reforged Arena exposure.
 
+Batch 35 adds strict 40x24 variants only for Wasteland Outpost and Overgrown
+Suburb. `MatchmakingManager` resolves the shared document from
+`GameServer.getCapabilities().largeWorlds` at every authoritative launch path,
+including draft, scheduled intent, FORCE/practice, party/Crew, and rematch.
+The unchanged public map name remains the wire value. `GameScene` consumes the
+normalized welcome capability to resolve that same variant; it does not infer
+from viewport size, map name, local configuration, or art availability. False,
+absent, malformed, old-server, and reconnect fallback paths retain the exact
+20x12 legacy objects, while the four un-authored arenas always resolve to their
+legacy objects even when the capability is true. The opt-in remains default
+false and is not exposed, scheduled, deployed, or enabled in production.
+
 ## Server-first rollout and rollback
 
 For each capability, keep this order:

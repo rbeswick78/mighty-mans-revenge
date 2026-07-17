@@ -42,7 +42,7 @@ interface SentMessage {
   reliable: boolean;
 }
 
-function makeFakeServer() {
+function makeFakeServer(largeWorlds = false) {
   const sent: SentMessage[] = [];
   /** Mutable so tests can decide who the leaderboard rebroadcast reaches. */
   const connected: PlayerId[] = [];
@@ -51,6 +51,7 @@ function makeFakeServer() {
       sent.push({ playerId, message, reliable: !!opts?.reliable });
     }),
     getConnectedPlayerIds: vi.fn(() => [...connected]),
+    getCapabilities: vi.fn(() => ({ largeWorlds })),
     playerCount: 2,
   } as unknown as GameServer;
   return { fake, sent, connected };
@@ -122,8 +123,8 @@ function generalIntent(
 }
 
 describe('MatchmakingManager generalized match intent', () => {
-  function setup(lockOverride: Partial<ScheduledArenaLock> = {}) {
-    const made = makeFakeServer();
+  function setup(lockOverride: Partial<ScheduledArenaLock> = {}, largeWorlds = false) {
+    const made = makeFakeServer(largeWorlds);
     const locks = new Map<PlayerId, ScheduledArenaLock>();
     const release = vi.fn((playerId: PlayerId) => locks.delete(playerId));
     const manager = new MatchmakingManager(
@@ -158,6 +159,7 @@ describe('MatchmakingManager generalized match intent', () => {
 
     const [match] = manager.getActiveMatches();
     expect(match.getMapData().name).toBe(listMapNames()[0]);
+    expect([match.getMapData().width, match.getMapData().height]).toEqual([20, 12]);
     expect(match.gameModeType).toBe(GameModeType.DEATHMATCH);
     expect(match.players.size).toBe(2);
     expect(match.selectionState.get('p1')?.locked).toBe('mighty_man');
@@ -196,6 +198,22 @@ describe('MatchmakingManager generalized match intent', () => {
     expect(match.phase).toBe(MatchPhase.COUNTDOWN);
     expect(sent.some(({ message }) => message.type === 'server:characterSelectState')).toBe(false);
     expect(release).toHaveBeenCalledWith('p1');
+  });
+
+  it('uses the server-advertised large-world successor without changing the public map name', () => {
+    const { manager, fake } = setup({}, true);
+    expect(fake.getCapabilities().largeWorlds).toBe(true);
+    expect(
+      manager.handleSubmitMatchIntent('p1', 'Alpha', generalIntent({ intentId: 'intent_large_1' })),
+    ).toBe(true);
+
+    const [match] = manager.getActiveMatches();
+    expect(match.getMapData()).toMatchObject({
+      name: 'Wasteland Outpost',
+      width: 40,
+      height: 24,
+      tileSize: 48,
+    });
   });
 
   it('groups exact Rumble humans, fills requested bots, and rejects fighter collisions', () => {

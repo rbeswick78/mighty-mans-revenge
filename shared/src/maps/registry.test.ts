@@ -9,6 +9,7 @@ import {
   normalizeArenaWins,
 } from './registry.js';
 import { validateMap } from '../utils/map-validator.js';
+import { validateMapDocument } from '../utils/map-authoring-validator.js';
 
 describe('MAP_REGISTRY', () => {
   it('contains the default map', () => {
@@ -19,6 +20,74 @@ describe('MAP_REGISTRY', () => {
     const m = getMap(DEFAULT_MAP_NAME);
     expect(m.name).toBe(DEFAULT_MAP_NAME);
     expect(m.tiles.length).toBe(m.height);
+  });
+
+  it('resolves only the two authored successors for a literal large-world selection', () => {
+    for (const name of ['Wasteland Outpost', 'Overgrown Suburb']) {
+      const legacy = getMap(name);
+      const successor = getMap(name, { largeWorlds: true });
+      expect([legacy.width, legacy.height, legacy.tileSize], `${name} legacy`).toEqual([
+        20, 12, 48,
+      ]);
+      expect([successor.width, successor.height, successor.tileSize], `${name} successor`).toEqual([
+        40, 24, 48,
+      ]);
+      expect(successor.name).toBe(legacy.name);
+      expect(validateMapDocument(successor, 'standard-40x24'), name).toMatchObject({
+        valid: true,
+        errors: [],
+      });
+    }
+
+    for (const name of listMapNames().slice(2)) {
+      expect(getMap(name, { largeWorlds: true })).toBe(getMap(name));
+    }
+  });
+
+  it('keeps both authored successors playable through shared runtime systems', () => {
+    for (const name of ['Wasteland Outpost', 'Overgrown Suburb']) {
+      const map = getMap(name, { largeWorlds: true });
+      const authoring = map.authoring!;
+      const gates = map.decorations?.filter(({ interaction }) => interaction === 'shootable_gate');
+      const barrels = map.decorations?.filter(({ hazard }) => hazard === 'explosive_barrel');
+      const pickupTypes = new Set(map.pickupSpawns.map(({ type }) => type));
+
+      expect(map.spawnPoints).toHaveLength(4);
+      expect(
+        new Set(
+          map.spawnPoints.map(
+            ({ x, y }) => `${x < 20 ? 'west' : 'east'}-${y < 12 ? 'north' : 'south'}`,
+          ),
+        ),
+      ).toEqual(new Set(['west-north', 'east-north', 'west-south', 'east-south']));
+      expect(map.kothHills).toHaveLength(3);
+      expect(authoring.objectives.filter(({ kind }) => kind === 'koth')).toHaveLength(3);
+      expect(authoring.objectives.filter(({ kind }) => kind === 'core-run')).toEqual([
+        expect.objectContaining({ footprint: { x: 19, y: 11, w: 2, h: 2 } }),
+      ]);
+      expect(pickupTypes).toEqual(
+        new Set([
+          'weapon_shotgun',
+          'weapon_pistol',
+          'weapon_bat',
+          'gun_ammo',
+          'armor',
+          'overcharge',
+          'grenade',
+          'bandage',
+        ]),
+      );
+      expect(gates).toHaveLength(2);
+      expect(barrels).toHaveLength(2);
+      expect(authoring.connectivity.requireSingleWalkableComponent).toBe(true);
+      expect(authoring.minimap).toMatchObject({
+        projection: 'orthographic-top-left',
+        bounds: { x: 0, y: 0, w: 40, h: 24 },
+      });
+      expect(authoring.symmetryReview.kind).toBe('asymmetric');
+      expect(authoring.symmetryReview.rationale.length).toBeGreaterThan(80);
+      expect(validateMap(map)).toEqual({ valid: true, errors: [] });
+    }
   });
 
   it('getMap throws for an unknown name', () => {

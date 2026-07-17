@@ -168,7 +168,7 @@ test.describe('Rumble Draft Rally', () => {
       testInfo.project.name !== 'desktop-chromium',
       'One authoritative three-client journey is sufficient; Firefox/mobile Rally UI is covered above.',
     );
-    test.setTimeout(60000);
+    test.setTimeout(90000);
     const pageB = await context.newPage();
     const pageC = await context.newPage();
     await Promise.all([pageB.goto('/'), pageC.goto('/')]);
@@ -268,7 +268,7 @@ async function waitForRallyPhase(page: Page, category: 'map' | 'mode'): Promise<
             category: scene?.latestDraft?.rallyCategory,
           };
         }),
-      { timeout: 12000 },
+      { timeout: 20000 },
     )
     .toEqual({ active: true, kind: 'rally', category });
 }

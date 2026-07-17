@@ -302,6 +302,35 @@ file and directory inputs in stable order. No recorder threshold, browser
 layout, capability default, authoritative 20Hz behavior, snapshot shape, or
 production state changes in this batch.
 
+### Batch 35 first successor-arena evidence
+
+Wasteland Outpost and Overgrown Suburb now each have one deterministic strict
+40x24, 48px-tile successor document. Both retain the exact public arena name,
+one `(0, 0)`-origin 1920x1152 world, four quadrant spawns, three KOTH anchors,
+the centered Core Run anchor, reachable ten-pickup economy, one connected
+walkable component, minimap metadata, destructible cover, two shootable gates,
+two existing explosive barrels, and explicit asymmetric transform review.
+Wasteland keeps badlands/watchtower/command-post routes; Overgrown keeps ruined
+rowhome/cul-de-sac/park routes and parked-car cover.
+
+The six-map public registry, registry order, persistence keys, draft/schedule
+names, and wire payloads remain unchanged. With the literal server capability
+false or absent, both names return their byte-identical 20x12 legacy documents;
+the four Batch 36-37 arenas always remain legacy. With `largeWorlds: true`, the
+server resolves either successor for every authoritative launch/rematch path
+and the client consumes the same normalized handshake. No viewport, map-name,
+local-config, or art inference participates, and no capability is exposed or
+enabled by default.
+
+The preserved Batch 18 logical resource envelope stays 960x576 while actual
+successor world truth is 1920x1152 in the dynamic render plan, camera bounds,
+collision grid, and minimap projection. Targeted desktop Chromium live pixels
+and staged Firefox/mobile direct-renderer evidence cover both biome layouts,
+four camera edges, objectives, gate destruction/barrel preservation, HUD/
+minimap, Results/rematch, recovery, and legacy restoration. RFG-003 remains the
+evidence disposition; simulation remains authoritative at 20Hz and production
+is unchanged.
+
 ## Adjacent bug reproductions
 
 `client/src/rendering/camera-baseline.test.ts` now asserts the repaired

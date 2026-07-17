@@ -85,6 +85,33 @@ describe('minimap foundation', () => {
     expect(projection.landmarks).toHaveLength(map.decorations?.length ?? 0);
   });
 
+  it('projects both 40x24 successor documents from their authored world bounds', () => {
+    for (const name of ['Wasteland Outpost', 'Overgrown Suburb']) {
+      const successor = getMap(name, { largeWorlds: true });
+      const successorBounds = worldBoundsForMap(successor);
+      const successorLayout = minimapLayoutForGameplay(viewport, hud, successorBounds)!;
+      const projection = createMinimapStaticProjection(
+        successor,
+        createCollisionGrid(successor),
+        successorLayout,
+      );
+
+      expect(projection.worldBounds, name).toEqual({
+        left: 0,
+        top: 0,
+        width: 1920,
+        height: 1152,
+      });
+      expect(projection.solids, name).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ col: 0, row: 0 }),
+          expect.objectContaining({ col: 39, row: 23 }),
+        ]),
+      );
+      expect(projection.landmarks, name).toHaveLength(successor.decorations?.length ?? 0);
+    }
+  });
+
   it('removes destroyed solids and their authored landmark without changing map truth', () => {
     const grid = createCollisionGrid(map);
     const before = createMinimapStaticProjection(map, grid, layout);
