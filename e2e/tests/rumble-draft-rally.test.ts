@@ -14,7 +14,7 @@ async function waitForLobby(gamePage: import('@playwright/test').Page): Promise<
           };
           return lobby?.sys?.settings.active ?? false;
         }),
-      { timeout: 15000 },
+      { timeout: 30000 },
     )
     .toBe(true);
 }

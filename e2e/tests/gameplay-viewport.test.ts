@@ -209,14 +209,25 @@ async function stageGameplay(
   );
 }
 
-async function batch35SuccessorSnapshot(
+type AuthoredSuccessorName =
+  | 'Wasteland Outpost'
+  | 'Overgrown Suburb'
+  | 'Scrapyard'
+  | 'Collapsed Overpass';
+
+async function authoredSuccessorSnapshot(
   page: Page,
-  mapName: 'Wasteland Outpost' | 'Overgrown Suburb',
+  mapName: AuthoredSuccessorName,
 ): Promise<Record<string, unknown>> {
-  const interaction =
-    mapName === 'Wasteland Outpost'
-      ? { gate: { col: 15, row: 11 }, barrel: { col: 12, row: 6 } }
-      : { gate: { col: 13, row: 8 }, barrel: { col: 12, row: 7 } };
+  const interaction: Record<
+    AuthoredSuccessorName,
+    { gate: { col: number; row: number }; barrel: { col: number; row: number } }
+  > = {
+    'Wasteland Outpost': { gate: { col: 15, row: 11 }, barrel: { col: 12, row: 6 } },
+    'Overgrown Suburb': { gate: { col: 13, row: 8 }, barrel: { col: 12, row: 7 } },
+    Scrapyard: { gate: { col: 14, row: 6 }, barrel: { col: 12, row: 9 } },
+    'Collapsed Overpass': { gate: { col: 14, row: 6 }, barrel: { col: 12, row: 9 } },
+  };
   return page.evaluate(async ({ gate, barrel }) => {
     const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
       'GameScene',
@@ -251,7 +262,7 @@ async function batch35SuccessorSnapshot(
     };
     const controller = scene.getCameraController();
     const grid = scene.mapRenderer.getCollisionGrid();
-    if (!controller || !grid) throw new Error('Batch 35 scene systems are not ready');
+    if (!controller || !grid) throw new Error('Authored successor scene systems are not ready');
     const edgeTargets = [
       { label: 'north-west', x: 168, y: 168 },
       { label: 'north-east', x: 1752, y: 168 },
@@ -307,10 +318,13 @@ async function batch35SuccessorSnapshot(
       environment: scene.getReforgedEnvironmentState(),
       minimapSource,
     };
-  }, interaction);
+  }, interaction[mapName]);
 }
 
-async function batch35ObjectiveKinds(page: Page, mode: 'koth' | 'core_run'): Promise<string[]> {
+async function authoredSuccessorObjectiveKinds(
+  page: Page,
+  mode: 'koth' | 'core_run',
+): Promise<string[]> {
   await page.evaluate((selectedMode) => {
     const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
       'GameScene',
@@ -1051,10 +1065,10 @@ async function dynamicWorldMutationSnapshot(page: Page): Promise<Record<string, 
       };
     };
     const grid = scene.mapRenderer.getCollisionGrid();
-    scene.decalRenderer.addBulletHoleIfWall(384, 72, 0, grid);
+    scene.decalRenderer.addBulletHoleIfWall(384, 312, 0, grid);
     const beforeDestruction = scene.getDynamicWorldRenderState().decals.resources;
-    scene.mapRenderer.destroyTileAt(8, 1);
-    scene.decalRenderer.updateDestroyedTiles([{ col: 8, row: 1 }]);
+    scene.mapRenderer.destroyTileAt(8, 6);
+    scene.decalRenderer.updateDestroyedTiles([{ col: 8, row: 6 }]);
     const afterDestruction = scene.getDynamicWorldRenderState().decals.resources;
 
     const edgeView = { x: 0, y: 0, width: 336, height: 336 };
@@ -1235,7 +1249,7 @@ async function minimapScenarioSnapshot(page: Page): Promise<Record<string, unkno
     const bountyState = scene.getMinimapRenderState();
 
     const beforeDestruction = scene.getMinimapRenderState();
-    scene.onTilesDestroyed?.([{ col: 7, row: 5 }]);
+    scene.onTilesDestroyed?.([{ col: 14, row: 6 }]);
     await settle();
     const afterDestruction = scene.getMinimapRenderState();
 
@@ -1383,20 +1397,20 @@ test('gated gameplay keeps one 16:9 logical view across desktop and mobile', asy
       menuLauncher: { x: 1120, y: 32, width: 128, height: 42 },
     },
     dynamic: {
-      worldBounds: { left: 0, top: 0, width: 960, height: 576 },
-      viewportResource: { width: 960, height: 576 },
-      chunks: 6,
+      worldBounds: { left: 0, top: 0, width: 1920, height: 1152 },
+      viewportResource: { width: 1280, height: 720 },
+      chunks: 15,
       quality: 'full',
-      map: { chunkCount: 6 },
-      decals: { resourceCount: 6 },
-      lighting: { width: 960, height: 576, quality: 'full' },
+      map: { chunkCount: 15 },
+      decals: { resourceCount: 15 },
+      lighting: { width: 1280, height: 720, quality: 'full' },
     },
     minimap: {
       layout: {
         panel: { x: 1032, y: 232, width: 216, height: 154 },
         map: { x: 1040, y: 258, width: 200, height: 120 },
       },
-      worldBounds: { left: 0, top: 0, width: 960, height: 576 },
+      worldBounds: { left: 0, top: 0, width: 1920, height: 1152 },
       landmarkCount: 10,
       scrollFactors: [0, 0, 0, 0, 0, 0],
       interactive: false,
@@ -1482,7 +1496,8 @@ test('gated gameplay keeps one 16:9 logical view across desktop and mobile', asy
   const input = await coordinateInputSnapshot(page, testInfo.project.name === 'mobile-landscape');
   expect(input.rawAim).toBeCloseTo(input.expectedAim as number, 6);
   if (testInfo.project.name === 'mobile-landscape') {
-    expect(input.fixedMapRejectsOutsideWorldY).toBe(true);
+    // Logical y=600 is now inside Scrapyard's authored 1152px-tall world.
+    expect(input.fixedMapRejectsOutsideWorldY).toBe(false);
   } else {
     expect(input.crosshair).toEqual([...(input.pointer as number[]), 0, 0]);
   }
@@ -1697,7 +1712,7 @@ test('minimap projects map truth, objectives, local and Crew allies without came
       panel: { x: 1032, y: 232, width: 216, height: 154 },
       map: { x: 1040, y: 258, width: 200, height: 120 },
     },
-    worldBounds: { left: 0, top: 0, width: 960, height: 576 },
+    worldBounds: { left: 0, top: 0, width: 1920, height: 1152 },
     landmarkCount: 9,
     scrollFactors: [0, 0, 0, 0, 0, 0],
     interactive: false,
@@ -2991,15 +3006,17 @@ test('one missing atlas restores the complete legacy visual owner', async ({ pag
   });
 });
 
-test('Batch 35 successors preserve server-owned selection, arena systems, and legacy restoration', async ({
+test('Batch 36 successors preserve server-owned selection, arena systems, and legacy restoration', async ({
   page,
 }, testInfo) => {
   test.skip(!largeWorldsAdvertised, 'Run with CAPABILITY_LARGE_WORLDS=true.');
-  test.setTimeout(90_000);
+  test.setTimeout(150_000);
 
   const successors = [
     { name: 'Wasteland Outpost' as const, landmarks: 6, family: 'wasteland' },
     { name: 'Overgrown Suburb' as const, landmarks: 10, family: 'overgrown' },
+    { name: 'Scrapyard' as const, landmarks: 10, family: 'industrial' },
+    { name: 'Collapsed Overpass' as const, landmarks: 14, family: 'industrial' },
   ];
   for (const expected of successors) {
     await stageGameplay(page, true, false, expected.name);
@@ -3019,9 +3036,9 @@ test('Batch 35 successors preserve server-owned selection, arena systems, and le
       },
     });
 
-    expect(await batch35ObjectiveKinds(page, 'koth')).toEqual(['koth', 'next-koth']);
-    expect(await batch35ObjectiveKinds(page, 'core_run')).toEqual(['core']);
-    const scenario = (await batch35SuccessorSnapshot(page, expected.name)) as {
+    expect(await authoredSuccessorObjectiveKinds(page, 'koth')).toEqual(['koth', 'next-koth']);
+    expect(await authoredSuccessorObjectiveKinds(page, 'core_run')).toEqual(['core']);
+    const scenario = (await authoredSuccessorSnapshot(page, expected.name)) as {
       cameraEdges: Array<{ label: string; scrollX: number; scrollY: number; zoom: number }>;
       gateWasSolid: boolean;
       gateIsSolid: boolean;
@@ -3068,7 +3085,7 @@ test('Batch 35 successors preserve server-owned selection, arena systems, and le
 
     if (testInfo.project.name === 'desktop-chromium') {
       const live = await page.screenshot();
-      await testInfo.attach(`batch-35-${expected.name}-desktop-live`, {
+      await testInfo.attach(`batch-36-${expected.name}-desktop-live`, {
         body: live,
         contentType: 'image/png',
       });
@@ -3076,7 +3093,7 @@ test('Batch 35 successors preserve server-owned selection, arena systems, and le
       const direct = await rendererSnapshot(page);
       expect(direct.sampledColors, expected.name).toBeGreaterThan(8);
       expect(direct.nonBlackSamples, expected.name).toBeGreaterThan(100);
-      await testInfo.attach(`batch-35-${expected.name}-direct-renderer`, {
+      await testInfo.attach(`batch-36-${expected.name}-direct-renderer`, {
         body: Buffer.from(direct.dataUrl.split(',')[1] ?? '', 'base64'),
         contentType: 'image/png',
       });
@@ -3091,7 +3108,7 @@ test('Batch 35 successors preserve server-owned selection, arena systems, and le
       scene: { start(key: string, data: unknown): void };
     };
     scene.shutdown();
-    scene.scene.start('ResultsScene', { nickname: 'BATCH 35' });
+    scene.scene.start('ResultsScene', { nickname: 'BATCH 36' });
   });
   await waitForScene(page, 'ResultsScene');
   await expect
@@ -3104,14 +3121,14 @@ test('Batch 35 successors preserve server-owned selection, arena systems, and le
     .toEqual([960, 720]);
   await page.evaluate(() => {
     const game = (window as unknown as { game?: Phaser.Game }).game;
-    if (!game) throw new Error('game missing before Batch 35 rematch');
+    if (!game) throw new Error('game missing before Batch 36 rematch');
     game.scene.stop('ResultsScene');
     game.scene.start('GameScene', {
-      nickname: 'BATCH 35',
+      nickname: 'BATCH 36',
       matchData: {
-        matchId: 'batch-35-rematch',
+        matchId: 'batch-36-rematch',
         opponents: [{ id: 'viewport-rival', nickname: 'RIVAL' }],
-        mapName: 'Overgrown Suburb',
+        mapName: 'Collapsed Overpass',
         gameMode: 'deathmatch',
         matchKind: 'practice',
       },
@@ -3162,7 +3179,7 @@ test('Batch 35 successors preserve server-owned selection, arena systems, and le
       game.scene.getScenes(true)[0]?.scene.start('GameScene', {
         nickname: 'OLD SERVER',
         matchData: {
-          matchId: 'batch-35-old-server',
+          matchId: 'batch-36-old-server',
           opponents: [{ id: 'viewport-rival', nickname: 'RIVAL' }],
           mapName,
           gameMode: 'deathmatch',

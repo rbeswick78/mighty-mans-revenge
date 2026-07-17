@@ -1,0 +1,370 @@
+{
+  "name": "Scrapyard",
+  "width": 40,
+  "height": 24,
+  "tileSize": 48,
+  "theme": "scrapyard",
+  "tiles": [
+    [
+      1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+      1, 1, 1, 1, 1, 1, 1, 1, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 3, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 2, 2, 2, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 4, 0, 0, 1, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 2, 2, 2, 2, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0,
+      2, 2, 2, 2, 2, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 2, 2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 4, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0,
+      0, 2, 2, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 2, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 1, 0, 0, 0, 0, 1,
+      1, 1, 1, 1, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 1, 0, 0, 4, 0, 1,
+      1, 1, 1, 1, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 2, 2, 1,
+      1, 1, 1, 1, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 3, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+      1, 1, 1, 1, 1, 1, 1, 1, 1
+    ]
+  ],
+  "spawnPoints": [
+    { "id": "spawn-north-west", "x": 3, "y": 3 },
+    { "id": "spawn-south-east", "x": 36, "y": 20 },
+    { "id": "spawn-south-west", "x": 3, "y": 20 },
+    { "id": "spawn-north-east", "x": 36, "y": 3 }
+  ],
+  "pickupSpawns": [
+    { "id": "shotgun-crusher-lane", "x": 19, "y": 10, "type": "weapon_shotgun" },
+    { "id": "pistol-south-sort", "x": 20, "y": 13, "type": "weapon_pistol" },
+    { "id": "bat-north-haul-road", "x": 19, "y": 2, "type": "weapon_bat" },
+    { "id": "ammo-south-haul-road", "x": 20, "y": 21, "type": "gun_ammo" },
+    { "id": "armor-core-west", "x": 19, "y": 12, "type": "armor" },
+    { "id": "overcharge-core-east", "x": 20, "y": 11, "type": "overcharge" },
+    { "id": "grenade-west-yard", "x": 11, "y": 6, "type": "grenade" },
+    { "id": "grenade-east-yard", "x": 28, "y": 17, "type": "grenade" },
+    { "id": "bandage-west-lane", "x": 4, "y": 11, "type": "bandage" },
+    { "id": "bandage-east-lane", "x": 35, "y": 12, "type": "bandage" }
+  ],
+  "decorations": [
+    {
+      "id": "cars-west-compressed",
+      "x": 6,
+      "y": 9,
+      "w": 2,
+      "h": 1,
+      "texture": "deco_car_scrap_gray",
+      "flipX": true
+    },
+    {
+      "id": "cars-east-compressed",
+      "x": 32,
+      "y": 14,
+      "w": 2,
+      "h": 1,
+      "texture": "deco_car_scrap_red"
+    },
+    {
+      "id": "container-west-red",
+      "x": 10,
+      "y": 5,
+      "w": 2,
+      "h": 1,
+      "texture": "deco_container_red"
+    },
+    {
+      "id": "container-east-gray",
+      "x": 28,
+      "y": 18,
+      "w": 2,
+      "h": 1,
+      "texture": "deco_container_gray",
+      "flipX": true
+    },
+    {
+      "id": "barrel-west-sort",
+      "x": 12,
+      "y": 9,
+      "w": 1,
+      "h": 1,
+      "texture": "deco_barrel_red",
+      "hazard": "explosive_barrel"
+    },
+    {
+      "id": "barrel-east-sort",
+      "x": 27,
+      "y": 14,
+      "w": 1,
+      "h": 1,
+      "texture": "deco_barrel_red",
+      "hazard": "explosive_barrel"
+    },
+    {
+      "id": "cache-south-west-salvage",
+      "x": 10,
+      "y": 17,
+      "w": 1,
+      "h": 1,
+      "texture": "deco_scavenger_cache",
+      "interaction": "scavenger_cache"
+    },
+    {
+      "id": "cache-north-east-salvage",
+      "x": 29,
+      "y": 6,
+      "w": 1,
+      "h": 1,
+      "texture": "deco_scavenger_cache",
+      "interaction": "scavenger_cache"
+    },
+    {
+      "id": "gate-west-processing",
+      "x": 14,
+      "y": 6,
+      "w": 1,
+      "h": 1,
+      "texture": "tiles_wire_fence_closing",
+      "interaction": "shootable_gate"
+    },
+    {
+      "id": "gate-east-processing",
+      "x": 25,
+      "y": 17,
+      "w": 1,
+      "h": 1,
+      "texture": "tiles_wire_fence_closing",
+      "interaction": "shootable_gate"
+    }
+  ],
+  "kothHills": [
+    { "x": 6, "y": 11 },
+    { "x": 19, "y": 11 },
+    { "x": 32, "y": 11 }
+  ],
+  "authoring": {
+    "schemaVersion": 1,
+    "profile": "standard-40x24",
+    "regions": [
+      { "id": "west-salvage-yard", "areas": [{ "x": 0, "y": 0, "w": 15, "h": 24 }] },
+      { "id": "central-processing-yard", "areas": [{ "x": 15, "y": 0, "w": 10, "h": 24 }] },
+      { "id": "east-salvage-yard", "areas": [{ "x": 25, "y": 0, "w": 15, "h": 24 }] }
+    ],
+    "landmarks": [
+      {
+        "id": "west-compressed-car-maze",
+        "regionId": "west-salvage-yard",
+        "footprint": { "x": 4, "y": 5, "w": 10, "h": 6 },
+        "minimap": "major"
+      },
+      {
+        "id": "central-salvage-crusher",
+        "regionId": "central-processing-yard",
+        "footprint": { "x": 17, "y": 6, "w": 6, "h": 12 },
+        "minimap": "major"
+      },
+      {
+        "id": "east-container-maze",
+        "regionId": "east-salvage-yard",
+        "footprint": { "x": 26, "y": 13, "w": 10, "h": 6 },
+        "minimap": "major"
+      },
+      {
+        "id": "north-fenced-sort-lane",
+        "regionId": "central-processing-yard",
+        "footprint": { "x": 13, "y": 2, "w": 14, "h": 5 },
+        "minimap": "minor"
+      },
+      {
+        "id": "south-fenced-sort-lane",
+        "regionId": "central-processing-yard",
+        "footprint": { "x": 13, "y": 17, "w": 14, "h": 5 },
+        "minimap": "minor"
+      }
+    ],
+    "minimap": {
+      "projection": "orthographic-top-left",
+      "bounds": { "x": 0, "y": 0, "w": 40, "h": 24 },
+      "landmarkIds": [
+        "west-compressed-car-maze",
+        "central-salvage-crusher",
+        "east-container-maze",
+        "north-fenced-sort-lane",
+        "south-fenced-sort-lane"
+      ]
+    },
+    "connectivity": {
+      "requireSingleWalkableComponent": true,
+      "links": [
+        {
+          "id": "west-open-haul-road",
+          "fromRegionId": "west-salvage-yard",
+          "toRegionId": "central-processing-yard"
+        },
+        {
+          "id": "east-open-haul-road",
+          "fromRegionId": "central-processing-yard",
+          "toRegionId": "east-salvage-yard"
+        },
+        {
+          "id": "west-gate-shortcut",
+          "fromRegionId": "west-salvage-yard",
+          "toRegionId": "central-processing-yard",
+          "gateId": "gate-west-processing"
+        },
+        {
+          "id": "east-gate-shortcut",
+          "fromRegionId": "central-processing-yard",
+          "toRegionId": "east-salvage-yard",
+          "gateId": "gate-east-processing"
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "koth-west-salvage",
+        "kind": "koth",
+        "regionId": "west-salvage-yard",
+        "footprint": { "x": 6, "y": 11, "w": 2, "h": 2 }
+      },
+      {
+        "id": "koth-central-crusher",
+        "kind": "koth",
+        "regionId": "central-processing-yard",
+        "footprint": { "x": 19, "y": 11, "w": 2, "h": 2 }
+      },
+      {
+        "id": "koth-east-salvage",
+        "kind": "koth",
+        "regionId": "east-salvage-yard",
+        "footprint": { "x": 32, "y": 11, "w": 2, "h": 2 }
+      },
+      {
+        "id": "core-run-center",
+        "kind": "core-run",
+        "regionId": "central-processing-yard",
+        "footprint": { "x": 19, "y": 11, "w": 2, "h": 2 }
+      }
+    ],
+    "spawnSafety": {
+      "spawnIds": ["spawn-north-west", "spawn-south-east", "spawn-south-west", "spawn-north-east"],
+      "minimumPathDistanceTiles": 17,
+      "minimumEgressDirections": 4
+    },
+    "pickupPlacement": {
+      "pickupIds": [
+        "shotgun-crusher-lane",
+        "pistol-south-sort",
+        "bat-north-haul-road",
+        "ammo-south-haul-road",
+        "armor-core-west",
+        "overcharge-core-east",
+        "grenade-west-yard",
+        "grenade-east-yard",
+        "bandage-west-lane",
+        "bandage-east-lane"
+      ]
+    },
+    "gates": [
+      {
+        "decorationId": "gate-west-processing",
+        "connectsRegionIds": ["west-salvage-yard", "central-processing-yard"]
+      },
+      {
+        "decorationId": "gate-east-processing",
+        "connectsRegionIds": ["central-processing-yard", "east-salvage-yard"]
+      }
+    ],
+    "hazards": [
+      {
+        "decorationId": "barrel-west-sort",
+        "kind": "explosive_barrel",
+        "regionId": "west-salvage-yard"
+      },
+      {
+        "decorationId": "barrel-east-sort",
+        "kind": "explosive_barrel",
+        "regionId": "east-salvage-yard"
+      }
+    ],
+    "symmetryReview": {
+      "kind": "asymmetric",
+      "rationale": "Compressed-car, container, and salvage masses are deliberately offset around the crusher lanes; horizontal, vertical, and rotational transforms were reviewed for comparable primary routes, gate flanks, pickup access, and landmark escape options.",
+      "exceptions": [],
+      "checkedTransforms": ["horizontal", "vertical", "rotational"]
+    }
+  }
+}

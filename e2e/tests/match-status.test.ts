@@ -17,6 +17,8 @@ interface StatusNode {
 
 interface StatusSnapshot {
   score: StatusNode;
+  logicalWidth: number;
+  logicalHeight: number;
   mode: StatusNode;
   timer: StatusNode;
   event: StatusNode;
@@ -44,9 +46,12 @@ async function statusSnapshot(page: Page): Promise<StatusSnapshot> {
       style: { color: string; fontSize: string };
       getBounds: () => Bounds;
     };
-    const scene = (
-      window as unknown as { game?: { scene: { getScene: (key: string) => unknown } } }
-    ).game?.scene.getScene('GameScene') as {
+    const game = (
+      window as unknown as {
+        game?: { scale: { width: number }; scene: { getScene: (key: string) => unknown } };
+      }
+    ).game;
+    const scene = game?.scene.getScene('GameScene') as {
       hud: {
         scoreText: TextNode;
         coreRunText: TextNode;
@@ -62,6 +67,8 @@ async function statusSnapshot(page: Page): Promise<StatusSnapshot> {
     });
 
     return {
+      logicalWidth: game?.scale.width ?? 960,
+      logicalHeight: game?.scale.height ?? 720,
       score: read(scene.hud.scoreText),
       mode: read(scene.hud.coreRunText),
       timer: read(scene.hud.timerText),
@@ -146,9 +153,9 @@ test.describe('Readable match status', () => {
     const ordered = [status.score, status.mode, status.timer, status.event];
     for (const [index, node] of ordered.entries()) {
       expect(node.bounds.x).toBeGreaterThanOrEqual(300);
-      expect(node.bounds.x + node.bounds.width).toBeLessThanOrEqual(660);
-      expect(node.bounds.y).toBeGreaterThanOrEqual(576);
-      expect(node.bounds.y + node.bounds.height).toBeLessThanOrEqual(720);
+      expect(node.bounds.x + node.bounds.width).toBeLessThanOrEqual(status.logicalWidth - 300);
+      expect(node.bounds.y).toBeGreaterThanOrEqual(0);
+      expect(node.bounds.y + node.bounds.height).toBeLessThanOrEqual(status.logicalHeight);
       if (index > 0) {
         const previous = ordered[index - 1];
         expect(node.bounds.y).toBeGreaterThanOrEqual(previous.bounds.y + previous.bounds.height);
@@ -176,7 +183,9 @@ test.describe('Readable match status', () => {
     const compact = await statusSnapshot(gamePage);
     expect(compact.score.font).toBe(11);
     expect(compact.score.bounds.x).toBeGreaterThanOrEqual(300);
-    expect(compact.score.bounds.x + compact.score.bounds.width).toBeLessThanOrEqual(660);
+    expect(compact.score.bounds.x + compact.score.bounds.width).toBeLessThanOrEqual(
+      compact.logicalWidth - 300,
+    );
     expect(compact.timer).toMatchObject({ text: '0:10', color: '#ea4f36' });
 
     await gamePage.evaluate(() => {

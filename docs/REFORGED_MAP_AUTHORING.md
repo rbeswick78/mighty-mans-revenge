@@ -1,11 +1,12 @@
 # Reforged Standard-Arena Authoring Contract
 
 Batch 34 defines the shared, deterministic contract for 40x24 standard arenas.
-Batch 35 applies it to Wasteland Outpost and Overgrown Suburb behind the
-existing literal server-owned `largeWorlds` opt-in. The six current 20x12 maps
-remain the registry/default/fallback documents; runtime simulation, collision,
-destruction, navigation, camera, HUD, matchmaking, mode, and bot behavior still
-consume the established shared contracts.
+Batches 35-36 apply it to Wasteland Outpost, Overgrown Suburb, Scrapyard, and
+Collapsed Overpass behind the existing literal server-owned `largeWorlds`
+opt-in. The six current 20x12 maps remain the registry/default/fallback
+documents; runtime simulation, collision, destruction, navigation, camera, HUD,
+matchmaking, mode, and bot behavior still consume the established shared
+contracts.
 
 ## Compatibility profiles
 
@@ -142,14 +143,15 @@ failure behavior.
 - The client dynamic renderer, camera, HUD, and current minimap continue to use
   actual map dimensions, collision, decorations, and snapshots. They do not
   infer regions, objectives, teams, or visibility from authoring metadata.
-- Wasteland Outpost and Overgrown Suburb have separately named source files but
-  retain their exact public names. The authoritative server resolves their
-  40x24 variants only from its advertised `largeWorlds` capability; the client
-  consumes that same normalized handshake choice with no viewport, name,
-  local-config, or art inference and no second wire/map-selection surface.
+- Wasteland Outpost, Overgrown Suburb, Scrapyard, and Collapsed Overpass have
+  separately named source files but retain their exact public names. The
+  authoritative server resolves their 40x24 variants only from its advertised
+  `largeWorlds` capability; the client consumes that same normalized handshake
+  choice with no viewport, name, local-config, or art inference and no second
+  wire/map-selection surface.
 - The six legacy documents remain 20x12 at tile size 48, world size 960x576,
-  origin `(0, 0)`, and the same registry order/names. Scrapyard, Collapsed
-  Overpass, Checkpoint Zero, and Rusted Refinery have no successor variant yet.
+  origin `(0, 0)`, and the same registry order/names. Checkpoint Zero and Rusted
+  Refinery have no successor variant yet.
 - All capabilities remain strict server-owned opt-ins and default false. This
   resolver cannot schedule, expose, default-match, or deploy an arena.
 
@@ -173,11 +175,32 @@ metadata, one connected walkable component, two shootable gates, and two
 existing explosive barrels. Their tiles and established runtime arrays are the
 only gameplay truth; region/landmark/review metadata remains declarative.
 
+## Batch 36 authored successors
+
+`scrapyard.standard-40x24.json` preserves compressed-car lanes, container and
+salvage stacks, fenced sort lanes, and the central crusher/processing-yard
+identity. Its two shootable gates create optional north/south yard shortcuts,
+while paired barrels, caches, cars, and containers provide meaningful shared
+destructible-cover and hazard choices.
+
+`collapsed-overpass.standard-40x24.json` preserves divided concrete approaches,
+broken road decks, north/south underpass channels, heavy central supports, and
+stranded-vehicle cover. Four shootable gates join the approaches to both
+underpass flanks without adding a map-specific collision or navigation rule.
+
+Both documents declare four quadrant spawns, ten reachable pickups, three
+legal KOTH anchors, the geometric-center Core Run anchor, complete minimap
+metadata, one connected walkable component, existing explosive-barrel hazards,
+and an explicit asymmetric review of horizontal, vertical, and rotational
+transforms. Their tiles and established runtime arrays are the only gameplay
+truth; region/landmark/review metadata remains declarative.
+
 ## Scope boundary
 
-Batch 34 owns the schema, validator, fixtures, and CLI. Batch 35 owns only the
-first two successor layouts and minimal resolver; Batches 36-37 own the other
-four layouts. Batch 38 owns mode/bot rebalance; Batch 39 owns the
-Reforged Arena release gate and any production exposure. Tactical-map gameplay,
+Batch 34 owns the schema, validator, fixtures, and CLI. Batch 35 owns the first
+two successor layouts and minimal resolver; Batch 36 owns only Scrapyard and
+Collapsed Overpass in that resolver; Batch 37 owns Checkpoint Zero and Rusted
+Refinery. Batch 38 owns mode/bot rebalance; Batch 39 owns the Reforged Arena
+release gate and any production exposure. Tactical-map gameplay,
 Battle Royale regions, containers, loot, rarity, safe zones, spectating, new
 hazards, and production deployment remain outside this contract.

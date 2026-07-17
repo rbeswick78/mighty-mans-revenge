@@ -741,7 +741,7 @@ Maps are visually themed: map JSON carries an optional `theme` id resolved clien
 
 Map JSON also carries `kothHills` — top-left tiles of the 2×2 King of the Hill zones, in relocation order. The validator checks bounds/walkability (≥3 entries when present); the registry requires every shipped map to declare them, because mode rotation can put KOTH on any map.
 
-**Reforged map authoring contract (Batches 34-35):** successor standard arenas use
+**Reforged map authoring contract (Batches 34-36):** successor standard arenas use
 the shared `standard-40x24` document profile: exactly 40x24 48px tiles plus a
 versioned declarative `authoring` block for complete non-overlapping regions,
 identified landmarks and minimap projection, connected walkable routes,
@@ -753,14 +753,14 @@ order. The `compatible` profile accepts the unchanged six legacy maps with no
 authoring block. Runtime simulation still consumes the established `MapData`
 fields only: authoring IDs/review data do not register a map, alter collision,
 destruction, selection, balance, rendering, minimap visibility, matchmaking,
-or capability exposure. See `docs/REFORGED_MAP_AUTHORING.md`. Wasteland Outpost
-and Overgrown Suburb now have strict successor documents selected only by an
-explicit `{ largeWorlds: true }` resolver input. `MatchmakingManager` supplies
-that input from `GameServer.getCapabilities()` and the client consumes the same
-normalized server handshake; false/absent capability paths keep the exact six
-legacy registry objects, and the other four arenas have no successor yet.
-Batch 36-37 own those layouts, Batch 38 owns mode/bot rebalance, and Batch 39
-owns release/exposure.
+or capability exposure. See `docs/REFORGED_MAP_AUTHORING.md`. Wasteland Outpost,
+Overgrown Suburb, Scrapyard, and Collapsed Overpass now have strict successor
+documents selected only by an explicit `{ largeWorlds: true }` resolver input.
+`MatchmakingManager` supplies that input from `GameServer.getCapabilities()`
+and the client consumes the same normalized server handshake; false/absent
+capability paths keep the exact six legacy registry objects, while Checkpoint
+Zero and Rusted Refinery have no successor yet. Batch 37 owns those remaining
+layouts, Batch 38 owns mode/bot rebalance, and Batch 39 owns release/exposure.
 
 Six arenas ship in registry order: Wasteland Outpost, Overgrown Suburb, Scrapyard, Collapsed Overpass, Checkpoint Zero, and Rusted Refinery. Collapsed Overpass uses the `overpass` theme, six hill locations, heavy central supports, and open outer loops. Checkpoint Zero uses the `checkpoint` theme, rotationally paired gates/props, and dense horizontal plus vertical low-cover lanes. Rusted Refinery uses the `refinery` theme, a red-roofed central power vault with open north/south approaches, and two diagonal shootable side gates. All three create destructible route choices without introducing map-only collision rules.
 

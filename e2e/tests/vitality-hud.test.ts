@@ -16,6 +16,7 @@ interface VitalityState {
   sprint: string;
   sprintColor: string;
   sprintFont: number;
+  vitalsPanel: Bounds;
   sprintBounds: Bounds;
   sprintBarHeight: number;
 }
@@ -50,6 +51,7 @@ async function vitalityState(page: Page): Promise<VitalityState> {
         staminaText: TextNode;
         staminaBarBg: { height: number };
       };
+      getResponsiveHudLayout(): { vitalsPanel: Bounds } | null;
     };
     const healthBounds = scene.hud.healthText.getBounds();
     const sprintBounds = scene.hud.staminaText.getBounds();
@@ -63,6 +65,12 @@ async function vitalityState(page: Page): Promise<VitalityState> {
       sprintFont: Number.parseInt(scene.hud.staminaText.style.fontSize, 10),
       sprintBounds,
       sprintBarHeight: scene.hud.staminaBarBg.height,
+      vitalsPanel: scene.getResponsiveHudLayout()?.vitalsPanel ?? {
+        x: 0,
+        y: 576,
+        width: 300,
+        height: 144,
+      },
     };
   });
 }
@@ -122,10 +130,14 @@ test.describe('Vitality HUD', () => {
       sprintBarHeight: 16,
     });
     for (const bounds of [ready.healthBounds, ready.sprintBounds]) {
-      expect(bounds.x).toBeGreaterThanOrEqual(0);
-      expect(bounds.x + bounds.width).toBeLessThan(300);
-      expect(bounds.y).toBeGreaterThanOrEqual(576);
-      expect(bounds.y + bounds.height).toBeLessThanOrEqual(720);
+      expect(bounds.x).toBeGreaterThanOrEqual(ready.vitalsPanel.x);
+      expect(bounds.x + bounds.width).toBeLessThanOrEqual(
+        ready.vitalsPanel.x + ready.vitalsPanel.width,
+      );
+      expect(bounds.y).toBeGreaterThanOrEqual(ready.vitalsPanel.y);
+      expect(bounds.y + bounds.height).toBeLessThanOrEqual(
+        ready.vitalsPanel.y + ready.vitalsPanel.height,
+      );
     }
     await gamePage.waitForTimeout(50);
     await gamePage.screenshot({ path: testInfo.outputPath('vitality-ready.png') });

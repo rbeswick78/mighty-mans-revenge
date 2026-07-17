@@ -6,7 +6,9 @@ import wastelandOutpostStandard from '../../maps/wasteland-outpost.standard-40x2
 import overgrownSuburb from '../../maps/overgrown-suburb.json' with { type: 'json' };
 import overgrownSuburbStandard from '../../maps/overgrown-suburb.standard-40x24.json' with { type: 'json' };
 import scrapyard from '../../maps/scrapyard.json' with { type: 'json' };
+import scrapyardStandard from '../../maps/scrapyard.standard-40x24.json' with { type: 'json' };
 import collapsedOverpass from '../../maps/collapsed-overpass.json' with { type: 'json' };
+import collapsedOverpassStandard from '../../maps/collapsed-overpass.standard-40x24.json' with { type: 'json' };
 import checkpointZero from '../../maps/checkpoint-zero.json' with { type: 'json' };
 import rustedRefinery from '../../maps/rusted-refinery.json' with { type: 'json' };
 
@@ -21,7 +23,12 @@ const ALL: readonly MapData[] = [
 ];
 
 const LARGE_WORLD_VARIANTS: ReadonlyMap<string, MapData> = new Map(
-  [wastelandOutpostStandard, overgrownSuburbStandard].map((document) => {
+  [
+    wastelandOutpostStandard,
+    overgrownSuburbStandard,
+    scrapyardStandard,
+    collapsedOverpassStandard,
+  ].map((document) => {
     const validation = validateMapDocument(document, 'standard-40x24');
     if (!validation.valid || !validation.mapData) {
       throw new Error(`Invalid large-world map: ${validation.errors.join('; ')}`);

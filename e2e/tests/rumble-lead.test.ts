@@ -129,9 +129,15 @@ test('composes Rumble lead drama in the live HUD', async ({ gamePage }, testInfo
       .toBe('active');
   }
   const presentation = await gamePage.evaluate(() => {
-    const scene = (
-      window as unknown as { game?: { scene: { getScene: (key: string) => unknown } } }
-    ).game?.scene.getScene('GameScene') as {
+    const game = (
+      window as unknown as {
+        game?: {
+          scale: { width: number; height: number };
+          scene: { getScene(key: string): unknown };
+        };
+      }
+    ).game;
+    const scene = game?.scene.getScene('GameScene') as {
       gameService: {
         getPlayerId: () => string | null;
         emit: (event: string, ...args: unknown[]) => void;
@@ -144,11 +150,6 @@ test('composes Rumble lead drama in the live HUD', async ({ gamePage }, testInfo
           getBounds: () => { x: number; y: number; width: number; height: number };
         };
       };
-      cameras: {
-        main: {
-          worldView: { x: number; y: number; width: number; height: number };
-        };
-      };
     };
     const localId = scene.gameService.getPlayerId();
     if (!localId) throw new Error('local fighter missing');
@@ -159,7 +160,6 @@ test('composes Rumble lead drama in the live HUD', async ({ gamePage }, testInfo
     ]);
     const callout = scene.hud.combatCalloutText;
     const bounds = callout.getBounds();
-    const worldView = scene.cameras.main.worldView;
     return {
       text: callout.text,
       visible: callout.visible,
@@ -171,10 +171,10 @@ test('composes Rumble lead drama in the live HUD', async ({ gamePage }, testInfo
         bottom: bounds.y + bounds.height,
       },
       visibleBounds: {
-        x: worldView.x,
-        y: worldView.y,
-        right: worldView.x + worldView.width,
-        bottom: worldView.y + worldView.height,
+        x: 0,
+        y: 0,
+        right: game?.scale.width ?? 960,
+        bottom: game?.scale.height ?? 720,
       },
     };
   });

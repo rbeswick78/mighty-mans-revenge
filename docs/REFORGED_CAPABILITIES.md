@@ -306,6 +306,16 @@ absent, malformed, old-server, and reconnect fallback paths retain the exact
 legacy objects even when the capability is true. The opt-in remains default
 false and is not exposed, scheduled, deployed, or enabled in production.
 
+Batch 36 extends that same private resolver only for Scrapyard and Collapsed
+Overpass. The authoritative launch/rematch inputs and normalized client
+handshake remain unchanged: literal `largeWorlds: true` selects one of the four
+authored successors by its unchanged public name, while false, absent,
+malformed, old-server, and reconnect fallback paths retain the exact 20x12
+legacy objects. Checkpoint Zero and Rusted Refinery remain legacy-only even when
+the capability is true. No viewport, map-name, local-config, or art inference
+participates, no second client-owned selection surface exists, and the opt-in
+remains default false, unexposed, undeployed, and disabled in production.
+
 ## Server-first rollout and rollback
 
 For each capability, keep this order:

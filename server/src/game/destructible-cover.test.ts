@@ -159,8 +159,13 @@ describe('findDemolitionWaveTiles', () => {
     ]);
   });
 
-  it('opens both successor shortcuts while preserving their explosive barrels', () => {
-    for (const name of ['Wasteland Outpost', 'Overgrown Suburb']) {
+  it('opens every successor shortcut while preserving explosive barrels', () => {
+    for (const name of [
+      'Wasteland Outpost',
+      'Overgrown Suburb',
+      'Scrapyard',
+      'Collapsed Overpass',
+    ]) {
       const map = getMap(name, { largeWorlds: true });
       const grid = createCollisionGrid(map);
       const wave = findDemolitionWaveTiles(map, grid);

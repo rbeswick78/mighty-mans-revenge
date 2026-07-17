@@ -331,6 +331,38 @@ minimap, Results/rematch, recovery, and legacy restoration. RFG-003 remains the
 evidence disposition; simulation remains authoritative at 20Hz and production
 is unchanged.
 
+### Batch 36 second successor-arena evidence
+
+Scrapyard and Collapsed Overpass now each have one deterministic strict 40x24,
+48px-tile successor document. Both retain the exact public arena name, one
+`(0, 0)`-origin 1920x1152 world, four quadrant spawns, three KOTH anchors, the
+centered Core Run anchor, a reachable ten-pickup economy, one connected walkable
+component, complete minimap metadata, destructible cover, shootable-gate
+shortcuts, existing explosive-barrel hazards, and explicit asymmetric transform
+review. Scrapyard preserves compressed-car, container, salvage, fenced-sort,
+and processing-yard lanes; Collapsed Overpass preserves broken road decks,
+underpass channels, stranded vehicles, heavy supports, and divided concrete
+approaches.
+
+The public six-map registry, registry order, persistence keys, draft/schedule
+names, and wire payloads remain unchanged. With the literal server capability
+false or absent, all four successor-owned names return their byte-identical
+20x12 legacy documents; Checkpoint Zero and Rusted Refinery remain legacy-only.
+With `largeWorlds: true`, the server resolves any of the four authored
+successors for every authoritative launch/rematch path and the client consumes
+the same normalized handshake. No viewport, map-name, local-config, or art
+inference participates, and no capability is exposed or enabled by default.
+
+The preserved Batch 18 logical resource envelope remains 960x576 while actual
+successor world truth is 1920x1152 in the dynamic render plan, camera bounds,
+collision grid, and minimap projection. The Batch 36 authored-layout/runtime-
+loading tier covers both new industrial layouts, all four camera edges and
+spawn quadrants, objectives, gate destruction and barrel preservation, HUD and
+minimap, Results/rematch, recovery, and legacy restoration. RFG-003 continues
+to require Chromium live/compositor pixels plus staged Firefox/mobile object,
+input, and direct-renderer evidence; simulation remains authoritative at 20Hz
+and production remains unchanged.
+
 ## Adjacent bug reproductions
 
 `client/src/rendering/camera-baseline.test.ts` now asserts the repaired

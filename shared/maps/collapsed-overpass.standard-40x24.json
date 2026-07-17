@@ -1,0 +1,425 @@
+{
+  "name": "Collapsed Overpass",
+  "width": 40,
+  "height": 24,
+  "tileSize": 48,
+  "theme": "overpass",
+  "tiles": [
+    [
+      1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+      1, 1, 1, 1, 1, 1, 1, 1, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 3, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1,
+      1, 1, 1, 1, 1, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 2, 2, 2, 0, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 2, 2, 2, 1,
+      1, 1, 1, 1, 1, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1,
+      1, 1, 1, 1, 1, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 2, 2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      2, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 4, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0,
+      0, 2, 2, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 4, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1,
+      1, 1, 1, 1, 1, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 2, 2, 2, 0, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 2, 2, 2, 1,
+      1, 1, 1, 1, 1, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1,
+      1, 1, 1, 1, 1, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 3, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+      1, 1, 1, 1, 1, 1, 1, 1, 1
+    ]
+  ],
+  "spawnPoints": [
+    { "id": "spawn-north-west", "x": 3, "y": 3 },
+    { "id": "spawn-south-east", "x": 36, "y": 20 },
+    { "id": "spawn-south-west", "x": 3, "y": 20 },
+    { "id": "spawn-north-east", "x": 36, "y": 3 }
+  ],
+  "pickupSpawns": [
+    { "id": "shotgun-underpass", "x": 19, "y": 10, "type": "weapon_shotgun" },
+    { "id": "pistol-south-channel", "x": 20, "y": 13, "type": "weapon_pistol" },
+    { "id": "bat-north-deck", "x": 20, "y": 2, "type": "weapon_bat" },
+    { "id": "ammo-south-deck", "x": 19, "y": 21, "type": "gun_ammo" },
+    { "id": "armor-core-west", "x": 19, "y": 12, "type": "armor" },
+    { "id": "overcharge-core-east", "x": 20, "y": 11, "type": "overcharge" },
+    { "id": "grenade-west-approach", "x": 11, "y": 8, "type": "grenade" },
+    { "id": "grenade-east-approach", "x": 28, "y": 15, "type": "grenade" },
+    { "id": "bandage-west-channel", "x": 4, "y": 11, "type": "bandage" },
+    { "id": "bandage-east-channel", "x": 35, "y": 12, "type": "bandage" }
+  ],
+  "decorations": [
+    {
+      "id": "vehicle-west-north",
+      "x": 10,
+      "y": 6,
+      "w": 2,
+      "h": 1,
+      "texture": "deco_car_scrap_gray",
+      "flipX": true
+    },
+    {
+      "id": "vehicle-east-south",
+      "x": 28,
+      "y": 17,
+      "w": 2,
+      "h": 1,
+      "texture": "deco_car_scrap_red"
+    },
+    {
+      "id": "vehicle-west-south",
+      "x": 10,
+      "y": 17,
+      "w": 2,
+      "h": 1,
+      "texture": "deco_car_scrap_red"
+    },
+    {
+      "id": "vehicle-east-north",
+      "x": 28,
+      "y": 6,
+      "w": 2,
+      "h": 1,
+      "texture": "deco_car_scrap_gray",
+      "flipX": true
+    },
+    {
+      "id": "container-west-channel",
+      "x": 6,
+      "y": 9,
+      "w": 2,
+      "h": 1,
+      "texture": "deco_container_gray"
+    },
+    {
+      "id": "container-east-channel",
+      "x": 32,
+      "y": 14,
+      "w": 2,
+      "h": 1,
+      "texture": "deco_container_red",
+      "flipX": true
+    },
+    {
+      "id": "barrel-west-underpass",
+      "x": 12,
+      "y": 9,
+      "w": 1,
+      "h": 1,
+      "texture": "deco_barrel_red",
+      "hazard": "explosive_barrel"
+    },
+    {
+      "id": "barrel-east-underpass",
+      "x": 27,
+      "y": 14,
+      "w": 1,
+      "h": 1,
+      "texture": "deco_barrel_red",
+      "hazard": "explosive_barrel"
+    },
+    {
+      "id": "cache-west-abutment",
+      "x": 8,
+      "y": 14,
+      "w": 1,
+      "h": 1,
+      "texture": "deco_scavenger_cache",
+      "interaction": "scavenger_cache"
+    },
+    {
+      "id": "cache-east-abutment",
+      "x": 31,
+      "y": 9,
+      "w": 1,
+      "h": 1,
+      "texture": "deco_scavenger_cache",
+      "interaction": "scavenger_cache"
+    },
+    {
+      "id": "gate-west-north-ramp",
+      "x": 14,
+      "y": 6,
+      "w": 1,
+      "h": 1,
+      "texture": "tiles_wire_fence_closing",
+      "interaction": "shootable_gate"
+    },
+    {
+      "id": "gate-west-south-ramp",
+      "x": 14,
+      "y": 17,
+      "w": 1,
+      "h": 1,
+      "texture": "tiles_wire_fence_closing",
+      "interaction": "shootable_gate"
+    },
+    {
+      "id": "gate-east-north-ramp",
+      "x": 25,
+      "y": 6,
+      "w": 1,
+      "h": 1,
+      "texture": "tiles_wire_fence_closing",
+      "interaction": "shootable_gate"
+    },
+    {
+      "id": "gate-east-south-ramp",
+      "x": 25,
+      "y": 17,
+      "w": 1,
+      "h": 1,
+      "texture": "tiles_wire_fence_closing",
+      "interaction": "shootable_gate"
+    }
+  ],
+  "kothHills": [
+    { "x": 6, "y": 11 },
+    { "x": 19, "y": 11 },
+    { "x": 32, "y": 11 }
+  ],
+  "authoring": {
+    "schemaVersion": 1,
+    "profile": "standard-40x24",
+    "regions": [
+      { "id": "west-concrete-approach", "areas": [{ "x": 0, "y": 0, "w": 15, "h": 24 }] },
+      { "id": "central-underpass-channel", "areas": [{ "x": 15, "y": 0, "w": 10, "h": 24 }] },
+      { "id": "east-concrete-approach", "areas": [{ "x": 25, "y": 0, "w": 15, "h": 24 }] }
+    ],
+    "landmarks": [
+      {
+        "id": "west-broken-road-decks",
+        "regionId": "west-concrete-approach",
+        "footprint": { "x": 4, "y": 5, "w": 10, "h": 14 },
+        "minimap": "major"
+      },
+      {
+        "id": "central-underpass-supports",
+        "regionId": "central-underpass-channel",
+        "footprint": { "x": 17, "y": 5, "w": 6, "h": 14 },
+        "minimap": "major"
+      },
+      {
+        "id": "east-broken-road-decks",
+        "regionId": "east-concrete-approach",
+        "footprint": { "x": 26, "y": 5, "w": 10, "h": 14 },
+        "minimap": "major"
+      },
+      {
+        "id": "north-stranded-convoy",
+        "regionId": "central-underpass-channel",
+        "footprint": { "x": 10, "y": 4, "w": 20, "h": 5 },
+        "minimap": "minor"
+      },
+      {
+        "id": "south-stranded-convoy",
+        "regionId": "central-underpass-channel",
+        "footprint": { "x": 10, "y": 15, "w": 20, "h": 5 },
+        "minimap": "minor"
+      }
+    ],
+    "minimap": {
+      "projection": "orthographic-top-left",
+      "bounds": { "x": 0, "y": 0, "w": 40, "h": 24 },
+      "landmarkIds": [
+        "west-broken-road-decks",
+        "central-underpass-supports",
+        "east-broken-road-decks",
+        "north-stranded-convoy",
+        "south-stranded-convoy"
+      ]
+    },
+    "connectivity": {
+      "requireSingleWalkableComponent": true,
+      "links": [
+        {
+          "id": "west-open-underpass",
+          "fromRegionId": "west-concrete-approach",
+          "toRegionId": "central-underpass-channel"
+        },
+        {
+          "id": "east-open-underpass",
+          "fromRegionId": "central-underpass-channel",
+          "toRegionId": "east-concrete-approach"
+        },
+        {
+          "id": "west-north-gate-shortcut",
+          "fromRegionId": "west-concrete-approach",
+          "toRegionId": "central-underpass-channel",
+          "gateId": "gate-west-north-ramp"
+        },
+        {
+          "id": "west-south-gate-shortcut",
+          "fromRegionId": "west-concrete-approach",
+          "toRegionId": "central-underpass-channel",
+          "gateId": "gate-west-south-ramp"
+        },
+        {
+          "id": "east-north-gate-shortcut",
+          "fromRegionId": "central-underpass-channel",
+          "toRegionId": "east-concrete-approach",
+          "gateId": "gate-east-north-ramp"
+        },
+        {
+          "id": "east-south-gate-shortcut",
+          "fromRegionId": "central-underpass-channel",
+          "toRegionId": "east-concrete-approach",
+          "gateId": "gate-east-south-ramp"
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "koth-west-approach",
+        "kind": "koth",
+        "regionId": "west-concrete-approach",
+        "footprint": { "x": 6, "y": 11, "w": 2, "h": 2 }
+      },
+      {
+        "id": "koth-central-underpass",
+        "kind": "koth",
+        "regionId": "central-underpass-channel",
+        "footprint": { "x": 19, "y": 11, "w": 2, "h": 2 }
+      },
+      {
+        "id": "koth-east-approach",
+        "kind": "koth",
+        "regionId": "east-concrete-approach",
+        "footprint": { "x": 32, "y": 11, "w": 2, "h": 2 }
+      },
+      {
+        "id": "core-run-center",
+        "kind": "core-run",
+        "regionId": "central-underpass-channel",
+        "footprint": { "x": 19, "y": 11, "w": 2, "h": 2 }
+      }
+    ],
+    "spawnSafety": {
+      "spawnIds": ["spawn-north-west", "spawn-south-east", "spawn-south-west", "spawn-north-east"],
+      "minimumPathDistanceTiles": 17,
+      "minimumEgressDirections": 4
+    },
+    "pickupPlacement": {
+      "pickupIds": [
+        "shotgun-underpass",
+        "pistol-south-channel",
+        "bat-north-deck",
+        "ammo-south-deck",
+        "armor-core-west",
+        "overcharge-core-east",
+        "grenade-west-approach",
+        "grenade-east-approach",
+        "bandage-west-channel",
+        "bandage-east-channel"
+      ]
+    },
+    "gates": [
+      {
+        "decorationId": "gate-west-north-ramp",
+        "connectsRegionIds": ["west-concrete-approach", "central-underpass-channel"]
+      },
+      {
+        "decorationId": "gate-west-south-ramp",
+        "connectsRegionIds": ["west-concrete-approach", "central-underpass-channel"]
+      },
+      {
+        "decorationId": "gate-east-north-ramp",
+        "connectsRegionIds": ["central-underpass-channel", "east-concrete-approach"]
+      },
+      {
+        "decorationId": "gate-east-south-ramp",
+        "connectsRegionIds": ["central-underpass-channel", "east-concrete-approach"]
+      }
+    ],
+    "hazards": [
+      {
+        "decorationId": "barrel-west-underpass",
+        "kind": "explosive_barrel",
+        "regionId": "west-concrete-approach"
+      },
+      {
+        "decorationId": "barrel-east-underpass",
+        "kind": "explosive_barrel",
+        "regionId": "east-concrete-approach"
+      }
+    ],
+    "symmetryReview": {
+      "kind": "asymmetric",
+      "rationale": "Broken road-deck masses, divided concrete approaches, and stranded convoys intentionally offset sightlines around the underpass; horizontal, vertical, and rotational transforms were reviewed for comparable channels, ramp flanks, pickup access, and escapable support cover.",
+      "exceptions": [],
+      "checkedTransforms": ["horizontal", "vertical", "rotational"]
+    }
+  }
+}

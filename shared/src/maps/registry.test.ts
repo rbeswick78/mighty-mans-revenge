@@ -11,6 +11,13 @@ import {
 import { validateMap } from '../utils/map-validator.js';
 import { validateMapDocument } from '../utils/map-authoring-validator.js';
 
+const AUTHORED_SUCCESSOR_NAMES = [
+  'Wasteland Outpost',
+  'Overgrown Suburb',
+  'Scrapyard',
+  'Collapsed Overpass',
+] as const;
+
 describe('MAP_REGISTRY', () => {
   it('contains the default map', () => {
     expect(MAP_REGISTRY.has(DEFAULT_MAP_NAME)).toBe(true);
@@ -22,8 +29,8 @@ describe('MAP_REGISTRY', () => {
     expect(m.tiles.length).toBe(m.height);
   });
 
-  it('resolves only the two authored successors for a literal large-world selection', () => {
-    for (const name of ['Wasteland Outpost', 'Overgrown Suburb']) {
+  it('resolves only the four authored successors for a literal large-world selection', () => {
+    for (const name of AUTHORED_SUCCESSOR_NAMES) {
       const legacy = getMap(name);
       const successor = getMap(name, { largeWorlds: true });
       expect([legacy.width, legacy.height, legacy.tileSize], `${name} legacy`).toEqual([
@@ -39,13 +46,13 @@ describe('MAP_REGISTRY', () => {
       });
     }
 
-    for (const name of listMapNames().slice(2)) {
+    for (const name of listMapNames().slice(AUTHORED_SUCCESSOR_NAMES.length)) {
       expect(getMap(name, { largeWorlds: true })).toBe(getMap(name));
     }
   });
 
-  it('keeps both authored successors playable through shared runtime systems', () => {
-    for (const name of ['Wasteland Outpost', 'Overgrown Suburb']) {
+  it('keeps all four authored successors playable through shared runtime systems', () => {
+    for (const name of AUTHORED_SUCCESSOR_NAMES) {
       const map = getMap(name, { largeWorlds: true });
       const authoring = map.authoring!;
       const gates = map.decorations?.filter(({ interaction }) => interaction === 'shootable_gate');
@@ -77,7 +84,8 @@ describe('MAP_REGISTRY', () => {
           'bandage',
         ]),
       );
-      expect(gates).toHaveLength(2);
+      expect(gates!.length).toBeGreaterThanOrEqual(2);
+      expect(gates!.length % 2).toBe(0);
       expect(barrels).toHaveLength(2);
       expect(authoring.connectivity.requireSingleWalkableComponent).toBe(true);
       expect(authoring.minimap).toMatchObject({
