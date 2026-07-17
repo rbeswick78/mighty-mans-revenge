@@ -1,0 +1,72 @@
+{
+  "assets": [
+    {
+      "id": "environment.industrial.core",
+      "provenance": {
+        "attribution": "OpenAI-assisted production reference; deterministic project geometry",
+        "creator": "Mighty Man's Revenge Reforged biome environment geometry",
+        "generation": {
+          "id": "exec-bad498a8-bd8f-4c89-a4c7-266d172a9fe3",
+          "promptDocument": "art/reforged/references/biome-environment-art/PROMPTS.md",
+          "provider": "OpenAI built-in image generation"
+        },
+        "license": "LicenseRef-MMR-Project-Owned",
+        "origin": "ai-assisted",
+        "sourceReference": "tools/reforged-assets/create-biome-environment-art-sources.mjs"
+      },
+      "sourceSha256": "3732f91c8f749f184a12f2fa0db54477b915249669aebf4417db9c7b9d75a6df"
+    },
+    {
+      "id": "environment.irradiated.core",
+      "provenance": {
+        "attribution": "OpenAI-assisted production reference; deterministic project geometry",
+        "creator": "Mighty Man's Revenge Reforged biome environment geometry",
+        "generation": {
+          "id": "exec-bad498a8-bd8f-4c89-a4c7-266d172a9fe3",
+          "promptDocument": "art/reforged/references/biome-environment-art/PROMPTS.md",
+          "provider": "OpenAI built-in image generation"
+        },
+        "license": "LicenseRef-MMR-Project-Owned",
+        "origin": "ai-assisted",
+        "sourceReference": "tools/reforged-assets/create-biome-environment-art-sources.mjs"
+      },
+      "sourceSha256": "b1ebe08d36f02ad9129b7c4309804a1b44bed2c2f09254ef737ccdb73bd012ad"
+    },
+    {
+      "id": "environment.overgrown.core",
+      "provenance": {
+        "attribution": "OpenAI-assisted production reference; deterministic project geometry",
+        "creator": "Mighty Man's Revenge Reforged biome environment geometry",
+        "generation": {
+          "id": "exec-bad498a8-bd8f-4c89-a4c7-266d172a9fe3",
+          "promptDocument": "art/reforged/references/biome-environment-art/PROMPTS.md",
+          "provider": "OpenAI built-in image generation"
+        },
+        "license": "LicenseRef-MMR-Project-Owned",
+        "origin": "ai-assisted",
+        "sourceReference": "tools/reforged-assets/create-biome-environment-art-sources.mjs"
+      },
+      "sourceSha256": "acdeb2b43db6c269c824fc00c9713554c3b731fce1c83516020fbcc0ee0b33a1"
+    },
+    {
+      "id": "environment.wasteland.core",
+      "provenance": {
+        "attribution": "OpenAI-assisted production reference; deterministic project geometry",
+        "creator": "Mighty Man's Revenge Reforged biome environment geometry",
+        "generation": {
+          "id": "exec-bad498a8-bd8f-4c89-a4c7-266d172a9fe3",
+          "promptDocument": "art/reforged/references/biome-environment-art/PROMPTS.md",
+          "provider": "OpenAI built-in image generation"
+        },
+        "license": "LicenseRef-MMR-Project-Owned",
+        "origin": "ai-assisted",
+        "sourceReference": "tools/reforged-assets/create-biome-environment-art-sources.mjs"
+      },
+      "sourceSha256": "b63b025ae2a4a5572effcde4616c8635e438cf812d83dc2dfb51321b95528a12"
+    }
+  ],
+  "atlasId": "biome-environment-art.core",
+  "manifestSha256": "b3edf963eba815554bca7d24fbfaa22976f86f7054288fd70f2d11f9ec300929",
+  "schemaVersion": 1,
+  "textureSha256": "410bd101a4d24da9ca2cf0d6292b67f1dcfb06d4ebd6130017bd3e50769965cb"
+}

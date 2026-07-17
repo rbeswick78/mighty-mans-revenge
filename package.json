@@ -17,6 +17,7 @@
     "assets:generate:fighter-art-i": "node tools/reforged-assets/create-fighter-art-i-sources.mjs",
     "assets:generate:fighter-art-ii": "node tools/reforged-assets/create-fighter-art-ii-sources.mjs",
     "assets:generate:weapon-pickup-art": "node tools/reforged-assets/create-weapon-pickup-art-sources.mjs",
+    "assets:generate:biome-environment-art": "node tools/reforged-assets/create-biome-environment-art-sources.mjs",
     "test:assets": "node --test tools/reforged-assets/*.test.mjs",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint . --ext .ts,.tsx",

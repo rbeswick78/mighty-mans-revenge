@@ -23,6 +23,13 @@ function batch30ArtifactPath(testInfo: TestInfo, name: string): string | null {
   return path.join(artifactDir, `${testInfo.project.name}-${name}.png`);
 }
 
+function batch31ArtifactPath(testInfo: TestInfo, name: string): string | null {
+  const artifactDir = process.env.BATCH31_ARTIFACT_DIR;
+  if (!artifactDir) return null;
+  mkdirSync(artifactDir, { recursive: true });
+  return path.join(artifactDir, `${testInfo.project.name}-${name}.png`);
+}
+
 async function waitForScene(page: Page, key: string): Promise<void> {
   await expect
     .poll(
@@ -2349,6 +2356,202 @@ test('weapon and pickup art remains legacy without modernArt proof', async ({ pa
     return scene.getReforgedPickupRenderState();
   });
   expect(fallback).toEqual([{ id: 'ammo', textureKey: 'pickup_ammo', frameName: '__BASE' }]);
+});
+
+test('biome kit preview preserves four families, collision hierarchy, damage pairs, and live-map dormancy', async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    !largeWorldsAdvertised ||
+      !modernArtAdvertised ||
+      !['desktop-chromium', 'mobile-landscape'].includes(testInfo.project.name),
+    'Run the Batch 31 visual tier in desktop Chromium and mobile landscape.',
+  );
+  await stageGameplay(page, true, true);
+  const evidence = await page.evaluate(() => {
+    const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'GameScene',
+    ) as unknown as {
+      scene: { pause(): void };
+      add: Phaser.GameObjects.GameObjectFactory;
+      cameras: { main: Phaser.Cameras.Scene2D.Camera };
+      children: Phaser.GameObjects.DisplayList;
+      textures: Phaser.Textures.TextureManager;
+      mapRenderer: { getCollisionGrid(): number[][] };
+    };
+    scene.scene.pause();
+    scene.cameras.main.resetFX();
+    const textureKey = 'reforged-biome-environment-art';
+    const texture = scene.textures.get(textureKey);
+    const before = scene.children.list.filter(
+      (entry) =>
+        'texture' in entry && (entry as Phaser.GameObjects.Image).texture?.key === textureKey,
+    ).length;
+    const collisionBefore = JSON.stringify(scene.mapRenderer.getCollisionGrid());
+    const families = ['wasteland', 'overgrown', 'industrial', 'irradiated'];
+    const panel = scene.add.rectangle(480, 270, 920, 500, 0x090d14, 0.94).setDepth(2000);
+    panel.setStrokeStyle(3, 0x32485d, 1);
+    const objects: Phaser.GameObjects.GameObject[] = [panel];
+    families.forEach((family, familyIndex) => {
+      const originX = 145 + familyIndex * 225;
+      const originY = 105;
+      objects.push(
+        scene.add
+          .text(originX, 48, family.toUpperCase(), {
+            fontFamily: 'Arial, sans-serif',
+            fontSize: '18px',
+            color: '#f3f0df',
+          })
+          .setOrigin(0.5)
+          .setDepth(2002),
+      );
+      for (let row = 0; row < 3; row += 1) {
+        for (let column = 0; column < 3; column += 1) {
+          const role = row === 2 && column === 2 ? 5 : (row + column) % 3;
+          objects.push(
+            scene.add
+              .image(
+                originX + (column - 1) * 56,
+                originY + row * 56,
+                textureKey,
+                `environment.${family}.core/${String(role).padStart(3, '0')}`,
+              )
+              .setDisplaySize(58, 58)
+              .setDepth(2001),
+          );
+        }
+      }
+      const pairY = 300;
+      for (const [role, xOffset] of [
+        [16, -72],
+        [6, -72],
+        [7, -24],
+        [17, 24],
+        [8, 24],
+        [9, 72],
+      ] as const) {
+        objects.push(
+          scene.add
+            .image(
+              originX + xOffset,
+              pairY,
+              textureKey,
+              `environment.${family}.core/${String(role).padStart(3, '0')}`,
+            )
+            .setDisplaySize(48, 48)
+            .setDepth(role >= 16 ? 2001 : 2002),
+        );
+      }
+      for (const [role, xOffset] of [
+        [14, -42],
+        [15, 18],
+        [19, 72],
+      ] as const) {
+        objects.push(
+          scene.add
+            .image(
+              originX + xOffset,
+              390,
+              textureKey,
+              `environment.${family}.core/${String(role).padStart(3, '0')}`,
+            )
+            .setDisplaySize(role === 19 ? 42 : 58, role === 19 ? 42 : 58)
+            .setDepth(2002),
+        );
+      }
+    });
+    const collisionAfter = JSON.stringify(scene.mapRenderer.getCollisionGrid());
+    const previewImages = objects.filter(
+      (entry) =>
+        'texture' in entry && (entry as Phaser.GameObjects.Image).texture?.key === textureKey,
+    ).length;
+    const currentMapTextureKeys = new Set<string>();
+    const collectTextureKeys = (entries: readonly Phaser.GameObjects.GameObject[]): void => {
+      for (const entry of entries) {
+        if ('texture' in entry) {
+          const key = (entry as Phaser.GameObjects.Image).texture?.key;
+          if (key && key !== textureKey) currentMapTextureKeys.add(key);
+        }
+        if ('list' in entry && Array.isArray((entry as Phaser.GameObjects.Container).list)) {
+          collectTextureKeys((entry as Phaser.GameObjects.Container).list);
+        }
+      }
+    };
+    collectTextureKeys(scene.children.list);
+    return {
+      atlasAvailable: scene.textures.exists(textureKey),
+      terminalFrames: families.map((family) => texture.has(`environment.${family}.core/019`)),
+      before,
+      previewImages,
+      collisionUnchanged: collisionBefore === collisionAfter,
+      currentMapTextureKeys: Array.from(currentMapTextureKeys),
+    };
+  });
+  expect(evidence).toMatchObject({
+    atlasAvailable: true,
+    terminalFrames: [true, true, true, true],
+    before: 0,
+    previewImages: 72,
+    collisionUnchanged: true,
+  });
+  expect(evidence.currentMapTextureKeys.some((key) => key.startsWith('tiles_'))).toBe(true);
+  const gameplayPath =
+    batch31ArtifactPath(testInfo, 'biome-kit-gameplay') ??
+    testInfo.outputPath('batch-31-biome-kit-gameplay.png');
+  await page.screenshot({ path: gameplayPath });
+  if (testInfo.project.name === 'desktop-chromium') {
+    await page.evaluate(() => {
+      const canvas = document.querySelector('canvas');
+      if (canvas) canvas.style.filter = 'grayscale(1)';
+    });
+    const grayscalePath = batch31ArtifactPath(testInfo, 'biome-kit-grayscale');
+    if (grayscalePath) await page.screenshot({ path: grayscalePath });
+    await page.evaluate(() => {
+      const canvas = document.querySelector('canvas');
+      if (canvas) canvas.style.filter = '';
+    });
+    await page.setViewportSize({ width: 844, height: 390 });
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        ),
+    );
+    const mobileWidthPath = batch31ArtifactPath(testInfo, 'biome-kit-mobile-width');
+    if (mobileWidthPath) await page.screenshot({ path: mobileWidthPath });
+  }
+  const direct = await rendererSnapshot(page);
+  expect(direct.sampledColors).toBeGreaterThan(12);
+  expect(direct.nonBlackSamples).toBeGreaterThan(120);
+  const directImage = Buffer.from(direct.dataUrl.split(',')[1] ?? '', 'base64');
+  const directPath = batch31ArtifactPath(testInfo, 'biome-kit-direct-renderer');
+  if (directPath) writeFileSync(directPath, directImage);
+  await testInfo.attach('batch-31-biome-kit-direct-renderer', {
+    body: directImage,
+    contentType: 'image/png',
+  });
+});
+
+test('biome kit remains dormant without modernArt proof', async ({ page }, testInfo) => {
+  test.skip(
+    !largeWorldsAdvertised || testInfo.project.name !== 'desktop-chromium',
+    'Run the Batch 31 capability fallback proof in desktop Chromium.',
+  );
+  await stageGameplay(page, true, false);
+  const state = await page.evaluate(() => {
+    const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'GameScene',
+    ) as Phaser.Scene;
+    const textureKey = 'reforged-biome-environment-art';
+    return {
+      atlasRegistered: scene.textures.exists(textureKey),
+      liveUses: scene.children.list.filter(
+        (entry) =>
+          'texture' in entry && (entry as Phaser.GameObjects.Image).texture?.key === textureKey,
+      ).length,
+    };
+  });
+  expect(state).toEqual({ atlasRegistered: true, liveUses: 0 });
 });
 
 test('Results and connection recovery restore legacy scene sizing', async ({ page }) => {

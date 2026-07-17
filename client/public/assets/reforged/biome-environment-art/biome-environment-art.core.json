@@ -1,0 +1,940 @@
+{
+  "assets": {
+    "environment.industrial.core": {
+      "columns": 5,
+      "frameCount": 20,
+      "frameHeight": 64,
+      "frames": [
+        "environment.industrial.core/000",
+        "environment.industrial.core/001",
+        "environment.industrial.core/002",
+        "environment.industrial.core/003",
+        "environment.industrial.core/004",
+        "environment.industrial.core/005",
+        "environment.industrial.core/006",
+        "environment.industrial.core/007",
+        "environment.industrial.core/008",
+        "environment.industrial.core/009",
+        "environment.industrial.core/010",
+        "environment.industrial.core/011",
+        "environment.industrial.core/012",
+        "environment.industrial.core/013",
+        "environment.industrial.core/014",
+        "environment.industrial.core/015",
+        "environment.industrial.core/016",
+        "environment.industrial.core/017",
+        "environment.industrial.core/018",
+        "environment.industrial.core/019"
+      ],
+      "frameWidth": 64,
+      "sheetHeight": 256,
+      "sheetWidth": 320
+    },
+    "environment.irradiated.core": {
+      "columns": 5,
+      "frameCount": 20,
+      "frameHeight": 64,
+      "frames": [
+        "environment.irradiated.core/000",
+        "environment.irradiated.core/001",
+        "environment.irradiated.core/002",
+        "environment.irradiated.core/003",
+        "environment.irradiated.core/004",
+        "environment.irradiated.core/005",
+        "environment.irradiated.core/006",
+        "environment.irradiated.core/007",
+        "environment.irradiated.core/008",
+        "environment.irradiated.core/009",
+        "environment.irradiated.core/010",
+        "environment.irradiated.core/011",
+        "environment.irradiated.core/012",
+        "environment.irradiated.core/013",
+        "environment.irradiated.core/014",
+        "environment.irradiated.core/015",
+        "environment.irradiated.core/016",
+        "environment.irradiated.core/017",
+        "environment.irradiated.core/018",
+        "environment.irradiated.core/019"
+      ],
+      "frameWidth": 64,
+      "sheetHeight": 256,
+      "sheetWidth": 320
+    },
+    "environment.overgrown.core": {
+      "columns": 5,
+      "frameCount": 20,
+      "frameHeight": 64,
+      "frames": [
+        "environment.overgrown.core/000",
+        "environment.overgrown.core/001",
+        "environment.overgrown.core/002",
+        "environment.overgrown.core/003",
+        "environment.overgrown.core/004",
+        "environment.overgrown.core/005",
+        "environment.overgrown.core/006",
+        "environment.overgrown.core/007",
+        "environment.overgrown.core/008",
+        "environment.overgrown.core/009",
+        "environment.overgrown.core/010",
+        "environment.overgrown.core/011",
+        "environment.overgrown.core/012",
+        "environment.overgrown.core/013",
+        "environment.overgrown.core/014",
+        "environment.overgrown.core/015",
+        "environment.overgrown.core/016",
+        "environment.overgrown.core/017",
+        "environment.overgrown.core/018",
+        "environment.overgrown.core/019"
+      ],
+      "frameWidth": 64,
+      "sheetHeight": 256,
+      "sheetWidth": 320
+    },
+    "environment.wasteland.core": {
+      "columns": 5,
+      "frameCount": 20,
+      "frameHeight": 64,
+      "frames": [
+        "environment.wasteland.core/000",
+        "environment.wasteland.core/001",
+        "environment.wasteland.core/002",
+        "environment.wasteland.core/003",
+        "environment.wasteland.core/004",
+        "environment.wasteland.core/005",
+        "environment.wasteland.core/006",
+        "environment.wasteland.core/007",
+        "environment.wasteland.core/008",
+        "environment.wasteland.core/009",
+        "environment.wasteland.core/010",
+        "environment.wasteland.core/011",
+        "environment.wasteland.core/012",
+        "environment.wasteland.core/013",
+        "environment.wasteland.core/014",
+        "environment.wasteland.core/015",
+        "environment.wasteland.core/016",
+        "environment.wasteland.core/017",
+        "environment.wasteland.core/018",
+        "environment.wasteland.core/019"
+      ],
+      "frameWidth": 64,
+      "sheetHeight": 256,
+      "sheetWidth": 320
+    }
+  },
+  "atlas": {
+    "extrude": 2,
+    "format": "RGBA8888",
+    "height": 512,
+    "id": "biome-environment-art.core",
+    "image": "biome-environment-art.core.png",
+    "padding": 3,
+    "premultipliedAlpha": false,
+    "width": 1024
+  },
+  "frames": {
+    "environment.industrial.core/000": {
+      "assetId": "environment.industrial.core",
+      "frameIndex": 0,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 5,
+      "y": 5
+    },
+    "environment.industrial.core/001": {
+      "assetId": "environment.industrial.core",
+      "frameIndex": 1,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 76,
+      "y": 5
+    },
+    "environment.industrial.core/002": {
+      "assetId": "environment.industrial.core",
+      "frameIndex": 2,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 147,
+      "y": 5
+    },
+    "environment.industrial.core/003": {
+      "assetId": "environment.industrial.core",
+      "frameIndex": 3,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 218,
+      "y": 5
+    },
+    "environment.industrial.core/004": {
+      "assetId": "environment.industrial.core",
+      "frameIndex": 4,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 289,
+      "y": 5
+    },
+    "environment.industrial.core/005": {
+      "assetId": "environment.industrial.core",
+      "frameIndex": 5,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 360,
+      "y": 5
+    },
+    "environment.industrial.core/006": {
+      "assetId": "environment.industrial.core",
+      "frameIndex": 6,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 431,
+      "y": 5
+    },
+    "environment.industrial.core/007": {
+      "assetId": "environment.industrial.core",
+      "frameIndex": 7,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 502,
+      "y": 5
+    },
+    "environment.industrial.core/008": {
+      "assetId": "environment.industrial.core",
+      "frameIndex": 8,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 573,
+      "y": 5
+    },
+    "environment.industrial.core/009": {
+      "assetId": "environment.industrial.core",
+      "frameIndex": 9,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 644,
+      "y": 5
+    },
+    "environment.industrial.core/010": {
+      "assetId": "environment.industrial.core",
+      "frameIndex": 10,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 715,
+      "y": 5
+    },
+    "environment.industrial.core/011": {
+      "assetId": "environment.industrial.core",
+      "frameIndex": 11,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 786,
+      "y": 5
+    },
+    "environment.industrial.core/012": {
+      "assetId": "environment.industrial.core",
+      "frameIndex": 12,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 857,
+      "y": 5
+    },
+    "environment.industrial.core/013": {
+      "assetId": "environment.industrial.core",
+      "frameIndex": 13,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 928,
+      "y": 5
+    },
+    "environment.industrial.core/014": {
+      "assetId": "environment.industrial.core",
+      "frameIndex": 14,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 5,
+      "y": 76
+    },
+    "environment.industrial.core/015": {
+      "assetId": "environment.industrial.core",
+      "frameIndex": 15,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 76,
+      "y": 76
+    },
+    "environment.industrial.core/016": {
+      "assetId": "environment.industrial.core",
+      "frameIndex": 16,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 147,
+      "y": 76
+    },
+    "environment.industrial.core/017": {
+      "assetId": "environment.industrial.core",
+      "frameIndex": 17,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 218,
+      "y": 76
+    },
+    "environment.industrial.core/018": {
+      "assetId": "environment.industrial.core",
+      "frameIndex": 18,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 289,
+      "y": 76
+    },
+    "environment.industrial.core/019": {
+      "assetId": "environment.industrial.core",
+      "frameIndex": 19,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 360,
+      "y": 76
+    },
+    "environment.irradiated.core/000": {
+      "assetId": "environment.irradiated.core",
+      "frameIndex": 0,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 431,
+      "y": 76
+    },
+    "environment.irradiated.core/001": {
+      "assetId": "environment.irradiated.core",
+      "frameIndex": 1,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 502,
+      "y": 76
+    },
+    "environment.irradiated.core/002": {
+      "assetId": "environment.irradiated.core",
+      "frameIndex": 2,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 573,
+      "y": 76
+    },
+    "environment.irradiated.core/003": {
+      "assetId": "environment.irradiated.core",
+      "frameIndex": 3,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 644,
+      "y": 76
+    },
+    "environment.irradiated.core/004": {
+      "assetId": "environment.irradiated.core",
+      "frameIndex": 4,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 715,
+      "y": 76
+    },
+    "environment.irradiated.core/005": {
+      "assetId": "environment.irradiated.core",
+      "frameIndex": 5,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 786,
+      "y": 76
+    },
+    "environment.irradiated.core/006": {
+      "assetId": "environment.irradiated.core",
+      "frameIndex": 6,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 857,
+      "y": 76
+    },
+    "environment.irradiated.core/007": {
+      "assetId": "environment.irradiated.core",
+      "frameIndex": 7,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 928,
+      "y": 76
+    },
+    "environment.irradiated.core/008": {
+      "assetId": "environment.irradiated.core",
+      "frameIndex": 8,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 5,
+      "y": 147
+    },
+    "environment.irradiated.core/009": {
+      "assetId": "environment.irradiated.core",
+      "frameIndex": 9,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 76,
+      "y": 147
+    },
+    "environment.irradiated.core/010": {
+      "assetId": "environment.irradiated.core",
+      "frameIndex": 10,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 147,
+      "y": 147
+    },
+    "environment.irradiated.core/011": {
+      "assetId": "environment.irradiated.core",
+      "frameIndex": 11,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 218,
+      "y": 147
+    },
+    "environment.irradiated.core/012": {
+      "assetId": "environment.irradiated.core",
+      "frameIndex": 12,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 289,
+      "y": 147
+    },
+    "environment.irradiated.core/013": {
+      "assetId": "environment.irradiated.core",
+      "frameIndex": 13,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 360,
+      "y": 147
+    },
+    "environment.irradiated.core/014": {
+      "assetId": "environment.irradiated.core",
+      "frameIndex": 14,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 431,
+      "y": 147
+    },
+    "environment.irradiated.core/015": {
+      "assetId": "environment.irradiated.core",
+      "frameIndex": 15,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 502,
+      "y": 147
+    },
+    "environment.irradiated.core/016": {
+      "assetId": "environment.irradiated.core",
+      "frameIndex": 16,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 573,
+      "y": 147
+    },
+    "environment.irradiated.core/017": {
+      "assetId": "environment.irradiated.core",
+      "frameIndex": 17,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 644,
+      "y": 147
+    },
+    "environment.irradiated.core/018": {
+      "assetId": "environment.irradiated.core",
+      "frameIndex": 18,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 715,
+      "y": 147
+    },
+    "environment.irradiated.core/019": {
+      "assetId": "environment.irradiated.core",
+      "frameIndex": 19,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 786,
+      "y": 147
+    },
+    "environment.overgrown.core/000": {
+      "assetId": "environment.overgrown.core",
+      "frameIndex": 0,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 857,
+      "y": 147
+    },
+    "environment.overgrown.core/001": {
+      "assetId": "environment.overgrown.core",
+      "frameIndex": 1,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 928,
+      "y": 147
+    },
+    "environment.overgrown.core/002": {
+      "assetId": "environment.overgrown.core",
+      "frameIndex": 2,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 5,
+      "y": 218
+    },
+    "environment.overgrown.core/003": {
+      "assetId": "environment.overgrown.core",
+      "frameIndex": 3,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 76,
+      "y": 218
+    },
+    "environment.overgrown.core/004": {
+      "assetId": "environment.overgrown.core",
+      "frameIndex": 4,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 147,
+      "y": 218
+    },
+    "environment.overgrown.core/005": {
+      "assetId": "environment.overgrown.core",
+      "frameIndex": 5,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 218,
+      "y": 218
+    },
+    "environment.overgrown.core/006": {
+      "assetId": "environment.overgrown.core",
+      "frameIndex": 6,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 289,
+      "y": 218
+    },
+    "environment.overgrown.core/007": {
+      "assetId": "environment.overgrown.core",
+      "frameIndex": 7,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 360,
+      "y": 218
+    },
+    "environment.overgrown.core/008": {
+      "assetId": "environment.overgrown.core",
+      "frameIndex": 8,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 431,
+      "y": 218
+    },
+    "environment.overgrown.core/009": {
+      "assetId": "environment.overgrown.core",
+      "frameIndex": 9,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 502,
+      "y": 218
+    },
+    "environment.overgrown.core/010": {
+      "assetId": "environment.overgrown.core",
+      "frameIndex": 10,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 573,
+      "y": 218
+    },
+    "environment.overgrown.core/011": {
+      "assetId": "environment.overgrown.core",
+      "frameIndex": 11,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 644,
+      "y": 218
+    },
+    "environment.overgrown.core/012": {
+      "assetId": "environment.overgrown.core",
+      "frameIndex": 12,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 715,
+      "y": 218
+    },
+    "environment.overgrown.core/013": {
+      "assetId": "environment.overgrown.core",
+      "frameIndex": 13,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 786,
+      "y": 218
+    },
+    "environment.overgrown.core/014": {
+      "assetId": "environment.overgrown.core",
+      "frameIndex": 14,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 857,
+      "y": 218
+    },
+    "environment.overgrown.core/015": {
+      "assetId": "environment.overgrown.core",
+      "frameIndex": 15,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 928,
+      "y": 218
+    },
+    "environment.overgrown.core/016": {
+      "assetId": "environment.overgrown.core",
+      "frameIndex": 16,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 5,
+      "y": 289
+    },
+    "environment.overgrown.core/017": {
+      "assetId": "environment.overgrown.core",
+      "frameIndex": 17,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 76,
+      "y": 289
+    },
+    "environment.overgrown.core/018": {
+      "assetId": "environment.overgrown.core",
+      "frameIndex": 18,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 147,
+      "y": 289
+    },
+    "environment.overgrown.core/019": {
+      "assetId": "environment.overgrown.core",
+      "frameIndex": 19,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 218,
+      "y": 289
+    },
+    "environment.wasteland.core/000": {
+      "assetId": "environment.wasteland.core",
+      "frameIndex": 0,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 289,
+      "y": 289
+    },
+    "environment.wasteland.core/001": {
+      "assetId": "environment.wasteland.core",
+      "frameIndex": 1,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 360,
+      "y": 289
+    },
+    "environment.wasteland.core/002": {
+      "assetId": "environment.wasteland.core",
+      "frameIndex": 2,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 431,
+      "y": 289
+    },
+    "environment.wasteland.core/003": {
+      "assetId": "environment.wasteland.core",
+      "frameIndex": 3,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 502,
+      "y": 289
+    },
+    "environment.wasteland.core/004": {
+      "assetId": "environment.wasteland.core",
+      "frameIndex": 4,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 573,
+      "y": 289
+    },
+    "environment.wasteland.core/005": {
+      "assetId": "environment.wasteland.core",
+      "frameIndex": 5,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 644,
+      "y": 289
+    },
+    "environment.wasteland.core/006": {
+      "assetId": "environment.wasteland.core",
+      "frameIndex": 6,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 715,
+      "y": 289
+    },
+    "environment.wasteland.core/007": {
+      "assetId": "environment.wasteland.core",
+      "frameIndex": 7,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 786,
+      "y": 289
+    },
+    "environment.wasteland.core/008": {
+      "assetId": "environment.wasteland.core",
+      "frameIndex": 8,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 857,
+      "y": 289
+    },
+    "environment.wasteland.core/009": {
+      "assetId": "environment.wasteland.core",
+      "frameIndex": 9,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 928,
+      "y": 289
+    },
+    "environment.wasteland.core/010": {
+      "assetId": "environment.wasteland.core",
+      "frameIndex": 10,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 5,
+      "y": 360
+    },
+    "environment.wasteland.core/011": {
+      "assetId": "environment.wasteland.core",
+      "frameIndex": 11,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 76,
+      "y": 360
+    },
+    "environment.wasteland.core/012": {
+      "assetId": "environment.wasteland.core",
+      "frameIndex": 12,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 147,
+      "y": 360
+    },
+    "environment.wasteland.core/013": {
+      "assetId": "environment.wasteland.core",
+      "frameIndex": 13,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 218,
+      "y": 360
+    },
+    "environment.wasteland.core/014": {
+      "assetId": "environment.wasteland.core",
+      "frameIndex": 14,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 289,
+      "y": 360
+    },
+    "environment.wasteland.core/015": {
+      "assetId": "environment.wasteland.core",
+      "frameIndex": 15,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 360,
+      "y": 360
+    },
+    "environment.wasteland.core/016": {
+      "assetId": "environment.wasteland.core",
+      "frameIndex": 16,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 431,
+      "y": 360
+    },
+    "environment.wasteland.core/017": {
+      "assetId": "environment.wasteland.core",
+      "frameIndex": 17,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 502,
+      "y": 360
+    },
+    "environment.wasteland.core/018": {
+      "assetId": "environment.wasteland.core",
+      "frameIndex": 18,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 573,
+      "y": 360
+    },
+    "environment.wasteland.core/019": {
+      "assetId": "environment.wasteland.core",
+      "frameIndex": 19,
+      "height": 64,
+      "rotated": false,
+      "trimmed": false,
+      "width": 64,
+      "x": 644,
+      "y": 360
+    }
+  },
+  "integrity": {
+    "textureSha256": "410bd101a4d24da9ca2cf0d6292b67f1dcfb06d4ebd6130017bd3e50769965cb"
+  },
+  "schemaVersion": 1
+}

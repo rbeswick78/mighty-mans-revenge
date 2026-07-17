@@ -363,3 +363,29 @@ spawn timing, melee mechanics, or authority. Live use is limited to existing
 rifle/pistol/shotgun and sustain-pickup paths behind literal server-owned
 `modernArt`; bat/punch and fallback behavior stay complete. SMG, sniper,
 launcher, rarity, and container art remains dormant until later owning batches.
+
+## Batch 31 production mapping
+
+The biome environment atlas applies one shared registered 64px grammar to the
+four locked families. Each family has three quiet, edge-compatible ground
+variants; horizontal, vertical, and corner transition pieces into the next
+family; intact/damaged full-wall, low-cover, two-prop, and landmark pairs;
+separate southeast wall/cover/prop shadows; and a compact navigation anchor.
+Wasteland stays tobacco dust, sun-baked masonry, scrap, and warm rust;
+overgrown stays damp green concrete, vines, oxidized teal, and reclaimed
+suburb mass; industrial stays red oxide, steel, hazard amber, and hard modular
+geometry; irradiated stays charcoal/black glass, sick mineral green, violet
+contamination, and bounded accents.
+
+Full collision is the tallest, darkest, heaviest silhouette. Low cover is
+lower, lighter, and medium-contoured. Ground borders remain quiet and exactly
+continuous; decoration stays inside stable footprints; landmark openings and
+anchors survive grayscale and mobile scaling; shadows are separate
+presentation layers with a fixed southeast direction. Reduced quality removes
+only secondary wear/flecks. It retains terrain edges, collision silhouettes,
+damage pairing, landmark negative space, shadows, and anchors without bloom.
+
+All Batch 31 art is presentation-only. Damaged frames mirror existing
+authoritative destruction truth and add no destructible class, health, hazard,
+collision, cover rule, prop behavior, region, spawn, objective, or physics.
+Current maps and their legacy visual fallbacks remain unchanged until Batch 33.

@@ -241,3 +241,24 @@ archive, external font, third-party reference, logo, trademark, Batch 25 pixel,
 image-generation cache, or fighter-atlas pixel is redistributed at runtime.
 Biome, combat-feedback, map, inventory, loot, rarity-mechanics, and coherent
 full-journey cutover work remain outside this set.
+
+## Batch 31 production disposition
+
+Batch 31 leaves every Batch 25 artifact and all four previously completed
+production atlases unchanged. One original text-only image-generation run
+supplied the production reference for the wasteland, overgrown, industrial,
+and irradiated environment grammar. Its exact prompt, provider, generation ID,
+unaltered 1536x1024 PNG, dimensions, SHA-256, and inspection disposition live
+under `art/reforged/references/biome-environment-art/`. It is a visual-
+development input only; deterministic project geometry is the sole source of
+canonical runtime pixels.
+
+The `biome-environment-art` manifest records four AI-assisted canonical sheets
+under the project-owned license, one per family. The separate non-runtime report
+records every source hash plus manifest and atlas integrity. Runtime import JSON
+contains only loading-safe asset/frame, dimension, packing, and texture-
+integrity fields. No prompt, generation ID, license detail, source archive,
+external font, third-party reference, logo, trademark, Batch 25 pixel,
+generated-image cache, or completed-atlas pixel is redistributed at runtime.
+Combat feedback, map authoring, hazards, collision, and coherent full-journey
+cutover remain outside this set.

@@ -1,0 +1,93 @@
+{
+  "schemaVersion": 1,
+  "atlas": {
+    "id": "biome-environment-art.core",
+    "maxWidth": 1024,
+    "maxHeight": 1024,
+    "padding": 3,
+    "extrude": 2,
+    "limits": {
+      "maxSourceBytes": 1048576,
+      "maxDecodedBytes": 4194304,
+      "maxAtlasBytes": 2097152
+    }
+  },
+  "assets": [
+    {
+      "id": "environment.industrial.core",
+      "source": "industrial-environment.png",
+      "width": 320,
+      "height": 256,
+      "frames": { "width": 64, "height": 64, "count": 20, "columns": 5 },
+      "provenance": {
+        "origin": "ai-assisted",
+        "creator": "Mighty Man's Revenge Reforged biome environment geometry",
+        "license": "LicenseRef-MMR-Project-Owned",
+        "attribution": "OpenAI-assisted production reference; deterministic project geometry",
+        "sourceReference": "tools/reforged-assets/create-biome-environment-art-sources.mjs",
+        "generation": {
+          "provider": "OpenAI built-in image generation",
+          "id": "exec-bad498a8-bd8f-4c89-a4c7-266d172a9fe3",
+          "promptDocument": "art/reforged/references/biome-environment-art/PROMPTS.md"
+        }
+      }
+    },
+    {
+      "id": "environment.irradiated.core",
+      "source": "irradiated-environment.png",
+      "width": 320,
+      "height": 256,
+      "frames": { "width": 64, "height": 64, "count": 20, "columns": 5 },
+      "provenance": {
+        "origin": "ai-assisted",
+        "creator": "Mighty Man's Revenge Reforged biome environment geometry",
+        "license": "LicenseRef-MMR-Project-Owned",
+        "attribution": "OpenAI-assisted production reference; deterministic project geometry",
+        "sourceReference": "tools/reforged-assets/create-biome-environment-art-sources.mjs",
+        "generation": {
+          "provider": "OpenAI built-in image generation",
+          "id": "exec-bad498a8-bd8f-4c89-a4c7-266d172a9fe3",
+          "promptDocument": "art/reforged/references/biome-environment-art/PROMPTS.md"
+        }
+      }
+    },
+    {
+      "id": "environment.overgrown.core",
+      "source": "overgrown-environment.png",
+      "width": 320,
+      "height": 256,
+      "frames": { "width": 64, "height": 64, "count": 20, "columns": 5 },
+      "provenance": {
+        "origin": "ai-assisted",
+        "creator": "Mighty Man's Revenge Reforged biome environment geometry",
+        "license": "LicenseRef-MMR-Project-Owned",
+        "attribution": "OpenAI-assisted production reference; deterministic project geometry",
+        "sourceReference": "tools/reforged-assets/create-biome-environment-art-sources.mjs",
+        "generation": {
+          "provider": "OpenAI built-in image generation",
+          "id": "exec-bad498a8-bd8f-4c89-a4c7-266d172a9fe3",
+          "promptDocument": "art/reforged/references/biome-environment-art/PROMPTS.md"
+        }
+      }
+    },
+    {
+      "id": "environment.wasteland.core",
+      "source": "wasteland-environment.png",
+      "width": 320,
+      "height": 256,
+      "frames": { "width": 64, "height": 64, "count": 20, "columns": 5 },
+      "provenance": {
+        "origin": "ai-assisted",
+        "creator": "Mighty Man's Revenge Reforged biome environment geometry",
+        "license": "LicenseRef-MMR-Project-Owned",
+        "attribution": "OpenAI-assisted production reference; deterministic project geometry",
+        "sourceReference": "tools/reforged-assets/create-biome-environment-art-sources.mjs",
+        "generation": {
+          "provider": "OpenAI built-in image generation",
+          "id": "exec-bad498a8-bd8f-4c89-a4c7-266d172a9fe3",
+          "promptDocument": "art/reforged/references/biome-environment-art/PROMPTS.md"
+        }
+      }
+    }
+  ]
+}

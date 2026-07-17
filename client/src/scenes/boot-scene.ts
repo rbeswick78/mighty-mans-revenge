@@ -29,6 +29,10 @@ import {
   registerReforgedWeaponPickupAtlas,
 } from '../rendering/reforged-weapon-pickup-runtime.js';
 import {
+  preloadReforgedEnvironmentAtlas,
+  registerReforgedEnvironmentAtlas,
+} from '../rendering/reforged-environment-runtime.js';
+import {
   WIRE_GATE_FRAME_HEIGHT,
   WIRE_GATE_FRAME_WIDTH,
   WIRE_GATE_OPEN_ANIMATION_KEY,
@@ -181,6 +185,7 @@ export class BootScene extends Phaser.Scene {
     preloadReforgedFighterAtlas(this);
     preloadReforgedFighterArtIIAtlas(this);
     preloadReforgedWeaponPickupAtlas(this);
+    preloadReforgedEnvironmentAtlas(this);
     this.loadRealAssets();
     this.generateProceduralAssets();
     // Menu-scene procedural textures (sky gradient, city silhouette, brick
@@ -194,6 +199,7 @@ export class BootScene extends Phaser.Scene {
     registerReforgedFighterAtlas(this);
     registerReforgedFighterArtIIAtlas(this);
     registerReforgedWeaponPickupAtlas(this);
+    registerReforgedEnvironmentAtlas(this);
     this.createCharacterAnimations();
     createReforgedFighterAnimations(this);
     createReforgedFighterArtIIAnimations(this);

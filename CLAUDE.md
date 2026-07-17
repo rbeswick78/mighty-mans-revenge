@@ -522,6 +522,19 @@ art is mechanically dormant. No shared/server/wire, damage, ammo, spawn,
 inventory, loot, capability-default, production, or deployment behavior is
 changed; Batch 31 owns biomes and Batch 33 owns coherent cutover.
 
+**Reforged biome environment kit (Batch 31):** one separate deterministic
+80-frame 1024x512 `biome-environment-art.core` atlas owns four exact 20-frame
+family sheets for wasteland, overgrown, industrial, and irradiated. Each sheet
+registers three seam-safe ground variants, directed family transitions,
+intact/damaged wall, low-cover, prop, and landmark pairs, three southeast
+shadows, and one navigation anchor. Boot validates/registers the runtime-safe
+grid, but live maps deliberately remain on their complete legacy tiles,
+decorations, and procedural fallbacks until Batch 33. The kit is presentation-
+only: it changes no map JSON, collision/destruction class, decoration meaning,
+physics, wire state, capability default, production behavior, or deployment.
+Literal server-owned `modernArt` permits only the verified dormant preview;
+Batch 32 owns combat feedback and Batch 33 owns coherent live map cutover.
+
 ### Why This Matters for Agents
 
 Client prediction and server simulation **must use identical physics code** from `/shared`. If you change movement, collision, or physics logic, you must change it in `/shared` and verify both client and server still agree. A mismatch between client prediction and server authority causes visible rubber-banding.

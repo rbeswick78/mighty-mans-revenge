@@ -248,6 +248,15 @@ owned `true`, default false, and remain unadvertised in production. Batch 24
 does not authorize Batch 25 visual work, larger arenas, capability exposure,
 or deployment.
 
+Batch 31 adds a registered biome environment atlas without changing the
+`modernArt` handshake, fallback, or exposure state. Literal `modernArt: true`
+permits the isolated verification preview only; live map rendering still uses
+the complete legacy tile, decoration, damage, and procedural paths. False,
+absent, malformed, reconnecting, disconnected, and old-server paths never
+instantiate environment-kit presentation. No capability default, map/collision
+authority, destruction lifecycle, physics, wire contract, production exposure,
+or deployment changes. Batch 33 remains the owner of coherent live cutover.
+
 ## Server-first rollout and rollback
 
 For each capability, keep this order:

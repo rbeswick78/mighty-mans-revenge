@@ -229,11 +229,39 @@ old-server, missing-atlas path stay legacy. SMG, sniper, launcher, rarity, and
 container frames are registered production inputs but remain mechanically
 dormant until their owning later batches.
 
+## Batch 31 biome environment disposition
+
+`art/reforged/sources/biome-environment-art/manifest.json` is the separate
+loading and lineage boundary for the four environment families. One original
+AI-assisted visual-development reference is retained with its complete prompt,
+generation ID, dimensions, hash, and inspection record under
+`art/reforged/references/biome-environment-art/`; deterministic project geometry
+in `tools/reforged-assets/create-biome-environment-art-sources.mjs` is the sole
+source of canonical production pixels. Neither the reference nor a Batch 25
+golden enters runtime output.
+
+Four canonical five-column 64px sheets each contain 20 frames: three seam-safe
+ground variants; horizontal, vertical, and corner family transitions; paired
+intact/damaged full wall, low cover, two props, and landmark; three separate
+southeast shadows; and one navigation anchor. The unchanged Batch 26 packer
+sorts all 80 frames into one 1024x512 `biome-environment-art.core` RGBA8888
+atlas with 3px padding, 2px extrusion, no trim or rotation, and the established
+byte limits. Runtime PNG/import JSON stays under
+`client/public/assets/reforged/biome-environment-art/`; license, prompt,
+generation, source, and hash lineage stays under
+`art/reforged/provenance/biome-environment-art/`.
+
+Boot validates/registers the exact schema. The atlas remains dormant for live
+maps; only the literal `modernArt` verification preview may instantiate it.
+Current map JSON, legacy tiles/decorations, collision/destruction authority,
+and all completed atlases remain unchanged until Batch 33 owns coherent cutover.
+
 ## Scope boundary
 
 Batch 26 owns this contract and tooling; Batch 27 owns the completed modern UI
 production set; Batch 28 owns the completed Mighty Man, Bruce, and Frost Wizard
 set; Batch 29 owns the completed Bubba, Jack, and Rook set; Batch 30 owns the
-completed weapon/pickup production set. Batches 31-32 own biome and combat-
-feedback production. Batch 33 owns coherent live cutover. No pipeline output
+completed weapon/pickup production set; Batch 31 owns the completed biome
+environment set; Batch 32 owns combat-feedback production. Batch 33 owns
+coherent live cutover. No pipeline output
 can enable `modernArt`, retire a fallback, or authorize deployment.

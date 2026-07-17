@@ -5,9 +5,9 @@ Read this file and `CLAUDE.md` completely at the start of every batch. The
 completed `docs/REPLAYABILITY_ROADMAP.md` remains the historical record for the
 systems this program preserves and reorganizes.
 
-- **Status:** Batch 30 complete on 2026-07-16; deterministic production weapon,
-  pickup, container, ammo, and rarity presentation is in-repo.
-- **Next batch:** Batch 31 — Biome environment kit.
+- **Status:** Batch 31 complete on 2026-07-16; the deterministic four-family
+  biome environment kit is in-repo and mechanically dormant.
+- **Next batch:** Batch 32 — Modern combat feedback.
 - **Public releases:** Reforged Arena, then Battle Royale.
 - **Working model:** one numbered batch per session, direct commits and pushes
   to `main`, milestone-gated production deployments.
@@ -1103,6 +1103,26 @@ assets for six guns plus existing sustain pickups.
 Produce seamless terrain, walls, low cover, damage states, props, landmarks,
 shadows, and transitions for wasteland, overgrown, industrial, and irradiated
 families with explicit collision readability.
+
+- [x] One original AI-assisted reference plus deterministic project geometry
+      emits four exact 20-frame 64px sheets. Each family owns three seam-safe
+      ground variants, three directed transition pieces, paired full-wall,
+      low-cover, two-prop, and landmark states, three southeast shadows, and a
+      grayscale-readable navigation anchor.
+- [x] The unchanged Batch 26 packer emits a separate deterministic 80-frame
+      1024x512 RGBA8888 `biome-environment-art.core` atlas plus runtime-safe
+      import JSON and complete non-runtime provenance. All completed atlases and
+      Batch 25 goldens remain byte-for-byte isolated from this set.
+- [x] Boot validates/registers all 80 frames. Literal server-owned `modernArt`
+      permits only the targeted verification preview; live maps retain their
+      exact legacy tile, cover, decoration, procedural, destruction, collision,
+      minimap, and fallback paths until Batch 33.
+- [x] Deterministic asset/import/grid/seam/registration/collision/pairing/
+      footprint/landmark/shadow/transition/palette/grayscale/dormancy/full-
+      reduced checks, typecheck, lint, affected/full builds, formatting, diff/
+      provenance review, and targeted desktop Chromium/mobile-landscape visual
+      evidence pass. No shared/server/wire/map/mechanics/capability-default/
+      production/deployment behavior changes and no Batch 32 work occurs.
 
 #### Batch 32 — Modern combat feedback
 
@@ -2919,6 +2939,57 @@ unchanged. Batch 31 owns biome terrain/cover/prop production; Batch 32 owns
 combat feedback; Batch 33 owns coherent Boot-through-Results cutover and
 verified legacy retirement.
 
+### Batch 31 — 2026-07-16 — Biome environment kit
+
+**Shipped:** Added one original AI-assisted environment reference plus
+deterministic project geometry for wasteland, overgrown, industrial, and
+irradiated. Four canonical five-column 64px sheets provide 80 exact frames:
+three seam-safe ground variants, horizontal/vertical/corner transitions,
+intact/damaged full walls, low cover, two props, landmarks, three southeast
+shadows, and navigation anchors per family. The unchanged Batch 26 packer emits
+one separate deterministic 1024x512 RGBA8888 `biome-environment-art.core`
+atlas, runtime-safe import JSON, and complete non-runtime provenance. Boot
+validates/registers the grid. The `modernArt`-owned verification preview is the
+only presentation path; live maps remain completely legacy until Batch 33.
+
+**Verification:** Selected the camera/world/arena/visual tier augmented with
+isolated client-rendering checks because executable changes are confined to
+deterministic production art, Boot loading, a dormant runtime contract, and
+focused browser instrumentation. The 25-test asset suite passed byte-identical
+source/runtime/provenance rebuild, exact 80-frame metadata, seam edges,
+transition compatibility, registration, collision-class mass, intact/damaged
+pairing, prop footprint, landmark negative space, shadow direction, family
+palette, grayscale value, runtime safety, and lineage checks. Five focused
+Vitest contract tests passed exact import, frame roles, transition order,
+dormancy, fallback, and full/reduced rules. Typecheck, lint, affected client
+build, full production build, repository formatting, and `git diff --check`
+passed. Targeted desktop Chromium and mobile-landscape evidence passed four
+cases with one deliberate inverse-project skip: capability-on preview, live-map
+dormancy, collision-grid stability, legacy chunk-tile use, capability-off/
+old-server behavior, current small-world HUD/minimap, Results/rematch/recovery
+restoration, and direct-renderer sampling. Inspected full, 844x390 mobile-width,
+grayscale, seam-tiled, and gameplay-scale outputs remain readable. Broader unit
+and three-project browser suites were omitted because no shared/server/wire,
+map/collision/destruction lifecycle, navigation/input, or capability foundation
+changed.
+
+**Deployment:** Skipped. Batch 31 is incomplete visual-system milestone work
+behind default-false capabilities. No production environment, server/client
+deployment, capability exposure, or legacy asset changed.
+
+**Deviations:** No product-scope deviation. The first browser probe inspected
+only top-level scene children and missed legacy tiles nested in Batch 21 chunk
+containers; the corrected recursive probe passed. The local `pnpm exec vitest`
+shim failed resolution and the installed repository executable passed under the
+required managed permission. Mobile compositor evidence remains subject to
+RFG-003, so Chromium supplies live/mobile-sized pixels and staged mobile object
+plus direct-renderer evidence remains paired with it.
+
+**Known issues:** No new bug-ledger entry was required. RFG-001 and RFG-002
+remain closed historical proofs. RFG-003 remains gate-dispositioned and
+unchanged. Batch 32 owns modern combat feedback; Batch 33 owns coherent
+Boot-through-Results visual cutover and verified legacy retirement.
+
 ## Batch 22 input prompt (historical)
 
 ```text
@@ -3485,35 +3556,29 @@ Continue the Reforged build for Mighty Man's Revenge.
 Read docs/REIMAGINING_ROADMAP.md and CLAUDE.md completely first. Read
 docs/REFORGED_BASELINE.md, docs/REFORGED_CAPABILITIES.md,
 docs/REFORGED_STYLE_BIBLE.md, docs/REFORGED_ASSET_PIPELINE.md, and
-docs/reforged/style-bible/PROVENANCE.md before implementation. Batch 30 —
-Weapons and pickups is complete. Implement Batch 31 — Biome environment kit
-exactly as specified and do not begin Batch 32 — Modern combat feedback.
+docs/reforged/style-bible/PROVENANCE.md before implementation. Batch 31 — Biome
+environment kit is complete. Implement Batch 32 — Modern combat feedback
+exactly as specified and do not begin Batch 33 — Full-journey visual cutover.
 
-Produce the coherent modular environment kit for all four locked biome
-families: wasteland, overgrown, industrial, and irradiated. Each family must
-include seamless terrain/floor transitions, full-collision walls, low cover,
-damage states, props, landmarks, shadows, and family-to-family transition
-pieces. Preserve the style-bible value hierarchy and collision readability:
-quiet walkable ground, unmistakable high-mass full collision, lower and lighter
-low cover, restrained decoration, high-contrast objective/navigation anchors,
-and silhouettes that survive grayscale, mobile-width, and gameplay scale.
-Wasteland remains tobacco dust, sun-baked masonry, scrap, and warm rust;
-overgrown remains damp green concrete, vines, oxidized teal, and reclaimed
-suburb mass; industrial remains red oxide, steel, hazard amber, and hard modular
-geometry; irradiated remains charcoal/black-glass ground, sick mineral green,
-violet contamination, and bounded danger accents without bloom-dependent
-readability.
+Produce the coherent modern combat-feedback set for every currently established
+presentation family named by Batch 32: muzzle, scenery/player impact,
+explosion, healing, armor, each fighter ability, rarity, zone, and elimination.
+Preserve the style-bible reading order, event identity, hit point, direction,
+radius/boundary, warning, timing, silhouette, and full/reduced contract. Full
+quality may retain bounded secondary sparks, smoke, debris, facets, soft light,
+and short trails. Reduced quality must retain the decisive event, confirmed
+impact point, explosion radius cue, healing/armor identity, ability release,
+rarity badge/shape, zone boundary, and elimination cue without bloom-dependent
+readability or unbounded overdraw.
 
-Keep environment art modular and seam-safe. Preserve exact cell registration,
-edge continuity, collision class, damaged/intact pairing, shadow direction,
-prop footprint, landmark negative space, and transition compatibility. Damage
-states are presentation counterparts for existing authoritative destruction
-truth only; do not add destructible classes, health, hazards, collision, cover
-rules, map regions, objectives, spawns, gates, or physics. Do not change any
-current map JSON, map dimensions, collision grids, decoration semantics, or
-server/shared map authority merely because replacement art exists. Retain all
-legacy tiles, cover, decoration, and procedural fallbacks until Batch 33 owns a
-coherent verified cutover.
+Keep feedback art pooled, bounded, deterministic to authoritative events, and
+registered to the established rendering lifecycle. Presentation must consume
+existing snapshot/event truth only; do not add damage, healing, armor, ability,
+rarity, zone, elimination, projectile, hit-confirmation, collision, camera,
+physics, input, or wire rules. Do not infer player hits from ray endpoints,
+change explosion or hazard radii, add rarity mechanics, expose Battle Royale,
+or let cosmetic quality affect gameplay. Retain every legacy effect and
+procedural fallback until Batch 33 owns one coherent verified cutover.
 
 Use the Batch 26 source/manifest/provenance contract and the smallest production
 source/atlas sets that preserve exact grids and the established loading
@@ -3522,19 +3587,18 @@ counts, and columns, deterministic sorting, no trim/rotation, mip-safe
 extrusion/padding, byte limits, runtime-safe metadata, and complete non-runtime
 lineage. Batch 25 goldens remain documentation references and may not be copied
 into runtime output. Record every original/AI-assisted production input and
-inspect source plus packed output at full, mobile-width, grayscale, seam-tiled,
-and gameplay scale before acceptance.
+inspect source plus packed output at full, mobile-width, grayscale, direct-
+renderer, full/reduced, and gameplay scale before acceptance.
 
-Preserve Batch 30's complete `weapon-pickup-art.core` contract: eight canonical
-sheets and 158 registered frames in one deterministic 1024x1024 atlas; exact
-six-gun held/firing/dry/ground/HUD/ammo/container silhouettes; five sustain
-pickup identities; supply/container language; six grayscale-readable rarity
-shape codes; full/reduced essential treatment; mechanically dormant SMG,
-sniper, launcher, rarity, and container art; legacy bat/punch fallback; and
-literal server-owned `modernArt` gating. Preserve Batch 29's separate 404-frame
-`fighter-art-ii.core`, Batch 28's separate 288-frame `fighter-art-i.core`, and
-Batch 27's modern UI atlas unchanged. Do not merge environment pixels into any
-completed atlas.
+Preserve Batch 31's separate 80-frame 1024x512
+`biome-environment-art.core` atlas, four exact 20-frame family grids, seam-safe
+terrain/transitions, collision-class silhouettes, intact/damaged pairs, stable
+footprints, southeast shadows, landmark negative space, navigation anchors,
+full/reduced treatment, live-map dormancy, and literal server-owned `modernArt`
+verification-preview gate. Preserve Batch 30's separate 158-frame weapon/pickup
+atlas, Batch 29's 404-frame fighter II atlas, Batch 28's 288-frame fighter I
+atlas, and Batch 27's 48-frame modern UI atlas unchanged. Do not merge combat-
+feedback pixels into any completed atlas.
 
 Preserve the complete Batch 18–24 viewport, coordinate, camera, dynamic
 rendering, quality, responsive HUD, minimap, fallback, and regression-gate
@@ -3545,39 +3609,39 @@ Capability-off, old-server, and old-client paths retain the exact established
 960x720 gameplay/Lobby behavior through Batch 54. All capabilities remain
 strict server-owned opt-ins and default false.
 
-Do not begin Batch 32 or later work: no modern muzzle/impact/explosion/healing/
-armor/ability/rarity/zone/elimination cutover, full-journey visual cutover,
-larger arena, tactical-map gameplay/input, movement or balance tuning, Battle
-Royale mechanics, capability exposure, or deployment. Do not add biome hazards,
-loot, containers, map behavior, or collision merely because its art exists.
-Batch 32 owns combat feedback, Batch 33 owns coherent Boot-through-Results
-cutover, and Batch 34 owns larger-map authoring contracts.
+Do not begin Batch 33 or later work: no coherent Boot-through-Results visual
+cutover, legacy retirement, larger arena, tactical-map gameplay/input, movement
+or balance tuning, Battle Royale mechanics, capability exposure, or deployment.
+Do not add rarity damage, loot/container behavior, hazards, projectiles,
+mechanics, or wire state merely because replacement feedback art exists. Batch
+33 owns coherent cutover and Batch 34 owns larger-map authoring contracts.
 
-Batch 30 is complete and pushed on main as `feat(art): add Reforged weapons and
-pickups`. One original AI-assisted reference plus deterministic project geometry
-emits six 24-frame gun sheets, eight sustain/container frames, and six rarity
-frames. The Batch 26 tool packs a 158-frame 1024x1024 RGBA8888 atlas plus
-runtime-safe import JSON and separate complete provenance. All 20 asset tests,
-all 1,585 unit tests, typecheck, lint, affected/full builds, formatting, diff/
-provenance review, targeted desktop Chromium/mobile-landscape object and visual
-evidence, current small-world HUD/minimap, capability-off fallback, Results/
-rematch, and recovery checks are green. No shared/server/wire/mechanics/
-capability-default/production/deployment behavior changed.
+Batch 31 is complete and pushed on main as `feat(art): add Reforged biome
+environment kit`. One original AI-assisted reference plus deterministic project
+geometry emits four 20-frame family sheets. The Batch 26 tool packs an 80-frame
+1024x512 RGBA8888 atlas plus runtime-safe import JSON and separate complete
+provenance. All 25 asset tests, five focused client contract tests, typecheck,
+lint, affected/full builds, formatting, diff/provenance review, and targeted
+desktop Chromium/mobile-landscape object, grayscale, direct-renderer, and visual
+evidence are green. Current small-world tiles/collision, HUD/minimap,
+capability-off/old-server fallback, Results/rematch, and recovery contracts
+remain unchanged. No shared/server/wire/map/mechanics/capability-default/
+production/deployment behavior changed.
 
-Choose and document the Batch 31 visual/client-rendering verification tier. Run
+Choose and document the Batch 32 visual/client-rendering verification tier. Run
 focused validators for every new manifest/output and add deterministic import,
-exact grid, seam, registration, collision-class silhouette, intact/damaged
-pairing, prop footprint, landmark, shadow-direction, transition, palette,
-grayscale, fallback, and full/reduced tests. Verify all four biome identities,
-seam-tiled terrain, full-collision versus low-cover readability, current map
-behavior, destruction presentation, future-art dormancy, capability-on
-rendering, capability-off/old-server fallback, current small-world behavior,
-HUD/minimap readability, Results/rematch, and recovery restoration at full,
-mobile-width, and gameplay scale. Run repository formatting, `git diff --check`,
-intended-diff/provenance review, `corepack pnpm typecheck`, `corepack pnpm lint`,
-affected and full production builds, and targeted desktop Chromium/mobile-
-landscape interaction and visual evidence. Escalate to full unit or three-
-project browser suites if shared/server/wire, collision/destruction lifecycle,
+exact grid/registration, event coverage, direction/origin, timing, radius/
+boundary, pooling/budget, palette, grayscale, fallback, and full/reduced tests.
+Verify every current muzzle, scenery/player impact, explosion, heal, armor,
+ability, rarity, zone, and elimination identity; confirmed-hit versus scenery
+separation; mechanically dormant future rarity/zone art; capability-on preview/
+presentation; capability-off/old-server fallback; current small-world behavior;
+HUD/minimap readability; Results/rematch; and recovery restoration at full,
+mobile-width, direct-renderer, and gameplay scale. Run repository formatting,
+`git diff --check`, intended-diff/provenance review, `corepack pnpm typecheck`,
+`corepack pnpm lint`, affected and full production builds, and targeted desktop
+Chromium/mobile-landscape interaction and visual evidence. Escalate to full unit
+or three-project browser suites if shared/server/wire, effect lifecycle,
 recovery, capability foundations, or broader scene behavior changes. Update
 roadmap acceptance/status, architecture/pipeline/provenance docs, bug ledger
 only with proven evidence, and Session Log. Run the complete end-of-batch
@@ -3587,11 +3651,12 @@ exactly matching origin/main, and skip deployment.
 Carry-over warnings: use Corepack pnpm 10.33.0 if the local shim mismatches. Do
 not overwrite, reinterpret, or atlas the Batch 25 goldens. Keep source archives
 and full license/generation lineage out of runtime redistribution. Preserve all
-three completed production atlases and both fighter atlases' exact layer/state
-contracts. Keep uncut biome art mechanically dormant except for explicitly
-verified capability-owned preview/presentation paths. RFG-001/RFG-002 remain
+five completed production atlases, including both fighter atlases' exact layer/
+state contracts and the biome kit's live-map dormancy. Keep uncut combat-
+feedback art mechanically dormant except for explicitly verified capability-
+owned preview/presentation paths. RFG-001/RFG-002 remain
 closed historical proofs. RFG-003 still requires staged Firefox/WebKit object/
 input evidence and direct renderer pixels where applicable, with Chromium as
-the live/compositor and mobile-sized visual reference. Batch 31 owns the biome
-kit; Batch 32 owns modern combat feedback.
+the live/compositor and mobile-sized visual reference. Batch 32 owns modern
+combat feedback; Batch 33 owns coherent visual cutover.
 ```
