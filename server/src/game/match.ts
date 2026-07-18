@@ -251,6 +251,7 @@ export class Match implements MatchContext {
   private readonly departedPlayerIds: Set<PlayerId> = new Set();
   /** Present only for the dormant Battle Royale format; standard matches keep the old path. */
   private readonly battleRoyaleLifecycle: BattleRoyaleLifecycle | null;
+  private readonly battleRoyaleOpponentDamage = new Map<PlayerId, number>();
   /** Monotonic simulation cohort used to recognize same-tick final combat trades. */
   private battleRoyaleSimulationStep = 0;
   private readonly battleRoyaleSafeZonePlan: BattleRoyaleSafeZonePlan | null;
@@ -384,6 +385,9 @@ export class Match implements MatchContext {
       lifecycleOptions?.format === 'battle_royale'
         ? new BattleRoyaleLifecycle(playerEntries.map((entry) => entry.id))
         : null;
+    if (this.battleRoyaleLifecycle !== null) {
+      for (const entry of playerEntries) this.battleRoyaleOpponentDamage.set(entry.id, 0);
+    }
     this.battleRoyaleInventoryManager =
       this.battleRoyaleLifecycle === null ? null : new BattleRoyaleInventoryManager();
     this.tracksRumbleLead =
@@ -1307,6 +1311,24 @@ export class Match implements MatchContext {
   getBattleRoyaleSpectatorState(): BattleRoyaleSpectatorState | null {
     if (!this.battleRoyaleLifecycle || this.phase !== MatchPhase.ACTIVE) return null;
     return this.battleRoyaleLifecycle.spectatorState(this.players);
+  }
+
+  /** Terminal-only record inputs, derived from server combat/lifecycle authority. */
+  getBattleRoyaleRecordStats(): ReadonlyMap<
+    PlayerId,
+    { eliminations: number; damage: number }
+  > | null {
+    if (this.battleRoyaleLifecycle === null) return null;
+    const eliminations = this.battleRoyaleLifecycle.eliminationCredits();
+    return new Map(
+      [...this.players.keys()].map((playerId) => [
+        playerId,
+        {
+          eliminations: eliminations.get(playerId) ?? 0,
+          damage: Math.max(0, Math.round(this.battleRoyaleOpponentDamage.get(playerId) ?? 0)),
+        },
+      ]),
+    );
   }
 
   getScrapstormState(): ScrapstormState | null {
@@ -3076,6 +3098,12 @@ export class Match implements MatchContext {
   private recordAttributedDamage(attackerId: PlayerId, victimId: PlayerId, damage: number): void {
     this.stats.recordDamage(attackerId, damage);
     this.stats.recordDamageTaken(victimId, damage);
+    if (this.battleRoyaleLifecycle !== null && attackerId !== victimId && damage > 0) {
+      this.battleRoyaleOpponentDamage.set(
+        attackerId,
+        (this.battleRoyaleOpponentDamage.get(attackerId) ?? 0) + damage,
+      );
+    }
     if (this.tracksRumbleAssists) {
       this.rumbleAssistTracker.recordDamage(attackerId, victimId, damage, this.getElapsedSeconds());
     }

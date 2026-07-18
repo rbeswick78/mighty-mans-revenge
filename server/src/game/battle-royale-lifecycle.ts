@@ -59,6 +59,23 @@ export class BattleRoyaleLifecycle {
     return this.eliminations.has(playerId);
   }
 
+  /** Opponent-only terminal credits; self, zone, and departure edges grant none. */
+  eliminationCredits(): ReadonlyMap<PlayerId, number> {
+    const credits = new Map<PlayerId, number>(this.entrantIds.map((playerId) => [playerId, 0]));
+    for (const event of this.eliminations.values()) {
+      if (
+        event.cause !== 'combat' ||
+        event.eliminatedBy === null ||
+        event.eliminatedBy === event.playerId ||
+        !credits.has(event.eliminatedBy)
+      ) {
+        continue;
+      }
+      credits.set(event.eliminatedBy, (credits.get(event.eliminatedBy) ?? 0) + 1);
+    }
+    return credits;
+  }
+
   /** Deterministic live projection; never accepts a client-selected target. */
   spectatorState(players: ReadonlyMap<PlayerId, PlayerState>): BattleRoyaleSpectatorState {
     const livingPlayerIds = this.entrantIds

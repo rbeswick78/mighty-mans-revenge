@@ -246,6 +246,104 @@ describe('MatchmakingManager Battle Royale queue', () => {
     ).toBe(true);
   });
 
+  it('records one isolated terminal archive for every human and never persists bot fill', async () => {
+    const dataDir = mkdtempSync(path.join(os.tmpdir(), 'mmr-br-records-'));
+    const store = new PersistentStatsStore(dataDir);
+    try {
+      const { fake, sent, connected } = makeFakeServer(false, true);
+      connected.push('A', 'B', 'C');
+      const manager = new MatchmakingManager(fake, () => 0, store);
+      manager.handleJoinBattleRoyale('A', 'Alpha', 'mighty_man');
+      manager.handleJoinBattleRoyale('B', 'Bravo', 'bruce');
+      manager.handleJoinBattleRoyale('C', 'Charlie', 'rook');
+      manager.tick(BATTLE_ROYALE_QUEUE.BOT_FILL_DEADLINE_SECONDS, 1);
+      const [match] = manager.getActiveMatches();
+      match.phase = MatchPhase.ACTIVE;
+      const internals = match as unknown as {
+        recordAttributedDamage(attackerId: PlayerId, victimId: PlayerId, damage: number): void;
+      };
+      internals.recordAttributedDamage('A', 'B', 150.9);
+      internals.recordAttributedDamage('A', 'A', 60);
+      internals.recordAttributedDamage('B', 'A', 20.5);
+      match.onKill('A', 'B', 'gun');
+      match.update(0.05);
+      match.onPlayerDisconnect('C', true);
+      for (const botId of [...match.players.keys()].filter((id) => id.startsWith('bot:'))) {
+        match.update(0.05);
+        match.onPlayerDisconnect(botId, true);
+      }
+      sent.length = 0;
+      manager.tick(0.05, 99);
+
+      expect(store.getBattleRoyaleRecord('Alpha')).toEqual({
+        matches: 1,
+        wins: 1,
+        topThreeFinishes: 1,
+        eliminations: 1,
+        damage: 151,
+        bestPlacement: 1,
+      });
+      expect(store.getBattleRoyaleRecord('Bravo')).toMatchObject({
+        matches: 1,
+        wins: 0,
+        eliminations: 0,
+        damage: 21,
+      });
+      expect(store.getBattleRoyaleRecord('Charlie')).toMatchObject({
+        matches: 1,
+        wins: 0,
+        eliminations: 0,
+        damage: 0,
+      });
+      expect(store.getBattleRoyaleRecord(BOT.NICKNAME)).toBeNull();
+      expect(store.getLifetime('Alpha')).toBeNull();
+      expect(sent.some(({ message }) => message.type === 'server:leaderboard')).toBe(false);
+      const archives = sent.filter(({ message }) => message.type === 'server:battleRoyaleRecord');
+      expect(archives.map(({ playerId }) => playerId).sort()).toEqual(['A', 'B', 'C']);
+      expect(archives.every(({ reliable }) => reliable)).toBe(true);
+      manager.tick(0.05, 100);
+      expect(store.getBattleRoyaleRecord('Alpha')?.matches).toBe(1);
+
+      await store.flush();
+      const reloaded = new PersistentStatsStore(dataDir);
+      expect(reloaded.getBattleRoyaleRecord('Alpha')).toEqual(store.getBattleRoyaleRecord('Alpha'));
+    } finally {
+      await store.flush();
+      rmSync(dataDir, { recursive: true, force: true });
+    }
+  });
+
+  it('serves a validated record only through the advertised capability', async () => {
+    const dataDir = mkdtempSync(path.join(os.tmpdir(), 'mmr-br-request-'));
+    const store = new PersistentStatsStore(dataDir);
+    try {
+      store.recordBattleRoyaleMatch([
+        { nickname: 'Alpha', placement: 1, won: true, eliminations: 3, damage: 500 },
+      ]);
+      const enabled = makeFakeServer(false, true);
+      const manager = new MatchmakingManager(enabled.fake, () => 0, store);
+      expect(manager.handleRequestBattleRoyaleRecord('A', 'Alpha')).toBe(true);
+      expect(enabled.sent.at(-1)).toMatchObject({
+        playerId: 'A',
+        reliable: true,
+        message: {
+          type: 'server:battleRoyaleRecord',
+          nickname: 'Alpha',
+          record: { matches: 1, wins: 1, bestPlacement: 1 },
+        },
+      });
+      expect(manager.handleRequestBattleRoyaleRecord('A', 'not valid')).toBe(false);
+
+      const disabled = makeFakeServer();
+      const disabledManager = new MatchmakingManager(disabled.fake, () => 0, store);
+      expect(disabledManager.handleRequestBattleRoyaleRecord('A', 'Alpha')).toBe(false);
+      expect(disabled.sent).toHaveLength(0);
+    } finally {
+      await store.flush();
+      rmSync(dataDir, { recursive: true, force: true });
+    }
+  });
+
   it('serializes BR inventory and loot additively while standard snapshots omit every field', () => {
     const battleRoyale = makeFakeServer(false, true);
     const battleRoyaleManager = new MatchmakingManager(battleRoyale.fake);

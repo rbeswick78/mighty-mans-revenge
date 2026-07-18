@@ -90,6 +90,7 @@ import type { PartyLaunchResult } from './party-manager.js';
 import type {
   PersistentStatsStore,
   MatchStatsEntry,
+  BattleRoyaleStatsEntry,
 } from '../persistence/persistent-stats-store.js';
 
 /**
@@ -620,6 +621,27 @@ export class MatchmakingManager {
       'Player joined Battle Royale queue',
     );
     this.tryCreateBattleRoyale(0);
+    return true;
+  }
+
+  /** Return one Battle Royale archive without exposing or ranking other callsigns. */
+  handleRequestBattleRoyaleRecord(playerId: PlayerId, nickname: string): boolean {
+    if (
+      !this.server.getCapabilities().battleRoyale ||
+      !this.statsStore ||
+      !/^[A-Za-z0-9_.-]{2,16}$/.test(nickname)
+    ) {
+      return false;
+    }
+    this.server.sendTo(
+      playerId,
+      {
+        type: 'server:battleRoyaleRecord',
+        nickname,
+        record: this.statsStore.getBattleRoyaleRecord(nickname),
+      },
+      { reliable: true },
+    );
     return true;
   }
 
@@ -2938,7 +2960,45 @@ export class MatchmakingManager {
       }
     }
 
-    // Fold this match into the lifetime records and attach the pairing's
+    if (this.statsStore && isBattleRoyale && result.battleRoyale) {
+      const placements = new Map(
+        result.battleRoyale.placements.map((standing) => [standing.playerId, standing.placement]),
+      );
+      const recordStats = match.getBattleRoyaleRecordStats();
+      const entries: BattleRoyaleStatsEntry[] = [];
+      const humanIds: PlayerId[] = [];
+      for (const [playerId, player] of match.players) {
+        if (playerId.startsWith('bot:')) continue;
+        const placement = placements.get(playerId);
+        const stats = recordStats?.get(playerId);
+        if (placement === undefined || !stats) continue;
+        humanIds.push(playerId);
+        entries.push({
+          nickname: player.nickname,
+          placement,
+          won: result.winnerId === playerId,
+          eliminations: stats.eliminations,
+          damage: stats.damage,
+        });
+      }
+      this.statsStore.recordBattleRoyaleMatch(entries);
+      for (let index = 0; index < humanIds.length; index += 1) {
+        const playerId = humanIds[index];
+        const nickname = entries[index]?.nickname;
+        if (!nickname) continue;
+        this.server.sendTo(
+          playerId,
+          {
+            type: 'server:battleRoyaleRecord',
+            nickname,
+            record: this.statsStore.getBattleRoyaleRecord(nickname),
+          },
+          { reliable: true },
+        );
+      }
+    }
+
+    // Fold this standard match into the lifetime records and attach the pairing's
     // all-time rivalry line before shipping the result. The in-memory
     // update is synchronous and O(players); the file write is queued onto
     // fs.promises — nothing here blocks the tick.

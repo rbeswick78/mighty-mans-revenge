@@ -21,6 +21,7 @@ import type {
   RadiationStormState,
   BattleRoyaleSafeZoneState,
   BattleRoyaleSpectatorState,
+  BattleRoyaleRecord,
   ScrapstormState,
   RumbleLeadState,
 } from '@shared/types/game.js';
@@ -30,6 +31,7 @@ import type {
   ServerMessage,
   ServerGameStateMessage,
   KothHudState,
+  ServerBattleRoyaleRecordMessage,
 } from '@shared/types/network.js';
 import { MatchPhase } from '@shared/types/game.js';
 import {
@@ -102,6 +104,7 @@ type EventName =
   | 'overtimeStart'
   | 'taunt'
   | 'leaderboard'
+  | 'battleRoyaleRecord'
   | 'dailyGauntletLeaderboard'
   | 'error';
 
@@ -235,6 +238,30 @@ export function normalizeBattleRoyaleSpectatorState(
     aliveCount: value.aliveCount,
     standings: standings.map((standing) => ({ ...standing })),
   };
+}
+
+export function normalizeBattleRoyaleRecord(
+  value: ServerBattleRoyaleRecordMessage['record'],
+): BattleRoyaleRecord | null {
+  if (value === null) return null;
+  const counts = [
+    value.matches,
+    value.wins,
+    value.topThreeFinishes,
+    value.eliminations,
+    value.damage,
+  ];
+  if (
+    counts.some((count) => !Number.isInteger(count) || count < 0) ||
+    value.matches < 1 ||
+    value.wins > value.matches ||
+    value.topThreeFinishes > value.matches ||
+    !Number.isInteger(value.bestPlacement) ||
+    (value.bestPlacement ?? 0) < 1
+  ) {
+    return null;
+  }
+  return { ...value };
 }
 
 export class NetworkManager {
@@ -715,6 +742,13 @@ export class NetworkManager {
     this.connection.send({ type: 'client:leaveBattleRoyaleSpectator' });
   }
 
+  requestBattleRoyaleRecord(nickname: string): void {
+    if (!this.serverCapabilities.battleRoyale || !/^[A-Za-z0-9_.-]{2,16}$/.test(nickname)) {
+      return;
+    }
+    this.connection.send({ type: 'client:requestBattleRoyaleRecord', nickname });
+  }
+
   /** Get the current local player state (with client-side prediction applied). */
   getLocalPlayerState(): PlayerState | null {
     return this.localPlayerState;
@@ -999,6 +1033,14 @@ export class NetworkManager {
         // after each match's stats are recorded.
         this.emit('leaderboard', msg.entries);
         break;
+
+      case 'server:battleRoyaleRecord': {
+        if (!this.serverCapabilities.battleRoyale) break;
+        const record = normalizeBattleRoyaleRecord(msg.record);
+        if (msg.record !== null && record === null) break;
+        this.emit('battleRoyaleRecord', msg.nickname, record);
+        break;
+      }
 
       case 'server:dailyGauntletLeaderboard':
         this.emit('dailyGauntletLeaderboard', msg);

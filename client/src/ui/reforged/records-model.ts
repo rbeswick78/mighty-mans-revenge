@@ -6,7 +6,7 @@ import {
 } from '@shared/config/game.js';
 import { listMapNames } from '@shared/maps/registry.js';
 import type { PlayerId } from '@shared/types/common.js';
-import type { MatchResult } from '@shared/types/game.js';
+import type { BattleRoyaleRecord, MatchResult } from '@shared/types/game.js';
 import type { ArenaWins } from '@shared/types/map.js';
 import type {
   LeaderboardEntry,
@@ -60,6 +60,7 @@ export interface ReforgedRecordsServerSnapshots {
   readonly characterWins: Readonly<Record<(typeof CHARACTER_IDS)[number], number>>;
   readonly arenaWins: Readonly<ArenaWins> | null;
   readonly lastMatchResult: MatchResult | null;
+  readonly battleRoyaleRecord: Readonly<BattleRoyaleRecord> | null;
 }
 
 export interface ReforgedRecordsLocalValues {
@@ -290,16 +291,28 @@ function challengesSection(
   };
 }
 
-function battleRoyaleSection(): ReforgedRecordSection {
+function battleRoyaleSection(record: Readonly<BattleRoyaleRecord> | null): ReforgedRecordSection {
+  const bestPlacement = record?.bestPlacement ?? null;
   return {
     id: 'battle_royale',
-    label: 'BR FUTURE',
-    summary: 'RESERVED',
+    label: 'BATTLE ROYALE',
+    summary: record ? `${formatCount(record.matches)} MATCHES` : 'NO RECORD',
     heading: 'BATTLE ROYALE RECORDS',
-    authority: 'EXPLICIT ZERO STATE / BATCH 49 OWNS FUTURE PERSISTENCE',
+    authority: 'SERVER-AUTHORED BATTLE ROYALE TOTALS / ISOLATED FROM PVP',
     columns: [
-      ['NO BATTLE ROYALE RECORD EXISTS YET', 'MATCHES / --', 'WINS / --', 'TOP THREE / --'],
-      ['ELIMINATIONS / --', 'DAMAGE / --', 'BEST PLACEMENT / --', '', 'NOT RECORDED OR INFERRED'],
+      [
+        record ? 'COMPLETED BATTLE ROYALE ARCHIVE' : 'NO COMPLETED BATTLE ROYALE YET',
+        `MATCHES / ${formatCount(record?.matches ?? 0)}`,
+        `WINS / ${formatCount(record?.wins ?? 0)}`,
+        `TOP THREE / ${formatCount(record?.topThreeFinishes ?? 0)}`,
+      ],
+      [
+        `ELIMINATIONS / ${formatCount(record?.eliminations ?? 0)}`,
+        `DAMAGE / ${formatCount(record?.damage ?? 0)}`,
+        `BEST PLACEMENT / ${bestPlacement === null ? '--' : `#${bestPlacement}`}`,
+        '',
+        'TERMINAL SERVER RESULTS ONLY / NO CLIENT INFERENCE',
+      ],
     ],
   };
 }
@@ -316,6 +329,6 @@ export function buildReforgedRecordSections(
     fightersSection(snapshots),
     arenasSection(snapshots),
     challengesSection(snapshots, values),
-    battleRoyaleSection(),
+    battleRoyaleSection(snapshots.battleRoyaleRecord),
   ];
 }

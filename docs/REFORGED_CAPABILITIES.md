@@ -547,6 +547,27 @@ safe-lobby fallback.
 
 This remains dormant support code. `battleRoyale`, `newShell`, `schedules`,
 `largeWorlds`, and `modernArt` remain strict server-owned opt-ins, default
-false, and unexposed. Batch 49 owns separate Battle Royale records. Production
+false, and unexposed. Production remains on approved Batch 33, and no
+deployment, restart, live smoke, or capability advertisement is authorized.
+
+## Batch 49 Battle Royale records disposition
+
+Batch 49 does not add, expose, or alter a capability. The durable record map is
+isolated inside the existing server stats file and updates only when an
+already-authorized Battle Royale reaches its legal terminal event. Standard
+matches never enter that branch, bot identities are excluded, and the existing
+leaderboard/rivalry/career messages contain no Battle Royale totals.
+
+The client sends `client:requestBattleRoyaleRecord` only after literal
+`battleRoyale: true` and a locally valid callsign. The server revalidates both
+before returning one reliable `server:battleRoyaleRecord` snapshot. Old servers
+never advertise the capability, so new clients do not send the additive
+request; old clients ignore the additive response after a match. Capability
+loss, disconnect, malformed data, or a stale callsign clears or rejects the
+projection instead of retaining another identity's archive.
+
+This remains dormant support code. `battleRoyale`, `newShell`, `schedules`,
+`largeWorlds`, and `modernArt` remain strict server-owned opt-ins, default
+false, and unexposed. Batch 50 owns network/performance hardening. Production
 remains on approved Batch 33, and no deployment, restart, live smoke, or
 capability advertisement is authorized.

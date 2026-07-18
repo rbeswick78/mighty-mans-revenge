@@ -22,6 +22,7 @@ import {
   RadiationStormState,
   BattleRoyaleSafeZoneState,
   BattleRoyaleSpectatorState,
+  BattleRoyaleRecord,
   ScrapstormState,
   MatchKind,
 } from './game.js';
@@ -59,6 +60,7 @@ export type ClientMessage =
   | ClientRematchRequestMessage
   | ClientReturnToLobbyMessage
   | ClientLeaveBattleRoyaleSpectatorMessage
+  | ClientRequestBattleRoyaleRecordMessage
   | ClientCharacterHoverMessage
   | ClientCharacterLockMessage
   | ClientDraftPickMessage
@@ -206,6 +208,12 @@ export interface ClientLeaveBattleRoyaleSpectatorMessage {
   type: 'client:leaveBattleRoyaleSpectator';
 }
 
+/** Request the durable Battle Royale archive for one validated callsign. */
+export interface ClientRequestBattleRoyaleRecordMessage {
+  type: 'client:requestBattleRoyaleRecord';
+  nickname: string;
+}
+
 export interface ClientCharacterHoverMessage {
   type: 'client:characterHover';
   characterId: CharacterId;
@@ -274,6 +282,7 @@ export type ServerMessage =
   | ServerOvertimeStartMessage
   | ServerTauntMessage
   | ServerLeaderboardMessage
+  | ServerBattleRoyaleRecordMessage
   | ServerDailyGauntletLeaderboardMessage
   | ServerPongMessage
   | ServerErrorMessage;
@@ -792,6 +801,13 @@ export interface LeaderboardEntry {
 export interface ServerLeaderboardMessage {
   type: 'server:leaderboard';
   entries: LeaderboardEntry[];
+}
+
+/** Reliable per-callsign Battle Royale archive; null means no completed match. */
+export interface ServerBattleRoyaleRecordMessage {
+  type: 'server:battleRoyaleRecord';
+  nickname: string;
+  record: BattleRoyaleRecord | null;
 }
 
 /** One server-authored completed-clear score on a UTC Daily Run board. */

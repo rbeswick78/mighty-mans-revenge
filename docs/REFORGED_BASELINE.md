@@ -756,3 +756,38 @@ The final authoritative baseline retained configured/rolling 20 Hz and the
 processing remained 0.065 ms; no product tick-budget defect was proven. All
 capabilities remain default false and unexposed; production remains on Batch 33
 and no deployment, restart, or live smoke occurred.
+
+### Batch 49 Battle Royale records baseline
+
+The version-1 persistent file now includes a separate per-callsign Battle
+Royale map. Its matches, unique wins, top-three finishes, opponent eliminations,
+rounded opponent damage, and best placement never enter existing PvP lifetime,
+head-to-head, streak, fighter/arena mastery, contracts, Daily boards, or the
+all-time leaderboard. Old files backfill an empty map, malformed additive rows
+are discarded independently, and queued atomic writes retain their existing
+restart behavior.
+
+Exactly one terminal update includes every human entrant, including eliminated,
+departed, and disconnected fighters, while excluding bot fill. Unique winners,
+mutual-final draws, top-three placement, opponent/self/zone/departure credit,
+repeated matches, best improvement, and restart retention have deterministic
+coverage. A capability-owned validated callsign request receives one reliable
+server record or null; malformed, stale, wrong-callsign, capability-off, and
+old-peer shapes fail closed. The Records tab renders the six totals without
+writing or inferring them.
+
+Focused store, lifecycle, match-end, route, network, cache, and Records coverage
+passed 205 tests. Desktop Chromium and mobile-landscape journeys proved the
+archive, explicit zero state, stale-response rejection, callsign refresh, and
+responsive presentation. The complete matrix passed 1,759 tests; typecheck,
+ESLint, all production builds, and the unchanged 624-product standard balance
+matrix passed. The client bundle transformed 232 modules and retained the
+inherited large-chunk warning.
+
+The final authoritative baseline retained configured/rolling 20 Hz and the
+50 ms budget. Synthetic four-player mean/p95/p99/max work was
+0.012/0.021/0.053/0.900 ms, and standard active snapshots remained exactly
+2,481/3,762 bytes. One host scheduler drift window reset while average live
+processing remained 0.070 ms; no product tick-budget defect was proven. All
+capabilities remain default false and unexposed; production remains on Batch 33
+and no deployment, restart, or live smoke occurred.

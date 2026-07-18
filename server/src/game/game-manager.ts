@@ -304,6 +304,10 @@ export class GameManager {
         this.matchmaking.handleLeaveBattleRoyaleSpectator(playerId);
         break;
 
+      case 'client:requestBattleRoyaleRecord':
+        this.matchmaking.handleRequestBattleRoyaleRecord(playerId, message.nickname);
+        break;
+
       case 'client:characterHover':
         this.matchmaking.handleCharacterHover(playerId, message.characterId);
         break;

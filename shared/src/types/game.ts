@@ -96,6 +96,17 @@ export interface BattleRoyaleResult {
   };
 }
 
+/** Durable per-callsign Battle Royale totals, isolated from standard PvP. */
+export interface BattleRoyaleRecord {
+  matches: number;
+  wins: number;
+  topThreeFinishes: number;
+  eliminations: number;
+  damage: number;
+  /** Lowest completed placement; null until the first terminal result. */
+  bestPlacement: number | null;
+}
+
 /** Persistent moving target for Bounty Hunt snapshots and bot routing. */
 export interface BountyHuntState {
   /** Living fighter currently worth the bounty bonus; null during overtime. */

@@ -111,14 +111,8 @@ describe('PersistentStatsStore', () => {
 
   it('persists one career completion for each finished contract', () => {
     const store = makeStore();
-    store.recordMatch(
-      [entry('Ryan', 2, 1, {}, true), entry('Dave', 1, 2)],
-      'Ryan',
-    );
-    store.recordMatch(
-      [entry('Ryan', 1, 2), entry('Dave', 2, 1, {}, true)],
-      'Dave',
-    );
+    store.recordMatch([entry('Ryan', 2, 1, {}, true), entry('Dave', 1, 2)], 'Ryan');
+    store.recordMatch([entry('Ryan', 1, 2), entry('Dave', 2, 1, {}, true)], 'Dave');
     expect(store.getLifetime('Ryan')!.contractsCompleted).toBe(1);
     expect(store.getLifetime('Dave')!.contractsCompleted).toBe(1);
   });
@@ -180,24 +174,15 @@ describe('PersistentStatsStore', () => {
   it('banks mastery only for the winning fighter', () => {
     const store = makeStore();
     store.recordMatch(
-      [
-        entry('Ryan', 3, 1, {}, false, 'jack'),
-        entry('Dave', 1, 3, {}, false, 'bubba'),
-      ],
+      [entry('Ryan', 3, 1, {}, false, 'jack'), entry('Dave', 1, 3, {}, false, 'bubba')],
       'Ryan',
     );
     store.recordMatch(
-      [
-        entry('Ryan', 2, 2, {}, false, 'mighty_man'),
-        entry('Dave', 2, 2, {}, false, 'bubba'),
-      ],
+      [entry('Ryan', 2, 2, {}, false, 'mighty_man'), entry('Dave', 2, 2, {}, false, 'bubba')],
       null,
     );
     store.recordMatch(
-      [
-        entry('Ryan', 1, 3, {}, false, 'frost_wizard'),
-        entry('Dave', 3, 1, {}, false, 'bubba'),
-      ],
+      [entry('Ryan', 1, 3, {}, false, 'frost_wizard'), entry('Dave', 3, 1, {}, false, 'bubba')],
       'Dave',
     );
 
@@ -272,14 +257,101 @@ describe('PersistentStatsStore', () => {
     });
   });
 
+  it('persists Battle Royale totals separately and improves best placement', async () => {
+    const store = makeStore();
+    store.recordBattleRoyaleMatch([
+      { nickname: 'Ryan', placement: 5, won: false, eliminations: 2, damage: 311.9 },
+      { nickname: 'Dave', placement: 1, won: true, eliminations: 4, damage: 720 },
+    ]);
+    store.recordBattleRoyaleMatch([
+      { nickname: 'RYAN', placement: 2, won: false, eliminations: 3, damage: 450.7 },
+      { nickname: 'Dave', placement: 1, won: false, eliminations: 1, damage: 90 },
+    ]);
+
+    expect(store.getBattleRoyaleRecord('ryan')).toEqual({
+      matches: 2,
+      wins: 0,
+      topThreeFinishes: 1,
+      eliminations: 5,
+      damage: 763,
+      bestPlacement: 2,
+    });
+    expect(store.getBattleRoyaleRecord('DAVE')).toEqual({
+      matches: 2,
+      wins: 1,
+      topThreeFinishes: 2,
+      eliminations: 5,
+      damage: 810,
+      bestPlacement: 1,
+    });
+    expect(store.getLifetime('Ryan')).toBeNull();
+    expect(store.getTopPlayers(5)).toEqual([]);
+
+    await store.flush();
+    const reloaded = makeStore();
+    expect(reloaded.getBattleRoyaleRecord('Ryan')).toEqual(store.getBattleRoyaleRecord('Ryan'));
+    expect(reloaded.getLifetime('Ryan')).toBeNull();
+  });
+
+  it('loads old files without Battle Royale and normalizes only malformed additive rows', () => {
+    const oldShape: Record<string, unknown> = {
+      version: 1,
+      players: {
+        ryan: {
+          ...entry('Ryan'),
+          wins: 2,
+          losses: 0,
+          draws: 0,
+          matches: 2,
+          contractsCompleted: 0,
+          currentWinStreak: 2,
+          bestWinStreak: 2,
+          characterWins: createEmptyCharacterWins(),
+          arenaWins: createEmptyArenaWins(),
+          weaponKills: createEmptyKillsByWeapon(),
+        },
+      },
+      headToHead: {},
+      dailyGauntlet: {},
+    };
+    writeFileSync(path.join(dataDir, 'persistent-stats.json'), JSON.stringify(oldShape), 'utf8');
+    expect(makeStore().getBattleRoyaleRecord('Ryan')).toBeNull();
+
+    oldShape.battleRoyale = {
+      ryan: {
+        nickname: 'Ryan',
+        matches: 3,
+        wins: 99,
+        topThreeFinishes: 2,
+        eliminations: -4,
+        damage: 123.9,
+        bestPlacement: 2,
+      },
+      broken: { nickname: 7, matches: 4 },
+    };
+    writeFileSync(path.join(dataDir, 'persistent-stats.json'), JSON.stringify(oldShape), 'utf8');
+    const normalized = makeStore();
+    expect(normalized.getBattleRoyaleRecord('Ryan')).toEqual({
+      matches: 3,
+      wins: 3,
+      topThreeFinishes: 2,
+      eliminations: 0,
+      damage: 124,
+      bestPlacement: 2,
+    });
+    expect(normalized.getBattleRoyaleRecord('broken')).toBeNull();
+    expect(normalized.getLifetime('Ryan')?.wins).toBe(2);
+  });
+
   it('writes valid, versioned JSON with sorted pair keys', async () => {
     const store = makeStore();
     store.recordMatch([entry('Zed'), entry('Amy')], 'Zed');
     await store.flush();
 
-    const file = JSON.parse(
-      readFileSync(path.join(dataDir, 'persistent-stats.json'), 'utf8'),
-    ) as { version: number; headToHead: Record<string, unknown> };
+    const file = JSON.parse(readFileSync(path.join(dataDir, 'persistent-stats.json'), 'utf8')) as {
+      version: number;
+      headToHead: Record<string, unknown>;
+    };
     expect(file.version).toBe(1);
     expect(Object.keys(file.headToHead)).toEqual(['amy|zed']);
   });
@@ -303,11 +375,7 @@ describe('PersistentStatsStore', () => {
       },
       headToHead: {},
     };
-    writeFileSync(
-      path.join(dataDir, 'persistent-stats.json'),
-      JSON.stringify(oldShape),
-      'utf8',
-    );
+    writeFileSync(path.join(dataDir, 'persistent-stats.json'), JSON.stringify(oldShape), 'utf8');
 
     const store = makeStore();
     const ryan = store.getLifetime('Ryan')!;

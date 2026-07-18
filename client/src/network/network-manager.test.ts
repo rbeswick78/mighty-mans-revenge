@@ -958,6 +958,71 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
     });
   });
 
+  it('requests and validates only capability-owned Battle Royale record snapshots', () => {
+    const seen: unknown[] = [];
+    manager.on('battleRoyaleRecord', (nickname, record) => seen.push({ nickname, record }));
+
+    manager.requestBattleRoyaleRecord('Alpha');
+    expect(hoisted.sentMessages).not.toContainEqual(
+      expect.objectContaining({ type: 'client:requestBattleRoyaleRecord' }),
+    );
+    deliver({
+      type: 'server:welcome',
+      playerId: LOCAL_ID,
+      capabilities: { battleRoyale: true },
+    });
+    manager.requestBattleRoyaleRecord('Alpha');
+    manager.requestBattleRoyaleRecord('not valid');
+    expect(hoisted.sentMessages).toContainEqual({
+      type: 'client:requestBattleRoyaleRecord',
+      nickname: 'Alpha',
+    });
+    expect(
+      hoisted.sentMessages.filter((message) => message.type === 'client:requestBattleRoyaleRecord'),
+    ).toHaveLength(1);
+
+    deliver({
+      type: 'server:battleRoyaleRecord',
+      nickname: 'Alpha',
+      record: {
+        matches: 7,
+        wins: 2,
+        topThreeFinishes: 4,
+        eliminations: 13,
+        damage: 4567,
+        bestPlacement: 1,
+      },
+    });
+    deliver({
+      type: 'server:battleRoyaleRecord',
+      nickname: 'Alpha',
+      record: {
+        matches: 1,
+        wins: 2,
+        topThreeFinishes: 0,
+        eliminations: 0,
+        damage: 0,
+        bestPlacement: 1,
+      },
+    } as ServerMessage);
+    deliver({ type: 'server:battleRoyaleRecord', nickname: 'New', record: null });
+
+    expect(seen).toEqual([
+      {
+        nickname: 'Alpha',
+        record: {
+          matches: 7,
+          wins: 2,
+          topThreeFinishes: 4,
+          eliminations: 13,
+          damage: 4567,
+          bestPlacement: 1,
+        },
+      },
+      { nickname: 'New', record: null },
+    ]);
+  });
+
   it('sends the additive generalized match intent without changing legacy joins', () => {
     manager.submitMatchIntent('Alpha', {
       intentId: 'intent_client_0001',

@@ -11,6 +11,7 @@ import type {
   RumbleLeadState,
   TeamId,
   MatchKind,
+  BattleRoyaleRecord,
 } from '@shared/types/game.js';
 import type {
   DraftCategory,
@@ -41,6 +42,7 @@ import {
 } from '@shared/matchmaking/match-intent.js';
 import type { PartyState } from '@shared/matchmaking/party.js';
 import { localArenaWinsFromDraft, mergeArenaWinsFromResult } from './record-snapshots.js';
+import { battleRoyaleRecordResponse } from './battle-royale-record.js';
 
 export interface EventWarningPayload {
   event: MutatorId;
@@ -128,6 +130,7 @@ type GameServiceEvent =
   | 'overtimeStart'
   | 'taunt'
   | 'leaderboard'
+  | 'battleRoyaleRecord'
   | 'dailyGauntletLeaderboard';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -156,6 +159,8 @@ export class GameService {
    * after every match — can render it immediately via getLeaderboard().
    */
   private latestLeaderboard: LeaderboardEntry[] = [];
+  private requestedBattleRoyaleNickname = '';
+  private latestBattleRoyaleRecord: BattleRoyaleRecord | null = null;
   /** Latest server-clock Daily Run board; null until the connect snapshot. */
   private latestDailyGauntletLeaderboard: ServerDailyGauntletLeaderboardMessage | null = null;
   /**
@@ -239,6 +244,19 @@ export class GameService {
   /** Latest cached all-time top players (empty before the first message). */
   getLeaderboard(): LeaderboardEntry[] {
     return this.latestLeaderboard;
+  }
+
+  getBattleRoyaleRecord(nickname: string): BattleRoyaleRecord | null {
+    return nickname.trim().toLowerCase() === this.requestedBattleRoyaleNickname.toLowerCase()
+      ? this.latestBattleRoyaleRecord
+      : null;
+  }
+
+  requestBattleRoyaleRecord(nickname: string): void {
+    this.requestedBattleRoyaleNickname = nickname.trim();
+    this.latestBattleRoyaleRecord = null;
+    this.networkManager.requestBattleRoyaleRecord(this.requestedBattleRoyaleNickname);
+    this.emit('battleRoyaleRecord', this.latestBattleRoyaleRecord);
   }
 
   /** Current server-authored Daily Run board, if the connect snapshot arrived. */
@@ -399,6 +417,10 @@ export class GameService {
     });
 
     this.networkManager.on('welcome', () => {
+      if (!this.networkManager.getServerCapabilities().battleRoyale) {
+        this.requestedBattleRoyaleNickname = '';
+        this.latestBattleRoyaleRecord = null;
+      }
       this.emit('capabilitiesChanged', this.networkManager.getServerCapabilities());
     });
 
@@ -418,6 +440,8 @@ export class GameService {
     this.networkManager.on('reconnecting', () => {
       this.currentMatch = null;
       this.latestDraftState = null;
+      this.requestedBattleRoyaleNickname = '';
+      this.latestBattleRoyaleRecord = null;
       this.emit('reconnecting');
     });
 
@@ -425,6 +449,8 @@ export class GameService {
       // A dropped connection tears down any in-flight draft server-side.
       this.currentMatch = null;
       this.latestDraftState = null;
+      this.requestedBattleRoyaleNickname = '';
+      this.latestBattleRoyaleRecord = null;
       this.emit('disconnected');
     });
 
@@ -616,6 +642,20 @@ export class GameService {
       this.latestLeaderboard = entries;
       this.emit('leaderboard', entries);
     });
+
+    this.networkManager.on(
+      'battleRoyaleRecord',
+      (nickname: string, record: BattleRoyaleRecord | null) => {
+        const response = battleRoyaleRecordResponse(
+          this.requestedBattleRoyaleNickname,
+          nickname,
+          record,
+        );
+        if (!response.accepted) return;
+        this.latestBattleRoyaleRecord = response.record;
+        this.emit('battleRoyaleRecord', this.latestBattleRoyaleRecord);
+      },
+    );
 
     this.networkManager.on(
       'dailyGauntletLeaderboard',

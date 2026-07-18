@@ -23,7 +23,7 @@ interface SentMessage {
  * Fake GameServer that captures the handlers GameManager wires up, so a
  * test can simulate a connection without real geckos networking.
  */
-function makeFakeServer(schedules = false, newShell = false) {
+function makeFakeServer(schedules = false, newShell = false, battleRoyale = false) {
   const sent: SentMessage[] = [];
   const connected: PlayerId[] = [];
   let connectHandler: ((playerId: PlayerId) => void) | null = null;
@@ -34,7 +34,12 @@ function makeFakeServer(schedules = false, newShell = false) {
       sent.push({ playerId, message, reliable: !!opts?.reliable });
     }),
     getConnectedPlayerIds: vi.fn(() => [...connected]),
-    getCapabilities: vi.fn(() => ({ ...DISABLED_SERVER_CAPABILITIES, schedules, newShell })),
+    getCapabilities: vi.fn(() => ({
+      ...DISABLED_SERVER_CAPABILITIES,
+      schedules,
+      newShell,
+      battleRoyale,
+    })),
     broadcast: vi.fn((message: ServerMessage) => {
       for (const playerId of connected) {
         sent.push({ playerId, message, reliable: false });
@@ -194,6 +199,26 @@ describe('GameManager connection leaderboard', () => {
 
     expect(sent.some((s) => s.message.type === 'server:leaderboard')).toBe(false);
     expect(sent.some((s) => s.message.type === 'server:dailyGauntletLeaderboard')).toBe(false);
+  });
+
+  it('routes a capability-owned Battle Royale record request reliably', () => {
+    const { fake, sent, message } = makeFakeServer(false, true, true);
+    store = new PersistentStatsStore(dataDir);
+    store.recordBattleRoyaleMatch([
+      { nickname: 'Alpha', placement: 1, won: true, eliminations: 4, damage: 640 },
+    ]);
+    new GameManager(fake, store);
+
+    message('p1', { type: 'client:requestBattleRoyaleRecord', nickname: 'Alpha' });
+    expect(sent.at(-1)).toMatchObject({
+      playerId: 'p1',
+      reliable: true,
+      message: {
+        type: 'server:battleRoyaleRecord',
+        nickname: 'Alpha',
+        record: { matches: 1, wins: 1, eliminations: 4, damage: 640 },
+      },
+    });
   });
 
   it('sends and refreshes authoritative schedules only when advertised', () => {

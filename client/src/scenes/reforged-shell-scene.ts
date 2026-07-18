@@ -93,6 +93,7 @@ export class ReforgedShellScene extends Phaser.Scene {
   private inputHint!: Phaser.GameObjects.Text;
   private onMatchFound: ((matchData: MatchData) => void) | null = null;
   private onLeaderboard: ((entries: LeaderboardEntry[]) => void) | null = null;
+  private onBattleRoyaleRecord: (() => void) | null = null;
   private onDailyLeaderboard: ((snapshot: ServerDailyGauntletLeaderboardMessage) => void) | null =
     null;
   private onCapabilitiesChanged: ((capabilities: Readonly<ServerCapabilities>) => void) | null =
@@ -255,6 +256,7 @@ export class ReforgedShellScene extends Phaser.Scene {
     this.selectTab('play');
     this.bindInput();
     this.bindConnectionLifecycle();
+    this.gameService.requestBattleRoyaleRecord(this.nickname);
     this.scale.on(Phaser.Scale.Events.RESIZE, this.layoutShell, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.handleShutdown, this);
     this.layoutShell();
@@ -453,10 +455,12 @@ export class ReforgedShellScene extends Phaser.Scene {
   private bindConnectionLifecycle(): void {
     this.onMatchFound = (matchData) => this.openMatch(matchData);
     this.onLeaderboard = () => this.refreshRecordsSnapshots();
+    this.onBattleRoyaleRecord = () => this.refreshRecordsSnapshots();
     this.onDailyLeaderboard = () => this.refreshRecordsSnapshots();
     this.onCapabilitiesChanged = (capabilities) => {
       if (menuSceneForCapabilities(capabilities) !== 'ReforgedShellScene') this.returnToLobby();
       this.playRosterPanel?.setBattleRoyaleQueue(null);
+      this.gameService.requestBattleRoyaleRecord(this.nickname);
     };
     this.onLobbyConfig = (schedule) => {
       const presentation = playSchedulePresentation(
@@ -493,6 +497,7 @@ export class ReforgedShellScene extends Phaser.Scene {
       this.settingsPanel?.setFullscreenActive(Boolean(document.fullscreenElement));
     this.gameService.on('matchFound', this.onMatchFound);
     this.gameService.on('leaderboard', this.onLeaderboard);
+    this.gameService.on('battleRoyaleRecord', this.onBattleRoyaleRecord);
     this.gameService.on('dailyGauntletLeaderboard', this.onDailyLeaderboard);
     this.gameService.on('capabilitiesChanged', this.onCapabilitiesChanged);
     this.gameService.on('lobbyConfig', this.onLobbyConfig);
@@ -738,6 +743,7 @@ export class ReforgedShellScene extends Phaser.Scene {
       characterWins: this.gameService.getLatestCharacterWins(),
       arenaWins: this.gameService.getLatestArenaWins(),
       lastMatchResult: this.gameService.getLastMatchResult(),
+      battleRoyaleRecord: this.gameService.getBattleRoyaleRecord(this.nickname),
     };
   }
 
@@ -747,6 +753,7 @@ export class ReforgedShellScene extends Phaser.Scene {
 
   private updateCallsign(callsign: string): void {
     this.nickname = callsign;
+    this.gameService.requestBattleRoyaleRecord(callsign);
     this.challengesPanel?.setNickname(callsign);
     this.refreshRecordsSnapshots();
     this.playRosterPanel?.setEntryEnabled(this.canSubmitMatchIntent());
@@ -914,6 +921,10 @@ export class ReforgedShellScene extends Phaser.Scene {
     if (this.onLeaderboard) {
       this.gameService.off('leaderboard', this.onLeaderboard);
       this.onLeaderboard = null;
+    }
+    if (this.onBattleRoyaleRecord) {
+      this.gameService.off('battleRoyaleRecord', this.onBattleRoyaleRecord);
+      this.onBattleRoyaleRecord = null;
     }
     if (this.onDailyLeaderboard) {
       this.gameService.off('dailyGauntletLeaderboard', this.onDailyLeaderboard);

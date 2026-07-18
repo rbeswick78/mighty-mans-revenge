@@ -13,6 +13,7 @@ import {
 import type {
   CharacterId,
   ArenaWins,
+  BattleRoyaleRecord,
   DailyGauntletChaseTarget,
   DailyGauntletLeaderboardEntry,
   KillWeapon,
@@ -64,6 +65,8 @@ export interface PersistentStatsData {
   headToHead: Record<string, HeadToHeadRecord>;
   /** UTC challenge key -> lowercased callsign -> best completed clear. */
   dailyGauntlet: Record<string, Record<string, DailyGauntletScoreRecord>>;
+  /** Lowercased callsign -> Battle Royale-only totals. */
+  battleRoyale: Record<string, BattleRoyaleRecord & { nickname: string }>;
 }
 
 /** One player's contribution to a finished match. */
@@ -74,6 +77,15 @@ export interface MatchStatsEntry {
   killsByWeapon: Record<KillWeapon, number>;
   contractCompleted: boolean;
   characterId: CharacterId | null;
+}
+
+/** One human entrant's authoritative contribution to a completed Battle Royale. */
+export interface BattleRoyaleStatsEntry {
+  nickname: string;
+  placement: number;
+  won: boolean;
+  eliminations: number;
+  damage: number;
 }
 
 const FILE_NAME = 'persistent-stats.json';
@@ -90,7 +102,47 @@ function defaultDataDir(): string {
 }
 
 function emptyData(): PersistentStatsData {
-  return { version: 1, players: {}, headToHead: {}, dailyGauntlet: {} };
+  return { version: 1, players: {}, headToHead: {}, dailyGauntlet: {}, battleRoyale: {} };
+}
+
+function safeCount(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
+}
+
+function safeDamage(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
+}
+
+function normalizeBattleRoyaleData(
+  value: unknown,
+): Record<string, BattleRoyaleRecord & { nickname: string }> {
+  if (typeof value !== 'object' || value === null) return {};
+  const normalized: Record<string, BattleRoyaleRecord & { nickname: string }> = {};
+  for (const raw of Object.values(value)) {
+    if (typeof raw !== 'object' || raw === null) continue;
+    const record = raw as Partial<BattleRoyaleRecord> & { nickname?: unknown };
+    if (typeof record.nickname !== 'string') continue;
+    const key = normalizeKey(record.nickname);
+    if (key === '') continue;
+    const matches = safeCount(record.matches);
+    const bestPlacement =
+      typeof record.bestPlacement === 'number' &&
+      Number.isFinite(record.bestPlacement) &&
+      record.bestPlacement >= 1
+        ? Math.floor(record.bestPlacement)
+        : null;
+    if (matches === 0 || bestPlacement === null) continue;
+    normalized[key] = {
+      nickname: record.nickname,
+      matches,
+      wins: Math.min(safeCount(record.wins), matches),
+      topThreeFinishes: Math.min(safeCount(record.topThreeFinishes), matches),
+      eliminations: safeCount(record.eliminations),
+      damage: safeDamage(record.damage),
+      bestPlacement,
+    };
+  }
+  return normalized;
 }
 
 function isChallengeKey(value: string): boolean {
@@ -205,10 +257,7 @@ export class PersistentStatsStore {
       } else if (key === winnerKey) {
         lifetime.wins += 1;
         lifetime.currentWinStreak += 1;
-        lifetime.bestWinStreak = Math.max(
-          lifetime.bestWinStreak,
-          lifetime.currentWinStreak,
-        );
+        lifetime.bestWinStreak = Math.max(lifetime.bestWinStreak, lifetime.currentWinStreak);
         if (entry.characterId !== null) {
           lifetime.characterWins[entry.characterId] =
             (lifetime.characterWins[entry.characterId] ?? 0) + 1;
@@ -246,6 +295,35 @@ export class PersistentStatsStore {
     this.scheduleWrite();
   }
 
+  /** Fold one legal terminal Battle Royale into isolated per-callsign totals. */
+  recordBattleRoyaleMatch(entries: readonly BattleRoyaleStatsEntry[]): void {
+    let changed = false;
+    for (const entry of entries) {
+      const key = normalizeKey(entry.nickname);
+      if (key === '' || !Number.isFinite(entry.placement) || entry.placement < 1) continue;
+      const placement = Math.floor(entry.placement);
+      const record = (this.data.battleRoyale[key] ??= {
+        nickname: entry.nickname,
+        matches: 0,
+        wins: 0,
+        topThreeFinishes: 0,
+        eliminations: 0,
+        damage: 0,
+        bestPlacement: null,
+      });
+      record.nickname = entry.nickname;
+      record.matches += 1;
+      if (entry.won && placement === 1) record.wins += 1;
+      if (placement <= 3) record.topThreeFinishes += 1;
+      record.eliminations += safeCount(entry.eliminations);
+      record.damage += safeDamage(entry.damage);
+      record.bestPlacement =
+        record.bestPlacement === null ? placement : Math.min(record.bestPlacement, placement);
+      changed = true;
+    }
+    if (changed) this.scheduleWrite();
+  }
+
   /**
    * The all-time record between two players, zeroed if they have never
    * met. A/B follow the storage convention (alphabetical by lowercased
@@ -270,6 +348,20 @@ export class PersistentStatsStore {
   /** Lifetime totals for a nickname, or null if never seen. */
   getLifetime(nickname: string): LifetimePlayerStats | null {
     return this.data.players[normalizeKey(nickname)] ?? null;
+  }
+
+  /** Battle Royale-only totals for one callsign, or null before its first terminal match. */
+  getBattleRoyaleRecord(nickname: string): BattleRoyaleRecord | null {
+    const record = this.data.battleRoyale[normalizeKey(nickname)];
+    if (!record) return null;
+    return {
+      matches: record.matches,
+      wins: record.wins,
+      topThreeFinishes: record.topThreeFinishes,
+      eliminations: record.eliminations,
+      damage: record.damage,
+      bestPlacement: record.bestPlacement,
+    };
   }
 
   /**
@@ -322,9 +414,7 @@ export class PersistentStatsStore {
       board[key] = {
         nickname,
         score: safeScore,
-        achievedAtMs: Number.isFinite(achievedAtMs)
-          ? Math.max(0, Math.floor(achievedAtMs))
-          : 0,
+        achievedAtMs: Number.isFinite(achievedAtMs) ? Math.max(0, Math.floor(achievedAtMs)) : 0,
       };
     } else if (casingChanged) {
       previous.nickname = nickname;
@@ -345,10 +435,7 @@ export class PersistentStatsStore {
   }
 
   /** Today's top completed Daily Run clears, ranked score then first-achieved. */
-  getDailyGauntletLeaderboard(
-    challengeKey: string,
-    n: number,
-  ): DailyGauntletLeaderboardEntry[] {
+  getDailyGauntletLeaderboard(challengeKey: string, n: number): DailyGauntletLeaderboardEntry[] {
     const limit = Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
     return this.sortedDailyGauntletRows(challengeKey)
       .slice(0, limit)
@@ -385,9 +472,7 @@ export class PersistentStatsStore {
       };
     }
 
-    const safeSize = Number.isFinite(visibleSize)
-      ? Math.max(1, Math.floor(visibleSize))
-      : 1;
+    const safeSize = Number.isFinite(visibleSize) ? Math.max(1, Math.floor(visibleSize)) : 1;
     if (rows.length < safeSize) {
       return { kind: 'claim_slot', projectedRank: rows.length + 1 };
     }
@@ -454,6 +539,9 @@ export class PersistentStatsStore {
       data.dailyGauntlet = normalizeDailyGauntletData(
         (parsed as { dailyGauntlet?: unknown }).dailyGauntlet,
       );
+      data.battleRoyale = normalizeBattleRoyaleData(
+        (parsed as { battleRoyale?: unknown }).battleRoyale,
+      );
       return data;
     } catch (err) {
       logger.warn(
@@ -470,9 +558,7 @@ export class PersistentStatsStore {
     this.pendingWrite = this.pendingWrite.then(() => this.writeNow());
   }
 
-  private sortedDailyGauntletRows(
-    challengeKey: string,
-  ): Array<[string, DailyGauntletScoreRecord]> {
+  private sortedDailyGauntletRows(challengeKey: string): Array<[string, DailyGauntletScoreRecord]> {
     return Object.entries(this.data.dailyGauntlet[challengeKey] ?? {}).sort(
       ([keyA, a], [keyB, b]) => {
         if (b.score !== a.score) return b.score - a.score;

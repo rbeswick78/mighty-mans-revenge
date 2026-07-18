@@ -5,9 +5,9 @@ Read this file and `CLAUDE.md` completely at the start of every batch. The
 completed `docs/REPLAYABILITY_ROADMAP.md` remains the historical record for the
 systems this program preserves and reorganizes.
 
-- **Status:** Batch 48 Battle Royale spectating completed on 2026-07-18;
+- **Status:** Batch 49 Battle Royale records completed on 2026-07-18;
   the format remains dormant and every capability remains default false.
-- **Next step:** Batch 49 Battle Royale records under the user's standing
+- **Next step:** Batch 50 network and performance hardening under the user's standing
   authorization to continue sequentially through the plan while deferring human
   involvement. The deferred Batch 39 human release walkthrough still does not
   authorize deployment, capability exposure, production restart, or live smoke.
@@ -1804,6 +1804,56 @@ Acceptance:
 
 Persist and render matches, wins, top-three finishes, eliminations, damage, and
 best placement separately from existing PvP totals.
+
+**Verification tier selected before implementation (2026-07-18):**
+cross-cutting persistence, authoritative match-end aggregation, additive shared
+wire, reconnect retrieval, and capability-owned Records presentation. This
+batch can affect the durable stats-file migration boundary, N-player Battle
+Royale terminal accounting, optional old-client/old-server messages, cached
+record identity, and responsive Records rendering. Required evidence is focused
+store migration/corruption/serialization tests, terminal aggregation tests,
+server routing and client normalization/cache tests, pure Records-model tests,
+the complete unit suite, typecheck, lint, all production builds, targeted
+desktop Chromium and mobile-landscape Records journeys, the authoritative
+baseline, and the unchanged standard balance matrix. The complete
+three-project Playwright matrix remains reserved for Batch 51 unless focused
+evidence reveals broader coupling.
+
+Acceptance:
+
+- [x] The persistent store owns a separate per-callsign Battle Royale record
+      containing matches, unique wins, top-three finishes, opponent
+      eliminations, opponent damage, and best placement. Standard PvP lifetime,
+      rivalry, streak, mastery, contract, Daily, and leaderboard totals are not
+      incremented or ranked by Battle Royale.
+- [x] Exactly one durable update occurs at the authoritative terminal event for
+      every human entrant, including already-eliminated, deliberately departed,
+      and disconnected entrants. Bot-fill identities are never persisted.
+- [x] Unique placement-one winners increment wins; mutual-elimination draws do
+      not. Placement 1–3 increments top-three, best placement is the lowest
+      completed placement ever reached, self/zone/departure eliminations grant
+      no elimination, and self/zone damage grants no opponent-damage total.
+- [x] Old version-1 files with no Battle Royale field load with an empty record
+      map; malformed additive records normalize fail-closed without discarding
+      valid standard or Daily data. Atomic queued writes and restart retention
+      remain unchanged.
+- [x] A capability-owned client can request one callsign's record and receives
+      an optional reliable server-authored snapshot. Missing, stale, malformed,
+      wrong-callsign, capability-off, old-client, and old-server shapes never
+      invent, merge, or retain another callsign's totals.
+- [x] The Reforged Records tab renders all six authoritative totals with a clear
+      no-record zero state, updates after a completed Battle Royale and callsign
+      change, remains readable on desktop/mobile, and performs no record write
+      or result inference.
+- [x] Deterministic N-player evidence covers an eight-entrant mixed human/bot
+      terminal result, unique win, mutual final elimination, departures,
+      opponent/self damage, repeated matches, best-placement improvement, and
+      restart round-trip.
+- [x] Standard Duel/Rumble/Crew/Practice, all eight modes, rematches, overtime,
+      standard persistence/leaderboards, wire fallback, input, presentation,
+      Results, and balance snapshots remain exact.
+- [x] Batch 50 performance hardening and all later exposure, release,
+      deployment, restart, and live-smoke work do not begin.
 
 #### Batch 50 — Network and performance hardening
 
@@ -4544,6 +4594,70 @@ eight-entrant projection, and every final focused and full regression passes.
 33 commit `f39eb34131f8827f85432aafcc6d6c18a2d0ac51`; `newShell`, `schedules`,
 `largeWorlds`, `modernArt`, and `battleRoyale` remain strict server-owned
 opt-ins, default false, and unexposed. Proceed only to Batch 49 under the user's
+standing direct-development authorization. Capability exposure, deployment,
+production restart, and live smoke remain explicitly unauthorized.
+
+### Batch 49 - 2026-07-18 - Battle Royale records
+
+**Scope and tier:** Before runtime implementation, the cross-cutting
+persistence, match-end aggregation, additive-wire, reconnect retrieval, and
+Records-presentation tier was selected and documented. The batch added only the
+separate Battle Royale archive, terminal human accounting, validated per-
+callsign retrieval/cache, and read-only Records rendering. Batch 50 hardening
+and all later exposure, release, deployment, restart, and live smoke did not
+enter the allowlist.
+
+**Authority and persistence:** `PersistentStatsData.battleRoyale` is an additive
+lowercased-callsign map in the existing atomic version-1 file. It stores matches,
+unique wins, top-three finishes, opponent eliminations, rounded opponent damage,
+and lowest best placement independently of standard PvP lifetime, rivalry,
+streak, mastery, contracts, Daily boards, and leaderboard ranking. Old files
+backfill empty. Malformed additive rows fail closed without discarding valid
+standard or Daily data, and queued temp-file/rename writes retain restart
+semantics.
+
+Only a legal terminal event updates the archive, exactly once, for every human
+entrant even after elimination, deliberate departure, or disconnect. Bot-fill
+IDs are excluded. A unique placement-one winner earns a win; mutual-final
+placement-one fighters do not. Placement one through three earns top-three.
+Lifecycle eliminator edges exclude self, zone, and departure credits, while a
+Battle Royale-only damage accumulator excludes self/zone damage without
+changing standard stats.
+
+**Wire and presentation:** A new client requests only one validated callsign
+after literal Battle Royale capability ownership. The server revalidates both
+and returns one reliable record or null. The client validates the entire
+optional shape, rejects stale/wrong-callsign responses, clears on capability or
+recovery loss, and presents all six totals plus an explicit no-record state.
+Old servers do not advertise the request path and old clients ignore the
+additive response. Results and local storage never author or merge totals.
+
+**Verification:** Focused store migration/restart, lifecycle, match-end, route,
+network, cache, and Records coverage passed 205 tests. Focused desktop Chromium
+and mobile-landscape journeys passed and proved authoritative totals, the zero
+state, stale-callsign rejection, fresh-callsign replacement, and responsive
+rendering. The initial mobile runner port was occupied; retrying on an isolated
+port passed without a product change. The complete unit matrix passed 1,759
+tests. Typecheck, ESLint, all production builds, and the unchanged 624-product
+standard balance matrix passed. The client build transformed 232 modules and
+retained the inherited large-chunk warning.
+
+The final authoritative baseline retained configured/rolling 20 Hz and the
+50 ms budget; synthetic four-player mean/p95/p99/max work was
+0.012/0.021/0.053/0.900 ms and standard active snapshots remained exactly
+2,481/3,762 bytes. A host scheduler drift reset produced a 15.516 Hz wall-clock
+sample while average processing remained 0.070 ms; no product tick-budget
+defect was proven. The Batch 49 allowlist was formatted and `git diff --check`
+passed.
+
+**Bug ledger:** No product defect was proven, so no entry was added. The only
+focused browser retry was caused by an occupied local port and passed on the
+next isolated pair without a code correction.
+
+**Deployment and disposition:** Skipped. Production remains on approved Batch
+33 commit `f39eb34131f8827f85432aafcc6d6c18a2d0ac51`; `newShell`, `schedules`,
+`largeWorlds`, `modernArt`, and `battleRoyale` remain strict server-owned
+opt-ins, default false, and unexposed. Proceed only to Batch 50 under the user's
 standing direct-development authorization. Capability exposure, deployment,
 production restart, and live smoke remain explicitly unauthorized.
 

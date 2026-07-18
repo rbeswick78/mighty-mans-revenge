@@ -548,4 +548,27 @@ describe('Battle Royale lifecycle', () => {
     expect(victim.isDead).toBe(true);
     expect(match.stats.getStats(shooter.id).killsByWeapon.gun).toBe(1);
   });
+
+  it('derives record eliminations and damage from opponent-only authority', () => {
+    const match = createBattleRoyaleMatch(4);
+    activate(match);
+    const internals = match as unknown as {
+      recordAttributedDamage(attackerId: string, victimId: string, damage: number): void;
+    };
+    internals.recordAttributedDamage('player-0', 'player-1', 99.9);
+    internals.recordAttributedDamage('player-0', 'player-0', 40);
+    internals.recordAttributedDamage('player-2', 'player-2', 80);
+    eliminate(match, 'player-0', 'player-1');
+    match.update(0.05);
+    eliminate(match, 'player-2', 'player-2');
+    match.update(0.05);
+    match.onPlayerDisconnect('player-3', true);
+
+    expect(Object.fromEntries(match.getBattleRoyaleRecordStats() ?? [])).toEqual({
+      'player-0': { eliminations: 1, damage: 100 },
+      'player-1': { eliminations: 0, damage: 0 },
+      'player-2': { eliminations: 0, damage: 0 },
+      'player-3': { eliminations: 0, damage: 0 },
+    });
+  });
 });

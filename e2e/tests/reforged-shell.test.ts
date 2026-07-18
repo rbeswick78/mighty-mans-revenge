@@ -2849,10 +2849,13 @@ test('Challenges preserves setup, progress, authority, and every established ent
     .toEqual([960, 720]);
 });
 
-test('Records consolidates authoritative snapshots and device records with a Battle Royale zero state', async ({
+test('Records renders the authoritative Battle Royale archive and callsign-safe refresh', async ({
   page,
 }, testInfo) => {
-  test.skip(!shellAdvertised, 'Run with CAPABILITY_NEW_SHELL=true for the gated shell path.');
+  test.skip(
+    !shellAdvertised || !battleRoyaleAdvertised,
+    'Run with CAPABILITY_NEW_SHELL=true and CAPABILITY_BATTLE_ROYALE=true.',
+  );
   await page.addInitScript(() => {
     localStorage.setItem('mmr_nickname', 'Batch8');
     localStorage.setItem(
@@ -2999,12 +3002,32 @@ test('Records consolidates authoritative snapshots and device records with a Bat
         { nickname: 'Batch8', score: 6500 },
       ],
     });
+    manager.handleMessage({
+      type: 'server:battleRoyaleRecord',
+      nickname: 'Batch8',
+      record: {
+        matches: 14,
+        wins: 3,
+        topThreeFinishes: 8,
+        eliminations: 29,
+        damage: 8125,
+        bestPlacement: 1,
+      },
+    });
   });
 
   await clickLogicalTab(page, 'records', touch);
   expect(await recordsSnapshot(page)).toMatchObject({
     selectedSectionId: 'career',
-    sectionLabels: ['CAREER', 'BOARDS', 'RIVALRY', 'FIGHTERS', 'ARENAS', 'CHALLENGE', 'BR FUTURE'],
+    sectionLabels: [
+      'CAREER',
+      'BOARDS',
+      'RIVALRY',
+      'FIGHTERS',
+      'ARENAS',
+      'CHALLENGE',
+      'BATTLE ROYALE',
+    ],
     heading: 'CAREER / BATCH8',
   });
   expect((await recordsSnapshot(page)).columns.flat()).toContain('ALL-TIME TOP 5 / #2');
@@ -3041,11 +3064,75 @@ test('Records consolidates authoritative snapshots and device records with a Bat
   await clickLogicalRecordOption(page, 6, touch);
   expect(await recordsSnapshot(page)).toMatchObject({
     selectedSectionId: 'battle_royale',
-    authority: 'EXPLICIT ZERO STATE / BATCH 49 OWNS FUTURE PERSISTENCE',
+    authority: 'SERVER-AUTHORED BATTLE ROYALE TOTALS / ISOLATED FROM PVP',
   });
   expect((await recordsSnapshot(page)).columns.flat()).toEqual(
-    expect.arrayContaining(['MATCHES / --', 'BEST PLACEMENT / --', 'NOT RECORDED OR INFERRED']),
+    expect.arrayContaining([
+      'MATCHES / 14',
+      'WINS / 3',
+      'TOP THREE / 8',
+      'ELIMINATIONS / 29',
+      'DAMAGE / 8,125',
+      'BEST PLACEMENT / #1',
+    ]),
   );
+
+  await page.evaluate(() => {
+    const shell = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'ReforgedShellScene',
+    ) as unknown as {
+      updateCallsign(callsign: string): void;
+      gameService: { getNetworkManager(): { handleMessage(message: unknown): void } };
+    };
+    shell.updateCallsign('Fresh49');
+    const manager = shell.gameService.getNetworkManager();
+    manager.handleMessage({
+      type: 'server:battleRoyaleRecord',
+      nickname: 'Batch8',
+      record: {
+        matches: 99,
+        wins: 99,
+        topThreeFinishes: 99,
+        eliminations: 999,
+        damage: 99999,
+        bestPlacement: 1,
+      },
+    });
+  });
+  await expect
+    .poll(async () => (await recordsSnapshot(page)).columns.flat())
+    .toEqual(expect.arrayContaining(['MATCHES / 0', 'BEST PLACEMENT / --']));
+  await page.evaluate(() => {
+    const shell = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'ReforgedShellScene',
+    ) as unknown as {
+      gameService: { getNetworkManager(): { handleMessage(message: unknown): void } };
+    };
+    shell.gameService.getNetworkManager().handleMessage({
+      type: 'server:battleRoyaleRecord',
+      nickname: 'Fresh49',
+      record: {
+        matches: 2,
+        wins: 0,
+        topThreeFinishes: 1,
+        eliminations: 4,
+        damage: 1075,
+        bestPlacement: 2,
+      },
+    });
+  });
+  await expect
+    .poll(async () => (await recordsSnapshot(page)).columns.flat())
+    .toEqual(
+      expect.arrayContaining([
+        'MATCHES / 2',
+        'WINS / 0',
+        'TOP THREE / 1',
+        'ELIMINATIONS / 4',
+        'DAMAGE / 1,075',
+        'BEST PLACEMENT / #2',
+      ]),
+    );
 
   if (touch) {
     await page.screenshot({ path: testInfo.outputPath('records-mobile-webkit.png') });

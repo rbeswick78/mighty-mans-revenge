@@ -95,6 +95,14 @@ function snapshots(): ReforgedRecordsServerSnapshots {
     characterWins,
     arenaWins: Object.fromEntries(listMapNames().map((name, index) => [name, index * 3])),
     lastMatchResult: result(),
+    battleRoyaleRecord: {
+      matches: 14,
+      wins: 3,
+      topThreeFinishes: 8,
+      eliminations: 29,
+      damage: 8125,
+      bestPlacement: 1,
+    },
   };
 }
 
@@ -164,6 +172,20 @@ describe('buildReforgedRecordSections', () => {
         '1 TOURS / 2/4 PATCHES',
       ]),
     );
+    expect(sections.find((section) => section.id === 'battle_royale')).toMatchObject({
+      summary: '14 MATCHES',
+      authority: 'SERVER-AUTHORED BATTLE ROYALE TOTALS / ISOLATED FROM PVP',
+    });
+    expect(sections.find((section) => section.id === 'battle_royale')?.columns.flat()).toEqual(
+      expect.arrayContaining([
+        'MATCHES / 14',
+        'WINS / 3',
+        'TOP THREE / 8',
+        'ELIMINATIONS / 29',
+        'DAMAGE / 8,125',
+        'BEST PLACEMENT / #1',
+      ]),
+    );
   });
 
   it('keeps explicit zero states when snapshots and local records are absent or malformed', () => {
@@ -175,6 +197,7 @@ describe('buildReforgedRecordSections', () => {
       characterWins: createEmptyCharacterWins(),
       arenaWins: null,
       lastMatchResult: null,
+      battleRoyaleRecord: null,
     };
     const malformed: ReforgedRecordsLocalValues = {
       scrapPit: '{bad',
@@ -207,16 +230,25 @@ describe('buildReforgedRecordSections', () => {
     );
   });
 
-  it('always reserves Battle Royale as a non-recording zero state', () => {
-    const section = buildReforgedRecordSections(snapshots(), localValues()).find(
+  it('shows a server-owned Battle Royale zero state without inferring from results', () => {
+    const empty = { ...snapshots(), battleRoyaleRecord: null };
+    const section = buildReforgedRecordSections(empty, localValues()).find(
       (candidate) => candidate.id === 'battle_royale',
     );
     expect(section).toMatchObject({
-      summary: 'RESERVED',
-      authority: 'EXPLICIT ZERO STATE / BATCH 49 OWNS FUTURE PERSISTENCE',
+      summary: 'NO RECORD',
+      authority: 'SERVER-AUTHORED BATTLE ROYALE TOTALS / ISOLATED FROM PVP',
     });
     expect(section?.columns.flat()).toEqual(
-      expect.arrayContaining(['MATCHES / --', 'BEST PLACEMENT / --', 'NOT RECORDED OR INFERRED']),
+      expect.arrayContaining([
+        'MATCHES / 0',
+        'WINS / 0',
+        'TOP THREE / 0',
+        'ELIMINATIONS / 0',
+        'DAMAGE / 0',
+        'BEST PLACEMENT / --',
+        'TERMINAL SERVER RESULTS ONLY / NO CLIENT INFERENCE',
+      ]),
     );
   });
 });

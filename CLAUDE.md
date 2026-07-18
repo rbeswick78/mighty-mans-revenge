@@ -88,7 +88,7 @@ curl http://34.24.140.207:3001/health
 ```
 
 **Persistent state on the VM:** lifetime player stats, head-to-head records,
-and recent Daily Run scoreboards live in
+separate per-callsign Battle Royale archives, and recent Daily Run scoreboards live in
 `/opt/mighty-mans-revenge/server/data/persistent-stats.json`
 (path overridable via `DATA_DIR`). The directory is untracked/gitignored, so
 the git-pull deploy flow never touches it — do not `git clean` or wipe the
@@ -201,11 +201,11 @@ win-streak context, the latest lifetime rivalry/set result, all fighter mastery
 totals, and retained local arena mastery from the established draft/result
 snapshots. It also reads Scrap Pit, Gauntlet best, Daily progress, Build Codex,
 and Crew Tour through their existing device-local keys and normalizers. Battle
-Royale has an explicit unrecorded zero state only; Batch 49 still owns its
-persistence. No record write, ranking, retention, scoring, rematch, wire, or
-authority rule changed. Settings remains empty, Play/Fighters/Challenges keep
-their established boundaries, and the default-false capability preserves the
-complete legacy Lobby fallback.
+Royale now reads Batch 49's separate server archive: matches, wins, top-three
+finishes, eliminations, damage, and best placement. No client record write,
+ranking, scoring, rematch, or result inference is allowed. Settings remains
+empty, Play/Fighters/Challenges keep their established boundaries, and the
+default-false capability preserves the complete legacy Lobby fallback.
 
 **Reforged Settings (Batch 9):** the capability-owned Settings tab owns the
 established device-local callsign, AudioManager mute/master/SFX/music controls,
@@ -956,12 +956,11 @@ production flag, or deployment follows from passing Batch 38 evidence.
 ## Reforged Release State
 
 Batch 39 automated evidence remains green and its human tester/release review
-is deliberately deferred. Batch 48's dormant Battle Royale spectator lifecycle
-is complete: eliminated fighters remain read-only participants, target and
-placement truth is server projected, leave reaches provisional Results, and the
-legal terminal event still routes connected entrants to final Results.
-Additive wire fields remain optional and `battleRoyale` stays default false and
-unexposed.
+is deliberately deferred. Batch 49's dormant Battle Royale record lifecycle is
+complete: terminal server truth updates one separate per-callsign archive for
+every human entrant, bot fill is excluded, and the Reforged Records tab only
+projects validated server retrieval. Additive wire fields remain optional and
+`battleRoyale` stays default false and unexposed.
 RFG-004 remains resolved by the per-run `GameScene.minimapRenderer` reset and
 RFG-005 resolves the Battle Royale self-explosion lifecycle gap. The user has
 authorized sequential plan work through Batch 51 while deferring human
@@ -1125,6 +1124,31 @@ returns a reliable provisional placement payload, and removes the spectator
 from the live match. The legal terminal event continues to send one coherent
 final Results payload to every connected entrant. Disconnect/reconnect retains
 the established safe-lobby fallback; neither path invents a result or re-enters
-simulation. Batch 49 owns separate Battle Royale records. No spectator state
-is persisted, no capability is exposed, and no deployment, restart, or live
-smoke is authorized.
+simulation. No spectator state is persisted, no capability is exposed, and no
+deployment, restart, or live smoke is authorized.
+
+## Battle Royale Records Contract
+
+Batch 49 adds `PersistentStatsData.battleRoyale`, a separate lowercased-callsign
+map inside the existing atomic version-1 file. It stores matches, unique wins,
+top-three finishes, opponent eliminations, rounded opponent damage, and lowest
+best placement. Old files without the field backfill an empty map; malformed
+additive rows are discarded without losing valid standard, rivalry, mastery,
+contract, or Daily data.
+
+Only the legal Battle Royale terminal event records, exactly once. Every human
+entrant is included even after elimination, deliberate departure, or
+disconnect; `bot:` identities are excluded. A unique placement-one winner earns
+a win, while mutual-final-elimination placement-one fighters do not. Placement
+one through three earns top-three. Lifecycle eliminator edges exclude self,
+zone, and departure credits, and a Battle Royale-only accumulator excludes
+self/zone damage without changing standard `PlayerStats` semantics.
+
+`client:requestBattleRoyaleRecord` is sent only after literal Battle Royale
+capability ownership and a validated callsign. The reliable
+`server:battleRoyaleRecord` returns that callsign's record or null. Clients
+validate the entire optional record, reject stale/wrong-callsign responses,
+clear on capability/recovery loss, and render an explicit zero state without
+merging Results or local storage. Batch 50 owns network/performance hardening.
+Every capability remains default false and unexposed, and no deployment,
+restart, or live smoke is authorized.
