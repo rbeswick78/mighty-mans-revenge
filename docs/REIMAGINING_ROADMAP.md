@@ -5,9 +5,9 @@ Read this file and `CLAUDE.md` completely at the start of every batch. The
 completed `docs/REPLAYABILITY_ROADMAP.md` remains the historical record for the
 systems this program preserves and reorganizes.
 
-- **Status:** Batch 45 Battle Royale four-biome arena completed on
-  2026-07-18; the format remains dormant and every capability remains default false.
-- **Next step:** Batch 46 safe-zone phases under the user's standing
+- **Status:** Batch 46 Battle Royale safe-zone phases completed on 2026-07-18;
+  the format remains dormant and every capability remains default false.
+- **Next step:** Batch 47 Battle Royale bots under the user's standing
   authorization to continue sequentially through the plan while deferring human
   involvement. The deferred Batch 39 human release walkthrough still does not
   authorize deployment, capability exposure, production restart, or live smoke.
@@ -1643,6 +1643,51 @@ Acceptance:
 
 Implement deterministic nested circles, preview/closing/hold phases,
 escalating outside damage, final closure, warnings, minimap, and tactical map.
+
+**Verification tier selected before implementation (2026-07-18):** strict
+shared geometry/state-machine, authoritative 20 Hz eight-fighter simulation,
+additive network compatibility, and capability-owned client world/HUD/minimap/
+tactical-map projection tier. The batch crosses deterministic plan generation,
+phase transitions, lethal environmental damage and Battle Royale terminal
+ordering, optional snapshot normalization, responsive multi-input map UI, and
+existing zone art. Run focused phase/geometry/damage/lifecycle, reconnect and
+old-server omission, standard-byte compatibility, minimap/tactical-map,
+fallback/reduced presentation, and pointer/keyboard/gamepad/touch evidence;
+the complete unit matrix; typecheck; lint; all builds; map/asset validation;
+the authoritative server baseline; unchanged standard balance evidence;
+allowlist and repository-wide formatting inventories; `git diff --check`; and
+focused desktop Chromium, desktop Firefox, and mobile-landscape browser proof.
+
+Acceptance:
+
+- [x] A stable match/map seed creates one bounded sequence of strictly nested
+      circles; reconnects and independent servers reproduce every center,
+      radius, duration, and phase index without consuming gameplay RNG.
+- [x] Server-owned `preview`, `closing`, `hold`, and `final` phases advance at
+      exact boundaries. Closing radii interpolate monotonically, holds do not
+      drift, the final phase closes to zero, and no client clock advances them.
+- [x] Living non-invulnerable fighters outside the current circle receive
+      authoritative one-second environmental pulses whose damage escalates by
+      phase and can eliminate. Stable fighter ordering and lifecycle batching
+      preserve coherent winner/placement outcomes, including final mutual
+      elimination and disconnect/damage ordering.
+- [x] Optional snapshot state carries only the current/next circle, phase,
+      timing, and damage facts needed for projection. Old clients ignore it,
+      old-server omission clears it, malformed additions fail closed, and all
+      standard snapshots remain byte-identical.
+- [x] World warnings and the existing non-interactive minimap project current
+      and next circles, local outside danger, phase/countdown, and final closure
+      from server state using approved zone art or procedural fallback.
+- [x] A responsive Battle Royale-only tactical map can be opened and closed by
+      keyboard, standard gamepad, and touch, shows authored regions/landmarks/
+      containers plus current/next circles and the local fighter, and never
+      reveals generic rivals or authors simulation state.
+- [x] Capability-off, standard Duel/Rumble/Crew/Practice, the established
+      Radiation Storm mutator, camera/HUD/input, stats/persistence, rematches,
+      and all six standard maps retain exact prior behavior.
+- [x] Batch 47 bot loot/zone planning and all later spectating, records,
+      hardening, release, exposure, deployment, restart, and live-smoke work do
+      not begin.
 
 #### Batch 47 — Battle Royale bots
 
@@ -4223,6 +4268,69 @@ the bug ledger did not change.
 33 commit `f39eb34131f8827f85432aafcc6d6c18a2d0ac51`; `newShell`, `schedules`,
 `largeWorlds`, `modernArt`, and `battleRoyale` remain strict server-owned
 opt-ins, default false, and unexposed. Proceed only to Batch 46 under the user's
+standing direct-development authorization. Capability exposure, deployment,
+production restart, and live smoke remain explicitly unauthorized.
+
+### Batch 46 - 2026-07-18 - Safe-zone phases
+
+**Scope and tier:** Before runtime implementation, the strict shared
+geometry/state-machine, authoritative 20 Hz Battle Royale simulation, additive
+wire compatibility, and capability-owned world/minimap/tactical-map projection
+tier was selected and documented. The batch added only deterministic circles,
+lethal outside pressure, projection/warnings, and local tactical-map input.
+Batch 47 bot decisions, spectating, records, hardening, exposure, release,
+deployment, restart, and live smoke did not enter the allowlist.
+
+**Authoritative lifecycle:** A stable match seed and authored map dimensions
+produce one immutable eight-segment plan without consuming gameplay RNG.
+Preview, closing, hold, and final segments expose exact server time; centers and
+radii close monotonically through bounded strictly nested targets and reach
+zero in the final segment. One-second outside pulses are sampled at their exact
+simulation times even across a large update, escalate from 2 to 16 damage,
+honor invulnerability/Iron Hide/armor, create no attacker or kill credit, and
+can eliminate in stable player-ID order. Zone and combat eliminations in the
+same final simulation step form one legal mutual-elimination cohort, while
+departure ordering remains distinct and one-life respawn remains zero.
+
+**Wire and projection:** The additive optional `battleRoyaleSafeZone` snapshot
+contains current/next circle geometry, phase index/name, authoritative time
+remaining, and pulse damage. The client atomically validates it, clears an
+old-server omission, and never advances phase or damage. World boundary/wash/
+status, the compact non-interactive minimap, and a responsive Battle Royale-
+only tactical map consume the normalized state. The tactical map contains the
+four authored regions, landmarks, containers, current/next circles, and local
+fighter; it has no generic-rival input. Tap, keyboard M, and standard-gamepad
+D-pad Up toggle it, with local gameplay input suppressed while open. Closed
+tactical maps do not redraw their large static arena projection.
+
+**Verification:** Focused geometry, damage, lifecycle, manager/wire,
+normalization, minimap, tactical-layout, and presentation coverage passed 221
+tests. The complete matrix passed 155 files and 1,730 tests. Typecheck, ESLint,
+all package builds, all 13 compatible map documents, the strict map tests, 30
+asset-contract tests, and the unchanged 624-product standard balance matrix
+passed. Focused browser proof passed desktop Chromium pointer/keyboard,
+desktop Firefox standard-gamepad, and mobile landscape touch paths. The first
+browser fixture used only one declared opponent despite the eight-slot
+match-found contract; correcting the fixture to the established seven-
+opponent shape produced the final three-project pass and did not require a
+product change.
+
+The Batch 46 allowlist was formatted and `git diff --check` passed. The
+authoritative baseline retained configured/rolling 20 Hz and the 50 ms budget;
+synthetic four-player mean/p95/p99/max work was
+0.014/0.027/0.071/0.814 ms, while standard active snapshots remained exactly
+2,481/3,762 bytes. No standard gameplay, Radiation Storm, stats, persistence,
+schedule, public map, capability, or production value changed.
+
+**Bug ledger:** No product defect was proven, so no entry was added. RFG-001
+and RFG-002 remain closed historical camera proofs, RFG-003 remains the
+gate-dispositioned compositor rule, RFG-004 remains resolved, and the Batch 43/
+44 fixture corrections remain closed.
+
+**Deployment and disposition:** Skipped. Production remains on approved Batch
+33 commit `f39eb34131f8827f85432aafcc6d6c18a2d0ac51`; `newShell`, `schedules`,
+`largeWorlds`, `modernArt`, and `battleRoyale` remain strict server-owned
+opt-ins, default false, and unexposed. Proceed only to Batch 47 under the user's
 standing direct-development authorization. Capability exposure, deployment,
 production restart, and live smoke remain explicitly unauthorized.
 

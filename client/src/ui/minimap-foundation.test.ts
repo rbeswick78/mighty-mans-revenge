@@ -296,4 +296,29 @@ describe('minimap foundation', () => {
       { kind: 'local', playerId: 'local' },
     ]);
   });
+
+  it('projects current and next BR circles without adding rival markers', () => {
+    const projection = createMinimapDynamicProjection(
+      map,
+      layout,
+      dynamicInput({
+        battleRoyaleSafeZone: {
+          phaseIndex: 1,
+          phase: 'closing',
+          center: { x: 480, y: 288 },
+          radius: 144,
+          nextCenter: { x: 528, y: 288 },
+          nextRadius: 72,
+          phaseSecondsRemaining: 8,
+          damagePerPulse: 2,
+        },
+      }),
+    );
+    expect(projection.safeZone).toMatchObject({
+      phase: 'closing',
+      current: { radius: 30 },
+      next: { radius: 15 },
+    });
+    expect(projection.players.map(({ playerId }) => playerId)).toEqual(['local']);
+  });
 });

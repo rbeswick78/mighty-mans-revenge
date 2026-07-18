@@ -1498,6 +1498,223 @@ test('Battle Royale projects one-slot inventory, loot, and contextual reload inp
   }
 });
 
+test('Battle Royale projects the authoritative safe zone into world, minimap, and tactical map', async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    !shellAdvertised || !battleRoyaleAdvertised,
+    'Run with CAPABILITY_NEW_SHELL=true and CAPABILITY_BATTLE_ROYALE=true.',
+  );
+  test.setTimeout(60_000);
+  const gamepadProject = testInfo.project.name === 'desktop-firefox';
+  await page.addInitScript((mockGamepad) => {
+    if (!mockGamepad) return;
+    const state = {
+      axes: [0, 0, 0, 0],
+      buttons: Array.from({ length: 16 }, () => ({ pressed: false, value: 0 })),
+    };
+    Object.defineProperty(navigator, 'getGamepads', {
+      configurable: true,
+      value: () => [
+        {
+          id: 'Batch 46 Standard Gamepad',
+          index: 0,
+          connected: true,
+          mapping: 'standard',
+          axes: state.axes,
+          buttons: state.buttons,
+          timestamp: 0,
+        },
+      ],
+    });
+    (window as unknown as { __battleZoneGamepad?: typeof state }).__battleZoneGamepad = state;
+  }, gamepadProject);
+  await page.addInitScript(() => {
+    localStorage.setItem('mmr_fighter_selection', 'rook');
+    localStorage.setItem('mmr_nickname', 'Circle46');
+  });
+  await page.goto('/');
+  if (testInfo.project.name !== 'desktop-chromium') {
+    await stageNonChromiumShell(page, `battle-zone-${testInfo.project.name}`);
+  }
+  await waitForActiveScene(page, 'ReforgedShellScene');
+  const localId = await page.evaluate(() => {
+    const shell = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'ReforgedShellScene',
+    ) as unknown as {
+      gameService: {
+        getNetworkManager(): {
+          getPlayerId(): string | null;
+          handleMessage(message: unknown): void;
+        };
+      };
+    };
+    const manager = shell.gameService.getNetworkManager();
+    const playerId = manager.getPlayerId();
+    if (!playerId) throw new Error('missing local Battle Royale zone player');
+    manager.handleMessage({
+      type: 'server:matchFound',
+      matchId: 'battle-zone-46',
+      opponents: Array.from({ length: 7 }, (_, index) => ({
+        id: index === 0 ? 'hidden-rival-46' : `hidden-rival-46-${index}`,
+        nickname: index === 0 ? 'Hidden Rival' : `Hidden Rival ${index}`,
+      })),
+      mapName: 'Shatterlands',
+      gameMode: 'deathmatch',
+      matchKind: 'battle_royale',
+      battleRoyale: { participantCount: 8, humanCount: 1, botCount: 7 },
+    });
+    return playerId;
+  });
+  await waitForActiveScene(page, 'GameScene');
+
+  await page.evaluate((playerId) => {
+    const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'GameScene',
+    ) as unknown as {
+      gameService: { getNetworkManager(): { handleMessage(message: unknown): void } };
+      tacticalMapRenderer: {
+        launcher: Phaser.GameObjects.Rectangle;
+      };
+    };
+    const player = (id: string, x: number, y: number, nickname: string) => ({
+      id,
+      characterId: 'rook',
+      position: { x, y },
+      velocity: { x: 0, y: 0 },
+      aimAngle: 0,
+      health: 100,
+      maxHealth: 100,
+      armor: 0,
+      ammo: 0,
+      weaponId: 'punch',
+      battleRoyaleInventory: { equipped: null, loadedAmmo: 0, reserveAmmo: 0 },
+      specialAmmo: 0,
+      specialReserve: 0,
+      grenades: 3,
+      isReloading: false,
+      isSprinting: false,
+      stamina: 3,
+      isDead: false,
+      respawnTimer: 0,
+      invulnerableTimer: 0,
+      lastProcessedInput: 0,
+      score: 0,
+      deaths: 0,
+      nickname,
+      abilityActiveSeconds: 0,
+      abilityCooldownSeconds: 0,
+      frozenTimer: 0,
+      secondWindTimer: 0,
+    });
+    scene.gameService.getNetworkManager().handleMessage({
+      type: 'server:gameState',
+      tick: 46,
+      phase: 'active',
+      countdownTimer: 0,
+      matchTimer: 88,
+      players: [
+        player(playerId, 320, 256, 'Circle46'),
+        player('hidden-rival-46', 2200, 1200, 'Hidden Rival'),
+      ],
+      grenades: [],
+      axes: [],
+      bulletTrails: [],
+      barrelExplosions: [],
+      contract: {
+        id: 'hot_shot',
+        title: 'HOT SHOT',
+        objective: 'LAND 8 ATTACKS',
+        target: 8,
+        players: [],
+      },
+      punches: [],
+      pickups: [],
+      activeMutators: [],
+      isOvertime: false,
+      battleRoyaleSafeZone: {
+        phaseIndex: 3,
+        phase: 'closing',
+        center: { x: 1344, y: 816 },
+        radius: 560,
+        nextCenter: { x: 1180, y: 760 },
+        nextRadius: 300,
+        phaseSecondsRemaining: 8.4,
+        damagePerPulse: 4,
+      },
+    });
+  }, localId);
+
+  if (gamepadProject) {
+    await page.evaluate(() => {
+      const state = (
+        window as unknown as {
+          __battleZoneGamepad?: { buttons: Array<{ pressed: boolean; value: number }> };
+        }
+      ).__battleZoneGamepad;
+      if (!state) throw new Error('missing Battle Royale zone gamepad');
+      state.buttons[12] = { pressed: true, value: 1 };
+    });
+    await page.waitForTimeout(120);
+    await page.evaluate(() => {
+      const state = (
+        window as unknown as {
+          __battleZoneGamepad?: { buttons: Array<{ pressed: boolean; value: number }> };
+        }
+      ).__battleZoneGamepad;
+      if (state) state.buttons[12] = { pressed: false, value: 0 };
+    });
+  } else {
+    await page.evaluate(() => {
+      const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+        'GameScene',
+      ) as unknown as { tacticalMapRenderer: { launcher: Phaser.GameObjects.Rectangle } };
+      scene.tacticalMapRenderer.launcher.emit('pointerup');
+    });
+  }
+
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+          'GameScene',
+        ) as unknown as {
+          getBattleRoyaleSafeZoneRenderState(): Record<string, unknown> | null;
+          getTacticalMapRenderState(): Record<string, unknown> | null;
+          getMinimapRenderState(): { safeZone: { phase: string } | null } | null;
+        };
+        return {
+          world: scene.getBattleRoyaleSafeZoneRenderState(),
+          tactical: scene.getTacticalMapRenderState(),
+          minimapPhase: scene.getMinimapRenderState()?.safeZone?.phase,
+        };
+      }),
+    )
+    .toMatchObject({
+      world: { visible: true, outside: true, status: 'OUTSIDE SAFE ZONE · 4 DAMAGE' },
+      tactical: {
+        open: true,
+        regions: 4,
+        containers: 16,
+        safeZonePhase: 'closing',
+        rivalMarkers: 0,
+      },
+      minimapPhase: 'closing',
+    });
+
+  await page.keyboard.press('m');
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+          'GameScene',
+        ) as unknown as { getTacticalMapRenderState(): { open: boolean } | null };
+        return scene.getTacticalMapRenderState()?.open;
+      }),
+    )
+    .toBe(false);
+});
+
 test('Play submits one server-scheduled general intent and recovery clears queued entry', async ({
   page,
 }, testInfo) => {

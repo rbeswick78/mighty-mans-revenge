@@ -5,6 +5,7 @@ import {
   type CoreRunState,
   type KillConfirmedTagState,
   type TeamId,
+  type BattleRoyaleSafeZoneState,
 } from '@shared/types/game.js';
 import type { PlayerId } from '@shared/types/common.js';
 import type {
@@ -88,6 +89,18 @@ export interface MinimapPlayerProjection {
 export interface MinimapDynamicProjection {
   readonly objectives: readonly MinimapObjectiveProjection[];
   readonly players: readonly MinimapPlayerProjection[];
+  readonly safeZone: MinimapSafeZoneProjection | null;
+}
+
+export interface MinimapSafeZoneCircleProjection {
+  readonly center: HudPoint;
+  readonly radius: number;
+}
+
+export interface MinimapSafeZoneProjection {
+  readonly current: MinimapSafeZoneCircleProjection;
+  readonly next: MinimapSafeZoneCircleProjection | null;
+  readonly phase: BattleRoyaleSafeZoneState['phase'];
 }
 
 export interface MinimapPlayerState {
@@ -105,6 +118,7 @@ export interface MinimapDynamicInput {
   readonly confirmedTags: readonly KillConfirmedTagState[];
   readonly coreRun: CoreRunState | null;
   readonly bountyHunt: BountyHuntState | null;
+  readonly battleRoyaleSafeZone?: BattleRoyaleSafeZoneState | null;
 }
 
 function point(x: number, y: number): HudPoint {
@@ -320,6 +334,24 @@ export function createMinimapDynamicProjection(
 ): MinimapDynamicProjection {
   const worldBounds = worldBoundsForMap(mapData);
   const objectives: MinimapObjectiveProjection[] = [];
+  const zone = input.battleRoyaleSafeZone;
+  const radiusScale = layout.map.width / worldBounds.width;
+  const safeZone: MinimapSafeZoneProjection | null = zone
+    ? Object.freeze({
+        current: Object.freeze({
+          center: projectWorldPointToMinimap(worldBounds, layout.map, zone.center),
+          radius: zone.radius * radiusScale,
+        }),
+        next:
+          zone.nextCenter && zone.nextRadius !== null
+            ? Object.freeze({
+                center: projectWorldPointToMinimap(worldBounds, layout.map, zone.nextCenter),
+                radius: zone.nextRadius * radiusScale,
+              })
+            : null,
+        phase: zone.phase,
+      })
+    : null;
 
   if (input.gameMode === GameModeType.KOTH && input.koth) {
     objectives.push(
@@ -397,5 +429,6 @@ export function createMinimapDynamicProjection(
   return Object.freeze({
     objectives: Object.freeze(objectives),
     players: Object.freeze(players),
+    safeZone,
   });
 }

@@ -215,6 +215,11 @@ describe('MatchmakingManager Battle Royale queue', () => {
       battleRoyaleState.message.battleRoyaleContainers?.every(({ status }) => status === 'intact'),
     ).toBe(true);
     expect(battleRoyaleState.message.battleRoyaleSupplyBundles).toEqual([]);
+    expect(battleRoyaleState.message.battleRoyaleSafeZone).toMatchObject({
+      phaseIndex: 0,
+      phase: 'preview',
+      damagePerPulse: 0,
+    });
 
     const standard = makeFakeServer();
     const standardManager = new MatchmakingManager(standard.fake);
@@ -234,6 +239,7 @@ describe('MatchmakingManager Battle Royale queue', () => {
     expect(standardState.message.droppedWeapons).toBeUndefined();
     expect(standardState.message.battleRoyaleContainers).toBeUndefined();
     expect(standardState.message.battleRoyaleSupplyBundles).toBeUndefined();
+    expect(standardState.message.battleRoyaleSafeZone).toBeUndefined();
     expect(
       standardState.message.players.every(
         ({ battleRoyaleInventory }) => battleRoyaleInventory === undefined,

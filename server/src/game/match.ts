@@ -39,6 +39,10 @@ import {
   isTauntId,
   applyWeaponRarityDamage,
   BATTLE_ROYALE_INVENTORY,
+  BATTLE_ROYALE_SAFE_ZONE,
+  createBattleRoyaleSafeZonePlan,
+  battleRoyaleSafeZoneStateAt,
+  isOutsideBattleRoyaleSafeZone,
 } from '@shared/game';
 import type {
   PlayerId,
@@ -73,6 +77,8 @@ import type {
   TauntId,
   TeamId,
   BattleRoyaleMatchFormat,
+  BattleRoyaleSafeZonePlan,
+  BattleRoyaleSafeZoneState,
   BattleRoyaleContainerState,
   BattleRoyaleSupplyBundleState,
   DroppedWeaponState,
@@ -246,6 +252,9 @@ export class Match implements MatchContext {
   private readonly battleRoyaleLifecycle: BattleRoyaleLifecycle | null;
   /** Monotonic simulation cohort used to recognize same-tick final combat trades. */
   private battleRoyaleSimulationStep = 0;
+  private readonly battleRoyaleSafeZonePlan: BattleRoyaleSafeZonePlan | null;
+  private battleRoyaleSafeZoneElapsed = 0;
+  private battleRoyaleSafeZonePulseTimer = BATTLE_ROYALE_SAFE_ZONE.PULSE_SECONDS;
   /**
    * Set when the match ended because everyone else disconnected/forfeited.
    * Overrides the game mode's scoreboard winner in getResult().
@@ -386,6 +395,9 @@ export class Match implements MatchContext {
     this.plannedMidMatchMutator = plannedMidMatchMutator;
     this.timeLimitSeconds = resolveTimeLimitSeconds();
     this.stableSeed = stableSeed ?? matchId;
+    this.battleRoyaleSafeZonePlan = this.battleRoyaleLifecycle
+      ? createBattleRoyaleSafeZonePlan(this.stableSeed, mapData)
+      : null;
     this.battleRoyaleLootManager = this.battleRoyaleInventoryManager
       ? new BattleRoyaleLootManager(this.stableSeed, this.battleRoyaleInventoryManager)
       : null;
@@ -1267,6 +1279,14 @@ export class Match implements MatchContext {
     };
   }
 
+  getBattleRoyaleSafeZoneState(): BattleRoyaleSafeZoneState | null {
+    if (!this.battleRoyaleSafeZonePlan || this.phase !== MatchPhase.ACTIVE) return null;
+    return battleRoyaleSafeZoneStateAt(
+      this.battleRoyaleSafeZonePlan,
+      this.battleRoyaleSafeZoneElapsed,
+    );
+  }
+
   getScrapstormState(): ScrapstormState | null {
     if (!this.mutatorActive('scrapstorm') || this.isOvertime || this.phase !== MatchPhase.ACTIVE)
       return null;
@@ -1874,6 +1894,7 @@ export class Match implements MatchContext {
     this.updateWastelandWarp(dt);
     this.updateRadiationStorm(dt);
     this.updateScrapstorm(dt);
+    this.updateBattleRoyaleSafeZone(dt);
 
     // Update pickups. Weapon pickups about to land generate one-shot
     // "INCOMING" warnings for the HUD banner.
@@ -3211,6 +3232,45 @@ export class Match implements MatchContext {
         player.health = Math.max(1, player.health - MUTATORS.RADIATION_STORM_DAMAGE_PER_PULSE);
       }
     }
+  }
+
+  /** Advance the Battle Royale-only lethal circle in stable player-id order. */
+  private updateBattleRoyaleSafeZone(dt: number): void {
+    if (!this.battleRoyaleSafeZonePlan) return;
+    let cursor = this.battleRoyaleSafeZoneElapsed;
+    let remaining = dt;
+    while (remaining >= this.battleRoyaleSafeZonePulseTimer) {
+      cursor += this.battleRoyaleSafeZonePulseTimer;
+      remaining -= this.battleRoyaleSafeZonePulseTimer;
+      this.battleRoyaleSafeZonePulseTimer = BATTLE_ROYALE_SAFE_ZONE.PULSE_SECONDS;
+      const state = battleRoyaleSafeZoneStateAt(this.battleRoyaleSafeZonePlan, cursor);
+      if (state.damagePerPulse <= 0) continue;
+      const living = [...this.players.values()]
+        .filter((player) => !player.isDead)
+        .sort((left, right) => left.id.localeCompare(right.id));
+      for (const player of living) {
+        if (!isOutsideBattleRoyaleSafeZone(player.position, state)) continue;
+        const result = this.combatManager.applyLethalEnvironmentalDamage(
+          player,
+          state.damagePerPulse,
+        );
+        if (!result.killed) continue;
+        player.respawnTimer = 0;
+        player.deaths += 1;
+        this.stats.recordDeath(player.id);
+        this.cancelActiveAbility(player);
+        this.pendingBursts.delete(player.id);
+        this.fireCooldownTimers.delete(player.id);
+        this.battleRoyaleLifecycle?.recordElimination(
+          player.id,
+          'zone',
+          this.battleRoyaleSimulationStep,
+        );
+        this.clearBattleRoyaleInventoryOnElimination(player);
+      }
+    }
+    this.battleRoyaleSafeZonePulseTimer -= remaining;
+    this.battleRoyaleSafeZoneElapsed += dt;
   }
 
   /** Paint captured positions, then resolve fair nonlethal arena blasts. */

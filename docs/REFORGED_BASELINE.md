@@ -639,3 +639,41 @@ browser proof passed. The authoritative baseline retained configured/rolling
 2,481/3,762 bytes. All capabilities remain default false and unexposed;
 production remains on Batch 33 and no deployment, restart, or live smoke
 occurred.
+
+### Batch 46 Battle Royale safe-zone baseline
+
+Battle Royale now owns a deterministic eight-segment circle plan generated
+from the stable match seed and private arena dimensions without consuming
+gameplay RNG. Preview, closing, hold, and final phases carry exact durations;
+closing centers and radii interpolate from strictly nested bounded circles,
+holds remain fixed, and the final closure reaches radius zero. One-second
+outside pulses escalate from 2 through 16 damage, honor invulnerability and
+Iron Hide, drain armor before health, create no attacker or kill credit, and
+can eliminate in stable player-ID order. Same-simulation-step combat/zone final
+cohorts retain coherent mutual-elimination placement, while departures remain
+separately ordered and one-life respawn stays disabled.
+
+`battleRoyaleSafeZone` is an additive optional snapshot containing only the
+current/next circle, phase index/name, phase time remaining, and pulse damage.
+The client validates the complete object atomically, clears old-server
+omission, and projects it without advancing a gameplay clock. Standard
+snapshots omit the field and remain exactly 2,481/3,762 UTF-8 JSON bytes. The
+existing Radiation Storm state and nonlethal standard-mutator path are
+unchanged.
+
+World boundary/wash/status, the compact minimap, and the Battle Royale-only
+tactical map all consume the same normalized state. The tactical map exposes
+authored regions, landmarks, containers, current/next circles, and the local
+fighter only; its input foundation supports keyboard M, standard-gamepad
+D-pad Up, and the MAP touch launcher, and its render-state contract proves zero
+generic rival markers. Closed tactical maps do not redraw their large static
+projection.
+
+The complete 155-file/1,730-test matrix, typecheck, lint, all builds, map and
+asset validation, the unchanged 624-product balance matrix, and focused
+Chromium/Firefox/mobile browser proof passed. The authoritative baseline
+retained configured/rolling 20 Hz and its 50 ms budget; synthetic four-player
+mean/p95/p99/max work was 0.014/0.027/0.071/0.814 ms, and standard active
+snapshots remained exactly 2,481/3,762 bytes. All capabilities remain default
+false and unexposed; production remains on Batch 33 and no deployment,
+restart, or live smoke occurred.

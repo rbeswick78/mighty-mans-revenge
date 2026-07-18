@@ -20,6 +20,7 @@ import {
   RumbleGrudge,
   WastelandWarpState,
   RadiationStormState,
+  BattleRoyaleSafeZoneState,
   ScrapstormState,
   MatchKind,
 } from './game.js';
@@ -412,6 +413,8 @@ export interface ServerGameStateMessage {
   wastelandWarp?: WastelandWarpState;
   /** Authoritative safe zone for the Radiation Storm mutator. */
   radiationStorm?: RadiationStormState;
+  /** Authoritative Battle Royale circle; absent on standard/old servers. */
+  battleRoyaleSafeZone?: BattleRoyaleSafeZoneState;
   /** Authoritative warning for the next Scrapstorm impact. */
   scrapstorm?: ScrapstormState;
 }

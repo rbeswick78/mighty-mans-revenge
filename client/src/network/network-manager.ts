@@ -19,6 +19,7 @@ import type {
   BountyHuntState,
   WastelandWarpState,
   RadiationStormState,
+  BattleRoyaleSafeZoneState,
   ScrapstormState,
   RumbleLeadState,
 } from '@shared/types/game.js';
@@ -138,6 +139,57 @@ function normalizePlayerWeaponInstance(
   return normalizePlayerBattleRoyaleInventory(state)?.equipped ?? undefined;
 }
 
+function normalizeBattleRoyaleSafeZone(
+  value: ServerGameStateMessage['battleRoyaleSafeZone'],
+): BattleRoyaleSafeZoneState | null {
+  if (!value) return null;
+  const phases = [
+    'preview',
+    'closing',
+    'hold',
+    'closing',
+    'hold',
+    'closing',
+    'hold',
+    'final',
+  ] as const;
+  const finitePoint = (point: Vec2 | null): point is Vec2 =>
+    point !== null && Number.isFinite(point.x) && Number.isFinite(point.y);
+  const nextCoherent =
+    (value.nextCenter === null && value.nextRadius === null) ||
+    (finitePoint(value.nextCenter) &&
+      typeof value.nextRadius === 'number' &&
+      Number.isFinite(value.nextRadius) &&
+      value.nextRadius >= 0);
+  if (
+    !Number.isInteger(value.phaseIndex) ||
+    value.phaseIndex < 0 ||
+    value.phaseIndex >= phases.length ||
+    phases[value.phaseIndex] !== value.phase ||
+    !finitePoint(value.center) ||
+    !Number.isFinite(value.radius) ||
+    value.radius < 0 ||
+    !nextCoherent ||
+    (value.phase === 'final') !== (value.nextCenter === null && value.nextRadius === null) ||
+    !Number.isFinite(value.phaseSecondsRemaining) ||
+    value.phaseSecondsRemaining < 0 ||
+    !Number.isFinite(value.damagePerPulse) ||
+    value.damagePerPulse < 0
+  ) {
+    return null;
+  }
+  return {
+    phaseIndex: value.phaseIndex,
+    phase: value.phase,
+    center: { ...value.center },
+    radius: value.radius,
+    nextCenter: value.nextCenter ? { ...value.nextCenter } : null,
+    nextRadius: value.nextRadius,
+    phaseSecondsRemaining: value.phaseSecondsRemaining,
+    damagePerPulse: value.damagePerPulse,
+  };
+}
+
 export class NetworkManager {
   private connection: NetworkConnection;
   private prediction: ClientPrediction;
@@ -185,6 +237,7 @@ export class NetworkManager {
   private _bountyHuntState: BountyHuntState | null = null;
   private _wastelandWarpState: WastelandWarpState | null = null;
   private _radiationStormState: RadiationStormState | null = null;
+  private _battleRoyaleSafeZoneState: BattleRoyaleSafeZoneState | null = null;
   private _scrapstormState: ScrapstormState | null = null;
   /** Undefined until the first group snapshot; monotonic within one match. */
   private lastRumbleLeadSequence: number | undefined = undefined;
@@ -311,6 +364,7 @@ export class NetworkManager {
     this._bountyHuntState = null;
     this._wastelandWarpState = null;
     this._radiationStormState = null;
+    this._battleRoyaleSafeZoneState = null;
     this._scrapstormState = null;
     this.lastRumbleLeadSequence = undefined;
     this.matchEndsAtLocalMs = null;
@@ -333,6 +387,10 @@ export class NetworkManager {
 
   getRadiationStormState(): RadiationStormState | null {
     return this._radiationStormState;
+  }
+
+  getBattleRoyaleSafeZoneState(): BattleRoyaleSafeZoneState | null {
+    return this._battleRoyaleSafeZoneState;
   }
 
   getScrapstormState(): ScrapstormState | null {
@@ -1019,6 +1077,7 @@ export class NetworkManager {
     this._bountyHuntState = msg.bountyHunt ?? null;
     this._wastelandWarpState = msg.wastelandWarp ?? null;
     this._radiationStormState = msg.radiationStorm ?? null;
+    this._battleRoyaleSafeZoneState = normalizeBattleRoyaleSafeZone(msg.battleRoyaleSafeZone);
     this._scrapstormState = msg.scrapstorm ?? null;
     if (msg.rumbleLead) {
       if (

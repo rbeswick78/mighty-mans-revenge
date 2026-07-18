@@ -2544,6 +2544,7 @@ export class MatchmakingManager {
       rumbleLead: match.getRumbleLeadState() ?? undefined,
       wastelandWarp: match.getWastelandWarpState() ?? undefined,
       radiationStorm: match.getRadiationStormState() ?? undefined,
+      battleRoyaleSafeZone: match.getBattleRoyaleSafeZoneState() ?? undefined,
       scrapstorm: match.getScrapstormState() ?? undefined,
     };
 

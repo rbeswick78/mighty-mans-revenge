@@ -483,3 +483,26 @@ This remains dormant support code. `battleRoyale`, `newShell`, `schedules`,
 false, and unexposed. Batch 46 owns safe-zone phases. Production remains on
 approved Batch 33, and no deployment, restart, live smoke, or capability
 advertisement is authorized.
+
+## Batch 46 safe-zone disposition
+
+Batch 46 does not add or expose a capability. A server-authored Battle Royale
+match constructs one deterministic nested-circle plan and advances every
+phase, pulse, elimination, and terminal placement. The optional
+`battleRoyaleSafeZone` snapshot is present only while that lifecycle is active;
+standard matches omit it, old-server omission clears it, and malformed client
+input fails closed. This state is independent of the established standard
+Radiation Storm mutator and does not activate either standard mutator slot.
+
+The Battle Royale capability-owned client may project current/next boundaries,
+local danger and timing, compact minimap circles, and a responsive tactical map
+containing authored map truth plus the local fighter. It never receives a
+tactical-map rival collection and cannot advance a phase, apply damage, choose
+a circle, or author a placement. Keyboard, standard gamepad, and touch only
+toggle the local overlay and suppress local gameplay input while it is open.
+
+This remains dormant support code. `battleRoyale`, `newShell`, `schedules`,
+`largeWorlds`, and `modernArt` remain strict server-owned opt-ins, default
+false, and unexposed. Batch 47 owns Battle Royale bot loot/zone behavior.
+Production remains on approved Batch 33, and no deployment, restart, live
+smoke, or capability advertisement is authorized.

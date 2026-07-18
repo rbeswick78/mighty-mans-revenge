@@ -6,7 +6,7 @@ import type {
   PlayerState,
 } from '@shared/game';
 
-export type BattleRoyaleEliminationCause = 'combat' | 'departure';
+export type BattleRoyaleEliminationCause = 'combat' | 'zone' | 'departure';
 
 interface EliminationEvent {
   readonly playerId: PlayerId;
@@ -69,15 +69,15 @@ export class BattleRoyaleLifecycle {
     );
     const winnerId = livingIds.length === 1 ? livingIds[0] : null;
     const finalEvent = orderedEliminations.at(-1);
-    const finalCombatCohort =
-      winnerId === null && finalEvent?.cause === 'combat'
+    const finalLethalCohort =
+      winnerId === null && finalEvent !== undefined && finalEvent.cause !== 'departure'
         ? orderedEliminations.filter(
             (event) =>
-              event.cause === 'combat' && event.simulationStep === finalEvent.simulationStep,
+              event.cause !== 'departure' && event.simulationStep === finalEvent.simulationStep,
           )
         : [];
     const tiedFirstIds = new Set(
-      finalCombatCohort.length >= 2 ? finalCombatCohort.map((event) => event.playerId) : [],
+      finalLethalCohort.length >= 2 ? finalLethalCohort.map((event) => event.playerId) : [],
     );
     const terminalReason = this.terminalReason(winnerId, orderedEliminations, tiedFirstIds.size);
 

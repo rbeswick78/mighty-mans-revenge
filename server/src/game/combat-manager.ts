@@ -650,6 +650,31 @@ export class CombatManager {
     return armorBefore - victim.armor + (healthBefore - victim.health);
   }
 
+  /** Apply lethal, unattributed arena pressure with normal defensive reduction. */
+  applyLethalEnvironmentalDamage(
+    victim: PlayerState,
+    damage: number,
+  ): { killed: boolean; damageApplied: number } {
+    if (victim.isDead || victim.invulnerableTimer > 0 || damage <= 0) {
+      return { killed: false, damageApplied: 0 };
+    }
+    const reducedDamage = this.damageAfterReduction(victim, damage);
+    const armorBefore = victim.armor;
+    const healthBefore = victim.health;
+    const absorbed = Math.min(victim.armor, reducedDamage);
+    victim.armor -= absorbed;
+    victim.health = Math.max(0, victim.health - (reducedDamage - absorbed));
+    const killed = victim.health <= 0;
+    if (killed) {
+      victim.isDead = true;
+      victim.respawnTimer = RESPAWN.DELAY;
+    }
+    return {
+      killed,
+      damageApplied: armorBefore - victim.armor + (healthBefore - victim.health),
+    };
+  }
+
   /** Shared Iron Hide policy for attributed and environmental damage. */
   private damageAfterReduction(victim: PlayerState, damage: number): number {
     return victim.characterId === 'bubba' && victim.abilityActiveSeconds > 0

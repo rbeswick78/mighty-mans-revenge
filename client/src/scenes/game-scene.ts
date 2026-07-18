@@ -56,6 +56,8 @@ import { touchAbilityState } from '../input/touch-action-presentation.js';
 import { DecalRenderer } from '../rendering/decal-renderer.js';
 import { KothHillRenderer } from '../rendering/koth-hill-renderer.js';
 import { RadiationStormRenderer } from '../rendering/radiation-storm-renderer.js';
+import { BattleRoyaleSafeZoneRenderer } from '../rendering/battle-royale-safe-zone-renderer.js';
+import { TacticalMapRenderer } from '../rendering/tactical-map-renderer.js';
 import { ScrapstormRenderer } from '../rendering/scrapstorm-renderer.js';
 import { MinimapRenderer } from '../rendering/minimap-renderer.js';
 import {
@@ -115,6 +117,7 @@ import {
   type ResponsiveCombatHudLayout,
 } from '../ui/responsive-combat-hud.js';
 import { minimapLayoutForGameplay } from '../ui/minimap-foundation.js';
+import { tacticalMapLayoutForGameplay } from '../ui/tactical-map-foundation.js';
 import { useLegacyLogicalSize } from '../ui/reforged/responsive-menu-layout.js';
 import {
   createWorldRenderPlan,
@@ -167,6 +170,8 @@ export class GameScene extends Phaser.Scene {
   private confirmedTagRenderer: ConfirmedTagRenderer | null = null;
   private coreRunRenderer: CoreRunRenderer | null = null;
   private radiationStormRenderer: RadiationStormRenderer | null = null;
+  private battleRoyaleSafeZoneRenderer: BattleRoyaleSafeZoneRenderer | null = null;
+  private tacticalMapRenderer: TacticalMapRenderer | null = null;
   private scrapstormRenderer: ScrapstormRenderer | null = null;
   private minimapRenderer: MinimapRenderer | null = null;
   private grenadeRenderer: GrenadeRenderer | null = null;
@@ -215,6 +220,7 @@ export class GameScene extends Phaser.Scene {
   private matchMenu: MatchMenu | null = null;
   private matchMenuGamepad: MenuGamepadInput | null = null;
   private onMatchMenuEscape: (() => void) | null = null;
+  private onTacticalMapKey: (() => void) | null = null;
   private leavingMatch = false;
   /** Announce the first meaningful controller input once per round. */
   private controllerAnnounced = false;
@@ -313,6 +319,7 @@ export class GameScene extends Phaser.Scene {
   private lastBountyTargetId: PlayerId | null | undefined = undefined;
   /** Undefined before the first warp snapshot; later edges trigger feedback. */
   private lastWastelandWarpSequence: number | undefined = undefined;
+  private lastBattleRoyaleSafeZonePhaseIndex: number | undefined = undefined;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -340,6 +347,9 @@ export class GameScene extends Phaser.Scene {
     this.combatHudLayout = null;
     this.worldRenderPlan = null;
     this.minimapRenderer = null;
+    this.battleRoyaleSafeZoneRenderer = null;
+    this.tacticalMapRenderer = null;
+    this.lastBattleRoyaleSafeZonePhaseIndex = undefined;
     this.reforgedVisualCutover = null;
     this.worldRenderQuality.reset();
   }
@@ -428,6 +438,12 @@ export class GameScene extends Phaser.Scene {
       this,
       this.worldRenderPlan.viewportResource,
     );
+    if (capabilities.battleRoyale && this.matchData?.matchKind === 'battle_royale') {
+      this.battleRoyaleSafeZoneRenderer = new BattleRoyaleSafeZoneRenderer(
+        this,
+        this.worldRenderPlan.viewportResource,
+      );
+    }
     this.scrapstormRenderer = new ScrapstormRenderer(this, this.worldRenderPlan.viewportResource);
     this.grenadeRenderer = new GrenadeRenderer(this);
     this.axeRenderer = new AxeRenderer(this);
@@ -480,6 +496,20 @@ export class GameScene extends Phaser.Scene {
     if (grid && minimapLayout) {
       this.minimapRenderer = new MinimapRenderer(this, mapData, grid, minimapLayout);
     }
+    if (
+      grid &&
+      capabilities.battleRoyale &&
+      this.matchData?.matchKind === 'battle_royale' &&
+      mapData.battleRoyale
+    ) {
+      this.tacticalMapRenderer = new TacticalMapRenderer(
+        this,
+        mapData,
+        grid,
+        tacticalMapLayoutForGameplay(this.combatHudLayout, this.worldRenderPlan.worldBounds),
+        () => this.toggleTacticalMap(),
+      );
+    }
     this.hud = new HUD(this, this.combatHudLayout, this.reforgedVisualCutover.active);
     // Bullseye replaces the OS cursor on desktop only — touch input
     // doesn't have a hover position to track.
@@ -501,17 +531,22 @@ export class GameScene extends Phaser.Scene {
       },
       () => this.leaveCurrentMatch(),
       (open) => {
-        this.inputManager?.setGameplayEnabled(!open && this.matchPhase === MatchPhase.ACTIVE);
+        this.inputManager?.setGameplayEnabled(
+          !open && !this.tacticalMapRenderer?.isOpen() && this.matchPhase === MatchPhase.ACTIVE,
+        );
       },
       this.combatHudLayout,
     );
     this.matchMenu.setAvailable(false);
     this.onMatchMenuEscape = () => {
       if (this.leavingMatch || this.endTransitionStarted) return;
-      if (this.matchMenu?.isOpen()) this.matchMenu.back();
+      if (this.tacticalMapRenderer?.isOpen()) this.toggleTacticalMap(false);
+      else if (this.matchMenu?.isOpen()) this.matchMenu.back();
       else this.matchMenu?.show();
     };
     this.input.keyboard?.on('keydown-ESC', this.onMatchMenuEscape);
+    this.onTacticalMapKey = () => this.toggleTacticalMap();
+    this.input.keyboard?.on('keydown-M', this.onTacticalMapKey);
 
     // Wire up network events
     this.wireGameServiceEvents();
@@ -575,7 +610,9 @@ export class GameScene extends Phaser.Scene {
         localState.position,
         this.currentTick,
         hasActiveGrenade,
-        localState.frozenTimer > 0 || !!this.matchMenu?.isOpen(),
+        localState.frozenTimer > 0 ||
+          !!this.matchMenu?.isOpen() ||
+          !!this.tacticalMapRenderer?.isOpen(),
         this.matchData?.gameMode === GameModeType.ONE_IN_THE_CHAMBER,
       );
       this.gameService.sendInput(input);
@@ -1099,6 +1136,26 @@ export class GameScene extends Phaser.Scene {
       networkManager.getLocalPlayerState()?.position ?? null,
       this.time.now,
     );
+    const battleRoyaleSafeZone = networkManager.getBattleRoyaleSafeZoneState();
+    this.battleRoyaleSafeZoneRenderer?.update(
+      battleRoyaleSafeZone,
+      networkManager.getLocalPlayerState()?.position ?? null,
+      this.time.now,
+    );
+    this.tacticalMapRenderer?.update(
+      battleRoyaleSafeZone,
+      networkManager.getLocalPlayerState()?.position ?? null,
+    );
+    if (
+      battleRoyaleSafeZone &&
+      battleRoyaleSafeZone.phaseIndex !== this.lastBattleRoyaleSafeZonePhaseIndex
+    ) {
+      const previewCenter = battleRoyaleSafeZone.nextCenter ?? battleRoyaleSafeZone.center;
+      this.reforgedCombatFeedback?.showZonePreview(previewCenter.x, previewCenter.y);
+      this.lastBattleRoyaleSafeZonePhaseIndex = battleRoyaleSafeZone.phaseIndex;
+    } else if (!battleRoyaleSafeZone) {
+      this.lastBattleRoyaleSafeZonePhaseIndex = undefined;
+    }
     this.scrapstormRenderer?.update(
       networkManager.getScrapstormState(),
       networkManager.getPlayerId(),
@@ -1115,6 +1172,7 @@ export class GameScene extends Phaser.Scene {
       confirmedTags: networkManager.getConfirmedTags(),
       coreRun: coreRunState,
       bountyHunt: networkManager.getBountyHuntState(),
+      battleRoyaleSafeZone,
     });
     if (coreRunState) {
       const carrierId = coreRunState.carrierId;
@@ -1397,6 +1455,16 @@ export class GameScene extends Phaser.Scene {
     return this.minimapRenderer?.getRenderState() ?? null;
   }
 
+  getBattleRoyaleSafeZoneRenderState(): ReturnType<
+    BattleRoyaleSafeZoneRenderer['getRenderState']
+  > | null {
+    return this.battleRoyaleSafeZoneRenderer?.getRenderState() ?? null;
+  }
+
+  getTacticalMapRenderState(): ReturnType<TacticalMapRenderer['getRenderState']> | null {
+    return this.tacticalMapRenderer?.getRenderState() ?? null;
+  }
+
   getCameraController(): CameraController | null {
     return this.cameraController;
   }
@@ -1501,6 +1569,11 @@ export class GameScene extends Phaser.Scene {
       );
       if (minimapLayout) this.minimapRenderer.setLayout(minimapLayout);
     }
+    if (this.tacticalMapRenderer && this.worldRenderPlan) {
+      this.tacticalMapRenderer.setLayout(
+        tacticalMapLayoutForGameplay(this.combatHudLayout, this.worldRenderPlan.worldBounds),
+      );
+    }
   }
 
   private updateMatchMenuInput(): void {
@@ -1508,11 +1581,20 @@ export class GameScene extends Phaser.Scene {
     if (!actions?.hasAction || !this.matchMenu || this.leavingMatch) return;
 
     if (actions.menu) {
+      if (this.tacticalMapRenderer?.isOpen()) {
+        this.toggleTacticalMap(false);
+        return;
+      }
       if (this.matchMenu.isOpen()) this.matchMenu.hide();
       else if (!this.endTransitionStarted) this.matchMenu.show();
       return;
     }
-    if (!this.matchMenu.isOpen()) return;
+    if (!this.matchMenu.isOpen()) {
+      if (actions.up && this.tacticalMapRenderer && !this.endTransitionStarted) {
+        this.toggleTacticalMap();
+      }
+      return;
+    }
     if (actions.back) {
       this.matchMenu.back();
       return;
@@ -1520,6 +1602,16 @@ export class GameScene extends Phaser.Scene {
     if (actions.up || actions.left) this.matchMenu.moveFocus(-1);
     else if (actions.down || actions.right) this.matchMenu.moveFocus(1);
     else if (actions.confirm) this.matchMenu.activateFocused();
+  }
+
+  private toggleTacticalMap(open?: boolean): void {
+    if (!this.tacticalMapRenderer || this.leavingMatch || this.endTransitionStarted) return;
+    const nextOpen = open ?? !this.tacticalMapRenderer.isOpen();
+    if (nextOpen && this.matchMenu?.isOpen()) this.matchMenu.hide();
+    this.tacticalMapRenderer.setOpen(nextOpen);
+    this.inputManager?.setGameplayEnabled(
+      !nextOpen && !this.matchMenu?.isOpen() && this.matchPhase === MatchPhase.ACTIVE,
+    );
   }
 
   private leaveCurrentMatch(): void {
@@ -1588,7 +1680,9 @@ export class GameScene extends Phaser.Scene {
     this.onMatchStart = () => {
       this.matchPhase = MatchPhase.ACTIVE;
       this.matchMenu?.setAvailable(true);
-      this.inputManager?.setGameplayEnabled(!this.matchMenu?.isOpen());
+      this.inputManager?.setGameplayEnabled(
+        !this.matchMenu?.isOpen() && !this.tacticalMapRenderer?.isOpen(),
+      );
       if (this.hud) {
         this.hud.showCountdown(0); // Shows "FIGHT!"
         this.hud.hideModeBriefing();
@@ -2173,6 +2267,7 @@ export class GameScene extends Phaser.Scene {
       }
       this.decalRenderer?.updateDestroyedTiles(tiles);
       this.minimapRenderer?.refreshStatic();
+      this.tacticalMapRenderer?.refreshStatic();
     };
 
     // Sudden-death overtime: the tie banner beat. The clock re-anchor is
@@ -2437,6 +2532,10 @@ export class GameScene extends Phaser.Scene {
       this.input.keyboard?.off('keydown-ESC', this.onMatchMenuEscape);
       this.onMatchMenuEscape = null;
     }
+    if (this.onTacticalMapKey) {
+      this.input.keyboard?.off('keydown-M', this.onTacticalMapKey);
+      this.onTacticalMapKey = null;
+    }
     if (this.matchMenu) {
       this.matchMenu.destroy();
       this.matchMenu = null;
@@ -2457,6 +2556,8 @@ export class GameScene extends Phaser.Scene {
       this.minimapRenderer.destroy();
       this.minimapRenderer = null;
     }
+    this.tacticalMapRenderer?.destroy();
+    this.tacticalMapRenderer = null;
     if (this.kothHillRenderer) {
       this.kothHillRenderer.destroy();
       this.kothHillRenderer = null;
@@ -2497,6 +2598,8 @@ export class GameScene extends Phaser.Scene {
       this.radiationStormRenderer.destroy();
       this.radiationStormRenderer = null;
     }
+    this.battleRoyaleSafeZoneRenderer?.destroy();
+    this.battleRoyaleSafeZoneRenderer = null;
     if (this.scrapstormRenderer) {
       this.scrapstormRenderer.destroy();
       this.scrapstormRenderer = null;

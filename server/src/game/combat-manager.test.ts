@@ -575,6 +575,35 @@ describe('CombatManager', () => {
     });
   });
 
+  describe('applyLethalEnvironmentalDamage', () => {
+    it('drains armor, can kill, and never manufactures attribution', () => {
+      const victim = createPlayer({ id: 'victim', health: 20, armor: 5 });
+      const result = combat.applyLethalEnvironmentalDamage(victim, 25);
+      expect(result).toEqual({ killed: true, damageApplied: 25 });
+      expect(victim).toMatchObject({ health: 0, armor: 0, isDead: true });
+      expect(result).not.toHaveProperty('entry');
+    });
+
+    it('respects Iron Hide and invulnerability', () => {
+      const bubba = createPlayer({
+        id: 'bubba',
+        characterId: 'bubba',
+        health: 20,
+        maxHealth: 150,
+        abilityActiveSeconds: ABILITY.BUBBA_IRON_HIDE.DURATION,
+      });
+      expect(combat.applyLethalEnvironmentalDamage(bubba, 20)).toEqual({
+        killed: false,
+        damageApplied: 10,
+      });
+      bubba.invulnerableTimer = 1;
+      expect(combat.applyLethalEnvironmentalDamage(bubba, 100)).toEqual({
+        killed: false,
+        damageApplied: 0,
+      });
+    });
+  });
+
   describe('processShot — per-character hitbox', () => {
     it("a graze that misses a 24px character hits Bubba's 30px box", () => {
       // Ray along y=100; victim center offset 14px below: outside half 12,

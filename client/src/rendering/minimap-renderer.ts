@@ -48,6 +48,7 @@ export class MinimapRenderer {
   private dynamicProjection: MinimapDynamicProjection = Object.freeze({
     objectives: Object.freeze([]),
     players: Object.freeze([]),
+    safeZone: null,
   });
 
   constructor(
@@ -144,6 +145,7 @@ export class MinimapRenderer {
     landmarks: MinimapStaticProjection['landmarks'];
     objectives: MinimapDynamicProjection['objectives'];
     players: MinimapDynamicProjection['players'];
+    safeZone: MinimapDynamicProjection['safeZone'];
     scrollFactors: readonly number[];
     interactive: false;
   }> {
@@ -157,6 +159,7 @@ export class MinimapRenderer {
       landmarks: this.staticProjection.landmarks,
       objectives: this.dynamicProjection.objectives,
       players: this.dynamicProjection.players,
+      safeZone: this.dynamicProjection.safeZone,
       scrollFactors: Object.freeze([
         this.staticGraphics.scrollFactorX,
         this.staticGraphics.scrollFactorY,
@@ -246,6 +249,20 @@ export class MinimapRenderer {
   private drawDynamic(): void {
     const gfx = this.dynamicGraphics;
     gfx.clear();
+
+    const safeZone = this.dynamicProjection.safeZone;
+    if (safeZone?.next) {
+      gfx.lineStyle(1, 0x62e6ff, 0.65);
+      gfx.strokeCircle(safeZone.next.center.x, safeZone.next.center.y, safeZone.next.radius);
+    }
+    if (safeZone) {
+      gfx.lineStyle(2, 0xb8ff62, 0.95);
+      gfx.strokeCircle(
+        safeZone.current.center.x,
+        safeZone.current.center.y,
+        Math.max(1, safeZone.current.radius),
+      );
+    }
 
     for (const objective of this.dynamicProjection.objectives) {
       if ((objective.kind === 'koth' || objective.kind === 'next-koth') && objective.rect) {

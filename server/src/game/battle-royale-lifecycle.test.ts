@@ -56,6 +56,11 @@ function activate(match: Match): void {
   match.matchTimer = MATCH.TIME_LIMIT;
 }
 
+function advance(match: Match, seconds: number): void {
+  const ticks = Math.round(seconds / 0.05);
+  for (let tick = 0; tick < ticks; tick += 1) match.update(0.05);
+}
+
 function eliminate(match: Match, killerId: string, victimId: string): void {
   match.onKill(killerId, victimId, 'gun');
 }
@@ -150,6 +155,118 @@ describe('Battle Royale lifecycle', () => {
     ]);
   });
 
+  it('authors a true draw when the closing zone eliminates the final fighters together', () => {
+    const match = createBattleRoyaleMatch(2);
+    activate(match);
+    for (const player of match.players.values()) {
+      player.characterId = 'mighty_man';
+      player.position = { x: 1, y: 1 };
+      player.health = 2;
+      player.armor = 0;
+      player.invulnerableTimer = 0;
+    }
+    advance(match, 31);
+
+    expect(match.phase).toBe(MatchPhase.ENDED);
+    const result = match.getResult();
+    expect(result.winnerId).toBeNull();
+    expect(result.battleRoyale?.terminalReason).toBe('mutual_elimination');
+    expect(result.battleRoyale?.placements).toEqual([
+      { playerId: 'player-0', placement: 1, status: 'drawn' },
+      { playerId: 'player-1', placement: 1, status: 'drawn' },
+    ]);
+    expect([...match.players.values()].every((player) => player.respawnTimer === 0)).toBe(true);
+  });
+
+  it('keeps a zone elimination ahead of a later departure in placement order', () => {
+    const match = createBattleRoyaleMatch(3);
+    activate(match);
+    const exposed = match.players.get('player-2')!;
+    exposed.characterId = 'mighty_man';
+    exposed.position = { x: 1, y: 1 };
+    exposed.health = 2;
+    exposed.invulnerableTimer = 0;
+    for (const id of ['player-0', 'player-1']) {
+      const player = match.players.get(id)!;
+      player.position = match.getBattleRoyaleSafeZoneState()!.center;
+    }
+    advance(match, 31);
+    expect(exposed.isDead).toBe(true);
+    match.onPlayerDisconnect('player-1');
+    expect(match.checkMatchEnd()).toBe(true);
+    expect(match.getResult().battleRoyale?.placements).toEqual([
+      { playerId: 'player-0', placement: 1, status: 'winner' },
+      { playerId: 'player-1', placement: 2, status: 'departed' },
+      { playerId: 'player-2', placement: 3, status: 'eliminated' },
+    ]);
+  });
+
+  it('starts exact one-second outside pulses only when preview becomes closing', () => {
+    const match = createBattleRoyaleMatch(3);
+    activate(match);
+    const exposed = match.players.get('player-2')!;
+    exposed.position = { x: -10_000, y: -10_000 };
+    exposed.health = 100;
+    exposed.armor = 0;
+    exposed.invulnerableTimer = 0;
+
+    advance(match, 11.95);
+    expect(exposed.health).toBe(100);
+    match.update(0.05);
+    expect(match.getBattleRoyaleSafeZoneState()).toMatchObject({
+      phaseIndex: 1,
+      phase: 'closing',
+      damagePerPulse: 2,
+    });
+    expect(exposed.health).toBe(98);
+    advance(match, 1);
+    expect(exposed.health).toBe(96);
+  });
+
+  it('advances two independent eight-fighter 20 Hz simulations through every phase', () => {
+    const first = createBattleRoyaleMatch(8);
+    const second = createBattleRoyaleMatch(8);
+    activate(first);
+    activate(second);
+    for (const match of [first, second]) {
+      for (const player of match.players.values()) {
+        player.health = 1_000_000;
+        player.invulnerableTimer = 0;
+      }
+    }
+
+    const checkpoints = [6, 22, 38, 52, 67, 80, 92, 106, 116.05];
+    const expectedPhases = [
+      'preview',
+      'closing',
+      'hold',
+      'closing',
+      'hold',
+      'closing',
+      'hold',
+      'final',
+      'final',
+    ];
+    let elapsed = 0;
+    for (let index = 0; index < checkpoints.length; index += 1) {
+      const delta = checkpoints[index] - elapsed;
+      advance(first, delta);
+      advance(second, delta);
+      elapsed = checkpoints[index];
+      expect(first.getBattleRoyaleSafeZoneState()).toEqual(second.getBattleRoyaleSafeZoneState());
+      expect(first.getBattleRoyaleSafeZoneState()?.phase).toBe(expectedPhases[index]);
+    }
+    expect(first.getBattleRoyaleSafeZoneState()).toMatchObject({
+      phaseIndex: 7,
+      phase: 'final',
+      radius: 0,
+      phaseSecondsRemaining: 0,
+      damagePerPulse: 16,
+    });
+    expect(first.phase).toBe(MatchPhase.ACTIVE);
+    expect([...first.players.values()].filter(({ isDead }) => !isDead)).toHaveLength(8);
+  });
+
   it('keeps disconnect and elimination ordering stable without rewriting prior deaths', () => {
     const match = createBattleRoyaleMatch();
     activate(match);
@@ -205,6 +322,10 @@ describe('Battle Royale lifecycle', () => {
     expect(eliminated.isDead).toBe(true);
     expect(eliminated.respawnTimer).toBe(0);
 
+    for (const player of match.players.values()) {
+      if (!player.isDead) player.health = 1_000_000;
+    }
+
     match.update(MATCH.TIME_LIMIT + 1);
     expect(match.phase).toBe(MatchPhase.ACTIVE);
     expect(match.isOvertime).toBe(false);
@@ -238,6 +359,7 @@ describe('Battle Royale lifecycle', () => {
     const serialized = JSON.parse(JSON.stringify(standard.getResult())) as Record<string, unknown>;
     expect(serialized).not.toHaveProperty('matchKind');
     expect(serialized).not.toHaveProperty('battleRoyale');
+    expect(standard.getBattleRoyaleSafeZoneState()).toBeNull();
   });
 
   it('applies rarity after ordinary rifle falloff only for a coherent instance', () => {

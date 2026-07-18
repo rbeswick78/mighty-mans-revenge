@@ -411,6 +411,21 @@ export const BATTLE_ROYALE_LOOT = Object.freeze({
   SUPPLY_PICKUP_RADIUS: 30,
 });
 
+/** Server-owned Battle Royale circle cadence and lethal pressure. */
+export const BATTLE_ROYALE_SAFE_ZONE = Object.freeze({
+  PULSE_SECONDS: 1,
+  PREVIEW_SECONDS: 12,
+  FIRST_CLOSE_SECONDS: 20,
+  FIRST_HOLD_SECONDS: 12,
+  SECOND_CLOSE_SECONDS: 18,
+  SECOND_HOLD_SECONDS: 10,
+  THIRD_CLOSE_SECONDS: 16,
+  THIRD_HOLD_SECONDS: 8,
+  FINAL_CLOSE_SECONDS: 20,
+  TARGET_RADIUS_FRACTIONS: Object.freeze([0.38, 0.2, 0.09]),
+  DAMAGE_PER_PULSE: Object.freeze([0, 2, 3, 4, 6, 8, 10, 16]),
+});
+
 /**
  * Runtime list of every kill-attribution source, for keying per-weapon
  * kill counters. Must stay in sync with the KillWeapon union in

@@ -116,6 +116,20 @@ export interface RadiationStormState {
   shrinkSecondsRemaining: number;
 }
 
+export type BattleRoyaleSafeZonePhase = 'preview' | 'closing' | 'hold' | 'final';
+
+/** Reconnect-safe authoritative Battle Royale circle and phase timing. */
+export interface BattleRoyaleSafeZoneState {
+  phaseIndex: number;
+  phase: BattleRoyaleSafeZonePhase;
+  center: Vec2;
+  radius: number;
+  nextCenter: Vec2 | null;
+  nextRadius: number | null;
+  phaseSecondsRemaining: number;
+  damagePerPulse: number;
+}
+
 /** Reconnect-safe warning for the next localized Scrapstorm strike. */
 export interface ScrapstormState {
   /** Captured world position; null during the quiet interval between strikes. */

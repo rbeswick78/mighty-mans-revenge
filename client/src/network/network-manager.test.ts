@@ -660,6 +660,59 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
     expect(manager.getRadiationStormState()).toBeNull();
   });
 
+  it('normalizes, mirrors, and clears the optional Battle Royale safe zone', () => {
+    const battleRoyaleSafeZone = {
+      phaseIndex: 2,
+      phase: 'hold' as const,
+      center: { x: 900, y: 700 },
+      radius: 420,
+      nextCenter: { x: 860, y: 650 },
+      nextRadius: 220,
+      phaseSecondsRemaining: 7.5,
+      damagePerPulse: 6,
+    };
+    deliver(makeGameState([makeSerialized()], { battleRoyaleSafeZone }));
+    expect(manager.getBattleRoyaleSafeZoneState()).toEqual(battleRoyaleSafeZone);
+
+    deliver(makeGameState([makeSerialized()], { tick: 2 }));
+    expect(manager.getBattleRoyaleSafeZoneState()).toBeNull();
+  });
+
+  it('fails closed on a malformed Battle Royale safe-zone snapshot', () => {
+    deliver(
+      makeGameState([makeSerialized()], {
+        battleRoyaleSafeZone: {
+          phaseIndex: 1,
+          phase: 'closing',
+          center: { x: Number.NaN, y: 100 },
+          radius: 200,
+          nextCenter: null,
+          nextRadius: 100,
+          phaseSecondsRemaining: 4,
+          damagePerPulse: 2,
+        },
+      }),
+    );
+    expect(manager.getBattleRoyaleSafeZoneState()).toBeNull();
+
+    deliver(
+      makeGameState([makeSerialized()], {
+        tick: 2,
+        battleRoyaleSafeZone: {
+          phaseIndex: 7,
+          phase: 'final',
+          center: { x: 100, y: 100 },
+          radius: 0,
+          nextCenter: { x: 100, y: 100 },
+          nextRadius: 0,
+          phaseSecondsRemaining: 0,
+          damagePerPulse: 16,
+        },
+      }),
+    );
+    expect(manager.getBattleRoyaleSafeZoneState()).toBeNull();
+  });
+
   it('mirrors and clears the authoritative Scrapstorm warning', () => {
     const scrapstorm = {
       targetPosition: { x: 240, y: 144 },
