@@ -367,6 +367,10 @@ export class GameService {
     this.currentMatch = null;
   }
 
+  leaveBattleRoyaleSpectator(): void {
+    this.networkManager.leaveBattleRoyaleSpectator();
+  }
+
   on(event: GameServiceEvent, callback: GameServiceCallback): void {
     const list = this.listeners.get(event);
     if (list) {

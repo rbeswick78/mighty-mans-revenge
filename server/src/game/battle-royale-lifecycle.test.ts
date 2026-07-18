@@ -136,6 +136,56 @@ describe('Battle Royale lifecycle', () => {
     );
   });
 
+  it('projects stable live targets, secured placements, and killer context', () => {
+    const match = createBattleRoyaleMatch(4);
+    activate(match);
+    eliminate(match, 'player-1', 'player-3');
+    match.update(0.05);
+    match.onPlayerDisconnect('player-2');
+
+    expect(match.getBattleRoyaleSpectatorState()).toEqual({
+      livingPlayerIds: ['player-0', 'player-1'],
+      aliveCount: 2,
+      standings: [
+        {
+          playerId: 'player-0',
+          placement: 2,
+          status: 'alive',
+          eliminatedBy: null,
+          eliminationCause: null,
+        },
+        {
+          playerId: 'player-1',
+          placement: 2,
+          status: 'alive',
+          eliminatedBy: null,
+          eliminationCause: null,
+        },
+        {
+          playerId: 'player-2',
+          placement: 3,
+          status: 'departed',
+          eliminatedBy: null,
+          eliminationCause: 'departure',
+        },
+        {
+          playerId: 'player-3',
+          placement: 4,
+          status: 'eliminated',
+          eliminatedBy: 'player-1',
+          eliminationCause: 'combat',
+        },
+      ],
+    });
+    expect(match.getBattleRoyaleSpectatorExitResult()?.battleRoyale).toMatchObject({
+      terminalReason: 'left_early',
+      placements: expect.arrayContaining([
+        { playerId: 'player-2', placement: 3, status: 'departed' },
+        { playerId: 'player-3', placement: 4, status: 'eliminated' },
+      ]),
+    });
+  });
+
   it('authors a true draw when the final fighters mutually eliminate in one tick', () => {
     const match = createBattleRoyaleMatch(3);
     activate(match);

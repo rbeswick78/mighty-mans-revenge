@@ -525,6 +525,28 @@ input-cadence policy only and changes no shared combat value.
 
 This remains dormant support code. `battleRoyale`, `newShell`, `schedules`,
 `largeWorlds`, and `modernArt` remain strict server-owned opt-ins, default
-false, and unexposed. Batch 48 owns spectating. Production remains on approved
+false, and unexposed. Production remains on approved
 Batch 33, and no deployment, restart, live smoke, or capability advertisement
 is authorized.
+
+## Batch 48 Battle Royale spectator disposition
+
+Batch 48 does not add, expose, or alter a capability. The optional live
+spectator projection is emitted only by an already-active server-owned Battle
+Royale match. Standard snapshots omit it; capability-off clients cannot enter
+the route, and old peers tolerate its absence. The client cannot calculate
+standings, expand the target list, attribute an elimination, respawn, or change
+match simulation.
+
+Eliminated participants remain connected read-only spectators. Target cycling,
+camera focus, tactical-map focus, and killer copy project server-owned data.
+Leaving to Results is a validated eliminated-only request that returns a
+reliable provisional result; the legal terminal event remains the sole source
+of the final result for connected entrants. Disconnect retains the established
+safe-lobby fallback.
+
+This remains dormant support code. `battleRoyale`, `newShell`, `schedules`,
+`largeWorlds`, and `modernArt` remain strict server-owned opt-ins, default
+false, and unexposed. Batch 49 owns separate Battle Royale records. Production
+remains on approved Batch 33, and no deployment, restart, live smoke, or
+capability advertisement is authorized.

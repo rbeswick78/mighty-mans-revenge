@@ -178,6 +178,74 @@ describe('MatchmakingManager Battle Royale queue', () => {
     expect(manager.handleJoinBattleRoyale('A', 'Alpha', 'mighty_man')).toBe(true);
   });
 
+  it('routes an eliminated connected fighter from spectating to provisional Results', () => {
+    const { fake, sent } = makeFakeServer(false, true);
+    const manager = new MatchmakingManager(fake);
+    manager.handleJoinBattleRoyale('A', 'Alpha', 'mighty_man');
+    manager.tick(BATTLE_ROYALE_QUEUE.BOT_FILL_DEADLINE_SECONDS, 1);
+    const [match] = manager.getActiveMatches();
+    match.phase = MatchPhase.ACTIVE;
+    const killerId = [...match.players.keys()].find((playerId) => playerId !== 'A')!;
+    match.onKill(killerId, 'A', 'gun');
+
+    expect(manager.handleLeaveBattleRoyaleSpectator('A')).toBe(true);
+    const exit = sent.find(
+      ({ playerId, message }) => playerId === 'A' && message.type === 'server:matchEnd',
+    );
+    expect(exit).toMatchObject({
+      reliable: true,
+      message: {
+        type: 'server:matchEnd',
+        result: {
+          winnerId: null,
+          matchKind: 'battle_royale',
+          battleRoyale: {
+            terminalReason: 'left_early',
+            placements: expect.arrayContaining([
+              expect.objectContaining({ playerId: 'A', placement: 8, status: 'eliminated' }),
+            ]),
+          },
+        },
+      },
+    });
+    expect(match.getConnectedPlayerIds()).not.toContain('A');
+    expect(manager.handleLeaveBattleRoyaleSpectator(killerId)).toBe(false);
+  });
+
+  it('automatically delivers one coherent final result to every connected entrant', () => {
+    const { fake, sent } = makeFakeServer(false, true);
+    const manager = new MatchmakingManager(fake);
+    for (let index = 0; index < 8; index += 1) {
+      manager.handleJoinBattleRoyale(
+        `p${index}`,
+        `Player${index}`,
+        CHARACTER_IDS[index % CHARACTER_IDS.length],
+      );
+    }
+    const [match] = manager.getActiveMatches();
+    match.phase = MatchPhase.ACTIVE;
+    sent.length = 0;
+    for (let victim = 7; victim >= 1; victim -= 1) {
+      match.onKill('p0', `p${victim}`, 'gun');
+      if (victim > 1) match.update(0.05);
+    }
+    manager.tick(0.05, 48);
+
+    const finalMessages = sent.filter(({ message }) => message.type === 'server:matchEnd');
+    expect(finalMessages.map(({ playerId }) => playerId).sort()).toEqual(
+      Array.from({ length: 8 }, (_, index) => `p${index}`),
+    );
+    expect(finalMessages.every(({ reliable }) => reliable)).toBe(true);
+    expect(
+      finalMessages.every(
+        ({ message }) =>
+          message.type === 'server:matchEnd' &&
+          message.result.winnerId === 'p0' &&
+          message.result.battleRoyale?.placements.length === 8,
+      ),
+    ).toBe(true);
+  });
+
   it('serializes BR inventory and loot additively while standard snapshots omit every field', () => {
     const battleRoyale = makeFakeServer(false, true);
     const battleRoyaleManager = new MatchmakingManager(battleRoyale.fake);
@@ -220,6 +288,10 @@ describe('MatchmakingManager Battle Royale queue', () => {
       phase: 'preview',
       damagePerPulse: 0,
     });
+    expect(battleRoyaleState.message.battleRoyaleSpectator).toMatchObject({
+      aliveCount: 8,
+      livingPlayerIds: expect.arrayContaining(['A']),
+    });
 
     const standard = makeFakeServer();
     const standardManager = new MatchmakingManager(standard.fake);
@@ -240,6 +312,7 @@ describe('MatchmakingManager Battle Royale queue', () => {
     expect(standardState.message.battleRoyaleContainers).toBeUndefined();
     expect(standardState.message.battleRoyaleSupplyBundles).toBeUndefined();
     expect(standardState.message.battleRoyaleSafeZone).toBeUndefined();
+    expect(standardState.message.battleRoyaleSpectator).toBeUndefined();
     expect(
       standardState.message.players.every(
         ({ battleRoyaleInventory }) => battleRoyaleInventory === undefined,

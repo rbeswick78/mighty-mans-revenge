@@ -1,6 +1,7 @@
 import type {
   BattleRoyalePlacement,
   BattleRoyaleResult,
+  BattleRoyaleSpectatorState,
   BattleRoyaleTerminalReason,
   PlayerId,
   PlayerState,
@@ -13,6 +14,7 @@ interface EliminationEvent {
   readonly cause: BattleRoyaleEliminationCause;
   readonly sequence: number;
   readonly simulationStep: number;
+  readonly eliminatedBy: PlayerId | null;
 }
 
 export interface BattleRoyaleResolution extends BattleRoyaleResult {
@@ -39,6 +41,7 @@ export class BattleRoyaleLifecycle {
     playerId: PlayerId,
     cause: BattleRoyaleEliminationCause,
     simulationStep: number,
+    eliminatedBy: PlayerId | null = null,
   ): boolean {
     if (!this.entrantIds.includes(playerId) || this.eliminations.has(playerId)) return false;
     this.nextSequence += 1;
@@ -47,12 +50,75 @@ export class BattleRoyaleLifecycle {
       cause,
       sequence: this.nextSequence,
       simulationStep,
+      eliminatedBy,
     });
     return true;
   }
 
   isEliminated(playerId: PlayerId): boolean {
     return this.eliminations.has(playerId);
+  }
+
+  /** Deterministic live projection; never accepts a client-selected target. */
+  spectatorState(players: ReadonlyMap<PlayerId, PlayerState>): BattleRoyaleSpectatorState {
+    const livingPlayerIds = this.entrantIds
+      .filter((playerId) => {
+        const player = players.get(playerId);
+        return player !== undefined && !player.isDead && !this.eliminations.has(playerId);
+      })
+      .sort((left, right) => left.localeCompare(right));
+    const resolved = this.resolve(players);
+    const finalById = new Map(
+      resolved?.placements.map((standing) => [standing.playerId, standing]),
+    );
+    const standings = this.entrantIds
+      .map((playerId) => {
+        const final = finalById.get(playerId);
+        const elimination = this.eliminations.get(playerId);
+        if (final) {
+          return {
+            ...final,
+            eliminatedBy: elimination?.eliminatedBy ?? null,
+            eliminationCause: elimination?.cause ?? null,
+          };
+        }
+        if (!elimination) {
+          return {
+            playerId,
+            placement: livingPlayerIds.length,
+            status: 'alive' as const,
+            eliminatedBy: null,
+            eliminationCause: null,
+          };
+        }
+        return {
+          playerId,
+          placement: this.entrantIds.length - elimination.sequence + 1,
+          status:
+            elimination.cause === 'departure' ? ('departed' as const) : ('eliminated' as const),
+          eliminatedBy: elimination.eliminatedBy,
+          eliminationCause: elimination.cause,
+        };
+      })
+      .sort(
+        (left, right) =>
+          left.placement - right.placement || left.playerId.localeCompare(right.playerId),
+      );
+    return { livingPlayerIds, aliveCount: livingPlayerIds.length, standings };
+  }
+
+  /** Results projection for an eliminated fighter who leaves live spectating. */
+  spectatorExitResult(players: ReadonlyMap<PlayerId, PlayerState>): BattleRoyaleResult {
+    const live = this.spectatorState(players);
+    return {
+      placements: live.standings.map(({ playerId, placement, status }) => ({
+        playerId,
+        placement,
+        status,
+      })),
+      terminalReason: 'left_early',
+      actions: { canLeave: true, canSpectate: false },
+    };
   }
 
   resolve(players: ReadonlyMap<PlayerId, PlayerState>): BattleRoyaleResolution | null {

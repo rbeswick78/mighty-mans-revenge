@@ -723,3 +723,36 @@ The final authoritative baseline retained configured/rolling 20 Hz and the
 while average processing remained 0.066 ms; no tick-budget product defect was
 proven. All capabilities remain default false and unexposed; production remains
 on Batch 33 and no deployment, restart, or live smoke occurred.
+
+### Batch 48 Battle Royale spectator baseline
+
+Eliminated connected Battle Royale fighters now remain read-only match
+participants. The server publishes an optional format-only projection with the
+stable living target list, alive count, current/final standings, eliminator,
+and elimination cause. The client validates that object atomically and uses it
+only for target cycling, camera/tactical-map focus, and spectator copy. Missing
+or malformed optional state clears the projection. Standard snapshots omit the
+field and retain their previous bytes and behavior.
+
+Keyboard, standard gamepad, and touch cycle only through the projected living
+list. Eliminated local gameplay input remains ineffective and respawn remains
+disabled. The selected fighter owns spectator camera and tactical-map focus;
+the tactical map continues to reveal no generic rivals. A validated eliminated
+fighter can leave to reliable provisional Results, while the legal terminal
+event still sends one coherent final Results payload to every connected
+entrant. Disconnect/reconnect preserves the safe-lobby fallback.
+
+Focused lifecycle, matchmaking, network, presentation, Results, and spectator
+coverage passed 178 tests. Focused Chromium, Firefox, and mobile-landscape
+journeys proved keyboard, standard gamepad, and touch cycling plus target-owned
+camera/tactical-map focus and leave-to-Results. The complete matrix passed
+1,750 tests; typecheck, ESLint, production builds, and the unchanged 624-product
+standard balance matrix passed.
+
+The final authoritative baseline retained configured/rolling 20 Hz and the
+50 ms budget. Synthetic four-player mean/p95/p99/max work was
+0.016/0.029/0.081/0.837 ms, and standard active snapshots remained exactly
+2,481/3,762 bytes. One host scheduler drift window reset while average live
+processing remained 0.065 ms; no product tick-budget defect was proven. All
+capabilities remain default false and unexposed; production remains on Batch 33
+and no deployment, restart, or live smoke occurred.

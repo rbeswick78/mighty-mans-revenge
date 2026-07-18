@@ -20,6 +20,7 @@ import type {
   WastelandWarpState,
   RadiationStormState,
   BattleRoyaleSafeZoneState,
+  BattleRoyaleSpectatorState,
   ScrapstormState,
   RumbleLeadState,
 } from '@shared/types/game.js';
@@ -190,6 +191,52 @@ function normalizeBattleRoyaleSafeZone(
   };
 }
 
+export function normalizeBattleRoyaleSpectatorState(
+  value: ServerGameStateMessage['battleRoyaleSpectator'],
+): BattleRoyaleSpectatorState | null {
+  if (!value || !Number.isInteger(value.aliveCount) || value.aliveCount < 0) return null;
+  const livingPlayerIds = value.livingPlayerIds.filter(
+    (playerId): playerId is PlayerId => typeof playerId === 'string' && playerId.length > 0,
+  );
+  if (
+    livingPlayerIds.length !== value.livingPlayerIds.length ||
+    new Set(livingPlayerIds).size !== livingPlayerIds.length ||
+    value.aliveCount !== livingPlayerIds.length
+  ) {
+    return null;
+  }
+  const statuses = new Set(['alive', 'winner', 'eliminated', 'departed', 'drawn']);
+  const causes = new Set(['combat', 'zone', 'departure']);
+  const standings = value.standings.filter(
+    (standing) =>
+      typeof standing.playerId === 'string' &&
+      standing.playerId.length > 0 &&
+      Number.isInteger(standing.placement) &&
+      standing.placement >= 1 &&
+      statuses.has(standing.status) &&
+      (standing.eliminatedBy === null || typeof standing.eliminatedBy === 'string') &&
+      (standing.eliminationCause === null || causes.has(standing.eliminationCause)),
+  );
+  if (
+    standings.length !== value.standings.length ||
+    new Set(standings.map(({ playerId }) => playerId)).size !== standings.length ||
+    livingPlayerIds.some(
+      (playerId) =>
+        standings.find((standing) => standing.playerId === playerId)?.status !== 'alive',
+    ) ||
+    standings.some(
+      (standing) => (standing.status === 'alive') !== livingPlayerIds.includes(standing.playerId),
+    )
+  ) {
+    return null;
+  }
+  return {
+    livingPlayerIds: [...livingPlayerIds],
+    aliveCount: value.aliveCount,
+    standings: standings.map((standing) => ({ ...standing })),
+  };
+}
+
 export class NetworkManager {
   private connection: NetworkConnection;
   private prediction: ClientPrediction;
@@ -238,6 +285,7 @@ export class NetworkManager {
   private _wastelandWarpState: WastelandWarpState | null = null;
   private _radiationStormState: RadiationStormState | null = null;
   private _battleRoyaleSafeZoneState: BattleRoyaleSafeZoneState | null = null;
+  private _battleRoyaleSpectatorState: BattleRoyaleSpectatorState | null = null;
   private _scrapstormState: ScrapstormState | null = null;
   /** Undefined until the first group snapshot; monotonic within one match. */
   private lastRumbleLeadSequence: number | undefined = undefined;
@@ -365,6 +413,7 @@ export class NetworkManager {
     this._wastelandWarpState = null;
     this._radiationStormState = null;
     this._battleRoyaleSafeZoneState = null;
+    this._battleRoyaleSpectatorState = null;
     this._scrapstormState = null;
     this.lastRumbleLeadSequence = undefined;
     this.matchEndsAtLocalMs = null;
@@ -391,6 +440,10 @@ export class NetworkManager {
 
   getBattleRoyaleSafeZoneState(): BattleRoyaleSafeZoneState | null {
     return this._battleRoyaleSafeZoneState;
+  }
+
+  getBattleRoyaleSpectatorState(): BattleRoyaleSpectatorState | null {
+    return this._battleRoyaleSpectatorState;
   }
 
   getScrapstormState(): ScrapstormState | null {
@@ -656,6 +709,10 @@ export class NetworkManager {
   /** Return to lobby. */
   returnToLobby(): void {
     this.connection.send({ type: 'client:returnToLobby' });
+  }
+
+  leaveBattleRoyaleSpectator(): void {
+    this.connection.send({ type: 'client:leaveBattleRoyaleSpectator' });
   }
 
   /** Get the current local player state (with client-side prediction applied). */
@@ -1078,6 +1135,9 @@ export class NetworkManager {
     this._wastelandWarpState = msg.wastelandWarp ?? null;
     this._radiationStormState = msg.radiationStorm ?? null;
     this._battleRoyaleSafeZoneState = normalizeBattleRoyaleSafeZone(msg.battleRoyaleSafeZone);
+    this._battleRoyaleSpectatorState = normalizeBattleRoyaleSpectatorState(
+      msg.battleRoyaleSpectator,
+    );
     this._scrapstormState = msg.scrapstorm ?? null;
     if (msg.rumbleLead) {
       if (

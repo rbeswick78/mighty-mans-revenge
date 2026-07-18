@@ -34,6 +34,7 @@ const CLIENT_MESSAGE_TYPE_FLAGS: Record<ClientMessage['type'], true> = {
   'client:cancelMatchmaking': true,
   'client:rematchRequest': true,
   'client:returnToLobby': true,
+  'client:leaveBattleRoyaleSpectator': true,
   'client:characterHover': true,
   'client:characterLock': true,
   'client:draftPick': true,

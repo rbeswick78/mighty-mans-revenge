@@ -21,6 +21,7 @@ import {
   WastelandWarpState,
   RadiationStormState,
   BattleRoyaleSafeZoneState,
+  BattleRoyaleSpectatorState,
   ScrapstormState,
   MatchKind,
 } from './game.js';
@@ -57,6 +58,7 @@ export type ClientMessage =
   | ClientCancelMatchmakingMessage
   | ClientRematchRequestMessage
   | ClientReturnToLobbyMessage
+  | ClientLeaveBattleRoyaleSpectatorMessage
   | ClientCharacterHoverMessage
   | ClientCharacterLockMessage
   | ClientDraftPickMessage
@@ -197,6 +199,11 @@ export interface ClientRematchRequestMessage {
 
 export interface ClientReturnToLobbyMessage {
   type: 'client:returnToLobby';
+}
+
+/** Eliminated-only request to leave live Battle Royale spectating for Results. */
+export interface ClientLeaveBattleRoyaleSpectatorMessage {
+  type: 'client:leaveBattleRoyaleSpectator';
 }
 
 export interface ClientCharacterHoverMessage {
@@ -415,6 +422,8 @@ export interface ServerGameStateMessage {
   radiationStorm?: RadiationStormState;
   /** Authoritative Battle Royale circle; absent on standard/old servers. */
   battleRoyaleSafeZone?: BattleRoyaleSafeZoneState;
+  /** Authoritative live standings/targets; absent on standard/old servers. */
+  battleRoyaleSpectator?: BattleRoyaleSpectatorState;
   /** Authoritative warning for the next Scrapstorm impact. */
   scrapstorm?: ScrapstormState;
 }

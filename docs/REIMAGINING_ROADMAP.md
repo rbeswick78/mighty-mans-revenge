@@ -5,9 +5,9 @@ Read this file and `CLAUDE.md` completely at the start of every batch. The
 completed `docs/REPLAYABILITY_ROADMAP.md` remains the historical record for the
 systems this program preserves and reorganizes.
 
-- **Status:** Batch 47 Battle Royale bots completed on 2026-07-18;
+- **Status:** Batch 48 Battle Royale spectating completed on 2026-07-18;
   the format remains dormant and every capability remains default false.
-- **Next step:** Batch 48 spectating under the user's standing
+- **Next step:** Batch 49 Battle Royale records under the user's standing
   authorization to continue sequentially through the plan while deferring human
   involvement. The deferred Batch 39 human release walkthrough still does not
   authorize deployment, capability exposure, production restart, or live smoke.
@@ -1747,6 +1747,58 @@ Acceptance:
 
 Add target cycling, placement/alive count, killer context, tactical map, leave
 to Results, disconnect behavior, and automatic final Results.
+
+**Verification tier selected before implementation (2026-07-18):**
+cross-cutting navigation, input, recovery, shared wire, server lifecycle, and
+capability-owned client projection. This batch can affect authoritative live
+Battle Royale state, old-client/old-server optional-field fallback, camera
+ownership, keyboard/gamepad/touch spectator input, tactical-map focus,
+disconnect routing, and Game-to-Results navigation. Required evidence is
+focused shared/server/client unit and integration coverage, the complete unit
+suite, typecheck, lint, all production builds, targeted desktop Chromium and
+mobile-landscape spectator journeys, and the affected Firefox/WebKit journey
+subset. The complete three-project Playwright matrix remains reserved for the
+Batch 51 release gate unless focused evidence reveals broader coupling.
+
+Acceptance:
+
+- [x] The server publishes an optional Battle Royale-only live spectator
+      projection derived from the authoritative one-life ledger: stable living
+      target ids, alive count, each entrant's current/final placement, and the
+      eliminated local fighter's killer context. Standard snapshots remain
+      byte-shape compatible and old-client/old-server peers tolerate absence.
+- [x] An eliminated connected fighter remains in the live match as a pure
+      spectator, cannot submit effective combat input or respawn, follows a
+      deterministic living target, and cycles only through server-authored
+      living targets with keyboard, standard gamepad, and reachable touch
+      controls. Cycling never changes simulation authority.
+- [x] Spectator HUD shows authoritative placement, alive count, current target,
+      and killer context with deterministic fallback copy for zone, departure,
+      self, unknown, or old-server elimination data. Living players retain
+      ordinary Battle Royale HUD behavior and all standard formats remain
+      unchanged.
+- [x] The tactical map remains reachable while spectating, projects the current
+      spectator target as the local focus, preserves server-authored current and
+      next circles, and continues to reveal no generic rival markers.
+- [x] A connected eliminated fighter can explicitly leave the live Battle
+      Royale and reaches the existing Results route with the authoritative
+      provisional placement; disconnect/reconnect follows the established safe
+      lobby fallback and cannot invent a result or re-enter the simulation.
+- [x] The server's legal terminal event automatically routes every still-
+      connected participant to one coherent final Results payload. Winner,
+      mutual-elimination draw, last disconnect, and already-eliminated spectator
+      shapes preserve Batch 40 placement/winner rules and expose no rematch or
+      post-terminal spectate action.
+- [x] N-player deterministic tests cover target ordering/cycling, killer and
+      non-killer elimination context, disconnect/elimination ordering,
+      provisional-to-final placement coherence, no-input/no-respawn enforcement,
+      leave-to-Results, and automatic final Results for all connected entrants.
+- [x] Standard Duel/Rumble/Crew/Practice, all eight modes, rematches, overtime,
+      stats/persistence, wire fallback, input, camera, tactical-map, Results,
+      and balance snapshots remain exact where Batch 48 does not add an optional
+      Battle Royale projection.
+- [x] Batch 49 records/persistence and all later hardening, exposure, release,
+      deployment, restart, and live-smoke work do not begin.
 
 #### Batch 49 — Battle Royale records
 
@@ -4438,6 +4490,60 @@ all final focused and full regressions pass.
 33 commit `f39eb34131f8827f85432aafcc6d6c18a2d0ac51`; `newShell`, `schedules`,
 `largeWorlds`, `modernArt`, and `battleRoyale` remain strict server-owned
 opt-ins, default false, and unexposed. Proceed only to Batch 48 under the user's
+standing direct-development authorization. Capability exposure, deployment,
+production restart, and live smoke remain explicitly unauthorized.
+
+### Batch 48 - 2026-07-18 - Spectating
+
+**Scope and tier:** Before runtime implementation, the cross-cutting navigation,
+input, recovery, shared-wire, server-lifecycle, and capability-owned projection
+tier was selected and documented. The batch added only live Battle Royale
+spectator state, target cycling, placement/alive and killer presentation,
+target-owned camera/tactical-map focus, leave-to-Results, disconnect fallback,
+and automatic final Results. Batch 49 records and all later hardening, exposure,
+release, deployment, restart, and live smoke did not enter the allowlist.
+
+**Authority and behavior:** The server derives one optional Battle Royale-only
+spectator projection from the authoritative one-life ledger. Its stable living
+target IDs, alive count, live/final standings, eliminator, and elimination cause
+are never reconstructed client-side. Eliminated participants remain connected
+but produce no effective gameplay input and cannot respawn. Keyboard, standard
+gamepad, and reachable touch controls cycle only through the projected list;
+the selected fighter owns camera and tactical-map focus while generic rival
+markers remain absent. Omitted or malformed optional state clears the client
+projection, and standard snapshots omit the field.
+
+An eliminated participant may send one validated leave-spectator request. The
+server returns a reliable provisional Results payload with the participant's
+authoritative current placement, then records the departure. The legal terminal
+event still emits one coherent final Results payload to every connected entrant
+for winner, mutual-final-elimination, last-departure, and already-eliminated
+spectator shapes. Disconnect/reconnect retains the established safe-lobby
+fallback and cannot invent a result or re-enter simulation.
+
+**Verification:** Focused lifecycle, matchmaking, network, presentation,
+Results, and spectator coverage passed 178 tests. Focused desktop Chromium,
+desktop Firefox, and mobile-landscape journeys passed and proved keyboard,
+standard-gamepad, and touch cycling, stable target focus, spectator camera,
+tactical-map focus with zero rivals, and leave-to-Results. The complete unit
+matrix passed 1,750 tests. Typecheck, ESLint, all production builds, and the
+unchanged 624-product standard balance matrix passed. The final authoritative
+baseline retained configured/rolling 20 Hz and the 50 ms budget; synthetic
+four-player mean/p95/p99/max work was 0.016/0.029/0.081/0.837 ms and standard
+active snapshots remained exactly 2,481/3,762 bytes. A host scheduler drift
+reset produced a 15.996 Hz wall-clock sample while average processing remained
+0.065 ms; no product tick-budget defect was proven. The Batch 48 allowlist was
+formatted and `git diff --check` passed.
+
+**Bug ledger:** No product defect was proven, so no entry was added. The first
+focused browser fixture declared eight participants while supplying only two
+opponents; correcting that same-batch test fixture produced the intended
+eight-entrant projection, and every final focused and full regression passes.
+
+**Deployment and disposition:** Skipped. Production remains on approved Batch
+33 commit `f39eb34131f8827f85432aafcc6d6c18a2d0ac51`; `newShell`, `schedules`,
+`largeWorlds`, `modernArt`, and `battleRoyale` remain strict server-owned
+opt-ins, default false, and unexposed. Proceed only to Batch 49 under the user's
 standing direct-development authorization. Capability exposure, deployment,
 production restart, and live smoke remain explicitly unauthorized.
 

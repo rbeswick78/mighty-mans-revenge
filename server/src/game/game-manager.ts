@@ -300,6 +300,10 @@ export class GameManager {
         this.matchmaking.handleReturnToLobby(playerId);
         break;
 
+      case 'client:leaveBattleRoyaleSpectator':
+        this.matchmaking.handleLeaveBattleRoyaleSpectator(playerId);
+        break;
+
       case 'client:characterHover':
         this.matchmaking.handleCharacterHover(playerId, message.characterId);
         break;

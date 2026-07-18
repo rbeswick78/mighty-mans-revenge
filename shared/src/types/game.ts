@@ -45,7 +45,28 @@ export type MatchKind = 'duel' | 'rumble' | 'duos' | 'practice' | 'battle_royale
 export const BATTLE_ROYALE_MATCH_FORMAT = 'battle_royale' as const;
 export type BattleRoyaleMatchFormat = typeof BATTLE_ROYALE_MATCH_FORMAT;
 
-export type BattleRoyalePlacementStatus = 'winner' | 'eliminated' | 'departed' | 'drawn';
+export type BattleRoyalePlacementStatus = 'winner' | 'eliminated' | 'departed' | 'drawn' | 'alive';
+
+export type BattleRoyaleLiveStatus = BattleRoyalePlacementStatus;
+
+/** Server-authored live standing used only while a Battle Royale is in progress. */
+export interface BattleRoyaleLiveStanding {
+  playerId: PlayerId;
+  /** Best placement already secured: alive fighters share the current alive count. */
+  placement: number;
+  status: BattleRoyaleLiveStatus;
+  /** Opponent responsible for combat elimination; null for zone/departure/unknown. */
+  eliminatedBy: PlayerId | null;
+  eliminationCause: 'combat' | 'zone' | 'departure' | null;
+}
+
+/** Optional live projection for connected fighters and eliminated spectators. */
+export interface BattleRoyaleSpectatorState {
+  /** Stable player-id order; clients may cycle only within this list. */
+  livingPlayerIds: PlayerId[];
+  aliveCount: number;
+  standings: BattleRoyaleLiveStanding[];
+}
 
 /** One deterministic server-authored final standing. Equal placement means a true tie. */
 export interface BattleRoyalePlacement {
@@ -58,11 +79,13 @@ export type BattleRoyaleTerminalReason =
   | 'last_survivor'
   | 'mutual_elimination'
   | 'all_departed'
-  | 'no_survivor';
+  | 'no_survivor'
+  /** A connected eliminated fighter chose Results before the match ended. */
+  | 'left_early';
 
 /**
- * Additive Battle Royale Results payload. Spectating deliberately remains
- * unavailable until Batch 48; every completed result can always leave.
+ * Additive Battle Royale Results payload. Live spectating is represented by
+ * BattleRoyaleSpectatorState; a completed result can always leave.
  */
 export interface BattleRoyaleResult {
   placements: BattleRoyalePlacement[];

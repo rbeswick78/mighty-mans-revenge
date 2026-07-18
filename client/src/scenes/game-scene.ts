@@ -58,6 +58,7 @@ import { KothHillRenderer } from '../rendering/koth-hill-renderer.js';
 import { RadiationStormRenderer } from '../rendering/radiation-storm-renderer.js';
 import { BattleRoyaleSafeZoneRenderer } from '../rendering/battle-royale-safe-zone-renderer.js';
 import { TacticalMapRenderer } from '../rendering/tactical-map-renderer.js';
+import { BattleRoyaleSpectatorOverlay } from '../rendering/battle-royale-spectator-overlay.js';
 import { ScrapstormRenderer } from '../rendering/scrapstorm-renderer.js';
 import { MinimapRenderer } from '../rendering/minimap-renderer.js';
 import {
@@ -118,6 +119,10 @@ import {
 } from '../ui/responsive-combat-hud.js';
 import { minimapLayoutForGameplay } from '../ui/minimap-foundation.js';
 import { tacticalMapLayoutForGameplay } from '../ui/tactical-map-foundation.js';
+import {
+  battleRoyaleSpectatorPresentation,
+  cycleBattleRoyaleSpectatorTarget,
+} from '../ui/battle-royale-spectator.js';
 import { useLegacyLogicalSize } from '../ui/reforged/responsive-menu-layout.js';
 import {
   createWorldRenderPlan,
@@ -172,6 +177,9 @@ export class GameScene extends Phaser.Scene {
   private radiationStormRenderer: RadiationStormRenderer | null = null;
   private battleRoyaleSafeZoneRenderer: BattleRoyaleSafeZoneRenderer | null = null;
   private tacticalMapRenderer: TacticalMapRenderer | null = null;
+  private battleRoyaleSpectatorOverlay: BattleRoyaleSpectatorOverlay | null = null;
+  private battleRoyaleSpectatorTargetId: PlayerId | null = null;
+  private battleRoyaleResultsRequested = false;
   private scrapstormRenderer: ScrapstormRenderer | null = null;
   private minimapRenderer: MinimapRenderer | null = null;
   private grenadeRenderer: GrenadeRenderer | null = null;
@@ -221,6 +229,8 @@ export class GameScene extends Phaser.Scene {
   private matchMenuGamepad: MenuGamepadInput | null = null;
   private onMatchMenuEscape: (() => void) | null = null;
   private onTacticalMapKey: (() => void) | null = null;
+  private onSpectatorPreviousKey: (() => void) | null = null;
+  private onSpectatorNextKey: (() => void) | null = null;
   private leavingMatch = false;
   /** Announce the first meaningful controller input once per round. */
   private controllerAnnounced = false;
@@ -349,6 +359,9 @@ export class GameScene extends Phaser.Scene {
     this.minimapRenderer = null;
     this.battleRoyaleSafeZoneRenderer = null;
     this.tacticalMapRenderer = null;
+    this.battleRoyaleSpectatorOverlay = null;
+    this.battleRoyaleSpectatorTargetId = null;
+    this.battleRoyaleResultsRequested = false;
     this.lastBattleRoyaleSafeZonePhaseIndex = undefined;
     this.reforgedVisualCutover = null;
     this.worldRenderQuality.reset();
@@ -511,6 +524,15 @@ export class GameScene extends Phaser.Scene {
       );
     }
     this.hud = new HUD(this, this.combatHudLayout, this.reforgedVisualCutover.active);
+    if (capabilities.battleRoyale && this.matchData?.matchKind === 'battle_royale') {
+      this.battleRoyaleSpectatorOverlay = new BattleRoyaleSpectatorOverlay(
+        this,
+        this.combatHudLayout,
+        () => this.cycleBattleRoyaleSpectator(-1),
+        () => this.cycleBattleRoyaleSpectator(1),
+        () => this.leaveBattleRoyaleSpectating(),
+      );
+    }
     // Bullseye replaces the OS cursor on desktop only — touch input
     // doesn't have a hover position to track.
     if (!isTouchDevice()) {
@@ -532,7 +554,10 @@ export class GameScene extends Phaser.Scene {
       () => this.leaveCurrentMatch(),
       (open) => {
         this.inputManager?.setGameplayEnabled(
-          !open && !this.tacticalMapRenderer?.isOpen() && this.matchPhase === MatchPhase.ACTIVE,
+          !open &&
+            !this.tacticalMapRenderer?.isOpen() &&
+            this.matchPhase === MatchPhase.ACTIVE &&
+            !this.isBattleRoyaleSpectating(this.gameService.getNetworkManager()),
         );
       },
       this.combatHudLayout,
@@ -547,6 +572,10 @@ export class GameScene extends Phaser.Scene {
     this.input.keyboard?.on('keydown-ESC', this.onMatchMenuEscape);
     this.onTacticalMapKey = () => this.toggleTacticalMap();
     this.input.keyboard?.on('keydown-M', this.onTacticalMapKey);
+    this.onSpectatorPreviousKey = () => this.cycleBattleRoyaleSpectator(-1);
+    this.onSpectatorNextKey = () => this.cycleBattleRoyaleSpectator(1);
+    this.input.keyboard?.on('keydown-Q', this.onSpectatorPreviousKey);
+    this.input.keyboard?.on('keydown-E', this.onSpectatorNextKey);
 
     // Wire up network events
     this.wireGameServiceEvents();
@@ -567,6 +596,7 @@ export class GameScene extends Phaser.Scene {
 
     const networkManager = this.gameService.getNetworkManager();
     let localState = networkManager.getLocalPlayerState();
+    this.syncBattleRoyaleSpectator(networkManager);
     this.inputManager.setBattleRoyaleReloadContext(localState?.battleRoyaleInventory !== undefined);
 
     // Rate-limit input to the server tick rate. Client prediction uses
@@ -588,6 +618,7 @@ export class GameScene extends Phaser.Scene {
     while (
       this.inputAccumulatorMs >= SERVER.TICK_INTERVAL &&
       localState &&
+      (!localState.isDead || this.matchData?.matchKind !== 'battle_royale') &&
       this.matchPhase === MatchPhase.ACTIVE
     ) {
       this.inputAccumulatorMs -= SERVER.TICK_INTERVAL;
@@ -1137,15 +1168,16 @@ export class GameScene extends Phaser.Scene {
       this.time.now,
     );
     const battleRoyaleSafeZone = networkManager.getBattleRoyaleSafeZoneState();
+    const battleRoyaleFocus =
+      this.getBattleRoyaleSpectatorFocus(networkManager) ??
+      networkManager.getLocalPlayerState()?.position ??
+      null;
     this.battleRoyaleSafeZoneRenderer?.update(
       battleRoyaleSafeZone,
-      networkManager.getLocalPlayerState()?.position ?? null,
+      battleRoyaleFocus,
       this.time.now,
     );
-    this.tacticalMapRenderer?.update(
-      battleRoyaleSafeZone,
-      networkManager.getLocalPlayerState()?.position ?? null,
-    );
+    this.tacticalMapRenderer?.update(battleRoyaleSafeZone, battleRoyaleFocus);
     if (
       battleRoyaleSafeZone &&
       battleRoyaleSafeZone.phaseIndex !== this.lastBattleRoyaleSafeZonePhaseIndex
@@ -1465,6 +1497,12 @@ export class GameScene extends Phaser.Scene {
     return this.tacticalMapRenderer?.getRenderState() ?? null;
   }
 
+  getBattleRoyaleSpectatorRenderState(): ReturnType<
+    BattleRoyaleSpectatorOverlay['getRenderState']
+  > | null {
+    return this.battleRoyaleSpectatorOverlay?.getRenderState() ?? null;
+  }
+
   getCameraController(): CameraController | null {
     return this.cameraController;
   }
@@ -1504,6 +1542,15 @@ export class GameScene extends Phaser.Scene {
     networkManager: NetworkManager,
   ): void {
     if (!this.cameraController) return;
+
+    const battleRoyaleFocus = this.getBattleRoyaleSpectatorFocus(networkManager);
+    if (battleRoyaleFocus) {
+      this.cameraController.setTarget({
+        kind: 'spectator',
+        position: worldPointFrom(battleRoyaleFocus),
+      });
+      return;
+    }
 
     const localEliminated =
       localState?.isDead === true &&
@@ -1559,6 +1606,7 @@ export class GameScene extends Phaser.Scene {
         : null;
     this.combatHudLayout = responsiveCombatHudLayout(this.gameplayViewport, this.gameplaySafeArea);
     this.hud?.setLayout(this.combatHudLayout);
+    this.battleRoyaleSpectatorOverlay?.setLayout(this.combatHudLayout);
     this.matchMenu?.setLayout(this.combatHudLayout);
     this.inputManager?.setTouchActionLayout(this.combatHudLayout.touchActions);
     if (this.minimapRenderer && this.worldRenderPlan) {
@@ -1590,6 +1638,11 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     if (!this.matchMenu.isOpen()) {
+      if (this.isBattleRoyaleSpectating(this.gameService.getNetworkManager())) {
+        if (actions.left) this.cycleBattleRoyaleSpectator(-1);
+        else if (actions.right) this.cycleBattleRoyaleSpectator(1);
+        else if (actions.alternate) this.leaveBattleRoyaleSpectating();
+      }
       if (actions.up && this.tacticalMapRenderer && !this.endTransitionStarted) {
         this.toggleTacticalMap();
       }
@@ -1610,11 +1663,18 @@ export class GameScene extends Phaser.Scene {
     if (nextOpen && this.matchMenu?.isOpen()) this.matchMenu.hide();
     this.tacticalMapRenderer.setOpen(nextOpen);
     this.inputManager?.setGameplayEnabled(
-      !nextOpen && !this.matchMenu?.isOpen() && this.matchPhase === MatchPhase.ACTIVE,
+      !nextOpen &&
+        !this.matchMenu?.isOpen() &&
+        this.matchPhase === MatchPhase.ACTIVE &&
+        !this.isBattleRoyaleSpectating(this.gameService.getNetworkManager()),
     );
   }
 
   private leaveCurrentMatch(): void {
+    if (this.isBattleRoyaleSpectating(this.gameService.getNetworkManager())) {
+      this.leaveBattleRoyaleSpectating();
+      return;
+    }
     if (this.leavingMatch) return;
     this.leavingMatch = true;
     this.endTransitionStarted = true;
@@ -1628,6 +1688,70 @@ export class GameScene extends Phaser.Scene {
       this.cleanup();
       this.scene.start('LobbyScene');
     });
+  }
+
+  private isBattleRoyaleSpectating(networkManager: NetworkManager): boolean {
+    const localId = networkManager.getPlayerId();
+    const standing = networkManager
+      .getBattleRoyaleSpectatorState()
+      ?.standings.find(({ playerId }) => playerId === localId);
+    return standing !== undefined && standing.status !== 'alive';
+  }
+
+  private syncBattleRoyaleSpectator(networkManager: NetworkManager): void {
+    const state = networkManager.getBattleRoyaleSpectatorState();
+    const names = Object.fromEntries(
+      (this.matchData?.opponents ?? []).map(({ id, nickname }) => [id, nickname]),
+    );
+    const local = networkManager.getLocalPlayerState();
+    if (local) names[local.id] = local.nickname;
+    const presentation = battleRoyaleSpectatorPresentation(
+      state,
+      networkManager.getPlayerId(),
+      this.battleRoyaleSpectatorTargetId,
+      names,
+    );
+    this.battleRoyaleSpectatorTargetId = presentation.targetId;
+    this.battleRoyaleSpectatorOverlay?.update(presentation);
+    if (presentation.active) {
+      this.inputAccumulatorMs = 0;
+      this.inputManager?.setGameplayEnabled(false);
+    }
+  }
+
+  private cycleBattleRoyaleSpectator(direction: -1 | 1): void {
+    if (this.matchMenu?.isOpen() || this.tacticalMapRenderer?.isOpen()) return;
+    const state = this.gameService.getNetworkManager().getBattleRoyaleSpectatorState();
+    if (!state || !this.isBattleRoyaleSpectating(this.gameService.getNetworkManager())) return;
+    this.battleRoyaleSpectatorTargetId = cycleBattleRoyaleSpectatorTarget(
+      state.livingPlayerIds,
+      this.battleRoyaleSpectatorTargetId,
+      direction,
+    );
+  }
+
+  private getBattleRoyaleSpectatorFocus(networkManager: NetworkManager): Vec2 | null {
+    if (!this.isBattleRoyaleSpectating(networkManager) || !this.battleRoyaleSpectatorTargetId) {
+      return null;
+    }
+    return (
+      networkManager.getInterpolatedPlayer(this.battleRoyaleSpectatorTargetId)?.position ?? null
+    );
+  }
+
+  private leaveBattleRoyaleSpectating(): void {
+    if (
+      this.leavingMatch ||
+      this.endTransitionStarted ||
+      this.battleRoyaleResultsRequested ||
+      !this.isBattleRoyaleSpectating(this.gameService.getNetworkManager())
+    ) {
+      return;
+    }
+    this.matchMenu?.setAvailable(false);
+    this.inputManager?.setGameplayEnabled(false);
+    this.battleRoyaleResultsRequested = true;
+    this.gameService.leaveBattleRoyaleSpectator();
   }
 
   private installCrtPipeline(): void {
@@ -2536,6 +2660,14 @@ export class GameScene extends Phaser.Scene {
       this.input.keyboard?.off('keydown-M', this.onTacticalMapKey);
       this.onTacticalMapKey = null;
     }
+    if (this.onSpectatorPreviousKey) {
+      this.input.keyboard?.off('keydown-Q', this.onSpectatorPreviousKey);
+      this.onSpectatorPreviousKey = null;
+    }
+    if (this.onSpectatorNextKey) {
+      this.input.keyboard?.off('keydown-E', this.onSpectatorNextKey);
+      this.onSpectatorNextKey = null;
+    }
     if (this.matchMenu) {
       this.matchMenu.destroy();
       this.matchMenu = null;
@@ -2558,6 +2690,8 @@ export class GameScene extends Phaser.Scene {
     }
     this.tacticalMapRenderer?.destroy();
     this.tacticalMapRenderer = null;
+    this.battleRoyaleSpectatorOverlay?.destroy();
+    this.battleRoyaleSpectatorOverlay = null;
     if (this.kothHillRenderer) {
       this.kothHillRenderer.destroy();
       this.kothHillRenderer = null;

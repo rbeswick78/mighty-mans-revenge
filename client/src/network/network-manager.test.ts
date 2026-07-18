@@ -139,6 +139,47 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
     expect(manager.getLocalPlayerState()?.characterId).toBe('bubba');
   });
 
+  it('normalizes optional Battle Royale spectator state and clears old-server omissions', () => {
+    const spectator = {
+      livingPlayerIds: [REMOTE_ID],
+      aliveCount: 1,
+      standings: [
+        {
+          playerId: REMOTE_ID,
+          placement: 1,
+          status: 'alive' as const,
+          eliminatedBy: null,
+          eliminationCause: null,
+        },
+        {
+          playerId: LOCAL_ID,
+          placement: 2,
+          status: 'eliminated' as const,
+          eliminatedBy: REMOTE_ID,
+          eliminationCause: 'combat' as const,
+        },
+      ],
+    };
+    deliver(
+      makeGameState([makeSerialized({ isDead: true }), makeSerialized({ id: REMOTE_ID })], {
+        battleRoyaleSpectator: spectator,
+      }),
+    );
+    expect(manager.getBattleRoyaleSpectatorState()).toEqual(spectator);
+
+    deliver(
+      makeGameState([makeSerialized()], {
+        battleRoyaleSpectator: { ...spectator, aliveCount: 2 },
+      }),
+    );
+    expect(manager.getBattleRoyaleSpectatorState()).toBeNull();
+    deliver(makeGameState([makeSerialized()]));
+    expect(manager.getBattleRoyaleSpectatorState()).toBeNull();
+
+    manager.leaveBattleRoyaleSpectator();
+    expect(hoisted.sentMessages).toContainEqual({ type: 'client:leaveBattleRoyaleSpectator' });
+  });
+
   it('projects valid Battle Royale weapons, containers, supplies, and rockets, then clears old-server omissions', () => {
     const instance = {
       instanceId: 'weapon:network:42',

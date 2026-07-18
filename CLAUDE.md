@@ -615,8 +615,9 @@ the eight `GameMode` implementations or ordinary combat, abilities, grenades,
 healing, armor, stats, snapshots, or standard result bytes. Optional
 `MatchResult.battleRoyale` carries placements, terminal reason, and action
 availability. Results is a pure projection, provides a lobby exit, and keeps
-spectating false until Batch 48; an old server with no optional field gets an
-explicit unavailable state, never client-derived standings. Do not add the
+post-terminal spectating false; Batch 48 live spectating is carried by a
+separate optional server projection. An old server with no optional field gets
+an explicit unavailable state, never client-derived standings. Do not add the
 eight-slot queue, bot fill, inventory/loot, arena/zones, spectating, records, or
 capability exposure through this lifecycle seam.
 
@@ -955,11 +956,12 @@ production flag, or deployment follows from passing Batch 38 evidence.
 ## Reforged Release State
 
 Batch 39 automated evidence remains green and its human tester/release review
-is deliberately deferred. Batch 47's dormant Battle Royale bot lifecycle is
-complete: bots consume the established inventory, loot, Shatterlands, and
-safe-zone truth through deterministic server planning, then act only through
-ordinary sequenced input. Additive wire fields remain optional and
-`battleRoyale` stays default false and unexposed.
+is deliberately deferred. Batch 48's dormant Battle Royale spectator lifecycle
+is complete: eliminated fighters remain read-only participants, target and
+placement truth is server projected, leave reaches provisional Results, and the
+legal terminal event still routes connected entrants to final Results.
+Additive wire fields remain optional and `battleRoyale` stays default false and
+unexposed.
 RFG-004 remains resolved by the per-run `GameScene.minimapRenderer` reset and
 RFG-005 resolves the Battle Royale self-explosion lifecycle gap. The user has
 authorized sequential plan work through Batch 51 while deferring human
@@ -1100,6 +1102,29 @@ plus authoritative time and ordinary movement speed determine early rotation.
 N-player targets use stable distance/player-ID ties. Final closure suppresses
 loot and shortens only approach/trigger decision cadence; weapon stats,
 physics, safe-zone timing, damage, and placement remain unchanged. Standard
-bot paths never construct this plan. Batch 48 owns spectating. Every capability
-remains default false and unexposed, and no deployment, restart, or live smoke
-is authorized.
+bot paths never construct this plan. Every capability remains default false and
+unexposed, and no deployment, restart, or live smoke is authorized.
+
+## Battle Royale Spectator Contract
+
+Batch 48 adds one optional Battle Royale-only `battleRoyaleSpectator` snapshot.
+The server derives its stable living target IDs, alive count, current/final
+standings, eliminator, and elimination cause from the authoritative one-life
+ledger. Standard snapshots omit it, and omission or malformed optional data
+clears the client projection instead of inviting inferred standings.
+
+An eliminated connected fighter remains attached to the match but cannot
+produce effective gameplay input or respawn. Keyboard, standard gamepad, and
+reachable touch controls cycle only through the server-authored living list.
+The selected target owns spectator camera and tactical-map focus; the map still
+shows authoritative circles and no generic rival markers. Killer copy is a
+pure presentation of combat, self, zone, departure, or unknown server context.
+
+An eliminated fighter may request Results. The server validates that state,
+returns a reliable provisional placement payload, and removes the spectator
+from the live match. The legal terminal event continues to send one coherent
+final Results payload to every connected entrant. Disconnect/reconnect retains
+the established safe-lobby fallback; neither path invents a result or re-enters
+simulation. Batch 49 owns separate Battle Royale records. No spectator state
+is persisted, no capability is exposed, and no deployment, restart, or live
+smoke is authorized.

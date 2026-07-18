@@ -1164,7 +1164,9 @@ export class ResultsScene extends Phaser.Scene {
             ? 'DRAW'
             : standing.status === 'departed'
               ? 'LEFT'
-              : 'OUT';
+              : standing.status === 'alive'
+                ? 'LIVE'
+                : 'OUT';
       panel.add(
         this.add
           .text(28, y, `${standing.placement}`, {

@@ -1061,6 +1061,35 @@ export class MatchmakingManager {
     }
   }
 
+  /** Route an eliminated BR fighter to authoritative provisional Results. */
+  handleLeaveBattleRoyaleSpectator(playerId: PlayerId): boolean {
+    const matchId = this.playerMatchMap.get(playerId);
+    if (!matchId || this.matchKinds.get(matchId) !== 'battle_royale') return false;
+    const match = this.activeMatches.get(matchId);
+    if (!match || match.phase !== MatchPhase.ACTIVE) return false;
+    const spectator = match.getBattleRoyaleSpectatorState();
+    const localStanding = spectator?.standings.find((standing) => standing.playerId === playerId);
+    if (!localStanding || localStanding.status === 'alive') return false;
+    const result = match.getBattleRoyaleSpectatorExitResult();
+    if (!result) return false;
+    result.scores = Object.fromEntries(
+      [...match.players].map(([id, player]) => [id, player.score]),
+    );
+    result.playerNicknames = Object.fromEntries(
+      [...match.players].map(([id, player]) => [id, player.nickname]),
+    );
+    result.playerCharacters = Object.fromEntries(
+      [...match.players]
+        .filter(([, player]) => player.characterId !== null)
+        .map(([id, player]) => [id, player.characterId as CharacterId]),
+    );
+    result.departedPlayerIds = match.getDepartedPlayerIds();
+    result.isPractice = false;
+    this.server.sendTo(playerId, { type: 'server:matchEnd', result }, { reliable: true });
+    this.departActiveMatch(matchId, match, playerId);
+    return true;
+  }
+
   /** Called each server tick. */
   tick(dt: number, serverTick: number): void {
     // Try to create matches from queued players
@@ -2545,6 +2574,7 @@ export class MatchmakingManager {
       wastelandWarp: match.getWastelandWarpState() ?? undefined,
       radiationStorm: match.getRadiationStormState() ?? undefined,
       battleRoyaleSafeZone: match.getBattleRoyaleSafeZoneState() ?? undefined,
+      battleRoyaleSpectator: match.getBattleRoyaleSpectatorState() ?? undefined,
       scrapstorm: match.getScrapstormState() ?? undefined,
     };
 

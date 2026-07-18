@@ -90,6 +90,24 @@ describe('battleRoyaleResultsPresentation', () => {
     expect(battleRoyaleOutcomeTitle(result, 'alpha')).toBe('BATTLE ROYALE RESULTS');
   });
 
+  it('projects an authoritative early spectator exit without inventing a winner', () => {
+    const result = baseResult();
+    result.winnerId = null;
+    result.battleRoyale = {
+      placements: [
+        { playerId: 'alpha', placement: 1, status: 'alive' },
+        { playerId: 'bravo', placement: 2, status: 'eliminated' },
+      ],
+      terminalReason: 'left_early',
+      actions: { canLeave: true, canSpectate: false },
+    };
+    expect(battleRoyaleResultsPresentation(result)?.standings).toMatchObject([
+      { playerId: 'alpha', status: 'alive' },
+      { playerId: 'bravo', status: 'eliminated' },
+    ]);
+    expect(battleRoyaleOutcomeTitle(result, 'bravo')).toBe('PLACED #2');
+  });
+
   it('leaves every standard result behaviorally absent', () => {
     const result = baseResult();
     result.matchKind = 'duel';

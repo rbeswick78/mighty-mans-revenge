@@ -1715,6 +1715,290 @@ test('Battle Royale projects the authoritative safe zone into world, minimap, an
     .toBe(false);
 });
 
+test('Battle Royale spectator cycles authoritative targets and keeps the tactical focus', async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    !shellAdvertised || !battleRoyaleAdvertised,
+    'Run with CAPABILITY_NEW_SHELL=true and CAPABILITY_BATTLE_ROYALE=true.',
+  );
+  test.setTimeout(60_000);
+  const gamepad = testInfo.project.name === 'desktop-firefox';
+  const touch = testInfo.project.name === 'mobile-landscape';
+  await page.addInitScript((mockGamepad) => {
+    if (!mockGamepad) return;
+    const state = {
+      axes: [0, 0, 0, 0],
+      buttons: Array.from({ length: 16 }, () => ({ pressed: false, value: 0 })),
+    };
+    Object.defineProperty(navigator, 'getGamepads', {
+      configurable: true,
+      value: () => [
+        {
+          id: 'Batch 48 Standard Gamepad',
+          index: 0,
+          connected: true,
+          mapping: 'standard',
+          axes: state.axes,
+          buttons: state.buttons,
+          timestamp: 0,
+        },
+      ],
+    });
+    (window as unknown as { __battleSpectatorGamepad?: typeof state }).__battleSpectatorGamepad =
+      state;
+  }, gamepad);
+  await page.addInitScript(() => {
+    localStorage.setItem('mmr_fighter_selection', 'rook');
+    localStorage.setItem('mmr_nickname', 'Watcher48');
+  });
+  await page.goto('/');
+  if (testInfo.project.name !== 'desktop-chromium') {
+    await stageNonChromiumShell(page, `battle-spectator-${testInfo.project.name}`);
+  }
+  await waitForActiveScene(page, 'ReforgedShellScene');
+  const localId = await page.evaluate(() => {
+    const shell = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'ReforgedShellScene',
+    ) as unknown as {
+      gameService: {
+        getNetworkManager(): {
+          getPlayerId(): string | null;
+          handleMessage(message: unknown): void;
+        };
+      };
+    };
+    const manager = shell.gameService.getNetworkManager();
+    const playerId = manager.getPlayerId();
+    if (!playerId) throw new Error('missing local Battle Royale spectator');
+    manager.handleMessage({
+      type: 'server:matchFound',
+      matchId: 'battle-spectator-48',
+      opponents: [
+        { id: 'alpha-48', nickname: 'Alpha' },
+        { id: 'bravo-48', nickname: 'Bravo' },
+        ...Array.from({ length: 5 }, (_, index) => ({
+          id: `waiting-48-${index}`,
+          nickname: `Waiting ${index}`,
+        })),
+      ],
+      mapName: 'Shatterlands',
+      gameMode: 'deathmatch',
+      matchKind: 'battle_royale',
+      battleRoyale: { participantCount: 8, humanCount: 1, botCount: 7 },
+    });
+    return playerId;
+  });
+  await waitForActiveScene(page, 'GameScene');
+
+  await page.evaluate((playerId) => {
+    const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'GameScene',
+    ) as unknown as {
+      gameService: {
+        getNetworkManager(): { handleMessage(message: unknown): void };
+        leaveBattleRoyaleSpectator(): void;
+      };
+    };
+    const player = (id: string, x: number, y: number, nickname: string, isDead = false) => ({
+      id,
+      characterId: 'rook',
+      position: { x, y },
+      velocity: { x: 0, y: 0 },
+      aimAngle: 0,
+      health: isDead ? 0 : 100,
+      maxHealth: 100,
+      armor: 0,
+      ammo: 0,
+      weaponId: 'punch',
+      battleRoyaleInventory: { equipped: null, loadedAmmo: 0, reserveAmmo: 0 },
+      specialAmmo: 0,
+      specialReserve: 0,
+      grenades: 0,
+      isReloading: false,
+      isSprinting: false,
+      stamina: 3,
+      isDead,
+      respawnTimer: 0,
+      invulnerableTimer: 0,
+      lastProcessedInput: 0,
+      score: 0,
+      deaths: isDead ? 1 : 0,
+      nickname,
+      abilityActiveSeconds: 0,
+      abilityCooldownSeconds: 0,
+      frozenTimer: 0,
+      secondWindTimer: 0,
+    });
+    scene.gameService.getNetworkManager().handleMessage({
+      type: 'server:gameState',
+      tick: 48,
+      phase: 'active',
+      countdownTimer: 0,
+      matchTimer: 70,
+      players: [
+        player(playerId, 320, 256, 'Watcher48', true),
+        player('alpha-48', 900, 620, 'Alpha'),
+        player('bravo-48', 1900, 1080, 'Bravo'),
+      ],
+      grenades: [],
+      axes: [],
+      bulletTrails: [],
+      barrelExplosions: [],
+      contract: {
+        id: 'hot_shot',
+        title: 'HOT SHOT',
+        objective: 'LAND 8 ATTACKS',
+        target: 8,
+        players: [],
+      },
+      punches: [],
+      pickups: [],
+      activeMutators: [],
+      isOvertime: false,
+      battleRoyaleSpectator: {
+        livingPlayerIds: ['alpha-48', 'bravo-48'],
+        aliveCount: 2,
+        standings: [
+          {
+            playerId: 'alpha-48',
+            placement: 2,
+            status: 'alive',
+            eliminatedBy: null,
+            eliminationCause: null,
+          },
+          {
+            playerId: 'bravo-48',
+            placement: 2,
+            status: 'alive',
+            eliminatedBy: null,
+            eliminationCause: null,
+          },
+          {
+            playerId,
+            placement: 3,
+            status: 'eliminated',
+            eliminatedBy: 'bravo-48',
+            eliminationCause: 'combat',
+          },
+        ],
+      },
+      battleRoyaleSafeZone: {
+        phaseIndex: 2,
+        phase: 'hold',
+        center: { x: 1400, y: 820 },
+        radius: 760,
+        nextCenter: { x: 1600, y: 900 },
+        nextRadius: 500,
+        phaseSecondsRemaining: 10,
+        damagePerPulse: 2,
+      },
+    });
+    (window as unknown as { __spectatorResultsRequested?: boolean }).__spectatorResultsRequested =
+      false;
+    scene.gameService.leaveBattleRoyaleSpectator = () => {
+      (window as unknown as { __spectatorResultsRequested?: boolean }).__spectatorResultsRequested =
+        true;
+    };
+  }, localId);
+  await waitForRenderedFrames(page);
+
+  if (gamepad) {
+    await page.evaluate(() => {
+      const state = (
+        window as unknown as {
+          __battleSpectatorGamepad?: { buttons: Array<{ pressed: boolean; value: number }> };
+        }
+      ).__battleSpectatorGamepad;
+      if (!state) throw new Error('missing Batch 48 gamepad');
+      state.buttons[15] = { pressed: true, value: 1 };
+    });
+    await page.waitForTimeout(120);
+    await page.evaluate(() => {
+      const state = (
+        window as unknown as {
+          __battleSpectatorGamepad?: { buttons: Array<{ pressed: boolean; value: number }> };
+        }
+      ).__battleSpectatorGamepad;
+      if (state) state.buttons[15] = { pressed: false, value: 0 };
+    });
+  } else if (touch) {
+    await page.evaluate(() => {
+      const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+        'GameScene',
+      ) as unknown as {
+        battleRoyaleSpectatorOverlay: { next: Phaser.GameObjects.Text };
+      };
+      scene.battleRoyaleSpectatorOverlay.next.emit('pointerup');
+    });
+  } else {
+    await page.keyboard.press('E');
+  }
+  await page.waitForTimeout(150);
+  await page.evaluate(() => {
+    const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'GameScene',
+    ) as unknown as {
+      tacticalMapRenderer: { launcher: Phaser.GameObjects.Rectangle };
+    };
+    scene.tacticalMapRenderer.launcher.emit('pointerup');
+  });
+
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+          'GameScene',
+        ) as unknown as {
+          getBattleRoyaleSpectatorRenderState(): {
+            active: boolean;
+            targetId: string | null;
+          } | null;
+          getTacticalMapRenderState(): {
+            open: boolean;
+            localPoint: unknown;
+            rivalMarkers: number;
+          } | null;
+          getCameraController(): {
+            getState(): { target: { kind: string; position: { x: number; y: number } } | null };
+          } | null;
+        };
+        return {
+          spectator: scene.getBattleRoyaleSpectatorRenderState(),
+          tactical: scene.getTacticalMapRenderState(),
+          camera: scene.getCameraController()?.getState().target,
+        };
+      }),
+    )
+    .toMatchObject({
+      spectator: { active: true, targetId: 'bravo-48' },
+      tactical: { open: true, localPoint: expect.any(Object), rivalMarkers: 0 },
+      camera: { kind: 'spectator', position: { x: 1900, y: 1080 } },
+    });
+  await page.evaluate(() => {
+    const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'GameScene',
+    ) as unknown as {
+      tacticalMapRenderer: { launcher: Phaser.GameObjects.Rectangle };
+      battleRoyaleSpectatorOverlay: { results: Phaser.GameObjects.Text };
+    };
+    scene.tacticalMapRenderer.launcher.emit('pointerup');
+    scene.battleRoyaleSpectatorOverlay.results.emit('pointerup');
+  });
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as unknown as { __spectatorResultsRequested?: boolean })
+            .__spectatorResultsRequested ?? false,
+      ),
+    )
+    .toBe(true);
+  if (testInfo.project.name === 'desktop-chromium') {
+    await page.screenshot({ path: testInfo.outputPath('battle-spectator-48.png') });
+  }
+});
+
 test('Play submits one server-scheduled general intent and recovery clears queued entry', async ({
   page,
 }, testInfo) => {

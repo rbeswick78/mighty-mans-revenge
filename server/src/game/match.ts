@@ -79,6 +79,7 @@ import type {
   BattleRoyaleMatchFormat,
   BattleRoyaleSafeZonePlan,
   BattleRoyaleSafeZoneState,
+  BattleRoyaleSpectatorState,
   BattleRoyaleContainerState,
   BattleRoyaleSupplyBundleState,
   DroppedWeaponState,
@@ -849,6 +850,7 @@ export class Match implements MatchContext {
           victimId,
           'combat',
           this.battleRoyaleSimulationStep,
+          killerId,
         );
       }
       this.clearBattleRoyaleInventoryOnElimination(victim);
@@ -1054,6 +1056,21 @@ export class Match implements MatchContext {
       ...this.getContractHudState(),
       careerCompletions: {},
     };
+    return result;
+  }
+
+  /** Server-authored Results payload for an eliminated fighter leaving spectating early. */
+  getBattleRoyaleSpectatorExitResult(): MatchResult | null {
+    if (!this.battleRoyaleLifecycle || this.phase !== MatchPhase.ACTIVE) return null;
+    const result = this.gameMode.getResults(this);
+    result.winnerId = null;
+    result.matchKind = 'battle_royale';
+    result.battleRoyale = this.battleRoyaleLifecycle.spectatorExitResult(this.players);
+    result.rivalry = null;
+    result.rivalrySet = null;
+    result.nextMapName = null;
+    result.nextGameMode = null;
+    result.wentToOvertime = false;
     return result;
   }
 
@@ -1285,6 +1302,11 @@ export class Match implements MatchContext {
       this.battleRoyaleSafeZonePlan,
       this.battleRoyaleSafeZoneElapsed,
     );
+  }
+
+  getBattleRoyaleSpectatorState(): BattleRoyaleSpectatorState | null {
+    if (!this.battleRoyaleLifecycle || this.phase !== MatchPhase.ACTIVE) return null;
+    return this.battleRoyaleLifecycle.spectatorState(this.players);
   }
 
   getScrapstormState(): ScrapstormState | null {
@@ -2632,6 +2654,7 @@ export class Match implements MatchContext {
                 victim.id,
                 'combat',
                 this.battleRoyaleSimulationStep,
+                victim.id,
               );
               this.clearBattleRoyaleInventoryOnElimination(victim);
             } else {
