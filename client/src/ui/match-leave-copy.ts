@@ -1,7 +1,8 @@
 import type { PracticeKind } from '@shared/config/game.js';
+import type { MatchKind } from '@shared/types/game.js';
 
 export interface MatchMenuContext {
-  matchKind?: 'duel' | 'rumble' | 'duos' | 'practice';
+  matchKind?: MatchKind;
   practiceKind?: PracticeKind;
 }
 
@@ -33,6 +34,12 @@ export function matchLeaveCopy(context: MatchMenuContext): MatchLeaveCopy {
     return {
       headline: 'LEAVE THE RUMBLE?',
       detail: 'YOU WILL BE ELIMINATED. THE OTHER FIGHTERS KEEP GOING.',
+    };
+  }
+  if (context.matchKind === 'battle_royale') {
+    return {
+      headline: 'LEAVE BATTLE ROYALE?',
+      detail: 'YOU WILL BE ELIMINATED. YOUR SERVER-AUTHORED PLACEMENT IS FINAL.',
     };
   }
   return {

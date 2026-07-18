@@ -38,6 +38,41 @@ export enum GameModeType {
 /** Stable server-authored sides for Crew Battle. */
 export type TeamId = 'blue' | 'red';
 
+/** Queue/lifecycle family authored by the server and projected by clients. */
+export type MatchKind = 'duel' | 'rumble' | 'duos' | 'practice' | 'battle_royale';
+
+/** Dormant Batch 40 format token. Match-intent queueing is owned by Batch 41. */
+export const BATTLE_ROYALE_MATCH_FORMAT = 'battle_royale' as const;
+export type BattleRoyaleMatchFormat = typeof BATTLE_ROYALE_MATCH_FORMAT;
+
+export type BattleRoyalePlacementStatus = 'winner' | 'eliminated' | 'departed' | 'drawn';
+
+/** One deterministic server-authored final standing. Equal placement means a true tie. */
+export interface BattleRoyalePlacement {
+  playerId: PlayerId;
+  placement: number;
+  status: BattleRoyalePlacementStatus;
+}
+
+export type BattleRoyaleTerminalReason =
+  | 'last_survivor'
+  | 'mutual_elimination'
+  | 'all_departed'
+  | 'no_survivor';
+
+/**
+ * Additive Battle Royale Results payload. Spectating deliberately remains
+ * unavailable until Batch 48; every completed result can always leave.
+ */
+export interface BattleRoyaleResult {
+  placements: BattleRoyalePlacement[];
+  terminalReason: BattleRoyaleTerminalReason;
+  actions: {
+    canLeave: boolean;
+    canSpectate: boolean;
+  };
+}
+
 /** Persistent moving target for Bounty Hunt snapshots and bot routing. */
 export interface BountyHuntState {
   /** Living fighter currently worth the bounty bonus; null during overtime. */
@@ -402,7 +437,9 @@ export interface MatchResult {
   duration: number;
   gameMode: GameModeType;
   /** Queue family that created the match; absent on results from older servers. */
-  matchKind?: 'duel' | 'rumble' | 'duos' | 'practice';
+  matchKind?: MatchKind;
+  /** Authoritative placement projection; absent for standard/old-server results. */
+  battleRoyale?: BattleRoyaleResult;
   /** Winning side for a team match; null is a genuine team draw. */
   winnerTeamId?: TeamId | null;
   /** Immutable side assignment for every fighter in a team match. */

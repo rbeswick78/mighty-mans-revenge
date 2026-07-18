@@ -69,6 +69,7 @@ import type {
   MatchContractId,
   TauntId,
   TeamId,
+  BattleRoyaleMatchFormat,
 } from '@shared/game';
 import { logger } from '../utils/logger.js';
 import { PickupManager } from './pickup-manager.js';
@@ -81,6 +82,7 @@ import { getGameMode } from './modes/index.js';
 import type { GameMode, MatchContext } from './modes/game-mode.js';
 import { InputQueue } from './input-queue.js';
 import { RumbleAssistTracker } from './rumble-assist-tracker.js';
+import { BattleRoyaleLifecycle } from './battle-royale-lifecycle.js';
 
 interface PendingBurst {
   shotsRemaining: number;
@@ -93,6 +95,10 @@ interface PendingBurst {
 export interface AutonomousTauntEvent {
   playerId: PlayerId;
   tauntId: TauntId;
+}
+
+export interface MatchLifecycleOptions {
+  readonly format: BattleRoyaleMatchFormat;
 }
 
 export class Match implements MatchContext {
@@ -222,6 +228,10 @@ export class Match implements MatchContext {
   private rumbleLeadState: RumbleLeadState | null = null;
   /** Active-Rumble leavers stay in results but are removed from competition. */
   private readonly departedPlayerIds: Set<PlayerId> = new Set();
+  /** Present only for the dormant Battle Royale format; standard matches keep the old path. */
+  private readonly battleRoyaleLifecycle: BattleRoyaleLifecycle | null;
+  /** Monotonic simulation cohort used to recognize same-tick final combat trades. */
+  private battleRoyaleSimulationStep = 0;
   /**
    * Set when the match ended because everyone else disconnected/forfeited.
    * Overrides the game mode's scoreboard winner in getResult().
@@ -342,11 +352,19 @@ export class Match implements MatchContext {
     stableSeed?: string,
     gauntletBoonAssignments: ReadonlyMap<PlayerId, readonly GauntletBoonId[]> = new Map(),
     playerTeams: ReadonlyMap<PlayerId, TeamId> = new Map(),
+    lifecycleOptions?: MatchLifecycleOptions,
   ) {
     this.matchId = matchId;
     this.playerTeams = new Map(playerTeams);
-    this.tracksRumbleLead = playerEntries.length >= 3 && this.playerTeams.size === 0;
-    this.tracksRumbleAssists = playerEntries.length >= 3;
+    this.battleRoyaleLifecycle =
+      lifecycleOptions?.format === 'battle_royale'
+        ? new BattleRoyaleLifecycle(playerEntries.map((entry) => entry.id))
+        : null;
+    this.tracksRumbleLead =
+      this.battleRoyaleLifecycle === null &&
+      playerEntries.length >= 3 &&
+      this.playerTeams.size === 0;
+    this.tracksRumbleAssists = this.battleRoyaleLifecycle === null && playerEntries.length >= 3;
     this.rng = rng;
     this.rematchMutatorExclusions = new Set(rematchMutatorExclusions);
     this.plannedMidMatchMutator = plannedMidMatchMutator;
@@ -680,6 +698,7 @@ export class Match implements MatchContext {
 
   /** Record a kill event. */
   onKill(killerId: PlayerId, victimId: PlayerId, weapon: KillWeapon): void {
+    const victimWasEliminated = this.players.get(victimId)?.isDead ?? true;
     const isOpponentKill = killerId !== victimId;
     const assist =
       isOpponentKill && this.tracksRumbleAssists
@@ -773,6 +792,13 @@ export class Match implements MatchContext {
       this.cancelActiveAbility(victim);
       this.spawnLastLaughBomb(victim);
       this.dropPowerWeapon(victim);
+      if (!victimWasEliminated) {
+        this.battleRoyaleLifecycle?.recordElimination(
+          victimId,
+          'combat',
+          this.battleRoyaleSimulationStep,
+        );
+      }
     }
 
     // Reward the killer with 50% of their max health (no overheal). Skip
@@ -822,16 +848,25 @@ export class Match implements MatchContext {
   onPlayerDisconnect(playerId: PlayerId, eliminate = false): void {
     this.connectedPlayers.delete(playerId);
     if (this.tracksRumbleAssists) this.rumbleAssistTracker.removePlayer(playerId);
-    if (!eliminate || this.phase !== MatchPhase.ACTIVE) return;
+    if ((!eliminate && this.battleRoyaleLifecycle === null) || this.phase !== MatchPhase.ACTIVE)
+      return;
     const player = this.players.get(playerId);
     if (!player) return;
+    const wasEliminated = player.isDead || this.battleRoyaleLifecycle?.isEliminated(playerId);
     this.departedPlayerIds.add(playerId);
     player.isDead = true;
     player.health = 0;
     player.respawnTimer = 0;
     // Every mode score starts at zero or above. A leaver can no longer win
     // a timed Rumble even if they departed while leading.
-    player.score = -1;
+    if (this.battleRoyaleLifecycle === null) player.score = -1;
+    if (!wasEliminated) {
+      this.battleRoyaleLifecycle?.recordElimination(
+        playerId,
+        'departure',
+        this.battleRoyaleSimulationStep,
+      );
+    }
     this.inputQueues.get(playerId)?.drain();
   }
 
@@ -847,6 +882,12 @@ export class Match implements MatchContext {
   checkMatchEnd(): boolean {
     if (this.phase !== MatchPhase.ACTIVE) return false;
 
+    if (this.battleRoyaleLifecycle !== null) {
+      if (this.battleRoyaleLifecycle.resolve(this.players) === null) return false;
+      this.phase = MatchPhase.ENDED;
+      return true;
+    }
+
     let shouldEnd = false;
 
     if (this.isOvertime && this.overtimeWinnerId !== null) {
@@ -860,9 +901,7 @@ export class Match implements MatchContext {
         !this.isOvertime &&
         this.players.size > 1 &&
         this.gameMode.determineWinner(this) === null &&
-        [...this.players.values()].filter(
-          (player) => this.gameMode.canRespawn?.(this, player) ?? true,
-        ).length > 1
+        [...this.players.values()].filter((player) => this.canPlayerRespawn(player)).length > 1
       ) {
         this.enterOvertime();
       } else {
@@ -902,7 +941,7 @@ export class Match implements MatchContext {
         player.respawnTimer = 0;
         continue;
       }
-      if (this.gameMode.canRespawn?.(this, player) ?? true) {
+      if (this.canPlayerRespawn(player)) {
         this.respawnPlayer(player);
       } else {
         player.isDead = true;
@@ -923,6 +962,22 @@ export class Match implements MatchContext {
   /** Build the match result. */
   getResult(): MatchResult {
     const result = this.gameMode.getResults(this);
+    const battleRoyale = this.battleRoyaleLifecycle?.resolve(this.players) ?? null;
+    if (battleRoyale) {
+      result.winnerId = battleRoyale.winnerId;
+      result.matchKind = 'battle_royale';
+      result.battleRoyale = {
+        placements: battleRoyale.placements,
+        terminalReason: battleRoyale.terminalReason,
+        actions: battleRoyale.actions,
+      };
+      result.rivalry = null;
+      result.rivalrySet = null;
+      result.nextMapName = null;
+      result.nextGameMode = null;
+      result.wentToOvertime = false;
+      return result;
+    }
     if (this.overtimeWinnerId !== null) {
       result.winnerId = this.overtimeWinnerId;
     }
@@ -1298,10 +1353,13 @@ export class Match implements MatchContext {
       // Roll the mid-match mutator's activation time now, from the
       // injectable rng so tests can pin it: uniform inside the
       // 40%–70% elapsed window.
-      const windowSpan =
-        MUTATORS.MIDMATCH_MAX_ELAPSED_FRACTION - MUTATORS.MIDMATCH_MIN_ELAPSED_FRACTION;
-      this.midMatchSlot.activateAtElapsed =
-        this.timeLimitSeconds * (MUTATORS.MIDMATCH_MIN_ELAPSED_FRACTION + this.rng() * windowSpan);
+      if (this.battleRoyaleLifecycle === null) {
+        const windowSpan =
+          MUTATORS.MIDMATCH_MAX_ELAPSED_FRACTION - MUTATORS.MIDMATCH_MIN_ELAPSED_FRACTION;
+        this.midMatchSlot.activateAtElapsed =
+          this.timeLimitSeconds *
+          (MUTATORS.MIDMATCH_MIN_ELAPSED_FRACTION + this.rng() * windowSpan);
+      }
       this.gameMode.onStart(this);
       // Mode initialization owns opening scores (notably Last Stand lives),
       // so seed the silent baseline only after onStart has finished.
@@ -1310,6 +1368,7 @@ export class Match implements MatchContext {
   }
 
   private updateActive(dt: number): void {
+    this.battleRoyaleSimulationStep += 1;
     this.matchTimer -= dt;
     if (this.matchTimer < 0) {
       this.matchTimer = 0;
@@ -1337,7 +1396,7 @@ export class Match implements MatchContext {
     // No NEW mutator activations during overtime — resetting matchTimer to
     // OVERTIME.DURATION would otherwise re-trip the final-minute
     // thresholds mid-sudden-death. Mutators already active keep running.
-    if (!this.isOvertime) {
+    if (!this.isOvertime && this.battleRoyaleLifecycle === null) {
       this.updateMutatorSchedule();
     }
 
@@ -1636,7 +1695,7 @@ export class Match implements MatchContext {
       if (player.isDead && !this.isOvertime) {
         if (!this.connectedPlayers.has(playerId)) {
           player.respawnTimer = 0;
-        } else if (!(this.gameMode.canRespawn?.(this, player) ?? true)) {
+        } else if (!this.canPlayerRespawn(player)) {
           // Eliminated stock-lives players remain spectators. Zero the timer
           // so snapshots never imply that a respawn is still pending.
           player.respawnTimer = 0;
@@ -2387,6 +2446,12 @@ export class Match implements MatchContext {
       : 0;
     player.spawnRushTimer = 0;
     this.applyGauntletSpawnBoons(player);
+  }
+
+  /** Format rules outrank mode defaults: Battle Royale never grants another life. */
+  private canPlayerRespawn(player: PlayerState): boolean {
+    if (this.battleRoyaleLifecycle !== null) return false;
+    return this.gameMode.canRespawn?.(this, player) ?? true;
   }
 
   private hasGauntletBoon(playerId: PlayerId, boonId: GauntletBoonId): boolean {

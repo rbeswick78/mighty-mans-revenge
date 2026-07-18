@@ -85,6 +85,10 @@ import {
 import { useLegacyLogicalSize } from '../ui/reforged/responsive-menu-layout.js';
 import { configureModernUiScene, modernUiEnabledForScene } from '../ui/modern-ui-runtime.js';
 import { MODERN_UI_TEXTURE_KEY, modernUiIconFrame } from '../ui/modern-ui-contract.js';
+import {
+  battleRoyaleOutcomeTitle,
+  battleRoyaleResultsPresentation,
+} from '../ui/battle-royale-results.js';
 
 interface ResultsSceneData {
   result?: MatchResult;
@@ -282,10 +286,11 @@ export class ResultsScene extends Phaser.Scene {
     const camHeight = this.cameras.main.height;
     const localPlayerId = this.gameService.getPlayerId();
     const capabilities = this.gameService.getServerCapabilities();
+    const isBattleRoyale = this.result?.matchKind === 'battle_royale';
     const visualCutover = reforgedVisualCutoverForScene(this, capabilities.modernArt);
     configureModernUiScene(this, visualCutover.active);
     this.partyState =
-      capabilities.newShell && capabilities.schedules && !this.result?.isPractice
+      capabilities.newShell && capabilities.schedules && !this.result?.isPractice && !isBattleRoyale
         ? this.gameService.getPartyState()
         : null;
     const partyResults = partyResultsPresentation(
@@ -296,12 +301,17 @@ export class ResultsScene extends Phaser.Scene {
 
     const localTeam = localPlayerId ? this.result?.playerTeams?.[localPlayerId] : undefined;
     const isTeamMatch = this.result?.matchKind === 'duos';
+    const localBattleRoyaleStanding = battleRoyaleResultsPresentation(this.result)?.standings.find(
+      (standing) => standing.playerId === localPlayerId,
+    );
     const isWinner = isTeamMatch
       ? localTeam !== undefined && this.result?.winnerTeamId === localTeam
       : this.result?.winnerId === localPlayerId;
-    const isDraw = isTeamMatch
-      ? this.result?.winnerTeamId === null || this.result?.winnerTeamId === undefined
-      : this.result?.winnerId === null || this.result?.winnerId === undefined;
+    const isDraw = isBattleRoyale
+      ? localBattleRoyaleStanding?.status === 'drawn' || localBattleRoyaleStanding === undefined
+      : isTeamMatch
+        ? this.result?.winnerTeamId === null || this.result?.winnerTeamId === undefined
+        : this.result?.winnerId === null || this.result?.winnerId === undefined;
     const outcome: Outcome = isDraw ? 'draw' : isWinner ? 'victory' : 'defeat';
 
     // ────────────────────────────────────────────────────────────────────
@@ -327,7 +337,9 @@ export class ResultsScene extends Phaser.Scene {
     // Outcome banner (Press Start 2P, big)
     // ────────────────────────────────────────────────────────────────────
     const titleText =
-      gauntletOutcomeTitle(this.result) ?? (isDraw ? 'DRAW' : isWinner ? 'VICTORY' : 'DEFEAT');
+      battleRoyaleOutcomeTitle(this.result, localPlayerId) ??
+      gauntletOutcomeTitle(this.result) ??
+      (isDraw ? 'DRAW' : isWinner ? 'VICTORY' : 'DEFEAT');
     const titleColor = isDraw ? DRAW_COLOR : isWinner ? VICTORY_COLOR : DEFEAT_COLOR;
     new TitleLogo(this, centerX, 70, [titleText], {
       fontSize: 44,
@@ -344,9 +356,11 @@ export class ResultsScene extends Phaser.Scene {
     // Mode label above the banner: what was just played, plus a sudden-
     // death callout when the match needed overtime to settle.
     if (this.result?.gameMode) {
-      const modeLabel = this.result.wentToOvertime
-        ? `${gameModeDisplayName(this.result.gameMode)} - OVERTIME`
-        : gameModeDisplayName(this.result.gameMode);
+      const modeLabel = isBattleRoyale
+        ? 'BATTLE ROYALE // ONE LIFE'
+        : this.result.wentToOvertime
+          ? `${gameModeDisplayName(this.result.gameMode)} - OVERTIME`
+          : gameModeDisplayName(this.result.gameMode);
       this.add
         .text(centerX, 26, modeLabel, {
           fontFamily: MENU_FONTS.HEADER,
@@ -390,9 +404,11 @@ export class ResultsScene extends Phaser.Scene {
         centerX,
         arenaMastery ? 120 : 112,
         this.result
-          ? this.result.matchKind === 'duos'
-            ? `SAME CREWS // NEXT: ${gameModeDisplayName(this.result.nextGameMode ?? this.result.gameMode)} @ ${this.result.nextMapName?.toUpperCase() ?? 'RANDOM'}`
-            : (gauntletNextTeaser(this.result) ?? nextDraftTeaser(this.result))
+          ? isBattleRoyale
+            ? 'LAST FIGHTER STANDING // SERVER-AUTHORED PLACEMENTS'
+            : this.result.matchKind === 'duos'
+              ? `SAME CREWS // NEXT: ${gameModeDisplayName(this.result.nextGameMode ?? this.result.gameMode)} @ ${this.result.nextMapName?.toUpperCase() ?? 'RANDOM'}`
+              : (gauntletNextTeaser(this.result) ?? nextDraftTeaser(this.result))
           : 'NEXT: COIN TOSS PICKS WHO DRAFTS MAP + MODE',
         {
           fontFamily: MENU_FONTS.HEADER,
@@ -415,7 +431,8 @@ export class ResultsScene extends Phaser.Scene {
     if (
       partyResults === null &&
       this.result?.matchKind !== 'rumble' &&
-      this.result?.matchKind !== 'duos'
+      this.result?.matchKind !== 'duos' &&
+      !isBattleRoyale
     ) {
       this.renderTableau(isWinner, isDraw, camHeight, localPlayerId);
     }
@@ -436,14 +453,16 @@ export class ResultsScene extends Phaser.Scene {
     panel.setDepth(WastelandStreet.DEPTH.UI);
 
     if (this.result) {
-      if (this.result.matchKind === 'rumble') {
+      if (isBattleRoyale) {
+        this.renderBattleRoyaleStandings(panel, localPlayerId);
+      } else if (this.result.matchKind === 'rumble') {
         this.renderRumbleStandings(panel, localPlayerId);
       } else if (this.result.matchKind === 'duos') {
         this.renderCrewBattleStandings(panel, localPlayerId);
       } else {
         this.renderStats(panel, localPlayerId, isWinner, isDraw);
       }
-      this.renderAwardsAndRivalry(centerX, localPlayerId);
+      if (!isBattleRoyale) this.renderAwardsAndRivalry(centerX, localPlayerId);
     } else {
       const noData = this.add
         .text(panel.centerX, panel.centerY, 'No match data available', {
@@ -482,7 +501,7 @@ export class ResultsScene extends Phaser.Scene {
     const adjustedBtnY =
       hasBoonDraft || hasChaosForecast ? camHeight - 99 : hasRivalPreview ? camHeight - 94 : btnY;
     const btnGap = 14;
-    const totalButtons = hasRouteDraft ? 3 : 2;
+    const totalButtons = isBattleRoyale ? 1 : hasRouteDraft ? 3 : 2;
     const firstBtnX = centerX - (btnW * totalButtons + btnGap * (totalButtons - 1)) / 2;
     const requestNextFight = (gauntletRouteId?: PracticeGauntletRouteId): void => {
       if (this.rematchUnavailable) {
@@ -505,38 +524,40 @@ export class ResultsScene extends Phaser.Scene {
         .setVisible(true);
     };
 
-    this.rematchButton = new PixelButton(
-      this,
-      firstBtnX,
-      adjustedBtnY,
-      btnW,
-      btnH,
-      hasRouteDraft
-        ? gauntletRouteButtonLabel(routeChoices[0])
-        : partyResults
-          ? 'READY FOR REMATCH'
-          : (gauntletActionLabel(this.result) ?? rematchButtonLabel(this.result)),
-      {
-        variant: 'primary',
-        fontSize: hasBoonDraft
-          ? 7
-          : hasChaosForecast
-            ? 8
-            : hasRivalPreview
+    if (!isBattleRoyale) {
+      this.rematchButton = new PixelButton(
+        this,
+        firstBtnX,
+        adjustedBtnY,
+        btnW,
+        btnH,
+        hasRouteDraft
+          ? gauntletRouteButtonLabel(routeChoices[0])
+          : partyResults
+            ? 'READY FOR REMATCH'
+            : (gauntletActionLabel(this.result) ?? rematchButtonLabel(this.result)),
+        {
+          variant: 'primary',
+          fontSize: hasBoonDraft
+            ? 7
+            : hasChaosForecast
               ? 8
-              : hasRouteDraft
-                ? 9
-                : 13,
-        onClick: () => requestNextFight(hasRouteDraft ? routeChoices[0].id : undefined),
-      },
-    );
-    this.rematchButton.setDepth(WastelandStreet.DEPTH.UI);
-    if (partyResults) {
-      this.rematchButton.setDisabled(!partyResults.canRequestRematch);
-      this.rematchStatusText.setText(partyResults.statusText).setVisible(true);
+              : hasRivalPreview
+                ? 8
+                : hasRouteDraft
+                  ? 9
+                  : 13,
+          onClick: () => requestNextFight(hasRouteDraft ? routeChoices[0].id : undefined),
+        },
+      );
+      this.rematchButton.setDepth(WastelandStreet.DEPTH.UI);
+      if (partyResults) {
+        this.rematchButton.setDisabled(!partyResults.canRequestRematch);
+        this.rematchStatusText.setText(partyResults.statusText).setVisible(true);
+      }
     }
 
-    if (hasRouteDraft) {
+    if (!isBattleRoyale && hasRouteDraft) {
       this.alternateRouteButton = new PixelButton(
         this,
         firstBtnX + btnW + btnGap,
@@ -580,7 +601,13 @@ export class ResultsScene extends Phaser.Scene {
       .text(
         centerX,
         camHeight - 24,
-        isTouchDevice() ? 'TAP REMATCH, ROUTE, OR LOBBY' : 'TAB / ARROWS + ENTER  •  ESC / B LOBBY',
+        isBattleRoyale
+          ? isTouchDevice()
+            ? 'TAP TO LEAVE RESULTS'
+            : 'ENTER / ESC / B  •  BACK TO LOBBY'
+          : isTouchDevice()
+            ? 'TAP REMATCH, ROUTE, OR LOBBY'
+            : 'TAB / ARROWS + ENTER  •  ESC / B LOBBY',
         {
           fontFamily: MENU_FONTS.BODY,
           fontSize: '12px',
@@ -1082,6 +1109,99 @@ export class ResultsScene extends Phaser.Scene {
         rowIndex++;
       });
     }
+  }
+
+  private renderBattleRoyaleStandings(panel: MenuPanel, localPlayerId: PlayerId | null): void {
+    const presentation = battleRoyaleResultsPresentation(this.result);
+    if (!presentation) return;
+    panel.add(
+      this.add
+        .text(panel.centerX, 22, 'BATTLE ROYALE PLACEMENTS', {
+          fontFamily: MENU_FONTS.HEADER,
+          fontSize: '12px',
+          color: cssHex(NEXT_DRAFT_COLOR),
+        })
+        .setOrigin(0.5)
+        .setName('battle-royale-results-title'),
+    );
+    if (!presentation.hasAuthoritativePlacements) {
+      panel.add(
+        this.add
+          .text(panel.centerX, panel.centerY, 'PLACEMENTS UNAVAILABLE', {
+            fontFamily: MENU_FONTS.HEADER,
+            fontSize: '12px',
+            color: cssHex(LABEL_COLOR),
+          })
+          .setOrigin(0.5),
+      );
+      return;
+    }
+
+    const headings = [
+      { x: 28, text: '#' },
+      { x: 66, text: 'FIGHTER' },
+      { x: 276, text: 'STATUS' },
+      { x: 352, text: 'K/D' },
+    ];
+    for (const heading of headings) {
+      panel.add(
+        this.add.text(heading.x, 50, heading.text, {
+          fontFamily: MENU_FONTS.BODY,
+          fontSize: '9px',
+          color: cssHex(LABEL_COLOR),
+        }),
+      );
+    }
+    presentation.standings.slice(0, 8).forEach((standing, index) => {
+      const y = 76 + index * 30;
+      const isLocal = standing.playerId === localPlayerId;
+      const isWinner = standing.status === 'winner';
+      const color = isWinner ? WINNER_NICK_COLOR : isLocal ? VALUE_COLOR : LABEL_COLOR;
+      const status =
+        standing.status === 'winner'
+          ? 'WINNER'
+          : standing.status === 'drawn'
+            ? 'DRAW'
+            : standing.status === 'departed'
+              ? 'LEFT'
+              : 'OUT';
+      panel.add(
+        this.add
+          .text(28, y, `${standing.placement}`, {
+            fontFamily: MENU_FONTS.HEADER,
+            fontSize: '11px',
+            color: cssHex(color),
+          })
+          .setName(`battle-royale-placement-${standing.playerId}`),
+      );
+      panel.add(
+        this.add
+          .text(66, y, `${standing.nickname.toUpperCase()}${isLocal ? '  (YOU)' : ''}`, {
+            fontFamily: MENU_FONTS.HEADER,
+            fontSize: '9px',
+            color: cssHex(color),
+          })
+          .setName(`battle-royale-fighter-${standing.playerId}`),
+      );
+      panel.add(
+        this.add
+          .text(320, y, status, {
+            fontFamily: MENU_FONTS.HEADER,
+            fontSize: '9px',
+            color: cssHex(standing.status === 'departed' ? OPPONENT_LEFT_COLOR : color),
+          })
+          .setOrigin(1, 0),
+      );
+      panel.add(
+        this.add
+          .text(360, y, standing.stats ? `${standing.stats.kills}/${standing.stats.deaths}` : '—', {
+            fontFamily: MENU_FONTS.BODY,
+            fontSize: '10px',
+            color: cssHex(VALUE_COLOR),
+          })
+          .setOrigin(1, 0),
+      );
+    });
   }
 
   private renderRumbleStandings(panel: MenuPanel, localPlayerId: PlayerId | null): void {

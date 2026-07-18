@@ -10,6 +10,7 @@ import type {
   RumbleGrudge,
   RumbleLeadState,
   TeamId,
+  MatchKind,
 } from '@shared/types/game.js';
 import type {
   DraftCategory,
@@ -64,7 +65,7 @@ export interface MatchData {
   mapName: string;
   /** Mode this match will be played in — drives the pre-match mode label. */
   gameMode: GameModeType;
-  matchKind?: 'duel' | 'rumble' | 'duos' | 'practice';
+  matchKind?: MatchKind;
   /** Client validation result for the additive direct-launch projection. */
   standardLaunchStatus?: 'absent' | 'valid' | 'invalid';
   /** Present only when the complete server-owned projection validates. */

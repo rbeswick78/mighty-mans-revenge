@@ -5,10 +5,11 @@ Read this file and `CLAUDE.md` completely at the start of every batch. The
 completed `docs/REPLAYABILITY_ROADMAP.md` remains the historical record for the
 systems this program preserves and reorganizes.
 
-- **Status:** Batch 39 automated release gate completed on 2026-07-17; RFG-004
-  is resolved and every capability remains default false.
-- **Next step:** explicit human tester/release review; do not deploy, expose
-  capabilities, smoke production, or begin Batch 40 without fresh approval.
+- **Status:** Batch 40 Battle Royale lifecycle completed on 2026-07-18; the
+  format remains dormant and every capability remains default false.
+- **Next step:** stop. Batch 41's eight-slot queue requires fresh authorization;
+  the deferred Batch 39 human release walkthrough still does not authorize a
+  deployment, capability exposure, production restart, or live smoke.
 - **Public releases:** Reforged Arena, then Battle Royale.
 - **Working model:** one numbered batch per session, direct commits and pushes
   to `main`, milestone-gated production deployments.
@@ -194,7 +195,7 @@ Production deployment happens only at a gate or for an urgent live fix.
 |  37 | Checkpoint Zero and Rusted Refinery    | Large arenas  | **DONE — 2026-07-17** |
 |  38 | Mode and bot rebalance                 | Large arenas  | **DONE — 2026-07-17** |
 |  39 | Reforged Arena release gate            | Large arenas  | **DONE — 2026-07-17** |
-|  40 | Battle Royale lifecycle                | Battle Royale | Pending               |
+|  40 | Battle Royale lifecycle                | Battle Royale | Complete (2026-07-18) |
 |  41 | Eight-slot queue                       | Battle Royale | Pending               |
 |  42 | Weapon instances and rarity            | Battle Royale | Pending               |
 |  43 | Single-slot inventory                  | Battle Royale | Pending               |
@@ -1358,6 +1359,45 @@ Selected verification tier (2026-07-17, before any Batch 39 change): complete mi
 
 Add the format, one-life elimination, deterministic placement/winner rules,
 disabled respawn/mutator hooks, and mode-specific Results foundations.
+
+**Verification tier selected before implementation (2026-07-18):** shared,
+server, network, and client cross-package tier, escalated for authoritative
+lifecycle transitions, Results projection, recovery ordering, and additive wire
+compatibility. Required evidence is deterministic server-first lifecycle and
+terminal-shape coverage, focused shared/client compatibility and Results tests,
+the full unit matrix, typecheck, lint, all package builds, formatting and diff
+checks, targeted three-project browser journeys for the affected Results/leave/
+fallback surfaces, and the relevant 20 Hz server baseline probe. The complete
+browser inventory is required only if implementation reveals broader foundation
+or journey coupling.
+
+- [x] `battle_royale` is an additive shared match kind/format token and a
+      server-only `Match` lifecycle option; standard intent queues and launch
+      routes do not accept or expose it.
+- [x] The authoritative elimination ledger grants one life, zeroes dead-player
+      respawn timers, ends only at one survivor or a legal no-survivor terminal
+      shape, and derives stable N-player placements from immutable entrants plus
+      authoritative event order.
+- [x] One survivor owns placement 1 and `winnerId`; a same-tick final combat
+      cohort shares placement 1 with no winner; departures remain ordered and
+      cannot rewrite an earlier combat elimination.
+- [x] Battle Royale bypasses regulation overtime and all random/forced mutator
+      scheduling hooks while preserving ordinary abilities, grenades, healing,
+      armor, combat attribution, and snapshot authority.
+- [x] Optional server-authored Results include placement/status/terminal reason
+      and leave/future-spectate action foundations. The client only projects
+      those placements, offers the reachable lobby exit, exposes no rematch or
+      spectate behavior, and invents nothing when an old server omits the field.
+- [x] Focused deterministic tests cover one survivor, mutual final elimination,
+      all departures, disconnect/elimination ordering, no respawn, no overtime,
+      no mutators even under FORCE pins, eight entrants, winner/placement
+      coherence, standard-result field absence, and old-server fallback.
+- [x] Full unit, typecheck, lint, all builds, targeted three-project browser,
+      formatting/diff, and authoritative 20 Hz baseline evidence passed.
+- [x] Batch 41 queue/deadline/bot fill, rarity, weapons, inventory, loot,
+      containers, arena, zones, Battle Royale bots, spectating, records,
+      performance hardening, exposure, deployment, and production smoke did not
+      begin.
 
 #### Batch 41 — Eight-slot queue
 
@@ -3644,6 +3684,60 @@ disposition, tester approval, and any separately authorized exposure/deploy.
 **Deployment:** Skipped. Production remains on approved Batch 33 commit `f39eb34131f8827f85432aafcc6d6c18a2d0ac51`; `newShell`, `schedules`, `largeWorlds`, and `modernArt` remain strict server-owned opt-ins and default false, and `battleRoyale` remains false. No flag exposure, restart, live smoke, deployment, Battle Royale work, or successor task occurred.
 
 **Disposition:** The automated Reforged Arena release gate is complete with no open automated release blocker. Rollout remains unauthorized until the user completes the human walkthrough and explicitly approves a later server-first rollout. Stop the chain after Batch 39; do not create a Batch 40 successor.
+
+### Batch 40 - 2026-07-18 - Battle Royale lifecycle
+
+**Scope and tier:** Fresh user authorization superseded only the historical
+Batch 39 stop for exactly Batch 40. Before implementation, the shared/server/
+network/client cross-package tier was selected and escalated for lifecycle,
+Results, recovery ordering, and additive compatibility. Batch 39's human
+walkthrough and rollout remained deferred. No Batch 41 queue or later Battle
+Royale surface entered scope.
+
+**Authority:** Added the dormant shared `battle_royale` match kind and a
+server-only `MatchLifecycleOptions` route into `BattleRoyaleLifecycle`. The
+ledger records each immutable entrant's first authoritative combat elimination
+or active departure. One survivor uniquely owns winner and placement 1. A
+same-simulation-step final combat cohort shares first with no winner; all other
+placements follow stable event order, and a later disconnect cannot rewrite an
+earlier death. Eight-entrant evidence uses the same maps/arrays as smaller
+shapes. Dead fighters remain dead with zero respawn timer; regulation timeout
+does not start overtime, and neither random nor FORCE-pinned mutator slot can
+warn or activate.
+
+**Results and compatibility:** Optional `MatchResult.battleRoyale` carries
+server-authored placements, status, terminal reason, and leave/spectate action
+availability. Results presents a compact eight-row table, local placement,
+true final-fighter draws, and only the reachable lobby exit. Rematch is absent
+and spectating stays unavailable for Batch 48. Old-server results with no
+optional field show `PLACEMENTS UNAVAILABLE`; standard results serialize with
+neither new field, and old clients may ignore both additive fields. The eight
+existing modes, standard Duel/Rumble/Crew/Practice lifecycle, overtime,
+mutators, combat, stats, awards, persistence, rematches, and fallback behavior
+remain unchanged.
+
+**Verification:** Focused server/client evidence passed 12 tests before the
+full run; the final complete unit matrix passed 145 files and 1,644 tests.
+Typecheck, ESLint, shared/server/client builds, `git diff --check`, and the
+Batch 40 allowlist formatting passed. The repository-wide Prettier inventory
+still reports 97 inherited files, none on the Batch 40 allowlist. Targeted
+Results/leave/old-server fallback passed in desktop Chromium, desktop Firefox,
+and mobile landscape (six browser tests). The
+authoritative baseline retained configured and rolling 20 Hz with a 50 ms
+budget; synthetic four-player mean/p95/p99/max processing was
+0.017/0.027/0.082/1.352 ms. No broader journey coupling appeared, so the
+selected policy did not escalate to Batch 39's complete release inventory.
+No bug-ledger row was added because focused and full evidence found no new
+reproducible defect.
+
+**Deployment and disposition:** Skipped. Production remains on approved Batch
+33 commit `f39eb34131f8827f85432aafcc6d6c18a2d0ac51`; `newShell`, `schedules`,
+`largeWorlds`, `modernArt`, and `battleRoyale` remain strict server-owned
+opt-ins, default false, and unexposed. No queue, 15-second deadline, bot fill,
+rarity, new weapon, inventory, loot/container, arena, zone, tactical map,
+Battle Royale bot, spectating, record/persistence, hardening, deployment,
+restart, or live smoke began. Stop after Batch 40; Batch 41 requires separate
+fresh authorization.
 
 ## Batch 22 input prompt (historical)
 

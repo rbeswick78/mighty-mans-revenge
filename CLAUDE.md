@@ -603,6 +603,23 @@ Bullet trails also carry authoritative player-hit confirmation. Every trail begi
 
 Quick Match launches as 1v1; Wasteland Rumble launches with 2–4 players; Crew Battle currently launches a fixed 2v2 roster. The game remains architected for N players. Use arrays/maps of players everywhere — never hardcode `player1`/`player2` or assume exactly 2 players. Matchmaking, game state, and rendering must all support variable player counts.
 
+**Battle Royale lifecycle (Batch 40):** `battle_royale` is an additive shared
+match kind plus an internal `MatchLifecycleOptions` format; it is deliberately
+absent from standard `MatchIntent` formats and every launch queue until Batch 41. `BattleRoyaleLifecycle` owns immutable entrants and one authoritative
+elimination edge per fighter. Combat and active departure edges derive final
+placements from server event order; the sole tie is a same-simulation-step
+final combat cohort, whose fighters share first with `winnerId: null`. One
+survivor is the unique winner and placement 1. The format disables respawn,
+overtime, and both random and FORCE-pinned mutator scheduling without changing
+the eight `GameMode` implementations or ordinary combat, abilities, grenades,
+healing, armor, stats, snapshots, or standard result bytes. Optional
+`MatchResult.battleRoyale` carries placements, terminal reason, and action
+availability. Results is a pure projection, provides a lobby exit, and keeps
+spectating false until Batch 48; an old server with no optional field gets an
+explicit unavailable state, never client-derived standings. Do not add the
+eight-slot queue, bot fill, inventory/loot, arena/zones, spectating, records, or
+capability exposure through this lifecycle seam.
+
 ### Game Mode Abstraction
 
 Match logic is behind a `GameMode` interface (`onStart`, `onKill(…, weapon)`, `onTick`, `isMatchOver`, `getResults`, `determineWinner`, plus optional objective/lifecycle hooks). Eight modes exist: `DeathmatchMode`, `KothMode` (King of the Hill — 1 hill point per full second as sole living occupant, contested = nobody scores, hill relocates round-robin through the map's `kothHills` every 25s, first to 60 or highest at time-out; hill points ride in `PlayerState.score`), `GunGameMode`, `LastStandMode`, `KillConfirmedMode`, `OneInTheChamberMode`, `CoreRunMode`, and `BountyHuntMode` (see below). New modes = new class + registry entry; use optional hooks when a rule must affect core lifecycle or serialized objective state.
@@ -922,6 +939,13 @@ production flag, or deployment follows from passing Batch 38 evidence.
 - Approved Reforged visual direction: `docs/REFORGED_STYLE_BIBLE.md` — golden references, identity locks, readability rules, and later-asset constraints
 - Completed replayability build history: `docs/REPLAYABILITY_ROADMAP.md` — read it when changing established weapons, modes, maps, mutators, characters, stats, awards, or challenge behavior
 
-## Reforged Arena Release Gate
+## Reforged Release State
 
-Batch 39 automated evidence is green and awaits explicit human tester/release approval. RFG-004 was resolved by clearing the stale per-run `GameScene.minimapRenderer` owner in `init()`; literal `largeWorlds:false` now restores legacy viewport mode, resources, and `minimap: null` after successor play. Both complete three-project configurations, the strict all-six reproduction, and RFG-003 evidence pass. Do not expose a Reforged capability, deploy, restart production, smoke the live site, or begin Batch 40 without fresh user approval. Production remains on approved Batch 33 with every capability false.
+Batch 39 automated evidence remains green and its human tester/release review
+is deliberately deferred. Batch 40's dormant Battle Royale lifecycle is also
+complete, but no Battle Royale queue or route exists and `battleRoyale` remains
+strict server-owned, default false, and unexposed. RFG-004 remains resolved by
+the per-run `GameScene.minimapRenderer` reset. Do not expose any Reforged
+capability, deploy, restart production, smoke the live site, or begin Batch 41
+without fresh user approval. Production remains on approved Batch 33 with every
+capability false.

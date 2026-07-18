@@ -21,6 +21,7 @@ import {
   WastelandWarpState,
   RadiationStormState,
   ScrapstormState,
+  MatchKind,
 } from './game.js';
 import type {
   BotDifficulty,
@@ -489,7 +490,7 @@ export interface ServerMatchFoundMessage {
   /** Mode this match will be played in — drives the lobby's "NEXT: X" line. */
   gameMode: GameModeType;
   /** Queue family; optional so older servers still interoperate. */
-  matchKind?: 'duel' | 'rumble' | 'duos' | 'practice';
+  matchKind?: MatchKind;
   /**
    * Complete server-owned proof for capability-owned direct countdown entry.
    * Absent on legacy, old-server, FORCE, and every Practice/challenge route.

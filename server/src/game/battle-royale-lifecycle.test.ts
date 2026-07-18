@@ -1,0 +1,202 @@
+import { afterEach, describe, expect, it } from 'vitest';
+import {
+  CHARACTER_IDS,
+  GameModeType,
+  MATCH,
+  MatchPhase,
+  RESPAWN,
+  type MapData,
+} from '@shared/game';
+import { Match } from './match.js';
+
+function makeMapData(): MapData {
+  return {
+    name: 'battle-royale-lifecycle-test',
+    width: 10,
+    height: 10,
+    tileSize: 48,
+    tiles: Array.from({ length: 10 }, () => Array.from({ length: 10 }, () => 0)),
+    spawnPoints: [
+      { x: 1, y: 1 },
+      { x: 8, y: 8 },
+      { x: 1, y: 8 },
+      { x: 8, y: 1 },
+    ],
+    pickupSpawns: [],
+  };
+}
+
+function createBattleRoyaleMatch(playerCount = 4): Match {
+  return new Match(
+    'battle-royale-lifecycle',
+    makeMapData(),
+    Array.from({ length: playerCount }, (_, index) => ({
+      id: `player-${index}`,
+      nickname: `Player ${index}`,
+    })),
+    GameModeType.DEATHMATCH,
+    () => 0,
+    [],
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    new Map(),
+    new Map(),
+    { format: 'battle_royale' },
+  );
+}
+
+function activate(match: Match): void {
+  match.phase = MatchPhase.ACTIVE;
+  match.matchTimer = MATCH.TIME_LIMIT;
+}
+
+function eliminate(match: Match, killerId: string, victimId: string): void {
+  match.onKill(killerId, victimId, 'gun');
+}
+
+afterEach(() => {
+  delete process.env.FORCE_EVENT;
+  delete process.env.FORCE_MIDMATCH_MUTATOR;
+});
+
+describe('Battle Royale lifecycle', () => {
+  it('ends with one living survivor and coherent deterministic placements', () => {
+    const match = createBattleRoyaleMatch();
+    activate(match);
+    eliminate(match, 'player-0', 'player-3');
+    match.update(0.05);
+    eliminate(match, 'player-0', 'player-2');
+    match.update(0.05);
+    eliminate(match, 'player-0', 'player-1');
+
+    expect(match.checkMatchEnd()).toBe(true);
+    const result = match.getResult();
+    expect(result.winnerId).toBe('player-0');
+    expect(result.matchKind).toBe('battle_royale');
+    expect(result.battleRoyale).toEqual({
+      placements: [
+        { playerId: 'player-0', placement: 1, status: 'winner' },
+        { playerId: 'player-1', placement: 2, status: 'eliminated' },
+        { playerId: 'player-2', placement: 3, status: 'eliminated' },
+        { playerId: 'player-3', placement: 4, status: 'eliminated' },
+      ],
+      terminalReason: 'last_survivor',
+      actions: { canLeave: true, canSpectate: false },
+    });
+    expect(result.wentToOvertime).toBe(false);
+    expect(result.battleRoyale?.placements.find((row) => row.placement === 1)?.playerId).toBe(
+      result.winnerId,
+    );
+  });
+
+  it('authors a true draw when the final fighters mutually eliminate in one tick', () => {
+    const match = createBattleRoyaleMatch(3);
+    activate(match);
+    eliminate(match, 'player-0', 'player-2');
+    match.update(0.05);
+    eliminate(match, 'player-0', 'player-1');
+    eliminate(match, 'player-1', 'player-0');
+
+    expect(match.checkMatchEnd()).toBe(true);
+    const result = match.getResult();
+    expect(result.winnerId).toBeNull();
+    expect(result.battleRoyale?.terminalReason).toBe('mutual_elimination');
+    expect(result.battleRoyale?.placements).toEqual([
+      { playerId: 'player-0', placement: 1, status: 'drawn' },
+      { playerId: 'player-1', placement: 1, status: 'drawn' },
+      { playerId: 'player-2', placement: 3, status: 'eliminated' },
+    ]);
+  });
+
+  it('keeps disconnect and elimination ordering stable without rewriting prior deaths', () => {
+    const match = createBattleRoyaleMatch();
+    activate(match);
+    eliminate(match, 'player-0', 'player-3');
+    match.onPlayerDisconnect('player-3');
+    match.update(0.05);
+    match.onPlayerDisconnect('player-2');
+    match.update(0.05);
+    eliminate(match, 'player-0', 'player-1');
+
+    expect(match.checkMatchEnd()).toBe(true);
+    expect(match.getResult().battleRoyale?.placements).toEqual([
+      { playerId: 'player-0', placement: 1, status: 'winner' },
+      { playerId: 'player-1', placement: 2, status: 'eliminated' },
+      { playerId: 'player-2', placement: 3, status: 'departed' },
+      { playerId: 'player-3', placement: 4, status: 'eliminated' },
+    ]);
+  });
+
+  it('ends coherently with no winner when every entrant departs', () => {
+    const match = createBattleRoyaleMatch(3);
+    activate(match);
+    match.onPlayerDisconnect('player-2');
+    match.onPlayerDisconnect('player-0');
+    match.onPlayerDisconnect('player-1');
+
+    expect(match.checkMatchEnd()).toBe(true);
+    const result = match.getResult();
+    expect(result.winnerId).toBeNull();
+    expect(result.battleRoyale?.terminalReason).toBe('all_departed');
+    expect(result.battleRoyale?.placements).toEqual([
+      { playerId: 'player-1', placement: 1, status: 'departed' },
+      { playerId: 'player-0', placement: 2, status: 'departed' },
+      { playerId: 'player-2', placement: 3, status: 'departed' },
+    ]);
+  });
+
+  it('enforces one life and suppresses forced mutators and overtime', () => {
+    process.env.FORCE_EVENT = 'big_heads';
+    process.env.FORCE_MIDMATCH_MUTATOR = 'low_health';
+    const match = createBattleRoyaleMatch();
+    for (const [index, player] of [...match.players.values()].entries()) {
+      player.characterId = CHARACTER_IDS[index % CHARACTER_IDS.length]!;
+    }
+    match.phase = MatchPhase.WAITING;
+    match.startCountdown();
+    match.update(MATCH.COUNTDOWN_DURATION + 0.01);
+    expect(match.phase).toBe(MatchPhase.ACTIVE);
+
+    eliminate(match, 'player-0', 'player-3');
+    match.update(RESPAWN.DELAY + 1);
+    const eliminated = match.players.get('player-3')!;
+    expect(eliminated.isDead).toBe(true);
+    expect(eliminated.respawnTimer).toBe(0);
+
+    match.update(MATCH.TIME_LIMIT + 1);
+    expect(match.phase).toBe(MatchPhase.ACTIVE);
+    expect(match.isOvertime).toBe(false);
+    expect(match.consumeTickOvertimeStart()).toBeNull();
+    expect(match.activeMutators).toEqual([]);
+    expect(match.consumeTickMutatorWarnings()).toEqual([]);
+    expect(match.consumeTickMutatorStarts()).toEqual([]);
+  });
+
+  it('uses N-player-safe placement structures for an eight-entrant terminal result', () => {
+    const match = createBattleRoyaleMatch(8);
+    activate(match);
+    for (let victim = 7; victim >= 1; victim -= 1) {
+      eliminate(match, 'player-0', `player-${victim}`);
+      if (victim > 1) match.update(0.05);
+    }
+    expect(match.checkMatchEnd()).toBe(true);
+    const placements = match.getResult().battleRoyale?.placements ?? [];
+    expect(placements).toHaveLength(8);
+    expect(new Set(placements.map((row) => row.playerId)).size).toBe(8);
+    expect(placements.map((row) => row.placement)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+  });
+
+  it('does not add Battle Royale fields to a standard result', () => {
+    const standard = new Match('standard-byte-shape', makeMapData(), [
+      { id: 'alpha', nickname: 'Alpha' },
+      { id: 'bravo', nickname: 'Bravo' },
+    ]);
+    activate(standard);
+    eliminate(standard, 'alpha', 'bravo');
+    const serialized = JSON.parse(JSON.stringify(standard.getResult())) as Record<string, unknown>;
+    expect(serialized).not.toHaveProperty('matchKind');
+    expect(serialized).not.toHaveProperty('battleRoyale');
+  });
+});

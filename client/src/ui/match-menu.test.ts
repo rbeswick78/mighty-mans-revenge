@@ -11,6 +11,10 @@ describe('matchLeaveCopy', () => {
       headline: 'LEAVE THE RUMBLE?',
       detail: 'YOU WILL BE ELIMINATED. THE OTHER FIGHTERS KEEP GOING.',
     });
+    expect(matchLeaveCopy({ matchKind: 'battle_royale' })).toEqual({
+      headline: 'LEAVE BATTLE ROYALE?',
+      detail: 'YOU WILL BE ELIMINATED. YOUR SERVER-AUTHORED PLACEMENT IS FINAL.',
+    });
   });
 
   it('distinguishes ordinary practice, crew groups, and run progress', () => {

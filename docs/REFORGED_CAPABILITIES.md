@@ -370,3 +370,20 @@ reproduction, and RFG-003 evidence pass. `newShell`, `schedules`,
 `largeWorlds`, and `modernArt` remain strict server-owned opt-ins and default
 false, `battleRoyale` remains false, and production stays on the separately
 approved Batch 33 commit until explicit human tester/release approval.
+
+## Batch 40 lifecycle disposition
+
+Batch 40 adds dormant Battle Royale lifecycle and optional Results support
+without changing capability negotiation. `CAPABILITY_BATTLE_ROYALE` remains a
+strict literal server opt-in that defaults false; no queue, shell route,
+schedule, matchmaking intent, match launcher, production environment, or live
+advertisement consumes it. The shared `battle_royale` match kind is additive,
+and old clients ignore the optional Results field while new clients fail open to
+an explicit placement-unavailable Results state when an old server omits it.
+
+This is support code only, not an exposure event. Batch 41 owns the eight-slot
+queue and 15-second deadline, later batches own the remaining gameplay and
+records, and Batch 51 owns the release gate. Production remains on approved
+Batch 33 with `newShell`, `schedules`, `largeWorlds`, `modernArt`, and
+`battleRoyale` all false. No deployment, restart, live smoke, rollout, or
+capability change occurred.

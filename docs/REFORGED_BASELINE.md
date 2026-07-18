@@ -456,3 +456,32 @@ complete coherent-enabled inventory, default-false inventory plus exact
 cold-client rerun, and RFG-003 visual evidence pass. Automated evidence is
 green; production and every default remain unchanged pending explicit human
 tester/release approval.
+
+### Batch 40 Battle Royale lifecycle baseline
+
+The dormant `battle_royale` format adds no queue, route, capability exposure,
+or production state. A server-only lifecycle ledger records each immutable
+entrant's first combat elimination or active departure. One living survivor is
+the unique winner and placement 1; earlier eliminations receive stable reverse
+event-order placements; only final fighters eliminated by combat in the same
+simulation step share placement 1 with no winner. All departures and the
+no-survivor defensive terminal shape are explicit and deterministic.
+
+Battle Royale dead players remain dead with `respawnTimer: 0`. The format never
+enters standard sudden-death overtime and never schedules either mutator slot,
+including FORCE-pinned diagnostics. The eight registered `GameMode` classes,
+ordinary combat attribution, abilities, grenades, healing, armor, standard
+snapshots, and every standard result shape remain unchanged. The optional
+Results payload is server authored; clients present up to eight placements,
+provide only the existing leave-to-lobby action, keep future spectating false,
+and show `PLACEMENTS UNAVAILABLE` when an older server omits the field.
+
+Deterministic focused evidence covers one survivor, a mutually eliminated final
+pair, all departures, mixed disconnect/elimination order, duplicate departure
+after death, one-life enforcement, no overtime/mutators, eight entrants,
+winner/placement coherence, and absent fields on standard results. The complete
+145-file/1,644-test unit matrix, typecheck, lint, all builds, targeted Results
+and old-server fallback across desktop Chromium, desktop Firefox, and mobile
+landscape, and the authoritative server baseline passed. The baseline retained
+the configured/rolling 20 Hz contract, 50 ms tick budget, and synthetic
+four-player mean/p95/p99/max work of 0.017/0.027/0.082/1.352 ms.
