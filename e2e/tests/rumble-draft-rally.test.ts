@@ -1,20 +1,18 @@
 import { test, expect } from '../fixtures';
 import type { Page } from '@playwright/test';
 
+const shellAdvertised = process.env.CAPABILITY_NEW_SHELL === 'true';
+
 async function waitForLobby(gamePage: import('@playwright/test').Page): Promise<void> {
   await expect
     .poll(
       () =>
         gamePage.evaluate(() => {
-          const game = (
-            window as unknown as { game?: { scene: { getScene: (key: string) => unknown } } }
-          ).game;
-          const lobby = game?.scene.getScene('LobbyScene') as {
-            sys?: { settings: { active: boolean } };
-          };
-          return lobby?.sys?.settings.active ?? false;
+          const game = (window as unknown as { game?: Phaser.Game }).game;
+          const lobby = game?.scene.getScene('LobbyScene') as unknown as { gameService?: unknown };
+          return Boolean(game && lobby?.gameService);
         }),
-      { timeout: 30000 },
+      { timeout: 30_000 },
     )
     .toBe(true);
 }
@@ -167,6 +165,10 @@ test.describe('Rumble Draft Rally', () => {
     test.skip(
       testInfo.project.name !== 'desktop-chromium',
       'One authoritative three-client journey is sufficient; Firefox/mobile Rally UI is covered above.',
+    );
+    test.skip(
+      shellAdvertised,
+      'The enabled shell submits validated Rumble intents without entering the preserved legacy Draft Rally; the default-false matrix owns this real three-client journey.',
     );
     test.setTimeout(90000);
     const pageB = await context.newPage();

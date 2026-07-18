@@ -332,6 +332,7 @@ export class GameScene extends Phaser.Scene {
     this.gameplaySafeArea = null;
     this.combatHudLayout = null;
     this.worldRenderPlan = null;
+    this.minimapRenderer = null;
     this.reforgedVisualCutover = null;
     this.worldRenderQuality.reset();
   }

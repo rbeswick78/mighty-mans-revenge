@@ -1,5 +1,7 @@
 import { test, expect } from '../fixtures';
 
+const shellAdvertised = process.env.CAPABILITY_NEW_SHELL === 'true';
+
 interface ButtonSnapshot {
   x: number;
   y: number;
@@ -11,6 +13,10 @@ test.describe('Scrap Pit solo Rumble', () => {
   test('opens three distinct rivals and makes the crew answer a challenge', async ({
     gamePage,
   }, testInfo) => {
+    test.skip(
+      shellAdvertised,
+      'The enabled Challenges tab owns Scrap Pit; reforged-shell.test.ts covers its setup, persistence, and server intent.',
+    );
     test.skip(
       testInfo.project.name === 'desktop-firefox',
       'Authoritative Scrap Pit runs in Chromium; Firefox presentation is covered by staged surfaces.',

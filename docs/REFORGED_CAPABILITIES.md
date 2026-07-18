@@ -361,4 +361,12 @@ when production exposure is authorized.
 
 ## Batch 39 gate disposition
 
-The release review does not authorize exposure. RFG-004 proves that a coherent enabled journey followed by literal `largeWorlds:false` can report legacy viewport truth while retaining successor minimap state. Until that client lifecycle blocker is corrected and both complete browser matrices plus human review pass, `newShell`, `schedules`, `largeWorlds`, and `modernArt` remain default false and `battleRoyale` remains false. Production stays on the separately approved Batch 33 commit.
+The automated release review is green but does not authorize exposure.
+RFG-004 was resolved by clearing the per-run `GameScene` minimap owner during
+scene initialization; literal `largeWorlds:false` now restores the complete
+legacy viewport, resources, and `minimap: null` contract after coherent
+successor play. Both complete browser configurations, the focused all-six
+reproduction, and RFG-003 evidence pass. `newShell`, `schedules`,
+`largeWorlds`, and `modernArt` remain strict server-owned opt-ins and default
+false, `battleRoyale` remains false, and production stays on the separately
+approved Batch 33 commit until explicit human tester/release approval.

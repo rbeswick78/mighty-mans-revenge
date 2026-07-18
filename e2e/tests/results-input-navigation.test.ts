@@ -3,6 +3,9 @@ import type { Page } from '@playwright/test';
 import { test, expect } from '../fixtures';
 
 const shellAdvertised = process.env.CAPABILITY_NEW_SHELL === 'true';
+const schedulesAdvertised = process.env.CAPABILITY_SCHEDULES === 'true';
+const largeWorldsAdvertised = process.env.CAPABILITY_LARGE_WORLDS === 'true';
+const modernArtAdvertised = process.env.CAPABILITY_MODERN_ART === 'true';
 interface Bounds {
   x: number;
   y: number;
@@ -39,9 +42,47 @@ async function waitForScene(page: Page, key: string): Promise<void> {
     )
     .toBe(true);
 }
-
-async function startRouteResults(page: Page): Promise<void> {
+async function stageNonChromiumShell(page: Page): Promise<void> {
   await waitForScene(page, 'LobbyScene');
+  await page.evaluate(
+    ({ advertiseSchedules, advertiseLargeWorlds, advertiseModernArt }) => {
+      const lobby = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+        'LobbyScene',
+      ) as unknown as {
+        gameService: {
+          getNetworkManager(): {
+            connection: { setState(state: string): void };
+            handleMessage(message: unknown): void;
+          };
+        };
+      };
+      const manager = lobby.gameService.getNetworkManager();
+      manager.connection.setState('connected');
+      manager.handleMessage({
+        type: 'server:welcome',
+        playerId: 'results-input-stage',
+        capabilities: {
+          newShell: true,
+          schedules: advertiseSchedules,
+          largeWorlds: advertiseLargeWorlds,
+          modernArt: advertiseModernArt,
+          battleRoyale: false,
+        },
+      });
+    },
+    {
+      advertiseSchedules: schedulesAdvertised,
+      advertiseLargeWorlds: largeWorldsAdvertised,
+      advertiseModernArt: modernArtAdvertised,
+    },
+  );
+}
+
+async function startRouteResults(page: Page, projectName: string): Promise<void> {
+  if (shellAdvertised && projectName !== 'desktop-chromium') {
+    await stageNonChromiumShell(page);
+  }
+  await waitForScene(page, shellAdvertised ? 'ReforgedShellScene' : 'LobbyScene');
   await page.evaluate(() => {
     const runtime = window as unknown as {
       game?: {
@@ -202,7 +243,7 @@ test.describe('Results replay navigation', () => {
   test('keeps every next-action reachable on keyboard, gamepad, pointer, and touch', async ({
     gamePage,
   }, testInfo) => {
-    await startRouteResults(gamePage);
+    await startRouteResults(gamePage, testInfo.project.name);
     const mobile = testInfo.project.name === 'mobile-landscape';
     const initial = await resultsInputState(gamePage);
     expect(initial).toMatchObject({

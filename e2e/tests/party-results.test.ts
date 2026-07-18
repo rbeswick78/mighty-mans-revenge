@@ -91,14 +91,11 @@ async function waitForLobby(page: Page): Promise<void> {
   await expect
     .poll(
       () =>
-        page.evaluate(
-          () =>
-            (
-              (window as unknown as { game?: Phaser.Game }).game?.scene.getScene('LobbyScene') as
-                | Phaser.Scene
-                | undefined
-            )?.sys.settings.active ?? false,
-        ),
+        page.evaluate(() => {
+          const game = (window as unknown as { game?: Phaser.Game }).game;
+          const lobby = game?.scene.getScene('LobbyScene') as unknown as { gameService?: unknown };
+          return Boolean(game && lobby?.gameService);
+        }),
       { timeout: 20_000 },
     )
     .toBe(true);

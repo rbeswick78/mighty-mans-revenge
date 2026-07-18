@@ -124,8 +124,7 @@ async function stageGameplay(
           };
         };
       };
-      const active = game?.scene.getScenes(true)[0];
-      if (!active || !lobby.gameService) throw new Error('active menu scene is not ready');
+      if (!game || !lobby.gameService) throw new Error('game service is not ready');
 
       const manager = lobby.gameService.getNetworkManager();
       manager.connection.disconnect();
@@ -184,13 +183,15 @@ async function stageGameplay(
           matchKind: 'practice',
         },
       };
-      if (active.sys.settings.key === 'GameScene') {
-        (active as unknown as { shutdown(): void }).shutdown();
-        game.scene.stop('GameScene');
-        game.scene.start('GameScene', nextGameData);
-      } else {
-        active.scene.start('GameScene', nextGameData);
+      const activeGame = game.scene.getScene('GameScene') as unknown as {
+        sys: { settings: { active: boolean } };
+        shutdown(): void;
+      };
+      if (activeGame.sys.settings.active) activeGame.shutdown();
+      for (const scene of game.scene.getScenes(true)) {
+        game.scene.stop(scene.sys.settings.key);
       }
+      game.scene.start('GameScene', nextGameData);
     },
     {
       advertiseLargeWorlds: largeWorlds,
@@ -1303,9 +1304,14 @@ async function minimapScenarioSnapshot(page: Page): Promise<Record<string, unkno
   });
 }
 
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ page }, testInfo) => {
   await page.goto('/');
-  await waitForScene(page, 'LobbyScene');
+  await waitForScene(
+    page,
+    shellAdvertised && testInfo.project.name === 'desktop-chromium'
+      ? 'ReforgedShellScene'
+      : 'LobbyScene',
+  );
 });
 
 test('capability-off and old-server gameplay retain the exact legacy surface', async ({ page }) => {
@@ -3047,10 +3053,6 @@ test('Batch 37 successors preserve server-owned selection, arena systems, and le
     { name: 'Rusted Refinery' as const, landmarks: 10, family: 'industrial' },
   ];
   for (const expected of successors) {
-    if (shellAdvertised && expected.name !== 'Wasteland Outpost') {
-      await page.reload();
-      await waitForScene(page, 'ReforgedShellScene');
-    }
     await stageGameplay(page, true, modernArtAdvertised, expected.name);
     await page.waitForTimeout(400);
     const viewport = await viewportSnapshot(page, false);

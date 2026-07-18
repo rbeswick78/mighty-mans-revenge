@@ -1,10 +1,57 @@
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 
 const shellAdvertised = process.env.CAPABILITY_NEW_SHELL === 'true';
+const schedulesAdvertised = process.env.CAPABILITY_SCHEDULES === 'true';
+const largeWorldsAdvertised = process.env.CAPABILITY_LARGE_WORLDS === 'true';
+const modernArtAdvertised = process.env.CAPABILITY_MODERN_ART === 'true';
 
-async function waitForMenuOwner(page: Page): Promise<void> {
+async function waitForMenuOwner(page: Page, testInfo: TestInfo): Promise<void> {
   await page.goto('/');
   await page.waitForLoadState('load');
+  if (shellAdvertised && testInfo.project.name !== 'desktop-chromium') {
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const lobby = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+            'LobbyScene',
+          );
+          return lobby?.sys.settings.active ?? false;
+        }),
+      )
+      .toBe(true);
+    await page.evaluate(
+      ({ advertiseSchedules, advertiseLargeWorlds, advertiseModernArt }) => {
+        const lobby = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+          'LobbyScene',
+        ) as unknown as {
+          gameService: {
+            getNetworkManager(): {
+              connection: { setState(state: string): void };
+              handleMessage(message: unknown): void;
+            };
+          };
+        };
+        const manager = lobby.gameService.getNetworkManager();
+        manager.connection.setState('connected');
+        manager.handleMessage({
+          type: 'server:welcome',
+          playerId: 'combat-feedback-stage',
+          capabilities: {
+            newShell: true,
+            schedules: advertiseSchedules,
+            largeWorlds: advertiseLargeWorlds,
+            modernArt: advertiseModernArt,
+            battleRoyale: false,
+          },
+        });
+      },
+      {
+        advertiseSchedules: schedulesAdvertised,
+        advertiseLargeWorlds: largeWorldsAdvertised,
+        advertiseModernArt: modernArtAdvertised,
+      },
+    );
+  }
   await expect
     .poll(
       () =>
@@ -111,7 +158,7 @@ async function attachCanvasEvidence(page: Page, testInfo: TestInfo, name: string
 test('full feedback set is pooled, capability-owned, and directly rendered', async ({
   page,
 }, testInfo) => {
-  await waitForMenuOwner(page);
+  await waitForMenuOwner(page, testInfo);
   const evidence = await stageFeedback(page, 'full');
   expect(evidence).toEqual({ poolSize: 32, visible: 24, fallbackCreated: false });
   await attachCanvasEvidence(page, testInfo, 'combat-feedback-full');
@@ -124,7 +171,7 @@ test('full feedback set is pooled, capability-owned, and directly rendered', asy
 test('reduced feedback retains essentials inside the smaller pool budget', async ({
   page,
 }, testInfo) => {
-  await waitForMenuOwner(page);
+  await waitForMenuOwner(page, testInfo);
   const evidence = await stageFeedback(page, 'reduced');
   expect(evidence).toEqual({ poolSize: 32, visible: 16, fallbackCreated: false });
   await attachCanvasEvidence(page, testInfo, 'combat-feedback-reduced');

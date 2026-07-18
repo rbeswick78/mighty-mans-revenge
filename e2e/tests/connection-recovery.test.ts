@@ -1,6 +1,9 @@
 import { expect, test } from '../fixtures';
 
 const shellAdvertised = process.env.CAPABILITY_NEW_SHELL === 'true';
+const schedulesAdvertised = process.env.CAPABILITY_SCHEDULES === 'true';
+const largeWorldsAdvertised = process.env.CAPABILITY_LARGE_WORLDS === 'true';
+const modernArtAdvertised = process.env.CAPABILITY_MODERN_ART === 'true';
 
 async function waitForScene(gamePage: import('@playwright/test').Page, key: string): Promise<void> {
   await expect
@@ -22,11 +25,50 @@ async function waitForScene(gamePage: import('@playwright/test').Page, key: stri
     )
     .toBe(true);
 }
+async function stageNonChromiumShell(gamePage: import('@playwright/test').Page): Promise<void> {
+  await waitForScene(gamePage, 'LobbyScene');
+  await gamePage.evaluate(
+    ({ advertiseSchedules, advertiseLargeWorlds, advertiseModernArt }) => {
+      const lobby = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+        'LobbyScene',
+      ) as unknown as {
+        gameService: {
+          getNetworkManager(): {
+            connection: { setState(state: string): void };
+            handleMessage(message: unknown): void;
+          };
+        };
+      };
+      const manager = lobby.gameService.getNetworkManager();
+      manager.connection.setState('connected');
+      manager.handleMessage({
+        type: 'server:welcome',
+        playerId: 'recovery-stage',
+        capabilities: {
+          newShell: true,
+          schedules: advertiseSchedules,
+          largeWorlds: advertiseLargeWorlds,
+          modernArt: advertiseModernArt,
+          battleRoyale: false,
+        },
+      });
+    },
+    {
+      advertiseSchedules: schedulesAdvertised,
+      advertiseLargeWorlds: largeWorldsAdvertised,
+      advertiseModernArt: modernArtAdvertised,
+    },
+  );
+}
 
 test.describe('Wasteland signal recovery', () => {
   test('makes retry state and disabled play actions legible in the live lobby', async ({
     gamePage,
   }) => {
+    test.skip(
+      shellAdvertised,
+      'The enabled Settings tab owns retry state; reforged-shell.test.ts covers that replacement surface.',
+    );
     await waitForScene(gamePage, 'LobbyScene');
 
     const presentation = await gamePage.evaluate(() => {
@@ -102,8 +144,11 @@ test.describe('Wasteland signal recovery', () => {
 
   test('shows a clear signal-loss beat before returning an interrupted match to the lobby', async ({
     gamePage,
-  }) => {
-    await waitForScene(gamePage, 'LobbyScene');
+  }, testInfo) => {
+    if (shellAdvertised && testInfo.project.name !== 'desktop-chromium') {
+      await stageNonChromiumShell(gamePage);
+    }
+    await waitForScene(gamePage, shellAdvertised ? 'ReforgedShellScene' : 'LobbyScene');
     await gamePage.evaluate(() => {
       const game = (
         window as unknown as {

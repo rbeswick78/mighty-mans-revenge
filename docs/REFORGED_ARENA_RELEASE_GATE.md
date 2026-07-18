@@ -60,46 +60,87 @@ larger work stops the release review for a separately scoped follow-up.
 
 ## Evidence status
 
-Evidence results, exact commands, artifacts, blocker disposition, protected
-byte findings, and the human walkthrough/rollout checklist are recorded here
-as the gate runs. Until every required row is complete and reviewed, the gate
-status is **BLOCKED / NOT AUTHORIZED FOR ROLLOUT**.
+The complete automated and inspected gate is green. Human tester/release
+approval is still required, so the status is **AUTOMATED GATE PASSED / ROLLOUT
+NOT AUTHORIZED**. No deployment, production restart, capability exposure, live
+smoke, or Battle Royale work occurred.
 
 ## Automated evidence summary
 
-The non-browser matrix passed before the browser blocker stopped the gate:
+The complete milestone matrix passed:
 
 - asset, atlas, import, and provenance validation: 30/30;
 - compatible validation: all twelve map documents in stable order;
 - strict `standard-40x24` validation: all six successors;
 - validator CLI suite: 3/3;
-- deterministic balance inventory: 624 legal products and 48 maximum-participant regulations, all reaching Results without overtime;
+- deterministic balance inventory: 624 legal products and 48 maximum-
+  participant regulations, all reaching Results without overtime;
 - full Vitest inventory: 143 files and 1,634 tests;
 - typecheck, lint, shared/server/client builds, and the full production build;
-- server baseline: configured 20Hz, 50ms budget, 15.978Hz observed live rate, 0.011/0.018/0.053/0.610ms synthetic mean/p95/p99/max, and 2,481/3,762-byte snapshots;
-- coherent-enabled client baseline: Chromium live full quality over a 1920x1152 world, Firefox staged full quality, and mobile staged reduced quality.
+- server baseline: configured 20Hz, 50ms budget, 15.978Hz observed live rate,
+  0.011/0.018/0.053/0.610ms synthetic mean/p95/p99/max, and
+  2,481/3,762-byte snapshots;
+- complete default-false three-project inventory: 144 passes and 110
+  intentional project/capability skips. One cold auxiliary Chromium client
+  exceeded an inherited 5-second service-readiness poll; after restoring the
+  owned 30-second readiness budget, the exact real three-client Rumble Draft
+  Rally authority journey passed in 30.7 seconds;
+- complete coherent-enabled inventory: 181 passes and 74 intentional
+  project/capability skips with `newShell`, `schedules`, `largeWorlds`, and
+  `modernArt` literal true and `battleRoyale` literal false;
+- focused post-correction enabled evidence: 22 passes and 2 intentional
+  project skips across live Chromium and staged Firefox/mobile journeys; and
+- exact RFG-003 direct-renderer evidence: Firefox and mobile passed, with the
+  Chromium-only project intentionally skipped.
 
-The complete default-false three-project inventory produced 144 passes and 110 intentional project/capability skips. One mobile fixture timed out before its canvas existed; the exact case passed on immediate isolated rerun. Legacy Lobby, Draft, Character Select, activities, gameplay, Results, recovery, and input coverage therefore remain green with every capability false.
+The enabled client baselines retained a 1280x720 logical viewport, 1920x1152
+world, 15 dynamic chunks, and full desktop quality. The staged mobile baseline
+entered reduced quality as designed. Headless Chromium software-rendered frame
+rates remain diagnostic rather than hardware FPS; server tick/snapshot budgets
+and the client quality-transition assertions did not regress.
 
-The coherent-enabled inventory first exposed release-harness assumptions that still targeted the retained legacy Lobby or injected partial handshakes. Batch 39 corrected only that evidence routing: legacy-only tests remain mandatory in the default-false matrix, enabled tests select `ReforgedShellScene`, large-world expectations use the 1280x720 logical gameplay surface, and the all-six-arena journey starts each coherent case from a clean shell. Focused reruns passed for shell intent submission, validated direct launch, match menu, Results input, modern UI, recovery, and owner-aware combat feedback.
+The inventory covers five-tab navigation, every retained activity, explicit
+Duel/Rumble/Crew setup, schedules, parties, readiness, explicit bot fill,
+persistent fighters, Results/rematches, disconnect/recovery, every standard
+mode, all six successors, responsive viewport/camera/coordinates/HUD/minimap,
+all owned input families, maximum legal participant products, server-owned
+selection and authority, strict/partial/malformed/old-server capability
+handling, and atomic restoration of the complete legacy journey.
+
+Visual review found readable, non-black Chromium gameplay, shell,
+mobile-landscape-sized shell, Challenges, and Results captures with one modern
+owner. Native Firefox/mobile compositor captures remain black on the known
+unreliable path; RFG-003 therefore remains satisfied by staged object/input
+assertions plus the passing direct-renderer non-black proofs, with Chromium as
+the live/compositor pixel reference.
 
 ## Blocker disposition
 
-**Gate status: BLOCKED / ROLLOUT NOT AUTHORIZED.**
+**Gate status: AUTOMATED GATE PASSED / HUMAN APPROVAL REQUIRED / ROLLOUT NOT
+AUTHORIZED.**
 
 - **ID:** RFG-004
 - **Owner:** client `GameScene` large-world fallback and minimap lifecycle
-- **Severity:** release blocker
-- **Reproduction:** run `gameplay-viewport.test.ts` with `CAPABILITY_NEW_SHELL=true`, `CAPABILITY_SCHEDULES=true`, `CAPABILITY_LARGE_WORLDS=true`, `CAPABILITY_MODERN_ART=true`, and `CAPABILITY_BATTLE_ROYALE=false`; exercise all six successor arenas, then inject the test's literal `largeWorlds:false` fallback for Wasteland Outpost.
-- **Observed:** the viewport contract changes to `mode: legacy` and 960x576 bounds, but `getMinimapRenderState()` still exposes the prior 1920x1152 world, ten successor landmarks, and the large-world panel.
-- **Expected:** the complete legacy owner has no large-world minimap or successor resources.
-- **Disposition:** stop Batch 39 and request a separately scoped Reforged Arena fallback correction. Do not weaken the `minimap: null` assertion. After correction, rerun the focused reproduction, both complete browser inventories, visual inspection, and final static/protected-byte gates.
+- **Severity:** resolved release blocker
+- **Root cause:** Phaser reused the same `GameScene` instance across successor
+  and literal-false restarts. `init()` cleared the viewport and render-plan
+  owners but retained the prior `minimapRenderer` reference.
+- **Correction:** `GameScene.init()` now clears `minimapRenderer` with the
+  other per-run presentation owners. No map, asset, wire contract, capability,
+  default, gameplay mechanic, or performance budget changed.
+- **Proof:** the strict all-six-arena coherent journey now restores legacy
+  mode, 960x576 bounds, no successor resources, and `minimap: null`; the
+  complete enabled inventory and the exact focused reproduction pass without
+  weakening the assertion.
 
-RFG-001 and RFG-002 remain closed historical proofs. RFG-003 remains gate-dispositioned under the paired Chromium live/compositor plus staged Firefox/mobile direct-renderer rule. No other product blocker was proven before RFG-004 stopped the matrix.
+RFG-001 and RFG-002 remain closed historical proofs. RFG-003 remains
+gate-dispositioned under the paired Chromium live/compositor plus staged
+Firefox/mobile direct-renderer rule. No open Reforged Arena release blocker
+remains in automated evidence.
 
 ## Human walkthrough and rollout checklist
 
-Human release walkthrough is deferred until RFG-004 is fixed and the complete automated matrix is green. The eventual approval pass must confirm:
+The automated gate is ready for the human release walkthrough. Approval must confirm:
 
 1. five-tab navigation and every preserved activity with pointer, keyboard, standard gamepad, and touch where owned;
 2. explicit Duel, Rumble, and Crew setup, real multi-client party/readiness/bot-fill, schedule boundaries, fighter persistence, Results/rematch, and recovery;

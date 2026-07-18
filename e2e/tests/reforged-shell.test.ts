@@ -140,7 +140,7 @@ async function clickLogicalSettingsOption(
 async function stageNonChromiumShell(page: Page, playerId = 'staged-shell-player'): Promise<void> {
   await waitForActiveScene(page, 'LobbyScene');
   await page.evaluate(
-    ({ advertiseSchedules, advertiseModernArt, stagedPlayerId }) => {
+    ({ advertiseSchedules, advertiseLargeWorlds, advertiseModernArt, stagedPlayerId }) => {
       const lobby = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
         'LobbyScene',
       ) as unknown as {
@@ -161,7 +161,7 @@ async function stageNonChromiumShell(page: Page, playerId = 'staged-shell-player
         capabilities: {
           newShell: true,
           schedules: advertiseSchedules,
-          largeWorlds: false,
+          largeWorlds: advertiseLargeWorlds,
           modernArt: advertiseModernArt,
           battleRoyale: false,
         },
@@ -196,6 +196,7 @@ async function stageNonChromiumShell(page: Page, playerId = 'staged-shell-player
     },
     {
       advertiseSchedules: schedulesAdvertised,
+      advertiseLargeWorlds: largeWorldsAdvertised,
       advertiseModernArt: modernArtAdvertised,
       stagedPlayerId: playerId,
     },

@@ -21,9 +21,21 @@ async function waitForScene(gamePage: import('@playwright/test').Page, key: stri
     .toBe(true);
 }
 
+async function waitForRuntime(gamePage: import('@playwright/test').Page): Promise<void> {
+  await expect
+    .poll(() =>
+      gamePage.evaluate(() => {
+        const game = (window as unknown as { game?: Phaser.Game }).game;
+        const lobby = game?.scene.getScene('LobbyScene') as unknown as { gameService?: unknown };
+        return Boolean(game && lobby?.gameService);
+      }),
+    )
+    .toBe(true);
+}
+
 test.describe('Rumble assist surfaces', () => {
   test('celebrates local assist credit in the live combat lane', async ({ gamePage }) => {
-    await waitForScene(gamePage, 'LobbyScene');
+    await waitForRuntime(gamePage);
     await gamePage.evaluate(() => {
       const game = (
         window as unknown as {
@@ -67,6 +79,7 @@ test.describe('Rumble assist surfaces', () => {
         window as unknown as { game?: { scene: { getScene: (key: string) => unknown } } }
       ).game?.scene.getScene('GameScene') as {
         gameService: { emit: (event: string, value: unknown) => void };
+        getResponsiveHudLayout: () => { logicalWidth: number; logicalHeight: number } | null;
         hud: {
           combatCalloutText: {
             text: string;
@@ -86,6 +99,8 @@ test.describe('Rumble assist surfaces', () => {
       });
       const callout = scene.hud.combatCalloutText;
       const bounds = callout.getBounds();
+      const layout = scene.getResponsiveHudLayout();
+      if (!layout) throw new Error('responsive HUD layout is not ready');
       return {
         text: callout.text,
         visible: callout.visible,
@@ -93,8 +108,8 @@ test.describe('Rumble assist surfaces', () => {
         inside:
           bounds.x >= 0 &&
           bounds.y >= 0 &&
-          bounds.x + bounds.width <= 960 &&
-          bounds.y + bounds.height <= 576,
+          bounds.x + bounds.width <= layout.logicalWidth &&
+          bounds.y + bounds.height <= layout.logicalHeight,
       };
     });
 
@@ -109,7 +124,7 @@ test.describe('Rumble assist surfaces', () => {
   test('renders four-player K/A/D and the Wingman award without crowding results', async ({
     gamePage,
   }) => {
-    await waitForScene(gamePage, 'LobbyScene');
+    await waitForRuntime(gamePage);
     await gamePage.evaluate(() => {
       const game = (
         window as unknown as {
@@ -201,6 +216,7 @@ test.describe('Rumble assist surfaces', () => {
           const scene = (
             window as unknown as { game?: { scene: { getScene: (key: string) => unknown } } }
           ).game?.scene.getScene('ResultsScene') as {
+            scale: { width: number; height: number };
             children?: {
               list: Array<{
                 text?: string;
@@ -230,8 +246,8 @@ test.describe('Rumble assist surfaces', () => {
               bounds !== undefined &&
               bounds.x >= 0 &&
               bounds.y >= 0 &&
-              bounds.x + bounds.width <= 960 &&
-              bounds.y + bounds.height <= 720,
+              bounds.x + bounds.width <= scene.scale.width &&
+              bounds.y + bounds.height <= scene.scale.height,
           };
         }),
       )

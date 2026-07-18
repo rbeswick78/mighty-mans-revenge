@@ -445,6 +445,14 @@ compositor limitation rather than game pixels. Pair those renderer frames with
 staged object/input assertions and keep Chromium as the live/compositor visual
 reference until real-device coverage at the release gate.
 
-### Batch 39 release-gate blocker
+### Batch 39 release-gate disposition
 
-The complete non-browser and default-false release evidence passed, but coherent enabled-to-disabled fallback exposed RFG-004. After successor play, literal `largeWorlds:false` restores legacy viewport mode and 960x576 bounds while retaining the prior 1920x1152 minimap and successor landmarks. This is not an accepted fallback baseline: the complete legacy owner requires no large-world minimap. Batch 39 is blocked pending a separately scoped correction and full gate rerun; production and all defaults remain unchanged.
+RFG-004 was traced to a stale `GameScene.minimapRenderer` reference retained
+across same-instance scene restarts. Clearing that per-run owner in `init()`
+restores the complete legacy baseline after coherent successor play:
+`largeWorlds:false` now yields legacy viewport mode, 960x576 bounds, no
+successor resources, and no minimap. The strict all-six-arena reproduction,
+complete coherent-enabled inventory, default-false inventory plus exact
+cold-client rerun, and RFG-003 visual evidence pass. Automated evidence is
+green; production and every default remain unchanged pending explicit human
+tester/release approval.
