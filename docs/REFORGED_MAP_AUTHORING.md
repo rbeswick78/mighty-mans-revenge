@@ -214,6 +214,26 @@ asymmetric review of horizontal, vertical, and rotational transforms. Their
 tiles and established runtime arrays are the only gameplay truth; region,
 landmark, route, and review metadata remains declarative.
 
+## Batch 38 balance evidence
+
+`corepack pnpm reforged:balance` consumes all six strict successor documents
+without changing them. Its static collision fields establish comparable
+cross-arena bounds for spawn separation, path diameter, KOTH/Core Run contest
+travel, pickup density/access, shootable-gate access, explosive-barrel access,
+and destructible-cover inventory. Its 624-product inventory covers every legal
+standard format/composition/mode tuple, and its 48 maximum-participant runs
+exercise every arena/mode pair at the authoritative 20Hz step.
+
+The evidence supports retaining every authored value: minimum spawn separation
+is 17-21 path tiles, maximum arena traversal is 13.92 seconds, maximum KOTH
+travel is 10.8 seconds, Core Run access is 5.76 seconds with zero spawn spread,
+nearest pickup access is at most 3.36 seconds, gate/barrel access is at most
+8.4/8.88 seconds, and pickup density stays between 1.34 and 1.45 per hundred
+walkable tiles. Existing destruction tests separately prove each successor's
+shootable gates open while explosive barrels retain low-cover collision. No
+map, authoring metadata, spawn, pickup, objective, gate, hazard, or public
+registry value changed in Batch 38.
+
 ## Scope boundary
 
 Batch 34 owns the schema, validator, fixtures, and CLI. Batch 35 owns the first

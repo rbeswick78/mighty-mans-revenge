@@ -11,6 +11,7 @@
     "test:e2e": "playwright test --config e2e/playwright.config.ts",
     "baseline:server": "pnpm --filter @game/server baseline:evidence",
     "baseline:client": "playwright test --config e2e/playwright.config.ts e2e/tests/baseline-evidence.test.ts",
+    "reforged:balance": "pnpm --filter @game/server reforged:balance",
     "assets:validate": "node tools/reforged-assets/asset-pipeline.mjs validate",
     "assets:build": "node tools/reforged-assets/asset-pipeline.mjs build",
     "assets:generate:modern-ui": "node tools/reforged-assets/create-modern-ui-sources.mjs",

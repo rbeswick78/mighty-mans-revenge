@@ -293,6 +293,11 @@ export class BotController {
   private grenadeSeconds = 2.5;
   private activeGrenadeSeconds = 0;
   private abilitySeconds: number = BOT.ABILITY_OPENING_DELAY_SECONDS;
+  private lastPosition: Vec2 | null = null;
+  private movementExpected = false;
+  private stalledSeconds = 0;
+  private forcedPathSeconds = 0;
+  private recoveryCount = 0;
 
   private readonly profile;
 
@@ -304,10 +309,22 @@ export class BotController {
     this.profile = BOT_PROFILES[difficulty];
   }
 
+  /** Deterministic evidence hook; recovery remains internal to bot steering. */
+  getRecoveryCount(): number {
+    return this.recoveryCount;
+  }
+
   update(dt: number, match: Match, tick: number): void {
-    if (match.phase !== MatchPhase.ACTIVE) return;
+    if (match.phase !== MatchPhase.ACTIVE) {
+      this.resetMovementRecovery();
+      return;
+    }
     const bot = match.players.get(this.playerId);
-    if (!bot || bot.isDead) return;
+    if (!bot || bot.isDead) {
+      this.resetMovementRecovery();
+      return;
+    }
+    this.forcedPathSeconds = Math.max(0, this.forcedPathSeconds - dt);
     const bountyTargetId = match.getBountyHuntState()?.targetId ?? null;
     const bountyTarget =
       bountyTargetId !== null &&
@@ -336,7 +353,10 @@ export class BotController {
         ? BOT.SCAVENGER_RESOURCE_MAX_DETOUR_TILES
         : BOT.RESOURCE_MAX_DETOUR_TILES,
     );
-    if (!target && !objectiveTag && !looseCore && !supplyDrop && !resource) return;
+    if (!target && !objectiveTag && !looseCore && !supplyDrop && !resource) {
+      this.movementExpected = false;
+      return;
+    }
 
     this.elapsedSeconds += dt;
     this.pathRecalcSeconds -= dt;
@@ -376,6 +396,7 @@ export class BotController {
     const movementDx = movementGoal.position.x - bot.position.x;
     const movementDy = movementGoal.position.y - bot.position.y;
     const movementDistance = Math.hypot(movementDx, movementDy);
+    this.updateMovementRecovery(dt, bot.position);
     const movementAngle = Math.atan2(movementDy, movementDx);
     const movementRay = raycastAgainstGrid(
       grid,
@@ -392,10 +413,11 @@ export class BotController {
           bot,
           movementGoal.position,
           grid,
-          hasDirectMovementPath,
+          hasDirectMovementPath && this.forcedPathSeconds <= 0,
           movementDistance,
           movementGoal.isCombatTarget,
         );
+    this.movementExpected = !movementGoal.holdPosition && Math.hypot(movement.x, movement.y) > 0.01;
     const aimAngle =
       directAngle + Math.sin(this.elapsedSeconds * 1.7) * this.profile.aimWobbleRadians;
 
@@ -469,6 +491,40 @@ export class BotController {
       tick,
     };
     match.queueInput(this.playerId, input);
+  }
+
+  private resetMovementRecovery(): void {
+    this.lastPosition = null;
+    this.movementExpected = false;
+    this.stalledSeconds = 0;
+    this.forcedPathSeconds = 0;
+    this.waypoint = null;
+  }
+
+  /**
+   * Direct point steering can be geometrically clear for a ray while the
+   * fighter-sized movement box catches a nearby corner. Detect real simulated
+   * progress and temporarily require collision-grid waypoints to recover.
+   */
+  private updateMovementRecovery(dt: number, position: Vec2): void {
+    if (this.lastPosition && this.movementExpected) {
+      const progress = Math.hypot(
+        position.x - this.lastPosition.x,
+        position.y - this.lastPosition.y,
+      );
+      const isStalled = progress / dt <= BOT.STUCK_MIN_PROGRESS_PER_SECOND;
+      this.stalledSeconds = isStalled ? this.stalledSeconds + dt : 0;
+      if (this.stalledSeconds >= BOT.STUCK_REPATH_SECONDS) {
+        this.stalledSeconds = 0;
+        this.forcedPathSeconds = BOT.STUCK_FORCE_PATH_SECONDS;
+        this.recoveryCount++;
+        this.pathRecalcSeconds = 0;
+        this.waypoint = null;
+      }
+    } else {
+      this.stalledSeconds = 0;
+    }
+    this.lastPosition = { ...position };
   }
 
   /**

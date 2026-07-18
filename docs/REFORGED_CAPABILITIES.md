@@ -327,6 +327,17 @@ the opt-in remains default false, unexposed, undeployed, and disabled in
 production. Batch 38 owns cross-arena mode/bot rebalance; Batch 39 owns release
 review and any capability exposure.
 
+Batch 38 does not change capability negotiation or map selection. Literal
+server-owned `largeWorlds: true` remains the only path to all six successors;
+false, absent, partial, malformed, reconnecting, disconnected, and old-server
+states still select the byte-identical legacy maps. The new deterministic
+balance recorder consumes explicit successor documents only for offline/CI
+evidence and rejects `FORCE_*` diagnostics; it cannot advertise a capability,
+schedule a successor, mutate the registry, author a client choice, or change a
+wire payload. All five capability fields remain strict opt-ins and default
+false. Batch 39 must complete the release gate and stop for explicit user
+review before any separately authorized deployment or exposure.
+
 ## Server-first rollout and rollback
 
 For each capability, keep this order:

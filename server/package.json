@@ -7,7 +7,8 @@
     "build": "tsc -b",
     "start": "node dist/index.js",
     "test": "vitest run",
-    "baseline:evidence": "tsx src/tools/baseline-evidence.ts"
+    "baseline:evidence": "tsx src/tools/baseline-evidence.ts",
+    "reforged:balance": "tsx src/tools/reforged-balance-evidence.ts"
   },
   "dependencies": {
     "@shared/game": "workspace:*",

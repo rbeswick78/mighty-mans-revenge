@@ -889,6 +889,29 @@ every suite by default. The detailed matrix and release-gate triggers live in
 - **Hardcoding 2 players.** The matchmaking, game state, and rendering support N players. Use `Map<playerId, PlayerState>` patterns, not `player1`/`player2` fields.
 - **Ignoring browser autoplay policy for audio.** Audio can't play until the user has interacted with the page. The AudioManager must handle this gracefully.
 
+## Reforged Cross-Arena Balance Contract
+
+Batch 38 validates the six private `standard-40x24` successors through
+server-owned deterministic evidence. `corepack pnpm reforged:balance` records
+all 624 legal arena/format/composition/mode products, static collision-derived
+spawn/objective/pickup/gate/hazard travel, and 48 maximum-participant
+regulations at the authoritative 0.05-second step. Keep that recorder free of
+wall-clock timing and `FORCE_*` diagnostics.
+
+Bots use ordinary sequenced `PlayerInput`. When intended movement makes less
+than `BOT.STUCK_MIN_PROGRESS_PER_SECOND` progress for
+`BOT.STUCK_REPATH_SECONDS`, the controller clears the stale waypoint and
+requires collision-grid routing for `BOT.STUCK_FORCE_PATH_SECONDS`. These are
+shared bot/navigation values, not changes to `PLAYER.BASE_SPEED`, stamina,
+collision, mode rules, arena data, or client prediction. The recovery must
+remain N-player-safe and inside the existing authoritative 20Hz Match update.
+
+The evidence contract cannot select a map or expose `largeWorlds`. Public map
+names, `MAP_REGISTRY`, wire payloads, and all legacy/successor JSON files remain
+owned by the existing literal server-capability resolver. Batch 39 owns the
+complete release gate and user approval packet; no capability default,
+production flag, or deployment follows from passing Batch 38 evidence.
+
 ## Reference Links
 
 - [Valve Source Multiplayer Networking](https://developer.valvesoftware.com/wiki/Source_Multiplayer_Networking) — the foundational article for this game's netcode approach

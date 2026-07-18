@@ -592,6 +592,12 @@ export const BOT = Object.freeze({
   AIM_WOBBLE_RADIANS: 0.045,
   FIRE_INTERVAL_SECONDS: 0.55,
   STRAFE_SWITCH_SECONDS: 1.6,
+  /** Movement below this pixels-per-second floor while steering counts as stalled. */
+  STUCK_MIN_PROGRESS_PER_SECOND: 80,
+  /** Sustained no-progress window before Rusty abandons direct steering. */
+  STUCK_REPATH_SECONDS: 0.75,
+  /** Keep collision-grid waypoints authoritative long enough to clear a corner. */
+  STUCK_FORCE_PATH_SECONDS: 1.5,
   GRENADE_INTERVAL_SECONDS: 7,
   GRENADE_RUNG_INTERVAL_SECONDS: 1.5,
   GRENADE_DETONATE_SECONDS: 0.85,

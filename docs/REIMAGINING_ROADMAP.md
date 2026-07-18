@@ -5,9 +5,10 @@ Read this file and `CLAUDE.md` completely at the start of every batch. The
 completed `docs/REPLAYABILITY_ROADMAP.md` remains the historical record for the
 systems this program preserves and reorganizes.
 
-- **Status:** Batch 37 complete on 2026-07-17; all six strict 40x24 successors
-  now exist behind the server-owned opt-in.
-- **Next batch:** Batch 38 — Mode and bot rebalance.
+- **Status:** Batch 38 complete on 2026-07-17; all six strict 40x24 successors
+  now have deterministic cross-arena mode and bot balance evidence behind the
+  server-owned opt-in.
+- **Next batch:** Batch 39 — Reforged Arena release gate.
 - **Public releases:** Reforged Arena, then Battle Royale.
 - **Working model:** one numbered batch per session, direct commits and pushes
   to `main`, milestone-gated production deployments.
@@ -191,7 +192,7 @@ Production deployment happens only at a gate or for an urgent live fix.
 |  35 | Wasteland Outpost and Overgrown Suburb | Large arenas  | **DONE — 2026-07-17** |
 |  36 | Scrapyard and Collapsed Overpass       | Large arenas  | **DONE — 2026-07-17** |
 |  37 | Checkpoint Zero and Rusted Refinery    | Large arenas  | **DONE — 2026-07-17** |
-|  38 | Mode and bot rebalance                 | Large arenas  | Pending               |
+|  38 | Mode and bot rebalance                 | Large arenas  | **DONE — 2026-07-17** |
 |  39 | Reforged Arena release gate            | Large arenas  | Pending               |
 |  40 | Battle Royale lifecycle                | Battle Royale | Pending               |
 |  41 | Eight-slot queue                       | Battle Royale | Pending               |
@@ -1299,10 +1300,50 @@ Validate all eight modes, Crew compatibility, spawn safety, objective travel,
 pickup density, bot navigation, and regulation pacing. Keep base movement and
 stamina unchanged unless evidence creates a separate tuning batch.
 
+Selected verification tier (2026-07-17, before implementation): the
+cross-package shared/server plus arena/performance tier. Deterministic evidence
+must cover the complete 624-product matrix formed by all six strict successors,
+all legal Duel/Rumble/Crew compositions, and their format-compatible modes,
+then exercise focused mode, bot, spawn, objective, pickup, navigation,
+destruction, Results/rematch, recovery, registry/selection, validation, legacy,
+and capability-off boundaries. The full unit/static/build gates and relevant
+20Hz probes are mandatory. Use targeted three-project journeys plus inspected
+desktop Chromium and mobile-landscape evidence; reserve the complete browser
+inventory for an actual foundation change or a focused result that proves wider
+risk, because Batch 39 owns the release gate.
+
+- [x] Deterministic server evidence enumerates all 624 legal products across
+      six successors, eight modes, every compatible Duel/Rumble/Crew format,
+      and every legal human/bot composition. Each product starts on the strict
+      successor, owns the correct 173-second timer and pickup economy, and
+      processes authoritative bot input at 20Hz.
+- [x] Static collision evidence bounds all four spawn quadrants, whole-arena
+      path diameter, KOTH/Core Run contest travel and spread, nearest pickup
+      access and density, shootable-gate/explosive-barrel access, and
+      destructible-cover inventory. Runtime evidence covers every-spawn KOTH
+      reachability, Core Run and Kill Confirmed participation, useful pickup
+      collection, gate/barrel/destruction behavior, target choice, respawn
+      recovery, and all 48 maximum-participant arena/mode regulations.
+- [x] Measured evidence found one shared corner-stall condition: a fighter-
+      sized bot movement box could catch cover although its center ray was
+      clear. Shared deterministic progress detection now requests collision-
+      grid waypoints after 0.75 seconds below 80 px/s and holds that recovery
+      path for 1.5 seconds. No map, mode, spawn, pickup, movement, stamina,
+      combat, timer, wire, registry, selection, or capability value changed.
+- [x] Focused/full unit, validator/old-schema/stable-order, static/build/format/
+      diff/protected-byte, targeted three-project browser, inspected visual,
+      and 20Hz performance evidence pass. The complete browser inventory was
+      not escalated because no client, wire, recovery foundation, capability,
+      or map document changed; Batch 39 owns that release-wide gate. No
+      capability was exposed, no default changed, and no deployment occurred.
+
 #### Batch 39 — Reforged Arena release gate
 
-Run the complete gate above, resolve blockers as recorded batches, deploy
-server-first, enable the coherent Reforged capability, and smoke production.
+Run the complete gate above, disposition blockers as recorded follow-up work,
+and produce the explicit tester/release approval packet. Stop for user review
+with every capability still false. Only separately approved work after that
+sign-off may deploy server-first, enable the coherent Reforged capabilities,
+and smoke production.
 
 ### Milestone 5 — Battle Royale
 
@@ -3502,6 +3543,86 @@ closed historical proofs. RFG-003 remains gate-dispositioned and unchanged.
 Batch 38 owns cross-arena mode/bot rebalance; Batch 39 owns release review and
 any capability exposure.
 
+### Batch 38 - 2026-07-17 - Mode and bot rebalance
+
+**Shipped:** Added a deterministic server-owned balance recorder and CI
+contract for the complete 624-product cross-arena matrix: all six strict
+`standard-40x24` successors, all eight standard modes, every compatible
+Duel/Rumble/Crew format, and every legal human/bot composition. Static
+collision evidence records four-quadrant spawn separation, path diameter,
+KOTH/Core Run travel and contest spread, pickup density/access, gate and barrel
+access, and destructible inventory. Runtime evidence exercises every spawn
+against KOTH, Core Run and Kill Confirmed participation, useful pickup use,
+target choice, respawn recovery, and all 48 maximum-participant arena/mode
+regulations at the authoritative 0.05-second step.
+
+The measured cross-arena issue was one general corner stall: the bot's center
+ray could report a clear line while its fighter-sized movement box caught low
+cover. `BOT.STUCK_MIN_PROGRESS_PER_SECOND` now detects progress below 80 px/s;
+after 0.75 seconds the bot clears its stale waypoint and requires collision-
+grid routing for 1.5 seconds. The original Overgrown Suburb northeast-spawn
+KOTH reproduction now records recovery and reaches the contest. No base
+movement, stamina, mode, spawn, pickup, combat, objective, timer, arena,
+registry, wire, variant-selection, capability, or production value changed.
+
+**Balance evidence:** All arenas retain four spawns at 17-21 path tiles of
+minimum separation, a 58-tile/13.92-second maximum path diameter, ten declared
+pickups at 1.34-1.45 per hundred walkable tiles, maximum nearest-pickup access
+of 2.16-3.36 seconds, centered Core Run access of 5.76 seconds with zero spawn
+spread, maximum KOTH access of 8.88-10.8 seconds with 5.76-7.92 seconds of
+spawn spread, maximum gate access of 6.96-8.4 seconds, and maximum explosive-
+barrel access of 8.16-8.88 seconds. Every one of the 48 deterministic maximum-
+participant regulations reached Results without overtime in 26.35-173
+simulated seconds and produced authoritative combat activity. Therefore no
+arena or mode economy/timer tuning was justified.
+
+**Verification:** Used the preselected cross-package shared/server plus arena/
+performance tier. The focused server matrix passed 17 files/585 tests; focused
+shared validator, old-schema, registry, matchmaking, and party coverage passed
+5 files/91 tests; focused client routing, Results, minimap, pickup, and map
+presentation coverage passed 7 files/44 tests. The strict validator passed all
+six successors, compatible validation passed all twelve documents, and the
+stable-order CLI suite passed 3 tests. The full Vitest matrix passed 143 files/
+1,634 tests. Typecheck, lint, affected shared/server/client builds, and the full
+production build passed; Vite's established chunk advisory remains.
+
+The targeted literal-`largeWorlds` journey passed desktop Chromium, desktop
+Firefox, and mobile landscape (3/3). Across all six arenas it covered dynamic
+world/minimap geometry, camera edges, coordinate input, KOTH/Core Run anchors,
+gate destruction, preserved barrels, Results/rematch, reconnect recovery,
+capability-off restoration, and old-server fallback. Chromium live/compositor
+and Firefox/mobile direct-renderer evidence remained readable under RFG-003;
+representative desktop/direct captures were inspected. The complete browser
+inventory was not escalated because no client, wire, map, capability, fallback,
+or recovery foundation changed and focused evidence stayed green; Batch 39
+owns that release-wide matrix.
+
+The 20Hz baseline probe retained the 50ms budget and 20Hz rolling measurement;
+its synthetic four-player mean/p95/p99/max processing times were
+0.010/0.020/0.058/0.582ms. Repository-wide Prettier still reports the inherited
+historical/environment inventory; the Batch 38 allowlist is formatted.
+`git diff --check`, intended-diff review, strict/stable-order review, and the
+protected-byte review passed: all six legacy and all six successor map JSON
+files, public `MAP_REGISTRY`, capability defaults, visual assets/atlases, and
+provenance remain byte-identical to Batch 37.
+
+**Deployment:** Skipped exactly as required. Production remains on separately
+approved Batch 33 commit `f39eb34131f8827f85432aafcc6d6c18a2d0ac51`, all
+capabilities remain strict server-owned opt-ins and default false, no 40x24
+arena enters default matchmaking or production, and simulation remains 20Hz.
+
+**Deviations:** No product-scope deviation. The first focused Vitest command
+named a nonexistent root config and the second used a package-rooted include
+from the repository root; both failed before test execution and were replaced
+by the correct package-root invocation. Managed Windows Node access required
+approved repository-local execution. The browser run used isolated ports.
+
+**Known issues:** No bug-ledger entry was added because the measured corner
+stall was reproduced and closed inside the owning batch. RFG-001 and RFG-002
+remain closed historical proofs. RFG-003 remains gate-dispositioned and
+unchanged. Batch 39 owns the complete Reforged Arena release review, blocker
+disposition, tester approval, and any separately authorized exposure/deploy.
+
 ## Batch 22 input prompt (historical)
 
 ```text
@@ -4682,7 +4803,7 @@ Batch 37 owns only Checkpoint Zero and Rusted Refinery; Batch 38 owns cross-
 arena mode and bot rebalance.
 ```
 
-## Next-session prompt
+## Batch 38 input prompt (historical)
 
 ```text
 Continue the Reforged build for Mighty Man's Revenge.
@@ -4784,4 +4905,99 @@ atlas grids and complete non-runtime lineage. RFG-001/RFG-002 remain closed
 historical proofs. RFG-003 remains the paired staged/live visual-evidence rule.
 Batch 38 owns cross-arena mode and bot rebalance only; Batch 39 owns the release
 gate, production review, and any capability exposure.
+```
+
+## Next-session prompt
+
+```text
+Continue the Reforged build for Mighty Man's Revenge.
+
+Read docs/REIMAGINING_ROADMAP.md and CLAUDE.md completely first. Read
+docs/REFORGED_BASELINE.md, docs/REFORGED_CAPABILITIES.md,
+docs/REFORGED_MAP_AUTHORING.md, docs/REFORGED_STYLE_BIBLE.md,
+docs/REFORGED_ASSET_PIPELINE.md, and
+docs/reforged/style-bible/PROVENANCE.md before implementation. Batch 38 - Mode
+and bot rebalance is complete. Implement Batch 39 - Reforged Arena release
+gate exactly as specified and do not begin Batch 40 - Battle Royale lifecycle.
+
+Run the complete Reforged Arena gate as a non-deployment release review. Audit
+the complete Batch 2-38 contract: five-tab navigation and every preserved
+activity; explicit Duel, Rumble, and Crew setup; schedules, parties, readiness,
+bot fill, persistent fighters, Results/rematches, disconnect/recovery, all
+eight standard modes, all six strict 40x24 arenas, responsive viewport/camera/
+coordinates/HUD/minimap, atomic modern presentation, fallback behavior, and
+performance. Test pointer, keyboard, standard gamepad, and touch where owned.
+Exercise real multi-client and maximum legal participant shapes, server-owned
+selection/authority, every Reforged capability coherently enabled, default-
+false behavior, partial/malformed/old-server handshakes, and rollback to the
+complete legacy journey. Confirm no client inference, mixed art owner, black or
+unreadable required scene, unreachable activity, invalid combination, stale
+party/schedule state, unsafe arena path, bot stall, Results dead end, or budget
+regression remains.
+
+Batch 39 owns release evidence and blocker disposition only. Do not expose a
+capability, change any default, deploy, restart production, or smoke the live
+site without fresh explicit user approval after presenting the complete gate
+packet. Keep `newShell`, `schedules`, `largeWorlds`, and `modernArt` strict
+server-owned opt-ins and default false; keep `battleRoyale` false and out of
+scope. Production must remain on the separately user-approved Batch 33 commit
+until the user reviews the release evidence and authorizes a later server-first
+rollout. Stop the chain after Batch 39 and request tester/release approval; do
+not create a Batch 40 successor.
+
+Do not begin Battle Royale lifecycle, queues, rarity/loot/inventory,
+containers, the four-biome arena, safe zones, Battle Royale bots, spectating,
+or records. Do not add features or tune mechanics to make the gate pass. If a
+release blocker is proven, record its exact owner/severity/reproduction and
+either fix it only when the correction is narrowly inside an already-completed
+Reforged Arena contract or stop and request a separately scoped follow-up. Do
+not weaken assertions, validation, authority, fallback, visual coherence, or
+performance budgets.
+
+Batch 38 is complete and pushed on main as `feat(balance): validate Reforged
+modes and bots`. Deterministic server evidence covers 624 legal arena/format/
+composition/mode products and 48 maximum-participant regulations across all
+six successors and eight modes. Static evidence bounds spawn separation,
+whole-map/objective/pickup/gate/barrel travel, pickup density, and destructible
+inventory. Runtime evidence covers every-spawn KOTH paths, Core Run and Kill
+Confirmed participation, pickup use, target choice, unsticking, recovery, and
+regulation activity. One shared fighter-box corner stall was fixed with a
+0.75-second progress detector and 1.5-second forced collision-grid path; base
+movement, stamina, modes, pickups, maps, registry, wire contracts, selection,
+and capabilities remain unchanged. All twelve map documents are byte-identical
+to Batch 37. Strict/stable validation, 29 focused files/720 tests, the 143-file/
+1,634-test full unit matrix, typecheck, lint, affected/full builds, targeted
+three-project browser evidence, inspected Chromium/direct-renderer captures,
+and the 20Hz performance probe passed. Batch 38 skipped deployment and every
+capability remains default false.
+
+Choose and document the Batch 39 release-gate verification tier before any
+change; it must be the complete milestone matrix. Rerun strict/compatible and
+stable-order map validation, assets/provenance validation, full unit/static/
+build/format/diff/protected-byte checks, deterministic 624-product/48-
+regulation balance evidence, server tick/snapshot probes, and client frame/
+resource-quality evidence. Run the complete three-project browser inventory
+once with every Reforged Arena capability default false and once with
+`newShell`, `schedules`, `largeWorlds`, and `modernArt` coherently literal true
+while `battleRoyale` remains false. Add targeted real multi-client journeys and
+inspect desktop Chromium plus mobile-landscape visuals for Boot through
+Results, all six arenas, every owned activity/input family, recovery, and the
+atomic legacy fallback. Apply RFG-003 exactly: Chromium is the live/compositor
+pixel reference; Firefox/mobile staged object/input plus direct-renderer
+evidence remains required where the live path is unreliable.
+
+Update roadmap acceptance/status, architecture/baseline/capability and release
+documentation, bug ledger only with proven evidence, and Session Log. Run the
+complete end-of-batch ritual, commit and push the intended non-production
+allowlist directly to main, and verify a clean worktree with HEAD exactly
+matching origin/main. Then stop, present the blocker disposition and explicit
+human walkthrough/rollout checklist, and request user review. Do not deploy,
+expose capabilities, smoke production, or create a successor task.
+
+Carry-over warnings: use Corepack pnpm 10.33.0 if the local shim mismatches.
+Keep Batch 25 goldens documentation-only and preserve all six production atlas
+grids and complete non-runtime lineage. RFG-001/RFG-002 remain closed historical
+proofs. RFG-003 remains the paired staged/live visual-evidence rule. Batch 39
+owns the Reforged Arena release gate and user approval packet only; all Battle
+Royale work begins no earlier than a separately authorized Batch 40 session.
 ```

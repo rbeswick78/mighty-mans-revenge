@@ -394,6 +394,35 @@ to require Chromium live/compositor pixels plus staged Firefox/mobile object,
 input, and direct-renderer evidence; simulation remains authoritative at 20Hz
 and production remains unchanged.
 
+### Batch 38 cross-arena balance evidence
+
+The deterministic balance inventory is 624 legal products: six strict
+successors multiplied by every compatible standard mode and every legal
+Duel/Rumble/Crew human/bot composition. The maximum-participant regulation
+inventory is 48 runs (six arenas by eight modes) at the authoritative 20Hz
+step. Every run reached Results without overtime and generated combat activity;
+all legal products started with the correct strict map, 173-second regulation,
+mode-owned pickup count, team shape, and sequenced bot input.
+
+The shared six-arena bounds are now evidence: four quadrant spawns have 17-21
+tiles of minimum pairwise path separation; path diameter is 58 tiles/13.92
+seconds; KOTH maximum access is 8.88-10.8 seconds with 5.76-7.92 seconds of
+spawn spread; centered Core Run access is 5.76 seconds with zero spread;
+nearest pickup access is 2.16-3.36 seconds; pickup density is 1.34-1.45 per
+hundred walkable tiles; gate access is at most 8.4 seconds; explosive-barrel
+access is at most 8.88 seconds. All documents retain ten declared pickups,
+20-80 destructible-cover tiles, two or four shootable gates, and two existing
+explosive barrels.
+
+The only evidence-proven correction is shared bot unsticking. A clear center
+ray could still let the fighter-sized collision box catch a cover corner.
+Progress below 80 px/s for 0.75 seconds now clears the waypoint and forces the
+existing collision-grid path for 1.5 seconds. Base movement remains 200 px/s;
+stamina, mode/spawn/pickup parameters, map bytes, and regulation remain
+unchanged. The 20Hz performance probe retained a 50ms budget and measured
+synthetic four-player mean/p95/p99/max work of
+0.010/0.020/0.058/0.582ms.
+
 ## Adjacent bug reproductions
 
 `client/src/rendering/camera-baseline.test.ts` now asserts the repaired
