@@ -353,6 +353,12 @@ export class NetworkManager {
     this.connection.send({ type: 'client:joinRumble', nickname });
   }
 
+  /** Join only when the latest server handshake explicitly owns BR support. */
+  joinBattleRoyale(nickname: string, fighterId: CharacterId): void {
+    if (!this.serverCapabilities.battleRoyale) return;
+    this.connection.send({ type: 'client:joinBattleRoyale', nickname, fighterId });
+  }
+
   /** Submit the additive server-validated standard-match contract. */
   submitMatchIntent(nickname: string, intent: Readonly<MatchIntent>): void {
     this.connection.send({ type: 'client:submitMatchIntent', nickname, intent });

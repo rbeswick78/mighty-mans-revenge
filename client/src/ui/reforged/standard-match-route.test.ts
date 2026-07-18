@@ -14,6 +14,7 @@ const disabled: ServerCapabilities = {
   battleRoyale: false,
 };
 const enabled: ServerCapabilities = { ...disabled, newShell: true, schedules: true };
+const battleRoyaleEnabled: ServerCapabilities = { ...enabled, battleRoyale: true };
 const base: MatchData = {
   matchId: 'match-route-16',
   opponents: [{ id: 'bot-1', nickname: 'Scrapper 1' }],
@@ -99,6 +100,35 @@ describe('matchFoundDestination', () => {
         practiceKind: 'gauntlet',
         standardLaunchStatus: 'valid',
         standardMatch: direct,
+      }),
+    ).toBe('reject');
+  });
+
+  it('routes only a complete capability-owned Battle Royale projection to gameplay', () => {
+    const battleRoyale = {
+      ...base,
+      opponents: Array.from({ length: 7 }, (_, index) => ({
+        id: `fighter-${index}`,
+        nickname: `Fighter ${index}`,
+      })),
+      matchKind: 'battle_royale' as const,
+      standardLaunchStatus: 'absent' as const,
+      battleRoyaleLaunchStatus: 'valid' as const,
+      battleRoyale: { participantCount: 8, humanCount: 3, botCount: 5 },
+    };
+    expect(matchFoundDestination(battleRoyaleEnabled, battleRoyale)).toBe('game');
+    expect(matchFoundDestination(enabled, battleRoyale)).toBe('reject');
+    expect(
+      matchFoundDestination(battleRoyaleEnabled, {
+        ...battleRoyale,
+        battleRoyaleLaunchStatus: 'invalid',
+      }),
+    ).toBe('reject');
+    expect(
+      matchFoundDestination(battleRoyaleEnabled, {
+        ...battleRoyale,
+        battleRoyaleLaunchStatus: 'absent',
+        battleRoyale: undefined,
       }),
     ).toBe('reject');
   });

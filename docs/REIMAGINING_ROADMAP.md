@@ -5,11 +5,12 @@ Read this file and `CLAUDE.md` completely at the start of every batch. The
 completed `docs/REPLAYABILITY_ROADMAP.md` remains the historical record for the
 systems this program preserves and reorganizes.
 
-- **Status:** Batch 40 Battle Royale lifecycle completed on 2026-07-18; the
-  format remains dormant and every capability remains default false.
-- **Next step:** stop. Batch 41's eight-slot queue requires fresh authorization;
-  the deferred Batch 39 human release walkthrough still does not authorize a
-  deployment, capability exposure, production restart, or live smoke.
+- **Status:** Batch 41 Battle Royale eight-slot queue completed on 2026-07-18;
+  the format remains dormant and every capability remains default false.
+- **Next step:** Batch 42 weapon instances and rarity under the user's standing
+  authorization to continue sequentially through the plan while deferring human
+  involvement. The deferred Batch 39 human release walkthrough still does not
+  authorize deployment, capability exposure, production restart, or live smoke.
 - **Public releases:** Reforged Arena, then Battle Royale.
 - **Working model:** one numbered batch per session, direct commits and pushes
   to `main`, milestone-gated production deployments.
@@ -1403,6 +1404,47 @@ or journey coupling.
 
 Implement immediate eight-human launch and the 15-second bot-fill deadline,
 plus cancellation, duplicate protection, and pre-launch disconnect handling.
+
+**Verification tier selected before implementation (2026-07-18):** shared,
+server, network, and dormant-client cross-package tier, escalated for the
+server-owned 15-second clock, eight-participant launch, queue cancellation,
+duplicate entry, and pre-launch disconnect recovery boundaries. Required
+evidence is deterministic queue and manager integration coverage for one
+through eight humans, exact deadline behavior and bot counts, stable entrant
+order, cancellation/disconnect timer repair, capability-off rejection,
+N-player launch state, and additive old-client/old-server wire compatibility;
+then focused client transport/fallback tests, the full unit matrix, typecheck,
+lint, all package builds, formatting/diff checks, targeted three-project
+browser fallback evidence, and the relevant 20 Hz server baseline. The
+complete browser inventory remains reserved for the Batch 51 gate unless
+focused evidence reveals broader coupling.
+
+- [x] A strict `battleRoyale:true` server capability gates the additive solo
+      entry route; default-false and old-server clients expose no request or
+      format choice, and standard Duel/Rumble/Crew intents remain unchanged.
+- [x] The server-owned queue launches eight humans immediately or fills exactly
+      to eight with ordinary bots at the 15-second deadline for every one- to
+      seven-human cohort, preserving deterministic human and bot order.
+- [x] Cancellation, duplicate entry, capacity, cross-queue exclusion, and
+      pre-launch disconnect handling are authoritative; a surviving cohort
+      retains its original deadline and an empty cohort resets it.
+- [x] Launch locks the exact eight-participant roster, retains each human's
+      chosen fighter, bypasses standard character selection, and enters the
+      existing Battle Royale countdown/lifecycle without adding later bot,
+      weapon, loot, arena, zone, or spectating behavior.
+- [x] Optional queue/launch projections remain additive and validated: old
+      clients ignore them, new clients suppress the route for an old server,
+      malformed or capability-drifted launch state fails closed, and ordinary
+      match-found JSON omits the optional field.
+- [x] Battle Royale departures remain lifecycle eliminations; post-match
+      cleanup releases bots and keeps the reachable Results leave action while
+      omitting standard rematch and persistence. Standard formats preserve
+      their established lifecycle, wire, rematch, and persistence behavior.
+- [x] The complete 146-file/1,662-test unit matrix, typecheck, lint, all builds,
+      focused desktop Chromium/Firefox/mobile browser entry evidence, allowlist
+      formatting/diff checks, and authoritative 20 Hz baseline passed.
+- [x] Batch 42 rarity/weapons and all later Battle Royale gameplay, records,
+      hardening, exposure, deployment, restart, and live smoke did not begin.
 
 #### Batch 42 — Weapon instances and rarity
 
@@ -3738,6 +3780,58 @@ rarity, new weapon, inventory, loot/container, arena, zone, tactical map,
 Battle Royale bot, spectating, record/persistence, hardening, deployment,
 restart, or live smoke began. Stop after Batch 40; Batch 41 requires separate
 fresh authorization.
+
+### Batch 41 - 2026-07-18 - Eight-slot queue
+
+**Scope and tier:** The user separately authorized Batch 41 and then supplied
+standing authorization to continue sequentially through the plan while
+deferring human involvement as late as possible. Before implementation, the
+shared/server/network/dormant-client cross-package tier was selected and
+escalated for the server-owned deadline, exact roster construction, queue
+recovery, capability boundary, and additive compatibility. No Batch 42 weapon
+or rarity work entered the Batch 41 allowlist.
+
+**Queue authority:** A dedicated server-owned Battle Royale queue accepts only
+capability-gated solo entrants. It launches synchronously at eight humans or,
+for any one- through seven-human cohort, fills exactly to eight with ordinary
+bots when the original 15-second deadline expires. Entrants retain stable join
+order and their selected fighter. Cancellation, duplicate/capacity protection,
+cross-queue exclusion, pre-launch disconnect removal, nonempty-cohort deadline
+preservation, and empty-cohort deadline reset are deterministic and covered at
+the queue and matchmaking-manager boundaries.
+
+**Launch and compatibility:** The exact eight-player roster is prelocked and
+enters Battle Royale countdown without leaking standard character selection.
+The optional server-authored queue status reports deadline and projected bot
+fill; the optional match-found projection reports human/bot/total counts. The
+client validates all eight participants, capability ownership, and projection
+coherence before routing. Default-false or old-server clients cannot send or
+display Battle Royale entry, old clients ignore additive fields, and standard
+match-found serialization drops the undefined optional projection. Active
+departures remain eliminations; Results cleanup releases bots, preserves the
+leave foundation, and does not create standard rematch or persistence writes.
+
+**Verification:** Focused queue, manager, transport, route, and lifecycle
+coverage passed, followed by the complete 146-file/1,662-test unit matrix.
+Typecheck, ESLint, shared/server/client builds, Batch 41 allowlist formatting,
+and `git diff --check` passed. The repository-wide Prettier inventory still
+reports 97 inherited files, none on the intended Batch 41 allowlist.
+Targeted Battle Royale entry passed in desktop Chromium, desktop Firefox, and
+mobile landscape; Chromium exercised the real one-human/seven-bot deadline and
+the other projects exercised deterministic staged projection. The server probe
+retained configured and rolling 20 Hz with a 50 ms budget; synthetic four-player
+mean/p95/p99/max processing was 0.018/0.028/0.156/1.118 ms and standard snapshot
+bytes remained 2,481/3,762. No new reproducible product defect was found, so no
+bug-ledger row was added.
+
+**Deployment and disposition:** Skipped. Production remains on approved Batch
+33 commit `f39eb34131f8827f85432aafcc6d6c18a2d0ac51`; `newShell`, `schedules`,
+`largeWorlds`, `modernArt`, and `battleRoyale` remain strict server-owned
+opt-ins, default false, and unexposed. No rarity, weapon instance, new gun,
+inventory, loot/container, arena, zone, tactical map, Battle Royale bot AI,
+spectating, record/persistence, hardening, capability exposure, deployment,
+restart, or live smoke began. Proceed only to Batch 42 under the user's standing
+authorization and retain the production/release prohibition.
 
 ## Batch 22 input prompt (historical)
 

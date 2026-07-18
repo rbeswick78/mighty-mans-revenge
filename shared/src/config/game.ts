@@ -446,6 +446,13 @@ export const RUMBLE = Object.freeze({
   LAUNCH_DELAY_SECONDS: 6,
 });
 
+/** Server-owned solo queue contract for the dormant Battle Royale format. */
+export const BATTLE_ROYALE_QUEUE = Object.freeze({
+  MAX_PLAYERS: 8,
+  /** Every remaining slot becomes a standard bot exactly at this deadline. */
+  BOT_FILL_DEADLINE_SECONDS: 15,
+});
+
 /** 2v2 Practice battle: invite one human ally briefly, then let Rusty fill in. */
 export const CREW_BATTLE = Object.freeze({
   TEAM_SIZE: 2,

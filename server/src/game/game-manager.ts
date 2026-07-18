@@ -166,6 +166,12 @@ export class GameManager {
         this.matchmaking.handleJoinRumble(playerId, message.nickname);
         break;
 
+      case 'client:joinBattleRoyale':
+        if (this.server.getCapabilities().battleRoyale) {
+          this.matchmaking.handleJoinBattleRoyale(playerId, message.nickname, message.fighterId);
+        }
+        break;
+
       case 'client:submitMatchIntent': {
         const nickname = message.nickname;
         const intent = normalizeMatchIntent(message.intent, {

@@ -40,6 +40,7 @@ export type ClientMessage =
   | ClientInputMessage
   | ClientJoinMatchmakingMessage
   | ClientJoinRumbleMessage
+  | ClientJoinBattleRoyaleMessage
   | ClientSubmitMatchIntentMessage
   | ClientCreatePartyMessage
   | ClientJoinPartyMessage
@@ -74,6 +75,13 @@ export interface ClientJoinMatchmakingMessage {
 export interface ClientJoinRumbleMessage {
   type: 'client:joinRumble';
   nickname: string;
+}
+
+/** Additive solo entry for the capability-gated eight-slot queue. */
+export interface ClientJoinBattleRoyaleMessage {
+  type: 'client:joinBattleRoyale';
+  nickname: string;
+  fighterId: CharacterId;
 }
 
 /** Additive generalized standard-match entry; legacy joins remain accepted. */
@@ -491,6 +499,8 @@ export interface ServerMatchFoundMessage {
   gameMode: GameModeType;
   /** Queue family; optional so older servers still interoperate. */
   matchKind?: MatchKind;
+  /** Complete dormant direct-launch projection for an eight-slot BR match. */
+  battleRoyale?: BattleRoyaleMatchLaunch;
   /**
    * Complete server-owned proof for capability-owned direct countdown entry.
    * Absent on legacy, old-server, FORCE, and every Practice/challenge route.
@@ -510,6 +520,12 @@ export interface ServerMatchFoundMessage {
   gauntlet?: PracticeGauntletMatch;
   /** Accepted server-authored mid-match chaos promise for ordinary Sparring. */
   practiceMutatorId?: MutatorId;
+}
+
+export interface BattleRoyaleMatchLaunch {
+  readonly participantCount: number;
+  readonly humanCount: number;
+  readonly botCount: number;
 }
 
 /**
@@ -642,11 +658,13 @@ export interface ServerMatchmakingStatusMessage {
   queuePosition?: number;
   playersOnline?: number;
   /** Queue family for queue-specific lobby presentation. */
-  matchKind?: 'duel' | 'rumble' | 'duos';
+  matchKind?: 'duel' | 'rumble' | 'duos' | 'battle_royale';
   /** Current Rumble party or human Crew size while its join window is open. */
   groupSize?: number;
   maxGroupSize?: number;
   launchInMs?: number;
+  /** Server-projected slots that will become bots if the BR deadline lands now. */
+  botFillCount?: number;
 }
 
 export interface ServerRematchStatusMessage {

@@ -657,6 +657,31 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
     expect(seen).toEqual([{ playerId: REMOTE_ID, nickname: 'Bravo' }]);
   });
 
+  it('sends Battle Royale entry only after literal server capability ownership', () => {
+    manager.joinBattleRoyale('Alpha', 'mighty_man');
+    expect(hoisted.sentMessages).not.toContainEqual(
+      expect.objectContaining({ type: 'client:joinBattleRoyale' }),
+    );
+
+    deliver({
+      type: 'server:welcome',
+      playerId: LOCAL_ID,
+      capabilities: {
+        newShell: false,
+        schedules: false,
+        largeWorlds: false,
+        modernArt: false,
+        battleRoyale: true,
+      },
+    });
+    manager.joinBattleRoyale('Alpha', 'mighty_man');
+    expect(hoisted.sentMessages).toContainEqual({
+      type: 'client:joinBattleRoyale',
+      nickname: 'Alpha',
+      fighterId: 'mighty_man',
+    });
+  });
+
   it('sends the additive generalized match intent without changing legacy joins', () => {
     manager.submitMatchIntent('Alpha', {
       intentId: 'intent_client_0001',

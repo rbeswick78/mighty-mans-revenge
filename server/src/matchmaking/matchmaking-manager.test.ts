@@ -9,6 +9,7 @@ import {
   OVERTIME,
   DRAFT,
   RUMBLE,
+  BATTLE_ROYALE_QUEUE,
   CREW_BATTLE,
   BOT,
   SCRAP_PIT_RIVALS,
@@ -42,7 +43,7 @@ interface SentMessage {
   reliable: boolean;
 }
 
-function makeFakeServer(largeWorlds = false) {
+function makeFakeServer(largeWorlds = false, battleRoyale = false) {
   const sent: SentMessage[] = [];
   /** Mutable so tests can decide who the leaderboard rebroadcast reaches. */
   const connected: PlayerId[] = [];
@@ -51,11 +52,166 @@ function makeFakeServer(largeWorlds = false) {
       sent.push({ playerId, message, reliable: !!opts?.reliable });
     }),
     getConnectedPlayerIds: vi.fn(() => [...connected]),
-    getCapabilities: vi.fn(() => ({ largeWorlds })),
+    getCapabilities: vi.fn(() => ({ largeWorlds, battleRoyale })),
     playerCount: 2,
   } as unknown as GameServer;
   return { fake, sent, connected };
 }
+
+describe('MatchmakingManager Battle Royale queue', () => {
+  it('fails closed when the server does not advertise Battle Royale', () => {
+    const { fake, sent } = makeFakeServer();
+    const manager = new MatchmakingManager(fake);
+
+    expect(manager.handleJoinBattleRoyale('A', 'Alpha', 'mighty_man')).toBe(false);
+    expect(manager.getQueueLength()).toBe(0);
+    expect(manager.getActiveMatches()).toHaveLength(0);
+    expect(sent).toHaveLength(0);
+  });
+
+  it('fills one human to exactly eight at the authoritative 15-second deadline', () => {
+    const { fake, sent } = makeFakeServer(false, true);
+    const manager = new MatchmakingManager(fake);
+
+    expect(manager.handleJoinBattleRoyale('A', 'Alpha', 'rook')).toBe(true);
+    expect(sent.at(-1)?.message).toMatchObject({
+      type: 'server:matchmakingStatus',
+      status: 'queued',
+      matchKind: 'battle_royale',
+      groupSize: 1,
+      maxGroupSize: 8,
+      botFillCount: 7,
+      launchInMs: 15_000,
+    });
+
+    manager.tick(BATTLE_ROYALE_QUEUE.BOT_FILL_DEADLINE_SECONDS - 0.001, 1);
+    expect(manager.getActiveMatches()).toHaveLength(0);
+    manager.tick(0.001, 2);
+
+    const [match] = manager.getActiveMatches();
+    expect(match.players.size).toBe(8);
+    expect(match.phase).toBe(MatchPhase.COUNTDOWN);
+    expect(match.selectionState.get('A')?.locked).toBe('rook');
+    expect([...match.selectionState.values()].every(({ locked }) => locked !== null)).toBe(true);
+    const found = sent.find(
+      ({ playerId, message }) => playerId === 'A' && message.type === 'server:matchFound',
+    );
+    expect(found?.message).toMatchObject({
+      type: 'server:matchFound',
+      matchKind: 'battle_royale',
+      battleRoyale: { participantCount: 8, humanCount: 1, botCount: 7 },
+    });
+    if (!found || found.message.type !== 'server:matchFound') throw new Error('missing matchFound');
+    expect(found.message.opponents).toHaveLength(7);
+    expect(sent.some(({ message }) => message.type === 'server:characterSelectState')).toBe(false);
+  });
+
+  it('launches the eighth human synchronously without bots or standard setup leakage', () => {
+    const { fake, sent } = makeFakeServer(false, true);
+    const manager = new MatchmakingManager(fake);
+    for (let index = 0; index < 8; index += 1) {
+      expect(
+        manager.handleJoinBattleRoyale(
+          `p${index}`,
+          `Player${index}`,
+          CHARACTER_IDS[index % CHARACTER_IDS.length],
+        ),
+      ).toBe(true);
+    }
+
+    const [match] = manager.getActiveMatches();
+    expect(match.players.size).toBe(8);
+    expect(manager.getQueueLength()).toBe(0);
+    expect(
+      [...match.players.keys()].every((playerId) => !playerId.startsWith(BOT.PLAYER_ID_PREFIX)),
+    ).toBe(true);
+    const found = sent.filter(({ message }) => message.type === 'server:matchFound');
+    expect(found).toHaveLength(8);
+    expect(
+      found.every(
+        ({ message }) =>
+          message.type === 'server:matchFound' && message.battleRoyale?.botCount === 0,
+      ),
+    ).toBe(true);
+  });
+
+  it('projects authoritative Results without standard rematch or persistence-shaped fields', () => {
+    const { fake, sent } = makeFakeServer(false, true);
+    const manager = new MatchmakingManager(fake);
+    manager.handleJoinBattleRoyale('A', 'Alpha', 'mighty_man');
+    manager.tick(BATTLE_ROYALE_QUEUE.BOT_FILL_DEADLINE_SECONDS, 1);
+    const [match] = manager.getActiveMatches();
+    match.phase = MatchPhase.ACTIVE;
+    for (const playerId of match.players.keys()) {
+      if (playerId !== 'A') match.onPlayerDisconnect(playerId, true);
+    }
+    manager.tick(0.05, 2);
+
+    expect(manager.getActiveMatches()).toHaveLength(0);
+    const ended = sent.find(
+      ({ playerId, message }) => playerId === 'A' && message.type === 'server:matchEnd',
+    );
+    expect(ended?.message).toMatchObject({
+      type: 'server:matchEnd',
+      result: {
+        matchKind: 'battle_royale',
+        winnerId: 'A',
+        nextMapName: null,
+        nextGameMode: null,
+        rivalry: null,
+        rivalrySet: null,
+        battleRoyale: {
+          placements: expect.arrayContaining([
+            expect.objectContaining({ playerId: 'A', placement: 1, status: 'winner' }),
+          ]),
+        },
+      },
+    });
+
+    manager.handleRematchRequest('A');
+    expect(sent.at(-1)?.message).toMatchObject({
+      type: 'server:matchmakingStatus',
+      status: 'cancelled',
+    });
+    manager.handleReturnToLobby('A');
+    expect(manager.handleJoinBattleRoyale('A', 'Alpha', 'mighty_man')).toBe(true);
+  });
+
+  it('protects duplicates and preserves the remaining deadline after cancel and disconnect', () => {
+    const { fake, sent } = makeFakeServer(false, true);
+    const manager = new MatchmakingManager(fake);
+    manager.handleJoinBattleRoyale('A', 'Alpha', 'mighty_man');
+    manager.handleJoinBattleRoyale('B', 'Bravo', 'bruce');
+    manager.tick(5, 1);
+
+    expect(manager.handleJoinBattleRoyale('B', 'Bravo', 'bruce')).toBe(false);
+    manager.handleCancelMatchmaking('A');
+    const remaining = [...sent]
+      .reverse()
+      .find(
+        ({ playerId, message }) =>
+          playerId === 'B' &&
+          message.type === 'server:matchmakingStatus' &&
+          message.status === 'queued',
+      );
+    expect(remaining?.message).toMatchObject({
+      groupSize: 1,
+      botFillCount: 7,
+      launchInMs: 10_000,
+    });
+    manager.handlePlayerDisconnect('B');
+    expect(manager.getQueueLength()).toBe(0);
+
+    manager.handleJoinBattleRoyale('C', 'Cora', 'frost_wizard');
+    expect(sent.at(-1)?.message).toMatchObject({
+      type: 'server:matchmakingStatus',
+      groupSize: 1,
+      launchInMs: 15_000,
+    });
+    manager.handleJoinRumble('C', 'Cora');
+    expect(manager.getQueueLength()).toBe(1);
+  });
+});
 
 /**
  * Deterministic rng for draft tests: returns the given values in order,

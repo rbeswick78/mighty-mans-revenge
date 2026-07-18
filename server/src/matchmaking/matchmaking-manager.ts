@@ -4,6 +4,7 @@ import {
   GAME_MODE_ROTATION,
   DRAFT,
   RUMBLE,
+  BATTLE_ROYALE_QUEUE,
   CREW_BATTLE,
   CREW_BATTLE_MODES,
   RIVALRY_SET,
@@ -69,13 +70,16 @@ import type {
   PartyState,
   PartyParticipant,
   ScheduledArenaLock,
+  BattleRoyaleMatchLaunch,
 } from '@shared/game';
 import { Match } from '../game/match.js';
+import type { MatchLifecycleOptions } from '../game/match.js';
 import { BotController } from '../game/bot-controller.js';
 import { getGameMode } from '../game/modes/index.js';
 import { GameServer } from '../network/server.js';
 import { MatchmakingQueue } from './matchmaking-queue.js';
 import { RumbleQueue } from './rumble-queue.js';
+import { BattleRoyaleQueue, type BattleRoyaleQueueLaunch } from './battle-royale-queue.js';
 import { CrewQueue, type CrewQueueEntry } from './crew-queue.js';
 import { MatchIntentQueue, type MatchIntentQueueEntry } from './match-intent-queue.js';
 import { resolveRumbleCrown } from './rumble-crown.js';
@@ -150,7 +154,7 @@ interface PostMatchState {
   playerTeams: ReadonlyMap<PlayerId, TeamId>;
 }
 
-type MatchKind = 'duel' | 'rumble' | 'duos' | 'practice';
+type MatchKind = 'duel' | 'rumble' | 'duos' | 'practice' | 'battle_royale';
 
 interface MatchIntentArenaAuthority {
   lock(playerId: PlayerId, mode: GameModeType): Readonly<ScheduledArenaLock> | null;
@@ -229,6 +233,7 @@ interface RivalrySetState {
 export class MatchmakingManager {
   private readonly queue: MatchmakingQueue;
   private readonly rumbleQueue: RumbleQueue;
+  private readonly battleRoyaleQueue: BattleRoyaleQueue;
   private readonly crewQueue: CrewQueue;
   private readonly matchIntentQueue: MatchIntentQueue;
   private readonly server: GameServer;
@@ -308,6 +313,8 @@ export class MatchmakingManager {
   private modeRotationIndex = 0;
   /** Suppress 20Hz reliable queue spam; the lobby only renders whole seconds. */
   private lastRumbleStatusKey = '';
+  /** Same throttle contract for the one-to-eight-human Battle Royale wait. */
+  private lastBattleRoyaleStatusKey = '';
   /** Same throttle contract for the one-or-two-human Crew ally window. */
   private lastCrewStatusKey = '';
 
@@ -322,6 +329,7 @@ export class MatchmakingManager {
     this.server = server;
     this.queue = new MatchmakingQueue();
     this.rumbleQueue = new RumbleQueue();
+    this.battleRoyaleQueue = new BattleRoyaleQueue(() => now().getTime());
     this.crewQueue = new CrewQueue();
     this.matchIntentQueue = new MatchIntentQueue();
     this.getPlayerRTT = getPlayerRTT;
@@ -337,6 +345,7 @@ export class MatchmakingManager {
       this.playerMatchMap.has(playerId) ||
       this.queue.isPlayerQueued(playerId) ||
       this.rumbleQueue.isPlayerQueued(playerId) ||
+      this.battleRoyaleQueue.isPlayerQueued(playerId) ||
       this.crewQueue.isPlayerQueued(playerId) ||
       this.matchIntentQueue.isPlayerQueued(playerId)
     );
@@ -543,6 +552,7 @@ export class MatchmakingManager {
     if (
       this.playerMatchMap.has(playerId) ||
       this.rumbleQueue.isPlayerQueued(playerId) ||
+      this.battleRoyaleQueue.isPlayerQueued(playerId) ||
       this.crewQueue.isPlayerQueued(playerId) ||
       this.matchIntentQueue.isPlayerQueued(playerId)
     ) {
@@ -577,6 +587,7 @@ export class MatchmakingManager {
     if (
       this.playerMatchMap.has(playerId) ||
       this.queue.isPlayerQueued(playerId) ||
+      this.battleRoyaleQueue.isPlayerQueued(playerId) ||
       this.crewQueue.isPlayerQueued(playerId) ||
       this.matchIntentQueue.isPlayerQueued(playerId)
     ) {
@@ -589,6 +600,26 @@ export class MatchmakingManager {
       'Player joined Wasteland Rumble',
     );
     this.broadcastRumbleStatus();
+  }
+
+  /** Enter the dormant capability-owned solo queue with one validated fighter. */
+  handleJoinBattleRoyale(playerId: PlayerId, nickname: string, fighterId: CharacterId): boolean {
+    if (
+      !this.server.getCapabilities().battleRoyale ||
+      !/^[A-Za-z0-9_.-]{2,16}$/.test(nickname) ||
+      !CHARACTER_IDS.includes(fighterId) ||
+      this.isPlayerBusy(playerId)
+    ) {
+      return false;
+    }
+    this.playerNicknames.set(playerId, nickname);
+    if (!this.battleRoyaleQueue.addPlayer(playerId, nickname, fighterId)) return false;
+    logger.info(
+      { playerId, nickname, queueLength: this.battleRoyaleQueue.getQueueLength() },
+      'Player joined Battle Royale queue',
+    );
+    this.tryCreateBattleRoyale(0);
+    return true;
   }
 
   /** Queue one normalized generalized request against a fresh server-owned lock. */
@@ -606,6 +637,7 @@ export class MatchmakingManager {
       this.playerMatchMap.has(playerId) ||
       this.queue.isPlayerQueued(playerId) ||
       this.rumbleQueue.isPlayerQueued(playerId) ||
+      this.battleRoyaleQueue.isPlayerQueued(playerId) ||
       this.crewQueue.isPlayerQueued(playerId) ||
       this.matchIntentQueue.isPlayerQueued(playerId) ||
       !this.matchIntentArenaAuthority
@@ -716,6 +748,8 @@ export class MatchmakingManager {
     this.queue.removePlayer(playerId);
     const leftRumbleQueue = this.rumbleQueue.removePlayer(playerId);
     if (leftRumbleQueue) this.broadcastRumbleStatus();
+    const leftBattleRoyaleQueue = this.battleRoyaleQueue.removePlayer(playerId);
+    if (leftBattleRoyaleQueue) this.broadcastBattleRoyaleStatus();
     this.playerNicknames.set(playerId, nickname);
 
     if (safeKind === 'crew_battle') {
@@ -790,10 +824,12 @@ export class MatchmakingManager {
   handleCancelMatchmaking(playerId: PlayerId): void {
     const removedDuel = this.queue.removePlayer(playerId);
     const removedRumble = this.rumbleQueue.removePlayer(playerId);
+    const removedBattleRoyale = this.battleRoyaleQueue.removePlayer(playerId);
     const removedCrew = this.crewQueue.removePlayer(playerId);
     const removedIntent = this.matchIntentQueue.removePlayer(playerId) !== null;
     if (removedIntent) this.matchIntentArenaAuthority?.release(playerId);
-    const removed = removedDuel || removedRumble || removedCrew || removedIntent;
+    const removed =
+      removedDuel || removedRumble || removedBattleRoyale || removedCrew || removedIntent;
     if (removed) {
       logger.info({ playerId }, 'Player cancelled matchmaking');
       this.server.sendTo(
@@ -806,6 +842,7 @@ export class MatchmakingManager {
         { reliable: true },
       );
       if (removedRumble) this.broadcastRumbleStatus();
+      if (removedBattleRoyale) this.broadcastBattleRoyaleStatus();
       if (removedCrew) this.broadcastCrewStatus();
     }
   }
@@ -815,6 +852,8 @@ export class MatchmakingManager {
     this.queue.removePlayer(playerId);
     const leftRumbleQueue = this.rumbleQueue.removePlayer(playerId);
     if (leftRumbleQueue) this.broadcastRumbleStatus();
+    const leftBattleRoyaleQueue = this.battleRoyaleQueue.removePlayer(playerId);
+    if (leftBattleRoyaleQueue) this.broadcastBattleRoyaleStatus();
     const leftCrewQueue = this.crewQueue.removePlayer(playerId);
     if (leftCrewQueue) this.broadcastCrewStatus();
     this.playerNicknames.delete(playerId);
@@ -1026,6 +1065,7 @@ export class MatchmakingManager {
     // Try to create matches from queued players
     this.tryCreateMatch();
     this.tryCreateRumble(dt);
+    this.tryCreateBattleRoyale(dt);
     this.tryCreateCrew(dt);
     this.tryCreateIntentMatches();
 
@@ -1097,6 +1137,7 @@ export class MatchmakingManager {
     return (
       this.queue.getQueueLength() +
       this.rumbleQueue.getQueueLength() +
+      this.battleRoyaleQueue.getQueueLength() +
       this.crewQueue.getQueueLength() +
       this.matchIntentQueue.getQueueLength()
     );
@@ -1493,6 +1534,97 @@ export class MatchmakingManager {
     }
   }
 
+  private tryCreateBattleRoyale(dt: number): void {
+    const launch = this.battleRoyaleQueue.tick(dt);
+    if (!launch) {
+      if (this.battleRoyaleQueue.getQueueLength() > 0) this.broadcastBattleRoyaleStatus();
+      return;
+    }
+    this.launchBattleRoyale(launch);
+    this.broadcastBattleRoyaleStatus();
+  }
+
+  private launchBattleRoyale(launch: BattleRoyaleQueueLaunch): void {
+    const humanEntries = launch.humans.map((entry) => ({
+      id: entry.playerId,
+      nickname: entry.nickname,
+    }));
+    const botEntries = Array.from({ length: launch.botCount }, (_, index) => {
+      const id = `${BOT.PLAYER_ID_PREFIX}${crypto.randomUUID()}` as PlayerId;
+      const nickname = `Scrapper BR ${index + 1}`;
+      this.botPlayerIds.add(id);
+      this.playerNicknames.set(id, nickname);
+      return { id, nickname };
+    });
+    const entries = [...humanEntries, ...botEntries];
+    const preselectedFighters = new Map<PlayerId, CharacterId>();
+    for (const human of launch.humans) {
+      preselectedFighters.set(human.playerId, human.fighterId);
+    }
+    for (const [index, bot] of botEntries.entries()) {
+      preselectedFighters.set(bot.id, CHARACTER_IDS[index % CHARACTER_IDS.length]);
+    }
+    const matchId = crypto.randomUUID();
+    this.matchKinds.set(matchId, 'battle_royale');
+    logger.info(
+      {
+        matchId,
+        humanCount: launch.humans.length,
+        botCount: launch.botCount,
+        reason: launch.reason,
+      },
+      'Battle Royale queue ready',
+    );
+    this.launchMatch(
+      matchId,
+      this.forcedMap() ?? this.resolveMap(listMapNames()[0]),
+      GameModeType.DEATHMATCH,
+      entries,
+      {},
+      null,
+      [],
+      undefined,
+      null,
+      undefined,
+      null,
+      null,
+      null,
+      new Map(),
+      preselectedFighters,
+      undefined,
+      { format: 'battle_royale' },
+      Object.freeze({
+        participantCount: entries.length,
+        humanCount: launch.humans.length,
+        botCount: launch.botCount,
+      }),
+    );
+  }
+
+  private broadcastBattleRoyaleStatus(): void {
+    const groupSize = this.battleRoyaleQueue.getQueueLength();
+    const launchInMs = this.battleRoyaleQueue.getLaunchInMs();
+    const statusKey = `${groupSize}:${launchInMs === undefined ? 'idle' : Math.ceil(launchInMs / 1000)}`;
+    if (statusKey === this.lastBattleRoyaleStatusKey) return;
+    this.lastBattleRoyaleStatusKey = statusKey;
+    for (const entry of this.battleRoyaleQueue.getEntries()) {
+      this.server.sendTo(
+        entry.playerId,
+        {
+          type: 'server:matchmakingStatus',
+          status: 'queued',
+          matchKind: 'battle_royale',
+          groupSize,
+          maxGroupSize: BATTLE_ROYALE_QUEUE.MAX_PLAYERS,
+          botFillCount: BATTLE_ROYALE_QUEUE.MAX_PLAYERS - groupSize,
+          ...(launchInMs === undefined ? {} : { launchInMs }),
+          playersOnline: this.getOnlinePlayerCount(),
+        },
+        { reliable: true },
+      );
+    }
+  }
+
   private tryCreateCrew(dt: number): void {
     const group = this.crewQueue.tick(dt);
     if (!group) {
@@ -1617,6 +1749,7 @@ export class MatchmakingManager {
   private departActiveMatch(matchId: string, match: Match, playerId: PlayerId): void {
     const matchKind = this.matchKinds.get(matchId) ?? 'duel';
     const isRumble = matchKind === 'rumble';
+    const isBattleRoyale = matchKind === 'battle_royale';
     const isPreFight =
       match.phase === MatchPhase.CHARACTER_SELECT || match.phase === MatchPhase.COUNTDOWN;
     const isActivePractice =
@@ -1628,7 +1761,7 @@ export class MatchmakingManager {
     }
 
     const nickname = match.players.get(playerId)?.nickname ?? 'A fighter';
-    const eliminate = isRumble && match.phase === MatchPhase.ACTIVE;
+    const eliminate = (isRumble || isBattleRoyale) && match.phase === MatchPhase.ACTIVE;
     match.onPlayerDisconnect(playerId, eliminate);
     this.playerMatchMap.delete(playerId);
 
@@ -1708,6 +1841,8 @@ export class MatchmakingManager {
     playerTeams: ReadonlyMap<PlayerId, TeamId> = new Map(),
     preselectedFighters: ReadonlyMap<PlayerId, CharacterId> = new Map(),
     standardMatch?: Readonly<StandardMatchLaunch>,
+    lifecycleOptions?: MatchLifecycleOptions,
+    battleRoyale?: Readonly<BattleRoyaleMatchLaunch>,
   ): void {
     const matchKind =
       this.matchKinds.get(matchId) ?? (practiceDifficulty === null ? 'duel' : 'practice');
@@ -1758,6 +1893,7 @@ export class MatchmakingManager {
       dailySeed,
       boonAssignments,
       playerTeams,
+      lifecycleOptions,
     );
     match.setRttResolver(this.getPlayerRTT);
     this.activeMatches.set(matchId, match);
@@ -1829,6 +1965,12 @@ export class MatchmakingManager {
     for (const [playerId, fighterId] of preselectedFighters) {
       match.setLock(playerId, fighterId);
     }
+    if (lifecycleOptions?.format === 'battle_royale') {
+      // The queue already carries the persisted fighter choice. Commit the
+      // complete server-owned roster synchronously so BR never opens the
+      // standard Character Select route or its uniqueness constraint.
+      match.updateCharacterSelect(0);
+    }
 
     logger.info(
       {
@@ -1862,6 +2004,7 @@ export class MatchmakingManager {
           mapName: mapData.name,
           gameMode,
           matchKind,
+          battleRoyale,
           standardMatch,
           playerTeams:
             playerTeams.size > 0
@@ -2509,6 +2652,7 @@ export class MatchmakingManager {
   private onMatchEnded(matchId: string, match: Match): void {
     const result = match.getResult();
     const matchKind = this.matchKinds.get(matchId) ?? 'duel';
+    const isBattleRoyale = matchKind === 'battle_royale';
     result.matchKind = matchKind;
     result.scores = Object.fromEntries(
       [...match.players].map(([playerId, player]) => [playerId, player.score]),
@@ -2562,7 +2706,7 @@ export class MatchmakingManager {
     const isPractice = practiceDifficulty !== null;
     result.isPractice = isPractice;
     result.rivalrySet =
-      gauntlet || matchKind === 'rumble' || matchKind === 'duos'
+      gauntlet || matchKind === 'rumble' || matchKind === 'duos' || isBattleRoyale
         ? null
         : this.recordRivalrySet(match, result.winnerId);
     const humanPlayerId = gauntlet
@@ -2631,7 +2775,7 @@ export class MatchmakingManager {
     const nextMapName =
       this.forcedMap()?.name ??
       (restartingDaily ? dailyOpening.mapName : getNextMapName(match.mapManager.getMapData().name));
-    result.nextMapName = nextMapName;
+    if (!isBattleRoyale) result.nextMapName = nextMapName;
     const forcedNextMode = this.forcedMode();
     const nextGameMode =
       matchKind === 'duos'
@@ -2647,7 +2791,7 @@ export class MatchmakingManager {
           (restartingDaily
             ? dailyOpening.gameMode
             : this.nextCompatiblePracticeMode(match.gameModeType, practiceMutatorPreference)));
-    result.nextGameMode = nextGameMode;
+    if (!isBattleRoyale) result.nextGameMode = nextGameMode;
     const nextGauntlet = result.gauntlet
       ? practiceGauntletMatch(
           result.gauntlet.nextStage,
@@ -2756,7 +2900,7 @@ export class MatchmakingManager {
     // all-time rivalry line before shipping the result. The in-memory
     // update is synchronous and O(players); the file write is queued onto
     // fs.promises — nothing here blocks the tick.
-    if (this.statsStore && !isPractice) {
+    if (this.statsStore && !isPractice && !isBattleRoyale) {
       const entries: MatchStatsEntry[] = [];
       const previousStreaks = new Map<PlayerId, { current: number; best: number }>();
       const arenaName = match.getMapData().name;
@@ -2847,6 +2991,18 @@ export class MatchmakingManager {
     }
 
     logger.info({ matchId, winnerId: result.winnerId, duration: result.duration }, 'Match ended');
+
+    if (isBattleRoyale) {
+      // BR has no rematch contract and Batch 49 owns its separate persistence.
+      // Keep each connected human mapped only until their reachable Results
+      // leave action arrives; release synthetic players immediately.
+      this.activeMatches.delete(matchId);
+      this.previousPhases.delete(matchId);
+      this.botControllers.delete(matchId);
+      this.matchKinds.delete(matchId);
+      this.releasePracticePlayers([...match.players.keys()]);
+      return;
+    }
 
     // Move to post-match state for rematch handling
     const playerIds = connectedPlayerIds;

@@ -190,8 +190,10 @@ export class ReforgedShellScene extends Phaser.Scene {
       arenaStatusByMode: playSchedule.arenaStatusByMode,
       fighterId: this.selectedFighterId,
       entryEnabled: this.canSubmitMatchIntent(),
+      battleRoyaleEnabled: this.canJoinBattleRoyale(),
       onPointerIntent: () => this.enterPlayInput(false),
       onSubmit: (draft) => this.submitPlayIntent(draft),
+      onJoinBattleRoyale: () => this.joinBattleRoyale(),
       onCreateParty: (draft) => this.createParty(draft),
       onJoinParty: () => this.joinParty(),
       onCopyPartyLink: (joinPath) => this.copyPartyLink(joinPath),
@@ -454,6 +456,7 @@ export class ReforgedShellScene extends Phaser.Scene {
     this.onDailyLeaderboard = () => this.refreshRecordsSnapshots();
     this.onCapabilitiesChanged = (capabilities) => {
       if (menuSceneForCapabilities(capabilities) !== 'ReforgedShellScene') this.returnToLobby();
+      this.playRosterPanel?.setBattleRoyaleQueue(null);
     };
     this.onLobbyConfig = (schedule) => {
       const presentation = playSchedulePresentation(
@@ -468,8 +471,16 @@ export class ReforgedShellScene extends Phaser.Scene {
       this.playRosterPanel?.setEntryEnabled(this.canSubmitMatchIntent(schedule));
     };
     this.onMatchmakingStatus = (status) => {
-      if (status.status === 'queued') this.playRosterPanel?.setQueued(true);
-      if (status.status === 'cancelled') this.playRosterPanel?.setQueued(false);
+      if (status.status === 'queued' && status.matchKind === 'battle_royale') {
+        this.playRosterPanel?.setBattleRoyaleQueue(status);
+      } else if (status.status === 'queued') {
+        this.playRosterPanel?.setBattleRoyaleQueue(null);
+        this.playRosterPanel?.setQueued(true);
+      }
+      if (status.status === 'cancelled') {
+        this.playRosterPanel?.setBattleRoyaleQueue(null);
+        this.playRosterPanel?.setQueued(false);
+      }
     };
     this.onPartyState = (state) =>
       this.playRosterPanel?.setPartyState(state, this.gameService.getPlayerId());
@@ -760,6 +771,22 @@ export class ReforgedShellScene extends Phaser.Scene {
       isCallsignReady(this.nickname) &&
       this.gameService.getNetworkManager().getConnectionState() === 'connected'
     );
+  }
+
+  private canJoinBattleRoyale(): boolean {
+    const capabilities = this.gameService.getServerCapabilities();
+    return (
+      capabilities.newShell &&
+      capabilities.battleRoyale &&
+      isCallsignReady(this.nickname) &&
+      this.gameService.getNetworkManager().getConnectionState() === 'connected'
+    );
+  }
+
+  private joinBattleRoyale(): void {
+    if (this.leaving || !this.canJoinBattleRoyale()) return;
+    this.tryStartFullscreen();
+    this.gameService.joinBattleRoyale(this.nickname, this.selectedFighterId);
   }
 
   private submitPlayIntent(draft: SerializedPlayRosterDraft): boolean {

@@ -604,8 +604,8 @@ Bullet trails also carry authoritative player-hit confirmation. Every trail begi
 Quick Match launches as 1v1; Wasteland Rumble launches with 2–4 players; Crew Battle currently launches a fixed 2v2 roster. The game remains architected for N players. Use arrays/maps of players everywhere — never hardcode `player1`/`player2` or assume exactly 2 players. Matchmaking, game state, and rendering must all support variable player counts.
 
 **Battle Royale lifecycle (Batch 40):** `battle_royale` is an additive shared
-match kind plus an internal `MatchLifecycleOptions` format; it is deliberately
-absent from standard `MatchIntent` formats and every launch queue until Batch 41. `BattleRoyaleLifecycle` owns immutable entrants and one authoritative
+match kind plus an internal `MatchLifecycleOptions` format; it remains absent
+from standard `MatchIntent` formats. `BattleRoyaleLifecycle` owns immutable entrants and one authoritative
 elimination edge per fighter. Combat and active departure edges derive final
 placements from server event order; the sole tie is a same-simulation-step
 final combat cohort, whose fighters share first with `winnerId: null`. One
@@ -619,6 +619,19 @@ spectating false until Batch 48; an old server with no optional field gets an
 explicit unavailable state, never client-derived standings. Do not add the
 eight-slot queue, bot fill, inventory/loot, arena/zones, spectating, records, or
 capability exposure through this lifecycle seam.
+
+**Battle Royale queue (Batch 41):** `BattleRoyaleQueue` is a separate,
+server-ticked solo queue behind the strict `battleRoyale` capability. Eight
+humans launch immediately; one through seven humans retain their cohort's
+original deadline and receive deterministic ordinary-bot fill to exactly eight
+at 15 seconds. Cancellation, duplicate/capacity protection, disconnect removal,
+and standard-queue mutual exclusion are server owned. The prelocked roster
+retains human fighter choice and enters countdown without the standard draft.
+Queue and match-found projections are optional additive wire fields; clients
+must validate capability plus the complete eight-participant projection and may
+never infer missing counts. Keep bot fill on existing behavior until Batch 47,
+and do not expose the capability or add rarity, inventory, loot, arena, zones,
+spectating, or records through the queue seam.
 
 ### Game Mode Abstraction
 
@@ -942,10 +955,12 @@ production flag, or deployment follows from passing Batch 38 evidence.
 ## Reforged Release State
 
 Batch 39 automated evidence remains green and its human tester/release review
-is deliberately deferred. Batch 40's dormant Battle Royale lifecycle is also
-complete, but no Battle Royale queue or route exists and `battleRoyale` remains
-strict server-owned, default false, and unexposed. RFG-004 remains resolved by
-the per-run `GameScene.minimapRenderer` reset. Do not expose any Reforged
-capability, deploy, restart production, smoke the live site, or begin Batch 41
-without fresh user approval. Production remains on approved Batch 33 with every
-capability false.
+is deliberately deferred. Batch 41's dormant Battle Royale eight-slot queue is
+complete: a strict `battleRoyale:true` capability gates solo entry, the server
+owns the eight-human/15-second bot-fill launch, and optional queue/launch fields
+remain additive. `battleRoyale` stays default false and unexposed. RFG-004
+remains resolved by the per-run `GameScene.minimapRenderer` reset. The user has
+authorized sequential plan work beginning with Batch 42 while deferring human
+involvement, but has not authorized any capability exposure, deployment,
+production restart, or live smoke. Production remains on approved Batch 33 with
+every capability false.

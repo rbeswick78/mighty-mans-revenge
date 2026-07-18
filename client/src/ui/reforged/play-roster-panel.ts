@@ -3,6 +3,7 @@ import { GAME_MODE_ROTATION, type CharacterId } from '@shared/config/game.js';
 import type { PartyState } from '@shared/matchmaking/party.js';
 import type { GameModeType } from '@shared/types/game.js';
 import type { PlayerId } from '@shared/types/common.js';
+import type { ServerMatchmakingStatusMessage } from '@shared/types/network.js';
 import { cssHex } from '@shared/config/palette.js';
 import { menuBodyFont, menuHeaderFont } from '../modern-ui-runtime.js';
 import { ReforgedMenuTokens } from './design-tokens.js';
@@ -40,8 +41,10 @@ interface PlayRosterPanelOptions {
   readonly arenaStatusByMode?: Readonly<Partial<Record<GameModeType, string>>>;
   readonly fighterId: CharacterId;
   readonly entryEnabled: boolean;
+  readonly battleRoyaleEnabled: boolean;
   readonly onPointerIntent: () => void;
   readonly onSubmit: (draft: SerializedPlayRosterDraft) => boolean;
+  readonly onJoinBattleRoyale: () => void;
   readonly onCreateParty: (draft: SerializedPlayRosterDraft) => boolean;
   readonly onJoinParty: () => void;
   readonly onCopyPartyLink: (joinPath: string) => void;
@@ -69,6 +72,7 @@ export interface PlayRosterPanelSnapshot {
   readonly arenaStatus: string | null;
   readonly entryEnabled: boolean;
   readonly queued: boolean;
+  readonly battleRoyaleQueue: Readonly<ServerMatchmakingStatusMessage> | null;
   readonly partyState: Readonly<PartyState> | null;
   readonly partyError: string | null;
   readonly statusIcon: ModernUiIcon | null;
@@ -100,6 +104,7 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
   private arenaStatusByMode: Readonly<Partial<Record<GameModeType, string>>>;
   private entryEnabled: boolean;
   private queued = false;
+  private battleRoyaleQueue: Readonly<ServerMatchmakingStatusMessage> | null = null;
   private partyState: Readonly<PartyState> | null = null;
   private localPlayerId: PlayerId | null = null;
   private partyError: string | null = null;
@@ -214,6 +219,7 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
           : (this.arenaStatusByMode[this.builderState.mode] ?? null),
       entryEnabled: this.entryEnabled,
       queued: this.queued,
+      battleRoyaleQueue: this.battleRoyaleQueue,
       partyState: this.partyState,
       partyError: this.partyError,
       statusIcon: this.statusIcon
@@ -240,6 +246,12 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
   setQueued(queued: boolean): void {
     if (this.queued === queued) return;
     this.queued = queued;
+    this.rebuild();
+  }
+
+  setBattleRoyaleQueue(status: Readonly<ServerMatchmakingStatusMessage> | null): void {
+    this.battleRoyaleQueue = status;
+    this.queued = status !== null;
     this.rebuild();
   }
 
@@ -321,12 +333,37 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
     this.statusIcon?.setFrame(
       modernUiIconFrame(this.partyState ? 'party' : this.queued ? 'queue' : 'play'),
     );
+    if (this.battleRoyaleQueue) {
+      const groupSize = this.battleRoyaleQueue.groupSize ?? 0;
+      const maxGroupSize = this.battleRoyaleQueue.maxGroupSize ?? 8;
+      const launchInSeconds = Math.max(
+        0,
+        Math.ceil((this.battleRoyaleQueue.launchInMs ?? 0) / 1000),
+      );
+      return [
+        {
+          label: 'CANCEL BATTLE ROYALE',
+          detail: `${groupSize}/${maxGroupSize} HUMANS  /  BOT FILL IN ${launchInSeconds}S`,
+          onSelect: this.options.onCancel,
+        },
+      ];
+    }
     if (step === 'format') {
-      return PLAY_FORMATS.map((format) => ({
+      const standard = PLAY_FORMATS.map((format) => ({
         label: format.label,
         detail: format.detail,
         onSelect: () => this.choose({ kind: 'format', format: format.id }),
       }));
+      return this.options.battleRoyaleEnabled
+        ? [
+            ...standard,
+            {
+              label: 'BATTLE ROYALE',
+              detail: '8 SOLO SLOTS  /  BOTS AT 15S',
+              onSelect: this.options.onJoinBattleRoyale,
+            },
+          ]
+        : standard;
     }
     if (step === 'composition' && this.builderState.format !== null) {
       return playRosterCompositions(this.builderState.format).map((composition) => ({
@@ -528,6 +565,7 @@ export class PlayRosterPanel extends Phaser.GameObjects.Container {
   }
 
   private promptFor(step: PlayRosterBuilderStep): string {
+    if (this.battleRoyaleQueue) return 'SERVER-OWNED BATTLE ROYALE QUEUE';
     switch (step) {
       case 'format':
         return 'CHOOSE A STANDARD FORMAT';

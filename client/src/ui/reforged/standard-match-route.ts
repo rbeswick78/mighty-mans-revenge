@@ -16,6 +16,17 @@ export function matchFoundDestination(
   const status = matchData.standardLaunchStatus ?? 'absent';
   if (status === 'invalid' || (status === 'absent' && matchData.standardMatch)) return 'reject';
 
+  const battleRoyaleStatus = matchData.battleRoyaleLaunchStatus ?? 'absent';
+  if (matchData.matchKind === 'battle_royale') {
+    return status === 'absent' &&
+      battleRoyaleStatus === 'valid' &&
+      capabilities.battleRoyale &&
+      matchData.battleRoyale
+      ? 'game'
+      : 'reject';
+  }
+  if (battleRoyaleStatus !== 'absent' || matchData.battleRoyale) return 'reject';
+
   if (matchData.practiceKind !== undefined || matchData.matchKind === 'practice') {
     return status === 'absent' ? 'character-select' : 'reject';
   }

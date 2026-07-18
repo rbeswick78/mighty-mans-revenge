@@ -387,3 +387,22 @@ records, and Batch 51 owns the release gate. Production remains on approved
 Batch 33 with `newShell`, `schedules`, `largeWorlds`, `modernArt`, and
 `battleRoyale` all false. No deployment, restart, live smoke, rollout, or
 capability change occurred.
+
+## Batch 41 queue disposition
+
+Batch 41 consumes `battleRoyale` only behind a strict literal server opt-in.
+When false or omitted, the client exposes no Battle Royale choice and sends no
+join message; the server also rejects the dormant route. When true, the server
+may project additive Battle Royale queue status and an optional match-found
+roster summary. The client requires a coherent eight-participant projection and
+the still-live capability before routing, so absent, malformed, or drifted state
+fails closed rather than being inferred.
+
+This remains support code, not an exposure event. Optional properties disappear
+from standard JSON when undefined, preserving ordinary match-found bytes and
+behavior; old clients ignore the additions, and a new client connected to an old
+server suppresses entry. Production remains on approved Batch 33 with
+`newShell`, `schedules`, `largeWorlds`, `modernArt`, and `battleRoyale` false.
+Batch 42 may add dormant weapon-instance and rarity foundations under the user's
+standing development authorization, but no capability advertisement, rollout,
+deployment, restart, or live smoke is authorized.

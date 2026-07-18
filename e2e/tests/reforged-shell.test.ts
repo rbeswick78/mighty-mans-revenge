@@ -4,6 +4,7 @@ const shellAdvertised = process.env.CAPABILITY_NEW_SHELL === 'true';
 const schedulesAdvertised = process.env.CAPABILITY_SCHEDULES === 'true';
 const largeWorldsAdvertised = process.env.CAPABILITY_LARGE_WORLDS === 'true';
 const modernArtAdvertised = process.env.CAPABILITY_MODERN_ART === 'true';
+const battleRoyaleAdvertised = process.env.CAPABILITY_BATTLE_ROYALE === 'true';
 
 async function waitForActiveScene(page: Page, key: string): Promise<void> {
   await expect
@@ -140,7 +141,13 @@ async function clickLogicalSettingsOption(
 async function stageNonChromiumShell(page: Page, playerId = 'staged-shell-player'): Promise<void> {
   await waitForActiveScene(page, 'LobbyScene');
   await page.evaluate(
-    ({ advertiseSchedules, advertiseLargeWorlds, advertiseModernArt, stagedPlayerId }) => {
+    ({
+      advertiseSchedules,
+      advertiseLargeWorlds,
+      advertiseModernArt,
+      advertiseBattleRoyale,
+      stagedPlayerId,
+    }) => {
       const lobby = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
         'LobbyScene',
       ) as unknown as {
@@ -163,7 +170,7 @@ async function stageNonChromiumShell(page: Page, playerId = 'staged-shell-player
           schedules: advertiseSchedules,
           largeWorlds: advertiseLargeWorlds,
           modernArt: advertiseModernArt,
-          battleRoyale: false,
+          battleRoyale: advertiseBattleRoyale,
         },
       });
       if (advertiseSchedules) {
@@ -198,6 +205,7 @@ async function stageNonChromiumShell(page: Page, playerId = 'staged-shell-player
       advertiseSchedules: schedulesAdvertised,
       advertiseLargeWorlds: largeWorldsAdvertised,
       advertiseModernArt: modernArtAdvertised,
+      advertiseBattleRoyale: battleRoyaleAdvertised,
       stagedPlayerId: playerId,
     },
   );
@@ -211,6 +219,7 @@ async function playRosterSnapshot(page: Page): Promise<{
   arenaStatus: string | null;
   entryEnabled: boolean;
   queued: boolean;
+  battleRoyaleQueue: Record<string, unknown> | null;
   partyState: {
     partyId: string;
     code: string;
@@ -235,6 +244,7 @@ async function playRosterSnapshot(page: Page): Promise<{
         arenaStatus: string | null;
         entryEnabled: boolean;
         queued: boolean;
+        battleRoyaleQueue: Record<string, unknown> | null;
         partyState: {
           partyId: string;
           code: string;
@@ -692,6 +702,11 @@ test('Play roster builder reaches only a valid review across pointer, keyboard, 
     state: { format: null },
     serialized: null,
     optionLabels: ['CURATED DUEL', 'WASTELAND RUMBLE', 'CREW BATTLE'],
+    ...(battleRoyaleAdvertised
+      ? {
+          optionLabels: ['CURATED DUEL', 'WASTELAND RUMBLE', 'CREW BATTLE', 'BATTLE ROYALE'],
+        }
+      : {}),
   });
 
   // Direct pointer/touch enters the real Play control region.
@@ -805,6 +820,102 @@ test('Play roster builder reaches only a valid review across pointer, keyboard, 
       path: testInfo.outputPath('play-roster-options-mobile-chromium.png'),
     });
   }
+});
+
+test('Battle Royale entry projects the authoritative eight-slot wait and direct launch', async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    !shellAdvertised || !battleRoyaleAdvertised,
+    'Run with CAPABILITY_NEW_SHELL=true and CAPABILITY_BATTLE_ROYALE=true.',
+  );
+  test.setTimeout(60_000);
+  await page.addInitScript(() => {
+    localStorage.setItem('mmr_fighter_selection', 'rook');
+    localStorage.setItem('mmr_nickname', 'Royale41');
+  });
+  await page.goto('/');
+  const touch = testInfo.project.name === 'mobile-landscape';
+  const liveChromium = testInfo.project.name === 'desktop-chromium';
+  if (!liveChromium) await stageNonChromiumShell(page, `battle-royale-${testInfo.project.name}`);
+  await waitForActiveScene(page, 'ReforgedShellScene');
+  expect((await playRosterSnapshot(page)).optionLabels).toContain('BATTLE ROYALE');
+
+  if (!liveChromium) {
+    await page.evaluate(() => {
+      const shell = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+        'ReforgedShellScene',
+      ) as unknown as {
+        gameService: { getNetworkManager(): { connection: { send(message: unknown): void } } };
+      };
+      shell.gameService.getNetworkManager().connection.send = (message: unknown): void => {
+        (window as unknown as { battleRoyaleJoin?: unknown }).battleRoyaleJoin = message;
+      };
+    });
+  }
+  await clickLogicalPlayOption(page, 3, touch);
+
+  if (!liveChromium) {
+    expect(
+      await page.evaluate(
+        () => (window as unknown as { battleRoyaleJoin?: unknown }).battleRoyaleJoin,
+      ),
+    ).toEqual({
+      type: 'client:joinBattleRoyale',
+      nickname: 'Royale41',
+      fighterId: 'rook',
+    });
+    await page.evaluate(() => {
+      const shell = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+        'ReforgedShellScene',
+      ) as unknown as {
+        gameService: { getNetworkManager(): { handleMessage(message: unknown): void } };
+      };
+      shell.gameService.getNetworkManager().handleMessage({
+        type: 'server:matchmakingStatus',
+        status: 'queued',
+        matchKind: 'battle_royale',
+        groupSize: 1,
+        maxGroupSize: 8,
+        botFillCount: 7,
+        launchInMs: 15_000,
+      });
+    });
+  }
+
+  await expect.poll(async () => (await playRosterSnapshot(page)).queued).toBe(true);
+  expect(await playRosterSnapshot(page)).toMatchObject({
+    optionLabels: ['CANCEL BATTLE ROYALE'],
+    battleRoyaleQueue: {
+      matchKind: 'battle_royale',
+      groupSize: 1,
+      maxGroupSize: 8,
+      botFillCount: 7,
+    },
+  });
+
+  if (!liveChromium) {
+    await page.evaluate(() => {
+      const shell = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+        'ReforgedShellScene',
+      ) as unknown as {
+        gameService: { getNetworkManager(): { handleMessage(message: unknown): void } };
+      };
+      shell.gameService.getNetworkManager().handleMessage({
+        type: 'server:matchFound',
+        matchId: 'battle-royale-41',
+        opponents: Array.from({ length: 7 }, (_, index) => ({
+          id: `br-opponent-${index}`,
+          nickname: `Opponent${index}`,
+        })),
+        mapName: 'Wasteland Outpost',
+        gameMode: 'deathmatch',
+        matchKind: 'battle_royale',
+        battleRoyale: { participantCount: 8, humanCount: 1, botCount: 7 },
+      });
+    });
+  }
+  await waitForActiveScene(page, 'GameScene');
 });
 
 test('Play submits one server-scheduled general intent and recovery clears queued entry', async ({

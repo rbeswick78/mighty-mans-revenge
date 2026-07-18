@@ -485,3 +485,32 @@ and old-server fallback across desktop Chromium, desktop Firefox, and mobile
 landscape, and the authoritative server baseline passed. The baseline retained
 the configured/rolling 20 Hz contract, 50 ms tick budget, and synthetic
 four-player mean/p95/p99/max work of 0.017/0.027/0.082/1.352 ms.
+
+### Batch 41 Battle Royale queue baseline
+
+The dormant Battle Royale entry path is a dedicated solo queue and is consumed
+only when the server advertises literal `battleRoyale:true`. Eight humans launch
+immediately. A cohort of one through seven humans retains its initial
+server-owned deadline and is filled with deterministic ordinary bots to exactly
+eight at 15 seconds. Cancellation, duplicate/capacity rejection, standard-queue
+mutual exclusion, pre-launch disconnect removal, nonempty deadline preservation,
+and empty-cohort reset are authoritative.
+
+The launch roster retains stable human join order and selected fighters,
+prelocks all eight participants, and proceeds directly to countdown. Existing
+bot behavior and Wasteland Outpost remain temporary lifecycle foundations;
+rarity, weapon instances, inventory, loot, the four-biome arena, safe zones,
+Battle Royale bot behavior, spectating, and records remain later-batch work.
+Active departures are eliminations. Results cleanup releases queue bots and
+keeps the established leave foundation without standard rematch or persistence.
+
+Queue status and Battle Royale match-found details are optional server-authored
+fields. New clients validate capability, total/human/bot arithmetic, and the
+complete seven-opponent launch before routing. Old-server clients suppress the
+entry, old clients ignore the fields, malformed projections fail closed, and
+standard match-found serialization omits the undefined addition. The complete
+146-file/1,662-test unit matrix, typecheck, lint, all builds, and focused entry
+journeys on desktop Chromium, desktop Firefox, and mobile landscape passed. The
+server baseline retained configured/rolling 20 Hz, its 50 ms budget, synthetic
+four-player mean/p95/p99/max work of 0.018/0.028/0.156/1.118 ms, and unchanged
+2,481/3,762-byte standard snapshots.

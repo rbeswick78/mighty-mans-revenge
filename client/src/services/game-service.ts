@@ -25,6 +25,7 @@ import type {
   SerializedPlayerState,
   ServerPartyErrorMessage,
   ServerPartyLeftMessage,
+  BattleRoyaleMatchLaunch,
 } from '@shared/types/network.js';
 import type { ArenaWins } from '@shared/types/map.js';
 import { createEmptyCharacterWins } from '@shared/config/game.js';
@@ -70,6 +71,9 @@ export interface MatchData {
   standardLaunchStatus?: 'absent' | 'valid' | 'invalid';
   /** Present only when the complete server-owned projection validates. */
   standardMatch?: Readonly<StandardMatchLaunch>;
+  /** Client validation result for the complete eight-slot launch projection. */
+  battleRoyaleLaunchStatus?: 'absent' | 'valid' | 'invalid';
+  battleRoyale?: Readonly<BattleRoyaleMatchLaunch>;
   /** Immutable server-authored sides for Crew Battle. */
   playerTeams?: Record<PlayerId, TeamId>;
   practiceKind?: PracticeKind;
@@ -256,6 +260,11 @@ export class GameService {
     this.networkManager.joinRumble(nickname);
   }
 
+  joinBattleRoyale(nickname: string, fighterId: CharacterId): void {
+    this.localNickname = nickname;
+    this.networkManager.joinBattleRoyale(nickname, fighterId);
+  }
+
   submitMatchIntent(nickname: string, intent: Readonly<MatchIntent>): void {
     this.localNickname = nickname;
     this.networkManager.submitMatchIntent(nickname, intent);
@@ -433,6 +442,21 @@ export class GameService {
               allowedArenaNames: listMapNames(),
             })
           : null;
+      const rawBattleRoyale = msg.battleRoyale;
+      const battleRoyale =
+        msg.matchKind === 'battle_royale' &&
+        rawBattleRoyale !== undefined &&
+        Number.isInteger(rawBattleRoyale.participantCount) &&
+        Number.isInteger(rawBattleRoyale.humanCount) &&
+        Number.isInteger(rawBattleRoyale.botCount) &&
+        rawBattleRoyale.participantCount === 8 &&
+        rawBattleRoyale.humanCount >= 1 &&
+        rawBattleRoyale.humanCount <= 8 &&
+        rawBattleRoyale.botCount >= 0 &&
+        rawBattleRoyale.humanCount + rawBattleRoyale.botCount === 8 &&
+        msg.opponents.length === 7
+          ? Object.freeze({ ...rawBattleRoyale })
+          : null;
       this.currentMatch = {
         matchId: msg.matchId,
         opponents: msg.opponents,
@@ -442,6 +466,9 @@ export class GameService {
         standardLaunchStatus:
           rawStandardMatch === undefined ? 'absent' : standardMatch === null ? 'invalid' : 'valid',
         ...(standardMatch ? { standardMatch } : {}),
+        battleRoyaleLaunchStatus:
+          rawBattleRoyale === undefined ? 'absent' : battleRoyale === null ? 'invalid' : 'valid',
+        ...(battleRoyale ? { battleRoyale } : {}),
         playerTeams: msg.playerTeams,
         practiceKind: msg.practiceKind,
         rumbleCrown: msg.rumbleCrown,

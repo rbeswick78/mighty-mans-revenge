@@ -650,13 +650,19 @@ export class Match implements MatchContext {
     const sel = this.selectionState.get(playerId);
     if (!sel) return;
     if (sel.locked !== null) return;
-    for (const [otherId, otherSel] of this.selectionState) {
-      if (otherId === playerId) continue;
-      if (otherSel.locked === characterId) return;
+    if (this.battleRoyaleLifecycle === null) {
+      for (const [otherId, otherSel] of this.selectionState) {
+        if (otherId === playerId) continue;
+        if (otherSel.locked === characterId) return;
+      }
     }
 
     sel.locked = characterId;
     sel.hovered = characterId;
+
+    // Eight solo slots can exceed the fighter roster. Battle Royale retains
+    // the persisted fighter identity without importing standard draft locks.
+    if (this.battleRoyaleLifecycle !== null) return;
 
     // Auto-snap any other player whose hover collides with the new lock.
     for (const [otherId, otherSel] of this.selectionState) {
