@@ -6,6 +6,8 @@ import {
   type BulletTrail,
   type AxeState,
   type GrenadeState,
+  type RocketState,
+  type WeaponInstance,
   type KillFeedEntry,
   type WeaponId,
   type WeaponDef,
@@ -26,6 +28,7 @@ import {
   raycastAgainstGrid,
   rayIntersectsAABB,
   stepGrenade,
+  applyWeaponRarityDamage,
 } from '@shared/game';
 
 export interface ExplosionResult {
@@ -69,6 +72,12 @@ function generateAxeId(): string {
   return `axe_${Date.now()}_${nextAxeId++}`;
 }
 
+let nextRocketId = 0;
+
+function generateRocketId(): string {
+  return `rocket_${Date.now()}_${nextRocketId++}`;
+}
+
 /**
  * Check line-of-sight between two points using the collision grid.
  * Returns true if there is a clear line of sight (no walls blocking).
@@ -87,6 +96,7 @@ function hasLineOfSight(from: Vec2, to: Vec2, grid: CollisionGrid): boolean {
 export class CombatManager {
   private grenades: GrenadeState[] = [];
   private axes: AxeState[] = [];
+  private rockets: RocketState[] = [];
   /**
    * Axes spawned since the last updateAxes pass. A newly thrown axe sits
    * out its spawn tick unmoved: input processing (which spawns it) and
@@ -97,6 +107,7 @@ export class CombatManager {
    * guarantees every throw renders at least once (plus its landing).
    */
   private justSpawnedAxes = new Set<string>();
+  private justSpawnedRockets = new Set<string>();
 
   getGrenades(): GrenadeState[] {
     return this.grenades;
@@ -118,6 +129,102 @@ export class CombatManager {
 
   getAxes(): AxeState[] {
     return this.axes;
+  }
+
+  getRockets(): RocketState[] {
+    return this.rockets;
+  }
+
+  clearRockets(): void {
+    this.rockets = [];
+    this.justSpawnedRockets.clear();
+  }
+
+  spawnRocket(
+    shooterId: PlayerId,
+    position: Vec2,
+    aimAngle: number,
+    weaponInstance: WeaponInstance,
+  ): RocketState {
+    const projectile = WEAPONS.launcher.projectile;
+    const rocket: RocketState = {
+      id: generateRocketId(),
+      position: { ...position },
+      velocity: vecScale(vecFromAngle(aimAngle), projectile.speed),
+      shooterId,
+      angle: aimAngle,
+      distanceTraveled: 0,
+      weaponInstance,
+    };
+    this.rockets.push(rocket);
+    this.justSpawnedRockets.add(rocket.id);
+    return rocket;
+  }
+
+  /** Advance launcher rounds and return every authoritative impact blast. */
+  updateRockets(
+    dt: number,
+    players: Map<PlayerId, PlayerState>,
+    grid: CollisionGrid,
+    hitboxScale: number = 1,
+    canDamage: CanDamagePlayer = () => true,
+  ): { explosions: ExplosionResult[] } {
+    const explosions: ExplosionResult[] = [];
+    const surviving: RocketState[] = [];
+    const projectile = WEAPONS.launcher.projectile;
+
+    for (const rocket of this.rockets) {
+      if (this.justSpawnedRockets.delete(rocket.id)) {
+        surviving.push(rocket);
+        continue;
+      }
+
+      const remaining = projectile.maxRange - rocket.distanceTraveled;
+      const stepLength = Math.min(Math.hypot(rocket.velocity.x, rocket.velocity.y) * dt, remaining);
+      const direction = vecFromAngle(rocket.angle);
+      const wallHit = raycastAgainstGrid(
+        grid,
+        rocket.position.x,
+        rocket.position.y,
+        rocket.angle,
+        stepLength,
+      );
+      const travelCap = wallHit.hitTile ? wallHit.distance : stepLength;
+      let closest: { player: PlayerState; distance: number } | null = null;
+      for (const [playerId, player] of players) {
+        if (playerId === rocket.shooterId || player.isDead || player.invulnerableTimer > 0)
+          continue;
+        if (!canDamage(rocket.shooterId, playerId)) continue;
+        const hitbox = characterHitbox(player.characterId);
+        const hitDistance = rayIntersectsAABB(
+          rocket.position.x,
+          rocket.position.y,
+          direction.x,
+          direction.y,
+          player.position.x,
+          player.position.y,
+          (hitbox.width / 2) * hitboxScale,
+          (hitbox.height / 2) * hitboxScale,
+        );
+        if (hitDistance === null || hitDistance <= 0 || hitDistance > travelCap) continue;
+        if (!closest || hitDistance < closest.distance) closest = { player, distance: hitDistance };
+      }
+
+      // Keep a wall impact infinitesimally on the approach side so blast LOS
+      // cannot begin inside the solid cell and leak damage through it.
+      const impactDistance =
+        closest?.distance ?? (wallHit.hitTile ? Math.max(0, wallHit.distance - 0.001) : stepLength);
+      rocket.position = vecAdd(rocket.position, vecScale(direction, impactDistance));
+      rocket.distanceTraveled += impactDistance;
+      if (closest || wallHit.hitTile || rocket.distanceTraveled >= projectile.maxRange) {
+        explosions.push(this.applyLauncherExplosion(rocket, players, grid, canDamage));
+      } else {
+        surviving.push(rocket);
+      }
+    }
+
+    this.rockets = surviving;
+    return { explosions };
   }
 
   /** Same overtime contract as clearGrenades — no regulation leftovers. */
@@ -587,6 +694,36 @@ export class CombatManager {
       damages,
       grenadeId: grenade.id,
       throwerId: grenade.throwerId,
+    };
+  }
+
+  private applyLauncherExplosion(
+    rocket: RocketState,
+    players: Map<PlayerId, PlayerState>,
+    grid: CollisionGrid,
+    canDamage: CanDamagePlayer,
+  ): ExplosionResult {
+    const damages: ExplosionResult['damages'] = [];
+    const projectile = WEAPONS.launcher.projectile;
+    for (const [playerId, player] of players) {
+      if (player.isDead || !canDamage(rocket.shooterId, playerId)) continue;
+      const distance = vecDistance(rocket.position, player.position);
+      if (distance > projectile.blastRadius) continue;
+      if (!hasLineOfSight(rocket.position, player.position, grid)) continue;
+      const ordinaryDamage = calculateDamage(distance, WEAPONS.launcher);
+      const rarityDamage = applyWeaponRarityDamage(ordinaryDamage, rocket.weaponInstance.rarity);
+      const result = this.applyDamage(player, rarityDamage, rocket.shooterId, canDamage);
+      damages.push({
+        playerId,
+        damage: result.damageApplied,
+        killed: result.killed,
+      });
+    }
+    return {
+      position: { ...rocket.position },
+      damages,
+      grenadeId: rocket.id,
+      throwerId: rocket.shooterId,
     };
   }
 }

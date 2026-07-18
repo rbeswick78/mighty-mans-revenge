@@ -301,3 +301,11 @@ off/old-server paths, and recovery still require their registered fallbacks.
 Map authoring, larger arenas, future weapon/container/rarity/zone mechanics,
 capability exposure, production rollout, and deployment remain outside this
 disposition.
+
+## Batch 42 production disposition
+
+Batch 42 adds no generated or hand-authored production art and changes no
+source grid, packed atlas, runtime import file, reference, license, prompt,
+generation record, hash, or provenance report. Runtime code consumes existing
+Batch 30 named gun frames and code-native rarity/procedural projectile
+presentation only. No new asset lineage or redistribution obligation is created.

@@ -1,6 +1,8 @@
 import type { PlayerId, Vec2 } from '@shared/types/common.js';
 import type { SerializedPlayerState } from '@shared/types/network.js';
 import type { CharacterId, WeaponId } from '@shared/config/game.js';
+import type { WeaponInstance } from '@shared/types/weapon.js';
+import { normalizeWeaponInstance } from '@shared/utils/weapon-instance.js';
 import type { InterpolatedState } from './types.js';
 
 /** Stop extrapolating if we haven't received an update in this many ms. */
@@ -24,6 +26,7 @@ interface BufferedState {
   armor: number;
   ammo: number;
   weaponId: WeaponId;
+  weaponInstance?: WeaponInstance;
   specialAmmo: number;
   specialReserve: number;
   grenades: number;
@@ -82,6 +85,7 @@ function toInterpolated(s: BufferedState): InterpolatedState {
     armor: s.armor,
     ammo: s.ammo,
     weaponId: s.weaponId,
+    weaponInstance: s.weaponInstance,
     specialAmmo: s.specialAmmo,
     specialReserve: s.specialReserve,
     grenades: s.grenades,
@@ -109,11 +113,7 @@ export class EntityInterpolation {
    * Drops out-of-order arrivals (UDP can reorder packets), keeps a small
    * sliding window of recent states for the interpolator to pick from.
    */
-  pushState(
-    playerId: PlayerId,
-    state: SerializedPlayerState,
-    serverTick: number,
-  ): void {
+  pushState(playerId: PlayerId, state: SerializedPlayerState, serverTick: number): void {
     let buffer = this.buffers.get(playerId);
     if (!buffer) {
       buffer = { states: [], highestTick: -1, tickDedupActive: false };
@@ -142,6 +142,7 @@ export class EntityInterpolation {
       armor: state.armor,
       ammo: state.ammo,
       weaponId: state.weaponId,
+      weaponInstance: normalizeWeaponInstance(state.weaponInstance) ?? undefined,
       specialAmmo: state.specialAmmo,
       specialReserve: state.specialReserve,
       grenades: state.grenades,
@@ -176,10 +177,7 @@ export class EntityInterpolation {
    * behind real-time so typical UDP jitter (±20-30ms) lands inside the
    * buffered window instead of forcing a snap.
    */
-  getInterpolatedState(
-    playerId: PlayerId,
-    renderTime: number,
-  ): InterpolatedState | null {
+  getInterpolatedState(playerId: PlayerId, renderTime: number): InterpolatedState | null {
     const buffer = this.buffers.get(playerId);
     if (!buffer || buffer.states.length === 0) return null;
 

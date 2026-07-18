@@ -47,6 +47,8 @@ import {
   liveReforgedGunArtId,
   reforgedGunPresentationFrame,
 } from '../rendering/reforged-weapon-pickup-contract.js';
+import type { WeaponRarity } from '@shared/types/weapon.js';
+import { weaponRarityPresentation } from './weapon-rarity-presentation.js';
 import { reforgedWeaponPickupAtlasAvailable } from '../rendering/reforged-weapon-pickup-runtime.js';
 
 // Press Start 2P is much wider per glyph than Courier, so the final-minute
@@ -914,7 +916,12 @@ export class HUD {
    *   punch   — label only ("FISTS"); fists have no ammo, and the rifle
    *             ammo row hides too (syncAmmoRowVisibility).
    */
-  updateSpecialWeapon(weaponId: WeaponId, magAmmo: number, reserve: number): void {
+  updateSpecialWeapon(
+    weaponId: WeaponId,
+    magAmmo: number,
+    reserve: number,
+    rarity?: WeaponRarity,
+  ): void {
     this.currentWeaponId = weaponId;
     const modernGun = liveReforgedGunArtId(weaponId);
     this.weaponAmmoIcon?.setVisible(modernGun !== null);
@@ -925,7 +932,14 @@ export class HUD {
     const showLabel = weaponId !== 'rifle';
     this.specialWeaponLabel.setVisible(showLabel);
     if (showLabel) {
-      this.specialWeaponLabel.setText(WEAPONS[weaponId].displayName.toUpperCase());
+      const rarityView = rarity ? weaponRarityPresentation(rarity) : null;
+      this.specialWeaponLabel
+        .setText(
+          rarityView
+            ? `${rarityView.glyph} ${rarityView.label} ${WEAPONS[weaponId].displayName.toUpperCase()}`
+            : WEAPONS[weaponId].displayName.toUpperCase(),
+        )
+        .setColor(rarityView?.color ?? '#ffffff');
     }
 
     if (weaponId === 'shotgun') {
@@ -937,7 +951,12 @@ export class HUD {
       this.specialReserveText.setX(this.shotgunReserveTextX);
       this.specialReserveText.setText(`+${reserve}`);
       this.specialReserveText.setVisible(true);
-    } else if (weaponId === 'pistol') {
+    } else if (
+      weaponId === 'pistol' ||
+      weaponId === 'smg' ||
+      weaponId === 'sniper_rifle' ||
+      weaponId === 'launcher'
+    ) {
       for (let i = 0; i < this.specialShellIcons.length; i++) {
         const icon = this.specialShellIcons[i];
         icon.setVisible(i === 0);

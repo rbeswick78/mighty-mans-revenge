@@ -49,4 +49,41 @@ export interface WeaponDef {
    * Omit for ranged weapons.
    */
   readonly maxRange?: number;
+  /**
+   * Optional authoritative straight-line projectile model. Only the dormant
+   * Battle Royale launcher uses this; established hitscan/melee definitions
+   * omit it and retain their exact behavior.
+   */
+  readonly projectile?: Readonly<{
+    speed: number;
+    maxRange: number;
+    blastRadius: number;
+  }>;
+}
+
+export const BATTLE_ROYALE_GUN_IDS = [
+  'rifle',
+  'pistol',
+  'shotgun',
+  'smg',
+  'sniper_rifle',
+  'launcher',
+] as const;
+export type BattleRoyaleGunId = (typeof BATTLE_ROYALE_GUN_IDS)[number];
+
+export const WEAPON_RARITIES = [
+  'common',
+  'uncommon',
+  'rare',
+  'epic',
+  'legendary',
+  'mythical',
+] as const;
+export type WeaponRarity = (typeof WEAPON_RARITIES)[number];
+
+/** Server-authored identity carried by one Battle Royale gun. */
+export interface WeaponInstance {
+  readonly instanceId: string;
+  readonly weaponId: BattleRoyaleGunId;
+  readonly rarity: WeaponRarity;
 }

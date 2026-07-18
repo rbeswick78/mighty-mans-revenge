@@ -406,3 +406,18 @@ server suppresses entry. Production remains on approved Batch 33 with
 Batch 42 may add dormant weapon-instance and rarity foundations under the user's
 standing development authorization, but no capability advertisement, rollout,
 deployment, restart, or live smoke is authorized.
+
+## Batch 42 weapon-instance disposition
+
+Batch 42 does not add or expose a capability. Its weapon instances are usable
+only inside a server-authored `battle_royale` lifecycle that was itself reached
+through literal `battleRoyale:true`. The server rejects an incoherent or
+mismatched instance and all three new guns outside that lifecycle. Rarity and
+launcher projectiles arrive only as optional authoritative snapshot fields;
+standard JSON drops them when undefined, old-server omission clears them, and
+malformed client input cannot manufacture them.
+
+This is dormant support code. `battleRoyale` and every Reforged capability
+remain default false and unexposed. Batch 43 owns inventory; later batches own
+loot, arena, zones, bot AI, spectating, records, and hardening. Production
+remains on approved Batch 33, and no deployment, restart, or live smoke is authorized.

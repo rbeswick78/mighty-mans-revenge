@@ -299,6 +299,20 @@ incompatible states retain their existing assets; no legacy file is removed or
 stops loading. Batch 25 goldens and complete source/license/generation lineage
 remain non-runtime references.
 
+## Batch 42 runtime-consumer disposition
+
+Batch 42 creates no pixel or pipeline output. It consumes existing named Batch
+30 SMG, sniper-rifle, and launcher frames for server-authored weapon IDs and
+uses bounded procedural geometry for authoritative launcher positions. Rarity
+labels/shapes/colors are code-native presentation values. No manifest, source
+grid, packed PNG, runtime import JSON, hash, provenance report, padding,
+extrusion, registration, fallback, or byte budget changes.
+
+Weapon instances do not authorize asset loading or capability exposure.
+Existing atomic `modernArt` availability remains the only modern atlas gate;
+legacy presentation stays registered, and Batch 43 or later owns inventory,
+drops, containers, auras, and zone consumers.
+
 ## Scope boundary
 
 Batch 26 owns this contract and tooling; Batch 27 owns the completed modern UI

@@ -139,6 +139,61 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
     expect(manager.getLocalPlayerState()?.characterId).toBe('bubba');
   });
 
+  it('projects valid Battle Royale instances and rockets, then clears old-server omissions', () => {
+    const instance = {
+      instanceId: 'weapon:network:42',
+      weaponId: 'launcher',
+      rarity: 'epic',
+    } as const;
+    const fired: unknown[] = [];
+    manager.on('rocketFired', (rocket) => fired.push(rocket));
+    const state = makeGameState(
+      [
+        makeSerialized({
+          weaponId: 'launcher',
+          weaponInstance: instance,
+          specialAmmo: 1,
+        }),
+      ],
+      {
+        rockets: [
+          {
+            id: 'rocket-42',
+            position: { x: 100, y: 100 },
+            velocity: { x: 420, y: 0 },
+            shooterId: LOCAL_ID,
+            angle: 0,
+            distanceTraveled: 0,
+            weaponInstance: instance,
+          },
+        ],
+      },
+    );
+    deliver(state);
+    expect(manager.getLocalPlayerState()?.weaponInstance).toEqual(instance);
+    expect(manager.getActiveRockets()).toHaveLength(1);
+    expect(fired).toEqual([{ shooterId: LOCAL_ID, position: { x: 100, y: 100 } }]);
+
+    deliver(state);
+    expect(fired).toHaveLength(1);
+
+    deliver(makeGameState([makeSerialized()]));
+    expect(manager.getLocalPlayerState()?.weaponInstance).toBeUndefined();
+    expect(manager.getActiveRockets()).toEqual([]);
+  });
+
+  it('fails malformed additive weapon instances closed', () => {
+    const malformed = makeGameState([
+      {
+        ...makeSerialized({ weaponId: 'smg' }),
+        weaponInstance: { instanceId: 'bad space', weaponId: 'smg', rarity: 'ultra' },
+      } as unknown as SerializedPlayerState,
+    ]);
+    deliver(malformed);
+    expect(manager.getLocalPlayerState()?.weaponId).toBe('smg');
+    expect(manager.getLocalPlayerState()?.weaponInstance).toBeUndefined();
+  });
+
   it('keeps every capability disabled when an old server omits the advertisement', () => {
     expect(manager.getServerCapabilities()).toEqual({
       newShell: false,

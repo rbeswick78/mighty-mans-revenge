@@ -1,7 +1,7 @@
 import type { PlayerId, Vec2 } from '@shared/types/common.js';
 import type { CollisionGrid } from '@shared/types/map.js';
 import type { PlayerInput, PlayerState } from '@shared/types/player.js';
-import type { AxeState, GrenadeState, PunchEvent } from '@shared/types/projectile.js';
+import type { AxeState, GrenadeState, PunchEvent, RocketState } from '@shared/types/projectile.js';
 import type { PickupState } from '@shared/types/pickup.js';
 import type {
   KillConfirmedTagState,
@@ -36,6 +36,7 @@ import {
   type TauntId,
 } from '@shared/config/game.js';
 import { playerMovementModifiers } from '@shared/utils/event-modifiers.js';
+import { normalizeWeaponInstance } from '@shared/utils/weapon-instance.js';
 import { listMapNames } from '@shared/maps/registry.js';
 import type { MatchIntent } from '@shared/matchmaking/match-intent.js';
 import { isPartyState, type PartyState } from '@shared/matchmaking/party.js';
@@ -76,6 +77,7 @@ type EventName =
   | 'grenadeExploded'
   | 'axeThrown'
   | 'axeResolved'
+  | 'rocketFired'
   | 'punchSwung'
   | 'localCorrection'
   | 'eventWarning'
@@ -133,6 +135,7 @@ export class NetworkManager {
    */
   private latestAxes: AxeState[] = [];
   private lastAxeStates = new Map<string, { position: Vec2; angle: number }>();
+  private latestRockets: RocketState[] = [];
 
   /** Most recent pickups from server gameState. Scene polls for rendering. */
   private latestPickups: PickupState[] = [];
@@ -257,6 +260,7 @@ export class NetworkManager {
     this.lastGrenadePositions.clear();
     this.latestAxes = [];
     this.lastAxeStates.clear();
+    this.latestRockets = [];
     this.latestPickups = [];
     this.latestConfirmedTags = [];
     this._coreRunState = null;
@@ -602,6 +606,10 @@ export class NetworkManager {
     return this.latestAxes;
   }
 
+  getActiveRockets(): RocketState[] {
+    return this.latestRockets;
+  }
+
   /** Most recent pickups from the server, for rendering. */
   getPickups(): PickupState[] {
     return this.latestPickups;
@@ -919,6 +927,16 @@ export class NetworkManager {
       }
     }
     this.latestAxes = msg.axes ?? [];
+    const previousRocketIds = new Set(this.latestRockets.map((rocket) => rocket.id));
+    for (const rocket of msg.rockets ?? []) {
+      if (!previousRocketIds.has(rocket.id)) {
+        this.emit('rocketFired', {
+          shooterId: rocket.shooterId,
+          position: { ...rocket.position },
+        });
+      }
+    }
+    this.latestRockets = msg.rockets ?? [];
     this.latestPickups = msg.pickups;
     this.latestConfirmedTags = msg.confirmedTags ?? [];
     this._coreRunState = msg.coreRun ?? null;
@@ -1055,6 +1073,7 @@ export class NetworkManager {
       // Weapon slot is server-authoritative (auto-equip on pickup,
       // auto-revert on empty) — the client never predicts it.
       weaponId: serverState.weaponId,
+      weaponInstance: normalizeWeaponInstance(serverState.weaponInstance) ?? undefined,
       specialAmmo: serverState.specialAmmo,
       specialReserve: serverState.specialReserve,
       grenades: serverState.grenades,
@@ -1113,6 +1132,7 @@ export class NetworkManager {
       isReloading: s.isReloading,
       reloadTimer: 0,
       weaponId: s.weaponId,
+      weaponInstance: normalizeWeaponInstance(s.weaponInstance) ?? undefined,
       specialAmmo: s.specialAmmo,
       specialReserve: s.specialReserve,
       grenades: s.grenades,

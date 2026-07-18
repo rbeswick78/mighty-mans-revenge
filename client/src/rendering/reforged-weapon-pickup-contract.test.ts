@@ -51,8 +51,11 @@ describe('Reforged weapon and pickup contract', () => {
       'sniper-rifle',
       'launcher',
     ]);
-    expect(REFORGED_FUTURE_GUN_ART_IDS).toEqual(['smg', 'sniper-rifle', 'launcher']);
+    expect(REFORGED_FUTURE_GUN_ART_IDS).toEqual([]);
     expect(liveReforgedGunArtId('rifle')).toBe('rifle');
+    expect(liveReforgedGunArtId('smg')).toBe('smg');
+    expect(liveReforgedGunArtId('sniper_rifle')).toBe('sniper-rifle');
+    expect(liveReforgedGunArtId('launcher')).toBe('launcher');
     expect(liveReforgedGunArtId('bat')).toBeNull();
     expect(liveReforgedGunArtId('punch')).toBeNull();
     expect(shouldUseReforgedGunArt('shotgun', true, true)).toBe(true);

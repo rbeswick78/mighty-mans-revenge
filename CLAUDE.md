@@ -964,3 +964,22 @@ authorized sequential plan work beginning with Batch 42 while deferring human
 involvement, but has not authorized any capability exposure, deployment,
 production restart, or live smoke. Production remains on approved Batch 33 with
 every capability false.
+
+## Battle Royale Weapon-Instance Contract
+
+Batch 42 defines the six Battle Royale gun identities and six rarity tiers in
+shared immutable configuration. A `WeaponInstance` is valid only when its
+bounded instance ID, gun ID, and rarity all normalize coherently. Rarity scales
+the server's ordinary falloff result; it never replaces shared damage or lets a
+client author damage. SMG burst cadence, sniper cadence/range, and launcher
+flight/collision/LOS/blast damage all live in the existing authoritative Match
+and CombatManager tick at 20 Hz.
+
+Equipped instances and launcher projectiles are optional snapshot additions.
+Standard snapshots omit them, old-server omission clears them, and malformed
+instances fail closed. The client may render server-owned rarity and projectile
+state but may not infer collision, hits, damage, or rarity. The three new guns
+must remain inaccessible to every standard format; standard Weapon Roulette,
+pickups, stats/persistence, and snapshot bytes are protected compatibility
+contracts. Batch 43 owns inventory and dropped-weapon semantics. Every Reforged
+capability remains default false and unexposed, and Batch 42 authorizes no rollout.

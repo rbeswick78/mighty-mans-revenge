@@ -444,3 +444,17 @@ Animated gates, scavenger caches, bat/punch, and incompatible carried-object
 states retain explicit legacy presentation. Rarity/zone and future weapon/
 container art remain dormant. If any completed atlas is unavailable, the whole
 journey returns to legacy/procedural presentation rather than mixing styles.
+
+## Batch 42 rarity and weapon mapping
+
+The locked six rarity identities now label server-authored Battle Royale weapon
+instances with distinct compact shapes, names, and colors. Existing Batch 30
+SMG, sniper-rifle, and launcher frames may represent those authoritative gun
+IDs under the established coherent modern-art path; launcher flight uses a
+small rarity-ringed procedural projection. These are presentation consumers,
+not loot, inventory, collision, damage, or rarity authority.
+
+No style-bible pixel, atlas, fallback, frame registration, or quality budget
+changes in Batch 42. Standard weapons retain their established presentation,
+and absent/malformed instance state has no rarity treatment. Containers, aura
+comparison, zone art, dropped weapons, and inventory presentation remain later work.

@@ -514,3 +514,26 @@ journeys on desktop Chromium, desktop Firefox, and mobile landscape passed. The
 server baseline retained configured/rolling 20 Hz, its 50 ms budget, synthetic
 four-player mean/p95/p99/max work of 0.018/0.028/0.156/1.118 ms, and unchanged
 2,481/3,762-byte standard snapshots.
+
+### Batch 42 Battle Royale weapon baseline
+
+Battle Royale now has an exact six-gun instance vocabulary: rifle, pistol,
+shotgun, SMG, sniper rifle, and launcher. Common through mythical rarity uses
+shared deterministic weights and multipliers, with ordinary distance falloff
+resolved first. Instance IDs and gun/rarity coherence normalize fail closed.
+The server alone owns new-gun access, burst/cadence/ammo, launcher flight,
+collision, line of sight, blast damage, world interaction, and kill attribution.
+
+The client consumes optional equipped-instance and rocket arrays as projection
+state. It displays the six locked rarity label/shape/color identities and
+server positions, clears state when an old server omits it, and never infers a
+hit or rarity. Standard formats cannot fire the new guns even if incoherent
+state is injected. Their weapon registry, Weapon Roulette order, pickups,
+damage, modes, mutators, stats/persistence, and exact active snapshot sizes are
+unchanged.
+
+The complete 148-file/1,684-test unit matrix, typecheck, lint, all builds, and
+three-project focused browser proof passed. The authoritative baseline retained
+configured/rolling 20 Hz, the 50 ms budget, synthetic four-player
+mean/p95/p99/max work of 0.023/0.043/0.211/2.095 ms, and exact 2,481/3,762-byte
+standard snapshots. No capability default, production state, or deployment changed.

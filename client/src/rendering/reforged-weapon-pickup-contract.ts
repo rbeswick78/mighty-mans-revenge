@@ -21,7 +21,7 @@ export const REFORGED_GUN_ART_IDS = [
   'launcher',
 ] as const;
 export type ReforgedGunArtId = (typeof REFORGED_GUN_ART_IDS)[number];
-export const REFORGED_FUTURE_GUN_ART_IDS = ['smg', 'sniper-rifle', 'launcher'] as const;
+export const REFORGED_FUTURE_GUN_ART_IDS = [] as const;
 export type ReforgedRarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'mythical';
 export type ReforgedWeaponPickupQuality = 'full' | 'reduced';
 
@@ -79,7 +79,17 @@ export function reforgedWeaponPickupFrameName(assetId: string, frameIndex: numbe
 }
 
 export function liveReforgedGunArtId(weaponId: WeaponId): ReforgedGunArtId | null {
-  return weaponId === 'rifle' || weaponId === 'pistol' || weaponId === 'shotgun' ? weaponId : null;
+  if (weaponId === 'sniper_rifle') return 'sniper-rifle';
+  if (
+    weaponId === 'rifle' ||
+    weaponId === 'pistol' ||
+    weaponId === 'shotgun' ||
+    weaponId === 'smg' ||
+    weaponId === 'launcher'
+  ) {
+    return weaponId;
+  }
+  return null;
 }
 
 export function shouldUseReforgedGunArt(

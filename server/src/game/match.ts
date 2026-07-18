@@ -37,6 +37,7 @@ import {
   radiationStormRadius,
   isOutsideRadiationStorm,
   isTauntId,
+  applyWeaponRarityDamage,
 } from '@shared/game';
 import type {
   PlayerId,
@@ -50,6 +51,7 @@ import type {
   PunchEvent,
   AxeState,
   GrenadeState,
+  RocketState,
   GauntletBoonId,
   MutatorId,
   CharacterId,
@@ -85,6 +87,7 @@ import { RumbleAssistTracker } from './rumble-assist-tracker.js';
 import { BattleRoyaleLifecycle } from './battle-royale-lifecycle.js';
 
 interface PendingBurst {
+  weaponId: 'rifle' | 'smg';
   shotsRemaining: number;
   /** Seconds until the next shot in the burst fires. */
   nextShotIn: number;
@@ -822,6 +825,7 @@ export class Match implements MatchContext {
     this.fireCooldownTimers.delete(victimId);
     if (victim && victim.weaponId !== 'rifle') {
       victim.weaponId = 'rifle';
+      victim.weaponInstance = undefined;
       victim.specialAmmo = 0;
       victim.specialReserve = 0;
     }
@@ -960,6 +964,7 @@ export class Match implements MatchContext {
     this.fireCooldownTimers.clear();
     this.combatManager.clearGrenades();
     this.combatManager.clearAxes();
+    this.combatManager.clearRockets();
     this.pickupManager.removeScavengerRushDrops();
     this._tickOvertimeStart = { overtimeEndsInMs: OVERTIME.DURATION * 1000 };
     logger.info({ matchId: this.matchId }, 'Match tied — entering sudden-death overtime');
@@ -1295,6 +1300,11 @@ export class Match implements MatchContext {
     return this.combatManager.getAxes();
   }
 
+  /** Battle Royale launcher rounds in flight; always empty in standard formats. */
+  getActiveRockets(): RocketState[] {
+    return this.combatManager.getRockets();
+  }
+
   /** Mutators currently active, in activation order (empty before the first). */
   get activeMutators(): readonly MutatorId[] {
     return this._activeMutators;
@@ -1523,7 +1533,9 @@ export class Match implements MatchContext {
         const gunsDisabled =
           grenadesOnly || (this.gameMode.areGunsDisabled?.(this, player) ?? false);
         if (!gunsDisabled && input.firePressed) {
-          if (player.weaponId === 'shotgun') {
+          if (player.weaponId === 'launcher') {
+            this.tryFireLauncher(player, input, infiniteAmmo);
+          } else if (player.weaponId === 'shotgun') {
             this.tryFireShotgun(player, input, grid, infiniteAmmo);
           } else if (player.weaponId === 'punch' || player.weaponId === 'bat') {
             this.tryMelee(player, input, grid, player.weaponId, infiniteAmmo);
@@ -1631,6 +1643,18 @@ export class Match implements MatchContext {
       if (hit.killed) {
         this.onKill(hit.throwerId, hit.victimId, 'axe');
       }
+    }
+
+    const { explosions: rocketExplosions } = this.combatManager.updateRockets(
+      dt,
+      this.players,
+      grid,
+      this.hitValidationScale(),
+      this.canDamagePlayer,
+    );
+    for (const explosion of rocketExplosions) {
+      this.tickBarrelExplosions.push({ ...explosion.position });
+      this.recordExplosion(explosion, 'gun');
     }
 
     // Reload timers — short-circuited under infinite_ammo so the mag is
@@ -1825,23 +1849,25 @@ export class Match implements MatchContext {
       burst.nextShotIn -= dt;
       // Fire all shots whose timer has elapsed (handles slow ticks gracefully).
       while (burst.nextShotIn <= 0 && burst.shotsRemaining > 0) {
-        if (!infiniteAmmo && player.ammo <= 0) {
+        const availableAmmo = burst.weaponId === 'rifle' ? player.ammo : player.specialAmmo;
+        if (!infiniteAmmo && availableAmmo <= 0) {
           // Out of ammo mid-burst: drop remaining shots and start a reload.
           if (!player.isReloading) {
             player.isReloading = true;
-            player.reloadTimer = WEAPONS.rifle.reloadTime;
+            player.reloadTimer = WEAPONS[burst.weaponId].reloadTime;
           }
           burst.shotsRemaining = 0;
           break;
         }
 
-        this.fireOneShot(playerId, burst.lockedAngle, grid);
+        this.fireOneShot(playerId, burst.lockedAngle, grid, burst.weaponId);
         burst.shotsRemaining -= 1;
-        burst.nextShotIn += WEAPONS.rifle.burstInterval;
+        burst.nextShotIn += WEAPONS[burst.weaponId].burstInterval;
       }
 
       if (burst.shotsRemaining <= 0) {
         this.pendingBursts.delete(playerId);
+        this.finishRangedTrigger(player, burst.weaponId);
       }
     }
   }
@@ -1853,6 +1879,23 @@ export class Match implements MatchContext {
    */
   private usesSpecialAmmo(weaponId: WeaponId): boolean {
     return weaponId !== 'rifle' && WEAPONS[weaponId].magazineSize > 0;
+  }
+
+  private hasCoherentBattleRoyaleInstance(player: PlayerState, weaponId: WeaponId): boolean {
+    return (
+      this.battleRoyaleLifecycle !== null &&
+      player.weaponId === weaponId &&
+      player.weaponInstance?.weaponId === weaponId
+    );
+  }
+
+  private damageForWeaponInstance(
+    player: PlayerState,
+    weaponId: WeaponId,
+    ordinaryDamage: number,
+  ): number {
+    if (!this.hasCoherentBattleRoyaleInstance(player, weaponId)) return ordinaryDamage;
+    return applyWeaponRarityDamage(ordinaryDamage, player.weaponInstance!.rarity);
   }
 
   /**
@@ -1869,7 +1912,18 @@ export class Match implements MatchContext {
     grid: ReturnType<MapManager['getCollisionGrid']>,
   ): void {
     const weaponId = player.weaponId;
-    if (weaponId !== 'rifle' && weaponId !== 'pistol') return;
+    if (
+      weaponId !== 'rifle' &&
+      weaponId !== 'pistol' &&
+      weaponId !== 'smg' &&
+      weaponId !== 'sniper_rifle'
+    )
+      return;
+    if (
+      (weaponId === 'smg' || weaponId === 'sniper_rifle') &&
+      !this.hasCoherentBattleRoyaleInstance(player, weaponId)
+    )
+      return;
     const weapon = WEAPONS[weaponId];
 
     const coolingDown = (this.fireCooldownTimers.get(player.id) ?? 0) > 0;
@@ -1881,7 +1935,9 @@ export class Match implements MatchContext {
 
     if (weapon.burstSize > 1) {
       // Queue the remaining shots of the burst (rifle).
+      if (weaponId !== 'rifle' && weaponId !== 'smg') return;
       this.pendingBursts.set(player.id, {
+        weaponId,
         shotsRemaining: weapon.burstSize - 1,
         nextShotIn: weapon.burstInterval,
         lockedAngle: input.aimAngle,
@@ -1889,8 +1945,15 @@ export class Match implements MatchContext {
       return;
     }
 
-    // Semi-auto (pistol) post-shot handling, mirroring the shotgun.
-    if (weaponId !== 'pistol') return;
+    this.finishRangedTrigger(player, weaponId);
+  }
+
+  private finishRangedTrigger(
+    player: PlayerState,
+    weaponId: 'rifle' | 'pistol' | 'smg' | 'sniper_rifle',
+  ): void {
+    if (weaponId === 'rifle') return;
+    const weapon = WEAPONS[weaponId];
     if (player.specialAmmo > 0) {
       // Rounds left in the mag — pace the next trigger pull.
       this.fireCooldownTimers.set(player.id, weapon.fireCooldown);
@@ -1900,7 +1963,32 @@ export class Match implements MatchContext {
       player.isReloading = true;
       player.reloadTimer = weapon.reloadTime;
     } else if (!this.mutatorActive('infinite_ammo') && !this.mutatorActive('weapon_roulette')) {
-      // Completely dry: the pistol vanishes and the rifle comes back out.
+      // Completely dry: the special gun vanishes and the rifle comes back out.
+      this.revertToRifle(player);
+    }
+  }
+
+  private tryFireLauncher(player: PlayerState, input: PlayerInput, infiniteAmmo: boolean): void {
+    if (!this.hasCoherentBattleRoyaleInstance(player, 'launcher')) return;
+    const launcher = WEAPONS.launcher;
+    const coolingDown = (this.fireCooldownTimers.get(player.id) ?? 0) > 0;
+    if (coolingDown || player.isReloading || player.specialAmmo <= 0) return;
+
+    this.combatManager.spawnRocket(
+      player.id,
+      player.position,
+      input.aimAngle,
+      player.weaponInstance!,
+    );
+    this.stats.recordShot(player.id);
+    if (!infiniteAmmo) player.specialAmmo = Math.max(0, player.specialAmmo - 1);
+
+    if (player.specialAmmo > 0) {
+      this.fireCooldownTimers.set(player.id, launcher.fireCooldown);
+    } else if (player.specialReserve > 0) {
+      player.isReloading = true;
+      player.reloadTimer = launcher.reloadTime;
+    } else if (!this.mutatorActive('weapon_roulette')) {
       this.revertToRifle(player);
     }
   }
@@ -1916,7 +2004,7 @@ export class Match implements MatchContext {
     playerId: PlayerId,
     aimAngle: number,
     grid: ReturnType<MapManager['getCollisionGrid']>,
-    weaponId: 'rifle' | 'pistol' = 'rifle',
+    weaponId: 'rifle' | 'pistol' | 'smg' | 'sniper_rifle' = 'rifle',
   ): void {
     const player = this.players.get(playerId);
     if (!player) return;
@@ -1954,9 +2042,10 @@ export class Match implements MatchContext {
     if (shot.hit && shot.victimId && shot.damage !== undefined) {
       const victim = this.players.get(shot.victimId);
       if (victim) {
-        const damage =
+        const modeDamage =
           this.gameMode.damageForWeaponHit?.(this, player, victim, weaponId, shot.damage) ??
           shot.damage;
+        const damage = this.damageForWeaponInstance(player, weaponId, modeDamage);
         const result = this.combatManager.applyDamage(
           victim,
           damage,
@@ -1970,7 +2059,7 @@ export class Match implements MatchContext {
         this.recordAttributedDamage(playerId, shot.victimId, result.damageApplied);
         this.applyVampireHeal(playerId, shot.victimId, result.damageApplied);
         if (result.killed && result.entry) {
-          this.onKill(playerId, shot.victimId, weaponId === 'rifle' ? 'gun' : weaponId);
+          this.onKill(playerId, shot.victimId, weaponId === 'pistol' ? 'pistol' : 'gun');
         }
       }
     } else if (shot.hitTile) {
@@ -2134,7 +2223,7 @@ export class Match implements MatchContext {
       if (!victim || victim.isDead) continue;
       const result = this.combatManager.applyDamage(
         victim,
-        shot.damage,
+        this.damageForWeaponInstance(player, 'shotgun', shot.damage),
         player.id,
         this.canDamagePlayer,
       );
@@ -2186,6 +2275,7 @@ export class Match implements MatchContext {
    */
   private revertToRifle(player: PlayerState): void {
     player.weaponId = 'rifle';
+    player.weaponInstance = undefined;
     player.specialAmmo = 0;
     player.specialReserve = 0;
     this.fireCooldownTimers.delete(player.id);
@@ -2253,6 +2343,7 @@ export class Match implements MatchContext {
             this.spawnLastLaughBomb(victim);
             this.dropPowerWeapon(victim);
             victim.weaponId = 'rifle';
+            victim.weaponInstance = undefined;
             victim.specialAmmo = 0;
             victim.specialReserve = 0;
           }
@@ -2433,6 +2524,7 @@ export class Match implements MatchContext {
     player.reloadTimer = 0;
     // Death drops the special weapon — you respawn on the rifle.
     player.weaponId = 'rifle';
+    player.weaponInstance = undefined;
     player.specialAmmo = 0;
     player.specialReserve = 0;
     this.fireCooldownTimers.delete(player.id);

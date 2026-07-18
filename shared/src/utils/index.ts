@@ -13,3 +13,4 @@ export * from './gun-game.js';
 export * from './radiation-storm.js';
 export * from './practice-gauntlet.js';
 export * from './mutator-compatibility.js';
+export * from './weapon-instance.js';

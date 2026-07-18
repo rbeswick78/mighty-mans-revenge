@@ -28,6 +28,7 @@ import { ConfirmedTagRenderer } from '../rendering/confirmed-tag-renderer.js';
 import { CoreRunRenderer } from '../rendering/core-run-renderer.js';
 import { GrenadeRenderer } from '../rendering/grenade-renderer.js';
 import { AxeRenderer } from '../rendering/axe-renderer.js';
+import { RocketRenderer } from '../rendering/rocket-renderer.js';
 import { LightingRenderer } from '../rendering/lighting-renderer.js';
 import { KillJuice } from '../rendering/kill-juice.js';
 import { HealFlash } from '../rendering/heal-flash.js';
@@ -168,6 +169,7 @@ export class GameScene extends Phaser.Scene {
   private minimapRenderer: MinimapRenderer | null = null;
   private grenadeRenderer: GrenadeRenderer | null = null;
   private axeRenderer: AxeRenderer | null = null;
+  private rocketRenderer: RocketRenderer | null = null;
   private lightingRenderer: LightingRenderer | null = null;
   private killJuice: KillJuice | null = null;
   private healFlash: HealFlash | null = null;
@@ -275,6 +277,7 @@ export class GameScene extends Phaser.Scene {
   private onGrenadeThrown: ((pos: Vec2) => void) | null = null;
   private onGrenadeExploded: ((pos: Vec2) => void) | null = null;
   private onAxeThrown: ((pos: Vec2) => void) | null = null;
+  private onRocketFired: ((payload: { shooterId: PlayerId; position: Vec2 }) => void) | null = null;
   private onAxeResolved: ((payload: { position: Vec2; angle: number }) => void) | null = null;
   private onPunchSwung: ((punch: PunchEvent) => void) | null = null;
   private onLocalCorrection: ((correction: LocalCorrection) => void) | null = null;
@@ -420,6 +423,7 @@ export class GameScene extends Phaser.Scene {
     this.scrapstormRenderer = new ScrapstormRenderer(this, this.worldRenderPlan.viewportResource);
     this.grenadeRenderer = new GrenadeRenderer(this);
     this.axeRenderer = new AxeRenderer(this);
+    this.rocketRenderer = new RocketRenderer(this);
     this.lightingRenderer = new LightingRenderer(
       this,
       this.gameplayCoordinates,
@@ -892,6 +896,7 @@ export class GameScene extends Phaser.Scene {
           currentLocalState.weaponId,
           currentLocalState.specialAmmo,
           currentLocalState.specialReserve,
+          currentLocalState.weaponInstance?.rarity,
         );
         this.hud.updateGrenadeStatus(
           networkManager.hasActiveGrenadeFor(playerId),
@@ -1039,6 +1044,7 @@ export class GameScene extends Phaser.Scene {
     if (this.axeRenderer) {
       this.axeRenderer.updateAxes(networkManager.getActiveAxes());
     }
+    this.rocketRenderer?.updateRockets(networkManager.getActiveRockets());
 
     // KOTH hill zone overlay (draws nothing when the snapshot carries no
     // hill state). Runs outside the local-player block so the hill stays
@@ -1942,6 +1948,22 @@ export class GameScene extends Phaser.Scene {
       }
     };
 
+    this.onRocketFired = (payload: { shooterId: PlayerId; position: Vec2 }) => {
+      this.playerManager?.getRenderer(payload.shooterId)?.playShootAnimation();
+      const audio = AudioManager.getInstance();
+      const localState = this.gameService.getNetworkManager().getLocalPlayerState();
+      if (audio && localState) {
+        audio.playAtPosition(
+          'gunshot',
+          payload.position.x,
+          payload.position.y,
+          localState.position.x,
+          localState.position.y,
+          { rate: 0.42, detune: -400 },
+        );
+      }
+    };
+
     // Punch swings ride the gameState message (message-granularity, like
     // the axe events) — one per swing, local and remote punchers alike.
     // The swing drives the puncher's body-level attack anim; melee has no
@@ -2170,6 +2192,7 @@ export class GameScene extends Phaser.Scene {
     this.gameService.on('grenadeExploded', this.onGrenadeExploded);
     this.gameService.on('axeThrown', this.onAxeThrown);
     this.gameService.on('axeResolved', this.onAxeResolved);
+    this.gameService.on('rocketFired', this.onRocketFired);
     this.gameService.on('punchSwung', this.onPunchSwung);
     this.gameService.on('localCorrection', this.onLocalCorrection);
     this.gameService.on('eventWarning', this.onEventWarning);
@@ -2306,6 +2329,10 @@ export class GameScene extends Phaser.Scene {
     if (this.onAxeThrown) {
       this.gameService.off('axeThrown', this.onAxeThrown);
       this.onAxeThrown = null;
+    }
+    if (this.onRocketFired) {
+      this.gameService.off('rocketFired', this.onRocketFired);
+      this.onRocketFired = null;
     }
     if (this.onAxeResolved) {
       this.gameService.off('axeResolved', this.onAxeResolved);
@@ -2447,6 +2474,10 @@ export class GameScene extends Phaser.Scene {
     if (this.axeRenderer) {
       this.axeRenderer.destroy();
       this.axeRenderer = null;
+    }
+    if (this.rocketRenderer) {
+      this.rocketRenderer.destroy();
+      this.rocketRenderer = null;
     }
     if (this.grenadeRenderer) {
       this.grenadeRenderer.destroy();

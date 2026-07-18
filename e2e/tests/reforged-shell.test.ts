@@ -918,6 +918,179 @@ test('Battle Royale entry projects the authoritative eight-slot wait and direct 
   await waitForActiveScene(page, 'GameScene');
 });
 
+test('Battle Royale projects authoritative rarity and launcher flight into the scene', async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    !shellAdvertised || !battleRoyaleAdvertised,
+    'Run with CAPABILITY_NEW_SHELL=true and CAPABILITY_BATTLE_ROYALE=true.',
+  );
+  test.setTimeout(60_000);
+  await page.addInitScript(() => {
+    localStorage.setItem('mmr_fighter_selection', 'rook');
+    localStorage.setItem('mmr_nickname', 'Rarity42');
+  });
+  await page.goto('/');
+  const liveChromium = testInfo.project.name === 'desktop-chromium';
+  if (!liveChromium) await stageNonChromiumShell(page, `battle-weapon-${testInfo.project.name}`);
+  await waitForActiveScene(page, 'ReforgedShellScene');
+
+  const localId = await page.evaluate(() => {
+    const shell = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'ReforgedShellScene',
+    ) as unknown as {
+      gameService: {
+        getNetworkManager(): {
+          getPlayerId(): string | null;
+          handleMessage(message: unknown): void;
+        };
+      };
+    };
+    const manager = shell.gameService.getNetworkManager();
+    const playerId = manager.getPlayerId();
+    if (!playerId) throw new Error('missing local Battle Royale player');
+    manager.handleMessage({
+      type: 'server:matchFound',
+      matchId: 'battle-weapon-42',
+      opponents: Array.from({ length: 7 }, (_, index) => ({
+        id: `battle-weapon-opponent-${index}`,
+        nickname: `Opponent${index}`,
+      })),
+      mapName: 'Wasteland Outpost',
+      gameMode: 'deathmatch',
+      matchKind: 'battle_royale',
+      battleRoyale: { participantCount: 8, humanCount: 1, botCount: 7 },
+    });
+    return playerId;
+  });
+  await waitForActiveScene(page, 'GameScene');
+
+  await page.evaluate((playerId) => {
+    const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'GameScene',
+    ) as unknown as {
+      gameService: { getNetworkManager(): { handleMessage(message: unknown): void } };
+    };
+    const instance = {
+      instanceId: 'weapon:browser:42',
+      weaponId: 'launcher',
+      rarity: 'epic',
+    };
+    scene.gameService.getNetworkManager().handleMessage({
+      type: 'server:gameState',
+      tick: 42,
+      phase: 'active',
+      countdownTimer: 0,
+      matchTimer: 120,
+      players: [
+        {
+          id: playerId,
+          characterId: 'rook',
+          position: { x: 320, y: 256 },
+          velocity: { x: 0, y: 0 },
+          aimAngle: 0,
+          health: 100,
+          maxHealth: 100,
+          armor: 0,
+          ammo: 30,
+          weaponId: 'launcher',
+          weaponInstance: instance,
+          specialAmmo: 1,
+          specialReserve: 2,
+          grenades: 3,
+          isReloading: false,
+          isSprinting: false,
+          stamina: 3,
+          isDead: false,
+          respawnTimer: 0,
+          invulnerableTimer: 0,
+          lastProcessedInput: 0,
+          score: 0,
+          deaths: 0,
+          nickname: 'Rarity42',
+          abilityActiveSeconds: 0,
+          abilityCooldownSeconds: 0,
+          frozenTimer: 0,
+          secondWindTimer: 0,
+        },
+      ],
+      grenades: [],
+      axes: [],
+      rockets: [
+        {
+          id: 'rocket-browser-42',
+          position: { x: 352, y: 256 },
+          velocity: { x: 420, y: 0 },
+          shooterId: playerId,
+          angle: 0,
+          distanceTraveled: 32,
+          weaponInstance: instance,
+        },
+      ],
+      bulletTrails: [],
+      barrelExplosions: [],
+      contract: {
+        id: 'hot_shot',
+        title: 'HOT SHOT',
+        objective: 'LAND 8 ATTACKS',
+        target: 8,
+        players: [],
+      },
+      punches: [],
+      pickups: [],
+      activeMutators: [],
+      isOvertime: false,
+    });
+  }, localId);
+
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+          'GameScene',
+        ) as unknown as {
+          gameService: {
+            getNetworkManager(): {
+              getLocalPlayerState(): {
+                weaponId: string;
+                weaponInstance?: { rarity: string };
+              } | null;
+              getActiveRockets(): unknown[];
+            };
+          };
+          hud: {
+            specialWeaponLabel: Phaser.GameObjects.Text;
+          };
+          rocketRenderer: { sprites: Map<string, unknown> };
+        };
+        const manager = scene.gameService.getNetworkManager();
+        return {
+          weaponId: manager.getLocalPlayerState()?.weaponId,
+          rarity: manager.getLocalPlayerState()?.weaponInstance?.rarity,
+          rockets: manager.getActiveRockets().length,
+          renderedRockets: scene.rocketRenderer.sprites.size,
+          label: scene.hud.specialWeaponLabel.text,
+          labelVisible: scene.hud.specialWeaponLabel.visible,
+          labelColor: scene.hud.specialWeaponLabel.style.color,
+        };
+      }),
+    )
+    .toEqual({
+      weaponId: 'launcher',
+      rarity: 'epic',
+      rockets: 1,
+      renderedRockets: 1,
+      label: '◆ EPIC LAUNCHER',
+      labelVisible: true,
+      labelColor: '#a884f3',
+    });
+
+  await waitForRenderedFrames(page);
+  if (liveChromium) {
+    await page.screenshot({ path: testInfo.outputPath('battle-weapon-rarity-42.png') });
+  }
+});
+
 test('Play submits one server-scheduled general intent and recovery clears queued entry', async ({
   page,
 }, testInfo) => {

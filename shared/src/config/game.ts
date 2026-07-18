@@ -270,6 +270,62 @@ export const WEAPONS = Object.freeze({
     /** Picked up with 36 rounds total (12 in the mag + 24 reserve). */
     pickupAmmo: 36,
   }),
+  /** Dormant Battle Royale compact burst gun. */
+  smg: Object.freeze({
+    id: 'smg',
+    displayName: 'SMG',
+    damageMin: 5,
+    damageMax: 12,
+    falloffRangeMin: 48,
+    falloffRangeMax: 240,
+    burstSize: 4,
+    burstInterval: 0.08,
+    magazineSize: 24,
+    reloadTime: 1.6,
+    pelletCount: 1,
+    spreadAngle: 0,
+    fireCooldown: 0.42,
+    pickupAmmo: 72,
+  }),
+  /** Dormant Battle Royale long-range precision gun. */
+  sniper_rifle: Object.freeze({
+    id: 'sniper_rifle',
+    displayName: 'Sniper Rifle',
+    damageMin: 35,
+    damageMax: 90,
+    falloffRangeMin: 160,
+    falloffRangeMax: 720,
+    burstSize: 1,
+    burstInterval: 0,
+    magazineSize: 3,
+    reloadTime: 2.4,
+    pelletCount: 1,
+    spreadAngle: 0,
+    fireCooldown: 1.2,
+    pickupAmmo: 12,
+  }),
+  /** Dormant Battle Royale server-simulated explosive projectile. */
+  launcher: Object.freeze({
+    id: 'launcher',
+    displayName: 'Launcher',
+    damageMin: 35,
+    damageMax: 70,
+    falloffRangeMin: 1,
+    falloffRangeMax: 96,
+    burstSize: 1,
+    burstInterval: 0,
+    magazineSize: 1,
+    reloadTime: 2.5,
+    pelletCount: 1,
+    spreadAngle: 0,
+    fireCooldown: 0.8,
+    pickupAmmo: 6,
+    projectile: Object.freeze({
+      speed: 420,
+      maxRange: 900,
+      blastRadius: 96,
+    }),
+  }),
   /**
    * Finite-use melee power weapon. Each committed swing spends one point of
    * durability, including whiffs, and the special slot disappears at zero.
@@ -331,6 +387,16 @@ export const WEAPONS = Object.freeze({
 
 export type WeaponId = keyof typeof WEAPONS;
 export const WEAPON_IDS = Object.keys(WEAPONS) as WeaponId[];
+
+/** Locked Battle Royale rarity roll table and damage-only multipliers. */
+export const WEAPON_RARITY = Object.freeze({
+  common: Object.freeze({ weight: 0.1, damageMultiplier: 0.8 }),
+  uncommon: Object.freeze({ weight: 0.7, damageMultiplier: 0.9 }),
+  rare: Object.freeze({ weight: 0.1, damageMultiplier: 1.0 }),
+  epic: Object.freeze({ weight: 0.06, damageMultiplier: 1.1 }),
+  legendary: Object.freeze({ weight: 0.03, damageMultiplier: 1.2 }),
+  mythical: Object.freeze({ weight: 0.01, damageMultiplier: 1.3 }),
+});
 
 /**
  * Runtime list of every kill-attribution source, for keying per-weapon

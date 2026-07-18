@@ -1,5 +1,6 @@
 import { PlayerId, Vec2 } from './common.js';
 import type { WeaponId } from '../config/game.js';
+import type { WeaponInstance } from './weapon.js';
 
 export interface BulletTrail {
   startPos: Vec2;
@@ -42,6 +43,17 @@ export interface AxeState {
   angle: number;
   /** Px flown so far; the server retires the axe at RANGE_TILES * TILE_SIZE. */
   distanceTraveled: number;
+}
+
+/** Authoritative Battle Royale launcher projectile. */
+export interface RocketState {
+  id: string;
+  position: Vec2;
+  velocity: Vec2;
+  shooterId: PlayerId;
+  angle: number;
+  distanceTraveled: number;
+  weaponInstance: WeaponInstance;
 }
 
 /**

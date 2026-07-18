@@ -846,4 +846,84 @@ describe('CombatManager', () => {
       expect(combat.getAxes()).toHaveLength(0);
     });
   });
+
+  describe('Battle Royale launcher projectiles', () => {
+    const rareLauncher = {
+      instanceId: 'weapon:launcher:rare',
+      weaponId: 'launcher',
+      rarity: 'rare',
+    } as const;
+
+    it('holds one armed tick, then resolves the nearest impact authoritatively', () => {
+      const shooter = createPlayer({ id: 'shooter', position: { x: 100, y: 120 } });
+      const target = createPlayer({ id: 'target', position: { x: 250, y: 120 } });
+      const players = new Map<PlayerId, PlayerState>([
+        [shooter.id, shooter],
+        [target.id, target],
+      ]);
+      combat.spawnRocket(shooter.id, shooter.position, 0, rareLauncher);
+
+      expect(combat.updateRockets(0.05, players, createOpenGrid()).explosions).toEqual([]);
+      expect(combat.getRockets()).toHaveLength(1);
+      let explosions: ReturnType<CombatManager['updateRockets']>['explosions'] = [];
+      for (let tick = 0; tick < 10 && explosions.length === 0; tick += 1) {
+        explosions = combat.updateRockets(0.05, players, createOpenGrid()).explosions;
+      }
+      expect(explosions).toHaveLength(1);
+      expect(explosions[0].damages.some((damage) => damage.playerId === target.id)).toBe(true);
+      expect(target.health).toBeLessThan(PLAYER.MAX_HEALTH);
+      expect(combat.getRockets()).toHaveLength(0);
+    });
+
+    it('uses shape-independent rarity damage after radial falloff', () => {
+      const damageFor = (rarity: 'common' | 'mythical'): number => {
+        const manager = new CombatManager();
+        const shooter = createPlayer({ id: 'shooter', position: { x: 100, y: 120 } });
+        const target = createPlayer({ id: 'target', position: { x: 150, y: 120 } });
+        const players = new Map<PlayerId, PlayerState>([
+          [shooter.id, shooter],
+          [target.id, target],
+        ]);
+        manager.spawnRocket(shooter.id, shooter.position, 0, {
+          instanceId: `weapon:launcher:${rarity}`,
+          weaponId: 'launcher',
+          rarity,
+        });
+        manager.updateRockets(0.05, players, createOpenGrid());
+        const result = manager.updateRockets(0.1, players, createOpenGrid());
+        return result.explosions[0].damages.find((damage) => damage.playerId === target.id)!.damage;
+      };
+      expect(damageFor('mythical')).toBeGreaterThan(damageFor('common'));
+    });
+
+    it('impacts a wall and preserves line-of-sight protection behind it', () => {
+      const shooter = createPlayer({ id: 'shooter', position: { x: 100, y: 120 } });
+      const target = createPlayer({ id: 'target', position: { x: 280, y: 120 } });
+      const players = new Map<PlayerId, PlayerState>([
+        [shooter.id, shooter],
+        [target.id, target],
+      ]);
+      const grid = createGridWithWall(4, 2);
+      combat.spawnRocket(shooter.id, shooter.position, 0, rareLauncher);
+      combat.updateRockets(0.05, players, grid);
+      let explosions: ReturnType<CombatManager['updateRockets']>['explosions'] = [];
+      for (let tick = 0; tick < 10 && explosions.length === 0; tick += 1) {
+        explosions = combat.updateRockets(0.05, players, grid).explosions;
+      }
+      expect(explosions).toHaveLength(1);
+      expect(target.health).toBe(PLAYER.MAX_HEALTH);
+    });
+
+    it('keeps simultaneous N-player projectiles distinct and clearable', () => {
+      for (let index = 0; index < 8; index += 1) {
+        combat.spawnRocket(`p${index}`, { x: 100 + index * 10, y: 120 }, 0, {
+          ...rareLauncher,
+          instanceId: `weapon:launcher:${index}`,
+        });
+      }
+      expect(new Set(combat.getRockets().map((rocket) => rocket.id)).size).toBe(8);
+      combat.clearRockets();
+      expect(combat.getRockets()).toEqual([]);
+    });
+  });
 });

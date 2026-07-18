@@ -5,9 +5,9 @@ Read this file and `CLAUDE.md` completely at the start of every batch. The
 completed `docs/REPLAYABILITY_ROADMAP.md` remains the historical record for the
 systems this program preserves and reorganizes.
 
-- **Status:** Batch 41 Battle Royale eight-slot queue completed on 2026-07-18;
-  the format remains dormant and every capability remains default false.
-- **Next step:** Batch 42 weapon instances and rarity under the user's standing
+- **Status:** Batch 42 Battle Royale weapon instances and rarity completed on
+  2026-07-18; the format remains dormant and every capability remains default false.
+- **Next step:** Batch 43 single-slot inventory under the user's standing
   authorization to continue sequentially through the plan while deferring human
   involvement. The deferred Batch 39 human release walkthrough still does not
   authorize deployment, capability exposure, production restart, or live smoke.
@@ -197,7 +197,7 @@ Production deployment happens only at a gate or for an urgent live fix.
 |  38 | Mode and bot rebalance                 | Large arenas  | **DONE — 2026-07-17** |
 |  39 | Reforged Arena release gate            | Large arenas  | **DONE — 2026-07-17** |
 |  40 | Battle Royale lifecycle                | Battle Royale | Complete (2026-07-18) |
-|  41 | Eight-slot queue                       | Battle Royale | Pending               |
+|  41 | Eight-slot queue                       | Battle Royale | Complete (2026-07-18) |
 |  42 | Weapon instances and rarity            | Battle Royale | Pending               |
 |  43 | Single-slot inventory                  | Battle Royale | Pending               |
 |  44 | Containers and loot                    | Battle Royale | Pending               |
@@ -1450,6 +1450,46 @@ focused evidence reveals broader coupling.
 
 Add rarity-aware weapon instances and authoritative damage; implement SMG,
 sniper rifle, and launcher without changing standard weapon semantics.
+
+**Verification tier selected before implementation (2026-07-18):** shared,
+server simulation, additive network, and capability-owned client projection
+tier, escalated for the new projectile path and the server's authoritative
+damage choke point. Required evidence is deterministic coverage for the exact
+six-gun instance allowlist, immutable instance normalization, all six rarity
+roll boundaries/weights/multipliers, ordinary-falloff-then-rarity ordering,
+incoherent-instance rejection, SMG burst/ammo pacing, sniper range/cooldown,
+launcher flight/collision/radius/LOS/kill attribution, N-player simultaneous
+projectiles, and cleanup. Standard formats must prove unchanged weapon damage,
+ammo, pickups, modes, mutators, stats/persistence, snapshot bytes, and absent
+optional fields; old clients must ignore additive state and new clients must
+normalize old-server omissions. Run focused shared/server/client tests, the
+full unit matrix, typecheck, lint, all package builds, allowlist/repository
+format and diff checks, targeted desktop Chromium/mobile-landscape Battle
+Royale weapon projection plus capability-off fallback, and the authoritative
+20 Hz/snapshot baseline. Escalate browser scope only if focused evidence
+reveals broader scene, input, recovery, or rendering coupling.
+
+- [x] The exact six-gun Battle Royale allowlist and six rarity tiers use shared
+      immutable definitions, deterministic roll boundaries, locked weights, and
+      locked damage multipliers. Invalid or incoherent instances fail closed.
+- [x] Rifle, pistol, shotgun, SMG, sniper rifle, and launcher damage remains
+      server authoritative. Ordinary falloff resolves before rarity scaling;
+      SMG burst/ammo, sniper cadence/range, and launcher flight, collision,
+      blast radius, line of sight, and kill attribution have deterministic evidence.
+- [x] Launcher projectiles and equipped instances are additive optional snapshot
+      state. The client normalizes them, projects rocket flight and rarity HUD/art,
+      and never performs collision, damage, rarity, or result authority.
+- [x] Standard formats retain their legacy rifle/shotgun/pistol/punch registry,
+      Weapon Roulette order, damage, ammo, pickups, modes, mutators, stats,
+      persistence, and exact 2,481/3,762-byte active snapshot baselines. New guns
+      cannot fire outside a coherent Battle Royale lifecycle.
+- [x] Old-server omission clears additive state, malformed instances fail closed,
+      old clients may ignore the additions, and standard JSON omits undefined
+      fields. The complete 148-file/1,684-test unit matrix, typecheck, lint, all
+      builds, focused three-project browser projection, formatting/diff checks,
+      and authoritative 20 Hz baseline passed.
+- [x] Batch 43 inventory, loot, containers, arena, zones, bot AI, spectating,
+      records, hardening, exposure, deployment, restart, and live smoke did not begin.
 
 #### Batch 43 — Single-slot inventory
 
@@ -3832,6 +3872,49 @@ inventory, loot/container, arena, zone, tactical map, Battle Royale bot AI,
 spectating, record/persistence, hardening, capability exposure, deployment,
 restart, or live smoke began. Proceed only to Batch 42 under the user's standing
 authorization and retain the production/release prohibition.
+
+### Batch 42 - 2026-07-18 - Weapon instances and rarity
+
+**Scope and tier:** Before implementation, the shared/server simulation,
+additive-network, and capability-owned client-projection tier was selected and
+escalated for a new projectile family and the authoritative damage choke point.
+Batch 42 added only rarity-aware weapon instances and SMG, sniper rifle, and
+launcher mechanics. No inventory, loot source, container, arena, zone, bot AI,
+spectating, record, exposure, or release work entered the allowlist.
+
+**Authority and compatibility:** Shared immutable definitions own the exact six
+Battle Royale guns, six rarity tiers, deterministic weights, multipliers, and
+instance validation. The server validates a coherent lifecycle plus matching
+instance before any new gun can fire, applies ordinary falloff before rarity,
+owns burst/cadence/ammo and rocket flight/collision/LOS/blast damage, and keeps
+ordinary combat/world-destruction attribution. Clients normalize optional
+instances, render server positions and rarity identity, and emit presentation
+only. Old-server omission clears the additions; malformed state fails closed;
+standard serialization omits the fields. Standard Weapon Roulette, pickups,
+damage, stats/persistence, modes, mutators, and new-gun inaccessibility remain
+explicit regression proofs.
+
+**Verification:** Focused shared/server/client evidence passed 184 tests before
+the final assertions; the complete matrix passed 148 files and 1,684 tests.
+Typecheck, ESLint, all package builds, the Batch 42 allowlist formatting, and
+`git diff --check` passed. Repository-wide Prettier reports 96 inherited files,
+none on the Batch 42 allowlist. The focused authoritative-rarity/launcher projection
+passed desktop Chromium, desktop Firefox, and mobile landscape; Chromium also
+produced the trusted compositor artifact under RFG-003. The server baseline
+retained configured/rolling 20 Hz and the 50 ms budget; synthetic four-player
+mean/p95/p99/max work was 0.023/0.043/0.211/2.095 ms, while standard active
+snapshot bytes remained exactly 2,481/3,762. The wall-impact focused test first
+exposed a same-batch explosion-origin LOS edge; offsetting the authoritative
+impact point just outside solid collision fixed it, and focused plus full
+regression evidence passed. No open product defect remained, so no bug-ledger
+row was added.
+
+**Deployment and disposition:** Skipped. Production remains on approved Batch
+33 commit `f39eb34131f8827f85432aafcc6d6c18a2d0ac51`; `newShell`, `schedules`,
+`largeWorlds`, `modernArt`, and `battleRoyale` remain strict server-owned
+opt-ins, default false, and unexposed. Proceed only to Batch 43 under the user's
+standing direct-development authorization. Capability exposure, deployment,
+production restart, and live smoke remain explicitly unauthorized.
 
 ## Batch 22 input prompt (historical)
 

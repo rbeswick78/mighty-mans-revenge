@@ -1,6 +1,6 @@
 import { PlayerId, MatchId, Tick, Vec2 } from './common.js';
 import { PlayerInput } from './player.js';
-import { AxeState, GrenadeState, BulletTrail, PunchEvent } from './projectile.js';
+import { AxeState, GrenadeState, BulletTrail, PunchEvent, RocketState } from './projectile.js';
 import { PickupState } from './pickup.js';
 import type { ArenaWins } from './map.js';
 import {
@@ -358,6 +358,8 @@ export interface ServerGameStateMessage {
   grenades: GrenadeState[];
   /** Jack's thrown axes in flight (usually empty — one per Jack per 12s). */
   axes: AxeState[];
+  /** Dormant Battle Royale launcher projectiles; absent on standard/old servers. */
+  rockets?: RocketState[];
   bulletTrails: BulletTrail[];
   /** Environmental detonations resolved this snapshot (legacy wire name). */
   barrelExplosions: Vec2[];
@@ -451,6 +453,8 @@ export interface SerializedPlayerState {
   ammo: number;
   /** Equipped weapon; drives the held-overlay sprite and HUD ammo panel. */
   weaponId: WeaponId;
+  /** Server-authored Battle Royale gun identity; absent in standard formats. */
+  weaponInstance?: import('./weapon.js').WeaponInstance;
   /** Special weapon's magazine (shells loaded). 0 while on the rifle. */
   specialAmmo: number;
   /** Special weapon's reserve shells. 0 while on the rifle. */

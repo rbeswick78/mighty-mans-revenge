@@ -5,6 +5,8 @@ import {
   MATCH,
   MatchPhase,
   RESPAWN,
+  WEAPONS,
+  type PlayerInput,
   type MapData,
 } from '@shared/game';
 import { Match } from './match.js';
@@ -54,6 +56,24 @@ function activate(match: Match): void {
 
 function eliminate(match: Match, killerId: string, victimId: string): void {
   match.onKill(killerId, victimId, 'gun');
+}
+
+function fireInput(sequenceNumber: number, aimAngle = 0): PlayerInput {
+  return {
+    sequenceNumber,
+    moveX: 0,
+    moveY: 0,
+    aimAngle,
+    aimingGun: false,
+    firePressed: true,
+    aimingGrenade: false,
+    throwPressed: false,
+    detonatePressed: false,
+    reload: false,
+    sprint: false,
+    abilityPressed: false,
+    tick: sequenceNumber,
+  };
 }
 
 afterEach(() => {
@@ -198,5 +218,135 @@ describe('Battle Royale lifecycle', () => {
     const serialized = JSON.parse(JSON.stringify(standard.getResult())) as Record<string, unknown>;
     expect(serialized).not.toHaveProperty('matchKind');
     expect(serialized).not.toHaveProperty('battleRoyale');
+  });
+
+  it('applies rarity after ordinary rifle falloff only for a coherent instance', () => {
+    const match = createBattleRoyaleMatch(3);
+    activate(match);
+    const shooter = match.players.get('player-0')!;
+    const victim = match.players.get('player-1')!;
+    shooter.characterId = 'mighty_man';
+    victim.characterId = 'mighty_man';
+    shooter.position = { x: 100, y: 100 };
+    victim.position = { x: 150, y: 100 };
+    victim.invulnerableTimer = 0;
+    shooter.weaponInstance = {
+      instanceId: 'weapon:rifle:common',
+      weaponId: 'rifle',
+      rarity: 'common',
+    };
+    match.queueInput(shooter.id, fireInput(1));
+    match.update(0.05);
+    expect(match.getTickBulletTrails()[0].damageApplied).toBe(WEAPONS.rifle.damageMax * 0.8);
+
+    const standard = new Match('standard-rifle-damage', makeMapData(), [
+      { id: 'alpha', nickname: 'Alpha' },
+      { id: 'bravo', nickname: 'Bravo' },
+    ]);
+    activate(standard);
+    const alpha = standard.players.get('alpha')!;
+    const bravo = standard.players.get('bravo')!;
+    alpha.characterId = 'mighty_man';
+    bravo.characterId = 'mighty_man';
+    alpha.position = { x: 100, y: 100 };
+    bravo.position = { x: 150, y: 100 };
+    bravo.invulnerableTimer = 0;
+    standard.queueInput(alpha.id, fireInput(1));
+    standard.update(0.05);
+    expect(standard.getTickBulletTrails()[0].damageApplied).toBe(WEAPONS.rifle.damageMax);
+
+    alpha.weaponId = 'smg';
+    alpha.specialAmmo = WEAPONS.smg.magazineSize;
+    alpha.weaponInstance = {
+      instanceId: 'weapon:standard:smg',
+      weaponId: 'smg',
+      rarity: 'mythical',
+    };
+    standard.queueInput(alpha.id, fireInput(2));
+    standard.update(0.05);
+    expect(standard.getTickBulletTrails()).toEqual([]);
+    expect(alpha.specialAmmo).toBe(WEAPONS.smg.magazineSize);
+  });
+
+  it('fires the SMG burst and sniper while rejecting an incoherent new-gun instance', () => {
+    const match = createBattleRoyaleMatch(4);
+    activate(match);
+    const shooter = match.players.get('player-0')!;
+    const victim = match.players.get('player-1')!;
+    shooter.characterId = 'mighty_man';
+    victim.characterId = 'mighty_man';
+    shooter.position = { x: 100, y: 100 };
+    victim.position = { x: 250, y: 100 };
+    victim.health = victim.maxHealth;
+    victim.invulnerableTimer = 0;
+    shooter.weaponId = 'smg';
+    shooter.specialAmmo = WEAPONS.smg.magazineSize;
+    shooter.weaponInstance = {
+      instanceId: 'weapon:wrong',
+      weaponId: 'sniper_rifle',
+      rarity: 'rare',
+    };
+    match.queueInput(shooter.id, fireInput(1));
+    match.update(0.05);
+    expect(match.getTickBulletTrails()).toEqual([]);
+    expect(shooter.specialAmmo).toBe(WEAPONS.smg.magazineSize);
+
+    shooter.weaponInstance = { instanceId: 'weapon:smg', weaponId: 'smg', rarity: 'rare' };
+    match.queueInput(shooter.id, fireInput(2));
+    match.update(0.05);
+    match.update(0.3);
+    expect(shooter.specialAmmo).toBe(WEAPONS.smg.magazineSize - WEAPONS.smg.burstSize);
+    match.update(0.2);
+
+    shooter.weaponId = 'sniper_rifle';
+    shooter.specialAmmo = WEAPONS.sniper_rifle.magazineSize;
+    shooter.weaponInstance = {
+      instanceId: 'weapon:sniper',
+      weaponId: 'sniper_rifle',
+      rarity: 'mythical',
+    };
+    victim.health = victim.maxHealth;
+    victim.isDead = false;
+    match.queueInput(shooter.id, fireInput(3));
+    match.update(0.05);
+    expect(victim.isDead).toBe(true);
+    expect(match.getTickBulletTrails()[0]).toMatchObject({
+      weaponId: 'sniper_rifle',
+      hitPlayerId: victim.id,
+    });
+  });
+
+  it('projects and resolves a launcher instance through server-owned flight', () => {
+    const match = createBattleRoyaleMatch(3);
+    activate(match);
+    const shooter = match.players.get('player-0')!;
+    const victim = match.players.get('player-1')!;
+    shooter.characterId = 'mighty_man';
+    victim.characterId = 'mighty_man';
+    shooter.position = { x: 100, y: 100 };
+    victim.position = { x: 250, y: 100 };
+    victim.health = 10;
+    victim.invulnerableTimer = 0;
+    shooter.weaponId = 'launcher';
+    shooter.specialAmmo = 1;
+    shooter.weaponInstance = {
+      instanceId: 'weapon:launcher',
+      weaponId: 'launcher',
+      rarity: 'legendary',
+    };
+    match.queueInput(shooter.id, fireInput(1));
+    match.update(0.05);
+    expect(match.getActiveRockets()).toHaveLength(1);
+    expect(match.getActiveRockets()[0].weaponInstance).toEqual({
+      instanceId: 'weapon:launcher',
+      weaponId: 'launcher',
+      rarity: 'legendary',
+    });
+    for (let tick = 0; tick < 10 && match.getActiveRockets().length > 0; tick += 1) {
+      match.update(0.05);
+    }
+    expect(match.getActiveRockets()).toEqual([]);
+    expect(victim.isDead).toBe(true);
+    expect(match.stats.getStats(shooter.id).killsByWeapon.gun).toBe(1);
   });
 });
