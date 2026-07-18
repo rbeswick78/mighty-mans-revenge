@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 const shellAdvertised = process.env.CAPABILITY_NEW_SHELL === 'true';
 const schedulesAdvertised = process.env.CAPABILITY_SCHEDULES === 'true';
+const largeWorldsAdvertised = process.env.CAPABILITY_LARGE_WORLDS === 'true';
 const modernArtAdvertised = process.env.CAPABILITY_MODERN_ART === 'true';
 
 async function waitForActiveScene(page: Page, key: string): Promise<void> {
@@ -888,7 +889,7 @@ test('Play submits one server-scheduled general intent and recovery clears queue
           return [game?.scale.width, game?.scale.height];
         }),
       )
-      .toEqual([960, 720]);
+      .toEqual([largeWorldsAdvertised ? 1280 : 960, 720]);
     return;
   }
 
@@ -1061,7 +1062,7 @@ test('validated standard launch bypasses Draft and Character Select across point
         return [game?.scale.width, game?.scale.height];
       }),
     )
-    .toEqual([960, 720]);
+    .toEqual([largeWorldsAdvertised ? 1280 : 960, 720]);
 
   if (liveChromium) {
     await waitForRenderedFrames(page);

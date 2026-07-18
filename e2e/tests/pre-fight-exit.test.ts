@@ -177,6 +177,10 @@ test.describe('Pre-fight exit routes', () => {
   test('keeps Draft and Character Select escapable on every input surface', async ({
     gamePage,
   }, testInfo) => {
+    test.skip(
+      process.env.CAPABILITY_NEW_SHELL === 'true',
+      'Standard Reforged Play bypasses these legacy pre-fight scenes; enabled challenge entry is covered by reforged-shell.test.ts.',
+    );
     await waitForScene(gamePage, 'LobbyScene');
     await startDraft(gamePage);
     const draft = await backControlState(gamePage, 'DraftScene');

@@ -1,6 +1,8 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from '../fixtures';
 
+const shellAdvertised = process.env.CAPABILITY_NEW_SHELL === 'true';
+
 async function waitForLobby(page: Page): Promise<void> {
   await expect
     .poll(
@@ -33,7 +35,9 @@ interface AudioLobbyState {
 async function audioLobbyState(page: Page): Promise<AudioLobbyState> {
   return page.evaluate(() => {
     const game = (
-      window as unknown as { game?: { sound: { mute: boolean }; scene: { getScene: (key: string) => unknown } } }
+      window as unknown as {
+        game?: { sound: { mute: boolean }; scene: { getScene: (key: string) => unknown } };
+      }
     ).game;
     const scene = game?.scene.getScene('LobbyScene') as {
       audioButton?: {
@@ -45,8 +49,7 @@ async function audioLobbyState(page: Page): Promise<AudioLobbyState> {
     const bounds = scene?.audioButton?.getBounds();
     return {
       label:
-        scene?.audioButton?.list?.find((child) => child.text?.startsWith('AUDIO '))?.text ??
-        null,
+        scene?.audioButton?.list?.find((child) => child.text?.startsWith('AUDIO '))?.text ?? null,
       muted: game?.sound.mute ?? null,
       stored: localStorage.getItem('mmr_audio_muted'),
       gamepadReachable:
@@ -62,6 +65,10 @@ test.describe('Lobby audio control', () => {
   test('supports pointer/touch, persists mute, and restores through F2', async ({
     lobbyPage,
   }, testInfo) => {
+    test.skip(
+      shellAdvertised,
+      'The advertised shell owns audio through Settings; reforged-shell.test.ts covers that owner.',
+    );
     await waitForLobby(lobbyPage);
     const initial = await audioLobbyState(lobbyPage);
     expect(initial).toMatchObject({
@@ -80,8 +87,7 @@ test.describe('Lobby audio control', () => {
     const canvasWidth = await canvas.evaluate((element) => (element as HTMLCanvasElement).width);
     const canvasHeight = await canvas.evaluate((element) => (element as HTMLCanvasElement).height);
     const clickX =
-      canvasBox.x +
-      ((initial.bounds.x + initial.bounds.width / 2) / canvasWidth) * canvasBox.width;
+      canvasBox.x + ((initial.bounds.x + initial.bounds.width / 2) / canvasWidth) * canvasBox.width;
     const clickY =
       canvasBox.y +
       ((initial.bounds.y + initial.bounds.height / 2) / canvasHeight) * canvasBox.height;
@@ -91,26 +97,32 @@ test.describe('Lobby audio control', () => {
       await lobbyPage.mouse.click(clickX, clickY);
     }
 
-    await expect.poll(() => audioLobbyState(lobbyPage)).toMatchObject({
-      label: 'AUDIO OFF  ·  F2',
-      muted: true,
-      stored: 'true',
-    });
+    await expect
+      .poll(() => audioLobbyState(lobbyPage))
+      .toMatchObject({
+        label: 'AUDIO OFF  ·  F2',
+        muted: true,
+        stored: 'true',
+      });
 
     await lobbyPage.reload();
     await waitForLobby(lobbyPage);
-    await expect.poll(() => audioLobbyState(lobbyPage)).toMatchObject({
-      label: 'AUDIO OFF  ·  F2',
-      muted: true,
-      stored: 'true',
-      gamepadReachable: true,
-    });
+    await expect
+      .poll(() => audioLobbyState(lobbyPage))
+      .toMatchObject({
+        label: 'AUDIO OFF  ·  F2',
+        muted: true,
+        stored: 'true',
+        gamepadReachable: true,
+      });
 
     await lobbyPage.keyboard.press('F2');
-    await expect.poll(() => audioLobbyState(lobbyPage)).toMatchObject({
-      label: 'AUDIO ON  ·  F2',
-      muted: false,
-      stored: 'false',
-    });
+    await expect
+      .poll(() => audioLobbyState(lobbyPage))
+      .toMatchObject({
+        label: 'AUDIO ON  ·  F2',
+        muted: false,
+        stored: 'false',
+      });
   });
 });

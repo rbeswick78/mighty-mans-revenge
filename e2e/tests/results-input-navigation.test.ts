@@ -2,6 +2,7 @@ import type { Page } from '@playwright/test';
 
 import { test, expect } from '../fixtures';
 
+const shellAdvertised = process.env.CAPABILITY_NEW_SHELL === 'true';
 interface Bounds {
   x: number;
   y: number;
@@ -257,19 +258,21 @@ test.describe('Results replay navigation', () => {
 
     await expect
       .poll(() =>
-        gamePage.evaluate(() => {
+        gamePage.evaluate((useReforgedShell) => {
           const runtime = window as unknown as {
             game?: { scene: { getScene: (key: string) => unknown } };
             __resultsReturnedToLobby?: boolean;
           };
-          const lobby = runtime.game?.scene.getScene('LobbyScene') as {
+          const owner = runtime.game?.scene.getScene(
+            useReforgedShell ? 'ReforgedShellScene' : 'LobbyScene',
+          ) as {
             sys?: { settings?: { active?: boolean } };
           };
           return {
             returned: runtime.__resultsReturnedToLobby ?? false,
-            lobbyActive: lobby?.sys?.settings?.active ?? false,
+            lobbyActive: owner?.sys?.settings?.active ?? false,
           };
-        }),
+        }, shellAdvertised),
       )
       .toEqual({ returned: true, lobbyActive: true });
   });

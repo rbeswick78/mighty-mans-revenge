@@ -358,3 +358,7 @@ For each capability, keep this order:
 Do not advertise a capability merely because partial client code exists. The
 roadmap's milestone gates, not the presence of an environment variable, decide
 when production exposure is authorized.
+
+## Batch 39 gate disposition
+
+The release review does not authorize exposure. RFG-004 proves that a coherent enabled journey followed by literal `largeWorlds:false` can report legacy viewport truth while retaining successor minimap state. Until that client lifecycle blocker is corrected and both complete browser matrices plus human review pass, `newShell`, `schedules`, `largeWorlds`, and `modernArt` remain default false and `battleRoyale` remains false. Production stays on the separately approved Batch 33 commit.

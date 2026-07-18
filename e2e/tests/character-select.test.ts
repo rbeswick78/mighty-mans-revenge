@@ -1,5 +1,7 @@
 import { test, expect, type Page, type BrowserContext } from '@playwright/test';
 
+const shellAdvertised = process.env.CAPABILITY_NEW_SHELL === 'true';
+
 type PhaserBounds = { x: number; y: number; width: number; height: number };
 
 async function clickCanvasBounds(page: Page, bounds: PhaserBounds): Promise<void> {
@@ -227,6 +229,10 @@ async function startQuickMatch(page: Page, nickname: string): Promise<void> {
 test('solo practice launches against locked Rusty and reaches live play', async ({
   page,
 }, testInfo) => {
+  test.skip(
+    shellAdvertised,
+    'Advertised standard Play bypasses Draft and Character Select; the default-false matrix retains this legacy journey.',
+  );
   test.skip(
     testInfo.project.name !== 'desktop-chromium',
     'One authoritative browser flow is sufficient; mobile rendering has separate coverage',
@@ -1344,6 +1350,10 @@ test.describe('Character select (desktop)', () => {
 
   test.beforeEach(async ({ browser }, testInfo) => {
     test.skip(
+      shellAdvertised,
+      'Advertised standard Play bypasses Draft and Character Select; reforged-shell.test.ts covers the replacement route.',
+    );
+    test.skip(
       testInfo.project.name === 'mobile-landscape',
       'Mobile pair-up runs in its own describe block below',
     );
@@ -1660,6 +1670,10 @@ test.describe('Character select (mobile-landscape)', () => {
   let pageB: Page;
 
   test.beforeEach(async ({ browser }, testInfo) => {
+    test.skip(
+      shellAdvertised,
+      'Advertised standard Play bypasses Draft and Character Select; the default-false matrix retains this legacy journey.',
+    );
     test.skip(
       testInfo.project.name !== 'mobile-landscape',
       'Only runs on the mobile-landscape project',

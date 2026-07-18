@@ -1,5 +1,7 @@
 import { expect, test } from '../fixtures';
 
+const shellAdvertised = process.env.CAPABILITY_NEW_SHELL === 'true';
+
 async function waitForScene(gamePage: import('@playwright/test').Page, key: string): Promise<void> {
   await expect
     .poll(
@@ -145,6 +147,6 @@ test.describe('Wasteland signal recovery', () => {
 
     expect(overlay).toContain('SIGNAL LOST');
     expect(overlay).toContain('RETURNING TO THE OUTPOST...');
-    await waitForScene(gamePage, 'LobbyScene');
+    await waitForScene(gamePage, shellAdvertised ? 'ReforgedShellScene' : 'LobbyScene');
   });
 });

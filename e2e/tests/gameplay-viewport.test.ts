@@ -8,6 +8,8 @@ import { expect, test } from '../fixtures';
 
 const largeWorldsAdvertised = process.env.CAPABILITY_LARGE_WORLDS === 'true';
 const modernArtAdvertised = process.env.CAPABILITY_MODERN_ART === 'true';
+const shellAdvertised = process.env.CAPABILITY_NEW_SHELL === 'true';
+const schedulesAdvertised = process.env.CAPABILITY_SCHEDULES === 'true';
 
 function batch24ArtifactPath(testInfo: TestInfo, name: string): string | null {
   const artifactDir = process.env.BATCH24_ARTIFACT_DIR;
@@ -100,7 +102,13 @@ async function stageGameplay(
   mapName = 'Scrapyard',
 ): Promise<void> {
   await page.evaluate(
-    ({ advertiseLargeWorlds, advertiseModernArt, selectedMapName }) => {
+    ({
+      advertiseLargeWorlds,
+      advertiseModernArt,
+      advertiseNewShell,
+      advertiseSchedules,
+      selectedMapName,
+    }) => {
       const game = (window as unknown as { game?: Phaser.Game }).game;
       const lobby = game?.scene.getScene('LobbyScene') as unknown as {
         gameService: {
@@ -127,8 +135,8 @@ async function stageGameplay(
         type: 'server:welcome',
         playerId: 'viewport-local',
         capabilities: {
-          newShell: false,
-          schedules: false,
+          newShell: advertiseNewShell,
+          schedules: advertiseSchedules,
           largeWorlds: advertiseLargeWorlds,
           modernArt: advertiseModernArt,
           battleRoyale: false,
@@ -187,6 +195,8 @@ async function stageGameplay(
     {
       advertiseLargeWorlds: largeWorlds,
       advertiseModernArt: modernArt,
+      advertiseNewShell: shellAdvertised,
+      advertiseSchedules: schedulesAdvertised,
       selectedMapName: mapName,
     },
   );
@@ -379,12 +389,21 @@ async function authoredSuccessorObjectiveKinds(
   return expected;
 }
 
-async function viewportSnapshot(page: Page): Promise<Record<string, unknown>> {
-  return page.evaluate(() => {
+async function viewportSnapshot(
+  page: Page,
+  includeCoordinates = true,
+): Promise<Record<string, unknown>> {
+  return page.evaluate((includeCoordinateEvidence) => {
     const game = (window as unknown as { game?: Phaser.Game }).game;
     const scene = game?.scene.getScene('GameScene') as unknown as {
       cameras: {
-        main: { scrollX: number; scrollY: number; zoom: number; worldView: Phaser.Geom.Rectangle };
+        main: {
+          scrollX: number;
+          scrollY: number;
+          zoom: number;
+          worldView: Phaser.Geom.Rectangle;
+          preRender: (baseScale: number, resolution: number) => void;
+        };
       };
       getGameplayViewportContract(): {
         viewport: {
@@ -451,6 +470,7 @@ async function viewportSnapshot(page: Page): Promise<Record<string, unknown>> {
       };
     };
     const contract = scene.getGameplayViewportContract();
+    scene.cameras.main.preRender(1, 1);
     const coordinates = scene.getGameplayCoordinateSpace();
     const cameraController = scene.getCameraController();
     const hudLayout = scene.getResponsiveHudLayout();
@@ -489,10 +509,12 @@ async function viewportSnapshot(page: Page): Promise<Record<string, unknown>> {
         lighting: dynamic.lighting,
       },
       minimap,
-      coordinates: {
-        screenToWorld: coordinates.screenToWorld({ space: 'screen', x: 480, y: 288 }),
-        worldToScreen: coordinates.worldToScreen({ space: 'world', x: 480, y: 288 }),
-      },
+      coordinates: includeCoordinateEvidence
+        ? {
+            screenToWorld: coordinates.screenToWorld({ space: 'screen', x: 480, y: 288 }),
+            worldToScreen: coordinates.worldToScreen({ space: 'world', x: 480, y: 288 }),
+          }
+        : null,
       domains: {
         kothObjective: [
           scene.kothHillRenderer.gfx.scrollFactorX,
@@ -532,7 +554,7 @@ async function viewportSnapshot(page: Page): Promise<Record<string, unknown>> {
         xrayOverlay: [scene.xrayFx.tintRect.scrollFactorX, scene.xrayFx.tintRect.scrollFactorY],
       },
     };
-  });
+  }, includeCoordinates);
 }
 
 async function responsiveHudSnapshot(page: Page): Promise<Record<string, unknown>> {
@@ -1824,7 +1846,7 @@ test('dynamic chunks, destruction resources, lighting, and quality stay aligned'
   expect(state.projectedLight.radius).toBeCloseTo(187.5, 4);
 });
 
-test('modern UI frames preserve the current small world, HUD/minimap priorities, and Results focus', async ({
+test('modern UI frames preserve the large world, HUD/minimap priorities, and Results focus', async ({
   page,
 }, testInfo) => {
   test.skip(
@@ -1855,7 +1877,7 @@ test('modern UI frames preserve the current small world, HUD/minimap priorities,
     enabled: true,
     hudFrame: 'ui.chrome.states/001',
     minimapFrame: 'ui.chrome.states/003',
-    worldBounds: { width: 960, height: 576 },
+    worldBounds: { width: 1920, height: 1152 },
   });
   expect(gameplay.hud).not.toBeNull();
   expect(gameplay.minimap).not.toBeNull();
@@ -3025,8 +3047,13 @@ test('Batch 37 successors preserve server-owned selection, arena systems, and le
     { name: 'Rusted Refinery' as const, landmarks: 10, family: 'industrial' },
   ];
   for (const expected of successors) {
-    await stageGameplay(page, true, false, expected.name);
-    const viewport = await viewportSnapshot(page);
+    if (shellAdvertised && expected.name !== 'Wasteland Outpost') {
+      await page.reload();
+      await waitForScene(page, 'ReforgedShellScene');
+    }
+    await stageGameplay(page, true, modernArtAdvertised, expected.name);
+    await page.waitForTimeout(400);
+    const viewport = await viewportSnapshot(page, false);
     expect(viewport, expected.name).toMatchObject({
       mode: 'large-world',
       // Batch 18's fixed viewport resource envelope remains 960x576;
@@ -3158,7 +3185,7 @@ test('Batch 37 successors preserve server-owned selection, arena systems, and le
 
   for (const expected of successors) {
     await stageGameplay(page, false, false, expected.name);
-    expect(await viewportSnapshot(page), `${expected.name} capability-off`).toMatchObject({
+    expect(await viewportSnapshot(page, false), `${expected.name} capability-off`).toMatchObject({
       mode: 'legacy',
       worldBounds: { left: 0, top: 0, width: 960, height: 576 },
       minimap: null,

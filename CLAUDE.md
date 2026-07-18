@@ -921,3 +921,7 @@ production flag, or deployment follows from passing Batch 38 evidence.
 - Active Reforged build plan (multi-session): `docs/REIMAGINING_ROADMAP.md` — read it before every Reforged batch and implement only the active batch
 - Approved Reforged visual direction: `docs/REFORGED_STYLE_BIBLE.md` — golden references, identity locks, readability rules, and later-asset constraints
 - Completed replayability build history: `docs/REPLAYABILITY_ROADMAP.md` — read it when changing established weapons, modes, maps, mutators, characters, stats, awards, or challenge behavior
+
+## Reforged Arena Release Gate
+
+Batch 39 is blocked by RFG-004. A literal `largeWorlds:false` transition after successor play restores legacy viewport mode but can retain the prior successor minimap and landmarks. Do not weaken the `minimap: null` fallback proof or expose any Reforged capability. Correct the `GameScene` fallback/minimap lifecycle in separately scoped work, then rerun both complete three-project inventories, RFG-003 visual evidence, protected-byte checks, and human review. Production remains on approved Batch 33 with every capability false.

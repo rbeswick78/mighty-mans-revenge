@@ -5,10 +5,10 @@ Read this file and `CLAUDE.md` completely at the start of every batch. The
 completed `docs/REPLAYABILITY_ROADMAP.md` remains the historical record for the
 systems this program preserves and reorganizes.
 
-- **Status:** Batch 38 complete on 2026-07-17; all six strict 40x24 successors
-  now have deterministic cross-arena mode and bot balance evidence behind the
-  server-owned opt-in.
-- **Next batch:** Batch 39 — Reforged Arena release gate.
+- **Status:** Batch 39 release gate blocked on 2026-07-17 by RFG-004: a literal
+  large-world fallback retains the prior successor minimap after viewport truth
+  returns to legacy.
+- **Next step:** user review and separately scoped RFG-004 correction; do not begin Batch 40.
 - **Public releases:** Reforged Arena, then Battle Royale.
 - **Working model:** one numbered batch per session, direct commits and pushes
   to `main`, milestone-gated production deployments.
@@ -1345,6 +1345,13 @@ with every capability still false. Only separately approved work after that
 sign-off may deploy server-first, enable the coherent Reforged capabilities,
 and smoke production.
 
+Selected verification tier (2026-07-17, before any Batch 39 change): complete milestone matrix.
+
+- [x] Static, asset/provenance, strict/compatible/stable map, 624-product/48-regulation balance, full unit, typecheck, lint, build, server, and client baseline evidence passed.
+- [x] The complete default-false three-project inventory passed after one pre-canvas mobile setup timeout passed on isolated rerun.
+- [ ] Coherent-enabled release inventory is blocked by RFG-004: legacy viewport fallback retains the successor minimap. Rollout and human sign-off remain unauthorized.
+- [x] No capability default, production flag, deployment, live smoke, or Battle Royale work changed.
+
 ### Milestone 5 — Battle Royale
 
 #### Batch 40 — Battle Royale lifecycle
@@ -1487,11 +1494,12 @@ test frequency, not acceptance coverage or release quality gates.
    deliberately. It does not silently expand the active batch.
 4. Existing user changes are never discarded or staged accidentally.
 
-| ID      | Discovered | Reproduction/evidence                                                                                                     | Relationship  | Disposition                                                                                                                                                                                                                                                   | Status             |
-| ------- | ---------- | ------------------------------------------------------------------------------------------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
-| RFG-001 | 2026-07-15 | Idle recoil used to clear sustained `(320, 144)` base scroll to `(0, 0)`.                                                 | Batches 20/24 | Resolved by composed kick offsets in Batch 20; retain the proof in the Batch 24 gate.                                                                                                                                                                         | Resolved           |
-| RFG-002 | 2026-07-15 | Idle zoom pulse used to clear sustained base zoom `0.9` back to `1`.                                                      | Batches 20/24 | Resolved by the composed zoom multiplier in Batch 20; retain the proof in the Batch 24 gate.                                                                                                                                                                  | Resolved           |
-| RFG-003 | 2026-07-15 | Headless Firefox/WebKit live practice gets no player ID; compositor screenshots from staged WebKit gameplay remain black. | Batches 17/24 | Batch 24 accepts staged object/input assertions plus direct non-black Phaser renderer snapshots as trustworthy Firefox/WebKit visual evidence; Chromium remains the live/compositor reference. Revisit real-device/live-channel coverage at the release gate. | Gate-dispositioned |
+| ID      | Discovered | Reproduction/evidence                                                                                                                               | Relationship  | Disposition                                                                                                                                                                                                                                                   | Status             |
+| ------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| RFG-001 | 2026-07-15 | Idle recoil used to clear sustained `(320, 144)` base scroll to `(0, 0)`.                                                                           | Batches 20/24 | Resolved by composed kick offsets in Batch 20; retain the proof in the Batch 24 gate.                                                                                                                                                                         | Resolved           |
+| RFG-002 | 2026-07-15 | Idle zoom pulse used to clear sustained base zoom `0.9` back to `1`.                                                                                | Batches 20/24 | Resolved by the composed zoom multiplier in Batch 20; retain the proof in the Batch 24 gate.                                                                                                                                                                  | Resolved           |
+| RFG-003 | 2026-07-15 | Headless Firefox/WebKit live practice gets no player ID; compositor screenshots from staged WebKit gameplay remain black.                           | Batches 17/24 | Batch 24 accepts staged object/input assertions plus direct non-black Phaser renderer snapshots as trustworthy Firefox/WebKit visual evidence; Chromium remains the live/compositor reference. Revisit real-device/live-channel coverage at the release gate. | Gate-dispositioned |
+| RFG-004 | 2026-07-17 | After all-six-arena coherent play, literal `largeWorlds:false` reports legacy viewport truth but retains the prior 1920x1152 minimap and landmarks. | Batch 39      | Client `GameScene` fallback/minimap lifecycle release blocker. Preserve `minimap: null`; correct separately, then rerun both complete browser matrices and the release gate.                                                                                  | Open blocker       |
 
 ## End-of-batch ritual
 
@@ -3623,6 +3631,18 @@ remain closed historical proofs. RFG-003 remains gate-dispositioned and
 unchanged. Batch 39 owns the complete Reforged Arena release review, blocker
 disposition, tester approval, and any separately authorized exposure/deploy.
 
+### Batch 39 - 2026-07-17 - Reforged Arena release gate (blocked)
+
+**Reviewed:** Selected the complete milestone matrix before change and ran the non-deployment Batch 2-38 release audit. Static, asset/provenance, map validation, 624-product/48-regulation balance, full 143-file/1,634-test unit matrix, typecheck, lint, affected/full builds, server tick/snapshot, and coherent client resource-quality evidence passed. The default-false browser inventory produced 144 passes and 110 intentional skips; one mobile fixture setup timeout passed on immediate isolated rerun.
+
+**Evidence corrections:** The coherent inventory exposed legacy-only tests targeting the retained Lobby and helpers injecting partial handshakes. Batch 39 made evidence-only corrections so default-false assertions remain mandatory while enabled journeys select the Reforged owner and coherent large-world dimensions. Focused shell intent/direct-launch, recovery, combat-feedback, modern-UI, match-menu, and Results-input reruns passed.
+
+**Blocker:** RFG-004 is reproducible in the all-six-arena journey. After coherent successor play, a literal `largeWorlds:false` transition reports legacy mode and 960x576 viewport bounds but retains the prior 1920x1152 minimap, ten successor landmarks, and large-world panel. This is a client `GameScene` fallback/minimap lifecycle release blocker and violates atomic rollback. The `minimap: null` assertion remains unchanged.
+
+**Deployment:** Skipped. Production remains on approved Batch 33 commit `f39eb34131f8827f85432aafcc6d6c18a2d0ac51`; all capabilities remain strict server-owned opt-ins and default false. No flag exposure, restart, live smoke, deployment, Battle Royale work, or successor task occurred.
+
+**Disposition:** Batch 39 is blocked and rollout is not authorized. Request separately scoped RFG-004 correction, then rerun its focused reproduction, both complete browser inventories, RFG-003 visual inspection, final static/protected-byte checks, and human walkthrough.
+
 ## Batch 22 input prompt (historical)
 
 ```text
@@ -4910,17 +4930,23 @@ gate, production review, and any capability exposure.
 ## Next-session prompt
 
 ```text
-Continue the Reforged build for Mighty Man's Revenge.
+Review the blocked Batch 39 Reforged Arena release gate for Mighty Man's Revenge.
 
 Read docs/REIMAGINING_ROADMAP.md and CLAUDE.md completely first. Read
 docs/REFORGED_BASELINE.md, docs/REFORGED_CAPABILITIES.md,
 docs/REFORGED_MAP_AUTHORING.md, docs/REFORGED_STYLE_BIBLE.md,
 docs/REFORGED_ASSET_PIPELINE.md, and
-docs/reforged/style-bible/PROVENANCE.md before implementation. Batch 38 - Mode
-and bot rebalance is complete. Implement Batch 39 - Reforged Arena release
-gate exactly as specified and do not begin Batch 40 - Battle Royale lifecycle.
+docs/reforged/style-bible/PROVENANCE.md before any action. Read
+docs/REFORGED_ARENA_RELEASE_GATE.md and the RFG-004 bug-ledger entry. Batch 39
+is blocked: after coherent successor play, literal `largeWorlds:false` restores
+legacy viewport truth but retains the successor minimap and landmarks. Do not
+implement a correction without fresh explicit user approval, and do not begin
+Batch 40 - Battle Royale lifecycle.
 
-Run the complete Reforged Arena gate as a non-deployment release review. Audit
+If the user explicitly authorizes a separately scoped RFG-004 correction, fix
+only the client `GameScene` fallback/minimap lifecycle, preserve the
+`minimap: null` assertion, and rerun the complete Reforged Arena gate as a
+non-deployment release review. Audit
 the complete Batch 2-38 contract: five-tab navigation and every preserved
 activity; explicit Duel, Rumble, and Crew setup; schedules, parties, readiness,
 bot fill, persistent fighters, Results/rematches, disconnect/recovery, all

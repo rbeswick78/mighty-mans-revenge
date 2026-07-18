@@ -1,6 +1,9 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from '../fixtures';
 
+const shellAdvertised = process.env.CAPABILITY_NEW_SHELL === 'true';
+const largeWorldsAdvertised = process.env.CAPABILITY_LARGE_WORLDS === 'true';
+
 async function waitForScene(page: Page, key: string): Promise<void> {
   await expect
     .poll(
@@ -62,21 +65,22 @@ test.describe('Live match menu', () => {
   test('resumes safely and confirms a leave across pointer, touch, keyboard, and gamepad', async ({
     gamePage,
   }, testInfo) => {
-    await waitForScene(gamePage, 'LobbyScene');
-    await gamePage.evaluate(() => {
+    await waitForScene(gamePage, shellAdvertised ? 'ReforgedShellScene' : 'LobbyScene');
+    await gamePage.evaluate((useReforgedShell) => {
       const game = (
         window as unknown as {
           game?: {
             scene: {
               scenes: Array<{
-                scene: { start: (key: string, data: unknown) => void };
-                sys: { settings: { active: boolean } };
+                scene: { key: string; start: (key: string, data: unknown) => void };
+                sys: { settings: { active: boolean; key: string } };
               }>;
+              getScene: (key: string) => { scene: { start: (key: string, data: unknown) => void } };
             };
           };
         }
       ).game;
-      const active = game?.scene.scenes.find((scene) => scene.sys.settings.active);
+      const active = game?.scene.getScene(useReforgedShell ? 'ReforgedShellScene' : 'LobbyScene');
       if (!active) throw new Error('active scene is not ready');
       active.scene.start('GameScene', {
         nickname: 'MenuTester',
@@ -88,7 +92,7 @@ test.describe('Live match menu', () => {
           matchKind: 'duel',
         },
       });
-    });
+    }, shellAdvertised);
     await waitForScene(gamePage, 'GameScene');
     const preFightLauncherVisible = await gamePage.evaluate(() => {
       const scene = (
@@ -120,7 +124,11 @@ test.describe('Live match menu', () => {
 
     const touch = testInfo.project.name === 'mobile-landscape';
     const launcher = await controlBounds(gamePage, 'launcher');
-    expect(launcher).toMatchObject({ x: 816, y: 6, width: 128, height: 58 });
+    expect(launcher).toMatchObject(
+      largeWorldsAdvertised
+        ? { x: 1120, y: 24, width: 128, height: 58 }
+        : { x: 816, y: 6, width: 128, height: 58 },
+    );
     await activateCanvasControl(gamePage, launcher, touch);
 
     const opened = await gamePage.evaluate(() => {
@@ -257,6 +265,6 @@ test.describe('Live match menu', () => {
     });
     expect(leaveCalls).toBe(1);
 
-    await waitForScene(gamePage, 'LobbyScene');
+    await waitForScene(gamePage, shellAdvertised ? 'ReforgedShellScene' : 'LobbyScene');
   });
 });

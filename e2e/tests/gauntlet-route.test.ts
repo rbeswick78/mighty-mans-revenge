@@ -4,6 +4,10 @@ test.describe('Gauntlet route draft', () => {
   test('renders both next-fight routes and locks Route B through pointer input', async ({
     gamePage,
   }, testInfo) => {
+    test.skip(
+      process.env.CAPABILITY_NEW_SHELL === 'true',
+      'The default-false matrix owns the legacy pointer route; enabled challenge entry is covered by ReforgedShellScene.',
+    );
     await expect
       .poll(
         () =>

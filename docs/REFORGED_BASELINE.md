@@ -444,3 +444,7 @@ frames, so black WebKit compositor screenshots are classified as a headless
 compositor limitation rather than game pixels. Pair those renderer frames with
 staged object/input assertions and keep Chromium as the live/compositor visual
 reference until real-device coverage at the release gate.
+
+### Batch 39 release-gate blocker
+
+The complete non-browser and default-false release evidence passed, but coherent enabled-to-disabled fallback exposed RFG-004. After successor play, literal `largeWorlds:false` restores legacy viewport mode and 960x576 bounds while retaining the prior 1920x1152 minimap and successor landmarks. This is not an accepted fallback baseline: the complete legacy owner requires no large-world minimap. Batch 39 is blocked pending a separately scoped correction and full gate rerun; production and all defaults remain unchanged.

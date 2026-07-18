@@ -89,6 +89,10 @@ test.describe('Lobby keyboard navigation', () => {
   test('makes every route reachable without stealing callsign editing or touch control', async ({
     lobbyPage,
   }, testInfo) => {
+    test.skip(
+      process.env.CAPABILITY_NEW_SHELL === 'true',
+      'ReforgedShellScene owns enabled navigation; this file remains the default-false legacy proof.',
+    );
     const mobile = testInfo.project.name === 'mobile-landscape';
     await waitForLobby(lobbyPage, false);
     if (!mobile) {

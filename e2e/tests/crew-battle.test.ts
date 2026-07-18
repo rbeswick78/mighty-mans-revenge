@@ -1,5 +1,7 @@
 import { test, expect } from '../fixtures';
 
+const shellAdvertised = process.env.CAPABILITY_NEW_SHELL === 'true';
+
 test.describe('Crew Battle 2v2', () => {
   test('opens a readable ally window and lets every project cancel back to the lobby', async ({
     gamePage,
@@ -112,6 +114,10 @@ test.describe('Crew Battle 2v2', () => {
   test('launches two server-authored crews and marks the Rusty ally in live play', async ({
     gamePage,
   }, testInfo) => {
+    test.skip(
+      shellAdvertised,
+      'The advertised Play roster and party routes own live Crew launch; reforged-shell.test.ts covers that route.',
+    );
     test.skip(
       testInfo.project.name !== 'desktop-chromium',
       'One authoritative live-flow browser is sufficient; cross-device Crew UI is covered above.',
@@ -259,6 +265,10 @@ test.describe('Crew Battle 2v2', () => {
     gamePage,
     context,
   }, testInfo) => {
+    test.skip(
+      shellAdvertised,
+      'The advertised party surface owns two-client Crew setup; reforged-shell.test.ts covers that route.',
+    );
     test.skip(
       testInfo.project.name !== 'desktop-chromium',
       'Two-client WebRTC Crew pair-up is pinned to its stable Chromium project.',

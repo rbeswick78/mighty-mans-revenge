@@ -4,6 +4,10 @@ test.describe('Gauntlet Build Codex', () => {
   test('opens the trophy board, renders mastery progress, and returns to the lobby', async ({
     gamePage,
   }, testInfo) => {
+    test.skip(
+      process.env.CAPABILITY_NEW_SHELL === 'true',
+      'The enabled Challenges tab owns Build Codex; reforged-shell.test.ts covers that surface.',
+    );
     await gamePage.evaluate(() => {
       localStorage.setItem(
         'mmr_gauntlet_build_codex',

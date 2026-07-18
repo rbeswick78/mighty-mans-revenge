@@ -42,6 +42,10 @@ test.describe('Practice setup overlay', () => {
   test('keeps the lobby readable and supports pointer, touch, keyboard, and gamepad focus', async ({
     lobbyPage,
   }, testInfo) => {
+    test.skip(
+      process.env.CAPABILITY_NEW_SHELL === 'true',
+      'The enabled Challenges tab owns practice setup; reforged-shell.test.ts covers that surface.',
+    );
     await lobbyPage.evaluate(() => localStorage.removeItem('mmr_bot_difficulty'));
     await lobbyPage.reload();
     await waitForLobby(lobbyPage);
@@ -67,8 +71,7 @@ test.describe('Practice setup overlay', () => {
         gamepadButtons: () => unknown[];
       };
       const footer = scene.children.list.find(
-        (child) =>
-          child.text?.startsWith('TAB / ARROWS') || child.text?.startsWith('TAP A ROUTE'),
+        (child) => child.text?.startsWith('TAB / ARROWS') || child.text?.startsWith('TAP A ROUTE'),
       );
       const gamepadButtons = scene.gamepadButtons();
       return {
