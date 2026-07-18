@@ -5,9 +5,9 @@ Read this file and `CLAUDE.md` completely at the start of every batch. The
 completed `docs/REPLAYABILITY_ROADMAP.md` remains the historical record for the
 systems this program preserves and reorganizes.
 
-- **Status:** Batch 46 Battle Royale safe-zone phases completed on 2026-07-18;
+- **Status:** Batch 47 Battle Royale bots completed on 2026-07-18;
   the format remains dormant and every capability remains default false.
-- **Next step:** Batch 47 Battle Royale bots under the user's standing
+- **Next step:** Batch 48 spectating under the user's standing
   authorization to continue sequentially through the plan while deferring human
   involvement. The deferred Batch 39 human release walkthrough still does not
   authorize deployment, capability exposure, production restart, or live smoke.
@@ -201,9 +201,9 @@ Production deployment happens only at a gate or for an urgent live fix.
 |  42 | Weapon instances and rarity            | Battle Royale | Complete (2026-07-18) |
 |  43 | Single-slot inventory                  | Battle Royale | Complete (2026-07-18) |
 |  44 | Containers and loot                    | Battle Royale | Complete (2026-07-18) |
-|  45 | Four-biome arena                       | Battle Royale | Pending               |
-|  46 | Safe-zone phases                       | Battle Royale | Pending               |
-|  47 | Battle Royale bots                     | Battle Royale | Pending               |
+|  45 | Four-biome arena                       | Battle Royale | Complete (2026-07-18) |
+|  46 | Safe-zone phases                       | Battle Royale | Complete (2026-07-18) |
+|  47 | Battle Royale bots                     | Battle Royale | Complete (2026-07-18) |
 |  48 | Spectating                             | Battle Royale | Pending               |
 |  49 | Battle Royale records                  | Battle Royale | Pending               |
 |  50 | Network and performance hardening      | Battle Royale | Pending               |
@@ -1693,6 +1693,55 @@ Acceptance:
 
 Teach bots to open/compare loot, manage ammo/sustain, plan for current/next
 zones, select targets, fight, and increase aggression in final phases.
+
+**Verification tier selected before implementation (2026-07-18):** strict
+server-authoritative bot-decision and 20 Hz eight-fighter simulation tier. The
+batch crosses ordinary sequenced input, collision-grid routing, one-slot
+inventory/loot interaction, current/next safe-zone planning, N-player target
+selection, and final-phase combat cadence, while adding no client-authored
+decision or wire field. Run focused deterministic planner/comparison,
+container/open/collect/swap/reload/sustain, current/next/final zone, stable
+target, and eight-bot simulation evidence; the complete unit matrix;
+typecheck; lint; all builds; map/asset validation; the authoritative server
+baseline; unchanged standard balance evidence; allowlist and repository-wide
+formatting inventories; and `git diff --check`. Browser evidence is not
+selected initially because the owned behavior is dormant server-only input
+generation with no new scene, HUD, route, wire, or player-facing action;
+escalate if implementation or regressions cross one of those boundaries.
+
+Acceptance:
+
+- [x] Battle Royale bots inspect only authoritative container, ground-gun,
+      supply, inventory, player, collision, and safe-zone state, and express
+      every action through ordinary sequenced `PlayerInput`; they never open,
+      roll, collect, equip, damage, heal, or author circle state directly.
+- [x] Unarmed bots route to reachable intact containers, attack them through
+      normal combat, and collect the resulting gun/supply through the existing
+      contested interaction boundaries. Armed bots compare effective
+      damage/rarity, readiness, distance, and stable entity IDs, and never
+      replace a useful gun with a deterministic downgrade.
+- [x] Bots reload from universal reserve, seek useful ammo/bandage/armor/
+      grenade bundles, ignore exhausted or wasteful sustain, and preserve the
+      exact one-slot/drop/reserve economy under simultaneous contests.
+- [x] Current-circle danger preempts loot and combat. Bots plan toward the
+      next circle when authoritative remaining time and travel distance require
+      it, reject unsafe detours, and do not consume gameplay RNG or predict a
+      future server phase.
+- [x] Living opponents are selected from N-player-safe collections with stable
+      distance/player-ID ties. Ordinary line-of-sight, weapon range, ammo,
+      projectile, grenade, ability, damage, attribution, and lifecycle rules
+      remain the only way bots fight and eliminate.
+- [x] Final closure suppresses loot detours and increases approach/fire
+      aggression through input cadence only; it does not alter weapon stats,
+      physics, damage, safe-zone timing, or placement authority.
+- [x] Independent eight-fighter 20 Hz runs reproduce decisions and legal
+      terminal shapes without stalls or invalid input. Human-only Battle
+      Royale and capability-off paths remain unchanged.
+- [x] Standard Duel/Rumble/Crew/Practice bot behavior, all eight modes, six
+      public arenas, mutators, rematches, stats/persistence, snapshots, input,
+      presentation, fallback, and balance evidence remain exact.
+- [x] Batch 48 spectating and all later records, hardening, release, exposure,
+      deployment, restart, and live-smoke work do not begin.
 
 #### Batch 48 — Spectating
 
@@ -4331,6 +4380,64 @@ gate-dispositioned compositor rule, RFG-004 remains resolved, and the Batch 43/
 33 commit `f39eb34131f8827f85432aafcc6d6c18a2d0ac51`; `newShell`, `schedules`,
 `largeWorlds`, `modernArt`, and `battleRoyale` remain strict server-owned
 opt-ins, default false, and unexposed. Proceed only to Batch 47 under the user's
+standing direct-development authorization. Capability exposure, deployment,
+production restart, and live smoke remain explicitly unauthorized.
+
+### Batch 47 - 2026-07-18 - Battle Royale bots
+
+**Scope and tier:** Before runtime implementation, the strict
+server-authoritative bot-decision and 20 Hz eight-fighter simulation tier was
+selected and documented. The batch added only deterministic Battle Royale
+container/loot/sustain/zone/target planning and final-phase input cadence.
+Batch 48 spectating, records, hardening, exposure, release, deployment,
+restart, and live smoke did not enter the allowlist. Browser evidence was not
+selected because no wire, scene, HUD, route, presentation, or player-facing
+input surface changed.
+
+**Authority and behavior:** The new pure planner reads authoritative players,
+inventory, ground guns, containers, supply bundles, collision geometry, and
+current/next circle state. It returns only movement, aim, and contextual-swap
+intentions to the existing controller, which submits ordinary sequenced
+`PlayerInput`. Existing combat, loot, inventory, safe-zone, and lifecycle code
+still exclusively opens/rolls/collects/equips/reloads/heals/damages/attributes/
+eliminates. Unarmed and low-ammo bots attack containers, compare ordinary
+trigger output after damage-only rarity, seek useful universal ammo/sustain,
+step clear of inferior contextual drops before reload, and reject deterministic
+downgrades.
+
+Current-circle danger preempts combat and loot. Authoritative next geometry,
+phase time, ordinary fighter speed, and a shared travel buffer drive proactive
+rotation without advancing or predicting a server phase. Target selection is
+N-player safe with stable distance/player-ID ties. Final closure suppresses
+loot and shortens only approach/trigger decision cadence; weapon stats,
+physics, damage, circle timing, and placement remain untouched. Standard bot
+branches are unchanged.
+
+**Verification:** Focused planner, standard-controller, inventory, loot, and
+lifecycle coverage passed 64 tests. Two independent eight-bot 20 Hz
+Shatterlands runs reproduced player/inventory/loot state through active tick
+400 or the same legal early terminal. The complete matrix passed 156 files and
+1,738 tests. Typecheck, ESLint, all package builds, all 13 compatible maps,
+four strict map tests, 30 asset-contract tests, and the unchanged 624-product
+standard balance matrix passed. The Batch 47 allowlist was formatted and
+`git diff --check` passed. The repository-wide Prettier inventory still
+reports 95 inherited files, none on the Batch 47 allowlist. The final
+authoritative baseline retained
+configured/rolling 20 Hz and the 50 ms budget; synthetic four-player
+mean/p95/p99/max work was 0.014/0.024/0.069/0.775 ms and standard active
+snapshots remained exactly 2,481/3,762 bytes. A host scheduler drift reset
+produced a 15.965 Hz wall-clock sample while average processing stayed 0.066
+ms; no product tick-budget defect was proven.
+
+**Bug ledger:** No product defect was proven, so no entry was added. Focused
+development evidence clarified intended safe-target filtering, registered
+container attack endpoints, and the established contextual swap/reload input;
+all final focused and full regressions pass.
+
+**Deployment and disposition:** Skipped. Production remains on approved Batch
+33 commit `f39eb34131f8827f85432aafcc6d6c18a2d0ac51`; `newShell`, `schedules`,
+`largeWorlds`, `modernArt`, and `battleRoyale` remain strict server-owned
+opt-ins, default false, and unexposed. Proceed only to Batch 48 under the user's
 standing direct-development authorization. Capability exposure, deployment,
 production restart, and live smoke remain explicitly unauthorized.
 

@@ -1,6 +1,8 @@
 import {
   BOT,
   BOT_PROFILES,
+  BATTLE_ROYALE_BOT,
+  BATTLE_ROYALE_INVENTORY,
   DEFAULT_BOT_DIFFICULTY,
   GRENADE,
   KOTH,
@@ -27,6 +29,7 @@ import type {
 } from '@shared/game';
 import type { BotDifficulty, BotTactic } from '@shared/game';
 import type { Match } from './match.js';
+import { planBattleRoyaleBot } from './battle-royale-bot-planner.js';
 
 export interface GridPoint {
   x: number;
@@ -325,15 +328,30 @@ export class BotController {
       return;
     }
     this.forcedPathSeconds = Math.max(0, this.forcedPathSeconds - dt);
-    const bountyTargetId = match.getBountyHuntState()?.targetId ?? null;
+    const grid = match.mapManager.getCollisionGrid();
+    const battleRoyale = bot.battleRoyaleInventory !== undefined;
+    const battleRoyaleDrops = battleRoyale ? match.getDroppedWeapons() : [];
+    const battleRoyalePlan = battleRoyale
+      ? planBattleRoyaleBot(bot, {
+          players: match.players,
+          drops: battleRoyaleDrops,
+          containers: match.getBattleRoyaleContainers(),
+          supplies: match.getBattleRoyaleSupplyBundles(),
+          safeZone: match.getBattleRoyaleSafeZoneState(),
+          collisionGrid: grid,
+          tileSize: grid.tileSize,
+        })
+      : null;
+    const bountyTargetId = battleRoyale ? null : (match.getBountyHuntState()?.targetId ?? null);
     const bountyTarget =
       bountyTargetId !== null &&
       bountyTargetId !== bot.id &&
       !match.areTeammates(bot.id, bountyTargetId)
         ? (match.players.get(bountyTargetId) ?? null)
         : null;
-    const target =
-      bountyTarget && !bountyTarget.isDead
+    const target = battleRoyalePlan
+      ? battleRoyalePlan.combatTarget
+      : bountyTarget && !bountyTarget.isDead
         ? bountyTarget
         : pickBotTarget(
             bot,
@@ -341,19 +359,25 @@ export class BotController {
             this.tactic,
             (candidateId) => !match.areTeammates(bot.id, candidateId),
           );
-    const objectiveTag = this.pickNearestTag(bot, match.getKillConfirmedTags());
-    const coreState = match.getCoreRunState();
+    const objectiveTag = battleRoyale
+      ? null
+      : this.pickNearestTag(bot, match.getKillConfirmedTags());
+    const coreState = battleRoyale ? null : match.getCoreRunState();
     const looseCore = coreState?.carrierId === null ? coreState : null;
-    const supplyDrop = this.pickNearestSupply(bot, match.pickupManager.getPickups());
-    const resource = pickBotResource(
-      bot,
-      match.pickupManager.getPickups(),
-      match.mapManager.getCollisionGrid().tileSize,
-      this.tactic === 'scavenger'
-        ? BOT.SCAVENGER_RESOURCE_MAX_DETOUR_TILES
-        : BOT.RESOURCE_MAX_DETOUR_TILES,
-    );
-    if (!target && !objectiveTag && !looseCore && !supplyDrop && !resource) {
+    const supplyDrop = battleRoyale
+      ? null
+      : this.pickNearestSupply(bot, match.pickupManager.getPickups());
+    const resource = battleRoyale
+      ? null
+      : pickBotResource(
+          bot,
+          match.pickupManager.getPickups(),
+          match.mapManager.getCollisionGrid().tileSize,
+          this.tactic === 'scavenger'
+            ? BOT.SCAVENGER_RESOURCE_MAX_DETOUR_TILES
+            : BOT.RESOURCE_MAX_DETOUR_TILES,
+        );
+    if (!battleRoyalePlan && !target && !objectiveTag && !looseCore && !supplyDrop && !resource) {
       this.movementExpected = false;
       return;
     }
@@ -369,30 +393,39 @@ export class BotController {
       this.strafeSign *= -1;
     }
 
-    const combatPosition =
+    const combatPosition = battleRoyalePlan?.attackPosition ??
       target?.position ??
       objectiveTag?.position ??
       looseCore?.position ??
       supplyDrop?.position ??
-      resource!.position;
+      resource?.position ?? { ...bot.position };
     const dx = combatPosition.x - bot.position.x;
     const dy = combatPosition.y - bot.position.y;
     const distance = Math.hypot(dx, dy);
     const directAngle = Math.atan2(dy, dx);
-    const grid = match.mapManager.getCollisionGrid();
     const ray = raycastAgainstGrid(grid, bot.position.x, bot.position.y, directAngle, distance);
-    const hasLineOfSight = !ray.hitTile || ray.distance >= distance - 8;
-    const movementGoal = this.chooseMovementGoal(
-      bot,
-      target,
-      objectiveTag,
-      looseCore,
-      supplyDrop,
-      resource,
-      bountyTarget,
-      match,
-      grid,
-    );
+    const attackingContainer = battleRoyalePlan?.goalKind === 'container';
+    const hasLineOfSight =
+      !ray.hitTile ||
+      ray.distance >= distance - 8 ||
+      (attackingContainer && ray.distance >= distance - grid.tileSize);
+    const movementGoal = battleRoyalePlan
+      ? {
+          position: battleRoyalePlan.movementPosition,
+          holdPosition: battleRoyalePlan.goalKind === 'hold',
+          isCombatTarget: battleRoyalePlan.goalKind === 'target',
+        }
+      : this.chooseMovementGoal(
+          bot,
+          target,
+          objectiveTag,
+          looseCore,
+          supplyDrop,
+          resource,
+          bountyTarget,
+          match,
+          grid,
+        );
     const movementDx = movementGoal.position.x - bot.position.x;
     const movementDy = movementGoal.position.y - bot.position.y;
     const movementDistance = Math.hypot(movementDx, movementDy);
@@ -416,6 +449,9 @@ export class BotController {
           hasDirectMovementPath && this.forcedPathSeconds <= 0,
           movementDistance,
           movementGoal.isCombatTarget,
+          battleRoyalePlan?.finalAggression
+            ? BATTLE_ROYALE_BOT.FINAL_PREFERRED_DISTANCE_MULTIPLIER
+            : 1,
         );
     this.movementExpected = !movementGoal.holdPosition && Math.hypot(movement.x, movement.y) > 0.01;
     const aimAngle =
@@ -456,14 +492,28 @@ export class BotController {
       BOT.FIRE_RANGE,
       'maxRange' in weapon ? weapon.maxRange : BOT.FIRE_RANGE,
     );
-    const reload = this.shouldReload(bot);
+    const swapRequested =
+      battleRoyalePlan?.swapDropId !== null &&
+      battleRoyalePlan?.swapDropId !== undefined &&
+      Math.hypot(
+        battleRoyalePlan.movementPosition.x - bot.position.x,
+        battleRoyalePlan.movementPosition.y - bot.position.y,
+      ) <= BATTLE_ROYALE_INVENTORY.PICKUP_RADIUS;
+    const blockedByContextualDrop = battleRoyaleDrops.some(
+      (drop) =>
+        drop.id !== battleRoyalePlan?.swapDropId &&
+        Math.hypot(drop.position.x - bot.position.x, drop.position.y - bot.position.y) <=
+          BATTLE_ROYALE_INVENTORY.PICKUP_RADIUS,
+    );
+    const reload = swapRequested || (!blockedByContextualDrop && this.shouldReload(bot));
+    const attackIntent = target !== null || battleRoyalePlan?.attackPosition !== null;
     const firePressed =
-      !reload &&
-      target !== null &&
-      hasLineOfSight &&
-      distance <= usefulRange &&
-      this.fireSeconds <= 0;
-    if (firePressed) this.fireSeconds = this.profile.fireIntervalSeconds;
+      !reload && attackIntent && hasLineOfSight && distance <= usefulRange && this.fireSeconds <= 0;
+    if (firePressed) {
+      this.fireSeconds =
+        this.profile.fireIntervalSeconds *
+        (battleRoyalePlan?.finalAggression ? BATTLE_ROYALE_BOT.FINAL_FIRE_INTERVAL_MULTIPLIER : 1);
+    }
 
     const abilityPressed =
       !chamberRules &&
@@ -480,7 +530,7 @@ export class BotController {
       moveX: movement.x,
       moveY: movement.y,
       aimAngle,
-      aimingGun: target !== null && hasLineOfSight,
+      aimingGun: attackIntent && hasLineOfSight,
       firePressed,
       aimingGrenade: false,
       throwPressed,
@@ -678,6 +728,7 @@ export class BotController {
     hasDirectPath: boolean,
     distance: number,
     isCombatTarget: boolean,
+    preferredDistanceMultiplier: number,
   ): Vec2 {
     const dx = targetPosition.x - bot.position.x;
     const dy = targetPosition.y - bot.position.y;
@@ -688,7 +739,9 @@ export class BotController {
       const heldWeapon = WEAPONS[bot.weaponId];
       const meleeReach = 'maxRange' in heldWeapon ? heldWeapon.maxRange : undefined;
       const isMelee = meleeReach !== undefined;
-      const preferredDistance = isMelee ? meleeReach * 0.65 : BOT.PREFERRED_DISTANCE;
+      const preferredDistance = isMelee
+        ? meleeReach * 0.65
+        : BOT.PREFERRED_DISTANCE * preferredDistanceMultiplier;
       if (distance > preferredDistance) return toward;
       if (!isMelee && distance < BOT.RETREAT_DISTANCE) {
         return { x: -toward.x, y: -toward.y };

@@ -677,3 +677,49 @@ mean/p95/p99/max work was 0.014/0.027/0.071/0.814 ms, and standard active
 snapshots remained exactly 2,481/3,762 bytes. All capabilities remain default
 false and unexposed; production remains on Batch 33 and no deployment,
 restart, or live smoke occurred.
+
+### Batch 47 Battle Royale bot baseline
+
+Battle Royale bot-fill fighters now use a pure server planner over the
+existing authoritative player, inventory, ground-gun, container, supply,
+collision, and current/next circle state. The planner returns only movement,
+aim, and contextual-swap intentions; `BotController` emits ordinary sequenced
+`PlayerInput`, and the established Match, CombatManager, inventory, and loot
+managers remain the only code that opens containers, rolls contents, collects,
+equips, reloads, heals, damages, attributes, or eliminates.
+
+Unarmed or low-ammo bots route to intact containers and attack their solid
+tiles through ordinary combat. They compare candidate guns by the weapon's
+normal trigger output after the locked damage-only rarity multiplier, then use
+readiness, distance, and stable entity ID only as deterministic ties. Useful
+universal ammo, bandage, armor, and grenade bundles are prioritized without
+consuming wasteful sustain. A bot steps outside the contextual radius of the
+inferior gun created by its own upgrade swap before requesting a reload, so the
+one-input swap/reload contract remains intact.
+
+Current-circle danger preempts every target and detour. Next-circle geometry,
+authoritative phase time, ordinary fighter speed, and a shared travel buffer
+determine proactive rotation; unsafe loot is rejected and no future phase is
+simulated. Living targets use distance/player-ID ordering over N-player maps.
+Final closure suppresses loot and shortens only approach/trigger decision
+cadence. It changes no weapon, physics, damage, zone, lifecycle, placement, or
+client rule.
+
+Focused planner, standard-controller, inventory, loot, and lifecycle coverage
+passed 64 tests. Two independent eight-bot 20 Hz Shatterlands runs reproduced
+all player/inventory/loot state through active tick 400 or the same legal early
+terminal state. The complete matrix passed 156 files and 1,738 tests;
+typecheck, lint, all builds, all 13 compatible map documents, four strict map
+tests, 30 asset-contract tests, and the unchanged 624-product standard balance
+matrix passed. Browser evidence was not selected because Batch 47 adds no wire,
+scene, HUD, route, presentation, or player-facing input surface.
+The repository-wide Prettier inventory retains 95 inherited files outside the
+formatted Batch 47 allowlist.
+
+The final authoritative baseline retained configured/rolling 20 Hz and the
+50 ms budget. Synthetic four-player mean/p95/p99/max work was
+0.014/0.024/0.069/0.775 ms, and standard active snapshots remained exactly
+2,481/3,762 bytes. The host wall-clock probe reset one scheduler drift window
+while average processing remained 0.066 ms; no tick-budget product defect was
+proven. All capabilities remain default false and unexposed; production remains
+on Batch 33 and no deployment, restart, or live smoke occurred.

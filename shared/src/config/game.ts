@@ -426,6 +426,15 @@ export const BATTLE_ROYALE_SAFE_ZONE = Object.freeze({
   DAMAGE_PER_PULSE: Object.freeze([0, 2, 3, 4, 6, 8, 10, 16]),
 });
 
+/** Server-only Battle Royale bot planning and input-cadence policy. */
+export const BATTLE_ROYALE_BOT = Object.freeze({
+  MAX_LOOT_DETOUR_TILES: 14,
+  ZONE_TRAVEL_BUFFER_SECONDS: 2,
+  LOW_AMMO_MAGAZINES: 1,
+  FINAL_FIRE_INTERVAL_MULTIPLIER: 0.55,
+  FINAL_PREFERRED_DISTANCE_MULTIPLIER: 0.55,
+});
+
 /**
  * Runtime list of every kill-attribution source, for keying per-weapon
  * kill counters. Must stay in sync with the KillWeapon union in

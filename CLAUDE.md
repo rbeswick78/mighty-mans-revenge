@@ -955,10 +955,10 @@ production flag, or deployment follows from passing Batch 38 evidence.
 ## Reforged Release State
 
 Batch 39 automated evidence remains green and its human tester/release review
-is deliberately deferred. Batch 44's dormant Battle Royale container and loot
-lifecycle is complete: the server owns attack/open transitions, seeded gun,
-rarity and sustain rolls, supply contests, and compact elimination piles beside
-the Batch 43 one-slot inventory. Additive wire fields remain optional and
+is deliberately deferred. Batch 47's dormant Battle Royale bot lifecycle is
+complete: bots consume the established inventory, loot, Shatterlands, and
+safe-zone truth through deterministic server planning, then act only through
+ordinary sequenced input. Additive wire fields remain optional and
 `battleRoyale` stays default false and unexposed.
 RFG-004 remains resolved by the per-run `GameScene.minimapRenderer` reset and
 RFG-005 resolves the Battle Royale self-explosion lifecycle gap. The user has
@@ -1065,3 +1065,41 @@ minimap. It cannot choose the map, spawn, route, container, transition, or
 visibility result. Batch 46 owns zones and tactical-map gameplay; Batch 45 adds
 neither. All Reforged capabilities remain strict server-owned opt-ins, default
 false, and unexposed, and no deployment, restart, or live smoke is authorized.
+
+## Battle Royale Safe-Zone Contract
+
+Batch 46 derives one bounded, strictly nested eight-segment circle plan from
+the stable match seed and private arena dimensions without consuming gameplay
+RNG. Preview, closing, hold, and final phases advance only on the authoritative
+20 Hz server. One-second outside pulses honor ordinary invulnerability, armor,
+and Iron Hide, carry no attacker credit, and feed the Battle Royale lifecycle
+in stable fighter order. Standard Radiation Storm and both standard mutator
+slots remain separate and unchanged.
+
+The optional `battleRoyaleSafeZone` snapshot contains current/next geometry,
+phase identity, remaining phase time, and pulse damage. Clients validate and
+project that object atomically into world warnings, minimap, and the local-only
+tactical map; they never advance a circle, apply damage, or reveal generic
+rivals. Standard snapshots omit the field and old-server omission clears it.
+
+## Battle Royale Bot Contract
+
+Batch 47 adds a pure deterministic planner in front of the existing
+`BotController`. It reads only authoritative players, inventory, ground guns,
+containers, supply bundles, collision geometry, and current/next circle state.
+The planner may choose a movement, aim, or contextual-swap intention, but every
+result still travels through ordinary sequenced `PlayerInput`; only existing
+Match, CombatManager, inventory, and loot managers may open, roll, collect,
+equip, reload, heal, damage, attribute, or eliminate.
+
+Unarmed/low-ammo bots attack reachable containers, compare ground guns by the
+ordinary trigger output after damage-only rarity, collect only useful sustain,
+and step clear of an inferior contextual drop before reloading universal
+reserve. Current-circle danger preempts combat and loot; current/next geometry
+plus authoritative time and ordinary movement speed determine early rotation.
+N-player targets use stable distance/player-ID ties. Final closure suppresses
+loot and shortens only approach/trigger decision cadence; weapon stats,
+physics, safe-zone timing, damage, and placement remain unchanged. Standard
+bot paths never construct this plan. Batch 48 owns spectating. Every capability
+remains default false and unexposed, and no deployment, restart, or live smoke
+is authorized.

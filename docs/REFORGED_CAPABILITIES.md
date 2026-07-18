@@ -506,3 +506,25 @@ This remains dormant support code. `battleRoyale`, `newShell`, `schedules`,
 false, and unexposed. Batch 47 owns Battle Royale bot loot/zone behavior.
 Production remains on approved Batch 33, and no deployment, restart, live
 smoke, or capability advertisement is authorized.
+
+## Batch 47 Battle Royale bot disposition
+
+Batch 47 does not add, expose, or alter a capability. Bot planning activates
+only for a server-created fighter that already carries the Battle Royale
+inventory state; standard Duel/Rumble/Crew/Practice controllers take the exact
+established target, objective, pickup, mutator, and input branches. Human-only
+Battle Royale matches do not create a controller, and capability-off clients
+and servers remain unable to enter the route.
+
+The planner consumes no new wire state and authors none. It reads the same
+server-owned containers, drops, bundles, players, collision grid, and circle
+state already used by simulation, then submits ordinary sequenced input. It
+cannot bypass attack/open, seeded loot, contested collection, contextual
+swap/reload, damage, safe-zone, or lifecycle authority. Final aggression is an
+input-cadence policy only and changes no shared combat value.
+
+This remains dormant support code. `battleRoyale`, `newShell`, `schedules`,
+`largeWorlds`, and `modernArt` remain strict server-owned opt-ins, default
+false, and unexposed. Batch 48 owns spectating. Production remains on approved
+Batch 33, and no deployment, restart, live smoke, or capability advertisement
+is authorized.
