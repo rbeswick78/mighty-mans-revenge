@@ -229,7 +229,7 @@ describe('Battle Royale single-slot inventory', () => {
     expect(new Set(match.getDroppedWeapons().map((drop) => drop.id)).size).toBe(8);
   });
 
-  it('clears held inventory on elimination and departure without inventing elimination loot', () => {
+  it('clears held inventory on elimination and departure after authoring exact Batch 44 loot', () => {
     const match = createMatch();
     const victim = match.players.get('player-1')!;
     equip(victim, instance('weapon:death', 'launcher', 'mythical'), 1, 20);
@@ -239,7 +239,13 @@ describe('Battle Royale single-slot inventory', () => {
       loadedAmmo: 0,
       reserveAmmo: 0,
     });
-    expect(match.getDroppedWeapons()).toEqual([]);
+    expect(match.getDroppedWeapons()).toEqual([
+      expect.objectContaining({
+        weaponInstance: { instanceId: 'weapon:death', weaponId: 'launcher', rarity: 'mythical' },
+        loadedAmmo: 1,
+        lootSourceId: 'br-elimination:player-1',
+      }),
+    ]);
 
     const leaver = match.players.get('player-2')!;
     equip(leaver, instance('weapon:depart', 'smg'), 8, 12);
@@ -249,7 +255,8 @@ describe('Battle Royale single-slot inventory', () => {
       loadedAmmo: 0,
       reserveAmmo: 0,
     });
-    expect(match.getDroppedWeapons()).toEqual([]);
+    expect(match.getDroppedWeapons()).toHaveLength(2);
+    expect(match.getBattleRoyaleSupplyBundles()).toHaveLength(2);
   });
 
   it('records an uncredited launcher self-elimination in a multi-opponent Battle Royale', () => {

@@ -362,6 +362,10 @@ export interface ServerGameStateMessage {
   rockets?: RocketState[];
   /** Server-owned Battle Royale ground guns; absent on standard/old servers. */
   droppedWeapons?: import('./weapon.js').DroppedWeaponState[];
+  /** Attack-opened Battle Royale containers; absent on standard/old servers. */
+  battleRoyaleContainers?: import('./weapon.js').BattleRoyaleContainerState[];
+  /** Compact Battle Royale supplies and elimination piles; absent on standard/old servers. */
+  battleRoyaleSupplyBundles?: import('./weapon.js').BattleRoyaleSupplyBundleState[];
   bulletTrails: BulletTrail[];
   /** Environmental detonations resolved this snapshot (legacy wire name). */
   barrelExplosions: Vec2[];

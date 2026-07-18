@@ -73,6 +73,8 @@ import type {
   TauntId,
   TeamId,
   BattleRoyaleMatchFormat,
+  BattleRoyaleContainerState,
+  BattleRoyaleSupplyBundleState,
   DroppedWeaponState,
   WeaponInstance,
 } from '@shared/game';
@@ -89,6 +91,7 @@ import { InputQueue } from './input-queue.js';
 import { RumbleAssistTracker } from './rumble-assist-tracker.js';
 import { BattleRoyaleLifecycle } from './battle-royale-lifecycle.js';
 import { BattleRoyaleInventoryManager } from './battle-royale-inventory-manager.js';
+import { BattleRoyaleLootManager } from './battle-royale-loot-manager.js';
 
 interface PendingBurst {
   weaponId: 'rifle' | 'smg';
@@ -126,6 +129,7 @@ export class Match implements MatchContext {
   readonly stats: StatsTracker;
   readonly pickupManager: PickupManager;
   readonly battleRoyaleInventoryManager: BattleRoyaleInventoryManager | null;
+  readonly battleRoyaleLootManager: BattleRoyaleLootManager | null;
   readonly mapManager: MapManager;
   /** Mode this match runs — the matchmaking manager reads it for rotation. */
   readonly gameModeType: GameModeType;
@@ -382,6 +386,9 @@ export class Match implements MatchContext {
     this.plannedMidMatchMutator = plannedMidMatchMutator;
     this.timeLimitSeconds = resolveTimeLimitSeconds();
     this.stableSeed = stableSeed ?? matchId;
+    this.battleRoyaleLootManager = this.battleRoyaleInventoryManager
+      ? new BattleRoyaleLootManager(this.stableSeed, this.battleRoyaleInventoryManager)
+      : null;
     this.usesChallengeSeed = stableSeed !== undefined;
     for (const [playerId, boonIds] of gauntletBoonAssignments) {
       const valid = new Set(
@@ -1325,6 +1332,31 @@ export class Match implements MatchContext {
     return this.battleRoyaleInventoryManager?.getDrops() ?? [];
   }
 
+  getBattleRoyaleContainers(): BattleRoyaleContainerState[] {
+    return this.battleRoyaleLootManager?.getContainers() ?? [];
+  }
+
+  getBattleRoyaleSupplyBundles(): BattleRoyaleSupplyBundleState[] {
+    return this.battleRoyaleLootManager?.getSupplyBundles() ?? [];
+  }
+
+  /** Batch 45 map authoring feeds this boundary; standard matches reject it. */
+  spawnBattleRoyaleContainer(
+    id: string,
+    col: number,
+    row: number,
+  ): BattleRoyaleContainerState | null {
+    const manager = this.battleRoyaleLootManager;
+    const map = this.mapManager.getMapData();
+    const grid = this.mapManager.getCollisionGrid();
+    if (!manager || grid.solid[row]?.[col] !== true) return null;
+    return manager.spawnContainer(
+      id,
+      { col, row },
+      { x: col * map.tileSize + map.tileSize / 2, y: row * map.tileSize + map.tileSize / 2 },
+    );
+  }
+
   /** Future loot batches feed this server-owned boundary; standard matches reject it. */
   spawnBattleRoyaleDroppedWeapon(
     weaponInstance: WeaponInstance,
@@ -1836,6 +1868,7 @@ export class Match implements MatchContext {
     // Update pickups. Weapon pickups about to land generate one-shot
     // "INCOMING" warnings for the HUD banner.
     const weaponAnnouncements = this.pickupManager.update(dt);
+    this.battleRoyaleLootManager?.update(dt);
     for (const announcement of weaponAnnouncements) {
       this.tickWeaponIncoming.push({
         weaponId: 'shotgun',
@@ -1985,6 +2018,10 @@ export class Match implements MatchContext {
       if (this.battleRoyaleReloadRequests.has(playerId) && !swapped) {
         this.startBattleRoyaleReload(player);
       }
+      const supply = this.battleRoyaleLootManager?.findSupplyCandidate(player.position);
+      if (supply && this.battleRoyaleLootManager?.collectSupply(supply.id, player)) {
+        this.tickPickupCollections.push({ pickupId: supply.id, playerId });
+      }
     }
   }
 
@@ -2061,6 +2098,7 @@ export class Match implements MatchContext {
 
   private clearBattleRoyaleInventoryOnElimination(player: PlayerState): void {
     if (!player.battleRoyaleInventory) return;
+    this.battleRoyaleLootManager?.spawnEliminationPile(player);
     player.battleRoyaleInventory.reserveAmmo = 0;
     this.discardBattleRoyaleGun(player);
   }
@@ -2310,8 +2348,12 @@ export class Match implements MatchContext {
 
     this.stats.recordShot(player.id);
     const struckVictims = new Set<PlayerId>();
+    const struckScenery = new Set<string>();
 
     for (const shot of shots) {
+      if (this.battleRoyaleLootManager && !shot.hit && shot.hitTile) {
+        struckScenery.add(this.tileKey(shot.hitTile.col, shot.hitTile.row));
+      }
       if (!shot.hit || !shot.victimId || shot.damage === undefined) continue;
       // One damage application per victim per swing, however many rays
       // crossed their box.
@@ -2338,6 +2380,11 @@ export class Match implements MatchContext {
 
     if (struckVictims.size > 0) {
       this.stats.recordHit(player.id);
+    }
+
+    for (const key of struckScenery) {
+      const [col, row] = key.split(',').map(Number);
+      this.resolveShotSceneryAt(col, row, player.id);
     }
 
     this.tickPunchEvents.push({
@@ -2509,6 +2556,9 @@ export class Match implements MatchContext {
     for (const tile of blastable) {
       if (this.mapManager.destroyTile(tile.col, tile.row)) {
         this.tickDestroyedTiles.push(tile);
+        if (this.battleRoyaleLootManager?.openContainerAt(tile.col, tile.row)) {
+          continue;
+        }
         if (this.activeScavengerCaches.delete(this.tileKey(tile.col, tile.row))) {
           this.spawnScavengerCacheReward(tile.col, tile.row);
         }
@@ -2615,8 +2665,19 @@ export class Match implements MatchContext {
   /** Resolve the first authored interaction carried by a bullet-struck tile. */
   private resolveShotSceneryAt(col: number, row: number, instigatorId: PlayerId): void {
     if (this.detonateBarrelAt(col, row, instigatorId)) return;
+    if (this.openBattleRoyaleContainerAt(col, row)) return;
     if (this.openScavengerCacheAt(col, row)) return;
     this.openGateAt(col, row);
+  }
+
+  private openBattleRoyaleContainerAt(col: number, row: number): boolean {
+    const manager = this.battleRoyaleLootManager;
+    if (!manager?.hasIntactContainerAt(col, row)) return false;
+    if (!this.mapManager.destroyTile(col, row)) return false;
+    const opened = manager.openContainerAt(col, row);
+    if (!opened) return false;
+    this.tickDestroyedTiles.push({ col, row });
+    return true;
   }
 
   /** Consume a bullet-struck barrel and open its collision before it blasts. */

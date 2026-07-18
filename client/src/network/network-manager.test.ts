@@ -139,7 +139,7 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
     expect(manager.getLocalPlayerState()?.characterId).toBe('bubba');
   });
 
-  it('projects valid Battle Royale instances and rockets, then clears old-server omissions', () => {
+  it('projects valid Battle Royale weapons, containers, supplies, and rockets, then clears old-server omissions', () => {
     const instance = {
       instanceId: 'weapon:network:42',
       weaponId: 'launcher',
@@ -185,6 +185,24 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
             loadedAmmo: 8,
           },
         ],
+        battleRoyaleContainers: [
+          {
+            id: 'br-container:network',
+            position: { x: 192, y: 96 },
+            tile: { col: 4, row: 2 },
+            status: 'intact',
+          },
+        ],
+        battleRoyaleSupplyBundles: [
+          {
+            id: 'br-supply:network',
+            position: { x: 192, y: 96 },
+            reserveAmmo: 18,
+            sustainType: 'bandage',
+            lootSourceId: 'br-container:network',
+            source: 'container',
+          },
+        ],
       },
     );
     deliver(state);
@@ -196,6 +214,8 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
     });
     expect(manager.getActiveRockets()).toHaveLength(1);
     expect(manager.getDroppedWeapons()).toHaveLength(1);
+    expect(manager.getBattleRoyaleContainers()).toHaveLength(1);
+    expect(manager.getBattleRoyaleSupplyBundles()).toHaveLength(1);
     expect(fired).toEqual([{ shooterId: LOCAL_ID, position: { x: 100, y: 100 } }]);
 
     deliver(state);
@@ -206,6 +226,8 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
     expect(manager.getLocalPlayerState()?.battleRoyaleInventory).toBeUndefined();
     expect(manager.getActiveRockets()).toEqual([]);
     expect(manager.getDroppedWeapons()).toEqual([]);
+    expect(manager.getBattleRoyaleContainers()).toEqual([]);
+    expect(manager.getBattleRoyaleSupplyBundles()).toEqual([]);
   });
 
   it('fails malformed additive weapon instances closed', () => {
@@ -256,6 +278,47 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
     );
     expect(manager.getLocalPlayerState()?.battleRoyaleInventory).toBeUndefined();
     expect(manager.getDroppedWeapons()).toEqual([]);
+  });
+
+  it('fails malformed container or supply arrays closed independently', () => {
+    deliver(
+      makeGameState([makeSerialized()], {
+        battleRoyaleContainers: [
+          {
+            id: 'br-container:valid',
+            position: { x: 0, y: 0 },
+            tile: { col: 0, row: 0 },
+            status: 'intact',
+          },
+          {
+            id: 'bad space',
+            position: { x: 1, y: 1 },
+            tile: { col: 1, row: 1 },
+            status: 'opened',
+          },
+        ],
+        battleRoyaleSupplyBundles: [
+          {
+            id: 'br-supply:valid',
+            position: { x: 0, y: 0 },
+            reserveAmmo: 18,
+            sustainType: 'bandage',
+            lootSourceId: 'br-container:valid',
+            source: 'container',
+          },
+          {
+            id: 'br-supply:bad',
+            position: { x: 1, y: 1 },
+            reserveAmmo: -1,
+            sustainType: 'armor',
+            lootSourceId: 'br-container:valid',
+            source: 'container',
+          },
+        ],
+      }),
+    );
+    expect(manager.getBattleRoyaleContainers()).toEqual([]);
+    expect(manager.getBattleRoyaleSupplyBundles()).toEqual([]);
   });
 
   it('keeps every capability disabled when an old server omits the advertisement', () => {

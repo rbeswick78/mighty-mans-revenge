@@ -955,10 +955,11 @@ production flag, or deployment follows from passing Batch 38 evidence.
 ## Reforged Release State
 
 Batch 39 automated evidence remains green and its human tester/release review
-is deliberately deferred. Batch 43's dormant Battle Royale one-slot inventory
-is complete: the server owns fists, equipped instances, loaded/universal ammo,
-pickup contests, reload/swap, dry discard, and dropped-gun state. Additive wire
-fields remain optional and `battleRoyale` stays default false and unexposed.
+is deliberately deferred. Batch 44's dormant Battle Royale container and loot
+lifecycle is complete: the server owns attack/open transitions, seeded gun,
+rarity and sustain rolls, supply contests, and compact elimination piles beside
+the Batch 43 one-slot inventory. Additive wire fields remain optional and
+`battleRoyale` stays default false and unexposed.
 RFG-004 remains resolved by the per-run `GameScene.minimapRenderer` reset and
 RFG-005 resolves the Battle Royale self-explosion lifecycle gap. The user has
 authorized sequential plan work through Batch 51 while deferring human
@@ -1005,3 +1006,31 @@ only while Battle Royale inventory exists; keyboard R and standard-gamepad X
 retain the established input field. Batch 44 owns containers, loot rolls, supply
 bundles, rarity auras, and elimination piles. Every capability remains default
 false and unexposed, and Batch 43 authorizes no rollout.
+
+## Battle Royale Container and Loot Contract
+
+Batch 44 constructs `BattleRoyaleLootManager` only beside an existing
+Battle Royale inventory/lifecycle. The registration boundary accepts a bounded
+container ID and solid tile through `Match.spawnBattleRoyaleContainer`; future
+Batch 45 map authoring will feed it. Bullets,
+shotgun pellets, Battle Royale melee, grenades, and launcher/world explosions
+then converge on the existing server-owned scenery/destruction boundary. One
+successful open clears collision, retains a short `opened` projection, and
+authors exactly one full-mag gun plus one small supply bundle. Stable
+match/container hashing chooses the six-gun ID, locked rarity, and sustain type
+without consuming gameplay RNG.
+
+An elimination or departure creates one idempotent source-linked pile before
+inventory cleanup: the exact held instance and surviving loaded ammo when
+armed, the exact universal reserve, and one bandage/armor/grenade bundle.
+Ground guns and bundles are collected independently through stable player-ID,
+distance, and entity-ID ordering, so armed and unarmed contention remains
+N-player safe. The client cannot open, roll, collect, group, or compose loot.
+
+`battleRoyaleContainers`, `battleRoyaleSupplyBundles`, and `lootSourceId` are
+optional additive snapshot fields. Standard JSON omits them, old-server
+omission clears them, and malformed arrays fail closed. Modern/fallback/reduced
+renderers project only authoritative state using the existing container,
+supply, six-gun, and rarity atlas language. Batch 45 owns the four-biome arena;
+Batch 44 does not expose a capability or authorize rollout, deployment,
+production restart, or live smoke.

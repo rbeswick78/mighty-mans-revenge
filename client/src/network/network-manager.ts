@@ -5,6 +5,8 @@ import type { AxeState, GrenadeState, PunchEvent, RocketState } from '@shared/ty
 import type { PickupState } from '@shared/types/pickup.js';
 import type {
   BattleRoyaleInventoryState,
+  BattleRoyaleContainerState,
+  BattleRoyaleSupplyBundleState,
   DroppedWeaponState,
   WeaponInstance,
 } from '@shared/types/weapon.js';
@@ -43,6 +45,8 @@ import {
 import { playerMovementModifiers } from '@shared/utils/event-modifiers.js';
 import {
   normalizeBattleRoyaleInventory,
+  normalizeBattleRoyaleContainer,
+  normalizeBattleRoyaleSupplyBundle,
   normalizeDroppedWeapon,
   normalizeWeaponInstance,
 } from '@shared/utils/weapon-instance.js';
@@ -171,6 +175,8 @@ export class NetworkManager {
   private lastAxeStates = new Map<string, { position: Vec2; angle: number }>();
   private latestRockets: RocketState[] = [];
   private latestDroppedWeapons: DroppedWeaponState[] = [];
+  private latestBattleRoyaleContainers: BattleRoyaleContainerState[] = [];
+  private latestBattleRoyaleSupplyBundles: BattleRoyaleSupplyBundleState[] = [];
 
   /** Most recent pickups from server gameState. Scene polls for rendering. */
   private latestPickups: PickupState[] = [];
@@ -297,6 +303,8 @@ export class NetworkManager {
     this.lastAxeStates.clear();
     this.latestRockets = [];
     this.latestDroppedWeapons = [];
+    this.latestBattleRoyaleContainers = [];
+    this.latestBattleRoyaleSupplyBundles = [];
     this.latestPickups = [];
     this.latestConfirmedTags = [];
     this._coreRunState = null;
@@ -650,6 +658,14 @@ export class NetworkManager {
     return this.latestDroppedWeapons;
   }
 
+  getBattleRoyaleContainers(): BattleRoyaleContainerState[] {
+    return this.latestBattleRoyaleContainers;
+  }
+
+  getBattleRoyaleSupplyBundles(): BattleRoyaleSupplyBundleState[] {
+    return this.latestBattleRoyaleSupplyBundles;
+  }
+
   /** Most recent pickups from the server, for rendering. */
   getPickups(): PickupState[] {
     return this.latestPickups;
@@ -982,6 +998,20 @@ export class NetworkManager {
       (drop): drop is DroppedWeaponState => drop !== null,
     )
       ? droppedWeapons
+      : [];
+    const containers = (msg.battleRoyaleContainers ?? []).map(normalizeBattleRoyaleContainer);
+    this.latestBattleRoyaleContainers = containers.every(
+      (container): container is BattleRoyaleContainerState => container !== null,
+    )
+      ? containers
+      : [];
+    const supplyBundles = (msg.battleRoyaleSupplyBundles ?? []).map(
+      normalizeBattleRoyaleSupplyBundle,
+    );
+    this.latestBattleRoyaleSupplyBundles = supplyBundles.every(
+      (bundle): bundle is BattleRoyaleSupplyBundleState => bundle !== null,
+    )
+      ? supplyBundles
       : [];
     this.latestPickups = msg.pickups;
     this.latestConfirmedTags = msg.confirmedTags ?? [];

@@ -4,9 +4,12 @@ import { WEAPON_RARITIES } from '../types/weapon.js';
 import {
   applyWeaponRarityDamage,
   createWeaponInstance,
+  normalizeBattleRoyaleContainer,
   normalizeBattleRoyaleInventory,
+  normalizeBattleRoyaleSupplyBundle,
   normalizeDroppedWeapon,
   normalizeWeaponInstance,
+  rollBattleRoyaleGun,
   rollWeaponRarity,
 } from './weapon-instance.js';
 
@@ -32,6 +35,19 @@ describe('Battle Royale weapon instances', () => {
     [0.999999, 'mythical'],
   ] as const)('maps roll %s to %s', (roll, rarity) => {
     expect(rollWeaponRarity(roll)).toBe(rarity);
+  });
+
+  it('maps the full half-open interval deterministically across all six guns', () => {
+    expect([0, 1 / 6, 2 / 6, 3 / 6, 4 / 6, 5 / 6].map(rollBattleRoyaleGun)).toEqual([
+      'rifle',
+      'pistol',
+      'shotgun',
+      'smg',
+      'sniper_rifle',
+      'launcher',
+    ]);
+    expect(rollBattleRoyaleGun(-0.01)).toBeNull();
+    expect(rollBattleRoyaleGun(1)).toBeNull();
   });
 
   it('rejects invalid rolls and malformed or non-arsenal instances', () => {
@@ -92,5 +108,29 @@ describe('Battle Royale weapon instances', () => {
     expect(normalizeDroppedWeapon(drop)).toEqual(drop);
     expect(normalizeDroppedWeapon({ ...drop, position: { x: Number.NaN, y: 0 } })).toBeNull();
     expect(normalizeDroppedWeapon({ ...drop, loadedAmmo: 1.5 })).toBeNull();
+  });
+
+  it('normalizes additive container and compact-supply projections fail closed', () => {
+    const container = {
+      id: 'br-container:north',
+      position: { x: 168, y: 120 },
+      tile: { col: 3, row: 2 },
+      status: 'opened',
+    } as const;
+    expect(normalizeBattleRoyaleContainer(container)).toEqual(container);
+    expect(normalizeBattleRoyaleContainer({ ...container, status: 'damaged' })).toBeNull();
+    expect(normalizeBattleRoyaleContainer({ ...container, tile: { col: 3.5, row: 2 } })).toBeNull();
+
+    const supply = {
+      id: 'br-supply:0',
+      position: { x: 168, y: 120 },
+      reserveAmmo: 18,
+      sustainType: 'armor',
+      lootSourceId: 'br-container:north',
+      source: 'container',
+    } as const;
+    expect(normalizeBattleRoyaleSupplyBundle(supply)).toEqual(supply);
+    expect(normalizeBattleRoyaleSupplyBundle({ ...supply, reserveAmmo: 241 })).toBeNull();
+    expect(normalizeBattleRoyaleSupplyBundle({ ...supply, sustainType: 'shield' })).toBeNull();
   });
 });

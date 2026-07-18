@@ -404,6 +404,13 @@ export const BATTLE_ROYALE_INVENTORY = Object.freeze({
   MAX_RESERVE_AMMO: 240,
 });
 
+/** Dormant Battle Royale container and compact-loot lifecycle rules. */
+export const BATTLE_ROYALE_LOOT = Object.freeze({
+  CONTAINER_OPEN_FEEDBACK_SECONDS: 0.6,
+  CONTAINER_RESERVE_AMMO: 18,
+  SUPPLY_PICKUP_RADIUS: 30,
+});
+
 /**
  * Runtime list of every kill-attribution source, for keying per-weapon
  * kill counters. Must stay in sync with the KillWeapon union in

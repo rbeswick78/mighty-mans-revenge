@@ -438,3 +438,25 @@ boolean; none may choose a drop or author a swap. `battleRoyale` and every other
 Reforged capability remain strict server-owned opt-ins, default false, and
 unexposed. Batch 44 owns containers and loot. Production remains on approved
 Batch 33, and no deployment, restart, or live smoke is authorized.
+
+## Batch 44 container and loot disposition
+
+Batch 44 does not add or expose a capability. `BattleRoyaleLootManager` exists
+only beside the inventory manager in a server-authored `battle_royale`
+lifecycle. The server registers container tiles, resolves attack/open state,
+hashes gun/rarity/sustain contents, authors exact elimination piles, and chooses
+the stable winner of every gun or bundle collection. Standard matches have no
+loot manager; their attack, scenery, pickup, death-drop, input, snapshot, and
+persistence behavior remains on the established path.
+
+`battleRoyaleContainers`, `battleRoyaleSupplyBundles`, and optional gun
+`lootSourceId` values are additive snapshot fields. New clients clear omitted
+old-server state and fail each malformed array closed. They may render the
+server's intact/opened state, supply contents, source grouping, rarity
+aura/badge, and held-rarity comparison but cannot choose a roll, open a
+container, collect a component, or author a pile.
+
+This remains dormant support code. `battleRoyale`, `newShell`, `schedules`,
+`largeWorlds`, and `modernArt` remain strict server-owned opt-ins, default
+false, and unexposed. Batch 45 owns the four-biome arena. Production remains on
+approved Batch 33, and no deployment, restart, or live smoke is authorized.

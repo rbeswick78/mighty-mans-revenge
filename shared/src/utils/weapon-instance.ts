@@ -3,7 +3,10 @@ import {
   BATTLE_ROYALE_GUN_IDS,
   WEAPON_RARITIES,
   type BattleRoyaleGunId,
+  type BattleRoyaleContainerState,
   type BattleRoyaleInventoryState,
+  type BattleRoyaleSupplyBundleState,
+  type BattleRoyaleSustainType,
   type DroppedWeaponState,
   type WeaponInstance,
   type WeaponRarity,
@@ -56,6 +59,12 @@ export function createWeaponInstance(
 ): WeaponInstance | null {
   const rarity = rollWeaponRarity(roll);
   return rarity === null ? null : normalizeWeaponInstance({ instanceId, weaponId, rarity });
+}
+
+/** Deterministic half-open equal roll across the locked six-gun roster. */
+export function rollBattleRoyaleGun(roll: number): BattleRoyaleGunId | null {
+  if (!Number.isFinite(roll) || roll < 0 || roll >= 1) return null;
+  return BATTLE_ROYALE_GUN_IDS[Math.floor(roll * BATTLE_ROYALE_GUN_IDS.length)];
 }
 
 /** Rarity changes damage only; callers apply ordinary falloff first. */
@@ -117,10 +126,103 @@ export function normalizeDroppedWeapon(value: unknown): DroppedWeaponState | nul
   ) {
     return null;
   }
+  if (
+    candidate.lootSourceId !== undefined &&
+    (typeof candidate.lootSourceId !== 'string' || !INSTANCE_ID.test(candidate.lootSourceId))
+  ) {
+    return null;
+  }
   return Object.freeze({
     id: candidate.id,
     position: Object.freeze({ x: coordinates.x, y: coordinates.y }),
     weaponInstance,
     loadedAmmo,
+    ...(candidate.lootSourceId === undefined ? {} : { lootSourceId: candidate.lootSourceId }),
+  });
+}
+
+const SUSTAIN_TYPES: readonly BattleRoyaleSustainType[] = ['bandage', 'armor', 'grenade'];
+
+/** Fail-closed normalization for additive container snapshots. */
+export function normalizeBattleRoyaleContainer(value: unknown): BattleRoyaleContainerState | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+  const candidate = value as Record<string, unknown>;
+  const position = candidate.position;
+  const tile = candidate.tile;
+  if (typeof candidate.id !== 'string' || !INSTANCE_ID.test(candidate.id)) return null;
+  if (
+    typeof position !== 'object' ||
+    position === null ||
+    Array.isArray(position) ||
+    typeof tile !== 'object' ||
+    tile === null ||
+    Array.isArray(tile) ||
+    (candidate.status !== 'intact' && candidate.status !== 'opened')
+  ) {
+    return null;
+  }
+  const coordinates = position as Record<string, unknown>;
+  const tileCoordinates = tile as Record<string, unknown>;
+  if (
+    typeof coordinates.x !== 'number' ||
+    !Number.isFinite(coordinates.x) ||
+    typeof coordinates.y !== 'number' ||
+    !Number.isFinite(coordinates.y) ||
+    typeof tileCoordinates.col !== 'number' ||
+    !Number.isInteger(tileCoordinates.col) ||
+    tileCoordinates.col < 0 ||
+    typeof tileCoordinates.row !== 'number' ||
+    !Number.isInteger(tileCoordinates.row) ||
+    tileCoordinates.row < 0
+  ) {
+    return null;
+  }
+  return Object.freeze({
+    id: candidate.id,
+    position: Object.freeze({ x: coordinates.x, y: coordinates.y }),
+    tile: Object.freeze({ col: tileCoordinates.col, row: tileCoordinates.row }),
+    status: candidate.status,
+  });
+}
+
+/** Fail-closed normalization for additive supply and elimination-pile snapshots. */
+export function normalizeBattleRoyaleSupplyBundle(
+  value: unknown,
+): BattleRoyaleSupplyBundleState | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+  const candidate = value as Record<string, unknown>;
+  const position = candidate.position;
+  const reserveAmmo = normalizeAmmo(candidate.reserveAmmo);
+  if (
+    typeof candidate.id !== 'string' ||
+    !INSTANCE_ID.test(candidate.id) ||
+    typeof candidate.lootSourceId !== 'string' ||
+    !INSTANCE_ID.test(candidate.lootSourceId) ||
+    typeof position !== 'object' ||
+    position === null ||
+    Array.isArray(position) ||
+    reserveAmmo === null ||
+    reserveAmmo > BATTLE_ROYALE_INVENTORY.MAX_RESERVE_AMMO ||
+    !SUSTAIN_TYPES.includes(candidate.sustainType as BattleRoyaleSustainType) ||
+    (candidate.source !== 'container' && candidate.source !== 'elimination')
+  ) {
+    return null;
+  }
+  const coordinates = position as Record<string, unknown>;
+  if (
+    typeof coordinates.x !== 'number' ||
+    !Number.isFinite(coordinates.x) ||
+    typeof coordinates.y !== 'number' ||
+    !Number.isFinite(coordinates.y)
+  ) {
+    return null;
+  }
+  return Object.freeze({
+    id: candidate.id,
+    position: Object.freeze({ x: coordinates.x, y: coordinates.y }),
+    reserveAmmo,
+    sustainType: candidate.sustainType as BattleRoyaleSustainType,
+    lootSourceId: candidate.lootSourceId,
+    source: candidate.source,
   });
 }

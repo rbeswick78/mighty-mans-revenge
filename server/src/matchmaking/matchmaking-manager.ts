@@ -2510,6 +2510,12 @@ export class MatchmakingManager {
       axes: match.getActiveAxes(),
       rockets: match.getActiveRockets().length > 0 ? match.getActiveRockets() : undefined,
       droppedWeapons: match.battleRoyaleInventoryManager ? match.getDroppedWeapons() : undefined,
+      battleRoyaleContainers: match.battleRoyaleLootManager
+        ? match.getBattleRoyaleContainers()
+        : undefined,
+      battleRoyaleSupplyBundles: match.battleRoyaleLootManager
+        ? match.getBattleRoyaleSupplyBundles()
+        : undefined,
       bulletTrails: match.getTickBulletTrails(),
       barrelExplosions: match.getTickBarrelExplosions(),
       contract: match.getContractHudState(),

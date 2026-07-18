@@ -103,4 +103,26 @@ export interface DroppedWeaponState {
   readonly position: import('./common.js').Vec2;
   readonly weaponInstance: WeaponInstance;
   readonly loadedAmmo: number;
+  /** Groups a gun with its authoritative container or elimination supply. */
+  readonly lootSourceId?: string;
+}
+
+export type BattleRoyaleSustainType = 'bandage' | 'armor' | 'grenade';
+
+/** Attack-owned container projection. Open state is retained briefly for feedback. */
+export interface BattleRoyaleContainerState {
+  readonly id: string;
+  readonly position: import('./common.js').Vec2;
+  readonly tile: Readonly<{ col: number; row: number }>;
+  readonly status: 'intact' | 'opened';
+}
+
+/** Compact universal-ammo and sustain bundle projected from server loot state. */
+export interface BattleRoyaleSupplyBundleState {
+  readonly id: string;
+  readonly position: import('./common.js').Vec2;
+  readonly reserveAmmo: number;
+  readonly sustainType: BattleRoyaleSustainType;
+  readonly lootSourceId: string;
+  readonly source: 'container' | 'elimination';
 }

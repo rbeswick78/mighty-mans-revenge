@@ -569,3 +569,43 @@ mean/p95/p99/max work of 0.018/0.031/0.123/0.867 ms, and exact
 2,481/3,762-byte standard snapshots. RFG-005's three-fighter self-explosion
 reproduction now records the missing lifecycle event without inventing kill
 credit. No capability default, production state, or deployment changed.
+
+### Batch 44 Battle Royale container and loot baseline
+
+Battle Royale now has a server-owned container and compact-loot manager beside
+the one-slot inventory manager. A registered solid container opens once through
+the existing authoritative attack/destruction paths, clears collision, retains
+a short opened projection, and deterministically authors exactly one full-mag
+gun plus one small bundle containing 18 universal reserve and one bandage,
+armor, or grenade sustain pickup. Match/container hashing consumes none of the
+gameplay RNG, and repeated attacks cannot duplicate either component.
+
+Elimination and departure author one idempotent, source-linked compact pile. It
+contains the exact held instance, rarity, surviving loaded ammo, the fighter's
+universal reserve, and exactly one deterministic sustain bundle; an unarmed or
+dry fighter still leaves the bundle but no invented gun. Gun and bundle
+collection remain independent, use stable player-ID and nearest-ID processing,
+and support eight simultaneous contenders. Standard scenery, caches, pickups,
+death drops, melee, snapshots, modes, mutators, stats, and persistence retain
+their established paths because the loot manager is absent.
+
+Containers, supply bundles, and optional loot-source links are additive
+snapshot state. New clients validate each complete array atomically, clear it
+when an old server omits it, and render only server-owned positions/status.
+Modern art uses the existing container, damaged-container, supply, gun, and
+six-shape rarity frames; fallback uses code-native silhouettes, while reduced
+quality keeps the static rim/badge/comparison and removes only the secondary
+pulse. Collection, open state, contents, rarity, and comparison outcomes never
+originate on the client.
+
+The focused 170-test matrix and complete 150-file/1,704-test matrix passed with
+typecheck, lint, all builds, the Batch 44 allowlist format check, and the final
+Chromium/Firefox/mobile projection and pointer/keyboard/gamepad/touch case. The
+repository-wide Prettier inventory retains 96 inherited files outside the
+Batch 44 allowlist. The authoritative baseline retained
+configured/rolling 20 Hz and the 50 ms budget; synthetic four-player
+mean/p95/p99/max work was 0.017/0.030/0.094/1.324 ms, while standard active
+snapshots remained exactly 2,481/3,762 bytes. The mobile check resolved RFG-006
+by measuring coordinates against the active 960-wide fallback viewport; no
+product input code changed. No capability default, production state, or
+deployment changed.

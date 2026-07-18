@@ -177,7 +177,7 @@ describe('MatchmakingManager Battle Royale queue', () => {
     expect(manager.handleJoinBattleRoyale('A', 'Alpha', 'mighty_man')).toBe(true);
   });
 
-  it('serializes BR inventory and drops additively while standard snapshots omit both fields', () => {
+  it('serializes BR inventory and loot additively while standard snapshots omit every field', () => {
     const battleRoyale = makeFakeServer(false, true);
     const battleRoyaleManager = new MatchmakingManager(battleRoyale.fake);
     battleRoyaleManager.handleJoinBattleRoyale('A', 'Alpha', 'mighty_man');
@@ -209,6 +209,8 @@ describe('MatchmakingManager Battle Royale queue', () => {
         loadedAmmo: 17,
       },
     ]);
+    expect(battleRoyaleState.message.battleRoyaleContainers).toEqual([]);
+    expect(battleRoyaleState.message.battleRoyaleSupplyBundles).toEqual([]);
 
     const standard = makeFakeServer();
     const standardManager = new MatchmakingManager(standard.fake);
@@ -226,6 +228,8 @@ describe('MatchmakingManager Battle Royale queue', () => {
       throw new Error('missing standard gameState');
     }
     expect(standardState.message.droppedWeapons).toBeUndefined();
+    expect(standardState.message.battleRoyaleContainers).toBeUndefined();
+    expect(standardState.message.battleRoyaleSupplyBundles).toBeUndefined();
     expect(
       standardState.message.players.every(
         ({ battleRoyaleInventory }) => battleRoyaleInventory === undefined,

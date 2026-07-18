@@ -30,6 +30,7 @@ import { GrenadeRenderer } from '../rendering/grenade-renderer.js';
 import { AxeRenderer } from '../rendering/axe-renderer.js';
 import { RocketRenderer } from '../rendering/rocket-renderer.js';
 import { DroppedWeaponRenderer } from '../rendering/dropped-weapon-renderer.js';
+import { BattleRoyaleLootRenderer } from '../rendering/battle-royale-loot-renderer.js';
 import { LightingRenderer } from '../rendering/lighting-renderer.js';
 import { KillJuice } from '../rendering/kill-juice.js';
 import { HealFlash } from '../rendering/heal-flash.js';
@@ -172,6 +173,7 @@ export class GameScene extends Phaser.Scene {
   private axeRenderer: AxeRenderer | null = null;
   private rocketRenderer: RocketRenderer | null = null;
   private droppedWeaponRenderer: DroppedWeaponRenderer | null = null;
+  private battleRoyaleLootRenderer: BattleRoyaleLootRenderer | null = null;
   private lightingRenderer: LightingRenderer | null = null;
   private killJuice: KillJuice | null = null;
   private healFlash: HealFlash | null = null;
@@ -426,7 +428,15 @@ export class GameScene extends Phaser.Scene {
     this.grenadeRenderer = new GrenadeRenderer(this);
     this.axeRenderer = new AxeRenderer(this);
     this.rocketRenderer = new RocketRenderer(this);
-    this.droppedWeaponRenderer = new DroppedWeaponRenderer(this, this.reforgedVisualCutover.active);
+    this.droppedWeaponRenderer = new DroppedWeaponRenderer(
+      this,
+      this.reforgedVisualCutover.active,
+      () => this.worldRenderQuality.getBudget(),
+    );
+    this.battleRoyaleLootRenderer = new BattleRoyaleLootRenderer(
+      this,
+      this.reforgedVisualCutover.active,
+    );
     this.lightingRenderer = new LightingRenderer(
       this,
       this.gameplayCoordinates,
@@ -1053,7 +1063,14 @@ export class GameScene extends Phaser.Scene {
       this.axeRenderer.updateAxes(networkManager.getActiveAxes());
     }
     this.rocketRenderer?.updateRockets(networkManager.getActiveRockets());
-    this.droppedWeaponRenderer?.updateDrops(networkManager.getDroppedWeapons());
+    this.droppedWeaponRenderer?.updateDrops(
+      networkManager.getDroppedWeapons(),
+      networkManager.getLocalPlayerState()?.battleRoyaleInventory,
+    );
+    this.battleRoyaleLootRenderer?.update(
+      networkManager.getBattleRoyaleContainers(),
+      networkManager.getBattleRoyaleSupplyBundles(),
+    );
 
     // KOTH hill zone overlay (draws nothing when the snapshot carries no
     // hill state). Runs outside the local-player block so the hill stays
@@ -2490,6 +2507,8 @@ export class GameScene extends Phaser.Scene {
     }
     this.droppedWeaponRenderer?.destroy();
     this.droppedWeaponRenderer = null;
+    this.battleRoyaleLootRenderer?.destroy();
+    this.battleRoyaleLootRenderer = null;
     if (this.grenadeRenderer) {
       this.grenadeRenderer.destroy();
       this.grenadeRenderer = null;

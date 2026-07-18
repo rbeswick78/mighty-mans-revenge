@@ -16,6 +16,7 @@ export class BattleRoyaleInventoryManager {
     weaponInstance: WeaponInstance,
     loadedAmmo: number,
     position: Vec2,
+    lootSourceId?: string,
   ): DroppedWeaponState | null {
     const normalized = normalizeWeaponInstance(weaponInstance);
     if (!normalized || !Number.isFinite(position.x) || !Number.isFinite(position.y)) return null;
@@ -28,6 +29,7 @@ export class BattleRoyaleInventoryManager {
         WEAPONS[normalized.weaponId].magazineSize,
         Math.max(0, Math.floor(loadedAmmo)),
       ),
+      ...(lootSourceId === undefined ? {} : { lootSourceId }),
     };
     this.drops.set(id, drop);
     return drop;

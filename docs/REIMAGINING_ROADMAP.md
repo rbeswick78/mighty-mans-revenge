@@ -5,9 +5,9 @@ Read this file and `CLAUDE.md` completely at the start of every batch. The
 completed `docs/REPLAYABILITY_ROADMAP.md` remains the historical record for the
 systems this program preserves and reorganizes.
 
-- **Status:** Batch 43 Battle Royale single-slot inventory completed on
+- **Status:** Batch 44 Battle Royale containers and loot completed on
   2026-07-18; the format remains dormant and every capability remains default false.
-- **Next step:** Batch 44 containers and loot under the user's standing
+- **Next step:** Batch 45 four-biome arena under the user's standing
   authorization to continue sequentially through the plan while deferring human
   involvement. The deferred Batch 39 human release walkthrough still does not
   authorize deployment, capability exposure, production restart, or live smoke.
@@ -200,7 +200,7 @@ Production deployment happens only at a gate or for an urgent live fix.
 |  41 | Eight-slot queue                       | Battle Royale | Complete (2026-07-18) |
 |  42 | Weapon instances and rarity            | Battle Royale | Complete (2026-07-18) |
 |  43 | Single-slot inventory                  | Battle Royale | Complete (2026-07-18) |
-|  44 | Containers and loot                    | Battle Royale | Pending               |
+|  44 | Containers and loot                    | Battle Royale | Complete (2026-07-18) |
 |  45 | Four-biome arena                       | Battle Royale | Pending               |
 |  46 | Safe-zone phases                       | Battle Royale | Pending               |
 |  47 | Battle Royale bots                     | Battle Royale | Pending               |
@@ -1545,6 +1545,53 @@ only if the contextual action crosses an established input or scene foundation.
 Add attack-opened containers, guaranteed gun rolls, supply bundles, rarity
 auras/comparisons, contested collection, and compact elimination piles.
 
+**Verification tier selected before implementation (2026-07-18):** shared,
+server-simulation, additive-network, combat/scenery/pickup-authority, and
+capability-owned client-presentation tier. This batch crosses established
+attack, death-cleanup, contested-collection, eight-player snapshot, and
+Battle Royale inventory choke points. Deterministic evidence must prove that
+each container opens once only through an authoritative attack path, seeded
+gun/rarity rolls and identifiers are stable, every container yields exactly
+one gun plus one small supply bundle, concurrent opens and collections have a
+single deterministic winner, and an elimination produces the exact held gun
+instance with loaded ammo, universal reserve, and one bundled sustain pickup.
+Coverage must include armed and unarmed collection, dry/empty/departure cases,
+N-player piles and cleanup, malformed or absent optional wire fields failing
+closed, and standard scenery, caches, pickups, death drops, stats, modes,
+mutators, Results, persistence, and snapshots remaining unchanged. The client
+must render intact/opened containers, compact supply/pile state, and rarity
+aura/comparison cues solely from authoritative state across modern-art,
+fallback, and reduced-effects tiers. Required evidence is focused and full
+unit/integration coverage, typecheck, lint, production builds, targeted
+Chromium/Firefox/mobile pointer-keyboard/gamepad/touch browser coverage,
+authoritative 20 Hz and snapshot baselines, formatting, and diff review.
+
+**Acceptance (completed 2026-07-18):**
+
+- [x] Battle Royale alone constructs the server-owned container/supply manager;
+      standard matches reject its spawn boundary and omit every additive field.
+- [x] Hitscan, shotgun, melee, grenade, launcher, and blast-owned destruction
+      converge on one single-open container transition without altering standard
+      scenery interactions.
+- [x] Stable match/container seeds author one guaranteed full-mag six-gun
+      instance, the locked rarity roll, 18 universal reserve, and one sustain
+      pickup; duplicate attacks cannot duplicate loot.
+- [x] Stable player-ID and nearest-ID ordering resolve armed/unarmed and
+      eight-fighter gun/supply contention. Elimination and departure author one
+      compact source-linked pile with the exact held instance, loaded ammo,
+      reserve, and exactly one sustain bundle; repeated cleanup is idempotent.
+- [x] Optional container/supply/source fields normalize fail closed and clear on
+      old-server omission. The client projects intact/opened containers, compact
+      supply labels, rarity badge/rim/shape aura, and held-rarity comparison
+      without authoring collection or loot.
+- [x] Focused 170-test and complete 150-file/1,704-test matrices, typecheck,
+      lint, all builds, final three-project browser input/projection evidence,
+      formatting/diff checks, and the authoritative 20 Hz baseline passed.
+      Standard active snapshots remain exactly 2,481/3,762 bytes.
+- [x] Batch 45 arena authoring and all later zone, bot, spectating, records,
+      hardening, release, capability exposure, deployment, restart, and live
+      smoke work did not begin.
+
 #### Batch 45 — Four-biome arena
 
 Author the 56×34 arena with eight balanced spawn groups, four named regions,
@@ -1660,13 +1707,14 @@ test frequency, not acceptance coverage or release quality gates.
    deliberately. It does not silently expand the active batch.
 4. Existing user changes are never discarded or staged accidentally.
 
-| ID      | Discovered | Reproduction/evidence                                                                                                                                                       | Relationship  | Disposition                                                                                                                                                                                                                                                   | Status             |
-| ------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
-| RFG-001 | 2026-07-15 | Idle recoil used to clear sustained `(320, 144)` base scroll to `(0, 0)`.                                                                                                   | Batches 20/24 | Resolved by composed kick offsets in Batch 20; retain the proof in the Batch 24 gate.                                                                                                                                                                         | Resolved           |
-| RFG-002 | 2026-07-15 | Idle zoom pulse used to clear sustained base zoom `0.9` back to `1`.                                                                                                        | Batches 20/24 | Resolved by the composed zoom multiplier in Batch 20; retain the proof in the Batch 24 gate.                                                                                                                                                                  | Resolved           |
-| RFG-003 | 2026-07-15 | Headless Firefox/WebKit live practice gets no player ID; compositor screenshots from staged WebKit gameplay remain black.                                                   | Batches 17/24 | Batch 24 accepts staged object/input assertions plus direct non-black Phaser renderer snapshots as trustworthy Firefox/WebKit visual evidence; Chromium remains the live/compositor reference. Revisit real-device/live-channel coverage at the release gate. | Gate-dispositioned |
-| RFG-004 | 2026-07-17 | After all-six-arena coherent play, literal `largeWorlds:false` reported legacy viewport truth but retained the prior 1920x1152 minimap and landmarks.                       | Batch 39      | Resolved narrowly inside the completed fallback contract by clearing `GameScene.minimapRenderer` in `init()`. The strict all-six reproduction, complete enabled inventory, and RFG-003 paired evidence pass with `minimap: null` preserved.                   | Resolved           |
-| RFG-005 | 2026-07-18 | In a three-plus-fighter Battle Royale, an uncredited self-explosion marked the victim dead but did not append the lifecycle elimination, so terminal placement could stall. | Batches 40/43 | Resolved at the existing authoritative explosion-death branch by recording the combat elimination and clearing the one-slot inventory. A deterministic three-fighter launcher/wall reproduction proves the lifecycle advances without awarding a kill.        | Resolved           |
+| ID      | Discovered | Reproduction/evidence                                                                                                                                                                                                                        | Relationship  | Disposition                                                                                                                                                                                                                                                   | Status             |
+| ------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| RFG-001 | 2026-07-15 | Idle recoil used to clear sustained `(320, 144)` base scroll to `(0, 0)`.                                                                                                                                                                    | Batches 20/24 | Resolved by composed kick offsets in Batch 20; retain the proof in the Batch 24 gate.                                                                                                                                                                         | Resolved           |
+| RFG-002 | 2026-07-15 | Idle zoom pulse used to clear sustained base zoom `0.9` back to `1`.                                                                                                                                                                         | Batches 20/24 | Resolved by the composed zoom multiplier in Batch 20; retain the proof in the Batch 24 gate.                                                                                                                                                                  | Resolved           |
+| RFG-003 | 2026-07-15 | Headless Firefox/WebKit live practice gets no player ID; compositor screenshots from staged WebKit gameplay remain black.                                                                                                                    | Batches 17/24 | Batch 24 accepts staged object/input assertions plus direct non-black Phaser renderer snapshots as trustworthy Firefox/WebKit visual evidence; Chromium remains the live/compositor reference. Revisit real-device/live-channel coverage at the release gate. | Gate-dispositioned |
+| RFG-004 | 2026-07-17 | After all-six-arena coherent play, literal `largeWorlds:false` reported legacy viewport truth but retained the prior 1920x1152 minimap and landmarks.                                                                                        | Batch 39      | Resolved narrowly inside the completed fallback contract by clearing `GameScene.minimapRenderer` in `init()`. The strict all-six reproduction, complete enabled inventory, and RFG-003 paired evidence pass with `minimap: null` preserved.                   | Resolved           |
+| RFG-005 | 2026-07-18 | In a three-plus-fighter Battle Royale, an uncredited self-explosion marked the victim dead but did not append the lifecycle elimination, so terminal placement could stall.                                                                  | Batches 40/43 | Resolved at the existing authoritative explosion-death branch by recording the combat elimination and clearing the one-slot inventory. A deterministic three-fighter launcher/wall reproduction proves the lifecycle advances without awarding a kill.        | Resolved           |
+| RFG-006 | 2026-07-18 | The Battle Royale mobile reload browser fixture divided touch coordinates by the dormant 1280-wide viewport while `largeWorlds:false` correctly retained the 960-wide canvas, delivering Phaser x≈606 instead of the visible button's x=808. | Batches 43/44 | Resolved in the fixture by deriving logical width/height from the active Phaser scale manager and proving the delivered touch pointer is within two logical pixels of the rendered control. Product input code and capability defaults were unchanged.        | Resolved           |
 
 ## End-of-batch ritual
 
@@ -4006,6 +4054,67 @@ wall-impact reproduction passes. No open defect remains from Batch 43.
 33 commit `f39eb34131f8827f85432aafcc6d6c18a2d0ac51`; `newShell`, `schedules`,
 `largeWorlds`, `modernArt`, and `battleRoyale` remain strict server-owned
 opt-ins, default false, and unexposed. Proceed only to Batch 44 under the user's
+standing direct-development authorization. Capability exposure, deployment,
+production restart, and live smoke remain explicitly unauthorized.
+
+### Batch 44 - 2026-07-18 - Containers and loot
+
+**Scope and tier:** Before implementation, the shared/server-simulation,
+additive-network, combat/scenery/pickup-authority, and capability-owned
+client-presentation tier was selected. The batch added only attack-opened
+containers, stable guaranteed gun/rarity/sustain rolls, compact supply bundles,
+source-linked elimination piles, contested collection, and rarity
+aura/comparison projection. No four-biome arena, safe zone, bot behavior,
+spectating, records, hardening, exposure, release, or deployment work entered
+the allowlist.
+
+**Authority and compatibility:** `BattleRoyaleLootManager` exists only beside
+the server-authored lifecycle/inventory manager. Authoritative attack and blast
+paths open one registered solid container once, clear its collision, and author
+one full-mag gun plus 18 universal reserve and one sustain pickup from stable
+match/container hashes. Elimination and departure author one idempotent compact
+source with the exact held instance, surviving loaded ammo, reserve, and one
+sustain bundle before cleanup. Stable player-ID/distance/entity-ID ordering
+resolves eight-fighter gun and bundle contests. Standard matches have no loot
+manager, reject container registration, omit all additions, and preserve their
+scenery, melee, pickup, death-drop, mode/mutator, stats/persistence, rematch,
+input, and byte contracts.
+
+Clients atomically normalize optional container/supply/source state, clear
+old-server omission, and render only authoritative positions, status, contents,
+rarity badge/rim/shape, and held-rarity comparison. Modern art reuses the
+approved Batch 30 atlas; fallback remains code-native and reduced quality keeps
+decisive badge/rim/comparison reads. No client opens, rolls, collects, or
+composes loot.
+
+**Verification:** Focused shared/server/client/matchmaking evidence passed 170
+tests, then the complete matrix passed 150 files and 1,704 tests. Typecheck,
+ESLint, all package builds, the Batch 44 allowlist formatting, and
+`git diff --check` passed. The repository-wide Prettier inventory still reports
+96 inherited files, none on the Batch 44 allowlist. The final focused browser case passed desktop
+Chromium pointer/keyboard, desktop Firefox standard gamepad, and
+mobile-landscape touch while projecting the container, supply, source-linked
+gun, aura, comparison, HUD, and input state. The broader shell file was also
+run accidentally before the command separator was corrected: 29 tests passed,
+15 intentionally skipped, and its one mobile fixture failure became RFG-006;
+the narrow reproduction and final three-project gate passed after correction.
+The server baseline retained configured/rolling 20 Hz and the 50 ms budget;
+synthetic four-player mean/p95/p99/max work was
+0.017/0.030/0.094/1.324 ms, while standard active snapshot bytes remained
+exactly 2,481/3,762.
+
+**Bug ledger:** RFG-006 records a proven browser-fixture mismatch: with
+`largeWorlds:false`, the mobile test divided by dormant 1280-wide coordinates
+instead of the active 960-wide Phaser scale, so the visible x=808 reload button
+received x≈606. The fixture now derives both logical dimensions from the active
+scale manager and asserts the delivered pointer within two logical pixels.
+Product input/capability code did not change, and the isolated mobile plus final
+three-project evidence passes.
+
+**Deployment and disposition:** Skipped. Production remains on approved Batch
+33 commit `f39eb34131f8827f85432aafcc6d6c18a2d0ac51`; `newShell`, `schedules`,
+`largeWorlds`, `modernArt`, and `battleRoyale` remain strict server-owned
+opt-ins, default false, and unexposed. Proceed only to Batch 45 under the user's
 standing direct-development authorization. Capability exposure, deployment,
 production restart, and live smoke remain explicitly unauthorized.
 

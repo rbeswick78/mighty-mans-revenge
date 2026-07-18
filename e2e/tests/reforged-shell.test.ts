@@ -1091,7 +1091,7 @@ test('Battle Royale projects authoritative rarity and launcher flight into the s
   }
 });
 
-test('Battle Royale projects one-slot inventory and contextual reload input', async ({
+test('Battle Royale projects one-slot inventory, loot, and contextual reload input', async ({
   page,
 }, testInfo) => {
   test.skip(
@@ -1233,6 +1233,25 @@ test('Battle Royale projects one-slot inventory and contextual reload input', as
           position: { x: 336, y: 256 },
           weaponInstance: candidate,
           loadedAmmo: 2,
+          lootSourceId: 'br-container:browser-44',
+        },
+      ],
+      battleRoyaleContainers: [
+        {
+          id: 'br-container:browser-44',
+          position: { x: 420, y: 256 },
+          tile: { col: 8, row: 5 },
+          status: 'intact',
+        },
+      ],
+      battleRoyaleSupplyBundles: [
+        {
+          id: 'br-supply:browser-44',
+          position: { x: 336, y: 256 },
+          reserveAmmo: 18,
+          sustainType: 'armor',
+          lootSourceId: 'br-container:browser-44',
+          source: 'container',
         },
       ],
       bulletTrails: [],
@@ -1267,10 +1286,24 @@ test('Battle Royale projects one-slot inventory and contextual reload input', as
                 battleRoyaleInventory?: { loadedAmmo: number; reserveAmmo: number };
               } | null;
               getDroppedWeapons(): unknown[];
+              getBattleRoyaleContainers(): unknown[];
+              getBattleRoyaleSupplyBundles(): unknown[];
             };
           };
           hud: { weaponSwapLabel: Phaser.GameObjects.Text };
-          droppedWeaponRenderer: { sprites: Map<string, unknown> };
+          droppedWeaponRenderer: {
+            sprites: Map<
+              string,
+              {
+                comparison: Phaser.GameObjects.Text;
+                aura: Phaser.GameObjects.Graphics;
+              }
+            >;
+          };
+          battleRoyaleLootRenderer: {
+            containers: Map<string, { label: Phaser.GameObjects.Text }>;
+            supplies: Map<string, { label: Phaser.GameObjects.Text }>;
+          };
           inputManager: {
             touchInput: {
               reloadButton: Phaser.GameObjects.Arc;
@@ -1283,6 +1316,16 @@ test('Battle Royale projects one-slot inventory and contextual reload input', as
           inventory: manager.getLocalPlayerState()?.battleRoyaleInventory,
           drops: manager.getDroppedWeapons().length,
           renderedDrops: scene.droppedWeaponRenderer.sprites.size,
+          comparison: scene.droppedWeaponRenderer.sprites.get('drop-browser-43')?.comparison.text,
+          auraVisible: scene.droppedWeaponRenderer.sprites.get('drop-browser-43')?.aura.visible,
+          containers: manager.getBattleRoyaleContainers().length,
+          supplies: manager.getBattleRoyaleSupplyBundles().length,
+          renderedContainers: scene.battleRoyaleLootRenderer.containers.size,
+          renderedSupplies: scene.battleRoyaleLootRenderer.supplies.size,
+          containerLabel:
+            scene.battleRoyaleLootRenderer.containers.get('br-container:browser-44')?.label.text,
+          supplyLabel:
+            scene.battleRoyaleLootRenderer.supplies.get('br-supply:browser-44')?.label.text,
           swapLabel: scene.hud.weaponSwapLabel.text,
           swapVisible: scene.hud.weaponSwapLabel.visible,
           touchReloadVisible: scene.inputManager.touchInput.reloadButton.visible,
@@ -1294,6 +1337,14 @@ test('Battle Royale projects one-slot inventory and contextual reload input', as
       inventory: { loadedAmmo: 7, reserveAmmo: 29 },
       drops: 1,
       renderedDrops: 1,
+      comparison: '▲',
+      auraVisible: true,
+      containers: 1,
+      supplies: 1,
+      renderedContainers: 1,
+      renderedSupplies: 1,
+      containerLabel: 'ATTACK',
+      supplyLabel: '+18 · AR',
       swapLabel: 'RELOAD: SWAP FOR EPIC SHOTGUN · 2',
       swapVisible: true,
       touchReloadVisible: testInfo.project.name === 'mobile-landscape',
@@ -1306,18 +1357,52 @@ test('Battle Royale projects one-slot inventory and contextual reload input', as
         'GameScene',
       ) as unknown as {
         inputManager: { touchInput: { reloadButton: Phaser.GameObjects.Arc } };
+        input: Phaser.Input.InputPlugin;
+        scale: Phaser.Scale.ScaleManager;
       };
+      scene.input.once('pointerdown', (pointer: Phaser.Input.Pointer) => {
+        (
+          window as unknown as {
+            __battleInventoryTouch?: { x: number; y: number };
+          }
+        ).__battleInventoryTouch = { x: pointer.x, y: pointer.y };
+      });
       return {
         x: scene.inputManager.touchInput.reloadButton.x,
         y: scene.inputManager.touchInput.reloadButton.y,
+        logicalWidth: scene.scale.width,
+        logicalHeight: scene.scale.height,
       };
     });
     const canvas = await page.locator('canvas').boundingBox();
     if (!canvas) throw new Error('missing gameplay canvas');
     await page.touchscreen.tap(
-      canvas.x + (center.x / 1280) * canvas.width,
-      canvas.y + (center.y / 720) * canvas.height,
+      canvas.x + (center.x / center.logicalWidth) * canvas.width,
+      canvas.y + (center.y / center.logicalHeight) * canvas.height,
     );
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            (
+              window as unknown as {
+                __battleInventoryInputs?: Array<{ reload: boolean }>;
+              }
+            ).__battleInventoryInputs?.filter(({ reload }) => reload).length ?? 0,
+        ),
+      )
+      .toBe(1);
+    const deliveredPointer = await page.evaluate(
+      () =>
+        (
+          window as unknown as {
+            __battleInventoryTouch?: { x: number; y: number };
+          }
+        ).__battleInventoryTouch,
+    );
+    expect(deliveredPointer).toBeDefined();
+    expect(Math.abs(deliveredPointer!.x - center.x)).toBeLessThan(2);
+    expect(Math.abs(deliveredPointer!.y - center.y)).toBeLessThan(2);
   } else if (gamepadProject) {
     await page.waitForTimeout(100);
     await page.evaluate(() => {
