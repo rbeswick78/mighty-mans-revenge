@@ -98,6 +98,7 @@ describe('MatchmakingManager Battle Royale queue', () => {
     );
     expect(found?.message).toMatchObject({
       type: 'server:matchFound',
+      mapName: 'Shatterlands',
       matchKind: 'battle_royale',
       battleRoyale: { participantCount: 8, humanCount: 1, botCount: 7 },
     });
@@ -209,7 +210,10 @@ describe('MatchmakingManager Battle Royale queue', () => {
         loadedAmmo: 17,
       },
     ]);
-    expect(battleRoyaleState.message.battleRoyaleContainers).toEqual([]);
+    expect(battleRoyaleState.message.battleRoyaleContainers).toHaveLength(16);
+    expect(
+      battleRoyaleState.message.battleRoyaleContainers?.every(({ status }) => status === 'intact'),
+    ).toBe(true);
     expect(battleRoyaleState.message.battleRoyaleSupplyBundles).toEqual([]);
 
     const standard = makeFakeServer();

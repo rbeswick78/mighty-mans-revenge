@@ -150,6 +150,77 @@ export interface StandardArenaAuthoring {
   };
 }
 
+export type BattleRoyaleBiome = 'wasteland' | 'overgrown' | 'industrial' | 'irradiated';
+
+export interface BattleRoyaleArenaRegion {
+  id: string;
+  displayName: string;
+  biome: BattleRoyaleBiome;
+  areas: MapTileRect[];
+  /** Tile used for the compact non-interactive minimap label. */
+  label: MapTilePoint;
+}
+
+export interface BattleRoyaleArenaTransition {
+  id: string;
+  fromRegionId: string;
+  toRegionId: string;
+  orientation: 'horizontal' | 'vertical' | 'corner';
+  footprint: MapTileRect;
+}
+
+export interface BattleRoyaleArenaLandmark {
+  id: string;
+  displayName: string;
+  regionId: string;
+  footprint: MapTileRect;
+  minimap: 'major' | 'minor' | 'hidden';
+}
+
+export interface BattleRoyaleSpawnGroup {
+  id: string;
+  regionId: string;
+  spawnIds: readonly [string, string];
+}
+
+export interface BattleRoyaleContainerSpawn extends MapTilePoint {
+  id: string;
+  regionId: string;
+}
+
+export interface BattleRoyaleArenaRoute {
+  id: string;
+  fromRegionId: string;
+  toRegionId: string;
+  waypoints: MapTilePoint[];
+}
+
+/** Declarative and runtime-consumed authoring truth for the private BR arena. */
+export interface BattleRoyaleArenaAuthoring {
+  schemaVersion: 1;
+  profile: 'battle-royale-56x34';
+  regions: BattleRoyaleArenaRegion[];
+  transitions: BattleRoyaleArenaTransition[];
+  landmarks: BattleRoyaleArenaLandmark[];
+  minimap: {
+    projection: 'orthographic-top-left';
+    bounds: MapTileRect;
+    regionIds: string[];
+    landmarkIds: string[];
+  };
+  connectivity: {
+    requireSingleWalkableComponent: true;
+    routes: BattleRoyaleArenaRoute[];
+  };
+  spawnSafety: {
+    groups: BattleRoyaleSpawnGroup[];
+    minimumPathDistanceTiles: number;
+    minimumEgressDirections: number;
+  };
+  containerSpawns: BattleRoyaleContainerSpawn[];
+  sustainSpawnIds: string[];
+}
+
 export interface MapData {
   name: string;
   width: number;
@@ -176,6 +247,8 @@ export interface MapData {
   kothHills?: { x: number; y: number }[];
   /** Versioned authoring proof. Absent on the six legacy 20x12 maps. */
   authoring?: StandardArenaAuthoring;
+  /** Private Battle Royale arena metadata; absent from every standard map. */
+  battleRoyale?: BattleRoyaleArenaAuthoring;
 }
 
 /** Persisted real-match wins keyed by canonical arena name. */

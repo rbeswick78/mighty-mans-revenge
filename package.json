@@ -22,6 +22,7 @@
     "assets:generate:combat-feedback-art": "node tools/reforged-assets/create-combat-feedback-art-sources.mjs",
     "test:assets": "node --test tools/reforged-assets/*.test.mjs",
     "maps:validate": "pnpm --filter @shared/game build && node tools/reforged-maps/map-authoring.mjs validate --profile compatible shared/maps",
+    "maps:generate:battle-royale": "node tools/reforged-maps/create-battle-royale-map.mjs",
     "test:maps": "pnpm --filter @shared/game build && node --test tools/reforged-maps/*.test.mjs",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint . --ext .ts,.tsx",

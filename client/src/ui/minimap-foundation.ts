@@ -7,7 +7,12 @@ import {
   type TeamId,
 } from '@shared/types/game.js';
 import type { PlayerId } from '@shared/types/common.js';
-import type { CollisionGrid, MapData, MapDecoration } from '@shared/types/map.js';
+import type {
+  BattleRoyaleBiome,
+  CollisionGrid,
+  MapData,
+  MapDecoration,
+} from '@shared/types/map.js';
 import type { KothHudState } from '@shared/types/network.js';
 
 import { worldBoundsForMap } from '../rendering/dynamic-world-rendering.js';
@@ -40,10 +45,27 @@ export interface MinimapSolidProjection extends HudRect {
 export interface MinimapLandmarkProjection extends HudRect {
   readonly kind: MinimapLandmarkKind;
   readonly texture: string;
+  readonly label?: string;
+}
+
+export interface MinimapRegionProjection {
+  readonly id: string;
+  readonly displayName: string;
+  readonly biome: BattleRoyaleBiome;
+  readonly areas: readonly HudRect[];
+  readonly label: HudPoint;
+}
+
+export interface MinimapContainerProjection extends HudRect {
+  readonly id: string;
+  readonly col: number;
+  readonly row: number;
 }
 
 export interface MinimapStaticProjection {
   readonly worldBounds: WorldBounds;
+  readonly regions: readonly MinimapRegionProjection[];
+  readonly containers: readonly MinimapContainerProjection[];
   readonly solids: readonly MinimapSolidProjection[];
   readonly landmarks: readonly MinimapLandmarkProjection[];
 }
@@ -192,6 +214,28 @@ export function createMinimapStaticProjection(
   layout: MinimapLayout,
 ): MinimapStaticProjection {
   const worldBounds = worldBoundsForMap(mapData);
+  const regions =
+    mapData.battleRoyale?.regions.map((region) =>
+      Object.freeze({
+        id: region.id,
+        displayName: region.displayName,
+        biome: region.biome,
+        areas: Object.freeze(
+          region.areas.map((area) =>
+            projectWorldRectToMinimap(worldBounds, layout.map, {
+              x: area.x * mapData.tileSize,
+              y: area.y * mapData.tileSize,
+              width: area.w * mapData.tileSize,
+              height: area.h * mapData.tileSize,
+            }),
+          ),
+        ),
+        label: projectWorldPointToMinimap(worldBounds, layout.map, {
+          x: (region.label.x + 0.5) * mapData.tileSize,
+          y: (region.label.y + 0.5) * mapData.tileSize,
+        }),
+      }),
+    ) ?? [];
   const solids: MinimapSolidProjection[] = [];
   for (let row = 0; row < mapData.height; row++) {
     for (let col = 0; col < mapData.width; col++) {
@@ -206,6 +250,24 @@ export function createMinimapStaticProjection(
     }
   }
 
+  const containers =
+    mapData.battleRoyale?.containerSpawns
+      .filter(({ x, y }) => collisionGrid.solid[y]?.[x] === true)
+      .map((container) => {
+        const projected = projectWorldRectToMinimap(worldBounds, layout.map, {
+          x: container.x * mapData.tileSize,
+          y: container.y * mapData.tileSize,
+          width: mapData.tileSize,
+          height: mapData.tileSize,
+        });
+        return Object.freeze({
+          ...projected,
+          id: container.id,
+          col: container.x,
+          row: container.y,
+        });
+      }) ?? [];
+
   const landmarks = (mapData.decorations ?? [])
     .filter((decoration) => landmarkStillExists(decoration, collisionGrid))
     .map((decoration) => {
@@ -219,11 +281,14 @@ export function createMinimapStaticProjection(
         ...projected,
         kind: landmarkKind(decoration),
         texture: decoration.texture,
+        label: mapData.battleRoyale?.landmarks.find(({ id }) => id === decoration.id)?.displayName,
       });
     });
 
   return Object.freeze({
     worldBounds,
+    regions: Object.freeze(regions),
+    containers: Object.freeze(containers),
     solids: Object.freeze(solids),
     landmarks: Object.freeze(landmarks),
   });

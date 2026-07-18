@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 
 import { Wasteland, cssHex } from '@shared/config/palette.js';
-import type { CollisionGrid, MapData } from '@shared/types/map.js';
+import type { BattleRoyaleBiome, CollisionGrid, MapData } from '@shared/types/map.js';
 
 import { MENU_FONTS } from '../ui/menu/fonts.js';
 import { MODERN_UI_TEXTURE_KEY, modernUiIconFrame } from '../ui/modern-ui-contract.js';
@@ -30,6 +30,12 @@ const LANDMARK_COLORS: Readonly<Record<MinimapLandmarkKind, number>> = Object.fr
   gate: Wasteland.TEXT_LOADING,
   cache: Wasteland.TEXT_RELOAD_WARNING,
 });
+const REGION_COLORS: Readonly<Record<BattleRoyaleBiome, number>> = Object.freeze({
+  wasteland: 0x7a5738,
+  overgrown: 0x355b43,
+  industrial: 0x554b49,
+  irradiated: 0x514365,
+});
 
 export class MinimapRenderer {
   private readonly staticGraphics: Phaser.GameObjects.Graphics;
@@ -37,6 +43,7 @@ export class MinimapRenderer {
   private readonly modernPanel: Phaser.GameObjects.NineSlice | null;
   private readonly modernIcon: Phaser.GameObjects.Image | null;
   private readonly title: Phaser.GameObjects.Text;
+  private regionLabels: Phaser.GameObjects.Text[] = [];
   private staticProjection: MinimapStaticProjection;
   private dynamicProjection: MinimapDynamicProjection = Object.freeze({
     objectives: Object.freeze([]),
@@ -44,7 +51,7 @@ export class MinimapRenderer {
   });
 
   constructor(
-    scene: Phaser.Scene,
+    private readonly scene: Phaser.Scene,
     private readonly mapData: MapData,
     private readonly collisionGrid: CollisionGrid,
     private layout: MinimapLayout,
@@ -52,7 +59,7 @@ export class MinimapRenderer {
     const modern = modernUiEnabledForScene(scene);
     this.modernPanel = modern
       ? createModernUiNineSlice(
-          scene,
+          this.scene,
           'tactical',
           layout.panel.x,
           layout.panel.y,
@@ -63,7 +70,7 @@ export class MinimapRenderer {
           .setDepth(MINIMAP_STATIC_DEPTH - 1)
       : null;
     this.modernIcon = modern
-      ? scene.add
+      ? this.scene.add
           .image(
             layout.panel.x + 16,
             layout.title.y + 7,
@@ -74,17 +81,17 @@ export class MinimapRenderer {
           .setScrollFactor(0)
           .setDepth(MINIMAP_TITLE_DEPTH)
       : null;
-    this.staticGraphics = scene.add.graphics();
+    this.staticGraphics = this.scene.add.graphics();
     this.staticGraphics.setName('minimap-static');
     this.staticGraphics.setScrollFactor(0);
     this.staticGraphics.setDepth(MINIMAP_STATIC_DEPTH);
 
-    this.dynamicGraphics = scene.add.graphics();
+    this.dynamicGraphics = this.scene.add.graphics();
     this.dynamicGraphics.setName('minimap-dynamic');
     this.dynamicGraphics.setScrollFactor(0);
     this.dynamicGraphics.setDepth(MINIMAP_DYNAMIC_DEPTH);
 
-    this.title = scene.add.text(
+    this.title = this.scene.add.text(
       modern ? layout.title.x + 24 : layout.title.x,
       layout.title.y,
       modern ? 'TACTICAL / MINIMAP' : 'MINIMAP',
@@ -130,6 +137,8 @@ export class MinimapRenderer {
   getRenderState(): Readonly<{
     layout: MinimapLayout;
     worldBounds: MinimapStaticProjection['worldBounds'];
+    regions: MinimapStaticProjection['regions'];
+    containers: MinimapStaticProjection['containers'];
     solidCount: number;
     landmarkCount: number;
     landmarks: MinimapStaticProjection['landmarks'];
@@ -141,6 +150,8 @@ export class MinimapRenderer {
     return Object.freeze({
       layout: this.layout,
       worldBounds: this.staticProjection.worldBounds,
+      regions: this.staticProjection.regions,
+      containers: this.staticProjection.containers,
       solidCount: this.staticProjection.solids.length,
       landmarkCount: this.staticProjection.landmarks.length,
       landmarks: this.staticProjection.landmarks,
@@ -164,6 +175,8 @@ export class MinimapRenderer {
     this.staticGraphics.destroy();
     this.dynamicGraphics.destroy();
     this.title.destroy();
+    for (const label of this.regionLabels) label.destroy();
+    this.regionLabels = [];
   }
 
   getChromeFrame(): string | null {
@@ -185,9 +198,22 @@ export class MinimapRenderer {
 
     gfx.fillStyle(0x121820, 0.96);
     gfx.fillRect(map.x, map.y, map.width, map.height);
+    for (const region of this.staticProjection.regions) {
+      gfx.fillStyle(REGION_COLORS[region.biome], 0.48);
+      for (const area of region.areas) gfx.fillRect(area.x, area.y, area.width, area.height);
+    }
     for (const solid of this.staticProjection.solids) {
       gfx.fillStyle(0x697078, 0.78);
       gfx.fillRect(solid.x, solid.y, Math.max(1, solid.width), Math.max(1, solid.height));
+    }
+    for (const container of this.staticProjection.containers) {
+      gfx.fillStyle(0xf0b94d, 1);
+      gfx.fillRect(
+        container.x,
+        container.y,
+        Math.max(2, container.width),
+        Math.max(2, container.height),
+      );
     }
     for (const landmark of this.staticProjection.landmarks) {
       gfx.fillStyle(LANDMARK_COLORS[landmark.kind], 0.95);
@@ -200,6 +226,21 @@ export class MinimapRenderer {
     }
     gfx.lineStyle(1, Wasteland.TEXT_PRIMARY, 0.8);
     gfx.strokeRect(map.x, map.y, map.width, map.height);
+
+    for (const label of this.regionLabels) label.destroy();
+    this.regionLabels = this.staticProjection.regions.map((region) =>
+      this.scene.add
+        .text(region.label.x, region.label.y, region.displayName, {
+          fontFamily: MENU_FONTS.BODY,
+          fontSize: '6px',
+          color: cssHex(Wasteland.TEXT_PRIMARY),
+          stroke: '#000000',
+          strokeThickness: 2,
+        })
+        .setOrigin(0.5)
+        .setScrollFactor(0)
+        .setDepth(MINIMAP_TITLE_DEPTH),
+    );
   }
 
   private drawDynamic(): void {

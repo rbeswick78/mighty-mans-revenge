@@ -417,6 +417,13 @@ export class Match implements MatchContext {
     );
 
     this.mapManager.loadMap(mapData);
+    if (this.battleRoyaleLootManager && mapData.battleRoyale) {
+      for (const container of mapData.battleRoyale.containerSpawns) {
+        if (!this.spawnBattleRoyaleContainer(container.id, container.x, container.y)) {
+          throw new Error(`Invalid authored Battle Royale container ${container.id}`);
+        }
+      }
+    }
     for (const decoration of mapData.decorations ?? []) {
       if (decoration.hazard === 'explosive_barrel') {
         this.activeBarrels.add(this.tileKey(decoration.x, decoration.y));
@@ -432,7 +439,10 @@ export class Match implements MatchContext {
     // bandages) — filtered spawns never exist, so they never announce.
     this.pickupManager.initFromMap(mapData, (type) => this.isPickupTypeEnabledForMatch(type));
 
-    const spawns = this.mapManager.pickInitialSpawns(playerEntries.length, this.rng);
+    const spawns =
+      this.battleRoyaleLifecycle && mapData.battleRoyale
+        ? this.mapManager.pickBattleRoyaleInitialSpawns(playerEntries.length, this.rng)
+        : this.mapManager.pickInitialSpawns(playerEntries.length, this.rng);
     // Default-hover assignment: as we iterate over players in insertion order,
     // give each player the first CHARACTER_ID not already taken as a default
     // hover. With only 2 characters and 2 players today this means P1 gets

@@ -5,9 +5,9 @@ Read this file and `CLAUDE.md` completely at the start of every batch. The
 completed `docs/REPLAYABILITY_ROADMAP.md` remains the historical record for the
 systems this program preserves and reorganizes.
 
-- **Status:** Batch 44 Battle Royale containers and loot completed on
+- **Status:** Batch 45 Battle Royale four-biome arena completed on
   2026-07-18; the format remains dormant and every capability remains default false.
-- **Next step:** Batch 45 four-biome arena under the user's standing
+- **Next step:** Batch 46 safe-zone phases under the user's standing
   authorization to continue sequentially through the plan while deferring human
   involvement. The deferred Batch 39 human release walkthrough still does not
   authorize deployment, capability exposure, production restart, or live smoke.
@@ -1596,6 +1596,48 @@ authoritative 20 Hz and snapshot baselines, formatting, and diff review.
 
 Author the 56×34 arena with eight balanced spawn groups, four named regions,
 transitions, landmarks, routes, containers, sustain, cover, and map UI.
+
+**Verification tier selected before implementation (2026-07-18):** strict
+Battle Royale map-authoring/schema, shared registry and collision/navigation,
+authoritative eight-player spawn/container/pickup simulation, capability-owned
+multi-biome rendering/minimap, and cross-package compatibility tier. The map
+crosses shared JSON/types/validation, server match construction and the 20 Hz
+simulation, client world/chunk/camera/minimap projection, and the existing
+Battle Royale loot boundary. Run focused deterministic authoring/registry,
+connectivity, balanced-spawn, container, minimap, modern/fallback/reduced
+presentation, and matchmaking evidence; the complete unit matrix; typecheck;
+lint; shared/server/client builds; map and asset-contract validation; the
+authoritative server baseline; standard successor balance evidence; allowlist
+and repository-wide formatting inventories; `git diff --check`; and focused
+desktop Chromium, desktop Firefox, and mobile-landscape browser evidence.
+
+Acceptance:
+
+- [x] One private Battle Royale-only map is exactly 56×34 at 48px, has one
+      connected walkable component, and cannot enter the six-map standard
+      registry, schedule, draft, arena-mastery, Practice, or rematch rotation.
+- [x] Four complete, non-overlapping named biome regions preserve wasteland,
+      overgrown, industrial, and irradiated visual/collision language with
+      readable authored transition bands, routes, cover, and landmarks.
+- [x] Exactly eight server-owned spawn groups are balanced, mutually distinct,
+      safely egressed, and assigned deterministically without changing standard
+      `pickInitialSpawns` behavior.
+- [x] Every authored container is a registered solid one-cell prop consumed by
+      the Batch 44 attack/open boundary. Sustain, cover, landmarks, and routes
+      remain reachable, N-player safe, and free of spawn overlap.
+- [x] The existing non-interactive minimap projects authoritative region,
+      landmark, collision/destruction, container, and local-player truth at all
+      four map edges. No tactical-map input, safe-zone state, or enemy reveal is
+      introduced.
+- [x] Modern full/reduced and procedural fallback rendering preserve biome
+      boundaries, collision hierarchy, landmark/container identity, camera
+      clamping, chunk culling, and mobile readability without adding or
+      changing production art.
+- [x] Battle Royale matchmaking always selects the private arena regardless of
+      `largeWorlds` or `FORCE_MAP`; capability-off and all standard formats keep
+      exact prior map selection, public names, snapshots, stats, and behavior.
+- [x] Batch 46 safe zones and all later bot, spectating, records, hardening,
+      release, exposure, deployment, restart, and live-smoke work do not begin.
 
 #### Batch 46 — Safe-zone phases
 
@@ -4115,6 +4157,72 @@ three-project evidence passes.
 33 commit `f39eb34131f8827f85432aafcc6d6c18a2d0ac51`; `newShell`, `schedules`,
 `largeWorlds`, `modernArt`, and `battleRoyale` remain strict server-owned
 opt-ins, default false, and unexposed. Proceed only to Batch 45 under the user's
+standing direct-development authorization. Capability exposure, deployment,
+production restart, and live smoke remain explicitly unauthorized.
+
+### Batch 45 - 2026-07-18 - Four-biome arena
+
+**Scope and tier:** Before implementation, the strict Battle Royale
+map-authoring/schema, shared registry/collision/navigation, authoritative
+eight-player spawn/container/pickup simulation, capability-owned multi-biome
+renderer/minimap, and cross-package compatibility tier was selected. The batch
+added only the private `Shatterlands` arena and its lifecycle projection. Safe
+zones, tactical-map gameplay, Battle Royale bot behavior, spectating, records,
+hardening, exposure, release, and deployment did not enter the allowlist.
+
+**Authored and authoritative truth:** The deterministic generator emits one
+exact 56×34 map at 48px with a single connected walkable component. Four
+complete regions—Dust Basin, Greenward, Ironworks, and Glass Wastes—partition
+the world into wasteland, overgrown, industrial, and irradiated language with
+named transition bands, four connected region routes, four landmarks, cover,
+16 sustain spawns, and 16 one-cell containers. Eight two-candidate spawn groups
+have declared path separation and egress; the server shuffles groups and picks
+one candidate per group from match RNG without changing the established
+standard spawn algorithm. Match construction registers every authored
+container through the Batch 44 server boundary, and Battle Royale matchmaking
+selects `Shatterlands` regardless of `largeWorlds` or `FORCE_MAP`.
+
+The private arena resolves by name only for an authoritative Battle Royale
+client projection. It is absent from the six-map public registry and cannot
+enter schedules, Draft, Practice, Arena Mastery, standard rematches, persistent
+map normalization, or standard balance inventories. The renderer selects
+biome theme/family per cell while reusing the approved atlas or procedural
+fallback. The existing non-interactive minimap projects all four region labels,
+landmarks, collision/destruction, 16 explicit intact-container identities, and
+the local fighter; opened containers disappear when the authoritative tile
+destruction refresh arrives. No client chooses a map, spawn, route, container,
+or visibility result.
+
+**Verification:** The complete matrix passed 152 files and 1,714 tests;
+focused lifecycle/map/client evidence passed 177 tests. Typecheck, ESLint, all
+package builds, deterministic regeneration, all 13 compatible map documents,
+the strict Battle Royale CLI profile, 30 asset-contract tests, and the unchanged
+624-product standard balance matrix passed. The corrected focused browser case
+passed desktop Chromium, desktop Firefox, and mobile landscape with
+`battleRoyale:true`, `largeWorlds:false`, and `modernArt:false`, proving the
+independent capability route, four families, exact 2,688×1,632 bounds, region
+and landmark labels, 16 container identities, and non-interactive minimap. An
+accidentally broad shell invocation also left 24 unrelated cases green and 18
+intentionally skipped; its only three failures were the stale title-case test
+expectation corrected before the final focused pass.
+
+The complete Batch 45 allowlist and `git diff --check` passed. The
+repository-wide Prettier inventory retains 95 inherited files, none on the
+Batch 45 allowlist. Consecutive generator runs produced the same
+`E505321B0145B68B149114B385156AACF937FA1B7201D17A08FA108F46B7568E`
+SHA-256 after loading the repository's canonical formatting configuration.
+
+The server baseline retained configured/rolling 20 Hz and the 50 ms budget;
+synthetic four-player mean/p95/p99/max work was
+0.067/0.039/0.190/44.646 ms, while standard active snapshots remained exactly
+2,481/3,762 bytes. The high single max remained below budget during a host
+scheduling stall and the p99 stayed 0.190 ms. No product defect was proven, so
+the bug ledger did not change.
+
+**Deployment and disposition:** Skipped. Production remains on approved Batch
+33 commit `f39eb34131f8827f85432aafcc6d6c18a2d0ac51`; `newShell`, `schedules`,
+`largeWorlds`, `modernArt`, and `battleRoyale` remain strict server-owned
+opt-ins, default false, and unexposed. Proceed only to Batch 46 under the user's
 standing direct-development authorization. Capability exposure, deployment,
 production restart, and live smoke remain explicitly unauthorized.
 

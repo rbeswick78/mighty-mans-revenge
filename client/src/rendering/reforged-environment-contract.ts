@@ -114,6 +114,7 @@ const THEME_FAMILIES: Readonly<Record<string, ReforgedBiomeFamily>> = Object.fre
   overpass: 'industrial',
   checkpoint: 'industrial',
   refinery: 'industrial',
+  irradiated: 'irradiated',
 });
 
 /** Presentation-only projection; unknown/absent current themes remain wasteland. */

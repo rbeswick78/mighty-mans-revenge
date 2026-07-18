@@ -3,6 +3,10 @@ import Phaser from 'phaser';
 import type { MapData, CollisionGrid } from '@shared/types/map.js';
 import { TileType } from '@shared/types/map.js';
 import { createCollisionGrid } from '@shared/utils/collision.js';
+import {
+  battleRoyaleBiomeAt,
+  battleRoyaleTransitionAt,
+} from '@shared/utils/battle-royale-map-validator.js';
 import { Wasteland } from '@shared/config/palette.js';
 import {
   coverBarricadeAngle,
@@ -88,6 +92,9 @@ export class MapRenderer {
   private readonly modernArtEnabled: boolean;
   private modernEnvironment = false;
   private modernEnvironmentFamily: ReforgedBiomeFamily = 'wasteland';
+  private modernEnvironmentFamilies = new Set<ReforgedBiomeFamily>();
+  private cellThemes: MapTheme[][] = [];
+  private cellFamilies: ReforgedBiomeFamily[][] = [];
   private modernEnvironmentUseCount = 0;
   private legacyEnvironmentFallbackUseCount = 0;
   private modernDamagedFrames = new Map<Phaser.GameObjects.Sprite, string>();
@@ -107,6 +114,7 @@ export class MapRenderer {
     const theme = getTheme(mapData.theme);
     this.theme = theme;
     this.modernEnvironmentFamily = reforgedBiomeFamilyForTheme(mapData.theme);
+    this.modernEnvironmentFamilies.add(this.modernEnvironmentFamily);
     this.modernEnvironment = shouldPresentReforgedEnvironmentKit(
       'live-map',
       this.modernArtEnabled,
@@ -131,6 +139,18 @@ export class MapRenderer {
       new Array<Phaser.GameObjects.Sprite | null>(mapData.width).fill(null),
     );
     this.tileTypes = Array.from({ length: mapData.height }, (_, r) => mapData.tiles[r].slice());
+    this.cellThemes = Array.from({ length: mapData.height }, (_, row) =>
+      Array.from({ length: mapData.width }, (_, col) =>
+        getTheme(this.themeIdForBiome(battleRoyaleBiomeAt(mapData, col, row), mapData.theme)),
+      ),
+    );
+    this.cellFamilies = Array.from({ length: mapData.height }, (_, row) =>
+      Array.from({ length: mapData.width }, (_, col) => {
+        const family = battleRoyaleBiomeAt(mapData, col, row) ?? this.modernEnvironmentFamily;
+        this.modernEnvironmentFamilies.add(family);
+        return family;
+      }),
+    );
 
     // Cells hidden by a decoration sprite render as plain floor — a
     // rubble/garbage tile peeking out from under a car reads as noise.
@@ -151,6 +171,8 @@ export class MapRenderer {
     for (let row = 0; row < mapData.height; row++) {
       for (let col = 0; col < mapData.width; col++) {
         const tileType = mapData.tiles[row][col];
+        const cellTheme = this.cellThemes[row][col];
+        const cellFamily = this.cellFamilies[row][col];
         const x = col * tileSize + tileSize / 2;
         const y = row * tileSize + tileSize / 2;
 
@@ -164,16 +186,13 @@ export class MapRenderer {
                 x,
                 y,
                 REFORGED_ENVIRONMENT_TEXTURE_KEY,
-                reforgedEnvironmentFrame(
-                  this.modernEnvironmentFamily,
-                  reforgedEnvironmentGroundRole(row, col),
-                ),
+                reforgedEnvironmentFrame(cellFamily, this.modernGroundRole(mapData, row, col)),
               )
             : this.scene.add.sprite(
                 x,
                 y,
-                theme.floorTexture,
-                pickVariant(theme.floorVariants, row, col),
+                cellTheme.floorTexture,
+                pickVariant(cellTheme.floorVariants, row, col),
               );
           floorSprite.setScale(
             this.modernEnvironment ? tileSize / REFORGED_ENVIRONMENT_FRAME_SIZE : legacyScale,
@@ -194,7 +213,7 @@ export class MapRenderer {
               x + tileSize * 0.08,
               y + tileSize * 0.08,
               REFORGED_ENVIRONMENT_TEXTURE_KEY,
-              reforgedEnvironmentFrame(this.modernEnvironmentFamily, shadowRole),
+              reforgedEnvironmentFrame(cellFamily, shadowRole),
             )
             .setScale(tileSize / REFORGED_ENVIRONMENT_FRAME_SIZE)
             .setAlpha(0.72);
@@ -204,7 +223,9 @@ export class MapRenderer {
         }
 
         const { texture, frame } = this.pickTile(
-          theme,
+          cellTheme,
+          cellFamily,
+          mapData,
           mapData.tiles,
           mapData.height,
           mapData.width,
@@ -218,19 +239,16 @@ export class MapRenderer {
         );
         if (this.modernEnvironment) {
           this.modernEnvironmentUseCount += 1;
-          const role = this.modernTileRole(tileType, row, col, decoCovered);
+          const role = this.modernTileRole(mapData, tileType, row, col, decoCovered);
           const damaged = reforgedEnvironmentDamagedRole(role);
           if (damaged) {
-            this.modernDamagedFrames.set(
-              sprite,
-              reforgedEnvironmentFrame(this.modernEnvironmentFamily, damaged),
-            );
+            this.modernDamagedFrames.set(sprite, reforgedEnvironmentFrame(cellFamily, damaged));
           }
         }
         if (
           isCover &&
           !decoCovered.has(row * mapData.width + col) &&
-          theme.coverStyle === 'barricade'
+          cellTheme.coverStyle === 'barricade'
         ) {
           sprite.setAngle(
             coverBarricadeAngle(mapData.tiles, mapData.height, mapData.width, row, col),
@@ -246,6 +264,9 @@ export class MapRenderer {
     // the rect exactly, so a slight overflow past the collision box is
     // expected and reads as organic clutter.
     for (const deco of mapData.decorations ?? []) {
+      const decoCol = Math.min(mapData.width - 1, Math.floor(deco.x + deco.w / 2));
+      const decoRow = Math.min(mapData.height - 1, Math.floor(deco.y + deco.h / 2));
+      const decoFamily = this.cellFamilies[decoRow]?.[decoCol] ?? this.modernEnvironmentFamily;
       const modernRole = this.modernEnvironment ? reforgedEnvironmentDecorationRole(deco) : null;
       if (modernRole === null && !this.scene.textures.exists(deco.texture)) {
         // Unknown key (e.g. newer map JSON than client) — skip quietly
@@ -262,7 +283,7 @@ export class MapRenderer {
             cx + tileSize * 0.08,
             cy + tileSize * 0.08,
             REFORGED_ENVIRONMENT_TEXTURE_KEY,
-            reforgedEnvironmentFrame(this.modernEnvironmentFamily, 'shadow-prop'),
+            reforgedEnvironmentFrame(decoFamily, 'shadow-prop'),
           )
           .setDisplaySize(deco.w * tileSize, deco.h * tileSize)
           .setAlpha(0.72);
@@ -283,7 +304,7 @@ export class MapRenderer {
             cx,
             cy,
             REFORGED_ENVIRONMENT_TEXTURE_KEY,
-            reforgedEnvironmentFrame(this.modernEnvironmentFamily, modernRole),
+            reforgedEnvironmentFrame(decoFamily, modernRole),
           )
         : this.scene.add.sprite(cx, cy, deco.texture, isGate ? WIRE_GATE_CLOSED_FRAME : undefined);
       if (modernRole) {
@@ -291,10 +312,7 @@ export class MapRenderer {
         this.modernEnvironmentUseCount += 1;
         const damaged = reforgedEnvironmentDamagedRole(modernRole);
         if (damaged) {
-          this.modernDamagedFrames.set(
-            sprite,
-            reforgedEnvironmentFrame(this.modernEnvironmentFamily, damaged),
-          );
+          this.modernDamagedFrames.set(sprite, reforgedEnvironmentFrame(decoFamily, damaged));
         }
       } else {
         sprite.setScale(isGate ? wireGateScale(tileSize) : legacyScale);
@@ -327,7 +345,10 @@ export class MapRenderer {
               x,
               y,
               REFORGED_ENVIRONMENT_TEXTURE_KEY,
-              reforgedEnvironmentFrame(this.modernEnvironmentFamily, 'navigation-anchor'),
+              reforgedEnvironmentFrame(
+                this.cellFamilies[spawn.y]?.[spawn.x] ?? this.modernEnvironmentFamily,
+                'navigation-anchor',
+              ),
             )
             .setDisplaySize(24, 24)
             .setAlpha(0.55)
@@ -383,12 +404,14 @@ export class MapRenderer {
   getReforgedEnvironmentState(): Readonly<{
     active: boolean;
     family: ReforgedBiomeFamily;
+    families: readonly ReforgedBiomeFamily[];
     modernUseCount: number;
     legacyFallbackUseCount: number;
   }> {
     return Object.freeze({
       active: this.modernEnvironment,
       family: this.modernEnvironmentFamily,
+      families: Object.freeze([...this.modernEnvironmentFamilies].sort()),
       modernUseCount: this.modernEnvironmentUseCount,
       legacyFallbackUseCount: this.legacyEnvironmentFallbackUseCount,
     });
@@ -406,6 +429,8 @@ export class MapRenderer {
   /** Resolve the texture + frame for one cell from the active theme. */
   private pickTile(
     theme: MapTheme,
+    family: ReforgedBiomeFamily,
+    mapData: MapData,
     tiles: readonly (readonly number[])[],
     h: number,
     w: number,
@@ -416,10 +441,10 @@ export class MapRenderer {
     const tileType = tiles[row][col];
 
     if (this.modernEnvironment) {
-      const role = this.modernTileRole(tileType, row, col, decoCovered);
+      const role = this.modernTileRole(mapData, tileType, row, col, decoCovered);
       return {
         texture: REFORGED_ENVIRONMENT_TEXTURE_KEY,
-        frame: reforgedEnvironmentFrame(this.modernEnvironmentFamily, role),
+        frame: reforgedEnvironmentFrame(family, role),
       };
     }
 
@@ -444,15 +469,39 @@ export class MapRenderer {
   }
 
   private modernTileRole(
+    mapData: MapData,
     tileType: TileType,
     row: number,
     col: number,
     decoCovered: ReadonlySet<number>,
   ): ReforgedEnvironmentFrameRole {
     if (decoCovered.has(row * this.mapWidth + col)) {
-      return reforgedEnvironmentGroundRole(row, col);
+      return this.modernGroundRole(mapData, row, col);
+    }
+    if (tileType !== TileType.WALL && tileType !== TileType.COVER_LOW) {
+      return this.modernGroundRole(mapData, row, col);
     }
     return reforgedEnvironmentTileRole(tileType, row, col);
+  }
+
+  private modernGroundRole(
+    mapData: MapData,
+    row: number,
+    col: number,
+  ): ReforgedEnvironmentFrameRole {
+    const transition = battleRoyaleTransitionAt(mapData, col, row);
+    return transition ? `transition-${transition}` : reforgedEnvironmentGroundRole(row, col);
+  }
+
+  private themeIdForBiome(
+    biome: ReforgedBiomeFamily | null,
+    fallback: string | undefined,
+  ): string | undefined {
+    if (biome === 'overgrown') return 'suburb';
+    if (biome === 'industrial') return 'scrapyard';
+    if (biome === 'irradiated') return 'irradiated';
+    if (biome === 'wasteland') return 'wasteland';
+    return fallback;
   }
 
   /**
@@ -485,10 +534,14 @@ export class MapRenderer {
       if (this.modernEnvironment) {
         sprite.setTexture(
           REFORGED_ENVIRONMENT_TEXTURE_KEY,
-          reforgedEnvironmentFrame(this.modernEnvironmentFamily, 'ground-c'),
+          reforgedEnvironmentFrame(
+            this.cellFamilies[row]?.[col] ?? this.modernEnvironmentFamily,
+            'ground-c',
+          ),
         );
       } else {
-        sprite.setTexture(this.theme.floorTexture, this.theme.scorchFrame);
+        const theme = this.cellThemes[row]?.[col] ?? this.theme;
+        sprite.setTexture(theme.floorTexture, theme.scorchFrame);
       }
       this.scorchedCells.add(key);
     }
@@ -631,6 +684,9 @@ export class MapRenderer {
     this.modernShadowsByCell.clear();
     this.modernEnvironment = false;
     this.modernEnvironmentFamily = 'wasteland';
+    this.modernEnvironmentFamilies.clear();
+    this.cellThemes = [];
+    this.cellFamilies = [];
     this.modernEnvironmentUseCount = 0;
     this.legacyEnvironmentFallbackUseCount = 0;
     this.mapWidth = 0;

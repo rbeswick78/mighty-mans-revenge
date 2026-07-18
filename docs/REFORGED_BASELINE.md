@@ -609,3 +609,33 @@ snapshots remained exactly 2,481/3,762 bytes. The mobile check resolved RFG-006
 by measuring coordinates against the active 960-wide fallback viewport; no
 product input code changed. No capability default, production state, or
 deployment changed.
+
+### Batch 45 Battle Royale arena baseline
+
+Battle Royale now selects one private `Shatterlands` document: exactly 56×34
+at 48px and 2,688×1,632 world pixels. Four complete regions, authored
+transitions/routes/landmarks, 16 sustain pickups, 16 solid one-cell containers,
+and eight two-candidate spawn groups validate through the deterministic
+`battle-royale-56x34` profile. One candidate from each group is selected by the
+server's match RNG, and all containers enter the established Batch 44
+attack/open boundary. The standard six-map registry, public names, schedules,
+Draft, Practice, Arena Mastery, rematches, persistence, and 624-product balance
+inventory do not include the private arena.
+
+The client consumes the server-selected name and renders per-cell wasteland,
+overgrown, industrial, and irradiated families through the approved atlas or
+procedural fallback. The existing non-interactive minimap projects named
+regions, landmarks, mutable collision, 16 explicit intact-container identities,
+and permitted player truth; authoritative tile destruction removes an opened
+container. No map, spawn, route, transition, container, or visibility decision
+moves client-side, and no zone or tactical-map state exists yet.
+
+The complete 152-file/1,714-test matrix, typecheck, lint, all builds,
+deterministic map regeneration, 13-map compatible validation, strict map CLI,
+asset contracts, standard balance matrix, and focused Chromium/Firefox/mobile
+browser proof passed. The authoritative baseline retained configured/rolling
+20 Hz and the 50 ms budget; synthetic four-player mean/p95/p99/max work was
+0.067/0.039/0.190/44.646 ms, and standard active snapshots remained exactly
+2,481/3,762 bytes. All capabilities remain default false and unexposed;
+production remains on Batch 33 and no deployment, restart, or live smoke
+occurred.

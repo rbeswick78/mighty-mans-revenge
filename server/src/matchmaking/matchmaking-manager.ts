@@ -23,6 +23,7 @@ import {
   getNextCrewBattleMode,
   isCrewBattleMode,
   getMap,
+  getBattleRoyaleMap,
   getNextMapName,
   listMapNames,
   MAP_REGISTRY,
@@ -1577,7 +1578,7 @@ export class MatchmakingManager {
     );
     this.launchMatch(
       matchId,
-      this.forcedMap() ?? this.resolveMap(listMapNames()[0]),
+      getBattleRoyaleMap(),
       GameModeType.DEATHMATCH,
       entries,
       {},

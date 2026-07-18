@@ -16,11 +16,11 @@ function run(...args) {
   });
 }
 
-test('compatible profile validates six legacy maps and six successors in stable path order', () => {
+test('compatible profile validates six legacy maps, six successors, and private BR arena', () => {
   const execution = run('validate', '--profile', 'compatible', CURRENT_MAPS);
   assert.equal(execution.status, 0, execution.stderr);
   const lines = execution.stdout.trim().split(/\r?\n/);
-  assert.equal(lines.length, 12);
+  assert.equal(lines.length, 13);
   assert.deepEqual(
     lines,
     [...lines].sort((left, right) => left.localeCompare(right)),
@@ -37,6 +37,19 @@ test('compatible profile validates six legacy maps and six successors in stable 
       `${resolve(CURRENT_MAPS, 'wasteland-outpost.standard-40x24.json')}: OK (compatible)`,
     ],
   );
+});
+
+test('Battle Royale profile validates only the exact private arena contract', () => {
+  const royale = resolve(CURRENT_MAPS, 'shatterlands.battle-royale-56x34.json');
+  const execution = run('validate', '--profile', 'battle-royale-56x34', royale);
+  assert.equal(execution.status, 0, execution.stderr);
+  assert.equal(execution.stdout, `${royale}: OK (battle-royale-56x34)\n`);
+
+  const standard = resolve(CURRENT_MAPS, 'wasteland-outpost.standard-40x24.json');
+  const rejected = run('validate', '--profile', 'battle-royale-56x34', standard);
+  assert.equal(rejected.status, 1);
+  assert.match(rejected.stderr, /\[DIMENSIONS\]/);
+  assert.match(rejected.stderr, /\[AUTHORING_SCHEMA\]/);
 });
 
 test('standard profile rejects a legacy map with stable actionable codes', () => {

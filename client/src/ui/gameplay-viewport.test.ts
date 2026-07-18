@@ -39,6 +39,13 @@ describe('gameplay viewport contract', () => {
     });
   });
 
+  it('uses the large-world surface for an authoritative Battle Royale match only', () => {
+    expect(gameplayViewportForCapabilities({ battleRoyale: true }, true).mode).toBe('large-world');
+    expect(gameplayViewportForCapabilities({ battleRoyale: true }, false).mode).toBe('legacy');
+    expect(gameplayViewportForCapabilities({ battleRoyale: false }, true).mode).toBe('legacy');
+    expect(gameplayViewportForCapabilities({ battleRoyale: 'true' }, true).mode).toBe('legacy');
+  });
+
   it('keeps desktop and mobile-landscape logical visibility identical', () => {
     const desktop = gameplayViewportForCapabilities({ largeWorlds: true });
     const mobile = gameplayViewportForCapabilities({

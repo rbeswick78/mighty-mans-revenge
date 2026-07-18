@@ -1034,3 +1034,34 @@ renderers project only authoritative state using the existing container,
 supply, six-gun, and rarity atlas language. Batch 45 owns the four-biome arena;
 Batch 44 does not expose a capability or authorize rollout, deployment,
 production restart, or live smoke.
+
+## Battle Royale Four-Biome Arena Contract
+
+Batch 45 owns the private `Shatterlands` document and no standard-map slot.
+The durable generator emits exactly 56×34 tiles at 48px, one connected
+walkable component, four complete non-overlapping named regions (wasteland,
+overgrown, industrial, and irradiated), authored transition bands, connected
+region routes, four landmarks, cover, 16 sustain spawns, 16 one-cell container
+spawns, and exactly eight two-candidate spawn groups. Run
+`corepack pnpm maps:generate:battle-royale` to regenerate it and
+`corepack pnpm maps:validate` plus `corepack pnpm test:maps` to validate the
+strict `battle-royale-56x34` profile.
+
+`Shatterlands` is deliberately absent from `MAP_REGISTRY` and every public
+list, schedule, Draft, Practice, Arena Mastery, rematch rotation, and persistent
+map inventory. `getBattleRoyaleMap()` is the only authoritative selection
+source; a Battle Royale launch uses it regardless of `largeWorlds` and
+`FORCE_MAP`. General name resolution exists only so a client can project the
+server-selected map. Standard map selection and `pickInitialSpawns()` retain
+their established behavior and bytes.
+
+For Battle Royale only, the server shuffles the eight authored groups with
+match RNG and chooses one candidate from each group, then registers every
+authored solid container through the Batch 44 loot boundary. The client renders
+per-cell biome families using the existing modern atlas or procedural fallback
+and projects authoritative regions, landmarks, collision/destruction,
+container identities, and local-player truth on the existing non-interactive
+minimap. It cannot choose the map, spawn, route, container, transition, or
+visibility result. Batch 46 owns zones and tactical-map gameplay; Batch 45 adds
+neither. All Reforged capabilities remain strict server-owned opt-ins, default
+false, and unexposed, and no deployment, restart, or live smoke is authorized.

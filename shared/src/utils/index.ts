@@ -4,6 +4,7 @@ export * from './physics.js';
 export * from './damage.js';
 export * from './map-validator.js';
 export * from './map-authoring-validator.js';
+export * from './battle-royale-map-validator.js';
 export * from './ray-aabb.js';
 export * from './grenade-physics.js';
 export * from './trajectory-prediction.js';

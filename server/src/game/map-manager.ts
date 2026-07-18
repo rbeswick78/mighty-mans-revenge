@@ -1,10 +1,4 @@
-import {
-  MapData,
-  CollisionGrid,
-  Vec2,
-  createCollisionGrid,
-  vecDistance,
-} from '@shared/game';
+import { MapData, CollisionGrid, Vec2, createCollisionGrid, vecDistance } from '@shared/game';
 
 export class MapManager {
   private mapData: MapData | null = null;
@@ -41,12 +35,7 @@ export class MapManager {
    */
   destroyTile(col: number, row: number): boolean {
     if (!this.collisionGrid) return false;
-    if (
-      row < 0 ||
-      row >= this.collisionGrid.height ||
-      col < 0 ||
-      col >= this.collisionGrid.width
-    ) {
+    if (row < 0 || row >= this.collisionGrid.height || col < 0 || col >= this.collisionGrid.width) {
       return false;
     }
     if (!this.collisionGrid.solid[row][col]) return false;
@@ -81,6 +70,26 @@ export class MapManager {
       result.push(this.spawnToPixel(pool.pop()!));
     }
     return result;
+  }
+
+  /** One deterministic candidate from each authored BR group, in shuffled group order. */
+  pickBattleRoyaleInitialSpawns(count: number, rng: () => number = Math.random): Vec2[] {
+    const mapData = this.getMapData();
+    const groups = mapData.battleRoyale?.spawnSafety.groups;
+    if (!groups || groups.length < count) return this.pickInitialSpawns(count, rng);
+    const spawnById = new Map(
+      mapData.spawnPoints.flatMap((spawn) => (spawn.id ? [[spawn.id, spawn] as const] : [])),
+    );
+    const selectedGroups = this.shuffle([...groups], rng).slice(0, count);
+    return selectedGroups.map((group) => {
+      const candidateIndex = Math.min(
+        Math.floor(rng() * group.spawnIds.length),
+        group.spawnIds.length - 1,
+      );
+      const spawn = spawnById.get(group.spawnIds[candidateIndex]);
+      if (!spawn) throw new Error(`Battle Royale spawn group ${group.id} is incomplete`);
+      return this.spawnToPixel(spawn);
+    });
   }
 
   private shuffle<T>(arr: T[], rng: () => number): T[] {

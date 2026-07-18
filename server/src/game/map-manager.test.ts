@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { MapManager } from './map-manager.js';
-import type { MapData } from '@shared/game';
+import { getBattleRoyaleMap, type MapData } from '@shared/game';
 
 function makeMap(spawnCount: number): MapData {
   const spawnPoints = Array.from({ length: spawnCount }, (_, i) => ({
@@ -66,6 +66,39 @@ describe('MapManager.pickInitialSpawns', () => {
       expect((s.x - 24) % 48).toBe(0);
       expect((s.y - 24) % 48).toBe(0);
     }
+  });
+});
+
+describe('MapManager.pickBattleRoyaleInitialSpawns', () => {
+  it('selects one deterministic candidate from each of eight balanced groups', () => {
+    const map = getBattleRoyaleMap();
+    const first = new MapManager();
+    first.loadMap(map);
+    const second = new MapManager();
+    second.loadMap(map);
+    const a = first.pickBattleRoyaleInitialSpawns(8, mulberry32(45));
+    const b = second.pickBattleRoyaleInitialSpawns(8, mulberry32(45));
+    expect(a).toEqual(b);
+    expect(new Set(a.map(({ x, y }) => `${x},${y}`)).size).toBe(8);
+
+    const selectedTiles = new Set(
+      a.map(({ x, y }) => `${Math.floor(x / map.tileSize)},${Math.floor(y / map.tileSize)}`),
+    );
+    for (const group of map.battleRoyale!.spawnSafety.groups) {
+      const candidates = group.spawnIds.map((id) => {
+        const spawn = map.spawnPoints.find((point) => point.id === id)!;
+        return `${spawn.x},${spawn.y}`;
+      });
+      expect(candidates.filter((candidate) => selectedTiles.has(candidate))).toHaveLength(1);
+    }
+  });
+
+  it('retains the established standard fallback when BR authoring is absent', () => {
+    const manager = new MapManager();
+    manager.loadMap(makeMap(4));
+    expect(manager.pickBattleRoyaleInitialSpawns(4, mulberry32(7))).toEqual(
+      manager.pickInitialSpawns(4, mulberry32(7)),
+    );
   });
 });
 

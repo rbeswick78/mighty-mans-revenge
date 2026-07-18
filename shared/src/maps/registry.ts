@@ -1,5 +1,6 @@
 import type { ArenaWins, MapData } from '../types/map.js';
 import { validateMapDocument } from '../utils/map-authoring-validator.js';
+import { validateBattleRoyaleMapDocument } from '../utils/battle-royale-map-validator.js';
 import { validateMap } from '../utils/map-validator.js';
 import wastelandOutpost from '../../maps/wasteland-outpost.json' with { type: 'json' };
 import wastelandOutpostStandard from '../../maps/wasteland-outpost.standard-40x24.json' with { type: 'json' };
@@ -13,6 +14,7 @@ import checkpointZero from '../../maps/checkpoint-zero.json' with { type: 'json'
 import checkpointZeroStandard from '../../maps/checkpoint-zero.standard-40x24.json' with { type: 'json' };
 import rustedRefinery from '../../maps/rusted-refinery.json' with { type: 'json' };
 import rustedRefineryStandard from '../../maps/rusted-refinery.standard-40x24.json' with { type: 'json' };
+import shatterlandsBattleRoyale from '../../maps/shatterlands.battle-royale-56x34.json' with { type: 'json' };
 
 /** Registry order doubles as the rotation order (see getNextMapName). */
 const ALL: readonly MapData[] = [
@@ -41,6 +43,13 @@ const LARGE_WORLD_VARIANTS: ReadonlyMap<string, MapData> = new Map(
   }),
 );
 
+const battleRoyaleValidation = validateBattleRoyaleMapDocument(shatterlandsBattleRoyale);
+if (!battleRoyaleValidation.valid || !battleRoyaleValidation.mapData) {
+  throw new Error(`Invalid Battle Royale map: ${battleRoyaleValidation.errors.join('; ')}`);
+}
+const BATTLE_ROYALE_MAP = battleRoyaleValidation.mapData;
+export const BATTLE_ROYALE_MAP_NAME = BATTLE_ROYALE_MAP.name;
+
 for (const m of ALL) {
   const r = validateMap(m);
   if (!r.valid) {
@@ -59,6 +68,7 @@ export const MAP_REGISTRY: ReadonlyMap<string, MapData> = new Map(
 );
 
 export function getMap(name: string, selection: Readonly<{ largeWorlds?: boolean }> = {}): MapData {
+  if (name === BATTLE_ROYALE_MAP_NAME) return BATTLE_ROYALE_MAP;
   const m = MAP_REGISTRY.get(name);
   if (!m) {
     throw new Error(`Unknown map: ${name}`);
@@ -68,6 +78,15 @@ export function getMap(name: string, selection: Readonly<{ largeWorlds?: boolean
 
 export function listMapNames(): readonly string[] {
   return [...MAP_REGISTRY.keys()];
+}
+
+/** Private arena selected only by the server-owned Battle Royale launch path. */
+export function getBattleRoyaleMap(): MapData {
+  return BATTLE_ROYALE_MAP;
+}
+
+export function isBattleRoyaleMapName(name: string): boolean {
+  return name === BATTLE_ROYALE_MAP_NAME;
 }
 
 /** A complete zero-filled arena record for persistence and wire defaults. */

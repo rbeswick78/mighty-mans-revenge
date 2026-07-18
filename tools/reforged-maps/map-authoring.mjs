@@ -3,10 +3,10 @@
 import { readFile, readdir, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-import { validateMapDocument } from '../../shared/dist/index.js';
+import { validateBattleRoyaleMapDocument, validateMapDocument } from '../../shared/dist/index.js';
 
 const USAGE = `Usage:
-  node tools/reforged-maps/map-authoring.mjs validate [--profile compatible|standard-40x24] <file-or-directory> [...]
+  node tools/reforged-maps/map-authoring.mjs validate [--profile compatible|standard-40x24|battle-royale-56x34] <file-or-directory> [...]
 
 Directories are scanned recursively for .json files in stable path order.`;
 
@@ -31,7 +31,11 @@ async function main(argv) {
     }
     targets.push(arg);
   }
-  if (profile !== 'compatible' && profile !== 'standard-40x24') {
+  if (
+    profile !== 'compatible' &&
+    profile !== 'standard-40x24' &&
+    profile !== 'battle-royale-56x34'
+  ) {
     process.stderr.write(`[MAP_TOOL_PROFILE] $: unknown profile "${profile}"\n`);
     return 2;
   }
@@ -58,7 +62,11 @@ async function main(argv) {
       failed = true;
       continue;
     }
-    const validation = validateMapDocument(document, profile);
+    const validation =
+      profile === 'battle-royale-56x34' ||
+      (profile === 'compatible' && document?.battleRoyale !== undefined)
+        ? validateBattleRoyaleMapDocument(document)
+        : validateMapDocument(document, profile);
     if (validation.valid) {
       process.stdout.write(`${file}: OK (${profile})\n`);
       continue;

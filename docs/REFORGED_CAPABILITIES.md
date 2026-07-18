@@ -460,3 +460,26 @@ This remains dormant support code. `battleRoyale`, `newShell`, `schedules`,
 `largeWorlds`, and `modernArt` remain strict server-owned opt-ins, default
 false, and unexposed. Batch 45 owns the four-biome arena. Production remains on
 approved Batch 33, and no deployment, restart, or live smoke is authorized.
+
+## Batch 45 four-biome arena disposition
+
+Batch 45 does not add or expose a capability. A server-authored Battle Royale
+launch selects the private `Shatterlands` map directly; its exact 56×34 world
+is not gated by `largeWorlds` and cannot be overridden by `FORCE_MAP`. This is
+not client inference: the authoritative match-found map name remains the only
+client route. The private map is absent from every public standard registry,
+schedule, Draft, Practice, Arena Mastery, rematch, and persistent map inventory.
+
+The server alone assigns one fighter to each of eight authored spawn groups and
+registers all 16 authored containers through the existing loot manager. The
+client may render four per-cell biome families and project named regions,
+landmarks, collision/destruction, intact-container identities, and permitted
+player truth on the existing non-interactive minimap. It cannot select a map,
+spawn, route, container, transition, or reveal. No safe-zone or tactical-map
+field was added.
+
+This remains dormant support code. `battleRoyale`, `newShell`, `schedules`,
+`largeWorlds`, and `modernArt` remain strict server-owned opt-ins, default
+false, and unexposed. Batch 46 owns safe-zone phases. Production remains on
+approved Batch 33, and no deployment, restart, live smoke, or capability
+advertisement is authorized.

@@ -1,0 +1,424 @@
+{
+  "name": "Shatterlands",
+  "width": 56,
+  "height": 34,
+  "tileSize": 48,
+  "tiles": [
+    [
+      1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+      1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 3, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 3, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 4, 0, 1, 1, 1, 1, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 1, 1, 1, 1, 0, 4, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0,
+      4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0,
+      0, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0,
+      0, 2, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0,
+      0, 2, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0,
+      0, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0,
+      4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 2, 2, 2, 2, 0, 0, 2, 2, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 2, 2, 0, 0, 2, 2, 2, 2, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 4, 0, 1, 1, 1, 1, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 1, 1, 1, 1, 0, 4, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 3, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 3, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
+    ],
+    [
+      1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+      1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
+    ]
+  ],
+  "spawnPoints": [
+    { "id": "spawn-west-north-a", "x": 4, "y": 5 },
+    { "id": "spawn-west-north-b", "x": 5, "y": 4 },
+    { "id": "spawn-north-west-a", "x": 18, "y": 3 },
+    { "id": "spawn-north-west-b", "x": 20, "y": 4 },
+    { "id": "spawn-north-east-a", "x": 35, "y": 3 },
+    { "id": "spawn-north-east-b", "x": 37, "y": 4 },
+    { "id": "spawn-east-north-a", "x": 51, "y": 5 },
+    { "id": "spawn-east-north-b", "x": 50, "y": 4 },
+    { "id": "spawn-east-south-a", "x": 51, "y": 28 },
+    { "id": "spawn-east-south-b", "x": 50, "y": 29 },
+    { "id": "spawn-south-east-a", "x": 37, "y": 30 },
+    { "id": "spawn-south-east-b", "x": 35, "y": 29 },
+    { "id": "spawn-south-west-a", "x": 20, "y": 30 },
+    { "id": "spawn-south-west-b", "x": 18, "y": 29 },
+    { "id": "spawn-west-south-a", "x": 4, "y": 28 },
+    { "id": "spawn-west-south-b", "x": 5, "y": 29 }
+  ],
+  "pickupSpawns": [
+    { "id": "sustain-dust-bandage", "x": 6, "y": 6, "type": "bandage" },
+    { "id": "sustain-dust-armor", "x": 15, "y": 14, "type": "armor" },
+    { "id": "sustain-dust-grenade", "x": 22, "y": 5, "type": "grenade" },
+    { "id": "sustain-dust-charge", "x": 24, "y": 12, "type": "overcharge" },
+    { "id": "sustain-green-bandage", "x": 49, "y": 6, "type": "bandage" },
+    { "id": "sustain-green-armor", "x": 40, "y": 14, "type": "armor" },
+    { "id": "sustain-green-grenade", "x": 33, "y": 5, "type": "grenade" },
+    { "id": "sustain-green-charge", "x": 31, "y": 12, "type": "overcharge" },
+    { "id": "sustain-iron-bandage", "x": 6, "y": 27, "type": "bandage" },
+    { "id": "sustain-iron-armor", "x": 15, "y": 19, "type": "armor" },
+    { "id": "sustain-iron-grenade", "x": 22, "y": 28, "type": "grenade" },
+    { "id": "sustain-iron-charge", "x": 24, "y": 21, "type": "overcharge" },
+    { "id": "sustain-glass-bandage", "x": 49, "y": 27, "type": "bandage" },
+    { "id": "sustain-glass-armor", "x": 40, "y": 19, "type": "armor" },
+    { "id": "sustain-glass-grenade", "x": 33, "y": 28, "type": "grenade" },
+    { "id": "sustain-glass-charge", "x": 31, "y": 21, "type": "overcharge" }
+  ],
+  "theme": "wasteland",
+  "decorations": [
+    { "id": "sunken-relay", "x": 10, "y": 8, "w": 2, "h": 1, "texture": "deco_container_gray" },
+    {
+      "id": "vinebound-homes",
+      "x": 44,
+      "y": 8,
+      "w": 2,
+      "h": 1,
+      "texture": "deco_car_overgrown_blue"
+    },
+    { "id": "redline-foundry", "x": 10, "y": 24, "w": 2, "h": 1, "texture": "deco_container_red" },
+    { "id": "glassfall-crater", "x": 44, "y": 24, "w": 2, "h": 1, "texture": "deco_container_gray" }
+  ],
+  "battleRoyale": {
+    "schemaVersion": 1,
+    "profile": "battle-royale-56x34",
+    "regions": [
+      {
+        "id": "dust-basin",
+        "displayName": "DUST BASIN",
+        "biome": "wasteland",
+        "areas": [{ "x": 0, "y": 0, "w": 28, "h": 17 }],
+        "label": { "x": 10, "y": 3 }
+      },
+      {
+        "id": "greenward",
+        "displayName": "GREENWARD",
+        "biome": "overgrown",
+        "areas": [{ "x": 28, "y": 0, "w": 28, "h": 17 }],
+        "label": { "x": 45, "y": 3 }
+      },
+      {
+        "id": "ironworks",
+        "displayName": "IRONWORKS",
+        "biome": "industrial",
+        "areas": [{ "x": 0, "y": 17, "w": 28, "h": 17 }],
+        "label": { "x": 10, "y": 30 }
+      },
+      {
+        "id": "glass-wastes",
+        "displayName": "GLASS WASTES",
+        "biome": "irradiated",
+        "areas": [{ "x": 28, "y": 17, "w": 28, "h": 17 }],
+        "label": { "x": 44, "y": 30 }
+      }
+    ],
+    "transitions": [
+      {
+        "id": "dust-green-transition",
+        "fromRegionId": "dust-basin",
+        "toRegionId": "greenward",
+        "orientation": "horizontal",
+        "footprint": { "x": 27, "y": 2, "w": 2, "h": 13 }
+      },
+      {
+        "id": "iron-glass-transition",
+        "fromRegionId": "ironworks",
+        "toRegionId": "glass-wastes",
+        "orientation": "horizontal",
+        "footprint": { "x": 27, "y": 19, "w": 2, "h": 13 }
+      },
+      {
+        "id": "dust-iron-transition",
+        "fromRegionId": "dust-basin",
+        "toRegionId": "ironworks",
+        "orientation": "vertical",
+        "footprint": { "x": 2, "y": 16, "w": 24, "h": 2 }
+      },
+      {
+        "id": "green-glass-transition",
+        "fromRegionId": "greenward",
+        "toRegionId": "glass-wastes",
+        "orientation": "vertical",
+        "footprint": { "x": 30, "y": 16, "w": 24, "h": 2 }
+      },
+      {
+        "id": "four-biome-crossing",
+        "fromRegionId": "dust-basin",
+        "toRegionId": "glass-wastes",
+        "orientation": "corner",
+        "footprint": { "x": 27, "y": 16, "w": 2, "h": 2 }
+      }
+    ],
+    "landmarks": [
+      {
+        "id": "sunken-relay",
+        "displayName": "SUNKEN RELAY",
+        "regionId": "dust-basin",
+        "footprint": { "x": 10, "y": 8, "w": 2, "h": 1 },
+        "minimap": "major"
+      },
+      {
+        "id": "vinebound-homes",
+        "displayName": "VINEBOUND HOMES",
+        "regionId": "greenward",
+        "footprint": { "x": 44, "y": 8, "w": 2, "h": 1 },
+        "minimap": "major"
+      },
+      {
+        "id": "redline-foundry",
+        "displayName": "REDLINE FOUNDRY",
+        "regionId": "ironworks",
+        "footprint": { "x": 10, "y": 24, "w": 2, "h": 1 },
+        "minimap": "major"
+      },
+      {
+        "id": "glassfall-crater",
+        "displayName": "GLASSFALL CRATER",
+        "regionId": "glass-wastes",
+        "footprint": { "x": 44, "y": 24, "w": 2, "h": 1 },
+        "minimap": "major"
+      }
+    ],
+    "minimap": {
+      "projection": "orthographic-top-left",
+      "bounds": { "x": 0, "y": 0, "w": 56, "h": 34 },
+      "regionIds": ["dust-basin", "greenward", "ironworks", "glass-wastes"],
+      "landmarkIds": ["sunken-relay", "vinebound-homes", "redline-foundry", "glassfall-crater"]
+    },
+    "connectivity": {
+      "requireSingleWalkableComponent": true,
+      "routes": [
+        {
+          "id": "north-crossing",
+          "fromRegionId": "dust-basin",
+          "toRegionId": "greenward",
+          "waypoints": [
+            { "x": 27, "y": 8 },
+            { "x": 28, "y": 8 }
+          ]
+        },
+        {
+          "id": "south-crossing",
+          "fromRegionId": "ironworks",
+          "toRegionId": "glass-wastes",
+          "waypoints": [
+            { "x": 27, "y": 25 },
+            { "x": 28, "y": 25 }
+          ]
+        },
+        {
+          "id": "west-crossing",
+          "fromRegionId": "dust-basin",
+          "toRegionId": "ironworks",
+          "waypoints": [
+            { "x": 12, "y": 16 },
+            { "x": 12, "y": 17 }
+          ]
+        },
+        {
+          "id": "east-crossing",
+          "fromRegionId": "greenward",
+          "toRegionId": "glass-wastes",
+          "waypoints": [
+            { "x": 43, "y": 16 },
+            { "x": 43, "y": 17 }
+          ]
+        }
+      ]
+    },
+    "spawnSafety": {
+      "groups": [
+        {
+          "id": "west-north",
+          "regionId": "dust-basin",
+          "spawnIds": ["spawn-west-north-a", "spawn-west-north-b"]
+        },
+        {
+          "id": "north-west",
+          "regionId": "dust-basin",
+          "spawnIds": ["spawn-north-west-a", "spawn-north-west-b"]
+        },
+        {
+          "id": "north-east",
+          "regionId": "greenward",
+          "spawnIds": ["spawn-north-east-a", "spawn-north-east-b"]
+        },
+        {
+          "id": "east-north",
+          "regionId": "greenward",
+          "spawnIds": ["spawn-east-north-a", "spawn-east-north-b"]
+        },
+        {
+          "id": "east-south",
+          "regionId": "glass-wastes",
+          "spawnIds": ["spawn-east-south-a", "spawn-east-south-b"]
+        },
+        {
+          "id": "south-east",
+          "regionId": "glass-wastes",
+          "spawnIds": ["spawn-south-east-a", "spawn-south-east-b"]
+        },
+        {
+          "id": "south-west",
+          "regionId": "ironworks",
+          "spawnIds": ["spawn-south-west-a", "spawn-south-west-b"]
+        },
+        {
+          "id": "west-south",
+          "regionId": "ironworks",
+          "spawnIds": ["spawn-west-south-a", "spawn-west-south-b"]
+        }
+      ],
+      "minimumPathDistanceTiles": 10,
+      "minimumEgressDirections": 3
+    },
+    "containerSpawns": [
+      { "id": "container-dust-a", "x": 7, "y": 12, "regionId": "dust-basin" },
+      { "id": "container-dust-b", "x": 13, "y": 4, "regionId": "dust-basin" },
+      { "id": "container-dust-c", "x": 21, "y": 7, "regionId": "dust-basin" },
+      { "id": "container-dust-d", "x": 23, "y": 14, "regionId": "dust-basin" },
+      { "id": "container-green-a", "x": 48, "y": 12, "regionId": "greenward" },
+      { "id": "container-green-b", "x": 42, "y": 4, "regionId": "greenward" },
+      { "id": "container-green-c", "x": 34, "y": 7, "regionId": "greenward" },
+      { "id": "container-green-d", "x": 32, "y": 14, "regionId": "greenward" },
+      { "id": "container-iron-a", "x": 7, "y": 21, "regionId": "ironworks" },
+      { "id": "container-iron-b", "x": 13, "y": 29, "regionId": "ironworks" },
+      { "id": "container-iron-c", "x": 21, "y": 26, "regionId": "ironworks" },
+      { "id": "container-iron-d", "x": 23, "y": 19, "regionId": "ironworks" },
+      { "id": "container-glass-a", "x": 48, "y": 21, "regionId": "glass-wastes" },
+      { "id": "container-glass-b", "x": 42, "y": 29, "regionId": "glass-wastes" },
+      { "id": "container-glass-c", "x": 34, "y": 26, "regionId": "glass-wastes" },
+      { "id": "container-glass-d", "x": 32, "y": 19, "regionId": "glass-wastes" }
+    ],
+    "sustainSpawnIds": [
+      "sustain-dust-bandage",
+      "sustain-dust-armor",
+      "sustain-dust-grenade",
+      "sustain-dust-charge",
+      "sustain-green-bandage",
+      "sustain-green-armor",
+      "sustain-green-grenade",
+      "sustain-green-charge",
+      "sustain-iron-bandage",
+      "sustain-iron-armor",
+      "sustain-iron-grenade",
+      "sustain-iron-charge",
+      "sustain-glass-bandage",
+      "sustain-glass-armor",
+      "sustain-glass-grenade",
+      "sustain-glass-charge"
+    ]
+  }
+}

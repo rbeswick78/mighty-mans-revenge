@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { GameModeType } from '@shared/types/game.js';
-import { getMap } from '@shared/maps/registry.js';
+import { getBattleRoyaleMap, getMap } from '@shared/maps/registry.js';
 import { createCollisionGrid } from '@shared/utils/collision.js';
 
 import {
@@ -117,6 +117,44 @@ describe('minimap foundation', () => {
       );
       expect(projection.landmarks, name).toHaveLength(successor.decorations?.length ?? 0);
     }
+  });
+
+  it('projects all four named Shatterlands regions and authored landmarks', () => {
+    const royale = getBattleRoyaleMap();
+    const royaleBounds = worldBoundsForMap(royale);
+    const royaleLayout = minimapLayoutForGameplay(viewport, hud, royaleBounds)!;
+    const projection = createMinimapStaticProjection(
+      royale,
+      createCollisionGrid(royale),
+      royaleLayout,
+    );
+
+    expect(projection.worldBounds).toEqual({ left: 0, top: 0, width: 2688, height: 1632 });
+    expect(
+      projection.regions.map(({ id, displayName, biome }) => ({ id, displayName, biome })),
+    ).toEqual([
+      { id: 'dust-basin', displayName: 'DUST BASIN', biome: 'wasteland' },
+      { id: 'greenward', displayName: 'GREENWARD', biome: 'overgrown' },
+      { id: 'ironworks', displayName: 'IRONWORKS', biome: 'industrial' },
+      { id: 'glass-wastes', displayName: 'GLASS WASTES', biome: 'irradiated' },
+    ]);
+    expect(projection.regions.every(({ areas }) => areas.length === 1)).toBe(true);
+    expect(projection.containers.map(({ id }) => id)).toEqual(
+      royale.battleRoyale!.containerSpawns.map(({ id }) => id),
+    );
+    expect(projection.containers).toHaveLength(16);
+    expect(
+      projection.landmarks
+        .map(({ label }) => label)
+        .filter(Boolean)
+        .sort(),
+    ).toEqual(['GLASSFALL CRATER', 'REDLINE FOUNDRY', 'SUNKEN RELAY', 'VINEBOUND HOMES']);
+
+    const firstContainer = projection.containers[0];
+    const grid = createCollisionGrid(royale);
+    grid.solid[firstContainer.row][firstContainer.col] = false;
+    const opened = createMinimapStaticProjection(royale, grid, royaleLayout);
+    expect(opened.containers.map(({ id }) => id)).not.toContain(firstContainer.id);
   });
 
   it('removes destroyed solids and their authored landmark without changing map truth', () => {

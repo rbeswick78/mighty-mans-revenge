@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_MAP_NAME,
+  BATTLE_ROYALE_MAP_NAME,
   MAP_REGISTRY,
   createEmptyArenaWins,
   getMap,
+  getBattleRoyaleMap,
   getNextMapName,
   listMapNames,
   normalizeArenaWins,
+  isBattleRoyaleMapName,
 } from './registry.js';
 import { validateMap } from '../utils/map-validator.js';
 import { validateMapDocument } from '../utils/map-authoring-validator.js';
@@ -23,6 +26,17 @@ const AUTHORED_SUCCESSOR_NAMES = [
 describe('MAP_REGISTRY', () => {
   it('contains the default map', () => {
     expect(MAP_REGISTRY.has(DEFAULT_MAP_NAME)).toBe(true);
+  });
+
+  it('keeps Shatterlands private from every standard registry and persistence path', () => {
+    const map = getBattleRoyaleMap();
+    expect(BATTLE_ROYALE_MAP_NAME).toBe('Shatterlands');
+    expect(getMap(BATTLE_ROYALE_MAP_NAME)).toBe(map);
+    expect(isBattleRoyaleMapName(map.name)).toBe(true);
+    expect(MAP_REGISTRY.has(map.name)).toBe(false);
+    expect(listMapNames()).not.toContain(map.name);
+    expect(createEmptyArenaWins()).not.toHaveProperty(map.name);
+    expect(getNextMapName(map.name)).toBe(DEFAULT_MAP_NAME);
   });
 
   it('getMap returns the default map by name', () => {

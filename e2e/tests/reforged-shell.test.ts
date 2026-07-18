@@ -908,7 +908,7 @@ test('Battle Royale entry projects the authoritative eight-slot wait and direct 
           id: `br-opponent-${index}`,
           nickname: `Opponent${index}`,
         })),
-        mapName: 'Wasteland Outpost',
+        mapName: 'Shatterlands',
         gameMode: 'deathmatch',
         matchKind: 'battle_royale',
         battleRoyale: { participantCount: 8, humanCount: 1, botCount: 7 },
@@ -916,6 +916,48 @@ test('Battle Royale entry projects the authoritative eight-slot wait and direct 
     });
   }
   await waitForActiveScene(page, 'GameScene');
+  const arena = await page.evaluate(() => {
+    const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'GameScene',
+    ) as unknown as {
+      getReforgedEnvironmentState(): { families: readonly string[] } | null;
+      getMinimapRenderState(): {
+        worldBounds: { width: number; height: number };
+        regions: readonly { id: string; displayName: string; biome: string }[];
+        containers: readonly { id: string; col: number; row: number }[];
+        landmarks: readonly { id: string; label?: string }[];
+        interactive: false;
+      } | null;
+    };
+    return {
+      environment: scene.getReforgedEnvironmentState(),
+      minimap: scene.getMinimapRenderState(),
+    };
+  });
+  expect(arena.environment?.families).toEqual([
+    'industrial',
+    'irradiated',
+    'overgrown',
+    'wasteland',
+  ]);
+  expect(arena.minimap).toMatchObject({
+    worldBounds: { width: 2688, height: 1632 },
+    regions: [
+      { id: 'dust-basin', displayName: 'DUST BASIN', biome: 'wasteland' },
+      { id: 'greenward', displayName: 'GREENWARD', biome: 'overgrown' },
+      { id: 'ironworks', displayName: 'IRONWORKS', biome: 'industrial' },
+      { id: 'glass-wastes', displayName: 'GLASS WASTES', biome: 'irradiated' },
+    ],
+    interactive: false,
+  });
+  expect(arena.minimap?.containers).toHaveLength(16);
+  expect(new Set(arena.minimap?.containers.map(({ id }) => id)).size).toBe(16);
+  expect(arena.minimap?.landmarks.map(({ label }) => label).sort()).toEqual([
+    'GLASSFALL CRATER',
+    'REDLINE FOUNDRY',
+    'SUNKEN RELAY',
+    'VINEBOUND HOMES',
+  ]);
 });
 
 test('Battle Royale projects authoritative rarity and launcher flight into the scene', async ({

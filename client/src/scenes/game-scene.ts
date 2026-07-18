@@ -349,7 +349,11 @@ export class GameScene extends Phaser.Scene {
     const capabilities = this.gameService.getServerCapabilities();
     this.reforgedVisualCutover = reforgedVisualCutoverForScene(this, capabilities.modernArt);
     configureModernUiScene(this, this.reforgedVisualCutover.active);
-    this.gameplayViewport = useGameplayLogicalSize(this.scale, capabilities);
+    this.gameplayViewport = useGameplayLogicalSize(
+      this.scale,
+      capabilities,
+      this.matchData?.matchKind === 'battle_royale',
+    );
     const mapData: MapData = getMap(this.matchData?.mapName ?? DEFAULT_MAP_NAME, {
       largeWorlds: capabilities.largeWorlds,
     });

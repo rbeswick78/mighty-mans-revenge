@@ -78,8 +78,12 @@ const finiteNonNegative = (value: number): number =>
  * Unknown, absent, partial, or malformed capability values retain the exact
  * established 960x720 gameplay canvas.
  */
-export function gameplayViewportForCapabilities(capabilities: unknown): GameplayViewportContract {
-  return normalizeServerCapabilities(capabilities).largeWorlds
+export function gameplayViewportForCapabilities(
+  capabilities: unknown,
+  battleRoyaleMatch = false,
+): GameplayViewportContract {
+  const normalized = normalizeServerCapabilities(capabilities);
+  return normalized.largeWorlds || (normalized.battleRoyale && battleRoyaleMatch)
     ? LARGE_WORLD_GAMEPLAY_VIEWPORT
     : LEGACY_GAMEPLAY_VIEWPORT;
 }
@@ -164,8 +168,9 @@ export function currentGameplayOverlaySafeArea(canvas: HTMLCanvasElement): Gamep
 export function useGameplayLogicalSize(
   scale: Phaser.Scale.ScaleManager,
   capabilities: unknown,
+  battleRoyaleMatch = false,
 ): GameplayViewportContract {
-  const viewport = gameplayViewportForCapabilities(capabilities);
+  const viewport = gameplayViewportForCapabilities(capabilities, battleRoyaleMatch);
   if (scale.width !== viewport.logicalWidth || scale.height !== viewport.logicalHeight) {
     scale.setGameSize(viewport.logicalWidth, viewport.logicalHeight);
   }
