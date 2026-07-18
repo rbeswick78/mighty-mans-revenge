@@ -537,3 +537,35 @@ three-project focused browser proof passed. The authoritative baseline retained
 configured/rolling 20 Hz, the 50 ms budget, synthetic four-player
 mean/p95/p99/max work of 0.023/0.043/0.211/2.095 ms, and exact 2,481/3,762-byte
 standard snapshots. No capability default, production state, or deployment changed.
+
+### Batch 43 Battle Royale inventory baseline
+
+Battle Royale entrants now begin with fists and one server-owned gun slot. A
+held gun carries its immutable instance and loaded ammo; one bounded universal
+reserve stays with the fighter. Unarmed fighters automatically collect the
+nearest legal drop, while armed fighters only receive a server-authored nearby
+comparison and must use reload to swap. Stable player-ID processing and drop-ID
+tie-breaking resolve simultaneous collection deterministically.
+
+Reload transfers reserve into the current magazine. A swap places the old gun
+at the fighter's position with its exact instance, rarity, and surviving loaded
+ammo, without moving universal reserve. Spending the final loaded round discards
+the empty gun to fists. Elimination and departure clear held state without
+creating the compact loot piles owned by Batch 44. Standard authored weapon
+pickups are suppressed only inside the Battle Royale lifecycle; sustain and
+grenade behavior remain available, and no container or loot source exists yet.
+
+Inventory and ground guns are additive optional snapshot state. Clients validate
+slot/outer-instance coherence and ammo bounds, clear old-server omissions, fail
+an entire malformed drop projection closed, and only render authoritative state.
+The nearby comparison is server selected. Keyboard R, standard-gamepad X, and a
+Battle Royale-only touch button all emit the same existing reload input; standard
+touch layouts keep the new button absent.
+
+The complete 149-file/1,696-test unit matrix, typecheck, lint, all builds, and
+three-project focused browser proof passed. The authoritative baseline retained
+configured/rolling 20 Hz, the 50 ms budget, synthetic four-player
+mean/p95/p99/max work of 0.018/0.031/0.123/0.867 ms, and exact
+2,481/3,762-byte standard snapshots. RFG-005's three-fighter self-explosion
+reproduction now records the missing lifecycle event without inventing kill
+credit. No capability default, production state, or deployment changed.

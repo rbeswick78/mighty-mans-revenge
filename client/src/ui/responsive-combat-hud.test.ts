@@ -34,6 +34,7 @@ describe('responsive combat HUD layout', () => {
         taunt: { x: 808, y: 116 },
         grenade: { x: 904, y: 116 },
         ability: { x: 904, y: 208 },
+        reload: { x: 808, y: 208 },
       },
     });
   });
@@ -91,6 +92,7 @@ describe('responsive combat HUD layout', () => {
       layout.touchActions.taunt,
       layout.touchActions.grenade,
       layout.touchActions.ability,
+      layout.touchActions.reload,
     ];
 
     for (const value of points) {
@@ -108,9 +110,9 @@ describe('responsive combat HUD layout', () => {
     );
     const layout = responsiveCombatHudLayout(largeWorld, safeArea);
     const touchRegion = {
-      x: layout.touchActions.taunt.x - 40,
-      y: layout.touchActions.taunt.y - 40,
-      width: layout.safeArea.right - layout.touchActions.taunt.x + 40,
+      x: layout.touchActions.reload.x - 40,
+      y: layout.touchActions.reload.y - 40,
+      width: layout.safeArea.right - layout.touchActions.reload.x + 40,
       height: 80,
     };
 

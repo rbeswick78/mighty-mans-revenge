@@ -200,6 +200,11 @@ export class InputManager {
     this.touchInput.setLayout(layout);
   }
 
+  /** Expose contextual reload/swap on touch only while BR inventory is authoritative. */
+  setBattleRoyaleReloadContext(enabled: boolean): void {
+    this.touchInput.setBattleRoyaleReloadContext(enabled);
+  }
+
   /** Optional tactile feedback; silently ignored on unsupported browsers/pads. */
   rumble(strength: number, durationMs: number): void {
     if (this.activeMode === 'gamepad') {

@@ -38,6 +38,7 @@ import {
   isOutsideRadiationStorm,
   isTauntId,
   applyWeaponRarityDamage,
+  BATTLE_ROYALE_INVENTORY,
 } from '@shared/game';
 import type {
   PlayerId,
@@ -72,6 +73,8 @@ import type {
   TauntId,
   TeamId,
   BattleRoyaleMatchFormat,
+  DroppedWeaponState,
+  WeaponInstance,
 } from '@shared/game';
 import { logger } from '../utils/logger.js';
 import { PickupManager } from './pickup-manager.js';
@@ -85,6 +88,7 @@ import type { GameMode, MatchContext } from './modes/game-mode.js';
 import { InputQueue } from './input-queue.js';
 import { RumbleAssistTracker } from './rumble-assist-tracker.js';
 import { BattleRoyaleLifecycle } from './battle-royale-lifecycle.js';
+import { BattleRoyaleInventoryManager } from './battle-royale-inventory-manager.js';
 
 interface PendingBurst {
   weaponId: 'rifle' | 'smg';
@@ -121,6 +125,7 @@ export class Match implements MatchContext {
   private selectTimer: number = MATCH.CHARACTER_SELECT_TIMEOUT_SEC;
   readonly stats: StatsTracker;
   readonly pickupManager: PickupManager;
+  readonly battleRoyaleInventoryManager: BattleRoyaleInventoryManager | null;
   readonly mapManager: MapManager;
   /** Mode this match runs — the matchmaking manager reads it for rotation. */
   readonly gameModeType: GameModeType;
@@ -202,6 +207,8 @@ export class Match implements MatchContext {
    * shots; server-internal, like pendingBursts.
    */
   private fireCooldownTimers: Map<PlayerId, number> = new Map();
+  /** Reload presses collected this tick for the contextual BR swap/reload action. */
+  private readonly battleRoyaleReloadRequests = new Set<PlayerId>();
   /** Weapon-incoming warnings generated this tick, cleared after broadcast. */
   private tickWeaponIncoming: Array<{ weaponId: WeaponId; landsInMs: number }> = [];
   /**
@@ -363,6 +370,8 @@ export class Match implements MatchContext {
       lifecycleOptions?.format === 'battle_royale'
         ? new BattleRoyaleLifecycle(playerEntries.map((entry) => entry.id))
         : null;
+    this.battleRoyaleInventoryManager =
+      this.battleRoyaleLifecycle === null ? null : new BattleRoyaleInventoryManager();
     this.tracksRumbleLead =
       this.battleRoyaleLifecycle === null &&
       playerEntries.length >= 3 &&
@@ -390,9 +399,8 @@ export class Match implements MatchContext {
     this.mapManager = new MapManager();
     this.gameModeType = gameModeType;
     this.gameMode = getGameMode(gameModeType);
-    this.scavengerCacheReward = selectScavengerCacheReward(
-      this.stableSeed,
-      (type) => this.gameMode.isPickupTypeEnabled?.(type) ?? true,
+    this.scavengerCacheReward = selectScavengerCacheReward(this.stableSeed, (type) =>
+      this.isPickupTypeEnabledForMatch(type),
     );
     this.contractDefinition = selectMatchContract(
       this.stableSeed,
@@ -415,10 +423,7 @@ export class Match implements MatchContext {
     }
     // Modes can veto whole pickup categories (Gun Game: everything but
     // bandages) — filtered spawns never exist, so they never announce.
-    this.pickupManager.initFromMap(
-      mapData,
-      (type) => this.gameMode.isPickupTypeEnabled?.(type) ?? true,
-    );
+    this.pickupManager.initFromMap(mapData, (type) => this.isPickupTypeEnabledForMatch(type));
 
     const spawns = this.mapManager.pickInitialSpawns(playerEntries.length, this.rng);
     // Default-hover assignment: as we iterate over players in insertion order,
@@ -429,6 +434,15 @@ export class Match implements MatchContext {
     const takenDefaults = new Set<CharacterId>();
     playerEntries.forEach((entry, i) => {
       const player = this.createPlayerState(entry.id, entry.nickname, spawns[i]);
+      if (this.battleRoyaleInventoryManager) {
+        player.weaponId = 'punch';
+        player.ammo = 0;
+        player.battleRoyaleInventory = {
+          equipped: null,
+          loadedAmmo: 0,
+          reserveAmmo: 0,
+        };
+      }
       this.players.set(entry.id, player);
       this.inputQueues.set(entry.id, new InputQueue());
       this.stats.initPlayer(entry.id);
@@ -808,6 +822,7 @@ export class Match implements MatchContext {
           this.battleRoyaleSimulationStep,
         );
       }
+      this.clearBattleRoyaleInventoryOnElimination(victim);
     }
 
     // Reward the killer with 50% of their max health (no overheal). Skip
@@ -823,7 +838,7 @@ export class Match implements MatchContext {
     // restore the rifle slot after the carried special weapon has spilled.
     this.pendingBursts.delete(victimId);
     this.fireCooldownTimers.delete(victimId);
-    if (victim && victim.weaponId !== 'rifle') {
+    if (victim && !victim.battleRoyaleInventory && victim.weaponId !== 'rifle') {
       victim.weaponId = 'rifle';
       victim.weaponInstance = undefined;
       victim.specialAmmo = 0;
@@ -867,6 +882,7 @@ export class Match implements MatchContext {
     player.isDead = true;
     player.health = 0;
     player.respawnTimer = 0;
+    this.clearBattleRoyaleInventoryOnElimination(player);
     // Every mode score starts at zero or above. A leaver can no longer win
     // a timed Rumble even if they departed while leading.
     if (this.battleRoyaleLifecycle === null) player.score = -1;
@@ -1305,6 +1321,34 @@ export class Match implements MatchContext {
     return this.combatManager.getRockets();
   }
 
+  getDroppedWeapons(): DroppedWeaponState[] {
+    return this.battleRoyaleInventoryManager?.getDrops() ?? [];
+  }
+
+  /** Future loot batches feed this server-owned boundary; standard matches reject it. */
+  spawnBattleRoyaleDroppedWeapon(
+    weaponInstance: WeaponInstance,
+    loadedAmmo: number,
+    position: { x: number; y: number },
+  ): DroppedWeaponState | null {
+    return (
+      this.battleRoyaleInventoryManager?.spawnDrop(weaponInstance, loadedAmmo, position) ?? null
+    );
+  }
+
+  /** Universal reserve belongs to the fighter and never enters a dropped gun. */
+  grantBattleRoyaleReserve(playerId: PlayerId, amount: number): boolean {
+    const inventory = this.players.get(playerId)?.battleRoyaleInventory;
+    if (!inventory || !Number.isFinite(amount) || amount <= 0) return false;
+    inventory.reserveAmmo = Math.min(
+      BATTLE_ROYALE_INVENTORY.MAX_RESERVE_AMMO,
+      inventory.reserveAmmo + Math.floor(amount),
+    );
+    const player = this.players.get(playerId)!;
+    player.specialReserve = inventory.reserveAmmo;
+    return true;
+  }
+
   /** Mutators currently active, in activation order (empty before the first). */
   get activeMutators(): readonly MutatorId[] {
     return this._activeMutators;
@@ -1399,6 +1443,7 @@ export class Match implements MatchContext {
     this.tickPickupCollections = [];
     this.tickDestroyedTiles = [];
     this.tickBarrelExplosions = [];
+    this.battleRoyaleReloadRequests.clear();
 
     // Snapshot positions BEFORE this tick's inputs move anyone. A shot
     // that arrives this tick will rewind opponents to the snapshot taken
@@ -1512,7 +1557,9 @@ export class Match implements MatchContext {
         // Reloads apply to whichever weapon is in hand: special weapons
         // (shotgun/pistol) top their magazine up from reserve, the rifle
         // refills outright. Fists have nothing to reload.
-        if (!infiniteAmmo && input.reload && !player.isReloading) {
+        if (this.battleRoyaleInventoryManager && input.reload && !player.isReloading) {
+          this.battleRoyaleReloadRequests.add(player.id);
+        } else if (!infiniteAmmo && input.reload && !player.isReloading) {
           if (this.usesSpecialAmmo(player.weaponId)) {
             const held = WEAPONS[player.weaponId];
             if (player.specialAmmo < held.magazineSize && player.specialReserve > 0) {
@@ -1532,7 +1579,11 @@ export class Match implements MatchContext {
         // this drain can advance the player onto a gated rung.
         const gunsDisabled =
           grenadesOnly || (this.gameMode.areGunsDisabled?.(this, player) ?? false);
-        if (!gunsDisabled && input.firePressed) {
+        if (
+          !gunsDisabled &&
+          input.firePressed &&
+          !(this.battleRoyaleInventoryManager && input.reload)
+        ) {
           if (player.weaponId === 'launcher') {
             this.tryFireLauncher(player, input, infiniteAmmo);
           } else if (player.weaponId === 'shotgun') {
@@ -1591,6 +1642,8 @@ export class Match implements MatchContext {
         player.lastProcessedInput = input.sequenceNumber;
       }
     }
+
+    this.updateBattleRoyaleInventoryInteractions();
 
     // Advance any pending bursts.
     this.advanceBursts(dt, grid);
@@ -1664,6 +1717,26 @@ export class Match implements MatchContext {
     // match. The punch has no ammo, so nothing to top up.
     const infiniteAmmoActive = this.mutatorActive('infinite_ammo');
     for (const player of this.players.values()) {
+      if (player.battleRoyaleInventory) {
+        if (player.isReloading) {
+          player.reloadTimer -= dt;
+          if (player.reloadTimer <= 0) {
+            player.isReloading = false;
+            player.reloadTimer = 0;
+            const weaponId = player.battleRoyaleInventory.equipped?.weaponId;
+            if (weaponId) {
+              const take = Math.min(
+                WEAPONS[weaponId].magazineSize - player.battleRoyaleInventory.loadedAmmo,
+                player.battleRoyaleInventory.reserveAmmo,
+              );
+              player.battleRoyaleInventory.loadedAmmo += take;
+              player.battleRoyaleInventory.reserveAmmo -= take;
+              this.syncBattleRoyaleCombatAmmo(player);
+            }
+          }
+        }
+        continue;
+      }
       if (infiniteAmmoActive) {
         player.isReloading = false;
         player.reloadTimer = 0;
@@ -1882,11 +1955,114 @@ export class Match implements MatchContext {
   }
 
   private hasCoherentBattleRoyaleInstance(player: PlayerState, weaponId: WeaponId): boolean {
+    const inventory = player.battleRoyaleInventory;
     return (
       this.battleRoyaleLifecycle !== null &&
       player.weaponId === weaponId &&
-      player.weaponInstance?.weaponId === weaponId
+      player.weaponInstance?.weaponId === weaponId &&
+      inventory?.equipped?.weaponId === weaponId &&
+      inventory.equipped.instanceId === player.weaponInstance.instanceId
     );
+  }
+
+  private updateBattleRoyaleInventoryInteractions(): void {
+    const manager = this.battleRoyaleInventoryManager;
+    if (!manager) return;
+    const playerIds = [...this.players.keys()].sort((left, right) => left.localeCompare(right));
+    for (const playerId of playerIds) {
+      const player = this.players.get(playerId)!;
+      const inventory = player.battleRoyaleInventory;
+      if (!inventory || player.isDead || this.departedPlayerIds.has(playerId)) continue;
+      const candidate = manager.findCandidate(player.position);
+      inventory.swapCandidateId = candidate?.id;
+      let swapped = false;
+      if (
+        candidate &&
+        (inventory.equipped === null || this.battleRoyaleReloadRequests.has(playerId))
+      ) {
+        swapped = this.equipBattleRoyaleDrop(player, candidate.id);
+      }
+      if (this.battleRoyaleReloadRequests.has(playerId) && !swapped) {
+        this.startBattleRoyaleReload(player);
+      }
+    }
+  }
+
+  private equipBattleRoyaleDrop(player: PlayerState, dropId: string): boolean {
+    const manager = this.battleRoyaleInventoryManager;
+    const inventory = player.battleRoyaleInventory;
+    if (!manager || !inventory) return false;
+    const collected = manager.collect(dropId);
+    if (!collected) return false;
+    const oldInstance = inventory.equipped;
+    const oldLoadedAmmo = inventory.loadedAmmo;
+    inventory.equipped = collected.weaponInstance;
+    inventory.loadedAmmo = collected.loadedAmmo;
+    inventory.swapCandidateId = undefined;
+    player.weaponId = collected.weaponInstance.weaponId;
+    player.weaponInstance = collected.weaponInstance;
+    player.isReloading = false;
+    player.reloadTimer = 0;
+    this.pendingBursts.delete(player.id);
+    this.fireCooldownTimers.delete(player.id);
+    this.syncBattleRoyaleCombatAmmo(player);
+    if (oldInstance) manager.spawnDrop(oldInstance, oldLoadedAmmo, player.position);
+    return true;
+  }
+
+  private startBattleRoyaleReload(player: PlayerState): void {
+    const inventory = player.battleRoyaleInventory;
+    const weaponId = inventory?.equipped?.weaponId;
+    if (
+      !inventory ||
+      !weaponId ||
+      inventory.loadedAmmo >= WEAPONS[weaponId].magazineSize ||
+      inventory.reserveAmmo <= 0 ||
+      player.isReloading
+    ) {
+      return;
+    }
+    player.isReloading = true;
+    player.reloadTimer = WEAPONS[weaponId].reloadTime;
+  }
+
+  private syncBattleRoyaleInventoryFromCombat(player: PlayerState): void {
+    const inventory = player.battleRoyaleInventory;
+    if (!inventory?.equipped) return;
+    inventory.loadedAmmo =
+      inventory.equipped.weaponId === 'rifle' ? player.ammo : player.specialAmmo;
+    inventory.reserveAmmo = player.specialReserve;
+  }
+
+  private syncBattleRoyaleCombatAmmo(player: PlayerState): void {
+    const inventory = player.battleRoyaleInventory;
+    if (!inventory) return;
+    player.ammo = inventory.loadedAmmo;
+    player.specialAmmo = inventory.loadedAmmo;
+    player.specialReserve = inventory.reserveAmmo;
+  }
+
+  private discardBattleRoyaleGun(player: PlayerState): void {
+    const inventory = player.battleRoyaleInventory;
+    if (!inventory) return;
+    inventory.equipped = null;
+    inventory.loadedAmmo = 0;
+    inventory.swapCandidateId = undefined;
+    player.weaponId = 'punch';
+    player.weaponInstance = undefined;
+    player.ammo = 0;
+    player.specialAmmo = 0;
+    player.specialReserve = inventory.reserveAmmo;
+    player.isReloading = false;
+    player.reloadTimer = 0;
+    this.pendingBursts.delete(player.id);
+    this.fireCooldownTimers.delete(player.id);
+  }
+
+  private clearBattleRoyaleInventoryOnElimination(player: PlayerState): void {
+    if (!player.battleRoyaleInventory) return;
+    player.battleRoyaleInventory.reserveAmmo = 0;
+    this.discardBattleRoyaleGun(player);
   }
 
   private damageForWeaponInstance(
@@ -1952,6 +2128,17 @@ export class Match implements MatchContext {
     player: PlayerState,
     weaponId: 'rifle' | 'pistol' | 'smg' | 'sniper_rifle',
   ): void {
+    if (player.battleRoyaleInventory) {
+      this.syncBattleRoyaleInventoryFromCombat(player);
+      if (player.battleRoyaleInventory.loadedAmmo > 0) {
+        if (weaponId !== 'rifle') {
+          this.fireCooldownTimers.set(player.id, WEAPONS[weaponId].fireCooldown);
+        }
+      } else {
+        this.discardBattleRoyaleGun(player);
+      }
+      return;
+    }
     if (weaponId === 'rifle') return;
     const weapon = WEAPONS[weaponId];
     if (player.specialAmmo > 0) {
@@ -1982,6 +2169,12 @@ export class Match implements MatchContext {
     );
     this.stats.recordShot(player.id);
     if (!infiniteAmmo) player.specialAmmo = Math.max(0, player.specialAmmo - 1);
+    this.syncBattleRoyaleInventoryFromCombat(player);
+
+    if (player.battleRoyaleInventory && player.battleRoyaleInventory.loadedAmmo <= 0) {
+      this.discardBattleRoyaleGun(player);
+      return;
+    }
 
     if (player.specialAmmo > 0) {
       this.fireCooldownTimers.set(player.id, launcher.fireCooldown);
@@ -2037,6 +2230,7 @@ export class Match implements MatchContext {
         player.specialAmmo = Math.max(0, player.specialAmmo - 1);
       }
     }
+    this.syncBattleRoyaleInventoryFromCombat(player);
     this.stats.recordShot(playerId);
 
     if (shot.hit && shot.victimId && shot.damage !== undefined) {
@@ -2252,6 +2446,12 @@ export class Match implements MatchContext {
     if (!infiniteAmmo) {
       player.specialAmmo = Math.max(0, player.specialAmmo - 1);
     }
+    this.syncBattleRoyaleInventoryFromCombat(player);
+
+    if (player.battleRoyaleInventory && player.battleRoyaleInventory.loadedAmmo <= 0) {
+      this.discardBattleRoyaleGun(player);
+      return;
+    }
 
     if (player.specialAmmo > 0) {
       // Shells left in the mag — pump before the next shot.
@@ -2274,6 +2474,10 @@ export class Match implements MatchContext {
    * the player isn't left with a dead trigger.
    */
   private revertToRifle(player: PlayerState): void {
+    if (player.battleRoyaleInventory) {
+      this.discardBattleRoyaleGun(player);
+      return;
+    }
     player.weaponId = 'rifle';
     player.weaponInstance = undefined;
     player.specialAmmo = 0;
@@ -2342,10 +2546,19 @@ export class Match implements MatchContext {
             this.cancelActiveAbility(victim);
             this.spawnLastLaughBomb(victim);
             this.dropPowerWeapon(victim);
-            victim.weaponId = 'rifle';
-            victim.weaponInstance = undefined;
-            victim.specialAmmo = 0;
-            victim.specialReserve = 0;
+            if (this.battleRoyaleLifecycle) {
+              this.battleRoyaleLifecycle.recordElimination(
+                victim.id,
+                'combat',
+                this.battleRoyaleSimulationStep,
+              );
+              this.clearBattleRoyaleInventoryOnElimination(victim);
+            } else {
+              victim.weaponId = 'rifle';
+              victim.weaponInstance = undefined;
+              victim.specialAmmo = 0;
+              victim.specialReserve = 0;
+            }
           }
         }
       }
@@ -2364,7 +2577,7 @@ export class Match implements MatchContext {
 
   /** Spill the exact surviving special ammo as a short-lived contested pickup. */
   private dropPowerWeapon(victim: PlayerState): void {
-    if (this.isOvertime) return;
+    if (this.isOvertime || this.battleRoyaleInventoryManager) return;
     if (
       victim.weaponId !== 'shotgun' &&
       victim.weaponId !== 'pistol' &&
@@ -2554,6 +2767,19 @@ export class Match implements MatchContext {
 
   private hasGauntletBoon(playerId: PlayerId, boonId: GauntletBoonId): boolean {
     return this.gauntletBoonsByPlayer.get(playerId)?.has(boonId) ?? false;
+  }
+
+  private isPickupTypeEnabledForMatch(type: PickupType): boolean {
+    if (
+      this.battleRoyaleLifecycle &&
+      (type === PickupType.GUN_AMMO ||
+        type === PickupType.WEAPON_SHOTGUN ||
+        type === PickupType.WEAPON_PISTOL ||
+        type === PickupType.WEAPON_BAT)
+    ) {
+      return false;
+    }
+    return this.gameMode.isPickupTypeEnabled?.(type) ?? true;
   }
 
   /** Restore life-scoped boon benefits without weakening active mode/mutator rules. */
@@ -3018,7 +3244,7 @@ export class Match implements MatchContext {
     const position = anchors[(offset + sequence) % anchors.length];
     const rolled = selectScavengerCacheReward(
       `${this.stableSeed}:scavenger-rush:${sequence}`,
-      (type) => this.gameMode.isPickupTypeEnabled?.(type) ?? true,
+      (type) => this.isPickupTypeEnabledForMatch(type),
     );
 
     this.pickupManager.removeScavengerRushDrops();

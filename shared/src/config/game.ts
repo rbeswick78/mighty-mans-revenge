@@ -398,6 +398,12 @@ export const WEAPON_RARITY = Object.freeze({
   mythical: Object.freeze({ weight: 0.01, damageMultiplier: 1.3 }),
 });
 
+/** Dormant Battle Royale single-slot inventory interaction rules. */
+export const BATTLE_ROYALE_INVENTORY = Object.freeze({
+  PICKUP_RADIUS: 30,
+  MAX_RESERVE_AMMO: 240,
+});
+
 /**
  * Runtime list of every kill-attribution source, for keying per-weapon
  * kill counters. Must stay in sync with the KillWeapon union in

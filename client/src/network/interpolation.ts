@@ -1,8 +1,11 @@
 import type { PlayerId, Vec2 } from '@shared/types/common.js';
 import type { SerializedPlayerState } from '@shared/types/network.js';
 import type { CharacterId, WeaponId } from '@shared/config/game.js';
-import type { WeaponInstance } from '@shared/types/weapon.js';
-import { normalizeWeaponInstance } from '@shared/utils/weapon-instance.js';
+import type { BattleRoyaleInventoryState, WeaponInstance } from '@shared/types/weapon.js';
+import {
+  normalizeBattleRoyaleInventory,
+  normalizeWeaponInstance,
+} from '@shared/utils/weapon-instance.js';
 import type { InterpolatedState } from './types.js';
 
 /** Stop extrapolating if we haven't received an update in this many ms. */
@@ -27,6 +30,7 @@ interface BufferedState {
   ammo: number;
   weaponId: WeaponId;
   weaponInstance?: WeaponInstance;
+  battleRoyaleInventory?: BattleRoyaleInventoryState;
   specialAmmo: number;
   specialReserve: number;
   grenades: number;
@@ -74,6 +78,27 @@ function lerpAngle(a: number, b: number, t: number): number {
   return a + diff * t;
 }
 
+function coherentInventory(state: SerializedPlayerState): BattleRoyaleInventoryState | undefined {
+  const inventory = normalizeBattleRoyaleInventory(state.battleRoyaleInventory);
+  const instance = normalizeWeaponInstance(state.weaponInstance);
+  if (!inventory) return undefined;
+  if (inventory.equipped === null) {
+    return state.weaponId === 'punch' && instance === null ? inventory : undefined;
+  }
+  return instance &&
+    state.weaponId === inventory.equipped.weaponId &&
+    instance.instanceId === inventory.equipped.instanceId
+    ? inventory
+    : undefined;
+}
+
+function coherentWeaponInstance(state: SerializedPlayerState): WeaponInstance | undefined {
+  if (state.battleRoyaleInventory === undefined) {
+    return normalizeWeaponInstance(state.weaponInstance) ?? undefined;
+  }
+  return coherentInventory(state)?.equipped ?? undefined;
+}
+
 function toInterpolated(s: BufferedState): InterpolatedState {
   return {
     characterId: s.characterId,
@@ -86,6 +111,7 @@ function toInterpolated(s: BufferedState): InterpolatedState {
     ammo: s.ammo,
     weaponId: s.weaponId,
     weaponInstance: s.weaponInstance,
+    battleRoyaleInventory: s.battleRoyaleInventory,
     specialAmmo: s.specialAmmo,
     specialReserve: s.specialReserve,
     grenades: s.grenades,
@@ -142,7 +168,8 @@ export class EntityInterpolation {
       armor: state.armor,
       ammo: state.ammo,
       weaponId: state.weaponId,
-      weaponInstance: normalizeWeaponInstance(state.weaponInstance) ?? undefined,
+      weaponInstance: coherentWeaponInstance(state),
+      battleRoyaleInventory: coherentInventory(state),
       specialAmmo: state.specialAmmo,
       specialReserve: state.specialReserve,
       grenades: state.grenades,
@@ -227,6 +254,8 @@ export class EntityInterpolation {
           armor: curr.armor,
           ammo: curr.ammo,
           weaponId: curr.weaponId,
+          weaponInstance: curr.weaponInstance,
+          battleRoyaleInventory: curr.battleRoyaleInventory,
           specialAmmo: curr.specialAmmo,
           specialReserve: curr.specialReserve,
           grenades: curr.grenades,

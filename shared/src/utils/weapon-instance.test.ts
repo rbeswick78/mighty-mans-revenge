@@ -4,6 +4,8 @@ import { WEAPON_RARITIES } from '../types/weapon.js';
 import {
   applyWeaponRarityDamage,
   createWeaponInstance,
+  normalizeBattleRoyaleInventory,
+  normalizeDroppedWeapon,
   normalizeWeaponInstance,
   rollWeaponRarity,
 } from './weapon-instance.js';
@@ -58,5 +60,37 @@ describe('Battle Royale weapon instances', () => {
     expect(applyWeaponRarityDamage(25, 'common')).toBe(20);
     expect(applyWeaponRarityDamage(25, 'mythical')).toBe(32.5);
     expect(applyWeaponRarityDamage(Number.NaN, 'rare')).toBe(0);
+  });
+
+  it('normalizes coherent one-slot inventory and rejects malformed empty states', () => {
+    const equipped = { instanceId: 'weapon:inventory:43', weaponId: 'smg', rarity: 'rare' };
+    expect(
+      normalizeBattleRoyaleInventory({
+        equipped,
+        loadedAmmo: 7,
+        reserveAmmo: 31,
+        swapCandidateId: 'br-drop:4',
+      }),
+    ).toEqual({ equipped, loadedAmmo: 7, reserveAmmo: 31, swapCandidateId: 'br-drop:4' });
+    expect(
+      normalizeBattleRoyaleInventory({ equipped: null, loadedAmmo: 1, reserveAmmo: 0 }),
+    ).toBeNull();
+    expect(normalizeBattleRoyaleInventory({ equipped, loadedAmmo: -1, reserveAmmo: 0 })).toBeNull();
+  });
+
+  it('normalizes finite dropped weapons and rejects malformed projections', () => {
+    const drop = {
+      id: 'br-drop:3',
+      position: { x: 120, y: 240 },
+      weaponInstance: {
+        instanceId: 'weapon:drop:43',
+        weaponId: 'launcher',
+        rarity: 'legendary',
+      },
+      loadedAmmo: 1,
+    };
+    expect(normalizeDroppedWeapon(drop)).toEqual(drop);
+    expect(normalizeDroppedWeapon({ ...drop, position: { x: Number.NaN, y: 0 } })).toBeNull();
+    expect(normalizeDroppedWeapon({ ...drop, loadedAmmo: 1.5 })).toBeNull();
   });
 });

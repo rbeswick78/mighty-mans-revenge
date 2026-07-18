@@ -7,6 +7,8 @@ import {
   RESPAWN,
   WEAPONS,
   type PlayerInput,
+  type PlayerState,
+  type WeaponInstance,
   type MapData,
 } from '@shared/game';
 import { Match } from './match.js';
@@ -73,6 +75,24 @@ function fireInput(sequenceNumber: number, aimAngle = 0): PlayerInput {
     sprint: false,
     abilityPressed: false,
     tick: sequenceNumber,
+  };
+}
+
+function equipBattleRoyaleGun(
+  player: PlayerState,
+  weaponInstance: WeaponInstance,
+  loadedAmmo: number,
+  reserveAmmo = 0,
+): void {
+  player.weaponId = weaponInstance.weaponId;
+  player.weaponInstance = weaponInstance;
+  player.ammo = loadedAmmo;
+  player.specialAmmo = loadedAmmo;
+  player.specialReserve = reserveAmmo;
+  player.battleRoyaleInventory = {
+    equipped: weaponInstance,
+    loadedAmmo,
+    reserveAmmo,
   };
 }
 
@@ -230,11 +250,15 @@ describe('Battle Royale lifecycle', () => {
     shooter.position = { x: 100, y: 100 };
     victim.position = { x: 150, y: 100 };
     victim.invulnerableTimer = 0;
-    shooter.weaponInstance = {
-      instanceId: 'weapon:rifle:common',
-      weaponId: 'rifle',
-      rarity: 'common',
-    };
+    equipBattleRoyaleGun(
+      shooter,
+      {
+        instanceId: 'weapon:rifle:common',
+        weaponId: 'rifle',
+        rarity: 'common',
+      },
+      WEAPONS.rifle.magazineSize,
+    );
     match.queueInput(shooter.id, fireInput(1));
     match.update(0.05);
     expect(match.getTickBulletTrails()[0].damageApplied).toBe(WEAPONS.rifle.damageMax * 0.8);
@@ -279,8 +303,11 @@ describe('Battle Royale lifecycle', () => {
     victim.position = { x: 250, y: 100 };
     victim.health = victim.maxHealth;
     victim.invulnerableTimer = 0;
-    shooter.weaponId = 'smg';
-    shooter.specialAmmo = WEAPONS.smg.magazineSize;
+    equipBattleRoyaleGun(
+      shooter,
+      { instanceId: 'weapon:inventory:smg', weaponId: 'smg', rarity: 'rare' },
+      WEAPONS.smg.magazineSize,
+    );
     shooter.weaponInstance = {
       instanceId: 'weapon:wrong',
       weaponId: 'sniper_rifle',
@@ -291,20 +318,22 @@ describe('Battle Royale lifecycle', () => {
     expect(match.getTickBulletTrails()).toEqual([]);
     expect(shooter.specialAmmo).toBe(WEAPONS.smg.magazineSize);
 
-    shooter.weaponInstance = { instanceId: 'weapon:smg', weaponId: 'smg', rarity: 'rare' };
+    equipBattleRoyaleGun(
+      shooter,
+      { instanceId: 'weapon:smg', weaponId: 'smg', rarity: 'rare' },
+      WEAPONS.smg.magazineSize,
+    );
     match.queueInput(shooter.id, fireInput(2));
     match.update(0.05);
     match.update(0.3);
     expect(shooter.specialAmmo).toBe(WEAPONS.smg.magazineSize - WEAPONS.smg.burstSize);
     match.update(0.2);
 
-    shooter.weaponId = 'sniper_rifle';
-    shooter.specialAmmo = WEAPONS.sniper_rifle.magazineSize;
-    shooter.weaponInstance = {
-      instanceId: 'weapon:sniper',
-      weaponId: 'sniper_rifle',
-      rarity: 'mythical',
-    };
+    equipBattleRoyaleGun(
+      shooter,
+      { instanceId: 'weapon:sniper', weaponId: 'sniper_rifle', rarity: 'mythical' },
+      WEAPONS.sniper_rifle.magazineSize,
+    );
     victim.health = victim.maxHealth;
     victim.isDead = false;
     match.queueInput(shooter.id, fireInput(3));
@@ -327,13 +356,11 @@ describe('Battle Royale lifecycle', () => {
     victim.position = { x: 250, y: 100 };
     victim.health = 10;
     victim.invulnerableTimer = 0;
-    shooter.weaponId = 'launcher';
-    shooter.specialAmmo = 1;
-    shooter.weaponInstance = {
-      instanceId: 'weapon:launcher',
-      weaponId: 'launcher',
-      rarity: 'legendary',
-    };
+    equipBattleRoyaleGun(
+      shooter,
+      { instanceId: 'weapon:launcher', weaponId: 'launcher', rarity: 'legendary' },
+      1,
+    );
     match.queueInput(shooter.id, fireInput(1));
     match.update(0.05);
     expect(match.getActiveRockets()).toHaveLength(1);

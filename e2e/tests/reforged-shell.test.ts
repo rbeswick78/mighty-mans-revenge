@@ -1091,6 +1091,286 @@ test('Battle Royale projects authoritative rarity and launcher flight into the s
   }
 });
 
+test('Battle Royale projects one-slot inventory and contextual reload input', async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    !shellAdvertised || !battleRoyaleAdvertised,
+    'Run with CAPABILITY_NEW_SHELL=true and CAPABILITY_BATTLE_ROYALE=true.',
+  );
+  test.setTimeout(60_000);
+  const gamepadProject = testInfo.project.name === 'desktop-firefox';
+  await page.addInitScript((mockGamepad) => {
+    if (!mockGamepad) return;
+    const state = {
+      axes: [0, 0, 0, 0],
+      buttons: Array.from({ length: 16 }, () => ({ pressed: false, value: 0 })),
+    };
+    const pad = {
+      id: 'Batch 43 Standard Gamepad',
+      index: 0,
+      connected: true,
+      mapping: 'standard',
+      get axes() {
+        return state.axes;
+      },
+      get buttons() {
+        return state.buttons;
+      },
+      timestamp: 0,
+    };
+    Object.defineProperty(navigator, 'getGamepads', {
+      configurable: true,
+      value: () => [pad],
+    });
+    (window as unknown as { __battleInventoryGamepad?: typeof state }).__battleInventoryGamepad =
+      state;
+  }, gamepadProject);
+  await page.addInitScript(() => {
+    localStorage.setItem('mmr_fighter_selection', 'rook');
+    localStorage.setItem('mmr_nickname', 'Inventory43');
+  });
+  await page.goto('/');
+  const liveChromium = testInfo.project.name === 'desktop-chromium';
+  if (!liveChromium) await stageNonChromiumShell(page, `battle-inventory-${testInfo.project.name}`);
+  await waitForActiveScene(page, 'ReforgedShellScene');
+
+  const localId = await page.evaluate(() => {
+    const shell = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'ReforgedShellScene',
+    ) as unknown as {
+      gameService: {
+        getNetworkManager(): {
+          getPlayerId(): string | null;
+          handleMessage(message: unknown): void;
+        };
+      };
+    };
+    const manager = shell.gameService.getNetworkManager();
+    const playerId = manager.getPlayerId();
+    if (!playerId) throw new Error('missing local Battle Royale inventory player');
+    manager.handleMessage({
+      type: 'server:matchFound',
+      matchId: 'battle-inventory-43',
+      opponents: Array.from({ length: 7 }, (_, index) => ({
+        id: `battle-inventory-opponent-${index}`,
+        nickname: `Opponent${index}`,
+      })),
+      mapName: 'Wasteland Outpost',
+      gameMode: 'deathmatch',
+      matchKind: 'battle_royale',
+      battleRoyale: { participantCount: 8, humanCount: 1, botCount: 7 },
+    });
+    return playerId;
+  });
+  await waitForActiveScene(page, 'GameScene');
+
+  await page.evaluate((playerId) => {
+    const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+      'GameScene',
+    ) as unknown as {
+      gameService: {
+        sendInput(input: { reload: boolean; firePressed: boolean }): void;
+        getNetworkManager(): { handleMessage(message: unknown): void };
+      };
+    };
+    const captured: Array<{ reload: boolean; firePressed: boolean }> = [];
+    (window as unknown as { __battleInventoryInputs?: typeof captured }).__battleInventoryInputs =
+      captured;
+    scene.gameService.sendInput = (input) =>
+      captured.push({ reload: input.reload, firePressed: input.firePressed });
+    const equipped = { instanceId: 'weapon:held:43', weaponId: 'pistol', rarity: 'rare' };
+    const candidate = { instanceId: 'weapon:ground:43', weaponId: 'shotgun', rarity: 'epic' };
+    scene.gameService.getNetworkManager().handleMessage({
+      type: 'server:gameState',
+      tick: 43,
+      phase: 'active',
+      countdownTimer: 0,
+      matchTimer: 120,
+      players: [
+        {
+          id: playerId,
+          characterId: 'rook',
+          position: { x: 320, y: 256 },
+          velocity: { x: 0, y: 0 },
+          aimAngle: 0,
+          health: 100,
+          maxHealth: 100,
+          armor: 0,
+          ammo: 7,
+          weaponId: 'pistol',
+          weaponInstance: equipped,
+          battleRoyaleInventory: {
+            equipped,
+            loadedAmmo: 7,
+            reserveAmmo: 29,
+            swapCandidateId: 'drop-browser-43',
+          },
+          specialAmmo: 7,
+          specialReserve: 29,
+          grenades: 3,
+          isReloading: false,
+          isSprinting: false,
+          stamina: 3,
+          isDead: false,
+          respawnTimer: 0,
+          invulnerableTimer: 0,
+          lastProcessedInput: 0,
+          score: 0,
+          deaths: 0,
+          nickname: 'Inventory43',
+          abilityActiveSeconds: 0,
+          abilityCooldownSeconds: 0,
+          frozenTimer: 0,
+          secondWindTimer: 0,
+        },
+      ],
+      grenades: [],
+      axes: [],
+      droppedWeapons: [
+        {
+          id: 'drop-browser-43',
+          position: { x: 336, y: 256 },
+          weaponInstance: candidate,
+          loadedAmmo: 2,
+        },
+      ],
+      bulletTrails: [],
+      barrelExplosions: [],
+      contract: {
+        id: 'hot_shot',
+        title: 'HOT SHOT',
+        objective: 'LAND 8 ATTACKS',
+        target: 8,
+        players: [],
+      },
+      punches: [],
+      pickups: [],
+      activeMutators: [],
+      isOvertime: false,
+    });
+    scene.gameService.getNetworkManager().handleMessage({
+      type: 'server:matchStart',
+      matchEndsInMs: 120_000,
+    });
+  }, localId);
+
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+          'GameScene',
+        ) as unknown as {
+          gameService: {
+            getNetworkManager(): {
+              getLocalPlayerState(): {
+                battleRoyaleInventory?: { loadedAmmo: number; reserveAmmo: number };
+              } | null;
+              getDroppedWeapons(): unknown[];
+            };
+          };
+          hud: { weaponSwapLabel: Phaser.GameObjects.Text };
+          droppedWeaponRenderer: { sprites: Map<string, unknown> };
+          inputManager: {
+            touchInput: {
+              reloadButton: Phaser.GameObjects.Arc;
+              reloadButtonText: Phaser.GameObjects.Text;
+            };
+          };
+        };
+        const manager = scene.gameService.getNetworkManager();
+        return {
+          inventory: manager.getLocalPlayerState()?.battleRoyaleInventory,
+          drops: manager.getDroppedWeapons().length,
+          renderedDrops: scene.droppedWeaponRenderer.sprites.size,
+          swapLabel: scene.hud.weaponSwapLabel.text,
+          swapVisible: scene.hud.weaponSwapLabel.visible,
+          touchReloadVisible: scene.inputManager.touchInput.reloadButton.visible,
+          touchReloadLabel: scene.inputManager.touchInput.reloadButtonText.text,
+        };
+      }),
+    )
+    .toMatchObject({
+      inventory: { loadedAmmo: 7, reserveAmmo: 29 },
+      drops: 1,
+      renderedDrops: 1,
+      swapLabel: 'RELOAD: SWAP FOR EPIC SHOTGUN · 2',
+      swapVisible: true,
+      touchReloadVisible: testInfo.project.name === 'mobile-landscape',
+      touchReloadLabel: 'RELOAD',
+    });
+
+  if (testInfo.project.name === 'mobile-landscape') {
+    const center = await page.evaluate(() => {
+      const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+        'GameScene',
+      ) as unknown as {
+        inputManager: { touchInput: { reloadButton: Phaser.GameObjects.Arc } };
+      };
+      return {
+        x: scene.inputManager.touchInput.reloadButton.x,
+        y: scene.inputManager.touchInput.reloadButton.y,
+      };
+    });
+    const canvas = await page.locator('canvas').boundingBox();
+    if (!canvas) throw new Error('missing gameplay canvas');
+    await page.touchscreen.tap(
+      canvas.x + (center.x / 1280) * canvas.width,
+      canvas.y + (center.y / 720) * canvas.height,
+    );
+  } else if (gamepadProject) {
+    await page.waitForTimeout(100);
+    await page.evaluate(() => {
+      const state = (
+        window as unknown as {
+          __battleInventoryGamepad: {
+            buttons: Array<{ pressed: boolean; value: number }>;
+          };
+        }
+      ).__battleInventoryGamepad;
+      state.buttons[2] = { pressed: true, value: 1 };
+    });
+  } else {
+    const canvas = await page.locator('canvas').boundingBox();
+    if (!canvas) throw new Error('missing gameplay canvas');
+    await page.mouse.move(canvas.x + canvas.width * 0.75, canvas.y + canvas.height * 0.5);
+    await page.mouse.down();
+    await page.mouse.up();
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            (
+              window as unknown as {
+                __battleInventoryInputs?: Array<{ firePressed: boolean }>;
+              }
+            ).__battleInventoryInputs?.filter(({ firePressed }) => firePressed).length ?? 0,
+        ),
+      )
+      .toBe(1);
+    await page.keyboard.down('r');
+    await page.waitForTimeout(80);
+    await page.keyboard.up('r');
+  }
+
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (
+            window as unknown as {
+              __battleInventoryInputs?: Array<{ reload: boolean }>;
+            }
+          ).__battleInventoryInputs?.filter(({ reload }) => reload).length ?? 0,
+      ),
+    )
+    .toBe(1);
+  await waitForRenderedFrames(page);
+  if (liveChromium) {
+    await page.screenshot({ path: testInfo.outputPath('battle-inventory-43.png') });
+  }
+});
+
 test('Play submits one server-scheduled general intent and recovery clears queued entry', async ({
   page,
 }, testInfo) => {

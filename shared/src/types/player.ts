@@ -1,6 +1,6 @@
 import { PlayerId, Vec2, Tick } from './common.js';
 import type { CharacterId, WeaponId } from '../config/game.js';
-import type { WeaponInstance } from './weapon.js';
+import type { BattleRoyaleInventoryState, WeaponInstance } from './weapon.js';
 import type { KillWeapon } from './game.js';
 
 export interface PlayerState {
@@ -33,6 +33,8 @@ export interface PlayerState {
   weaponId: WeaponId;
   /** Optional Battle Royale instance; absent from every standard snapshot. */
   weaponInstance?: WeaponInstance;
+  /** Server-owned one-gun inventory; absent from every standard format. */
+  battleRoyaleInventory?: BattleRoyaleInventoryState;
   /**
    * Shells in the special weapon's magazine. Only meaningful while
    * weaponId !== 'rifle'; 0 otherwise.

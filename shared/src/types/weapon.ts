@@ -87,3 +87,20 @@ export interface WeaponInstance {
   readonly weaponId: BattleRoyaleGunId;
   readonly rarity: WeaponRarity;
 }
+
+/** Server-owned one-gun Battle Royale inventory; absent in standard formats. */
+export interface BattleRoyaleInventoryState {
+  equipped: WeaponInstance | null;
+  loadedAmmo: number;
+  reserveAmmo: number;
+  /** Server-selected nearby drop eligible for the contextual reload action. */
+  swapCandidateId?: string;
+}
+
+/** One authoritative gun on the ground. Universal reserve never enters a drop. */
+export interface DroppedWeaponState {
+  readonly id: string;
+  readonly position: import('./common.js').Vec2;
+  readonly weaponInstance: WeaponInstance;
+  readonly loadedAmmo: number;
+}

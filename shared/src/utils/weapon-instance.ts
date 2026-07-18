@@ -1,8 +1,10 @@
-import { WEAPON_RARITY } from '../config/game.js';
+import { BATTLE_ROYALE_INVENTORY, WEAPONS, WEAPON_RARITY } from '../config/game.js';
 import {
   BATTLE_ROYALE_GUN_IDS,
   WEAPON_RARITIES,
   type BattleRoyaleGunId,
+  type BattleRoyaleInventoryState,
+  type DroppedWeaponState,
   type WeaponInstance,
   type WeaponRarity,
 } from '../types/weapon.js';
@@ -60,4 +62,65 @@ export function createWeaponInstance(
 export function applyWeaponRarityDamage(baseDamage: number, rarity: WeaponRarity): number {
   if (!Number.isFinite(baseDamage) || baseDamage <= 0) return 0;
   return baseDamage * WEAPON_RARITY[rarity].damageMultiplier;
+}
+
+function normalizeAmmo(value: unknown): number | null {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null;
+}
+
+/** Fail-closed normalization for optional one-slot inventory snapshots. */
+export function normalizeBattleRoyaleInventory(value: unknown): BattleRoyaleInventoryState | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+  const candidate = value as Record<string, unknown>;
+  const equipped = candidate.equipped === null ? null : normalizeWeaponInstance(candidate.equipped);
+  const loadedAmmo = normalizeAmmo(candidate.loadedAmmo);
+  const reserveAmmo = normalizeAmmo(candidate.reserveAmmo);
+  if (equipped === null && candidate.equipped !== null) return null;
+  if (loadedAmmo === null || reserveAmmo === null) return null;
+  if (equipped === null && loadedAmmo !== 0) return null;
+  if (equipped && loadedAmmo > WEAPONS[equipped.weaponId].magazineSize) return null;
+  if (reserveAmmo > BATTLE_ROYALE_INVENTORY.MAX_RESERVE_AMMO) return null;
+  if (
+    candidate.swapCandidateId !== undefined &&
+    (typeof candidate.swapCandidateId !== 'string' || !INSTANCE_ID.test(candidate.swapCandidateId))
+  ) {
+    return null;
+  }
+  return Object.freeze({
+    equipped,
+    loadedAmmo,
+    reserveAmmo,
+    ...(candidate.swapCandidateId === undefined
+      ? {}
+      : { swapCandidateId: candidate.swapCandidateId }),
+  });
+}
+
+/** Fail-closed normalization for an authoritative ground-gun projection. */
+export function normalizeDroppedWeapon(value: unknown): DroppedWeaponState | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+  const candidate = value as Record<string, unknown>;
+  const position = candidate.position;
+  const weaponInstance = normalizeWeaponInstance(candidate.weaponInstance);
+  const loadedAmmo = normalizeAmmo(candidate.loadedAmmo);
+  if (typeof candidate.id !== 'string' || !INSTANCE_ID.test(candidate.id)) return null;
+  if (typeof position !== 'object' || position === null || Array.isArray(position)) return null;
+  const coordinates = position as Record<string, unknown>;
+  if (
+    typeof coordinates.x !== 'number' ||
+    !Number.isFinite(coordinates.x) ||
+    typeof coordinates.y !== 'number' ||
+    !Number.isFinite(coordinates.y) ||
+    weaponInstance === null ||
+    loadedAmmo === null ||
+    loadedAmmo > WEAPONS[weaponInstance.weaponId].magazineSize
+  ) {
+    return null;
+  }
+  return Object.freeze({
+    id: candidate.id,
+    position: Object.freeze({ x: coordinates.x, y: coordinates.y }),
+    weaponInstance,
+    loadedAmmo,
+  });
 }

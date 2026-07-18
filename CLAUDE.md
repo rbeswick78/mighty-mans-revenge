@@ -955,12 +955,13 @@ production flag, or deployment follows from passing Batch 38 evidence.
 ## Reforged Release State
 
 Batch 39 automated evidence remains green and its human tester/release review
-is deliberately deferred. Batch 41's dormant Battle Royale eight-slot queue is
-complete: a strict `battleRoyale:true` capability gates solo entry, the server
-owns the eight-human/15-second bot-fill launch, and optional queue/launch fields
-remain additive. `battleRoyale` stays default false and unexposed. RFG-004
-remains resolved by the per-run `GameScene.minimapRenderer` reset. The user has
-authorized sequential plan work beginning with Batch 42 while deferring human
+is deliberately deferred. Batch 43's dormant Battle Royale one-slot inventory
+is complete: the server owns fists, equipped instances, loaded/universal ammo,
+pickup contests, reload/swap, dry discard, and dropped-gun state. Additive wire
+fields remain optional and `battleRoyale` stays default false and unexposed.
+RFG-004 remains resolved by the per-run `GameScene.minimapRenderer` reset and
+RFG-005 resolves the Battle Royale self-explosion lifecycle gap. The user has
+authorized sequential plan work through Batch 51 while deferring human
 involvement, but has not authorized any capability exposure, deployment,
 production restart, or live smoke. Production remains on approved Batch 33 with
 every capability false.
@@ -983,3 +984,24 @@ must remain inaccessible to every standard format; standard Weapon Roulette,
 pickups, stats/persistence, and snapshot bytes are protected compatibility
 contracts. Batch 43 owns inventory and dropped-weapon semantics. Every Reforged
 capability remains default false and unexposed, and Batch 42 authorizes no rollout.
+
+## Battle Royale Single-Slot Inventory Contract
+
+Batch 43 constructs `BattleRoyaleInventoryManager` only for a server-authored
+Battle Royale lifecycle. Entrants spawn with fists, can equip exactly one
+coherent `WeaponInstance`, keep loaded ammo on that gun, and own one bounded
+universal reserve. Unarmed proximity auto-equips; armed proximity only projects
+the server's comparison candidate. The existing reload input intentionally swaps
+when a candidate exists and otherwise reloads from reserve. A swap drops the old
+gun's exact instance and loaded ammo while reserve stays with the fighter; a gun
+spent to zero is discarded to fists.
+
+`battleRoyaleInventory` and `droppedWeapons` are additive optional snapshot
+fields. Standard serialization omits them, old-server omission clears them, and
+clients fail malformed or incoherent state closed. Clients may render ground
+guns, ammo, rarity, and the server-selected comparison but never collect, choose,
+reload, swap, or damage outside ordinary input projection. Touch exposes reload
+only while Battle Royale inventory exists; keyboard R and standard-gamepad X
+retain the established input field. Batch 44 owns containers, loot rolls, supply
+bundles, rarity auras, and elimination piles. Every capability remains default
+false and unexposed, and Batch 43 authorizes no rollout.

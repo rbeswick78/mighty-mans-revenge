@@ -421,3 +421,20 @@ This is dormant support code. `battleRoyale` and every Reforged capability
 remain default false and unexposed. Batch 43 owns inventory; later batches own
 loot, arena, zones, bot AI, spectating, records, and hardening. Production
 remains on approved Batch 33, and no deployment, restart, or live smoke is authorized.
+
+## Batch 43 single-slot inventory disposition
+
+Batch 43 does not add or expose a capability. The one-slot inventory manager is
+constructed only for an existing server-authored `battle_royale` lifecycle.
+Standard matches have no inventory manager, omit both optional snapshot fields,
+and retain their established weapon, pickup, reload, death-drop, input, and
+persistence behavior. Old-server omission clears new-client inventory/drop
+state, and malformed or incoherent additions fail closed.
+
+The client is a pure projection: equipped instance, loaded/reserve ammo, nearby
+swap candidate, and ground guns all originate on the server. Keyboard,
+standard-gamepad, and Battle Royale-only touch routes send the existing reload
+boolean; none may choose a drop or author a swap. `battleRoyale` and every other
+Reforged capability remain strict server-owned opt-ins, default false, and
+unexposed. Batch 44 owns containers and loot. Production remains on approved
+Batch 33, and no deployment, restart, or live smoke is authorized.

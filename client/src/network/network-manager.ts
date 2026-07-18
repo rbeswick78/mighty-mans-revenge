@@ -4,6 +4,11 @@ import type { PlayerInput, PlayerState } from '@shared/types/player.js';
 import type { AxeState, GrenadeState, PunchEvent, RocketState } from '@shared/types/projectile.js';
 import type { PickupState } from '@shared/types/pickup.js';
 import type {
+  BattleRoyaleInventoryState,
+  DroppedWeaponState,
+  WeaponInstance,
+} from '@shared/types/weapon.js';
+import type {
   KillConfirmedTagState,
   MatchContractHudState,
   GameModeType,
@@ -36,7 +41,11 @@ import {
   type TauntId,
 } from '@shared/config/game.js';
 import { playerMovementModifiers } from '@shared/utils/event-modifiers.js';
-import { normalizeWeaponInstance } from '@shared/utils/weapon-instance.js';
+import {
+  normalizeBattleRoyaleInventory,
+  normalizeDroppedWeapon,
+  normalizeWeaponInstance,
+} from '@shared/utils/weapon-instance.js';
 import { listMapNames } from '@shared/maps/registry.js';
 import type { MatchIntent } from '@shared/matchmaking/match-intent.js';
 import { isPartyState, type PartyState } from '@shared/matchmaking/party.js';
@@ -100,6 +109,31 @@ export interface LocalCorrection {
   shouldSnap: boolean;
 }
 
+function normalizePlayerBattleRoyaleInventory(
+  state: ServerGameStateMessage['players'][number],
+): BattleRoyaleInventoryState | undefined {
+  const inventory = normalizeBattleRoyaleInventory(state.battleRoyaleInventory);
+  if (!inventory) return undefined;
+  const instance = normalizeWeaponInstance(state.weaponInstance);
+  if (inventory.equipped === null) {
+    return state.weaponId === 'punch' && instance === null ? inventory : undefined;
+  }
+  return instance &&
+    state.weaponId === inventory.equipped.weaponId &&
+    instance.instanceId === inventory.equipped.instanceId
+    ? inventory
+    : undefined;
+}
+
+function normalizePlayerWeaponInstance(
+  state: ServerGameStateMessage['players'][number],
+): WeaponInstance | undefined {
+  if (state.battleRoyaleInventory === undefined) {
+    return normalizeWeaponInstance(state.weaponInstance) ?? undefined;
+  }
+  return normalizePlayerBattleRoyaleInventory(state)?.equipped ?? undefined;
+}
+
 export class NetworkManager {
   private connection: NetworkConnection;
   private prediction: ClientPrediction;
@@ -136,6 +170,7 @@ export class NetworkManager {
   private latestAxes: AxeState[] = [];
   private lastAxeStates = new Map<string, { position: Vec2; angle: number }>();
   private latestRockets: RocketState[] = [];
+  private latestDroppedWeapons: DroppedWeaponState[] = [];
 
   /** Most recent pickups from server gameState. Scene polls for rendering. */
   private latestPickups: PickupState[] = [];
@@ -261,6 +296,7 @@ export class NetworkManager {
     this.latestAxes = [];
     this.lastAxeStates.clear();
     this.latestRockets = [];
+    this.latestDroppedWeapons = [];
     this.latestPickups = [];
     this.latestConfirmedTags = [];
     this._coreRunState = null;
@@ -610,6 +646,10 @@ export class NetworkManager {
     return this.latestRockets;
   }
 
+  getDroppedWeapons(): DroppedWeaponState[] {
+    return this.latestDroppedWeapons;
+  }
+
   /** Most recent pickups from the server, for rendering. */
   getPickups(): PickupState[] {
     return this.latestPickups;
@@ -937,6 +977,12 @@ export class NetworkManager {
       }
     }
     this.latestRockets = msg.rockets ?? [];
+    const droppedWeapons = (msg.droppedWeapons ?? []).map(normalizeDroppedWeapon);
+    this.latestDroppedWeapons = droppedWeapons.every(
+      (drop): drop is DroppedWeaponState => drop !== null,
+    )
+      ? droppedWeapons
+      : [];
     this.latestPickups = msg.pickups;
     this.latestConfirmedTags = msg.confirmedTags ?? [];
     this._coreRunState = msg.coreRun ?? null;
@@ -1073,7 +1119,8 @@ export class NetworkManager {
       // Weapon slot is server-authoritative (auto-equip on pickup,
       // auto-revert on empty) — the client never predicts it.
       weaponId: serverState.weaponId,
-      weaponInstance: normalizeWeaponInstance(serverState.weaponInstance) ?? undefined,
+      weaponInstance: normalizePlayerWeaponInstance(serverState),
+      battleRoyaleInventory: normalizePlayerBattleRoyaleInventory(serverState),
       specialAmmo: serverState.specialAmmo,
       specialReserve: serverState.specialReserve,
       grenades: serverState.grenades,
@@ -1132,7 +1179,8 @@ export class NetworkManager {
       isReloading: s.isReloading,
       reloadTimer: 0,
       weaponId: s.weaponId,
-      weaponInstance: normalizeWeaponInstance(s.weaponInstance) ?? undefined,
+      weaponInstance: normalizePlayerWeaponInstance(s),
+      battleRoyaleInventory: normalizePlayerBattleRoyaleInventory(s),
       specialAmmo: s.specialAmmo,
       specialReserve: s.specialReserve,
       grenades: s.grenades,

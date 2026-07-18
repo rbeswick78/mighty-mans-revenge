@@ -1,7 +1,7 @@
 import type { Vec2 } from '@shared/types/common.js';
 import type { PlayerInput, PlayerState } from '@shared/types/player.js';
 import type { CharacterId, WeaponId } from '@shared/config/game.js';
-import type { WeaponInstance } from '@shared/types/weapon.js';
+import type { BattleRoyaleInventoryState, WeaponInstance } from '@shared/types/weapon.js';
 
 export type ConnectionState = 'connecting' | 'connected' | 'disconnected' | 'reconnecting';
 export type ConnectionQuality = 'good' | 'fair' | 'poor';
@@ -29,6 +29,7 @@ export interface InterpolatedState {
   ammo: number;
   weaponId: WeaponId;
   weaponInstance?: WeaponInstance;
+  battleRoyaleInventory?: BattleRoyaleInventoryState;
   specialAmmo: number;
   specialReserve: number;
   grenades: number;

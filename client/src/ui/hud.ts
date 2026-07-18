@@ -47,7 +47,11 @@ import {
   liveReforgedGunArtId,
   reforgedGunPresentationFrame,
 } from '../rendering/reforged-weapon-pickup-contract.js';
-import type { WeaponRarity } from '@shared/types/weapon.js';
+import type {
+  BattleRoyaleInventoryState,
+  DroppedWeaponState,
+  WeaponRarity,
+} from '@shared/types/weapon.js';
 import { weaponRarityPresentation } from './weapon-rarity-presentation.js';
 import { reforgedWeaponPickupAtlasAvailable } from '../rendering/reforged-weapon-pickup-runtime.js';
 
@@ -121,6 +125,7 @@ export class HUD {
   private specialWeaponLabel: Phaser.GameObjects.Text;
   private specialShellIcons: Phaser.GameObjects.Image[] = [];
   private specialReserveText: Phaser.GameObjects.Text;
+  private weaponSwapLabel: Phaser.GameObjects.Text;
   /** Left edge of the icon run — reserve-text X is derived per weapon. */
   private specialIconStartX: number;
   /** specialReserveText X while the shotgun's full shell row is visible. */
@@ -373,6 +378,12 @@ export class HUD {
     this.specialReserveText.setScrollFactor(0);
     this.specialReserveText.setDepth(1000);
     this.specialReserveText.setVisible(false);
+    this.weaponSwapLabel = scene.add.text(hbX, specialY - 14, '', {
+      ...HEADER_STYLE,
+      fontSize: '9px',
+      color: '#ffd166',
+    });
+    this.weaponSwapLabel.setScrollFactor(0).setDepth(1001).setVisible(false);
 
     // --- Ability indicator: themed icon + radial sweep cooldown ---
     this.abilityRadius = 18;
@@ -776,6 +787,7 @@ export class HUD {
     this.grenadeText.setPosition(layout.grenades.x, layout.grenades.y);
 
     this.specialWeaponLabel.setPosition(layout.specialWeapon.x, layout.specialWeapon.y + 4);
+    this.weaponSwapLabel.setPosition(layout.specialWeapon.x, layout.specialWeapon.y - 14);
     this.specialIconStartX = layout.specialWeapon.x + 96;
     for (let i = 0; i < this.specialShellIcons.length; i++) {
       this.specialShellIcons[i].setPosition(
@@ -860,6 +872,7 @@ export class HUD {
       this.grenadeText,
       this.specialWeaponLabel,
       this.specialReserveText,
+      this.weaponSwapLabel,
       this.kothLabel,
       this.gunGameLadderText,
       this.lastStandText,
@@ -929,7 +942,7 @@ export class HUD {
       this.weaponAmmoIcon?.setFrame(reforgedGunPresentationFrame(modernGun, 'ammo'));
     }
 
-    const showLabel = weaponId !== 'rifle';
+    const showLabel = weaponId !== 'rifle' || rarity !== undefined;
     this.specialWeaponLabel.setVisible(showLabel);
     if (showLabel) {
       const rarityView = rarity ? weaponRarityPresentation(rarity) : null;
@@ -952,6 +965,7 @@ export class HUD {
       this.specialReserveText.setText(`+${reserve}`);
       this.specialReserveText.setVisible(true);
     } else if (
+      (rarity !== undefined && modernGun !== null) ||
       weaponId === 'pistol' ||
       weaponId === 'smg' ||
       weaponId === 'sniper_rifle' ||
@@ -986,6 +1000,34 @@ export class HUD {
     }
 
     this.syncAmmoRowVisibility();
+  }
+
+  updateBattleRoyaleInventory(
+    inventory: BattleRoyaleInventoryState | undefined,
+    drops: readonly DroppedWeaponState[],
+  ): void {
+    if (!inventory) {
+      this.weaponSwapLabel.setVisible(false);
+      return;
+    }
+    if (inventory.equipped === null) {
+      this.specialReserveText
+        .setX(this.specialIconStartX)
+        .setText(`RESERVE ${inventory.reserveAmmo}`)
+        .setVisible(true);
+    }
+    const candidate = drops.find((drop) => drop.id === inventory.swapCandidateId);
+    if (!candidate || inventory.equipped === null) {
+      this.weaponSwapLabel.setVisible(false);
+      return;
+    }
+    const rarity = weaponRarityPresentation(candidate.weaponInstance.rarity);
+    this.weaponSwapLabel
+      .setText(
+        `RELOAD: SWAP FOR ${rarity.label} ${WEAPONS[candidate.weaponInstance.weaponId].displayName.toUpperCase()} · ${candidate.loadedAmmo}`,
+      )
+      .setColor(rarity.color)
+      .setVisible(true);
   }
 
   /**
@@ -1753,6 +1795,7 @@ export class HUD {
     this.weaponAmmoIcon?.destroy();
     this.grenadeText.destroy();
     this.specialWeaponLabel.destroy();
+    this.weaponSwapLabel.destroy();
     for (const icon of this.specialShellIcons) {
       icon.destroy();
     }

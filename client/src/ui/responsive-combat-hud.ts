@@ -46,6 +46,7 @@ export interface ResponsiveCombatHudLayout {
     readonly taunt: HudPoint;
     readonly grenade: HudPoint;
     readonly ability: HudPoint;
+    readonly reload: HudPoint;
   };
 }
 
@@ -103,6 +104,7 @@ function legacyLayout(): ResponsiveCombatHudLayout {
       taunt: point(808, 116),
       grenade: point(904, 116),
       ability: point(904, 208),
+      reload: point(808, 208),
     }),
   });
 }
@@ -186,6 +188,7 @@ export function responsiveCombatHudLayout(
       panel: rect(panelX, panelY, panelWidth, panelHeight),
     }),
     touchActions: Object.freeze({
+      reload: point(safe.right - 328, actionY),
       taunt: point(safe.right - 232, actionY),
       grenade: point(safe.right - 136, actionY),
       ability: point(safe.right - 40, actionY),

@@ -177,6 +177,62 @@ describe('MatchmakingManager Battle Royale queue', () => {
     expect(manager.handleJoinBattleRoyale('A', 'Alpha', 'mighty_man')).toBe(true);
   });
 
+  it('serializes BR inventory and drops additively while standard snapshots omit both fields', () => {
+    const battleRoyale = makeFakeServer(false, true);
+    const battleRoyaleManager = new MatchmakingManager(battleRoyale.fake);
+    battleRoyaleManager.handleJoinBattleRoyale('A', 'Alpha', 'mighty_man');
+    battleRoyaleManager.tick(BATTLE_ROYALE_QUEUE.BOT_FILL_DEADLINE_SECONDS, 1);
+    const [battleRoyaleMatch] = battleRoyaleManager.getActiveMatches();
+    battleRoyaleMatch.phase = MatchPhase.ACTIVE;
+    battleRoyaleMatch.spawnBattleRoyaleDroppedWeapon(
+      { instanceId: 'wire-drop', weaponId: 'smg', rarity: 'epic' },
+      17,
+      { x: 300, y: 300 },
+    );
+    battleRoyale.sent.length = 0;
+    battleRoyaleManager.tick(0.05, 2);
+    const battleRoyaleState = battleRoyale.sent.find(
+      ({ playerId, message }) => playerId === 'A' && message.type === 'server:gameState',
+    );
+    if (!battleRoyaleState || battleRoyaleState.message.type !== 'server:gameState') {
+      throw new Error('missing Battle Royale gameState');
+    }
+    expect(battleRoyaleState.message.players.find(({ id }) => id === 'A')).toMatchObject({
+      weaponId: 'punch',
+      battleRoyaleInventory: { equipped: null, loadedAmmo: 0, reserveAmmo: 0 },
+    });
+    expect(battleRoyaleState.message.droppedWeapons).toEqual([
+      {
+        id: 'br-drop:0',
+        position: { x: 300, y: 300 },
+        weaponInstance: { instanceId: 'wire-drop', weaponId: 'smg', rarity: 'epic' },
+        loadedAmmo: 17,
+      },
+    ]);
+
+    const standard = makeFakeServer();
+    const standardManager = new MatchmakingManager(standard.fake);
+    standardManager.handleJoinMatchmaking('A', 'Alpha');
+    standardManager.handleJoinMatchmaking('B', 'Bravo');
+    walkDraft(standardManager, standard.sent);
+    const [standardMatch] = standardManager.getActiveMatches();
+    standardMatch.phase = MatchPhase.ACTIVE;
+    standard.sent.length = 0;
+    standardManager.tick(0.05, 3);
+    const standardState = standard.sent.find(
+      ({ playerId, message }) => playerId === 'A' && message.type === 'server:gameState',
+    );
+    if (!standardState || standardState.message.type !== 'server:gameState') {
+      throw new Error('missing standard gameState');
+    }
+    expect(standardState.message.droppedWeapons).toBeUndefined();
+    expect(
+      standardState.message.players.every(
+        ({ battleRoyaleInventory }) => battleRoyaleInventory === undefined,
+      ),
+    ).toBe(true);
+  });
+
   it('protects duplicates and preserves the remaining deadline after cancel and disconnect', () => {
     const { fake, sent } = makeFakeServer(false, true);
     const manager = new MatchmakingManager(fake);

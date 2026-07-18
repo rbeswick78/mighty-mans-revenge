@@ -360,6 +360,8 @@ export interface ServerGameStateMessage {
   axes: AxeState[];
   /** Dormant Battle Royale launcher projectiles; absent on standard/old servers. */
   rockets?: RocketState[];
+  /** Server-owned Battle Royale ground guns; absent on standard/old servers. */
+  droppedWeapons?: import('./weapon.js').DroppedWeaponState[];
   bulletTrails: BulletTrail[];
   /** Environmental detonations resolved this snapshot (legacy wire name). */
   barrelExplosions: Vec2[];
@@ -455,6 +457,8 @@ export interface SerializedPlayerState {
   weaponId: WeaponId;
   /** Server-authored Battle Royale gun identity; absent in standard formats. */
   weaponInstance?: import('./weapon.js').WeaponInstance;
+  /** Server-owned one-gun inventory; absent in standard formats. */
+  battleRoyaleInventory?: import('./weapon.js').BattleRoyaleInventoryState;
   /** Special weapon's magazine (shells loaded). 0 while on the rifle. */
   specialAmmo: number;
   /** Special weapon's reserve shells. 0 while on the rifle. */

@@ -152,6 +152,12 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
         makeSerialized({
           weaponId: 'launcher',
           weaponInstance: instance,
+          battleRoyaleInventory: {
+            equipped: instance,
+            loadedAmmo: 1,
+            reserveAmmo: 14,
+            swapCandidateId: 'br-drop:42',
+          },
           specialAmmo: 1,
         }),
       ],
@@ -167,11 +173,29 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
             weaponInstance: instance,
           },
         ],
+        droppedWeapons: [
+          {
+            id: 'br-drop:42',
+            position: { x: 140, y: 100 },
+            weaponInstance: {
+              instanceId: 'weapon:ground:42',
+              weaponId: 'smg',
+              rarity: 'uncommon',
+            },
+            loadedAmmo: 8,
+          },
+        ],
       },
     );
     deliver(state);
     expect(manager.getLocalPlayerState()?.weaponInstance).toEqual(instance);
+    expect(manager.getLocalPlayerState()?.battleRoyaleInventory).toMatchObject({
+      loadedAmmo: 1,
+      reserveAmmo: 14,
+      swapCandidateId: 'br-drop:42',
+    });
     expect(manager.getActiveRockets()).toHaveLength(1);
+    expect(manager.getDroppedWeapons()).toHaveLength(1);
     expect(fired).toEqual([{ shooterId: LOCAL_ID, position: { x: 100, y: 100 } }]);
 
     deliver(state);
@@ -179,7 +203,9 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
 
     deliver(makeGameState([makeSerialized()]));
     expect(manager.getLocalPlayerState()?.weaponInstance).toBeUndefined();
+    expect(manager.getLocalPlayerState()?.battleRoyaleInventory).toBeUndefined();
     expect(manager.getActiveRockets()).toEqual([]);
+    expect(manager.getDroppedWeapons()).toEqual([]);
   });
 
   it('fails malformed additive weapon instances closed', () => {
@@ -192,6 +218,44 @@ describe('NetworkManager per-match state (stale characterId bug)', () => {
     deliver(malformed);
     expect(manager.getLocalPlayerState()?.weaponId).toBe('smg');
     expect(manager.getLocalPlayerState()?.weaponInstance).toBeUndefined();
+    expect(manager.getLocalPlayerState()?.battleRoyaleInventory).toBeUndefined();
+  });
+
+  it('fails an incoherent inventory and any malformed dropped-weapon array closed', () => {
+    const equipped = { instanceId: 'weapon:coherent:43', weaponId: 'smg', rarity: 'rare' } as const;
+    deliver(
+      makeGameState(
+        [
+          makeSerialized({
+            weaponId: 'smg',
+            weaponInstance: equipped,
+            battleRoyaleInventory: {
+              equipped: { ...equipped, weaponId: 'rifle' },
+              loadedAmmo: 4,
+              reserveAmmo: 8,
+            },
+          }),
+        ],
+        {
+          droppedWeapons: [
+            {
+              id: 'br-drop:valid',
+              position: { x: 0, y: 0 },
+              weaponInstance: equipped,
+              loadedAmmo: 4,
+            },
+            {
+              id: 'bad space',
+              position: { x: 1, y: 1 },
+              weaponInstance: equipped,
+              loadedAmmo: 1,
+            },
+          ],
+        },
+      ),
+    );
+    expect(manager.getLocalPlayerState()?.battleRoyaleInventory).toBeUndefined();
+    expect(manager.getDroppedWeapons()).toEqual([]);
   });
 
   it('keeps every capability disabled when an old server omits the advertisement', () => {

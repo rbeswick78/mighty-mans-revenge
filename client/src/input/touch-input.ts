@@ -27,6 +27,7 @@ const GRENADE_BUTTON_SIZE = 40;
 const GRENADE_BUTTON_MARGIN = 16;
 const ABILITY_BUTTON_SIZE = 40;
 const TAUNT_BUTTON_SIZE = 40;
+const RELOAD_BUTTON_SIZE = 40;
 const TAUNT_BUTTON_GAP = 16;
 /** Vertical gap between the grenade button (above) and the ability button. */
 const ABILITY_BUTTON_GAP = 12;
@@ -88,6 +89,11 @@ export class TouchInput {
   private tauntButton: Phaser.GameObjects.Arc;
   private tauntButtonText: Phaser.GameObjects.Text;
   private tauntButtonPressedFlag = false;
+  /** Battle Royale-only contextual reload/swap action. */
+  private reloadButton: Phaser.GameObjects.Arc;
+  private reloadButtonText: Phaser.GameObjects.Text;
+  private reloadButtonPressedFlag = false;
+  private battleRoyaleReloadContext = false;
   /** False when the current mode disables grenades and character abilities. */
   private secondaryActionsEnabled = true;
   /** Visible during COUNTDOWN, but unable to buffer combat input until FIGHT. */
@@ -215,6 +221,25 @@ export class TouchInput {
       this.tauntButtonPressedFlag = true;
     });
 
+    const reloadX = tauntX;
+    const reloadY = abilityY;
+    this.reloadButton = scene.add.circle(
+      reloadX,
+      reloadY,
+      RELOAD_BUTTON_SIZE,
+      Wasteland.TEXT_LOADING,
+      0.65,
+    );
+    placeOnScreen(this.reloadButton, screenPoint(reloadX, reloadY));
+    this.reloadButton.setDepth(3000).setVisible(false);
+    this.reloadButtonText = scene.add.text(reloadX, reloadY, 'RELOAD', ACTION_BUTTON_TEXT_STYLE);
+    this.reloadButtonText.setOrigin(0.5).setDepth(3001).setVisible(false);
+    placeOnScreen(this.reloadButtonText, screenPoint(reloadX, reloadY));
+    this.reloadButton.on('pointerdown', () => {
+      if (!this.gameplayEnabled || !this.battleRoyaleReloadContext) return;
+      this.reloadButtonPressedFlag = true;
+    });
+
     if (actionLayout) this.setLayout(actionLayout);
 
     scene.input.on('pointerdown', this.onPointerDown, this);
@@ -237,6 +262,8 @@ export class TouchInput {
     this.grenadeButtonText.setPosition(layout.grenade.x, layout.grenade.y);
     this.abilityButton.setPosition(layout.ability.x, layout.ability.y);
     this.abilityButtonText.setPosition(layout.ability.x, layout.ability.y);
+    this.reloadButton.setPosition(layout.reload.x, layout.reload.y);
+    this.reloadButtonText.setPosition(layout.reload.x, layout.reload.y);
   }
 
   getLayoutState(): ResponsiveCombatHudLayout['touchActions'] | null {
@@ -248,6 +275,7 @@ export class TouchInput {
       this.tauntButton.setVisible(true).setInteractive();
       this.tauntButtonText.setVisible(true);
     }
+    this.syncReloadButtonVisibility();
     if (this.grenadeButton.visible) return;
     if (this.secondaryActionsEnabled) {
       this.grenadeButton.setVisible(true);
@@ -257,6 +285,21 @@ export class TouchInput {
       this.abilityButtonText.setVisible(true);
       this.abilityButton.setInteractive();
     }
+  }
+
+  /** Keep the contextual action absent from every established format. */
+  setBattleRoyaleReloadContext(enabled: boolean): void {
+    this.battleRoyaleReloadContext = enabled;
+    if (!enabled) this.reloadButtonPressedFlag = false;
+    this.syncReloadButtonVisibility();
+  }
+
+  private syncReloadButtonVisibility(): void {
+    const visible = this.isTouch && this.battleRoyaleReloadContext;
+    this.reloadButton.setVisible(visible);
+    this.reloadButtonText.setVisible(visible);
+    if (visible) this.reloadButton.setInteractive();
+    else this.reloadButton.disableInteractive();
   }
 
   setSecondaryActionsEnabled(enabled: boolean): void {
@@ -285,6 +328,7 @@ export class TouchInput {
     this.grenadeButtonPressedWhileLive = false;
     this.abilityButtonPressedFlag = false;
     this.tauntButtonPressedFlag = false;
+    this.reloadButtonPressedFlag = false;
     this.rightStickReleasedFlag = false;
     this.sprintActive = false;
     this.deactivateJoystick(this.leftJoystick);
@@ -478,6 +522,8 @@ export class TouchInput {
     this.abilityButtonPressedFlag = false;
     const tauntPressed = this.tauntButtonPressedFlag;
     this.tauntButtonPressedFlag = false;
+    const reloadPressed = this.reloadButtonPressedFlag;
+    this.reloadButtonPressedFlag = false;
 
     return {
       moveX: moveVec.x,
@@ -489,7 +535,7 @@ export class TouchInput {
       throwPressed,
       detonatePressed,
       sprint: this.sprintActive,
-      reload: false, // Auto-reload on mobile; no explicit button.
+      reload: reloadPressed,
       abilityPressed,
       tauntPressed,
     };
@@ -526,5 +572,7 @@ export class TouchInput {
     this.abilityButtonText.destroy();
     this.tauntButton.destroy();
     this.tauntButtonText.destroy();
+    this.reloadButton.destroy();
+    this.reloadButtonText.destroy();
   }
 }
