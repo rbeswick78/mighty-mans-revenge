@@ -71,6 +71,10 @@ export class DroppedWeaponRenderer {
     }
   }
 
+  getRenderState(): Readonly<{ resourceCount: number }> {
+    return Object.freeze({ resourceCount: this.sprites.size });
+  }
+
   private createDrop(drop: DroppedWeaponState): RenderedDrop {
     const artId = liveReforgedGunArtId(drop.weaponInstance.weaponId);
     const modern = this.modernArtAvailable && artId !== null;

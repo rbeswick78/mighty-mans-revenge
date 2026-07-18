@@ -1152,3 +1152,26 @@ clear on capability/recovery loss, and render an explicit zero state without
 merging Results or local storage. Batch 50 owns network/performance hardening.
 Every capability remains default false and unexposed, and no deployment,
 restart, or live smoke is authorized.
+
+## Battle Royale Performance Contract
+
+Batch 50 keeps simulation authority on the server while bounding the
+eight-entrant hot path. The deterministic stress fixture covers fighters, bots,
+projectiles, authored containers, loose loot, supply bundles, safe-zone state,
+transient combat effects, spectator projection, snapshot construction, full
+human fanout, settled heap, and terminal cleanup. Its fail-closed ceilings are
+the existing 50 ms tick budget, 64 KiB per encoded snapshot, 10 MiB/s aggregate
+eight-recipient traffic at 20 Hz, and 32 MiB settled heap growth.
+
+`RealtimeServer.sendToMany()` serializes a message lazily and at most once for
+all connected recipients while preserving the established reliable/unreliable
+transport semantics. Bot-only recipient sets do not allocate a payload. This is
+only an encoding/fanout optimization; every snapshot is still produced from
+authoritative server state and clients remain pure projections.
+
+Renderer performance diagnostics are read-only counts. The existing quality
+governor may reduce cosmetic pools and lighting only after sustained slow-frame
+pressure; isolated host/debug stalls do not switch tiers. It never changes
+fighters, hitboxes, projectiles, loot, zones, input, or match outcomes. Standard
+snapshots retain their exact wire bytes, every capability remains default false
+and unexposed, and no deployment, restart, or live smoke is authorized.

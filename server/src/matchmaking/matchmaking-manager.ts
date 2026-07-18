@@ -2600,10 +2600,10 @@ export class MatchmakingManager {
       scrapstorm: match.getScrapstormState() ?? undefined,
     };
 
-    // Send only to players in this match
-    for (const [playerId] of match.players) {
-      this.server.sendTo(playerId, stateMessage);
-    }
+    // The snapshot is immutable and identical for every participant. Encode
+    // once in GameServer, then fan the same bytes out to connected humans;
+    // bot ids remain silent recipients with no channel.
+    this.server.sendToMany(match.players.keys(), stateMessage);
 
     // Broadcast each kill recorded this tick. The client uses these for
     // kill-feed entries and per-side kill/death SFX.

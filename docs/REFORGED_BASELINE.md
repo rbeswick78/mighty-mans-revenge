@@ -791,3 +791,37 @@ The final authoritative baseline retained configured/rolling 20 Hz and the
 processing remained 0.070 ms; no product tick-budget defect was proven. All
 capabilities remain default false and unexposed; production remains on Batch 33
 and no deployment, restart, or live smoke occurred.
+
+### Batch 50 Battle Royale performance baseline
+
+The deterministic eight-entrant stress harness exercises four humans, four
+bots, eight fighters, concurrent grenades and rockets, sixteen authored
+containers, loose weapons, supply bundles, safe-zone state, transient combat
+effects, spectator projection, snapshot construction, full-human fanout,
+settled heap, and terminal cleanup. It fails closed against the existing 50 ms
+tick budget plus additive 64 KiB snapshot, 10 MiB/s aggregate-traffic, and
+32 MiB settled-heap-growth regression ceilings.
+
+The final GC-enabled sample recorded synthetic mean/p95/p99/max work of
+0.198/0.374/0.595/8.573 ms. Representative/stressed snapshots measured
+13,961/17,948 bytes; stressed 20 Hz traffic measured 358,960 bytes/s per client
+and 2,871,680 bytes/s across eight recipients. One encoding produced all eight
+human deliveries, while bot-only fanout produced none. Settled heap grew
+340,680 bytes after warmup and cleanup left zero active matches. The ordinary
+baseline retained configured/rolling 20 Hz, the 50 ms budget, and exact
+2,481/3,762-byte two/four-player active snapshots.
+
+Focused desktop Chromium and mobile-landscape evidence rendered exact stressed
+object counts and bounded cosmetic resources. The slow headless software
+renderer entered the documented reduced tier without moving gameplay state or
+decisive objects out of the server-owned projection. Desktop Chromium supplied
+the inspected readable pixels; the mobile WebKit compositor remained black
+under RFG-003 and therefore supplied object/state evidence only.
+
+The complete unit matrix passed 550 suites and 1,764 tests. Typecheck, ESLint,
+all production builds, focused browser evidence, deterministic baseline, and
+the unchanged 624-product standard balance matrix passed. RFG-007 closed the
+quality-governor blind spot for sustained deltas above 250 ms while retaining
+isolated-stall hysteresis. All capabilities remain default false and unexposed;
+production remains on Batch 33 and no deployment, restart, or live smoke
+occurred.

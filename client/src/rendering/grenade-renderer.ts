@@ -31,12 +31,13 @@ export class GrenadeRenderer {
       }
 
       if (g.isDeathBomb) {
-        const urgency = 1 - Math.min(
-          1,
-          Math.max(0, g.safetyFuseTimer) / MUTATORS.LAST_LAUGH_FUSE_SECONDS,
-        );
+        const urgency =
+          1 - Math.min(1, Math.max(0, g.safetyFuseTimer) / MUTATORS.LAST_LAUGH_FUSE_SECONDS);
         const pulse = 1.05 + Math.sin(this.scene.time.now * (0.012 + urgency * 0.02)) * 0.22;
-        sprite.setTint(0xff3b30).setScale(pulse).setAlpha(0.85 + urgency * 0.15);
+        sprite
+          .setTint(0xff3b30)
+          .setScale(pulse)
+          .setAlpha(0.85 + urgency * 0.15);
       } else {
         sprite.clearTint().setScale(1).setAlpha(1);
       }
@@ -50,6 +51,10 @@ export class GrenadeRenderer {
         this.sprites.delete(id);
       }
     }
+  }
+
+  getRenderState(): Readonly<{ resourceCount: number }> {
+    return Object.freeze({ resourceCount: this.sprites.size });
   }
 
   destroy(): void {

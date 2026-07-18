@@ -194,7 +194,7 @@ export class WorldRenderQualityController {
   private fastSamples = 0;
 
   sampleFrame(deltaMs: number): WorldRenderQualityTier {
-    if (!Number.isFinite(deltaMs) || deltaMs <= 0 || deltaMs > 250) return this.tier;
+    if (!Number.isFinite(deltaMs) || deltaMs <= 0) return this.tier;
     if (this.tier === 'full') {
       this.fastSamples = 0;
       this.slowSamples = deltaMs >= REDUCE_FRAME_MS ? this.slowSamples + 1 : 0;

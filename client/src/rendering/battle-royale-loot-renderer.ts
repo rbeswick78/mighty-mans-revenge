@@ -36,6 +36,10 @@ export class BattleRoyaleLootRenderer {
     this.updateSupplies(supplies);
   }
 
+  getRenderState(): Readonly<{ containers: number; supplies: number }> {
+    return Object.freeze({ containers: this.containers.size, supplies: this.supplies.size });
+  }
+
   private updateContainers(states: readonly BattleRoyaleContainerState[]): void {
     const active = new Set<string>();
     for (const state of states) {

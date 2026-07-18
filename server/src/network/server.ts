@@ -163,19 +163,33 @@ export class GameServer {
    * should stay unreliable so we don't retransmit stale data.
    */
   sendTo(playerId: PlayerId, message: ServerMessage, opts?: { reliable?: boolean }): void {
-    const channel = this.channels.get(playerId);
-    if (!channel) {
-      // Server-controlled practice players intentionally have no data
-      // channel. Matchmaking broadcasts through the same N-player loops;
-      // quietly discard their outbound copies instead of warning at 20 Hz.
-      if (playerId.startsWith(BOT.PLAYER_ID_PREFIX)) return;
-      logger.warn({ playerId, type: message.type }, 'Cannot send to unknown player');
-      return;
-    }
-    if (opts?.reliable) {
-      channel.emit('message', JSON.stringify(message), { reliable: true });
-    } else {
-      channel.emit('message', JSON.stringify(message));
+    this.sendToMany([playerId], message, opts);
+  }
+
+  /**
+   * Fan one immutable message out with a single JSON encoding. Per-tick match
+   * snapshots are identical for every recipient, so serializing once avoids
+   * multiplying the hottest network allocation by an eight-player lobby.
+   */
+  sendToMany(
+    playerIds: Iterable<PlayerId>,
+    message: ServerMessage,
+    opts?: { reliable?: boolean },
+  ): void {
+    let payload: string | null = null;
+    for (const playerId of playerIds) {
+      const channel = this.channels.get(playerId);
+      if (!channel) {
+        // Server-controlled practice players intentionally have no data
+        // channel. Matchmaking broadcasts through the same N-player loops;
+        // quietly discard their outbound copies instead of warning at 20 Hz.
+        if (playerId.startsWith(BOT.PLAYER_ID_PREFIX)) continue;
+        logger.warn({ playerId, type: message.type }, 'Cannot send to unknown player');
+        continue;
+      }
+      payload ??= JSON.stringify(message);
+      if (opts?.reliable) channel.emit('message', payload, { reliable: true });
+      else channel.emit('message', payload);
     }
   }
 

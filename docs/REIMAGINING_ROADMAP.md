@@ -5,12 +5,12 @@ Read this file and `CLAUDE.md` completely at the start of every batch. The
 completed `docs/REPLAYABILITY_ROADMAP.md` remains the historical record for the
 systems this program preserves and reorganizes.
 
-- **Status:** Batch 49 Battle Royale records completed on 2026-07-18;
+- **Status:** Batch 50 Battle Royale performance hardening completed on 2026-07-18;
   the format remains dormant and every capability remains default false.
-- **Next step:** Batch 50 network and performance hardening under the user's standing
-  authorization to continue sequentially through the plan while deferring human
-  involvement. The deferred Batch 39 human release walkthrough still does not
-  authorize deployment, capability exposure, production restart, or live smoke.
+- **Next step:** Batch 51 automated Battle Royale release gate under the user's
+  standing authorization to continue sequentially while deferring human
+  involvement. Human playtests, capability exposure, deployment, production
+  restart, and live smoke remain explicitly unauthorized and must stay deferred.
 - **Public releases:** Reforged Arena, then Battle Royale.
 - **Working model:** one numbered batch per session, direct commits and pushes
   to `main`, milestone-gated production deployments.
@@ -204,9 +204,9 @@ Production deployment happens only at a gate or for an urgent live fix.
 |  45 | Four-biome arena                       | Battle Royale | Complete (2026-07-18) |
 |  46 | Safe-zone phases                       | Battle Royale | Complete (2026-07-18) |
 |  47 | Battle Royale bots                     | Battle Royale | Complete (2026-07-18) |
-|  48 | Spectating                             | Battle Royale | Pending               |
-|  49 | Battle Royale records                  | Battle Royale | Pending               |
-|  50 | Network and performance hardening      | Battle Royale | Pending               |
+|  48 | Spectating                             | Battle Royale | **DONE — 2026-07-18** |
+|  49 | Battle Royale records                  | Battle Royale | **DONE — 2026-07-18** |
+|  50 | Network and performance hardening      | Battle Royale | **DONE — 2026-07-18** |
 |  51 | Battle Royale release gate             | Battle Royale | Pending               |
 |  52 | Production rollout                     | Rollout       | Pending               |
 |  53 | Visionary/tester response              | Rollout       | Pending               |
@@ -1861,6 +1861,54 @@ Profile eight fighters, bots, projectiles, containers, loot, zones, effects,
 snapshot traffic, tick time, memory, and frame pacing; optimize without moving
 authority client-side.
 
+**Verification tier selected before implementation (2026-07-18):**
+cross-cutting authoritative simulation, snapshot/network serialization, memory,
+and desktop/mobile rendering performance. Batch 50 can affect every Battle
+Royale snapshot consumer and the eight-entrant hot path, so required evidence is
+a deterministic server-side eight-fighter stress profile covering bots,
+projectiles, containers, loose loot, safe zones, and terminal cleanup; encoded
+snapshot and aggregate 20 Hz traffic measurements; tick distributions against
+the existing 50 ms authority budget; warm/settled heap measurements; focused
+performance-contract unit tests; the complete unit suite; typecheck, lint, all
+production builds; targeted desktop Chromium and mobile-landscape Battle Royale
+frame-pacing/object-budget evidence; the authoritative standard baseline; and
+the unchanged standard balance matrix. Existing 60 FPS/full-quality or
+documented reduced-quality behavior remains the client criterion. Network and
+memory measurements establish deterministic regression ceilings without
+weakening authority or inventing a production-device claim. The complete
+three-project Playwright matrix remains reserved for the Batch 51 release gate
+unless focused evidence reveals broader coupling.
+
+Acceptance:
+
+- [x] One reproducible eight-entrant Battle Royale profile exercises human and
+      bot simulation, concurrent projectiles, authored containers, loose loot,
+      moving safe-zone state, combat effects, snapshot construction, and
+      terminal cleanup without client-authored gameplay state.
+- [x] Synthetic tick mean/p95/p99/max remain inside the existing authoritative
+      50 ms tick budget, and live-loop evidence reports configured/effective
+      rate plus processing time without disguising host scheduling stalls.
+- [x] UTF-8 snapshot bytes and 20 Hz per-client/eight-recipient traffic are
+      measured for representative and stressed states. Optional Battle Royale
+      fields remain capability-owned and standard two/four-player snapshot
+      byte baselines remain exact.
+- [x] Warm and settled heap evidence covers sustained eight-fighter simulation
+      plus cleanup; retained state is bounded and no per-tick persistence or
+      blocking I/O enters the simulation loop.
+- [x] Desktop Chromium and mobile-landscape evidence records frame pacing,
+      active quality tier, rendered fighters/projectiles/loot/zones/effects,
+      and bounded renderer resources. Slow-frame pressure still degrades only
+      cosmetic budgets and never gameplay authority or decisive readability.
+- [x] Any optimization is deterministic, additive, N-player-safe, old-client/
+      old-server compatible, and preserves exact Battle Royale lifecycle,
+      queue, loot, zone, bot, spectator, Results, and records behavior.
+- [x] Standard Duel/Rumble/Crew/Practice, all eight modes, rematches, overtime,
+      standard stats, wire fallback, input, presentation, persistence, balance,
+      and production configuration remain behavior-compatible.
+- [x] Capabilities remain strict server-owned opt-ins and default false. No
+      capability exposure, deployment, production restart, or live smoke is
+      performed.
+
 #### Batch 51 — Battle Royale release gate
 
 Run the complete gate above, insert/fix blockers, deploy server-first, enable
@@ -1953,6 +2001,7 @@ test frequency, not acceptance coverage or release quality gates.
 | RFG-004 | 2026-07-17 | After all-six-arena coherent play, literal `largeWorlds:false` reported legacy viewport truth but retained the prior 1920x1152 minimap and landmarks.                                                                                        | Batch 39      | Resolved narrowly inside the completed fallback contract by clearing `GameScene.minimapRenderer` in `init()`. The strict all-six reproduction, complete enabled inventory, and RFG-003 paired evidence pass with `minimap: null` preserved.                   | Resolved           |
 | RFG-005 | 2026-07-18 | In a three-plus-fighter Battle Royale, an uncredited self-explosion marked the victim dead but did not append the lifecycle elimination, so terminal placement could stall.                                                                  | Batches 40/43 | Resolved at the existing authoritative explosion-death branch by recording the combat elimination and clearing the one-slot inventory. A deterministic three-fighter launcher/wall reproduction proves the lifecycle advances without awarding a kill.        | Resolved           |
 | RFG-006 | 2026-07-18 | The Battle Royale mobile reload browser fixture divided touch coordinates by the dormant 1280-wide viewport while `largeWorlds:false` correctly retained the 960-wide canvas, delivering Phaser x≈606 instead of the visible button's x=808. | Batches 43/44 | Resolved in the fixture by deriving logical width/height from the active Phaser scale manager and proving the delivered touch pointer is within two logical pixels of the rendered control. Product input code and capability defaults were unchanged.        | Resolved           |
+| RFG-007 | 2026-07-18 | The cosmetic quality governor discarded every frame sample above 250 ms, so sustained severe rendering pressure could never enter the documented reduced-effects tier.                                                                       | Batch 50      | Resolved by rejecting only non-finite/non-positive deltas. One isolated 300 ms host/debug stall retains full quality, while 30 sustained 300 ms samples cross the existing hysteresis and enter the cosmetic-only reduced tier.                               | Resolved           |
 
 ## End-of-batch ritual
 
@@ -4660,6 +4709,71 @@ next isolated pair without a code correction.
 opt-ins, default false, and unexposed. Proceed only to Batch 50 under the user's
 standing direct-development authorization. Capability exposure, deployment,
 production restart, and live smoke remain explicitly unauthorized.
+
+### Batch 50 - 2026-07-18 - Network and performance hardening
+
+**Scope and tier:** Before runtime work, the cross-cutting authoritative
+simulation, network serialization, memory, and desktop/mobile rendering tier
+was selected and documented. The batch profiled the complete eight-entrant hot
+path and made only two bounded optimizations: one encoded snapshot is now
+shared across a validated recipient fanout, and sustained severe frame pressure
+can reach the existing cosmetic-only reduced tier. Authority, lifecycle,
+mechanics, persistence, and capability ownership did not move client-side.
+
+**Server evidence:** The reproducible fixture ran four humans plus four bots on
+Shatterlands for 300 warmup and 3,000 sampled ticks with eight fighters, eight
+grenades, six rockets, sixteen containers, eight loose drops, eight supply
+bundles, one safe zone, transient trails/effects, eight spectator entries, and
+terminal cleanup. Synthetic mean/p95/p99/max work was
+0.198/0.374/0.595/8.573 ms against the 50 ms budget. The live loop reported
+configured and rolling 20 Hz, 15.989 effective host-wall-clock Hz after one
+reported scheduler drift reset, and 0.553 ms average processing.
+
+Representative/stressed snapshots were 13,961/17,948 UTF-8 bytes against the
+65,536-byte ceiling. At 20 Hz, stressed traffic was 358,960 bytes/s per client
+and 2,871,680 bytes/s across eight recipients against the 10,485,760-byte/s
+aggregate ceiling. Full-human fanout proved eight deliveries from one encoding;
+all-bot fanout performs no encoding. With exposed GC, warmed/settled heap was
+13,187,288/13,527,968 bytes, 340,680 bytes growth against the 33,554,432-byte
+ceiling, and terminal cleanup left no active match. Standard two/four-player
+snapshots remained exactly 2,481/3,762 bytes.
+
+**Client evidence:** Read-only renderer diagnostics expose only projection and
+resource counts. Focused desktop Chromium and mobile-landscape journeys passed
+in 55.8 seconds with all eight fighters, eight grenades, six rockets, twelve
+drops, sixteen containers, eight supplies, one zone, and active combat effects.
+Headless desktop software rendering sustained roughly 2.833 FPS and correctly
+entered reduced quality; mobile landscape sustained roughly 24.423 FPS and
+also entered reduced quality. Both retained exact object counts and bounded
+16-item combat-effect/resource pools. Desktop Chromium supplied a readable
+inspected compositor artifact. The known mobile WebKit black compositor frame
+remains covered by RFG-003, so its passing object/state evidence was not treated
+as trusted pixels.
+
+**Verification:** Focused performance, fanout, quality-governor, and complete
+matchmaking coverage passed. The complete unit matrix passed 550 suites and
+1,764 tests with no skips. Typecheck, ESLint, server/shared TypeScript builds,
+the 232-module production client build, deterministic server baseline, and the
+unchanged 624-product standard balance matrix passed. The client retained the
+inherited large-chunk warning. The formatted Batch 50 allowlist and
+`git diff --check` passed. The complete three-project Playwright matrix remains
+owned by Batch 51 as selected before implementation.
+
+**Bug ledger:** RFG-007 was reproduced and resolved inside this owning batch.
+The governor previously ignored every sample above 250 ms. It now ignores only
+invalid deltas: one isolated 300 ms host/debug stall remains full quality, while
+30 sustained 300 ms samples cross the existing hysteresis into reduced quality.
+Initial browser failures were fixture-only invalid-roster, capacity-expectation,
+and staged-connection errors and passed after fixture corrections without
+product changes. RFG-003 remains gate-dispositioned and unchanged.
+
+**Deployment and disposition:** Skipped. Production remains on approved Batch
+33 commit `f39eb34131f8827f85432aafcc6d6c18a2d0ac51`; `newShell`, `schedules`,
+`largeWorlds`, `modernArt`, and `battleRoyale` remain strict server-owned
+opt-ins, default false, and unexposed. Proceed only to the Batch 51 automated
+gate under the user's standing direct-development authorization. Human
+playtests, capability exposure, deployment, production restart, and live smoke
+remain explicitly unauthorized and deferred.
 
 ## Batch 22 input prompt (historical)
 

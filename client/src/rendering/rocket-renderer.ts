@@ -39,6 +39,10 @@ export class RocketRenderer {
     }
   }
 
+  getRenderState(): Readonly<{ resourceCount: number }> {
+    return Object.freeze({ resourceCount: this.sprites.size });
+  }
+
   destroy(): void {
     for (const graphic of this.sprites.values()) graphic.destroy();
     this.sprites.clear();

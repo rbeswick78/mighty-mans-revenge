@@ -1503,6 +1503,32 @@ export class GameScene extends Phaser.Scene {
     return this.battleRoyaleSpectatorOverlay?.getRenderState() ?? null;
   }
 
+  /** Read-only Batch 50 browser profiling seam; gameplay remains server-owned. */
+  getBattleRoyalePerformanceRenderState(): Readonly<{
+    fighters: number;
+    grenades: number;
+    rockets: number;
+    droppedWeapons: number;
+    containers: number;
+    supplies: number;
+    safeZoneVisible: boolean;
+    combatFeedback: ReturnType<ReforgedCombatFeedbackRenderer['getRenderState']> | null;
+    quality: ReturnType<WorldRenderQualityController['getBudget']>;
+  }> {
+    const loot = this.battleRoyaleLootRenderer?.getRenderState();
+    return Object.freeze({
+      fighters: this.playerManager?.getReforgedArtStates().length ?? 0,
+      grenades: this.grenadeRenderer?.getRenderState().resourceCount ?? 0,
+      rockets: this.rocketRenderer?.getRenderState().resourceCount ?? 0,
+      droppedWeapons: this.droppedWeaponRenderer?.getRenderState().resourceCount ?? 0,
+      containers: loot?.containers ?? 0,
+      supplies: loot?.supplies ?? 0,
+      safeZoneVisible: this.battleRoyaleSafeZoneRenderer?.getRenderState().visible ?? false,
+      combatFeedback: this.reforgedCombatFeedback?.getRenderState() ?? null,
+      quality: this.worldRenderQuality.getBudget(),
+    });
+  }
+
   getCameraController(): CameraController | null {
     return this.cameraController;
   }

@@ -8,7 +8,8 @@
     "start": "node dist/index.js",
     "test": "vitest run",
     "baseline:evidence": "tsx src/tools/baseline-evidence.ts",
-    "reforged:balance": "tsx src/tools/reforged-balance-evidence.ts"
+    "reforged:balance": "tsx src/tools/reforged-balance-evidence.ts",
+    "reforged:battle-royale-performance": "node --expose-gc --import tsx src/tools/battle-royale-performance-evidence.ts"
   },
   "dependencies": {
     "@shared/game": "workspace:*",

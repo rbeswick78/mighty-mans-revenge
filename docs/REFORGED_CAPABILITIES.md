@@ -571,3 +571,23 @@ This remains dormant support code. `battleRoyale`, `newShell`, `schedules`,
 false, and unexposed. Batch 50 owns network/performance hardening. Production
 remains on approved Batch 33, and no deployment, restart, live smoke, or
 capability advertisement is authorized.
+
+## Batch 50 network/performance disposition
+
+Batch 50 does not add, expose, or alter a capability. The server still creates
+every Battle Royale state transition and snapshot. Its additive fanout helper
+only reuses one serialized payload across connected recipients and performs no
+encoding for bot-only recipient sets; it cannot change recipients, reliability,
+simulation, lifecycle, or persistence.
+
+Client diagnostics report read-only renderer/resource counts, and the quality
+governor changes only cosmetic budgets after sustained slow-frame pressure.
+Fighters, hitboxes, projectiles, loot, zones, inputs, and outcomes remain
+server-owned. Standard snapshots retain their established exact byte baselines,
+and old clients/servers continue to omit or ignore Battle Royale-only fields.
+
+This remains dormant support code. `battleRoyale`, `newShell`, `schedules`,
+`largeWorlds`, and `modernArt` remain strict server-owned opt-ins, default
+false, and unexposed. Batch 51 owns the automated release gate; human playtests,
+capability exposure, deployment, production restart, and live smoke remain
+explicitly unauthorized and deferred. Production remains on approved Batch 33.

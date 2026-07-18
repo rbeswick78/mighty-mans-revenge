@@ -66,7 +66,7 @@ describe('dynamic world rendering', () => {
     );
   });
 
-  it('uses hysteretic quality budgets and ignores host-scale stalls', () => {
+  it('uses hysteretic quality budgets and reduces after sustained host-scale stalls', () => {
     expect(Object.isFrozen(WORLD_RENDER_QUALITY_BUDGETS)).toBe(true);
     expect(Object.isFrozen(WORLD_RENDER_QUALITY_BUDGETS.full)).toBe(true);
     expect(Object.isFrozen(WORLD_RENDER_QUALITY_BUDGETS.reduced)).toBe(true);
@@ -86,6 +86,13 @@ describe('dynamic world rendering', () => {
     expect(quality.getBudget()).toBe(WORLD_RENDER_QUALITY_BUDGETS.reduced);
     for (let i = 0; i < 240; i++) quality.sampleFrame(16);
     expect(quality.getBudget()).toBe(WORLD_RENDER_QUALITY_BUDGETS.full);
+
+    // One debugger/host pause cannot change quality, but a sustained severe
+    // slowdown must not remain in the full cosmetic tier forever.
+    quality.sampleFrame(300);
+    expect(quality.getBudget()).toBe(WORLD_RENDER_QUALITY_BUDGETS.full);
+    for (let i = 1; i < 30; i++) quality.sampleFrame(300);
+    expect(quality.getBudget()).toBe(WORLD_RENDER_QUALITY_BUDGETS.reduced);
   });
 
   it('reuses pooled slots deterministically at exhaustion and after cleanup', () => {

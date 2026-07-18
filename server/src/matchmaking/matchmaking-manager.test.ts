@@ -51,6 +51,13 @@ function makeFakeServer(largeWorlds = false, battleRoyale = false) {
     sendTo: vi.fn((playerId: PlayerId, message: ServerMessage, opts?: { reliable?: boolean }) => {
       sent.push({ playerId, message, reliable: !!opts?.reliable });
     }),
+    sendToMany: vi.fn(
+      (playerIds: Iterable<PlayerId>, message: ServerMessage, opts?: { reliable?: boolean }) => {
+        for (const playerId of playerIds) {
+          sent.push({ playerId, message, reliable: !!opts?.reliable });
+        }
+      },
+    ),
     getConnectedPlayerIds: vi.fn(() => [...connected]),
     getCapabilities: vi.fn(() => ({ largeWorlds, battleRoyale })),
     playerCount: 2,
