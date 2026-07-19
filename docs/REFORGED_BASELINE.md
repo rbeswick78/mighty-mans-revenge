@@ -825,3 +825,36 @@ quality-governor blind spot for sustained deltas above 250 ms while retaining
 isolated-stall hysteresis. All capabilities remain default false and unexposed;
 production remains on Batch 33 and no deployment, restart, or live smoke
 occurred.
+
+### Batch 51 Battle Royale automated release baseline
+
+The complete cumulative gate passed 550 suites and 1,764 tests, all 13
+compatible map documents, the strict Shatterlands profile, four map CLI tests,
+30 asset-pipeline tests, typecheck, ESLint, all production builds, and the
+unchanged 624-product standard balance matrix. Standard active snapshots remain
+exactly 2,481/3,762 bytes. The final ordinary baseline retained configured and
+rolling 20 Hz, the 50 ms authority budget, 0.068 ms average live processing,
+and 0.014/0.029/0.078/0.789 ms synthetic mean/p95/p99/max work. One host
+scheduler drift reset did not prove a processing-budget defect.
+
+The repeated eight-entrant profile measured 0.274/0.482/0.907/4.473 ms
+mean/p95/p99/max tick work, 13,551/17,892-byte representative/stressed
+snapshots, 357,840 bytes/s per client, 2,862,720 bytes/s for eight recipients,
+one encoding for all eight deliveries, 404,720 bytes settled heap growth, and
+zero active matches after cleanup. Every value remains within the existing
+50 ms, 64 KiB, 10 MiB/s, and 32 MiB fail-closed ceilings.
+
+The default-false and coherent test-only browser inventories each exercised
+279 cases across desktop Chromium, desktop Firefox, and mobile landscape. The
+final coherent run passed 203 tests with 75 intentional skips. Stale
+hidden-reload and scene-transition fixture assumptions were corrected; focused
+post-correction evidence passed across all three projects. Isolated long-run
+Firefox pointer, Chromium Party click, and Chromium synthetic reload-key flakes
+each passed fresh focused reproduction and did not prove product defects.
+Chromium remains the trusted pixel source; native headless WebKit black output
+retains RFG-003's paired object/input disposition.
+
+No runtime, authority, wire, balance, persistence, production configuration,
+or capability changed. Human and production release checks remain held, every
+capability remains default false and unexposed, and production remains on Batch
+33 without deployment, restart, health probe, or live smoke.

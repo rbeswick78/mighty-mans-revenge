@@ -1318,6 +1318,26 @@ test('capability-off and old-server gameplay retain the exact legacy surface', a
   test.skip(largeWorldsAdvertised, 'This invocation explicitly advertises large-world gameplay.');
   await stageGameplay(page, false);
 
+  expect(
+    await page.evaluate(() => {
+      const scene = (window as unknown as { game?: Phaser.Game }).game?.scene.getScene(
+        'GameScene',
+      ) as unknown as {
+        inputManager: {
+          touchInput: {
+            reloadButton: Phaser.GameObjects.Arc;
+            reloadButtonText: Phaser.GameObjects.Text;
+          };
+        };
+      };
+      return {
+        buttonVisible: scene.inputManager.touchInput.reloadButton.visible,
+        labelVisible: scene.inputManager.touchInput.reloadButtonText.visible,
+        interactive: scene.inputManager.touchInput.reloadButton.input?.enabled ?? false,
+      };
+    }),
+  ).toEqual({ buttonVisible: false, labelVisible: false, interactive: false });
+
   expect(await viewportSnapshot(page)).toEqual({
     scale: [960, 720],
     mode: 'legacy',
@@ -1349,6 +1369,7 @@ test('capability-off and old-server gameplay retain the exact legacy surface', a
         taunt: { x: 808, y: 116 },
         grenade: { x: 904, y: 116 },
         ability: { x: 904, y: 208 },
+        reload: { x: 808, y: 208 },
       },
     },
     dynamic: {

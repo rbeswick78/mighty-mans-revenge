@@ -591,3 +591,25 @@ This remains dormant support code. `battleRoyale`, `newShell`, `schedules`,
 false, and unexposed. Batch 51 owns the automated release gate; human playtests,
 capability exposure, deployment, production restart, and live smoke remain
 explicitly unauthorized and deferred. Production remains on approved Batch 33.
+
+## Batch 51 automated release-gate disposition
+
+Batch 51 adds or exposes no capability. The complete local gate validated the
+cumulative dormant Battle Royale path and the exact standard rollback path
+without changing shared defaults, server environment ownership, welcome
+advertisement, matchmaking access, or production configuration. The only code
+changes are browser-fixture evidence for Batch 44's hidden reload control and a
+transition-safe probe that follows whichever server-owned scene currently owns
+touch input during capability negotiation.
+
+Shared normalization still supplies literal false for `newShell`, `schedules`,
+`largeWorlds`, `modernArt`, and `battleRoyale`. The server still advertises each
+only for an exact corresponding `'true'` environment value. The coherent
+enabled matrix used those values only inside isolated local Playwright server
+processes; it did not modify a checked-in or production environment.
+
+The automated release-candidate gate is complete, but release actions are not.
+Human 6–8 minute, real-device, and real multi-client sign-off plus capability
+exposure, deployment, restart, production-health verification, and live smoke
+remain **HELD — NOT AUTHORIZED**. Production remains on approved Batch 33 commit
+`f39eb34131f8827f85432aafcc6d6c18a2d0ac51`.

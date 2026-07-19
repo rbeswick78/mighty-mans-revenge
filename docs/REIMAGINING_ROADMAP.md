@@ -5,12 +5,13 @@ Read this file and `CLAUDE.md` completely at the start of every batch. The
 completed `docs/REPLAYABILITY_ROADMAP.md` remains the historical record for the
 systems this program preserves and reorganizes.
 
-- **Status:** Batch 50 Battle Royale performance hardening completed on 2026-07-18;
-  the format remains dormant and every capability remains default false.
-- **Next step:** Batch 51 automated Battle Royale release gate under the user's
-  standing authorization to continue sequentially while deferring human
-  involvement. Human playtests, capability exposure, deployment, production
-  restart, and live smoke remain explicitly unauthorized and must stay deferred.
+- **Status:** Batch 51's automated Battle Royale release gate completed on
+  2026-07-18; the format remains dormant and every capability remains default
+  false.
+- **Next step:** Hold at the release boundary. Batch 52 requires human/release
+  authorization for real-device and multi-client playtests, capability
+  exposure, deployment, production restart, production health, and live smoke.
+  None is authorized by the Batch 42–51 direct-development approval.
 - **Public releases:** Reforged Arena, then Battle Royale.
 - **Working model:** one numbered batch per session, direct commits and pushes
   to `main`, milestone-gated production deployments.
@@ -207,7 +208,7 @@ Production deployment happens only at a gate or for an urgent live fix.
 |  48 | Spectating                             | Battle Royale | **DONE — 2026-07-18** |
 |  49 | Battle Royale records                  | Battle Royale | **DONE — 2026-07-18** |
 |  50 | Network and performance hardening      | Battle Royale | **DONE — 2026-07-18** |
-|  51 | Battle Royale release gate             | Battle Royale | Pending               |
+|  51 | Battle Royale release gate             | Battle Royale | **DONE — 2026-07-18** |
 |  52 | Production rollout                     | Rollout       | Pending               |
 |  53 | Visionary/tester response              | Rollout       | Pending               |
 |  54 | Legacy cleanup                         | Rollout       | Pending               |
@@ -1913,6 +1914,45 @@ Acceptance:
 
 Run the complete gate above, insert/fix blockers, deploy server-first, enable
 the capability, and complete production health plus live match smokes.
+
+**Verification tier selected before gate execution (2026-07-18):** complete
+Battle Royale milestone matrix. Because Batch 51 is a release gate, required
+local evidence is every deterministic map, asset, lifecycle, queue, loot,
+rarity, inventory, zone, bot, spectator, Results, persistence, performance,
+standard-compatibility, unit/integration, typecheck, lint, production-build,
+format/diff, and complete desktop-Chromium/desktop-Firefox/mobile-landscape
+browser check. The gate must also audit capability defaults and production
+configuration. RFG-003 retains its established paired-evidence disposition.
+
+The user's explicit production constraints split execution at the authorization
+boundary: human playtests, capability exposure, server/client deployment,
+production restart, production-health checks, and live match smokes are release
+actions and remain deferred. They may be documented as held requirements but
+must not be simulated, marked complete, or used to weaken the automated gate.
+
+Acceptance:
+
+- [x] Complete deterministic queue/lifecycle/loot/zone/bot/spectator/Results/
+      records integration and compatibility matrices pass for one-human-plus-
+      bots, partial-human, and full-eight-human shapes.
+- [x] Shatterlands passes strict authoring, connectivity, spawn-safety,
+      navigability, biome, container, minimap, and tactical-map evidence.
+- [x] Eight-fighter tick, network, memory, cleanup, and desktop/mobile cosmetic
+      quality budgets pass without moving authority client-side.
+- [x] The complete unit inventory, typecheck, lint, all production builds,
+      asset/map validators, baseline/balance/performance harnesses, formatter,
+      and `git diff --check` pass.
+- [x] The complete three-project Playwright inventory passes with default-false
+      production-equivalent capability ownership and focused dormant Battle
+      Royale staged evidence where required.
+- [x] Standard Duel/Rumble/Crew/Practice, all eight modes, rematches, overtime,
+      stats, persistence, compatibility fallback, input, presentation, and
+      production configuration remain unchanged.
+- [x] Human 6–8 minute playtests and real-device/multi-client approval remain
+      explicitly held for a later authorized release action.
+- [x] Server-first deployment, capability enablement, production restart,
+      production-health verification, and live end-to-end smoke remain
+      explicitly held for later authorization; production stays on Batch 33.
 
 ### Milestone 6 — Live rollout and feedback
 
@@ -4774,6 +4814,66 @@ opt-ins, default false, and unexposed. Proceed only to the Batch 51 automated
 gate under the user's standing direct-development authorization. Human
 playtests, capability exposure, deployment, production restart, and live smoke
 remain explicitly unauthorized and deferred.
+
+### Batch 51 - 2026-07-18 - Battle Royale automated release gate
+
+**Verification tier:** Complete Battle Royale milestone matrix, selected and
+recorded before the first Batch 51 repository change. The gate covered the
+entire Batch 40–50 server-owned lifecycle, eight-slot queue, rarity/inventory,
+loot, Shatterlands, safe zones, bots, spectator/Results, records, and
+performance surfaces together with every preserved standard and compatibility
+path. Human and production release actions were explicitly outside the
+authorized automated tier.
+
+**Automated evidence:** All 13 map documents passed compatible validation;
+Shatterlands also passed the strict `battle-royale-56x34` profile, and all four
+map-authoring CLI tests passed. All six source manifests validated and the
+asset pipeline passed 30 tests. The complete Vitest inventory passed 550 suites
+and 1,764 tests. Typecheck, ESLint, all production builds, the deterministic
+server baseline, the unchanged 624-product standard balance matrix, and the
+Battle Royale performance harness passed. The final standard baseline retained
+configured/rolling 20 Hz, a 50 ms authority budget, 0.068 ms average live
+processing, 0.014/0.029/0.078/0.789 ms synthetic mean/p95/p99/max work, and
+exact 2,481/3,762-byte active snapshots. One host scheduler drift window reset
+without a processing-budget failure.
+
+The repeated eight-entrant profile recorded 0.274/0.482/0.907/4.473 ms
+mean/p95/p99/max tick work, 13,551/17,892-byte representative/stressed
+snapshots, 357,840 bytes/s per client and 2,862,720 bytes/s for eight recipients
+at 20 Hz, one encoding for eight human deliveries, bounded 404,720-byte settled
+heap growth, and zero matches after cleanup. These remain well inside the
+existing 50 ms, 64 KiB, 10 MiB/s, and 32 MiB ceilings.
+
+**Browser and visual gate:** The complete production-equivalent default-false
+three-project inventory exercised 279 cases. Three exact legacy fixture
+expectations were updated for Batch 44's intentionally hidden, noninteractive
+reload control, then the corrected inventory passed 152 tests with 126
+intentional skips; one isolated long-run Firefox keyboard-pointer flake passed
+its immediate fresh reproduction. The complete coherent test-only capability
+inventory exercised all 279 cases with every five server environment opt-in
+set only inside isolated local processes. After the transition-safe touch
+fixture correction, the final inventory passed 203 tests with 75 intentional
+skips. One long-run Chromium synthetic reload key pulse was missed after its
+authoritative inventory, loot, comparison UI, and pointer-fire assertions had
+passed; Firefox gamepad and mobile touch variants passed in the complete run,
+and the exact Chromium journey immediately passed 1/1 on a fresh isolated
+server. Party bot fill and the corrected generic mobile pointer probe passed
+all three projects. Final focused post-correction evidence is green without
+weakening a product assertion. Chromium supplied inspected pixels;
+Firefox/WebKit object/input and direct-renderer evidence retain the established
+RFG-003 disposition.
+
+**Compatibility, bugs, and release disposition:** Capability defaults remain
+literal false in shared normalization and require exact server environment
+opt-ins. No runtime, wire, simulation, balance, persistence, production
+configuration, or capability exposure changed in Batch 51. The two fixture
+corrections and isolated reproduced flake did not prove a new product defect,
+so the bug ledger is unchanged; RFG-003 remains gate-dispositioned. The
+automated gate is complete. Human 6–8 minute, real-device, and real multi-client
+approval plus Batch 52 server-first deployment, capability enablement,
+production restart, production-health verification, and live smoke are
+**HELD — NOT AUTHORIZED**. Production remains on Batch 33 commit
+`f39eb34131f8827f85432aafcc6d6c18a2d0ac51`.
 
 ## Batch 22 input prompt (historical)
 

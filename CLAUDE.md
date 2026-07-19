@@ -1175,3 +1175,22 @@ pressure; isolated host/debug stalls do not switch tiers. It never changes
 fighters, hitboxes, projectiles, loot, zones, input, or match outcomes. Standard
 snapshots retain their exact wire bytes, every capability remains default false
 and unexposed, and no deployment, restart, or live smoke is authorized.
+
+## Battle Royale Release Gate Status
+
+Batch 51 completed the full local automated release gate for the cumulative
+Batch 40–50 contract. The authoritative source packet is
+`docs/BATTLE_ROYALE_RELEASE_GATE.md`. Maps, assets, lifecycle, queue, loot,
+zones, bots, spectator/Results, records, performance, standard compatibility,
+unit/static/build checks, and the complete three-project browser inventories
+are gate-dispositioned there. Batch 51 changes no runtime or production
+configuration; its browser-fixture corrections only preserve exact legacy HUD
+and server-owned scene-transition evidence.
+
+This is an automated release-candidate boundary, not rollout approval.
+`newShell`, `schedules`, `largeWorlds`, `modernArt`, and `battleRoyale` remain
+strict server-owned opt-ins, default false, and unexposed. Human 6–8 minute,
+real-device, and real multi-client playtests plus Batch 52 capability exposure,
+deployment, restart, production-health verification, and live smoke remain
+**HELD — NOT AUTHORIZED**. Production remains on Batch 33 commit
+`f39eb34131f8827f85432aafcc6d6c18a2d0ac51`.
