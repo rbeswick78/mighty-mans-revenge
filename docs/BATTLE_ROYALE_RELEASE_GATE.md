@@ -169,7 +169,12 @@ green at 20 Hz.
 
 The narrow correction makes the lifecycle ledger authoritative for Battle
 Royale duplicate detection and gives the format an explicit one-life briefing.
-Re-enable requires the complete fresh correction matrix plus a repeated live
-queue, terminal, eight-placement Results, leave/recovery, health, capability,
-and persistence smoke. Final release acceptance remains pending the owner's
-real-device, multi-user, and 6–8 minute production playtest.
+The complete fresh matrix passed with the documented long-run Chromium
+input-fixture disposition and fresh 1/1 reproduction. Commit
+`5336d213401ea0faaa675b331ed2320fe8935324` deployed server-first, and the
+repeated live queue produced one human plus seven bots, eight coherent terminal
+placements, leave/recovery, an authoritative record update, valid persistence,
+20 Hz health, zero active matches, and no new server/client errors. All five
+strict server-owned opt-ins are true for the limited canary. Final release
+acceptance remains pending the owner's real-device, multi-user, and 6–8 minute
+production playtest.

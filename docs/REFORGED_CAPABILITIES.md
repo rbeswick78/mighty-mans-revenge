@@ -622,10 +622,13 @@ defaults are unchanged: all five capabilities still normalize to false and the
 server still advertises each only for an exact server-owned `'true'` value.
 
 The server and capability-aware client were deployed from Batch 51 with all
-flags false, then Reforged Arena was enabled coherently. `newShell`, `schedules`,
-`largeWorlds`, and `modernArt` are currently true in production. The first
-Battle Royale smoke proved RFG-008, so `battleRoyale` alone was immediately
-returned to false while Arena remained healthy. No checked-in default changed.
+flags false, then Reforged Arena was enabled coherently. The first Battle Royale
+smoke proved RFG-008, so `battleRoyale` alone was immediately returned to false
+while Arena remained healthy. After the corrected commit passed the complete
+matrix and deployed server-first, the repeat live smoke produced all eight
+placement rows, recovery, and Records. `newShell`, `schedules`, `largeWorlds`,
+`modernArt`, and `battleRoyale` are now true in the limited production canary.
+No checked-in default changed.
 
 RFG-008 separates ordinary actor death from authoritative Battle Royale
 elimination identity. Combat may set `Player.isDead` before notifying `Match`;
@@ -633,6 +636,5 @@ the Battle Royale duplicate guard therefore consults its immutable lifecycle
 ledger, while standard matches preserve the existing `isDead` behavior. The
 client continues to project the server-authored result and now labels the
 format as Battle Royale rather than exposing the internal deathmatch rules
-adapter. Re-enable remains gated on the complete automated matrix and a repeat
-live eight-placement smoke; final acceptance still requires the owner's
-real-device and 6–8 minute canary playtest.
+adapter. The automated matrix and repeat live smoke are green; final acceptance
+still requires the owner's real-device and 6–8 minute canary playtest.

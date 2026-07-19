@@ -877,7 +877,13 @@ placement row per entrant. A pure presentation test keeps every standard mode
 briefing byte-for-value identical while Battle Royale displays its own name and
 one-life objective instead of the internal deathmatch adapter.
 
-The correction requires the complete Batch 52 production-rollout matrix and a
-repeat live eight-placement terminal smoke before `battleRoyale` can return to
-true. Owner real-device and 6–8 minute canary acceptance remains pending and is
-not replaced by automated or agent-driven browser evidence.
+The complete Batch 52 production-rollout matrix passed with the documented
+long-run Chromium input-fixture disposition and fresh 1/1 reproduction. Commit
+`5336d213401ea0faaa675b331ed2320fe8935324` then deployed server-first. The
+repeat live one-human/seven-bot match produced eight unique coherent placement
+rows, `BATTLE ROYALE // ONE LIFE` Results, Back to Lobby recovery, and an
+authoritative record update. Final health remained 20 Hz with zero active
+matches; the persistent JSON was valid and the accumulated PM2 error log had no
+modification since 2026-04-17. All five strict server-owned opt-ins are true for
+the limited canary. Owner real-device and 6–8 minute acceptance remains pending
+and is not replaced by automated or agent-driven browser evidence.

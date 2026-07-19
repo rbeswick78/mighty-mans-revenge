@@ -5,14 +5,15 @@ Read this file and `CLAUDE.md` completely at the start of every batch. The
 completed `docs/REPLAYABILITY_ROADMAP.md` remains the historical record for the
 systems this program preserves and reorganizes.
 
-- **Status:** Batch 52's owner-authorized two-person production canary is in
-  progress. Reforged Arena is live; Battle Royale is temporarily rolled back
-  to false while the proven RFG-008 placement-ledger correction completes the
-  full release matrix.
-- **Next step:** Finish the automated correction gate, redeploy server/client,
-  repeat the live Battle Royale smoke, then collect the owner's real-device
-  and 6–8 minute playtest sign-off. Human acceptance is deferred to the latest
-  safe point, not waived.
+- **Status:** Batch 52's owner-authorized two-person production canary is live
+  from commit `5336d213401ea0faaa675b331ed2320fe8935324`. All five strict
+  server-owned opt-ins are true; the corrected Battle Royale queue, match,
+  eight-placement Results, recovery, Records, persistence, and health smoke is
+  green.
+- **Next step:** The owner and second current user perform real-device,
+  multi-user, standard-path, and 6–8 minute Battle Royale playtests in
+  production. Human acceptance is the only remaining Batch 52 gate and is not
+  waived.
 - **Public releases:** Reforged Arena, then Battle Royale.
 - **Working model:** one numbered batch per session, direct commits and pushes
   to `main`, milestone-gated production deployments.
@@ -1982,7 +1983,7 @@ issue sets all five server flags false before any client rollback.
 
 Acceptance:
 
-- [ ] Local and remote release versions are explicit, compatible, clean, and
+- [x] Local and remote release versions are explicit, compatible, clean, and
       traceable to `origin/main`; the pre-rollout production commit and rollback
       commands are recorded.
 - [x] Production persistence is backed up and validates before restart; deploy
@@ -1996,13 +1997,13 @@ Acceptance:
 - [x] Reforged Arena capabilities are enabled coherently with
       `battleRoyale=false`; five-tab navigation, schedules, a standard launch,
       large-world presentation, Results/leave, and recovery are healthy.
-- [ ] Battle Royale is enabled only after Reforged Arena is healthy; queue,
+- [x] Battle Royale is enabled only after Reforged Arena is healthy; queue,
       bot fill, Shatterlands, one-life lifecycle, loot/zone/spectator/Results,
       Records retrieval, and leave/recovery are healthy in production.
 - [ ] Desktop and real-device mobile evidence, real multi-client standard
       evidence, and a real 6–8 minute Battle Royale playtest have explicit
       human sign-off before final rollout acceptance.
-- [ ] Final production health reports authoritative 20 Hz operation with no
+- [x] Final production health reports authoritative 20 Hz operation with no
       active-match leak, the deployed capability snapshot is exact, persistence
       remains valid, and rollback has been exercised or remains immediately
       available.
@@ -2079,16 +2080,16 @@ test frequency, not acceptance coverage or release quality gates.
    deliberately. It does not silently expand the active batch.
 4. Existing user changes are never discarded or staged accidentally.
 
-| ID      | Discovered | Reproduction/evidence                                                                                                                                                                                                                                                                 | Relationship  | Disposition                                                                                                                                                                                                                                                                                                                                                                                               | Status                                  |
-| ------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
-| RFG-001 | 2026-07-15 | Idle recoil used to clear sustained `(320, 144)` base scroll to `(0, 0)`.                                                                                                                                                                                                             | Batches 20/24 | Resolved by composed kick offsets in Batch 20; retain the proof in the Batch 24 gate.                                                                                                                                                                                                                                                                                                                     | Resolved                                |
-| RFG-002 | 2026-07-15 | Idle zoom pulse used to clear sustained base zoom `0.9` back to `1`.                                                                                                                                                                                                                  | Batches 20/24 | Resolved by the composed zoom multiplier in Batch 20; retain the proof in the Batch 24 gate.                                                                                                                                                                                                                                                                                                              | Resolved                                |
-| RFG-003 | 2026-07-15 | Headless Firefox/WebKit live practice gets no player ID; compositor screenshots from staged WebKit gameplay remain black.                                                                                                                                                             | Batches 17/24 | Batch 24 accepts staged object/input assertions plus direct non-black Phaser renderer snapshots as trustworthy Firefox/WebKit visual evidence; Chromium remains the live/compositor reference. Revisit real-device/live-channel coverage at the release gate.                                                                                                                                             | Gate-dispositioned                      |
-| RFG-004 | 2026-07-17 | After all-six-arena coherent play, literal `largeWorlds:false` reported legacy viewport truth but retained the prior 1920x1152 minimap and landmarks.                                                                                                                                 | Batch 39      | Resolved narrowly inside the completed fallback contract by clearing `GameScene.minimapRenderer` in `init()`. The strict all-six reproduction, complete enabled inventory, and RFG-003 paired evidence pass with `minimap: null` preserved.                                                                                                                                                               | Resolved                                |
-| RFG-005 | 2026-07-18 | In a three-plus-fighter Battle Royale, an uncredited self-explosion marked the victim dead but did not append the lifecycle elimination, so terminal placement could stall.                                                                                                           | Batches 40/43 | Resolved at the existing authoritative explosion-death branch by recording the combat elimination and clearing the one-slot inventory. A deterministic three-fighter launcher/wall reproduction proves the lifecycle advances without awarding a kill.                                                                                                                                                    | Resolved                                |
-| RFG-006 | 2026-07-18 | The Battle Royale mobile reload browser fixture divided touch coordinates by the dormant 1280-wide viewport while `largeWorlds:false` correctly retained the 960-wide canvas, delivering Phaser x≈606 instead of the visible button's x=808.                                          | Batches 43/44 | Resolved in the fixture by deriving logical width/height from the active Phaser scale manager and proving the delivered touch pointer is within two logical pixels of the rendered control. Product input code and capability defaults were unchanged.                                                                                                                                                    | Resolved                                |
-| RFG-007 | 2026-07-18 | The cosmetic quality governor discarded every frame sample above 250 ms, so sustained severe rendering pressure could never enter the documented reduced-effects tier.                                                                                                                | Batch 50      | Resolved by rejecting only non-finite/non-positive deltas. One isolated 300 ms host/debug stall retains full quality, while 30 sustained 300 ms samples cross the existing hysteresis and enter the cosmetic-only reduced tier.                                                                                                                                                                           | Resolved                                |
-| RFG-008 | 2026-07-19 | The first owner-authorized production Battle Royale smoke reached Results with only the winner and local zone victim; six bot combat eliminations were absent because lethal damage set `isDead` before `Match.onKill`, whose duplicate guard treated that state as already ledgered. | Batch 52      | Battle Royale was immediately rolled back alone. The guard now asks the authoritative lifecycle ledger whether the victim was already eliminated, while standard matches retain their prior `isDead` guard. Three- and eight-entrant regressions pre-mark combat victims dead and require complete coherent placements; the BR briefing also names the format instead of its internal deathmatch adapter. | Corrected; rollout verification pending |
+| ID      | Discovered | Reproduction/evidence                                                                                                                                                                                                                                                                 | Relationship  | Disposition                                                                                                                                                                                                                                                                                                                                                                                                                   | Status             |
+| ------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| RFG-001 | 2026-07-15 | Idle recoil used to clear sustained `(320, 144)` base scroll to `(0, 0)`.                                                                                                                                                                                                             | Batches 20/24 | Resolved by composed kick offsets in Batch 20; retain the proof in the Batch 24 gate.                                                                                                                                                                                                                                                                                                                                         | Resolved           |
+| RFG-002 | 2026-07-15 | Idle zoom pulse used to clear sustained base zoom `0.9` back to `1`.                                                                                                                                                                                                                  | Batches 20/24 | Resolved by the composed zoom multiplier in Batch 20; retain the proof in the Batch 24 gate.                                                                                                                                                                                                                                                                                                                                  | Resolved           |
+| RFG-003 | 2026-07-15 | Headless Firefox/WebKit live practice gets no player ID; compositor screenshots from staged WebKit gameplay remain black.                                                                                                                                                             | Batches 17/24 | Batch 24 accepts staged object/input assertions plus direct non-black Phaser renderer snapshots as trustworthy Firefox/WebKit visual evidence; Chromium remains the live/compositor reference. Revisit real-device/live-channel coverage at the release gate.                                                                                                                                                                 | Gate-dispositioned |
+| RFG-004 | 2026-07-17 | After all-six-arena coherent play, literal `largeWorlds:false` reported legacy viewport truth but retained the prior 1920x1152 minimap and landmarks.                                                                                                                                 | Batch 39      | Resolved narrowly inside the completed fallback contract by clearing `GameScene.minimapRenderer` in `init()`. The strict all-six reproduction, complete enabled inventory, and RFG-003 paired evidence pass with `minimap: null` preserved.                                                                                                                                                                                   | Resolved           |
+| RFG-005 | 2026-07-18 | In a three-plus-fighter Battle Royale, an uncredited self-explosion marked the victim dead but did not append the lifecycle elimination, so terminal placement could stall.                                                                                                           | Batches 40/43 | Resolved at the existing authoritative explosion-death branch by recording the combat elimination and clearing the one-slot inventory. A deterministic three-fighter launcher/wall reproduction proves the lifecycle advances without awarding a kill.                                                                                                                                                                        | Resolved           |
+| RFG-006 | 2026-07-18 | The Battle Royale mobile reload browser fixture divided touch coordinates by the dormant 1280-wide viewport while `largeWorlds:false` correctly retained the 960-wide canvas, delivering Phaser x≈606 instead of the visible button's x=808.                                          | Batches 43/44 | Resolved in the fixture by deriving logical width/height from the active Phaser scale manager and proving the delivered touch pointer is within two logical pixels of the rendered control. Product input code and capability defaults were unchanged.                                                                                                                                                                        | Resolved           |
+| RFG-007 | 2026-07-18 | The cosmetic quality governor discarded every frame sample above 250 ms, so sustained severe rendering pressure could never enter the documented reduced-effects tier.                                                                                                                | Batch 50      | Resolved by rejecting only non-finite/non-positive deltas. One isolated 300 ms host/debug stall retains full quality, while 30 sustained 300 ms samples cross the existing hysteresis and enter the cosmetic-only reduced tier.                                                                                                                                                                                               | Resolved           |
+| RFG-008 | 2026-07-19 | The first owner-authorized production Battle Royale smoke reached Results with only the winner and local zone victim; six bot combat eliminations were absent because lethal damage set `isDead` before `Match.onKill`, whose duplicate guard treated that state as already ledgered. | Batch 52      | Battle Royale was immediately rolled back alone. The guard now asks the authoritative lifecycle ledger whether the victim was already eliminated, while standard matches retain their prior `isDead` guard. Three- and eight-entrant regressions pre-mark combat victims dead and require complete coherent placements; the corrected live one-human/seven-bot smoke produced all eight coherent rows, recovery, and Records. | Resolved           |
 
 ## End-of-batch ritual
 
@@ -4940,6 +4941,26 @@ two rows, proving RFG-008. Battle Royale alone was immediately set false and
 saved under PM2; Arena stayed live, health reported authoritative 20 Hz, and no
 active match leaked.
 
+The pre-rollout production version was Batch 33
+`f39eb34131f8827f85432aafcc6d6c18a2d0ac51`; the first candidate was Batch 51
+`5d76ef50cbc1f6d5265854e95d4082871af1ba25`, and the corrected canary is
+`5336d213401ea0faaa675b331ed2320fe8935324`. The pre-rollout stats backup is
+`/opt/mighty-mans-revenge/server/data/backups/persistent-stats.pre-batch52-20260719T025452Z.json`
+with SHA-256
+`78608dd21d37e12b936dacf224b2a9f77372dc036d20ab2d274415b05195ae28`.
+The capability rollback command is:
+
+```bash
+sudo -u rybes env CAPABILITY_NEW_SHELL=false CAPABILITY_SCHEDULES=false \
+  CAPABILITY_LARGE_WORLDS=false CAPABILITY_MODERN_ART=false \
+  CAPABILITY_BATTLE_ROYALE=false bash -lc \
+  'pm2 restart mighty-mans-revenge --update-env; pm2 save'
+```
+
+A Battle Royale-only rollback uses the same command with the four Arena values
+true. Commit rollback remains a separately deliberate `git pull --ff-only`
+deployment of an approved commit, never a destructive checkout or stats reset.
+
 **Correction and deterministic evidence:** Combat marks a lethally damaged actor
 dead before calling `Match.onKill`. The Battle Royale duplicate guard now asks
 its authoritative lifecycle ledger whether that victim is already eliminated;
@@ -4966,11 +4987,16 @@ assertions had passed. The same journey passed in Firefox and mobile within the
 full run and then passed 1/1 in a fresh isolated Chromium reproduction. No
 runtime assertion was weakened and no second product defect was proven.
 
-**Current disposition:** The correction is ready to commit and deploy. Reforged
-Arena remains live and `battleRoyale` remains false until the corrected
-server/client pair and repeat live eight-placement smoke pass. Final acceptance
-still requires the owner's real-device, second-user, and 6–8 minute production
-playtest; Batch 53 has not begun.
+**Current disposition:** Commit
+`5336d213401ea0faaa675b331ed2320fe8935324` is on local and remote `main` and
+deployed to both server and client. All five strict server-owned opt-ins are
+true. The corrected one-human/seven-bot smoke produced eight unique coherent
+placement rows, `BATTLE ROYALE // ONE LIFE` Results, Back to Lobby recovery,
+and an authoritative two-match record with best placement #2. Final health was
+20 Hz with zero active matches; the stats file remained valid and the PM2 error
+log was unchanged since 2026-04-17. Final acceptance still requires the owner's
+real-device, second-user, and 6–8 minute production playtest; Batch 53 has not
+begun.
 
 ## Batch 22 input prompt (historical)
 

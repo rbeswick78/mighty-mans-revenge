@@ -161,8 +161,9 @@ with `battleRoyale=false`. Production health remained green at authoritative
 20 Hz and the live client presented the Reforged Arena route without Battle
 Royale.
 
-Reforged Arena remains live during the isolated RFG-008 Battle Royale rollback.
-Automated and agent-driven smoke evidence does not substitute for owner
-acceptance: the owner and second current user will perform the final real-device
-and multi-user walkthrough in production after the corrected Battle Royale
-canary is re-enabled.
+Reforged Arena remained live during the isolated RFG-008 Battle Royale rollback.
+After the corrected commit passed the complete matrix and repeat live smoke,
+Battle Royale was re-enabled; all five server-owned opt-ins are true for the
+limited canary. Automated and agent-driven smoke evidence does not substitute
+for owner acceptance: the owner and second current user will perform the final
+real-device and multi-user walkthrough in production.
