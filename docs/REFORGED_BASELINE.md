@@ -858,3 +858,26 @@ No runtime, authority, wire, balance, persistence, production configuration,
 or capability changed. Human and production release checks remain held, every
 capability remains default false and unexposed, and production remains on Batch
 33 without deployment, restart, health probe, or live smoke.
+
+### Batch 52 production-canary correction baseline
+
+The first owner-authorized live Battle Royale smoke used one human plus seven
+server bots and reached a legal terminal event, but Results contained only two
+rows. Server combat had marked six victims dead before `Match.onKill`; the
+Battle Royale branch incorrectly used that actor flag as a duplicate-elimination
+test even though no lifecycle row existed. The Battle Royale-only flag was
+rolled back immediately, leaving the four coherent Reforged Arena flags live.
+
+RFG-008 changes only the Battle Royale duplicate authority: its lifecycle
+ledger decides whether an elimination has already been recorded. Standard
+formats retain the former `isDead` guard and continue omitting Battle Royale
+wire fields. Deterministic three- and eight-entrant tests reproduce the real
+combat ordering by pre-marking victims dead, then require one complete unique
+placement row per entrant. A pure presentation test keeps every standard mode
+briefing byte-for-value identical while Battle Royale displays its own name and
+one-life objective instead of the internal deathmatch adapter.
+
+The correction requires the complete Batch 52 production-rollout matrix and a
+repeat live eight-placement terminal smoke before `battleRoyale` can return to
+true. Owner real-device and 6–8 minute canary acceptance remains pending and is
+not replaced by automated or agent-driven browser evidence.

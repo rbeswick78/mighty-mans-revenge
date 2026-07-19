@@ -1,10 +1,11 @@
 import Phaser from 'phaser';
-import { WEAPONS, ABILITY, GAME_MODES, GRENADE } from '@shared/config/game.js';
+import { WEAPONS, ABILITY, GRENADE } from '@shared/config/game.js';
 import type { CharacterId, WeaponId } from '@shared/config/game.js';
 import type {
   CoreRunState,
   BountyHuntState,
   GameModeType,
+  MatchKind,
   MatchContractHudState,
 } from '@shared/types/game.js';
 import type { PlayerId } from '@shared/types/common.js';
@@ -22,6 +23,7 @@ import { batDurabilityLabel } from '../rendering/bat-presentation.js';
 import { armorPresentation } from './armor-presentation.js';
 import type { InputMode } from '../input/input-manager.js';
 import { controlBriefingFor } from './control-briefing.js';
+import { modeBriefingPresentation } from './mode-briefing.js';
 import {
   grenadePresentation,
   rifleAmmoPresentation,
@@ -1378,8 +1380,9 @@ export class HUD {
     mode: GameModeType,
     inputMode: InputMode = 'keyboard',
     secondaryActionsEnabled = true,
+    matchKind?: MatchKind,
   ): void {
-    const briefing = GAME_MODES[mode];
+    const briefing = modeBriefingPresentation(mode, matchKind);
     const controls = controlBriefingFor(inputMode, secondaryActionsEnabled);
     this.modeBriefingTitle.setText(briefing.displayName);
     this.modeBriefingObjective.setText(briefing.objective);

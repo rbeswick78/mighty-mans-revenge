@@ -613,3 +613,26 @@ Human 6–8 minute, real-device, and real multi-client sign-off plus capability
 exposure, deployment, restart, production-health verification, and live smoke
 remain **HELD — NOT AUTHORIZED**. Production remains on approved Batch 33 commit
 `f39eb34131f8827f85432aafcc6d6c18a2d0ac51`.
+
+## Batch 52 production-canary disposition
+
+The owner authorized a limited production rollout for the only current users,
+with human acceptance performed in production after automated evidence. Shared
+defaults are unchanged: all five capabilities still normalize to false and the
+server still advertises each only for an exact server-owned `'true'` value.
+
+The server and capability-aware client were deployed from Batch 51 with all
+flags false, then Reforged Arena was enabled coherently. `newShell`, `schedules`,
+`largeWorlds`, and `modernArt` are currently true in production. The first
+Battle Royale smoke proved RFG-008, so `battleRoyale` alone was immediately
+returned to false while Arena remained healthy. No checked-in default changed.
+
+RFG-008 separates ordinary actor death from authoritative Battle Royale
+elimination identity. Combat may set `Player.isDead` before notifying `Match`;
+the Battle Royale duplicate guard therefore consults its immutable lifecycle
+ledger, while standard matches preserve the existing `isDead` behavior. The
+client continues to project the server-authored result and now labels the
+format as Battle Royale rather than exposing the internal deathmatch rules
+adapter. Re-enable remains gated on the complete automated matrix and a repeat
+live eight-placement smoke; final acceptance still requires the owner's
+real-device and 6–8 minute canary playtest.

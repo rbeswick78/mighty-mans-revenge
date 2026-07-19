@@ -150,3 +150,26 @@ The following requirements remain **HELD — NOT AUTHORIZED**:
 Batch 52 cannot begin under the Batch 42–51 development authorization.
 Production remains on Batch 33 commit
 `f39eb34131f8827f85432aafcc6d6c18a2d0ac51`.
+
+## Batch 52 owner-authorized production canary
+
+The held-actions section above records the Batch 51 boundary. On 2026-07-19 the
+owner separately authorized deployment, capability exposure, production
+restart, live smoke, and production-based testing for the app's two current
+users. That later authorization does not change defaults and does not waive the
+human acceptance gate.
+
+Server and client deployment, all-false fallback, and coherent Reforged Arena
+enablement passed. The first live Battle Royale smoke proved RFG-008: ordinary
+combat deaths reached actor state before the kill callback, so the duplicate
+guard skipped six authoritative placement-ledger entries. The smoke's Results
+contained only two of eight entrants. `battleRoyale` was immediately returned
+to false while the four Arena capabilities remained true and health remained
+green at 20 Hz.
+
+The narrow correction makes the lifecycle ledger authoritative for Battle
+Royale duplicate detection and gives the format an explicit one-life briefing.
+Re-enable requires the complete fresh correction matrix plus a repeated live
+queue, terminal, eight-placement Results, leave/recovery, health, capability,
+and persistence smoke. Final release acceptance remains pending the owner's
+real-device, multi-user, and 6–8 minute production playtest.

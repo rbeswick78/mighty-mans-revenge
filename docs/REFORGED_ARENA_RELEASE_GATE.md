@@ -149,3 +149,20 @@ The automated gate is ready for the human release walkthrough. Approval must con
 5. literal false, absent, partial, malformed, old-server, and reconnect handshakes returning atomically to the complete legacy journey.
 
 Only after that human sign-off may a separately authorized rollout deploy server support first with every flag false, deploy the capability-aware client, verify health, coherently enable `newShell`, `schedules`, `largeWorlds`, and `modernArt` while keeping `battleRoyale=false`, and smoke production. Rollback must set the server flags false first. None of those rollout steps occurred in Batch 39.
+
+## Batch 52 rollout update
+
+The preceding sections remain the immutable Batch 39 record. The owner later
+authorized a limited two-user production canary on 2026-07-19. Batch 52 deployed
+the Batch 51 server first with every capability false, deployed the
+capability-aware client, verified the false-capability legacy fallback, and
+then enabled `newShell`, `schedules`, `largeWorlds`, and `modernArt` coherently
+with `battleRoyale=false`. Production health remained green at authoritative
+20 Hz and the live client presented the Reforged Arena route without Battle
+Royale.
+
+Reforged Arena remains live during the isolated RFG-008 Battle Royale rollback.
+Automated and agent-driven smoke evidence does not substitute for owner
+acceptance: the owner and second current user will perform the final real-device
+and multi-user walkthrough in production after the corrected Battle Royale
+canary is re-enabled.

@@ -1821,6 +1821,7 @@ export class GameScene extends Phaser.Scene {
             this.matchData.gameMode,
             this.inputManager?.getActiveMode() ?? (isTouchDevice() ? 'touch' : 'keyboard'),
             this.matchData.gameMode !== GameModeType.ONE_IN_THE_CHAMBER,
+            this.matchData.matchKind,
           );
         }
       }

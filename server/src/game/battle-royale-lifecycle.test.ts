@@ -186,6 +186,22 @@ describe('Battle Royale lifecycle', () => {
     });
   });
 
+  it('records a combat elimination after lethal damage has already marked the victim dead', () => {
+    const match = createBattleRoyaleMatch(3);
+    activate(match);
+    match.players.get('player-2')!.isDead = true;
+    eliminate(match, 'player-0', 'player-2');
+    match.update(0.05);
+    eliminate(match, 'player-0', 'player-1');
+
+    expect(match.checkMatchEnd()).toBe(true);
+    expect(match.getResult().battleRoyale?.placements).toEqual([
+      { playerId: 'player-0', placement: 1, status: 'winner' },
+      { playerId: 'player-1', placement: 2, status: 'eliminated' },
+      { playerId: 'player-2', placement: 3, status: 'eliminated' },
+    ]);
+  });
+
   it('authors a true draw when the final fighters mutually eliminate in one tick', () => {
     const match = createBattleRoyaleMatch(3);
     activate(match);
@@ -389,6 +405,8 @@ describe('Battle Royale lifecycle', () => {
     const match = createBattleRoyaleMatch(8);
     activate(match);
     for (let victim = 7; victim >= 1; victim -= 1) {
+      // CombatManager applies lethal damage before Match receives the kill callback.
+      match.players.get(`player-${victim}`)!.isDead = true;
       eliminate(match, 'player-0', `player-${victim}`);
       if (victim > 1) match.update(0.05);
     }

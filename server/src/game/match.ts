@@ -755,7 +755,13 @@ export class Match implements MatchContext {
 
   /** Record a kill event. */
   onKill(killerId: PlayerId, victimId: PlayerId, weapon: KillWeapon): void {
-    const victimWasEliminated = this.players.get(victimId)?.isDead ?? true;
+    // Lethal damage marks the victim dead before the combat callback reaches
+    // this method. The one-life ledger, not PlayerState.isDead, is therefore
+    // the authoritative duplicate guard for Battle Royale eliminations.
+    const victimWasEliminated =
+      this.battleRoyaleLifecycle?.isEliminated(victimId) ??
+      this.players.get(victimId)?.isDead ??
+      true;
     const isOpponentKill = killerId !== victimId;
     const assist =
       isOpponentKill && this.tracksRumbleAssists

@@ -31,6 +31,26 @@ async function waitForActiveScene(page: Page, key: string): Promise<void> {
     .toBe(true);
 }
 
+async function waitForAnyActiveScene(page: Page, keys: readonly string[]): Promise<void> {
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          (sceneKeys) =>
+            (
+              window as unknown as {
+                game?: { scene: { getScenes(active: boolean): Array<{ scene: { key: string } }> } };
+              }
+            ).game?.scene
+              .getScenes(true)
+              .some((scene) => sceneKeys.includes(scene.scene.key)) ?? false,
+          keys,
+        ),
+      { timeout: 30_000 },
+    )
+    .toBe(true);
+}
+
 async function sampleFrames(page: Page, sampleMs: number): Promise<FrameEvidence> {
   return page.evaluate(
     (duration) =>
@@ -77,13 +97,14 @@ test('profiles the eight-fighter Battle Royale rendering envelope', async ({ pag
   });
   await page.goto('/');
   await page.waitForSelector('canvas');
-  await waitForActiveScene(page, 'LobbyScene');
+  await waitForAnyActiveScene(page, ['LobbyScene', 'ReforgedShellScene']);
 
   await page.evaluate(() => {
-    const lobby = (
+    const game = (
       window as unknown as {
         game?: {
           scene: {
+            getScenes(active: boolean): Array<{ scene: { key: string } }>;
             getScene(key: string): {
               gameService: {
                 getNetworkManager(): {
@@ -95,9 +116,14 @@ test('profiles the eight-fighter Battle Royale rendering envelope', async ({ pag
           };
         };
       }
-    ).game?.scene.getScene('LobbyScene');
-    if (!lobby) throw new Error('missing LobbyScene');
-    const manager = lobby.gameService.getNetworkManager();
+    ).game;
+    if (!game) throw new Error('missing game');
+    const activeSceneKeys = game.scene.getScenes(true).map((scene) => scene.scene.key);
+    const ownerKey = activeSceneKeys.includes('ReforgedShellScene')
+      ? 'ReforgedShellScene'
+      : 'LobbyScene';
+    const owner = game.scene.getScene(ownerKey);
+    const manager = owner.gameService.getNetworkManager();
     manager.connection.disconnect();
     manager.connection.setState('connected');
     manager.handleMessage({
